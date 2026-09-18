@@ -156,11 +156,11 @@
                                 </x-ui.odoo-form-ui>
                             </div>
 
-                            <x-ui.odoo-form-ui type="select" label="Freight Terms" name="freight_terms" id="freightTermsSelect">
-                                <option value="to_pay" @selected(old('freight_terms', $po?->freight_terms ?? 'to_pay') === 'to_pay')>To Pay (Freight Collect on Delivery)</option>
-                                <option value="to_be_billed" @selected(old('freight_terms', $po?->freight_terms ?? '') === 'to_be_billed')>To Be Billed (Vendor Prepaid &amp; Added)</option>
-                                <option value="prepaid" @selected(old('freight_terms', $po?->freight_terms ?? '') === 'prepaid')>FOR Site (Freight Included in Price)</option>
-                                <option value="customer_pickup" @selected(old('freight_terms', $po?->freight_terms ?? '') === 'customer_pickup')>Self Pickup (Ex-Works)</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('purchase.freight_terms')" name="freight_terms" id="freightTermsSelect">
+                                <option value="to_pay" @selected(old('freight_terms', $po?->freight_terms ?? 'to_pay') === 'to_pay')>{{ __('purchase.freight_to_pay') }}</option>
+                                <option value="to_be_billed" @selected(old('freight_terms', $po?->freight_terms ?? '') === 'to_be_billed')>{{ __('purchase.freight_to_be_billed') }}</option>
+                                <option value="prepaid" @selected(old('freight_terms', $po?->freight_terms ?? '') === 'prepaid')>{{ __('purchase.freight_prepaid') }}</option>
+                                <option value="customer_pickup" @selected(old('freight_terms', $po?->freight_terms ?? '') === 'customer_pickup')>{{ __('purchase.freight_customer_pickup') }}</option>
                             </x-ui.odoo-form-ui>
 
                             <div id="toPayFreightNoticeBanner" class="alert alert-warning border-warning p-2.5 mt-2 fs-12 mb-3 d-none">
@@ -172,7 +172,7 @@
                             <div id="freightFieldsContainer">
                                 <div class="row g-2 align-items-end">
                                     <div class="col-5" id="freightAmountCol">
-                                        <x-ui.odoo-form-ui type="input" label="Freight Amount (₹)" name="freight_amount" id="freightAmountInput" inputType="number" step="0.01" min="0" :value="old('freight_amount', number_format($po?->freight_amount ?? 0, 2, '.', ''))" />
+                                        <x-ui.odoo-form-ui type="input" :label="__('purchase.freight_amount') . ' (' . active_currency_symbol() . ')'" name="freight_amount" id="freightAmountInput" inputType="number" step="0.01" min="0" :value="old('freight_amount', number_format($po?->freight_amount ?? 0, 2, '.', ''))" />
                                     </div>
                                     <div class="col-7" id="freightAllocationMethodCol">
                                         <x-ui.odoo-form-ui type="select" label="Allocation Rule" name="freight_allocation_method" id="freightAllocationMethodSelect">
@@ -347,7 +347,7 @@
                                     <div id="summaryFreightSectionContainer">
                                         <hr class="my-2 border-slate">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <span class="text-muted fs-13 fw-semibold">Freight Charges:</span>
+                                            <span class="text-muted fs-13 fw-semibold">{{ __('purchase.freight_charges') }}:</span>
                                             <input type="text" id="summaryFreightText" class="form-control form-control-sm text-end fw-bold text-primary" style="width: 150px; height: 30px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="0.00">
                                         </div>
 
@@ -364,7 +364,7 @@
 
                                     <!-- FREIGHT CHARGES (Order Level Tax Mode) -->
                                     <div class="d-flex justify-content-between align-items-center mb-2" id="summaryOrderFreightRow">
-                                        <span class="text-muted fs-13 fw-semibold">Add: Freight Charges:</span>
+                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.add_freight_charges') }}:</span>
                                         <input type="text" id="summaryOrderFreightText" class="form-control form-control-sm text-end fw-bold text-primary" style="width: 150px; height: 30px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="0.00">
                                     </div>
 

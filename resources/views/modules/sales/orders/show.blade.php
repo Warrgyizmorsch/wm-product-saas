@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'Sales Order Details | SaaS ERP')
-@section('page-title', 'Sales Order ' . $order->sales_order_number)
-@section('breadcrumb', 'Sales / Sales Orders / ' . $order->sales_order_number)
+@section('title', __('crm.sales_order_details') . ' | SaaS ERP')
+@section('page-title', __('crm.sales_order_label') . ' ' . $order->sales_order_number)
+@section('breadcrumb', __('crm.sales') . ' / ' . __('crm.sales_orders') . ' / ' . $order->sales_order_number)
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <a href="{{ route('sales.orders.index') }}" class="btn btn-sm btn-light border me-1" title="Back to Sales Orders" data-bs-toggle="tooltip">
-            <i class="feather feather-arrow-left me-1"></i>Back
+        <a href="{{ route('sales.orders.index') }}" class="btn btn-sm btn-light border me-1" title="{{ __('crm.back_to_listing') }}" data-bs-toggle="tooltip">
+            <i class="feather feather-arrow-left me-1"></i>{{ __('crm.back') }}
         </a>
 
         @php
@@ -23,25 +23,21 @@
         @if ($order->status === 'Draft')
             <form action="{{ route('sales.orders.confirm', $order->id) }}" method="POST" class="d-inline d-print-none" id="confirmSoForm">
                 @csrf
-                <button type="button" class="btn btn-sm btn-success fw-bold px-3" onclick="confirmAction({ title: 'Confirm Sales Order', message: 'Confirm Sales Order {{ $order->sales_order_number }}?', variant: 'success', confirmText: 'Confirm' }, function() { document.getElementById('confirmSoForm').submit(); })">
-                    <i class="feather-check-circle me-1.5"></i>Confirm Order
+                <button type="button" class="btn btn-sm btn-success fw-bold px-3" onclick="confirmAction({ title: '{{ __('crm.confirm_order') }}', message: 'Confirm Sales Order {{ $order->sales_order_number }}?', variant: 'success', confirmText: '{{ __('crm.confirm') }}' }, function() { document.getElementById('confirmSoForm').submit(); })">
+                    <i class="feather-check-circle me-1.5"></i>{{ __('crm.confirm_order') }}
                 </button>
             </form>
 
             <form action="{{ route('sales.orders.cancel', $order->id) }}" method="POST" class="d-inline d-print-none" onsubmit="return confirm('Are you sure you want to cancel this sales order?');">
                 @csrf
                 <button type="submit" class="btn btn-sm btn-light border text-danger fw-bold px-3">
-                    <i class="feather-x-circle me-1.5 text-danger"></i>Cancel
+                    <i class="feather-x-circle me-1.5 text-danger"></i>{{ __('crm.cancel') }}
                 </button>
             </form>
         @elseif (in_array($order->status, ['Confirmed', 'Partially Shipped', 'Shipped']))
-            {{-- <x-ui.button href="{{ route('sales.dispatches.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" class="fw-bold px-3 d-print-none">
-                <i class="feather-truck me-1.5"></i>Dispatch Order
-            </x-ui.button> --}}
-
             @if ($hasUnbilledQty && $invoicingPolicy !== 'dispatch_order')
                 <a href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id, 'mode' => 'sales_order']) }}" class="btn btn-sm btn-primary fw-bold px-3 d-print-none">
-                    <i class="feather-file-text me-1.5"></i>Create Invoice
+                    <i class="feather-file-text me-1.5"></i>{{ __('crm.create_invoice') }}
                 </a>
             @endif
 
@@ -49,7 +45,7 @@
                 <form action="{{ route('sales.orders.cancel', $order->id) }}" method="POST" class="d-inline d-print-none" onsubmit="return confirm('Are you sure you want to cancel this sales order?');">
                     @csrf
                     <button type="submit" class="btn btn-sm btn-light border text-danger fw-bold px-3">
-                        <i class="feather-x-circle me-1.5 text-danger"></i>Cancel
+                        <i class="feather-x-circle me-1.5 text-danger"></i>{{ __('crm.cancel') }}
                     </button>
                 </form>
             @endif
@@ -60,7 +56,7 @@
             <x-ui.action-dropdown id="soProfileActionsDropdown">
                 <li>
                     <a href="{{ route('sales.orders.edit', $order->id) }}" class="dropdown-item py-2">
-                        <i class="feather-edit me-2 text-muted fs-12"></i>Edit Sales Order
+                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('crm.edit_sales_order') }}
                     </a>
                 </li>
             </x-ui.action-dropdown>
@@ -76,11 +72,11 @@
 
     @php
         $soTabs = [
-            ['id' => 'tab-order', 'label' => 'Sales Order Details', 'active' => true, 'icon' => 'feather-shopping-cart'],
-            ['id' => 'tab-dispatches', 'label' => 'Delivery Challans / DO (' . $order->dispatches->count() . ')', 'active' => false, 'icon' => 'feather-truck'],
-            ['id' => 'tab-invoices', 'label' => 'Invoices (' . $order->invoices->count() . ')', 'active' => false, 'icon' => 'feather-file-text'],
-            ['id' => 'tab-payments', 'label' => 'Payments (' . $order->allocations->count() . ')', 'active' => false, 'icon' => 'feather-dollar-sign'],
-            ['id' => 'tab-returns', 'label' => 'Returns (' . $order->returns->count() . ')', 'active' => false, 'icon' => 'feather-rotate-ccw'],
+            ['id' => 'tab-order', 'label' => __('crm.tab_so_details'), 'active' => true, 'icon' => 'feather-shopping-cart'],
+            ['id' => 'tab-dispatches', 'label' => __('crm.tab_dispatches') . ' (' . $order->dispatches->count() . ')', 'active' => false, 'icon' => 'feather-truck'],
+            ['id' => 'tab-invoices', 'label' => __('crm.tab_invoices') . ' (' . $order->invoices->count() . ')', 'active' => false, 'icon' => 'feather-file-text'],
+            ['id' => 'tab-payments', 'label' => __('crm.tab_payments') . ' (' . $order->allocations->count() . ')', 'active' => false, 'icon' => 'feather-dollar-sign'],
+            ['id' => 'tab-returns', 'label' => __('crm.tab_returns') . ' (' . $order->returns->count() . ')', 'active' => false, 'icon' => 'feather-rotate-ccw'],
         ];
     @endphp
 
@@ -169,8 +165,16 @@
         <!-- Top Status Bar (Chevron Pipeline + Actions) -->
         <div class="d-flex justify-content-between align-items-center bg-white border-bottom px-4 py-2 d-print-none" style="min-height: 52px;">
             <div class="d-flex align-items-center gap-2">
-                <span class="fs-12 fw-bold text-dark text-uppercase tracking-wider">Status:</span>
-                <span class="badge bg-soft-primary text-primary fs-11 px-2.5 py-1 fw-bold">{{ $order->status }}</span>
+                <span class="fs-12 fw-bold text-dark text-uppercase tracking-wider">{{ __('crm.status') }}:</span>
+                <span class="badge bg-soft-primary text-primary fs-11 px-2.5 py-1 fw-bold">
+                    @if($order->status === 'Draft') {{ __('crm.status_draft') }}
+                    @elseif($order->status === 'Confirmed') {{ __('crm.status_confirmed') }}
+                    @elseif($order->status === 'Partially Shipped') {{ __('crm.status_partially_shipped') }}
+                    @elseif($order->status === 'Shipped') {{ __('crm.status_shipped') }}
+                    @elseif($order->status === 'Cancelled') {{ __('crm.status_cancelled') }}
+                    @else {{ $order->status }}
+                    @endif
+                </span>
             </div>
 
             <!-- Custom Chevron Status Pipeline -->
@@ -195,7 +199,13 @@
                         }
                     @endphp
                     <span class="pipeline-step {{ $stepClass }}">
-                        {{ $state }}
+                        @if($state === 'Draft') {{ __('crm.status_draft') }}
+                        @elseif($state === 'Confirmed') {{ __('crm.status_confirmed') }}
+                        @elseif($state === 'Partially Shipped') {{ __('crm.status_partially_shipped') }}
+                        @elseif($state === 'Shipped') {{ __('crm.status_shipped') }}
+                        @elseif($state === 'Cancelled') {{ __('crm.status_cancelled') }}
+                        @else {{ $state }}
+                        @endif
                     </span>
                 @endforeach
             </div>
@@ -219,13 +229,13 @@
                                 </div>
                                 <div>
                                     <h4 class="fw-bold text-dark mb-0 fs-15">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</h4>
-                                    <p class="text-muted mb-0 fs-11">Official Sales Order Document</p>
+                                    <p class="text-muted mb-0 fs-11">{{ __('crm.official_so_doc') }}</p>
                                 </div>
                             </div>
                         </div>
                         <div class="col-sm-6 text-sm-end mt-3 mt-sm-0 text-start text-sm-end">
-                            <h5 class="fw-bold text-primary mb-1" style="letter-spacing: 0.5px; font-size: 14px;">SALES ORDER</h5>
-                            <span class="fs-13 fw-bold text-dark d-block">No: {{ $order->sales_order_number }}</span>
+                            <h5 class="fw-bold text-primary mb-1" style="letter-spacing: 0.5px; font-size: 14px;">{{ __('crm.sales_order_label') }}</h5>
+                            <span class="fs-13 fw-bold text-dark d-block">{{ __('crm.no_colon') }} {{ $order->sales_order_number }}</span>
                             @php
                                 $badgeClass = 'bg-soft-secondary text-secondary';
                                 if ($order->status === 'Confirmed') $badgeClass = 'bg-soft-info text-info';
@@ -233,7 +243,15 @@
                                 elseif ($order->status === 'Shipped') $badgeClass = 'bg-soft-success text-success';
                                 elseif ($order->status === 'Cancelled') $badgeClass = 'bg-soft-danger text-danger';
                             @endphp
-                            <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-10 fw-semibold rounded-pill mt-1">{{ $order->status }}</span>
+                            <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-10 fw-semibold rounded-pill mt-1">
+                                @if($order->status === 'Draft') {{ __('crm.status_draft') }}
+                                @elseif($order->status === 'Confirmed') {{ __('crm.status_confirmed') }}
+                                @elseif($order->status === 'Partially Shipped') {{ __('crm.status_partially_shipped') }}
+                                @elseif($order->status === 'Shipped') {{ __('crm.status_shipped') }}
+                                @elseif($order->status === 'Cancelled') {{ __('crm.status_cancelled') }}
+                                @else {{ $order->status }}
+                                @endif
+                            </span>
                         </div>
                     </div>
 
@@ -242,24 +260,24 @@
                     <!-- Meta details (Customer / Dates) -->
                     <div class="row mb-4 text-start g-3">
                         <div class="col-sm-4 text-start mb-2 mb-sm-0">
-                            <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Customer Info</span>
+                            <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">{{ __('crm.customer_info') }}</span>
                             <h6 class="fw-bold text-dark mb-1.5 fs-13">{{ $order->customer?->name ?? '—' }}</h6>
-                            <p class="text-muted mb-1 fs-12">Email: {{ $order->customer?->email ?: '—' }}</p>
-                            <p class="text-muted mb-0 fs-12">Phone: {{ $order->customer?->phone ?: '—' }}</p>
+                            <p class="text-muted mb-1 fs-12">{{ __('crm.email') }}: {{ $order->customer?->email ?: '—' }}</p>
+                            <p class="text-muted mb-0 fs-12">{{ __('crm.contact_phone') }}: {{ $order->customer?->phone ?: '—' }}</p>
                         </div>
                         <div class="col-sm-4 text-start mb-2 mb-sm-0">
-                            <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Order Schedule</span>
-                            <p class="text-dark mb-1 fs-12"><strong>Order Date:</strong> <span class="text-muted ms-1">{{ $order->order_date ? $order->order_date->format('d/m/Y') : '—' }}</span></p>
-                            <p class="text-dark mb-1 fs-12"><strong>Est. Shipment:</strong> <span class="text-muted ms-1">{{ $order->shipment_date ? $order->shipment_date->format('d/m/Y') : 'Not Scheduled' }}</span></p>
-                            <p class="text-dark mb-0 fs-12"><strong>Payment Terms:</strong> <span class="text-muted ms-1">{{ $order->payment_terms ?: 'Due on Receipt' }}</span></p>
+                            <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">{{ __('crm.order_schedule') }}</span>
+                            <p class="text-dark mb-1 fs-12"><strong>{{ __('crm.order_date') }}:</strong> <span class="text-muted ms-1">{{ $order->order_date ? $order->order_date->format('d/m/Y') : '—' }}</span></p>
+                            <p class="text-dark mb-1 fs-12"><strong>{{ __('crm.est_shipment') }}</strong> <span class="text-muted ms-1">{{ $order->shipment_date ? $order->shipment_date->format('d/m/Y') : __('crm.not_scheduled') }}</span></p>
+                            <p class="text-dark mb-0 fs-12"><strong>{{ __('crm.payment_terms') }}</strong> <span class="text-muted ms-1">{{ $order->payment_terms ?: __('crm.due_on_receipt') }}</span></p>
                         </div>
                         <div class="col-sm-4 text-sm-end text-start">
-                            <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Reference Details</span>
+                            <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">{{ __('crm.reference_details') }}</span>
                             @if($order->quotation)
-                                <p class="text-dark mb-1 fs-12"><strong>Quotation Ref:</strong> <a href="{{ route('crm.quotations.show', $order->quotation_id) }}" class="fw-bold text-primary ms-1">{{ $order->quotation->quotation_number }}</a></p>
+                                <p class="text-dark mb-1 fs-12"><strong>{{ __('crm.quotation_ref') }}:</strong> <a href="{{ route('crm.quotations.show', $order->quotation_id) }}" class="fw-bold text-primary ms-1">{{ $order->quotation->quotation_number }}</a></p>
                             @endif
                             @if($order->salesPerson)
-                                <p class="text-dark mb-0 fs-12"><strong>Sales Rep:</strong> <span class="text-muted ms-1">{{ $order->salesPerson->name }}</span></p>
+                                <p class="text-dark mb-0 fs-12"><strong>{{ __('crm.sales_rep') }}:</strong> <span class="text-muted ms-1">{{ $order->salesPerson->name }}</span></p>
                             @endif
                         </div>
                     </div>
@@ -270,12 +288,12 @@
                             <div class="border p-3 bg-light bg-opacity-50" style="border-radius: 6px !important; border-color: #cbd5e1 !important;">
                                 <div class="row g-3">
                                     <div class="col-md-6 text-start">
-                                        <h6 class="fw-bold text-dark fs-12 text-uppercase mb-2" style="letter-spacing: 0.5px;">Billing Address</h6>
-                                        <p class="text-muted fs-12 mb-0" style="white-space: pre-line; line-height: 1.5;">{{ $order->billing_address ?: 'No billing address provided.' }}</p>
+                                        <h6 class="fw-bold text-dark fs-12 text-uppercase mb-2" style="letter-spacing: 0.5px;">{{ __('crm.billing_address') }}</h6>
+                                        <p class="text-muted fs-12 mb-0" style="white-space: pre-line; line-height: 1.5;">{{ $order->billing_address ?: __('crm.no_billing_address') }}</p>
                                     </div>
                                     <div class="col-md-6 text-start">
-                                        <h6 class="fw-bold text-dark fs-12 text-uppercase mb-2" style="letter-spacing: 0.5px;">Shipping Address</h6>
-                                        <p class="text-muted fs-12 mb-0" style="white-space: pre-line; line-height: 1.5;">{{ $order->shipping_address ?: 'No shipping address provided.' }}</p>
+                                        <h6 class="fw-bold text-dark fs-12 text-uppercase mb-2" style="letter-spacing: 0.5px;">{{ __('crm.shipping_address') }}</h6>
+                                        <p class="text-muted fs-12 mb-0" style="white-space: pre-line; line-height: 1.5;">{{ $order->shipping_address ?: __('crm.no_shipping_address') }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -288,13 +306,13 @@
                             <thead class="table-light fs-10 text-uppercase fw-bold text-muted" style="border-bottom: 2px solid #cbd5e1;">
                                 <tr>
                                     <th class="ps-3 py-2 text-center" style="width: 4%;">#</th>
-                                    <th class="py-2 ps-3" style="width: 36%;">Product Details</th>
-                                    <th class="py-2 text-center" style="width: 14%;">Warehouse</th>
-                                    <th class="text-center py-2" style="width: 7%;">Qty</th>
-                                    <th class="text-end py-2 pe-3" style="width: 11%;">Unit Price</th>
-                                    <th class="text-end py-2 pe-3" style="width: 10%;">Discount (₹)</th>
-                                    <th class="text-end py-2 pe-3" style="width: 9%;">Taxes (%)</th>
-                                    <th class="text-end pe-4 py-2" style="width: 14%;">Amount (₹)</th>
+                                    <th class="py-2 ps-3" style="width: 36%;">{{ __('crm.product_details') }}</th>
+                                    <th class="py-2 text-center" style="width: 14%;">{{ __('crm.warehouse') }}</th>
+                                    <th class="text-center py-2" style="width: 7%;">{{ __('crm.qty') }}</th>
+                                    <th class="text-end py-2 pe-3" style="width: 11%;">{{ __('crm.unit_price') }}</th>
+                                    <th class="text-end py-2 pe-3" style="width: 10%;">{{ __('crm.discount') }}</th>
+                                    <th class="text-end py-2 pe-3" style="width: 9%;">{{ __('crm.taxes_percent') }}</th>
+                                    <th class="text-end pe-4 py-2" style="width: 14%;">{{ __('crm.amount') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-12 text-dark">
@@ -350,10 +368,10 @@
                                             </div>
                                         </td>
                                         <td class="text-center fw-semibold py-1.5">{{ $item->quantity }}</td>
-                                        <td class="text-end text-muted py-1.5 pe-3">₹{{ number_format($item->unit_price, 2) }}</td>
+                                        <td class="text-end text-muted py-1.5 pe-3">{{ format_currency($item->unit_price) }}</td>
                                         <td class="text-end text-danger py-1.5 pe-3">
                                             @if($item->discount > 0)
-                                                -₹{{ number_format($item->discount, 2) }}
+                                                -{{ format_currency($item->discount) }}
                                             @else
                                                 —
                                             @endif
@@ -365,7 +383,7 @@
                                                 —
                                             @endif
                                         </td>
-                                        <td class="text-end pe-4 fw-bold text-dark py-1.5">₹{{ number_format($lineTotalInclTax, 2) }}</td>
+                                        <td class="text-end pe-4 fw-bold text-dark py-1.5">{{ format_currency($lineTotalInclTax) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -377,14 +395,14 @@
                         <div class="col-sm-7 text-start">
                             @if($order->terms_conditions)
                                 <div class="mb-3">
-                                    <h6 class="fw-bold text-dark mb-1.5 fs-12 text-uppercase" style="letter-spacing: 0.5px;">Terms & Conditions</h6>
+                                    <h6 class="fw-bold text-dark mb-1.5 fs-12 text-uppercase" style="letter-spacing: 0.5px;">{{ __('crm.terms_conditions') }}</h6>
                                     <div class="text-muted fs-11 terms-conditions-content">{!! $order->terms_conditions !!}</div>
                                 </div>
                             @endif
 
                             @if($order->notes)
                                 <div>
-                                    <h6 class="fw-bold text-dark mb-1.5 fs-12 text-uppercase" style="letter-spacing: 0.5px;">Internal Notes / Remarks</h6>
+                                    <h6 class="fw-bold text-dark mb-1.5 fs-12 text-uppercase" style="letter-spacing: 0.5px;">{{ __('crm.internal_notes_remarks') }}</h6>
                                     <p class="text-muted fs-11 mb-0" style="white-space: pre-line; line-height: 1.4;">{{ $order->notes }}</p>
                                 </div>
                             @endif
@@ -423,69 +441,69 @@
 
                                 <!-- 1. Subtotal (Excl. Tax) -->
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                    <span class="text-muted fw-semibold">Subtotal (Excl. Tax):</span>
-                                    <span class="fw-bold text-dark">₹{{ number_format($grossSubtotal, 2) }}</span>
+                                    <span class="text-muted fw-semibold">{{ __('crm.subtotal_excl_tax') }}</span>
+                                    <span class="fw-bold text-dark">{{ format_currency($grossSubtotal) }}</span>
                                 </div>
 
                                 <!-- 2. Less: Item Discounts -->
                                 @if($order->discount_type !== 'without_discount' && $effectiveDiscount > 0)
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12 text-danger">
-                                        <span class="fw-semibold">Less: Item Discounts:</span>
-                                        <span class="fw-bold">-₹{{ number_format($effectiveDiscount, 2) }}</span>
+                                        <span class="fw-semibold">{{ __('crm.less_item_discounts') }}</span>
+                                        <span class="fw-bold">-{{ format_currency($effectiveDiscount) }}</span>
                                     </div>
                                 @endif
 
                                 <!-- 3. Items Taxable Value -->
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                    <span class="text-muted fw-semibold">Items Taxable Value:</span>
-                                    <span class="fw-bold text-dark">₹{{ number_format($taxableBase, 2) }}</span>
+                                    <span class="text-muted fw-semibold">{{ __('crm.items_taxable_value') }}</span>
+                                    <span class="fw-bold text-dark">{{ format_currency($taxableBase) }}</span>
                                 </div>
 
                                 <!-- 4. Add: CGST / SGST or IGST Breakdown -->
                                 @if($order->tax_type !== 'without_tax' && $itemsTaxAmount > 0)
                                     @if($gstType === 'cgst_sgst')
                                         <div class="d-flex justify-content-between align-items-center mb-1.5 fs-12">
-                                            <span class="text-muted fw-medium">Add: CGST (Central Tax):</span>
-                                            <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount / 2, 2) }}</span>
+                                            <span class="text-muted fw-medium">{{ __('crm.add_cgst') }}</span>
+                                            <span class="text-muted font-monospace">+{{ format_currency($itemsTaxAmount / 2) }}</span>
                                         </div>
                                         <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                            <span class="text-muted fw-medium">Add: SGST (State Tax):</span>
-                                            <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount / 2, 2) }}</span>
+                                            <span class="text-muted fw-medium">{{ __('crm.add_sgst') }}</span>
+                                            <span class="text-muted font-monospace">+{{ format_currency($itemsTaxAmount / 2) }}</span>
                                         </div>
                                     @else
                                         <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                            <span class="text-muted fw-medium">Add: IGST (Integrated Tax):</span>
-                                            <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount, 2) }}</span>
+                                            <span class="text-muted fw-medium">{{ __('crm.add_igst') }}</span>
+                                            <span class="text-muted font-monospace">+{{ format_currency($itemsTaxAmount) }}</span>
                                         </div>
                                     @endif
                                 @endif
 
                                 <!-- 5. Billed Items Total (Incl. GST) -->
                                 <div class="d-flex justify-content-between align-items-center my-2 py-1.5 px-2.5 rounded bg-white border fs-12 fw-bold text-dark" style="border-color: #e2e8f0 !important;">
-                                    <span>Billed Items Total (Incl. GST):</span>
-                                    <span>₹{{ number_format($itemsTotalInclGst, 2) }}</span>
+                                    <span>{{ __('crm.billed_items_total') }}</span>
+                                    <span>{{ format_currency($itemsTotalInclGst) }}</span>
                                 </div>
 
                                 <!-- 6. Freight Charges -->
                                 @if($freightAmount > 0)
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-semibold">Freight Charges:</span>
-                                        <span class="fw-bold text-primary">₹{{ number_format($freightAmount, 2) }}</span>
+                                        <span class="text-muted fw-semibold">{{ __('crm.freight_charges') }}</span>
+                                        <span class="fw-bold text-primary">{{ format_currency($freightAmount) }}</span>
                                     </div>
                                 @endif
 
                                 <!-- 7. Adjustment -->
                                 @if($adjustment != 0)
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-semibold">Adjustment:</span>
-                                        <span class="fw-bold text-dark">₹{{ number_format($adjustment, 2) }}</span>
+                                        <span class="text-muted fw-semibold">{{ __('crm.adjustment') }}</span>
+                                        <span class="fw-bold text-dark">{{ format_currency($adjustment) }}</span>
                                     </div>
                                 @endif
 
                                 <!-- 8. Grand Total -->
                                 <div class="d-flex justify-content-between align-items-center pt-2.5 border-top mt-2" style="border-color: #cbd5e1 !important;">
-                                    <span class="fw-bold text-dark fs-13 text-uppercase" style="letter-spacing: 0.5px;">Grand Total:</span>
-                                    <span class="fw-bold text-primary fs-16">₹{{ number_format($grandTotal, 2) }}</span>
+                                    <span class="fw-bold text-dark fs-13 text-uppercase" style="letter-spacing: 0.5px;">{{ __('crm.grand_total') }}</span>
+                                    <span class="fw-bold text-primary fs-16">{{ format_currency($grandTotal) }}</span>
                                 </div>
                             </div>
                         </div>
@@ -504,19 +522,19 @@
                     <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light bg-opacity-20">
                         <div class="d-flex align-items-center gap-2">
                             <i class="feather-truck fs-16 text-primary"></i>
-                            <h6 class="mb-0 fw-bold text-dark fs-14">Delivery Challans / Dispatches (DO)</h6>
+                            <h6 class="mb-0 fw-bold text-dark fs-14">{{ __('crm.delivery_challans_dispatches') }}</h6>
                         </div>
                     </div>
                     <div class="table-responsive">
                         <x-ui.odoo-form-ui type="table" id="soDispatchesTable">
                             <thead>
                                 <tr>
-                                    <th class="ps-4" style="width: 17%;">Dispatch #</th>
-                                    <th style="width: 12%;">Date</th>
-                                    <th style="width: 22%;">Transporter / Carrier</th>
-                                    <th style="width: 14%;">Vehicle No</th>
-                                    <th style="width: 10%;">Status</th>
-                                    <th class="text-end pe-4" style="width: 25%;">Actions</th>
+                                    <th class="ps-4" style="width: 17%;">{{ __('crm.dispatch_num') }}</th>
+                                    <th style="width: 12%;">{{ __('crm.date') }}</th>
+                                    <th style="width: 22%;">{{ __('crm.transporter_carrier') }}</th>
+                                    <th style="width: 14%;">{{ __('crm.vehicle_no') }}</th>
+                                    <th style="width: 10%;">{{ __('crm.status') }}</th>
+                                    <th class="text-end pe-4" style="width: 25%;">{{ __('crm.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
@@ -557,23 +575,23 @@
                                             <div class="hstack gap-2 justify-content-end align-items-center">
                                                 @if(!$isDispatchInvoiced && in_array($dispatch->status, ['Confirmed', 'Shipped', 'Dispatched', 'Delivered']))
                                                     <x-ui.button href="{!! route('sales.invoices.create', ['dispatch_order_id' => $dispatch->id, 'material_requirement_id' => $dispatch->material_requirement_id, 'sales_order_id' => $order->id, 'mode' => 'dispatch_order']) !!}" variant="soft-primary" size="xs" icon="feather-file-text" class="fw-bold px-2.5 py-1 fs-11 text-nowrap" title="Create Invoice against this Dispatch Order">
-                                                        Create Invoice
+                                                        {{ __('crm.create_invoice_btn') }}
                                                     </x-ui.button>
                                                 @elseif($isDispatchInvoiced)
-                                                    <span class="badge bg-soft-success text-success fs-10 fw-semibold px-2 py-0.5"><i class="feather-check me-1"></i>Invoiced</span>
+                                                    <span class="badge bg-soft-success text-success fs-10 fw-semibold px-2 py-0.5"><i class="feather-check me-1"></i>{{ __('crm.invoiced_badge') }}</span>
                                                 @endif
 
                                                 <x-ui.action-dropdown :viewUrl="route('sales.dispatches.show', $dispatch->id)" id="dispAction-{{ $dispatch->id }}">
                                                     <x-ui.dropdown-item href="{{ route('sales.dispatches.show', $dispatch->id) }}" icon="feather-eye me-2">
-                                                        View Dispatch
+                                                        {{ __('crm.view_dispatch') }}
                                                     </x-ui.dropdown-item>
                                                     @if(!$isDispatchInvoiced && in_array($dispatch->status, ['Confirmed', 'Shipped', 'Dispatched', 'Delivered']))
                                                         <x-ui.dropdown-item href="{!! route('sales.invoices.create', ['dispatch_order_id' => $dispatch->id, 'material_requirement_id' => $dispatch->material_requirement_id, 'sales_order_id' => $order->id, 'mode' => 'dispatch_order']) !!}" icon="feather-file-text me-2" class="text-success fw-semibold">
-                                                            Create Invoice
+                                                            {{ __('crm.create_invoice_btn') }}
                                                         </x-ui.dropdown-item>
                                                     @endif
                                                     <x-ui.dropdown-item href="{{ route('sales.dispatches.download-challan', $dispatch->id) }}" icon="feather-download me-2" target="_blank">
-                                                        Download Challan PDF
+                                                        {{ __('crm.download_challan_pdf') }}
                                                     </x-ui.dropdown-item>
                                                 </x-ui.action-dropdown>
                                             </div>
@@ -583,7 +601,7 @@
                                     <tr>
                                         <td colspan="6" class="text-center py-5 text-muted">
                                             <i class="feather-truck fs-1 mb-2 d-block text-gray-300"></i>
-                                            No Delivery Challans (Dispatches) generated for this Sales Order yet.
+                                            {{ __('crm.no_dispatches_text') }}
                                         </td>
                                     </tr>
                                 @endforelse
@@ -597,11 +615,11 @@
                     <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light bg-opacity-20">
                         <div class="d-flex align-items-center gap-2">
                             <i class="feather-file-text fs-16 text-primary"></i>
-                            <h6 class="mb-0 fw-bold text-dark fs-14">Sales Invoices</h6>
+                            <h6 class="mb-0 fw-bold text-dark fs-14">{{ __('crm.sales_invoices_header') }}</h6>
                         </div>
                         @if (($order->status === 'Confirmed' || $order->status === 'Partially Shipped' || $order->status === 'Shipped') && ($hasUnbilledQty ?? true) && $invoicingPolicy !== 'dispatch_order')
                             <x-ui.button href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id, 'mode' => 'sales_order']) }}" variant="primary" size="sm" icon="feather-plus" class="fw-bold">
-                                Create Invoice
+                                {{ __('crm.create_invoice_btn') }}
                             </x-ui.button>
                         @endif
                     </div>
@@ -609,12 +627,12 @@
                         <x-ui.odoo-form-ui type="table" id="soInvoicesTable">
                             <thead>
                                 <tr>
-                                    <th class="ps-4" style="width: 25%;">Invoice Number</th>
-                                    <th style="width: 18%;">Date</th>
-                                    <th style="width: 25%;">Source Shipment</th>
-                                    <th class="text-end" style="width: 17%;">Grand Total</th>
-                                    <th style="width: 15%;">Status</th>
-                                    <th class="text-end pe-4" style="width: 15%;">Actions</th>
+                                    <th class="ps-4" style="width: 25%;">{{ __('crm.invoice_number_col') }}</th>
+                                    <th style="width: 18%;">{{ __('crm.date') }}</th>
+                                    <th style="width: 25%;">{{ __('crm.source_shipment') }}</th>
+                                    <th class="text-end" style="width: 17%;">{{ __('crm.grand_total') }}</th>
+                                    <th style="width: 15%;">{{ __('crm.status') }}</th>
+                                    <th class="text-end pe-4" style="width: 15%;">{{ __('crm.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
@@ -641,22 +659,22 @@
                                                     {{ $inv->materialRequirement->requirement_number }}
                                                 </a>
                                             @else
-                                                <span class="text-muted fs-12">Advance / SO Billing</span>
+                                                <span class="text-muted fs-12">{{ __('crm.advance_so_billing') }}</span>
                                             @endif
                                         </td>
-                                        <td class="text-end fw-bold text-dark">₹{{ number_format($inv->total_amount ?? $inv->grand_total, 2) }}</td>
+                                        <td class="text-end fw-bold text-dark">{{ format_currency($inv->total_amount ?? $inv->grand_total) }}</td>
                                         <td>
                                             <span class="badge {{ $invBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $inv->status }}</span>
                                         </td>
                                         <td class="text-end pe-4">
                                             <x-ui.action-dropdown :viewUrl="route('sales.invoices.show', $inv->id)" id="invAction-{{ $inv->id }}">
                                                 <x-ui.dropdown-item href="{{ route('sales.invoices.show', $inv->id) }}" icon="feather-eye me-2">
-                                                    View Invoice
+                                                    {{ __('crm.view_invoice') }}
                                                 </x-ui.dropdown-item>
 
                                                 @if(in_array($inv->status, ['Sent', 'Partially Paid', 'Posted', 'Draft']))
                                                     <x-ui.dropdown-item href="{{ route('sales.payments.create', ['invoice_id' => $inv->id, 'customer_id' => $order->customer_id]) }}" icon="feather-dollar-sign me-2" class="text-success fw-semibold">
-                                                        Register Payment
+                                                        {{ __('crm.register_payment') }}
                                                     </x-ui.dropdown-item>
                                                 @endif
                                             </x-ui.action-dropdown>
@@ -666,7 +684,7 @@
                                     <tr>
                                         <td colspan="6" class="text-center py-5 text-muted">
                                             <i class="feather-file-text fs-1 mb-2 d-block text-gray-300"></i>
-                                            No invoices generated for this Sales Order yet.
+                                            {{ __('crm.no_invoices_text') }}
                                         </td>
                                     </tr>
                                 @endforelse
@@ -680,11 +698,11 @@
                     <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light bg-opacity-20">
                         <div class="d-flex align-items-center gap-2">
                             <i class="feather-dollar-sign fs-16 text-primary"></i>
-                            <h6 class="mb-0 fw-bold text-dark fs-14">Payments & Advance Allocations</h6>
+                            <h6 class="mb-0 fw-bold text-dark fs-14">{{ __('crm.payments_allocations_header') }}</h6>
                         </div>
                         @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
                             <x-ui.button href="{{ route('sales.payments.create', ['sales_order_id' => $order->id, 'customer_id' => $order->customer_id, 'allocate_to' => 'sales_order']) }}" variant="primary" size="sm" icon="feather-plus" class="fw-bold">
-                                Record Receipt / Advance
+                                {{ __('crm.record_receipt_advance') }}
                             </x-ui.button>
                         @endif
                     </div>
@@ -692,12 +710,12 @@
                         <x-ui.odoo-form-ui type="table" id="soPaymentsTable">
                             <thead>
                                 <tr>
-                                    <th class="ps-4" style="width: 25%;">Payment Number</th>
-                                    <th style="width: 20%;">Date</th>
-                                    <th style="width: 20%;">Method</th>
-                                    <th style="width: 20%;">Reference No</th>
-                                    <th class="text-end" style="width: 20%;">Allocated Amount</th>
-                                    <th class="text-end pe-4" style="width: 15%;">Actions</th>
+                                    <th class="ps-4" style="width: 25%;">{{ __('crm.payment_number_col') }}</th>
+                                    <th style="width: 20%;">{{ __('crm.date') }}</th>
+                                    <th style="width: 20%;">{{ __('crm.method') }}</th>
+                                    <th style="width: 20%;">{{ __('crm.reference_no') }}</th>
+                                    <th class="text-end" style="width: 20%;">{{ __('crm.allocated_amount') }}</th>
+                                    <th class="text-end pe-4" style="width: 15%;">{{ __('crm.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
@@ -709,11 +727,11 @@
                                         <td class="text-muted">{{ date('d/m/Y', strtotime($alloc->payment->payment_date)) }}</td>
                                         <td><span class="fw-semibold text-dark">{{ $alloc->payment->payment_method }}</span></td>
                                         <td class="text-muted">{{ $alloc->payment->reference_no ?: '—' }}</td>
-                                        <td class="text-end fw-bold text-dark">₹{{ number_format($alloc->allocated_amount, 2) }}</td>
+                                        <td class="text-end fw-bold text-dark">{{ format_currency($alloc->allocated_amount) }}</td>
                                         <td class="text-end pe-4">
                                             <x-ui.action-dropdown :viewUrl="route('sales.payments.show', $alloc->payment->id)" id="payAction-{{ $alloc->payment->id }}">
                                                 <x-ui.dropdown-item href="{{ route('sales.payments.show', $alloc->payment->id) }}" icon="feather-eye me-2">
-                                                    View Receipt
+                                                    {{ __('crm.view_receipt') }}
                                                 </x-ui.dropdown-item>
                                             </x-ui.action-dropdown>
                                         </td>
@@ -722,7 +740,7 @@
                                     <tr>
                                         <td colspan="6" class="text-center py-5 text-muted">
                                             <i class="feather-dollar-sign fs-1 mb-2 d-block text-gray-300"></i>
-                                            No payment receipts or advances adjusted for this Sales Order yet.
+                                            {{ __('crm.no_payments_text') }}
                                         </td>
                                     </tr>
                                 @endforelse
@@ -736,11 +754,11 @@
                     <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light bg-opacity-20">
                         <div class="d-flex align-items-center gap-2">
                             <i class="feather-rotate-ccw fs-16 text-primary"></i>
-                            <h6 class="mb-0 fw-bold text-dark fs-14">Sales Returns</h6>
+                            <h6 class="mb-0 fw-bold text-dark fs-14">{{ __('crm.sales_returns_header') }}</h6>
                         </div>
                         @if ($order->status === 'Partially Shipped' || $order->status === 'Shipped')
                             <x-ui.button href="{{ route('sales.returns.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus" class="fw-bold">
-                                Create Sales Return
+                                {{ __('crm.create_sales_return') }}
                             </x-ui.button>
                         @endif
                     </div>
@@ -748,11 +766,11 @@
                         <x-ui.odoo-form-ui type="table" id="soReturnsTable">
                             <thead>
                                 <tr>
-                                    <th class="ps-4" style="width: 25%;">Return Number</th>
-                                    <th style="width: 20%;">Date</th>
-                                    <th class="text-end" style="width: 20%;">Refund Amount</th>
-                                    <th style="width: 20%;">Status</th>
-                                    <th class="text-end pe-4" style="width: 15%;">Actions</th>
+                                    <th class="ps-4" style="width: 25%;">{{ __('crm.return_number_col') }}</th>
+                                    <th style="width: 20%;">{{ __('crm.date') }}</th>
+                                    <th class="text-end" style="width: 20%;">{{ __('crm.refund_amount') }}</th>
+                                    <th style="width: 20%;">{{ __('crm.status') }}</th>
+                                    <th class="text-end pe-4" style="width: 15%;">{{ __('crm.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
@@ -767,12 +785,12 @@
                                             <a href="{{ route('sales.returns.show', $ret->id) }}" class="text-primary">{{ $ret->return_number }}</a>
                                         </td>
                                         <td class="text-muted">{{ date('d/m/Y', strtotime($ret->return_date)) }}</td>
-                                        <td class="text-end fw-bold text-dark">₹{{ number_format($ret->total_refund_amount, 2) }}</td>
+                                        <td class="text-end fw-bold text-dark">{{ format_currency($ret->total_refund_amount) }}</td>
                                         <td><span class="badge {{ $retBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $ret->status }}</span></td>
                                         <td class="text-end pe-4">
                                             <x-ui.action-dropdown :viewUrl="route('sales.returns.show', $ret->id)" id="retAction-{{ $ret->id }}">
                                                 <x-ui.dropdown-item href="{{ route('sales.returns.show', $ret->id) }}" icon="feather-eye me-2">
-                                                    View Return
+                                                    {{ __('crm.view_return') }}
                                                 </x-ui.dropdown-item>
                                             </x-ui.action-dropdown>
                                         </td>
@@ -781,7 +799,7 @@
                                     <tr>
                                         <td colspan="5" class="text-center py-5 text-muted">
                                             <i class="feather-rotate-ccw fs-1 mb-2 d-block text-gray-300"></i>
-                                            No sales returns created for this Sales Order yet.
+                                            {{ __('crm.no_returns_text') }}
                                         </td>
                                     </tr>
                                 @endforelse

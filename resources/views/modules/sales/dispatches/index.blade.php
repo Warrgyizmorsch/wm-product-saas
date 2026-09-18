@@ -1,12 +1,12 @@
 @extends('layouts.duralux')
 
-@section('title', 'Dispatch Orders | SaaS ERP')
-@section('page-title', 'Dispatch Orders')
-@section('breadcrumb', 'Sales / Dispatches')
+@section('title', __('crm.dispatch_orders') . ' | SaaS ERP')
+@section('page-title', __('crm.dispatch_orders'))
+@section('breadcrumb', __('crm.sales_breadcrumb'))
 
 @section('page-actions')
     <x-ui.button href="{{ route('sales.dispatches.create') }}" variant="primary" icon="feather-plus">
-        Create Dispatch Order
+        {{ __('crm.create_dispatch_order') }}
     </x-ui.button>
 @endsection
 
@@ -22,40 +22,40 @@
         <!-- Toolbar: Title, Sort, Filter Drawer -->
         <div class="d-flex align-items-center mb-3">
             <div class="d-flex align-items-center gap-2">
-                <h5 class="fw-bold text-dark mb-0 me-2">All Dispatch Orders</h5>
+                <h5 class="fw-bold text-dark mb-0 me-2">{{ __('crm.all_dispatch_orders') }}</h5>
             </div>
             <div class="d-flex gap-2 ms-auto">
                 <!-- Custom Sort Component (Lead style) -->
-                <x-ui.sort-dropdown label="Sort">
+                <x-ui.sort-dropdown :label="__('crm.sort') ?: 'Sort'">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Latest Dispatches First</span>
+                        <span>{{ __('crm.latest_dispatches_first') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Oldest Dispatches First</span>
+                        <span>{{ __('crm.oldest_dispatches_first') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'dispatch_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'dispatch_number' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Dispatch Number (A-Z)</span>
+                        <span>{{ __('crm.dispatch_number_az') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'dispatch_number', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'dispatch_number' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Dispatch Number (Z-A)</span>
+                        <span>{{ __('crm.dispatch_number_za') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
                 <!-- Custom Filter Component (Lead style) -->
                 <form method="GET" action="{{ route('sales.dispatches.index') }}" class="d-inline">
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter :label="__('crm.filter') ?: 'Filter'" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
-                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Dispatch #, Customer, SO #..." value="{{ request('search') }}" />
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
+                            <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_placeholder_dispatches')" value="{{ request('search') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Dispatch Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.dispatch_status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status">
-                                <option value="">All Statuses</option>
+                                <option value="">{{ __('crm.all_statuses') }}</option>
                                 <option value="Pending" {{ request('status') === 'Pending' ? 'selected' : '' }}>Pending</option>
                                 <option value="Dispatched" {{ request('status') === 'Dispatched' ? 'selected' : '' }}>Dispatched</option>
                                 <option value="Delivered" {{ request('status') === 'Delivered' ? 'selected' : '' }}>Delivered</option>
@@ -64,24 +64,11 @@
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('sales.dispatches.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('sales.dispatches.index') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
-
-                <div class="dropdown d-inline-block">
-                    <a href="javascript:void(0)" class="action-dropdown-btn" data-bs-toggle="dropdown" aria-expanded="false" title="Options">
-                        <i class="feather-paperclip"></i>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end fs-13 shadow-lg">
-                        <li>
-                            <a href="{{ route('sales.dispatches.create') }}" class="dropdown-item">
-                                <i class="feather-plus me-2 text-muted fs-12"></i>New Dispatch Order
-                            </a>
-                        </li>
-                    </ul>
-                </div>
             </div>
         </div>
 
@@ -93,13 +80,13 @@
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" class="form-check-input" id="selectAllCheckbox">
                         </th>
-                        <th>Dispatch # & Date</th>
-                        <th>Material Requirement</th>
-                        <th>Sales Order</th>
-                        <th>Customer</th>
-                        <th>Carrier / Vehicle</th>
-                        <th>Status</th>
-                        <th class="text-end pe-4">Actions</th>
+                        <th>{{ __('crm.dispatch_date_and_num') }}</th>
+                        <th>{{ __('crm.material_requirement') }}</th>
+                        <th>{{ __('crm.sales_order') }}</th>
+                        <th>{{ __('crm.customer') }}</th>
+                        <th>{{ __('crm.carrier_vehicle') }}</th>
+                        <th>{{ __('crm.status') }}</th>
+                        <th class="text-end pe-4">{{ __('crm.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -142,7 +129,7 @@
                                         {{ $dispatch->materialRequirement->requirement_number }}
                                     </a>
                                 @else
-                                    <span class="badge bg-soft-success text-success font-monospace">Direct Outward</span>
+                                    <span class="badge bg-soft-success text-success font-monospace">{{ __('crm.direct_outward') }}</span>
                                 @endif
                             </td>
                             <td>
@@ -178,8 +165,8 @@
                                     @if ($dispatch->status === 'Pending')
                                         <form action="{{ route('sales.dispatches.confirm', $dispatch->id) }}" method="POST" id="confirmDispatchForm_{{ $dispatch->id }}" class="d-inline">
                                             @csrf
-                                            <x-ui.button type="button" variant="soft-success" size="xs" icon="feather-check-circle" class="fw-bold fs-11 text-nowrap" style="padding: 8px 8px !important;" onclick="confirmAction({ title: 'Confirm Dispatch Order', message: 'Confirm dispatch {{ $dispatch->dispatch_number }}? This will reserve stock in warehouse.', variant: 'success', confirmText: 'Confirm Dispatch' }, function() { document.getElementById('confirmDispatchForm_{{ $dispatch->id }}').submit(); })">
-                                                Confirm
+                                            <x-ui.button type="button" variant="soft-success" size="xs" icon="feather-check-circle" class="fw-bold fs-11 text-nowrap" style="padding: 8px 8px !important;" onclick="confirmAction({ title: '{{ __('crm.confirm_dispatch_order') }}', message: '{{ __('crm.confirm_dispatch') }} {{ $dispatch->dispatch_number }}?', variant: 'success', confirmText: '{{ __('crm.confirm_dispatch') }}' }, function() { document.getElementById('confirmDispatchForm_{{ $dispatch->id }}').submit(); })">
+                                                {{ __('crm.confirm') }}
                                             </x-ui.button>
                                         </form>
                                     @endif
@@ -187,7 +174,7 @@
                                     <x-ui.action-dropdown :viewUrl="route('sales.dispatches.show', $dispatch->id)">
                                         <li>
                                             <a href="{{ route('sales.dispatches.show', $dispatch->id) }}" class="dropdown-item">
-                                                <i class="feather-eye me-2 text-muted fs-12"></i>View Dispatch
+                                                <i class="feather-eye me-2 text-muted fs-12"></i>{{ __('crm.view_dispatch') }}
                                             </a>
                                         </li>
                                         @if ($dispatch->status === 'Pending')
@@ -195,8 +182,8 @@
                                             <li>
                                                 <form action="{{ route('sales.dispatches.confirm', $dispatch->id) }}" method="POST" id="confirmDispatchFormDropdown_{{ $dispatch->id }}">
                                                     @csrf
-                                                    <button type="button" class="dropdown-item text-success fw-semibold" onclick="confirmAction({ title: 'Confirm Dispatch Order', message: 'Confirm dispatch {{ $dispatch->dispatch_number }}? This will reserve stock in warehouse.', variant: 'success', confirmText: 'Confirm Dispatch' }, function() { document.getElementById('confirmDispatchFormDropdown_{{ $dispatch->id }}').submit(); })">
-                                                        <i class="feather-check-circle me-2 text-success fs-12"></i>Confirm Dispatch
+                                                    <button type="button" class="dropdown-item text-success fw-semibold" onclick="confirmAction({ title: '{{ __('crm.confirm_dispatch_order') }}', message: '{{ __('crm.confirm_dispatch') }} {{ $dispatch->dispatch_number }}?', variant: 'success', confirmText: '{{ __('crm.confirm_dispatch') }}' }, function() { document.getElementById('confirmDispatchFormDropdown_{{ $dispatch->id }}').submit(); })">
+                                                        <i class="feather-check-circle me-2 text-success fs-12"></i>{{ __('crm.confirm_dispatch') }}
                                                     </button>
                                                 </form>
                                             </li>
@@ -209,7 +196,7 @@
                         <tr>
                             <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="feather-send fs-1 d-block mb-3 text-light"></i>
-                                No dispatch orders found.
+                                {{ __('crm.no_dispatch_orders_found') }}
                             </td>
                         </tr>
                     @endforelse
@@ -257,7 +244,7 @@
 
                 if (visibleRows === 0 && totalRows > 0) {
                     $('#dispatchTable tbody').append(
-                        '<tr class="no-search-results"><td colspan="8" class="text-center py-4 text-muted"><i class="feather-search fs-3 d-block mb-2 text-light"></i>No dispatch orders matching "' + value + '"</td></tr>'
+                        '<tr class="no-search-results"><td colspan="8" class="text-center py-4 text-muted"><i class="feather-search fs-3 d-block mb-2 text-light"></i>{{ __('crm.no_dispatch_orders_matching', ['query' => '']) }}"' + value + '"</td></tr>'
                     );
                 }
             });

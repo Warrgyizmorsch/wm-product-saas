@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'Create Material Requirement | SaaS ERP')
-@section('page-title', 'Create Material Requirement')
-@section('breadcrumb', 'Sales / Material Requirements / Create')
+@section('title', __('crm.create_material_requirement') . ' | SaaS ERP')
+@section('page-title', __('crm.create_material_requirement'))
+@section('breadcrumb', __('ui.sales') . ' / ' . __('crm.material_requirements') . ' / ' . __('crm.create'))
 
 @section('content')
     @if ($errors->any())
         <x-ui.alert variant="danger" :dismissible="true" icon="feather-alert-triangle" class="shadow-sm mb-4">
-            <strong>Please fix the following errors:</strong>
+            <strong>{{ __('crm.fix_following_errors') ?: 'Please fix the following errors:' }}</strong>
             <ul class="mb-0 mt-1 ps-3">
                 @foreach ($errors->all() as $error)
                     <li class="fs-12">{{ $error }}</li>
@@ -23,49 +23,49 @@
         <x-ui.odoo-form-ui type="sheet" class="erp-single-panel bg-white p-4">
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
                 <div>
-                    <h5 class="fw-bold text-dark mb-0">New Material Requirement</h5>
-                    <span class="fs-12 text-muted">Requirement for Sales Order: <strong>{{ $salesOrder->sales_order_number }}</strong></span>
+                    <h5 class="fw-bold text-dark mb-0">{{ __('crm.new_material_requirement') }}</h5>
+                    <span class="fs-12 text-muted">{{ __('crm.requirement_for_so') }} <strong>{{ $salesOrder->sales_order_number }}</strong></span>
                 </div>
-                <x-ui.button href="{{ route('sales.orders.show', $salesOrder->id) }}" variant="light" size="sm" class="border">Cancel</x-ui.button>
+                <x-ui.button href="{{ route('sales.orders.show', $salesOrder->id) }}" variant="light" class="border">{{ __('crm.cancel') }}</x-ui.button>
             </div>
 
             <div class="row g-4 mb-4 fs-13 text-dark">
                 <!-- Column 1: Order Refs & Carrier -->
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" label="Customer" name="_customer_display" :value="$salesOrder->customer?->name" readonly="true" style="font-weight: bold; background-color: #f8f9fa;" />
+                    <x-ui.odoo-form-ui type="input" :label="__('crm.customer')" name="_customer_display" :value="$salesOrder->customer?->name" readonly="true" style="font-weight: bold; background-color: #f8f9fa;" />
 
-                    <x-ui.odoo-form-ui type="input" label="Carrier / Courier" name="carrier" :value="old('carrier')" placeholder="e.g. FedEx, Blue Dart, DHL" />
+                    <x-ui.odoo-form-ui type="input" :label="__('crm.carrier_courier')" name="carrier" :value="old('carrier')" placeholder="e.g. FedEx, Blue Dart, DHL" />
 
-                    <x-ui.odoo-form-ui type="input" label="Tracking Number" name="tracking_number" :value="old('tracking_number')" placeholder="AWB tracking reference..." />
+                    <x-ui.odoo-form-ui type="input" :label="__('crm.tracking_number')" name="tracking_number" :value="old('tracking_number')" placeholder="AWB tracking reference..." />
                 </div>
 
                 <!-- Column 2: Delivery Meta -->
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" label="Requirement Number" name="requirement_number" :value="old('requirement_number', $nextDeliveryNumber)" :readonly="true" :required="true" style="font-weight: bold; color: #495057;" />
+                    <x-ui.odoo-form-ui type="input" :label="__('crm.requirement_number')" name="requirement_number" :value="old('requirement_number', $nextDeliveryNumber)" :readonly="true" :required="true" style="font-weight: bold; color: #495057;" />
 
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="Requirement Date" name="requirement_date" :value="old('requirement_date', date('Y-m-d'))" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.requirement_date')" name="requirement_date" :value="old('requirement_date', date('Y-m-d'))" :required="true" />
                 </div>
             </div>
 
             <!-- Notes -->
             <div class="row g-4 mt-1 border-top pt-3 fs-13 text-dark">
                 <div class="col-md-12">
-                    <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="notes" rows="2" placeholder="Private internal remarks...">{{ old('notes') }}</x-ui.odoo-form-ui>
+                    <x-ui.odoo-form-ui type="textarea" :label="__('crm.internal_notes')" name="notes" rows="2" placeholder="Private internal remarks...">{{ old('notes') }}</x-ui.odoo-form-ui>
                 </div>
             </div>
 
             <!-- Delivery Lines Table -->
             <div class="border-top pt-4 mt-4">
-                <h5 class="fw-bold text-dark mb-3 fs-14">Items to Require</h5>
+                <h5 class="fw-bold text-dark mb-3 fs-14">{{ __('crm.items_to_require') }}</h5>
                 <div class="table-responsive">
                     <x-ui.odoo-form-ui type="table" id="deliveryItemsTable">
                         <thead>
                             <tr>
-                                <th style="width: 35%;">Product Details</th>
-                                <th style="width: 25%;">Source Warehouse</th>
-                                <th class="text-end" style="width: 13%;">Ordered Qty</th>
-                                <th class="text-end" style="width: 13%;">Shipped Qty</th>
-                                <th class="text-end pe-3" style="width: 14%;">Qty to Require</th>
+                                <th style="width: 35%;">{{ __('crm.product_details') }}</th>
+                                <th style="width: 25%;">{{ __('crm.source_warehouse') }}</th>
+                                <th class="text-end" style="width: 13%;">{{ __('crm.ordered_qty') }}</th>
+                                <th class="text-end" style="width: 13%;">{{ __('crm.shipped_qty') }}</th>
+                                <th class="text-end pe-3" style="width: 14%;">{{ __('crm.qty_to_require') }}</th>
                             </tr>
                         </thead>
                         <tbody class="fs-13 text-dark">
@@ -92,14 +92,14 @@
                                                     data-product-id="{{ $item->product_id }}" 
                                                     data-item-id="{{ $item->id }}" 
                                                     required>
-                                                <option value="">Select Warehouse...</option>
+                                                <option value="">{{ __('crm.select_warehouse') ?: 'Select Warehouse...' }}</option>
                                                 @foreach ($warehouses as $wh)
                                                     <option value="{{ $wh->id }}" {{ $selectedWhId == $wh->id ? 'selected' : '' }}>
                                                         {{ $wh->name }}
                                                      </option>
                                                 @endforeach
                                             </select>
-                                            <span class="available-qty-display d-block fs-11 mt-1 font-monospace text-muted" id="avail-qty-{{ $item->id }}">Available: 0</span>
+                                            <span class="available-qty-display d-block fs-11 mt-1 font-monospace text-muted" id="avail-qty-{{ $item->id }}">{{ __('crm.avail_th') }}: 0</span>
                                         </td>
                                         <td class="text-end fw-semibold">{{ (int)$item->quantity }}</td>
                                         <td class="text-end text-muted">{{ (int)$shipped }}</td>
@@ -116,7 +116,7 @@
                                                        style="width: 100px; margin-left: auto;">
                                                 <div class="text-end text-danger fw-semibold mt-1 fs-11 validation-error-msg" id="error-{{ $item->id }}" style="display: none;"></div>
                                             @else
-                                                <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11">Fully Required</span>
+                                                <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11">{{ __('crm.fully_required') }}</span>
                                                 <input type="hidden" name="items[{{ $item->id }}][quantity]" value="0">
                                             @endif
                                         </td>
@@ -129,8 +129,8 @@
             </div>
 
             <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                <x-ui.button href="{{ route('sales.orders.show', $salesOrder->id) }}" variant="light" size="md" class="border py-2 px-4 fs-12 shadow-sm">Discard</x-ui.button>
-                <x-ui.button type="submit" variant="primary" size="md" class="py-2 px-5 fw-bold fs-12 shadow-sm" style="background-color: #1e40af; border-color: #1e40af;">Save Material Requirement</x-ui.button>
+                <x-ui.button href="{{ route('sales.orders.show', $salesOrder->id) }}" variant="light" class="border py-2 px-4 fs-12 shadow-sm">{{ __('crm.discard') }}</x-ui.button>
+                <x-ui.button type="submit" variant="primary" class="py-2 px-5 fw-bold fs-12 shadow-sm" style="background-color: #1e40af; border-color: #1e40af;">{{ __('crm.save_material_requirement') }}</x-ui.button>
             </div>
         </x-ui.odoo-form-ui>
     </form>

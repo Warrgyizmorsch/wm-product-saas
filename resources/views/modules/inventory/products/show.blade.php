@@ -64,11 +64,10 @@
                             <div class="border-start ps-4">
                                 <span class="text-muted fs-11 text-uppercase d-block">{{ __('inventory.asset_value') }}</span>
                                 <h4 class="fw-bold text-dark mb-0">
-                                    ₹{{ number_format(
+                                    {{ format_currency(
                                         $product->variation_type === 'Variant' 
                                         ? $product->variants->sum(fn($v) => $v->warehouseStocks->sum(fn($ws) => $ws->quantity * $ws->unit_cost))
-                                        : $product->warehouseStocks->sum(fn($ws) => $ws->quantity * $ws->unit_cost), 
-                                        2
+                                        : $product->warehouseStocks->sum(fn($ws) => $ws->quantity * $ws->unit_cost)
                                     ) }}
                                 </h4>
                             </div>
@@ -150,17 +149,17 @@
                                         </tr>
                                         @php
                                             $typeMap = [
-                                                'raw_material'  => ['label' => 'Raw Material',    'color' => 'warning'],
-                                                'semi_finished' => ['label' => 'Semi-Finished',   'color' => 'info'],
-                                                'finished_good' => ['label' => 'Finished Good',   'color' => 'success'],
-                                                'consumable'    => ['label' => 'Consumable',      'color' => 'secondary'],
-                                                'service'       => ['label' => 'Service',         'color' => 'primary'],
-                                                'component'     => ['label' => 'Component',       'color' => 'danger'],
+                                                'raw_material'  => ['label' => __('inventory.raw_material'),    'color' => 'warning'],
+                                                'semi_finished' => ['label' => __('inventory.semi_finished'),   'color' => 'info'],
+                                                'finished_good' => ['label' => __('inventory.finished_good'),   'color' => 'success'],
+                                                'consumable'    => ['label' => __('inventory.consumable'),      'color' => 'secondary'],
+                                                'service'       => ['label' => __('inventory.service'),         'color' => 'primary'],
+                                                'component'     => ['label' => __('inventory.component'),       'color' => 'danger'],
                                             ];
                                             $typeInfo = $typeMap[$product->type] ?? ['label' => ucfirst(str_replace('_', ' ', $product->type ?? 'N/A')), 'color' => 'secondary'];
                                         @endphp
                                         <tr>
-                                            <td class="text-muted">Material Type</td>
+                                            <td class="text-muted">{{ __('inventory.material_type') }}</td>
                                             <td>
                                                 <span class="badge bg-soft-{{ $typeInfo['color'] }} text-{{ $typeInfo['color'] }} border border-{{ $typeInfo['color'] }}-subtle px-2 py-1 fw-semibold fs-11">
                                                     {{ $typeInfo['label'] }}
@@ -168,12 +167,12 @@
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Supplier Method</td>
-                                            <td class="fw-semibold text-capitalize">{{ strtolower($product->supplier_method ?? '') === 'buy' || strtolower($product->supplier_method ?? '') === 'trade' || empty($product->supplier_method) ? 'Trade' : ucfirst($product->supplier_method) }}</td>
+                                            <td class="text-muted">{{ __('inventory.supplier_method') }}</td>
+                                            <td class="fw-semibold text-capitalize">{{ strtolower($product->supplier_method ?? '') === 'buy' || strtolower($product->supplier_method ?? '') === 'trade' || empty($product->supplier_method) ? __('inventory.trade') : (strtolower($product->supplier_method ?? '') === 'manufacture' ? __('inventory.manufacture') : ucfirst($product->supplier_method)) }}</td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Planning Type</td>
-                                            <td class="fw-semibold text-capitalize">{{ $product->planning_type ?: 'Stock' }}</td>
+                                            <td class="text-muted">{{ __('inventory.planning_type') }}</td>
+                                            <td class="fw-semibold text-capitalize">{{ strtolower($product->planning_type ?? '') === 'stock' || empty($product->planning_type) ? __('inventory.stock') : (strtolower($product->planning_type ?? '') === 'manufacture' ? __('inventory.manufacture') : ucfirst($product->planning_type)) }}</td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.brand') }}</td>
@@ -190,19 +189,19 @@
                                     </tbody>
                                 </table>
 
-                                <h6 class="fw-bold text-primary mb-3"><i class="feather-box me-2"></i>Inventory & Tracking Settings</h6>
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-box me-2"></i>{{ __('inventory.inventory_tracking_settings') }}</h6>
                                 <table class="table table-borderless align-middle mb-4">
                                     <tbody>
                                         <tr>
-                                            <td class="text-muted" style="width: 160px;">Inventory Account</td>
+                                            <td class="text-muted" style="width: 160px;">{{ __('inventory.inventory_account') }}</td>
                                             <td class="fw-semibold text-dark">{{ $getAccountDisplay($product->inventory_account) }}</td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Valuation Method</td>
+                                            <td class="text-muted">{{ __('inventory.valuation_method') }}</td>
                                             <td class="fw-semibold">{{ $product->inventory_valuation_method ?: 'FIFO' }}</td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Reorder Point</td>
+                                            <td class="text-muted">{{ __('inventory.reorder_point') }}</td>
                                             <td class="fw-semibold">
                                                 @if($product->reorder_point)
                                                     {{ number_format($product->reorder_point, 0) }} {{ $product->uom?->code ?? 'pcs' }}
@@ -212,37 +211,37 @@
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Minimum Order Qty (MOQ)</td>
+                                            <td class="text-muted">{{ __('inventory.min_order_qty') }}</td>
                                             <td class="fw-semibold">
                                                 {{ number_format($product->minimum_order_qty ?? 1, 2) }} {{ $product->uom?->code ?? 'pcs' }}
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Order Multiple</td>
+                                            <td class="text-muted">{{ __('inventory.order_multiple') }}</td>
                                             <td class="fw-semibold">
                                                 {{ number_format($product->order_multiple ?? 1, 2) }} {{ $product->uom?->code ?? 'pcs' }}
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Opening Stock</td>
+                                            <td class="text-muted">{{ __('inventory.opening_stock') }}</td>
                                             <td class="fw-semibold">
                                                 @if($product->opening_stock)
                                                     {{ number_format($product->opening_stock, 0) }} {{ $product->uom?->code ?? 'pcs' }} 
-                                                    <span class="text-muted font-monospace fs-11">(@ ₹{{ number_format($product->opening_stock_rate, 2) }}/unit)</span>
+                                                    <span class="text-muted font-monospace fs-11">(@ {{ format_currency($product->opening_stock_rate) }}/{{ __('inventory.unit') }})</span>
                                                 @else
                                                     —
                                                 @endif
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Tracking Mode</td>
+                                            <td class="text-muted">{{ __('inventory.tracking_mode') }}</td>
                                             <td>
                                                 <div class="d-flex gap-2">
                                                     <span class="badge {{ $product->track_batch ? 'bg-soft-success text-success' : 'bg-soft-secondary text-muted' }} fs-11">
-                                                        Batch Tracking: {{ $product->track_batch ? 'Enabled' : 'Disabled' }}
+                                                        {{ __('inventory.batch_tracking') }}: {{ $product->track_batch ? __('inventory.enabled') : __('inventory.disabled') }}
                                                     </span>
                                                     <span class="badge {{ $product->track_serial_number ? 'bg-soft-success text-success' : 'bg-soft-secondary text-muted' }} fs-11">
-                                                        Serial Tracking: {{ $product->track_serial_number ? 'Enabled' : 'Disabled' }}
+                                                        {{ __('inventory.serial_tracking') }}: {{ $product->track_serial_number ? __('inventory.enabled') : __('inventory.disabled') }}
                                                     </span>
                                                 </div>
                                             </td>
@@ -285,7 +284,7 @@
                                     <tbody>
                                         <tr>
                                             <td class="text-muted" style="width: 160px;">{{ __('inventory.selling_price') }}</td>
-                                            <td class="fw-bold text-success">₹{{ number_format($product->selling_price, 2) }}</td>
+                                            <td class="fw-bold text-success">{{ format_currency($product->selling_price) }}</td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.sales_account') }}</td>
@@ -293,7 +292,7 @@
                                         </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.purchase_cost') }}</td>
-                                            <td class="fw-bold text-danger">₹{{ number_format($product->cost_price, 2) }}</td>
+                                            <td class="fw-bold text-danger">{{ format_currency($product->cost_price) }}</td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.purchase_account') }}</td>
@@ -386,8 +385,8 @@
                                                     <td class="text-end fw-bold text-dark">{{ number_format($qty, 0) }}</td>
                                                     <td class="text-end text-warning fw-semibold">{{ number_format($reserved, 0) }}</td>
                                                     <td class="text-end text-success fw-bold">{{ number_format($available, 0) }}</td>
-                                                    <td class="text-end">₹{{ number_format($cost, 2) }}</td>
-                                                    <td class="text-end fw-bold">₹{{ number_format($totalValuation, 2) }}</td>
+                                                    <td class="text-end">{{ format_currency($cost) }}</td>
+                                                    <td class="text-end fw-bold">{{ format_currency($totalValuation) }}</td>
                                                     <td>{{ number_format($product->reorder_point, 0) }}</td>
                                                 </tr>
                                             @endforeach
@@ -399,8 +398,8 @@
                                                     <td class="text-end fw-bold text-dark">{{ number_format($ws->quantity, 0) }}</td>
                                                     <td class="text-end text-warning fw-semibold">{{ number_format($ws->reserved_qty, 0) }}</td>
                                                     <td class="text-end text-success fw-bold">{{ number_format($ws->available_qty, 0) }}</td>
-                                                    <td class="text-end">₹{{ number_format($ws->unit_cost, 2) }}</td>
-                                                    <td class="text-end fw-bold">₹{{ number_format($ws->quantity * $ws->unit_cost, 2) }}</td>
+                                                    <td class="text-end">{{ format_currency($ws->unit_cost) }}</td>
+                                                    <td class="text-end fw-bold">{{ format_currency($ws->quantity * $ws->unit_cost) }}</td>
                                                     <td>
                                                         {{ number_format($product->reorder_point, 0) }}
                                                         @if($ws->quantity <= $product->reorder_point)
@@ -431,7 +430,7 @@
                                             <th>{{ __('inventory.sku_code') }}</th>
                                             <th>{{ __('inventory.selling_price') }}</th>
                                             <th>{{ __('inventory.cost_price') }}</th>
-                                            <th>Valuation Cost</th>
+                                            <th>{{ __('inventory.valuation_cost') }}</th>
                                             <th>{{ __('inventory.stock_on_hand') }}</th>
                                             <th class="text-end pe-4">{{ __('inventory.actions') }}</th>
                                         </tr>
@@ -447,17 +446,17 @@
                                                     {{ $variant->name }}
                                                 </td>
                                                 <td class="font-monospace">{{ $variant->sku }}</td>
-                                                <td>₹{{ number_format($variant->selling_price, 2) }}</td>
-                                                <td class="text-muted">₹{{ number_format($variant->cost_price, 2) }}</td>
-                                                <td class="fw-semibold text-primary">₹{{ number_format($variantAvgCost, 2) }}</td>
+                                                <td>{{ format_currency($variant->selling_price) }}</td>
+                                                <td class="text-muted">{{ format_currency($variant->cost_price) }}</td>
+                                                <td class="fw-semibold text-primary">{{ format_currency($variantAvgCost) }}</td>
                                                 <td class="fw-bold">
                                                     {{ number_format($variant->total_stock, 0) }}
                                                     <span class="text-muted fs-11">/ {{ $product->uom?->code ?? 'pcs' }}</span>
                                                 </td>
                                                 <td class="text-end pe-4">
                                                     <div class="d-inline-flex gap-1 justify-content-end align-items-center">
-                                                        <x-ui.icon-btn href="{{ route('inventory.products.show', $variant) }}" variant="soft-primary" icon="feather-eye" title="View Detail" />
-                                                        <x-ui.icon-btn href="{{ route('inventory.products.edit', $variant) }}" variant="soft-info" icon="feather-edit" title="Edit" />
+                                                        <x-ui.icon-btn href="{{ route('inventory.products.show', $variant) }}" variant="soft-primary" icon="feather-eye" :title="__('inventory.view_detail')" />
+                                                        <x-ui.icon-btn href="{{ route('inventory.products.edit', $variant) }}" variant="soft-info" icon="feather-edit" :title="__('inventory.edit')" />
                                                     </div>
                                                 </td>
                                             </tr>
@@ -529,8 +528,8 @@
                                                     @endif
                                                 </td>
                                                 <td class="text-end fw-bold">{{ number_format($tx->quantity, 0) }}</td>
-                                                <td class="text-end">₹{{ number_format($tx->unit_cost, 2) }}</td>
-                                                <td class="text-end fw-bold">₹{{ number_format($tx->total_value, 2) }}</td>
+                                                <td class="text-end">{{ format_currency($tx->unit_cost) }}</td>
+                                                <td class="text-end fw-bold">{{ format_currency($tx->total_value) }}</td>
                                                 <td class="text-end">
                                                     @if($tx->type === 'IN')
                                                         @if($tx->balance_qty > 0)

@@ -121,7 +121,7 @@
 
             <!-- Common Filter Component (Identical to Lead Listing) -->
             <form method="GET" action="{{ route('crm.leads.kanban') }}" class="d-inline">
-                <x-ui.filter :label="__('ui.filter')" offset="0, 5">
+                <x-ui.filter :label="__('crm.filter')" offset="0, 5">
                     <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                     
                     <div class="mb-3">
@@ -217,7 +217,7 @@
                         </span>
                     </div>
                     <div class="fs-11 text-muted fw-semibold mt-1">
-                        Total Value: <span class="text-dark font-monospace col-total">₹ {{ number_format($columnData['total_amount'], 2) }}</span>
+                        {{ __('crm.total_value') ?? 'Total Value' }}: <span class="text-dark font-monospace col-total">{{ format_currency($columnData['total_amount']) }}</span>
                     </div>
                 </div>
 
@@ -244,7 +244,7 @@
                                     {{ $lead->company_name }}
                                 </a>
                                 <span class="badge bg-soft-success text-success fs-10 font-monospace fw-bold">
-                                    ₹ {{ number_format($expAmt, 0) }}
+                                    {{ format_currency($expAmt) }}
                                 </span>
                             </div>
 
@@ -526,7 +526,8 @@
                 });
 
                 if (countBadge) countBadge.textContent = cards.length;
-                if (totalSpan) totalSpan.textContent = '₹ ' + totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                var currSym = window.AppCurrency?.symbol || @json(active_currency_symbol());
+                if (totalSpan) totalSpan.textContent = currSym + ' ' + totalVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             });
         }
     });

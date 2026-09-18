@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Quotations | SaaS ERP')
-@section('page-title', 'Quotations')
-@section('breadcrumb', 'CRM / Quotations')
+@section('title', __('crm.quotations') . ' | SaaS ERP')
+@section('page-title', __('crm.quotations'))
+@section('breadcrumb', __('crm.crm') . ' / ' . __('crm.quotations'))
 
 @section('content')
 
@@ -25,62 +25,71 @@
         
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex align-items-center mb-3">
-            <h5 class="fw-bold text-dark mb-0">Quotations Listing</h5>
+            <h5 class="fw-bold text-dark mb-0">{{ __('crm.quotations_listing') }}</h5>
             <div class="d-flex gap-2 ms-auto">
                 <!-- Custom Sort Component -->
-                <x-ui.sort-dropdown label="Sort">
+                <x-ui.sort-dropdown :label="__('crm.sort')">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'quotation_date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'quotation_date' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Quotation Date (Latest first)</span>
+                        <span>{{ __('crm.quotation_date_latest') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'quotation_date', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'quotation_date' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Quotation Date (Oldest first)</span>
+                        <span>{{ __('crm.quotation_date_oldest') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'quotation_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'quotation_number' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Quotation Number (A-Z)</span>
+                        <span>{{ __('crm.quotation_number_az') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'quotation_number', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'quotation_number' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Quotation Number (Z-A)</span>
+                        <span>{{ __('crm.quotation_number_za') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'total_amount', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'total_amount' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Total Amount (High to Low)</span>
+                        <span>{{ __('crm.total_amount_high_low') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'total_amount', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'total_amount' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Total Amount (Low to High)</span>
+                        <span>{{ __('crm.total_amount_low_high') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'customer_name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'customer_name' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Customer Name (A-Z)</span>
+                        <span>{{ __('crm.customer_name_az') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'customer_name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'customer_name' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Customer Name (Z-A)</span>
+                        <span>{{ __('crm.customer_name_za') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
                 <!-- Custom Filter Component -->
                 <form method="GET" action="{{ route('crm.quotations.index') }}" class="d-inline">
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter :label="__('crm.filter')" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
-                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Search quotation number, customer..." value="{{ request('search') }}" />
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
+                            <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_quotation_placeholder')" value="{{ request('search') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status">
-                                <option value="">All Statuses</option>
-                                @foreach(['Draft', 'Pending Approval', 'Approved', 'Sent', 'Quotation Sent', 'Accepted', 'Rejected', 'Quotation Rework'] as $statusOption)
-                                    <option value="{{ $statusOption }}" {{ request('status') === $statusOption ? 'selected' : '' }}>{{ $statusOption }}</option>
+                                <option value="">{{ __('crm.all_statuses') }}</option>
+                                @foreach([
+                                    'Draft' => __('crm.status_draft'),
+                                    'Pending Approval' => __('crm.status_pending_approval'),
+                                    'Approved' => __('crm.status_approved'),
+                                    'Sent' => __('crm.status_sent'),
+                                    'Quotation Sent' => __('crm.status_quotation_sent'),
+                                    'Accepted' => __('crm.status_accepted'),
+                                    'Rejected' => __('crm.status_rejected'),
+                                    'Quotation Rework' => __('crm.status_quotation_rework')
+                                ] as $statusVal => $statusLabel)
+                                    <option value="{{ $statusVal }}" {{ request('status') === $statusVal ? 'selected' : '' }}>{{ $statusLabel }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('crm.quotations.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('crm.quotations.index') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -95,13 +104,13 @@
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" class="form-check-input">
                         </th>
-                        <th>Quotation #</th>
-                        <th>Customer</th>
-                        <th>Date</th>
-                        <th>Expiry Date</th>
-                        <th class="text-end">Total Amount</th>
-                        <th class="ps-4">Status</th>
-                        <th class="text-end pe-4">Action</th>
+                        <th>{{ __('crm.quotation_num_col') }}</th>
+                        <th>{{ __('crm.customer') }}</th>
+                        <th>{{ __('crm.date') }}</th>
+                        <th>{{ __('crm.expiry_date') }}</th>
+                        <th class="text-end">{{ __('crm.total_amount') }}</th>
+                        <th class="ps-4">{{ __('crm.status') }}</th>
+                        <th class="text-end pe-4">{{ __('crm.action') }}</th>
                     </tr>
                 </thead>
                 <tbody class="fs-13 text-dark">
@@ -118,7 +127,7 @@
                             </td>
                             <td>{{ $quotation->quotation_date ? $quotation->quotation_date->format('d/m/Y') : '—' }}</td>
                             <td>{{ $quotation->expiry_date ? $quotation->expiry_date->format('d/m/Y') : '—' }}</td>
-                            <td class="text-end fw-bold text-dark">₹{{ number_format($quotation->total_amount, 2) }}</td>
+                            <td class="text-end fw-bold text-dark">{{ format_currency($quotation->total_amount) }}</td>
                             <td class="ps-4">
                                 @php
                                     $displayStatus = $quotation->status;
@@ -134,9 +143,22 @@
                                     }
                                     elseif ($quotation->status === 'Converted') $badgeClass = 'bg-soft-success text-success';
                                 @endphp
-                                <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $displayStatus }}</span>
+                                <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">
+                                    @if($displayStatus === 'Draft') {{ __('crm.status_draft') }}
+                                    @elseif($displayStatus === 'Pending Approval') {{ __('crm.status_pending_approval') }}
+                                    @elseif($displayStatus === 'Approved') {{ __('crm.status_approved') }}
+                                    @elseif($displayStatus === 'Sent') {{ __('crm.status_sent') }}
+                                    @elseif($displayStatus === 'Quotation Sent') {{ __('crm.status_quotation_sent') }}
+                                    @elseif($displayStatus === 'Accepted') {{ __('crm.status_accepted') }}
+                                    @elseif($displayStatus === 'Pending') {{ __('crm.status_pending') }}
+                                    @elseif($displayStatus === 'Converted') {{ __('crm.status_converted') }}
+                                    @elseif($displayStatus === 'Rejected') {{ __('crm.status_rejected') }}
+                                    @elseif($displayStatus === 'Quotation Rework') {{ __('crm.status_quotation_rework') }}
+                                    @else {{ $displayStatus }}
+                                    @endif
+                                </span>
                                 @if ($quotation->status === 'Rejected' && $quotation->rejection_reason)
-                                    <small class="d-block text-danger fs-11 mt-1 text-truncate" style="max-width: 180px;" title="Reason: {{ $quotation->rejection_reason }}" data-bs-toggle="tooltip">
+                                    <small class="d-block text-danger fs-11 mt-1 text-truncate" style="max-width: 180px;" title="{{ __('crm.rejection_reason_label') }}: {{ $quotation->rejection_reason }}" data-bs-toggle="tooltip">
                                         <i class="feather-alert-circle me-1"></i>{{ $quotation->rejection_reason }}
                                     </small>
                                 @endif
@@ -152,11 +174,11 @@
                                                 || !empty($quotation->account?->customer_id);
                                         @endphp
                                         @if (!$hasCustomer)
-                                            <a href="{{ $quotation->crm_deal_id ? route('crm.deals.showConvertForm', $quotation->crm_deal_id) : route('crm.quotations.showConvertForm', $quotation->id) }}" class="action-dropdown-btn" title="Convert to Customer" data-bs-toggle="tooltip" style="color: #d97706; border-color: #fde68a; background-color: #fef3c7; text-decoration: none;">
+                                            <a href="{{ $quotation->crm_deal_id ? route('crm.deals.showConvertForm', $quotation->crm_deal_id) : route('crm.quotations.showConvertForm', $quotation->id) }}" class="action-dropdown-btn" title="{{ __('crm.convert_to_customer') }}" data-bs-toggle="tooltip" style="color: #d97706; border-color: #fde68a; background-color: #fef3c7; text-decoration: none;">
                                                 <i class="feather-user-check"></i>
                                             </a>
                                         @else
-                                            <a href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" class="action-dropdown-btn" title="Convert to Sales Order" data-bs-toggle="tooltip" style="color: #6366f1; border-color: #c7d2fe; background-color: #e0e7ff; text-decoration: none;">
+                                            <a href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" class="action-dropdown-btn" title="{{ __('crm.convert_to_sales_order') }}" data-bs-toggle="tooltip" style="color: #6366f1; border-color: #c7d2fe; background-color: #e0e7ff; text-decoration: none;">
                                                 <i class="feather-shopping-cart"></i>
                                             </a>
                                         @endif
@@ -166,7 +188,7 @@
                                         @if ($quotation->lead_id && $quotation->status !== 'Accepted')
                                             <li>
                                                 <a href="{{ route('crm.leads.show', ['lead' => $quotation->lead_id, 'edit_quotation' => 1, 'active_quotation_id' => $quotation->id]) }}" class="dropdown-item">
-                                                    <i class="feather-edit me-2 text-muted fs-12"></i>Edit Quotation
+                                                    <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('crm.edit_quotation') }}
                                                 </a>
                                             </li>
                                         @endif
@@ -176,13 +198,13 @@
                                                 <form action="{{ route('crm.quotations.approve', $quotation->id) }}" method="POST" class="d-inline">
                                                     @csrf
                                                     <button type="submit" class="dropdown-item text-success">
-                                                        <i class="feather-check me-2 text-success fs-12"></i>Approve
+                                                        <i class="feather-check me-2 text-success fs-12"></i>{{ __('crm.approve') }}
                                                     </button>
                                                 </form>
                                             </li>
                                             <li>
                                                 <button type="button" class="dropdown-item text-danger" onclick="openRejectModal('{{ route('crm.quotations.reject', $quotation->id) }}', '{{ $quotation->quotation_number }}')">
-                                                    <i class="feather-x me-2 text-danger fs-12"></i>Reject
+                                                    <i class="feather-x me-2 text-danger fs-12"></i>{{ __('crm.reject') }}
                                                 </button>
                                             </li>
                                         @endif
@@ -193,8 +215,8 @@
                                                 @csrf
                                                 @method('DELETE')
 
-                                                <button type="button" class="dropdown-item text-danger" onclick="confirmAction({ title: 'Delete Quotation', message: 'Are you sure you want to delete this quotation?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteQuoIndexForm_{{ $quotation->id }}').submit(); })">
-                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Quotation
+                                                <button type="button" class="dropdown-item text-danger" onclick="confirmAction({ title: '{{ __('crm.delete_quotation') }}', message: '{{ __('crm.delete_quotation_confirm') }}', variant: 'danger', confirmText: '{{ __('crm.delete_quotation') }}' }, function() { document.getElementById('deleteQuoIndexForm_{{ $quotation->id }}').submit(); })">
+                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('crm.delete_quotation') }}
                                                 </button>
                                             </form>
                                         </li>
@@ -206,7 +228,7 @@
                         <tr>
                             <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="feather-file-text fs-1 mb-2 d-block"></i>
-                                No quotations found in this tenant workspace.
+                                {{ __('crm.no_quotations_found') }}
                             </td>
                         </tr>
                     @endforelse
@@ -281,22 +303,22 @@
                     @csrf
                     <div class="modal-header bg-soft-danger text-danger border-bottom-0">
                         <h5 class="modal-title fw-bold" id="rejectQuotationModalLabel">
-                            <i class="feather-x-circle me-2"></i>Reject Quotation <span id="rejectModalQuotationNumber" class="text-dark"></span>
+                            <i class="feather-x-circle me-2"></i>{{ __('crm.reject_quotation') }} <span id="rejectModalQuotationNumber" class="text-dark"></span>
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-4">
-                        <p class="text-muted fs-12 mb-3">Please specify the reason for rejecting this quotation. This reason will be saved in audit history and displayed on the quotation detail screen.</p>
+                        <p class="text-muted fs-12 mb-3">{{ __('crm.reject_quotation_subtext') }}</p>
                         
                         <div class="mb-3 text-start">
-                            <label for="rejectionReasonInput" class="form-label fw-bold text-dark fs-12 mb-1">Rejection Reason / Remarks <span class="text-danger">*</span></label>
-                            <textarea class="form-control" id="rejectionReasonInput" name="rejection_reason" rows="4" placeholder="Enter reason for rejection (e.g., Price too high, Scope changed, Customer declined, etc.)..." required></textarea>
+                            <label for="rejectionReasonInput" class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.rejection_reason_label') }} <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="rejectionReasonInput" name="rejection_reason" rows="4" placeholder="{{ __('crm.rejection_reason_placeholder') }}" required></textarea>
                         </div>
                     </div>
                     <div class="modal-footer bg-light border-top-0 px-4 py-3">
-                        <button type="button" class="btn btn-light btn-sm border text-uppercase fs-11 fw-bold" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-light btn-sm border text-uppercase fs-11 fw-bold" data-bs-dismiss="modal">{{ __('crm.cancel') }}</button>
                         <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold text-uppercase fs-11" style="background-color: #ea580c; border-color: #ea580c;">
-                            <i class="feather-x-circle me-1"></i> Confirm Rejection
+                            <i class="feather-x-circle me-1"></i> {{ __('crm.confirm_rejection') }}
                         </button>
                     </div>
                 </form>

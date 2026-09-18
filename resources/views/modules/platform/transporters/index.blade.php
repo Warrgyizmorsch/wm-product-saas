@@ -1,12 +1,12 @@
 @extends('layouts.duralux')
 
-@section('title', 'Transporters Directory | SaaS ERP')
-@section('page-title', 'Transporters Directory')
-@section('breadcrumb', 'Logistics / Transporters')
+@section('title', __('crm.transporters_directory') . ' | SaaS ERP')
+@section('page-title', __('crm.transporters_directory'))
+@section('breadcrumb', __('crm.logistics_transporters_breadcrumb'))
 
 @section('page-actions')
     <x-ui.button href="{{ route('platform.transporters.create') }}" variant="primary" icon="feather-plus">
-        NEW TRANSPORTER
+        {{ __('crm.new_transporter') }}
     </x-ui.button>
 @endsection
 
@@ -28,7 +28,7 @@
 
         {{-- 1. Header & Actions Toolbar --}}
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-            <h5 class="fw-bold text-dark mb-0"><i class="feather-truck text-primary me-2"></i>Transporters Listing</h5>
+            <h5 class="fw-bold text-dark mb-0"><i class="feather-truck text-primary me-2"></i>{{ __('crm.transporters_listing') }}</h5>
 
             <div class="d-flex align-items-center flex-wrap gap-2">
                 <!-- Search Box -->
@@ -39,28 +39,28 @@
                         @endif
                     @endforeach
                     <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
-                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="Search name, ID, GSTIN, phone..." value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('crm.search_transporter_placeholder') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
                     @if(request('search'))
-                        <a href="{{ route('platform.transporters.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search">
+                        <a href="{{ route('platform.transporters.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="{{ __('crm.reset') }}">
                             <i class="feather-x fs-12"></i>
                         </a>
                     @endif
                 </form>
 
                 <!-- Sort Dropdown -->
-                <x-ui.sort-dropdown label="SORT">
+                <x-ui.sort-dropdown :label="__('crm.sort') ?: 'SORT'">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Latest Created</span>
+                        <span>{{ __('crm.latest_created') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Oldest Created</span>
+                        <span>{{ __('crm.oldest_created') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Transporter Name (A - Z)</span>
+                        <span>{{ __('crm.transporter_name_az') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Transporter Name (Z - A)</span>
+                        <span>{{ __('crm.transporter_name_za') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
@@ -71,24 +71,24 @@
                             <input type="hidden" name="{{ $k }}" value="{{ $v }}">
                         @endif
                     @endforeach
-                    <x-ui.filter label="FILTER" offset="0, 5">
+                    <x-ui.filter :label="__('crm.filter') ?: 'FILTER'" offset="0, 5">
                         <div class="p-3 style-filter-menu" style="min-width: 250px;">
-                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
-                                <x-ui.odoo-form-ui type="input" name="search" placeholder="Search transporter name, phone..." value="{{ request('search') }}" />
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
+                                <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_transporter_placeholder')" value="{{ request('search') }}" />
                             </div>
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Transporter Status</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.transporter_status_label') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="status">
-                                    <option value="all" @selected(request('status', 'all') === 'all')>All Transporters</option>
-                                    <option value="active" @selected(request('status') === 'active')>Active Only</option>
-                                    <option value="inactive" @selected(request('status') === 'inactive')>Inactive Only</option>
+                                    <option value="all" @selected(request('status', 'all') === 'all')>{{ __('crm.all_transporters') }}</option>
+                                    <option value="active" @selected(request('status') === 'active')>{{ __('crm.active_only') }}</option>
+                                    <option value="inactive" @selected(request('status') === 'inactive')>{{ __('crm.inactive_only') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="d-flex justify-content-between pt-2 border-top">
-                                <a href="{{ route('platform.transporters.index') }}" class="btn btn-xs btn-light">Reset</a>
-                                <x-ui.button type="submit" variant="primary" size="xs">Apply Filter</x-ui.button>
+                                <a href="{{ route('platform.transporters.index') }}" class="btn btn-xs btn-light">{{ __('crm.reset') }}</a>
+                                <x-ui.button type="submit" variant="primary" size="xs">{{ __('crm.apply_filters') }}</x-ui.button>
                             </div>
                         </div>
                     </x-ui.filter>
@@ -104,13 +104,13 @@
                         <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
                             <input type="checkbox" class="form-check-input" id="selectAllTransporters">
                         </th>
-                        <th style="background-color: #e8ecf1 !important;">Transporter Name</th>
-                        <th style="background-color: #e8ecf1 !important;">15-Digit Transporter ID</th>
-                        <th style="background-color: #e8ecf1 !important;">GSTIN / PAN</th>
-                        <th style="background-color: #e8ecf1 !important;">Phone / Mobile</th>
-                        <th style="background-color: #e8ecf1 !important;">City / State</th>
-                        <th style="background-color: #e8ecf1 !important;">Status</th>
-                        <th style="width: 8%; background-color: #e8ecf1 !important;" class="text-end pe-3">Action</th>
+                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.transporter_name_col') }}</th>
+                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.transporter_id_col') }}</th>
+                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.gstin_pan_col') }}</th>
+                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.phone_mobile_col') }}</th>
+                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.city_state_col') }}</th>
+                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.status') }}</th>
+                        <th style="width: 8%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -166,59 +166,59 @@
                             </td>
                             <td>
                                 @if(strtolower($transporter->status) === 'active')
-                                    <x-ui.status-badge status="active" label="Active" size="sm" />
+                                    <x-ui.status-badge status="active" :label="__('crm.active')" size="sm" />
                                 @else
-                                    <x-ui.status-badge status="inactive" label="Inactive" size="sm" />
+                                    <x-ui.status-badge status="inactive" :label="__('crm.inactive')" size="sm" />
                                 @endif
                             </td>
                             <td class="text-end pe-3">
                                 <x-ui.action-dropdown :viewUrl="route('platform.transporters.show', $transporter)">
                                     <li>
                                         <a href="{{ route('platform.transporters.show', $transporter) }}" class="dropdown-item fs-12 py-1.5">
-                                            <i class="feather-eye me-2 text-primary"></i>View 360° Profile
+                                            <i class="feather-eye me-2 text-primary"></i>{{ __('crm.view_360_profile') }}
                                         </a>
                                     </li>
                                     <li>
                                         <button type="button" class="dropdown-item fs-12 py-1.5" data-bs-toggle="modal" data-bs-target="#editTransporterModal{{ $transporter->id }}">
-                                            <i class="feather-edit-2 me-2 text-info"></i>Edit Quick Master
+                                            <i class="feather-edit-2 me-2 text-info"></i>{{ __('crm.edit_quick_master') }}
                                         </button>
                                     </li>
                                     <li><hr class="dropdown-divider my-1"></li>
                                     <li>
-                                        <form method="POST" action="{{ route('platform.transporters.destroy', $transporter) }}" onsubmit="return confirm('Are you sure you want to delete this transporter?');">
+                                        <form method="POST" action="{{ route('platform.transporters.destroy', $transporter) }}" onsubmit="return confirm('{{ __('crm.confirm_delete_transporter') }}');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="dropdown-item fs-12 py-1.5 text-danger">
-                                                <i class="feather-trash-2 me-2"></i>Delete Transporter
+                                                <i class="feather-trash-2 me-2"></i>{{ __('crm.delete_transporter') }}
                                             </button>
                                         </form>
                                     </li>
                                 </x-ui.action-dropdown>
 
                                 <!-- Edit Modal Component for each row -->
-                                <x-ui.modal id="editTransporterModal{{ $transporter->id }}" title="Edit Transporter Master" size="md" :centered="true" :formAction="route('platform.transporters.update', $transporter)" formMethod="PUT" submitText="Save Changes" closeText="Cancel">
+                                <x-ui.modal id="editTransporterModal{{ $transporter->id }}" :title="__('crm.edit_transporter_master')" size="md" :centered="true" :formAction="route('platform.transporters.update', $transporter)" formMethod="PUT" :submitText="__('crm.save_changes')" :closeText="__('crm.cancel')">
                                     <div class="mb-3">
-                                        <x-ui.odoo-form-ui type="input" label="Transporter Name" name="name" :value="$transporter->name" :required="true" />
+                                        <x-ui.odoo-form-ui type="input" :label="__('crm.transporter_name_field')" name="name" :value="$transporter->name" :required="true" />
                                     </div>
                                     <div class="mb-3">
-                                        <x-ui.odoo-form-ui type="input" label="Transporter Code" name="code" :value="$transporter->code" placeholder="e.g. TRP-001" />
+                                        <x-ui.odoo-form-ui type="input" :label="__('crm.transporter_master_code')" name="code" :value="$transporter->code" placeholder="e.g. TRP-001" />
                                     </div>
                                     <div class="mb-3">
-                                        <x-ui.odoo-form-ui type="input" label="15-Digit Transporter ID (E-Way Bill)" name="transporter_id" :value="$transporter->transporter_id" placeholder="Optional 15-digit ID" />
+                                        <x-ui.odoo-form-ui type="input" :label="__('crm.transporter_id_eway')" name="transporter_id" :value="$transporter->transporter_id" placeholder="Optional 15-digit ID" />
                                     </div>
                                     <div class="mb-3">
-                                        <x-ui.odoo-form-ui type="input" label="GSTIN Number" name="gstin" :value="$transporter->gstin" placeholder="Optional 15-digit GSTIN" />
+                                        <x-ui.odoo-form-ui type="input" :label="__('crm.gstin_number_field')" name="gstin" :value="$transporter->gstin" placeholder="Optional 15-digit GSTIN" />
                                     </div>
                                     <div class="mb-3">
-                                        <x-ui.odoo-form-ui type="input" label="Phone Number" name="phone" :value="$transporter->phone" placeholder="Mobile / Landline" />
+                                        <x-ui.odoo-form-ui type="input" :label="__('crm.phone_mobile_col')" name="phone" :value="$transporter->phone" placeholder="Mobile / Landline" />
                                     </div>
                                     <div class="mb-3">
-                                        <x-ui.odoo-form-ui type="input" inputType="email" label="Email Address" name="email" :value="$transporter->email" placeholder="email@domain.com" />
+                                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.official_email_address')" name="email" :value="$transporter->email" placeholder="email@domain.com" />
                                     </div>
                                     <div class="mb-3">
-                                        <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true" :searchable="false">
-                                            <option value="active" @selected($transporter->status === 'active')>Active</option>
-                                            <option value="inactive" @selected($transporter->status === 'inactive')>Inactive</option>
+                                        <x-ui.odoo-form-ui type="select" :label="__('crm.active_status')" name="status" :required="true" :searchable="false">
+                                            <option value="active" @selected($transporter->status === 'active')>{{ __('crm.active') }}</option>
+                                            <option value="inactive" @selected($transporter->status === 'inactive')>{{ __('crm.inactive') }}</option>
                                         </x-ui.odoo-form-ui>
                                     </div>
                                 </x-ui.modal>
@@ -228,10 +228,10 @@
                         <tr>
                             <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="feather-truck fs-32 d-block mb-2 text-muted"></i>
-                                No transporters found matching your criteria.
+                                {{ __('crm.no_transporters_found') }}
                                 <div class="mt-2">
                                     <a href="{{ route('platform.transporters.create') }}" class="btn btn-sm btn-primary">
-                                        <i class="feather-plus me-1"></i>New Transporter Master
+                                        <i class="feather-plus me-1"></i>{{ __('crm.new_transporter_master') }}
                                     </a>
                                 </div>
                             </td>
@@ -244,7 +244,7 @@
         {{-- 3. Common ERP Pagination Component --}}
         @if($transporters->hasPages())
             <div class="pt-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span class="fs-12 text-muted">Showing {{ $transporters->firstItem() }} to {{ $transporters->lastItem() }} of {{ $transporters->total() }} transporters</span>
+                <span class="fs-12 text-muted">{{ __('crm.showing_transporters', ['from' => $transporters->firstItem(), 'to' => $transporters->lastItem(), 'total' => $transporters->total()]) }}</span>
                 {{ $transporters->links() }}
             </div>
         @endif

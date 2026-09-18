@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Process Sales Return | SaaS ERP')
-@section('page-title', 'Create Sales Return')
-@section('breadcrumb', 'Sales / Returns / Create')
+@section('title', __('crm.process_sales_return') . ' | SaaS ERP')
+@section('page-title', __('crm.create_return'))
+@section('breadcrumb', __('crm.sales') . ' / ' . __('crm.sales_returns') . ' / ' . __('crm.create'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -19,7 +19,7 @@
 @endpush
 
 @section('content')
-    <div class="erp-single-panel bg-white p-4">
+    <div class="erp-single-panel single-panal-erp bg-white p-4">
 
         <form action="{{ route('sales.returns.store') }}" method="POST" id="returnForm">
             @csrf
@@ -27,29 +27,29 @@
             <x-ui.odoo-form-ui type="sheet">
                 <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2 flex-wrap gap-2">
                     <div>
-                        <h4 class="fw-bold text-dark mb-0">Record Customer Return</h4>
-                        <span class="fs-12 text-muted">Create a sales return against an Order or directly for Over-The-Counter / Walk-in returns.</span>
+                        <h4 class="fw-bold text-dark mb-0">{{ __('crm.record_customer_return') }}</h4>
+                        <span class="fs-12 text-muted">{{ __('crm.record_customer_return_subtitle') }}</span>
                     </div>
                     <div class="d-flex gap-2">
-                        <x-ui.button href="{{ route('sales.returns.index') }}" variant="light" size="sm" class="border">Cancel</x-ui.button>
-                        <x-ui.button type="submit" id="saveReturnBtn" variant="primary" size="sm" icon="feather-save" style="background-color: #714B67; border-color: #714B67;">Save Return Draft</x-ui.button>
+                        <x-ui.button href="{{ route('sales.returns.index') }}" variant="light" size="sm" class="border">{{ __('crm.cancel') }}</x-ui.button>
+                        <x-ui.button type="submit" id="saveReturnBtn" variant="primary" size="sm" icon="feather-save" style="background-color: #714B67; border-color: #714B67;">{{ __('crm.save_return_draft') }}</x-ui.button>
                     </div>
                 </div>
 
                 <!-- Mode Switcher Bar -->
                 <div class="mb-4 bg-light p-3 rounded border">
-                    <label class="form-label fw-bold fs-11 text-uppercase text-muted d-block mb-2">Return Creation Mode:</label>
+                    <label class="form-label fw-bold fs-11 text-uppercase text-muted d-block mb-2">{{ __('crm.return_creation_mode') }}</label>
                     <div class="d-flex gap-4 flex-wrap align-items-center">
                         <div class="form-check">
                             <input class="form-check-input mode-radio" type="radio" name="return_mode" id="mode_so" value="so" checked autocomplete="off">
                             <label class="form-check-label fw-bold text-dark fs-13" for="mode_so">
-                                <i class="feather-file-text me-1 text-primary"></i>Against Sales Order
+                                <i class="feather-file-text me-1 text-primary"></i>{{ __('crm.against_sales_order') }}
                             </label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input mode-radio" type="radio" name="return_mode" id="mode_direct" value="direct" autocomplete="off">
                             <label class="form-check-label fw-bold text-dark fs-13" for="mode_direct">
-                                <i class="feather-plus-circle me-1 text-success"></i>Direct Return (Over-The-Counter / Walk-in)
+                                <i class="feather-plus-circle me-1 text-success"></i>{{ __('crm.direct_return') }}
                             </label>
                         </div>
                     </div>
@@ -58,30 +58,30 @@
                 <div class="row g-4 mb-4 fs-13 text-dark">
                     <!-- Column 1: Source Document & Customer -->
                     <div class="col-md-6 border-end pe-md-4">
-                        <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-2"></i>Customer & Sales Reference</h6>
+                        <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-2"></i>{{ __('crm.customer_sales_ref') }}</h6>
                         
                         <!-- SO Selector (SO Mode) -->
                         <div id="soSelectBlock">
-                            <x-ui.odoo-form-ui type="select" label="Sales Order Reference" name="sales_order_id" id="salesOrderSelect" class="odoo-select2">
-                                <option value="">Select Sales Order...</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.sales_order_ref')" name="sales_order_id" id="salesOrderSelect" class="odoo-select2">
+                                <option value="">{{ __('crm.select_sales_order_placeholder') }}</option>
                                 @foreach ($salesOrders as $so)
                                     <option value="{{ $so->id }}" @selected(old('sales_order_id', $prefillSalesOrderId) == $so->id)>
-                                        {{ $so->sales_order_number }} (Customer: {{ $so->customer?->name }})
+                                        {{ $so->sales_order_number }} ({{ __('crm.customer') }}: {{ $so->customer?->name }})
                                     </option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
                             <div id="invoiceSelectWrapper" class="mt-3">
-                                <x-ui.odoo-form-ui type="select" label="Sales Invoice Reference (Exact Tax & Line Mapping)" name="invoice_id" id="invoiceSelect" class="odoo-select2">
-                                    <option value="">-- Select Sales Invoice --</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('crm.invoice_ref')" name="invoice_id" id="invoiceSelect" class="odoo-select2">
+                                    <option value="">{{ __('crm.select_invoice_option') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                         </div>
 
                         <!-- Customer Selector (Direct Mode) -->
                         <div id="customerSelectBlock" style="display: none;">
-                            <x-ui.odoo-form-ui type="select" label="Customer Name" name="customer_id" id="customerSelect" class="odoo-select2">
-                                <option value="">Select Customer...</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.customer_name')" name="customer_id" id="customerSelect" class="odoo-select2">
+                                <option value="">{{ __('crm.select_customer') }}</option>
                                 @foreach($customers as $c)
                                     <option value="{{ $c->id }}" @selected(old('customer_id', $prefillCustomerId) == $c->id)>
                                         {{ $c->name }} {{ $c->code ? "({$c->code})" : '' }}
@@ -90,15 +90,15 @@
                             </x-ui.odoo-form-ui>
                         </div>
 
-                        <x-ui.odoo-form-ui type="input" label="Reason for Return" name="reason" :value="old('reason')" placeholder="e.g. Defective items, wrong size delivered..." />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.reason_for_return')" name="reason" :value="old('reason')" :placeholder="__('crm.reason_placeholder')" />
                     </div>
 
                     <!-- Column 2: Date & Return Code -->
                     <div class="col-md-6 ps-md-4">
-                        <h6 class="fw-bold text-primary mb-3"><i class="feather-calendar me-2"></i>Return Details</h6>
-                        <x-ui.odoo-form-ui type="input" label="Return Number" name="return_number" :value="old('return_number', $nextReturnNumber)" :readonly="true" :required="true" style="font-weight: bold;" />
+                        <h6 class="fw-bold text-primary mb-3"><i class="feather-calendar me-2"></i>{{ __('crm.return_details') }}</h6>
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.return_number')" name="return_number" :value="old('return_number', $nextReturnNumber)" :readonly="true" :required="true" style="font-weight: bold;" />
 
-                        <x-ui.odoo-form-ui type="input" inputType="date" label="Return Date" name="return_date" :value="old('return_date', date('Y-m-d'))" :required="true" />
+                        <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.return_date')" name="return_date" :value="old('return_date', date('Y-m-d'))" :required="true" />
                     </div>
                 </div>
 
@@ -106,8 +106,8 @@
                 <div class="border-top pt-4 mt-4">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
-                            <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-rotate-ccw me-2 text-danger"></i>Items to Return</h6>
-                            <span id="itemsHint" class="fs-12 text-muted">Select a Sales Order / Invoice to populate return items.</span>
+                            <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-rotate-ccw me-2 text-danger"></i>{{ __('crm.items_to_return') }}</h6>
+                            <span id="itemsHint" class="fs-12 text-muted">{{ __('crm.select_so_hint') }}</span>
                         </div>
                     </div>
 
@@ -115,17 +115,17 @@
                         <x-ui.odoo-form-ui type="table" id="returnItemsTable">
                             <thead class="table-light fs-12">
                                 <tr>
-                                    <th style="width: 40%;" class="ps-3">Product Details & Serials</th>
-                                    <th style="width: 25%;">Restock Warehouse</th>
-                                    <th class="text-end" style="width: 13%;">Return Qty</th>
-                                    <th class="text-end pe-3" style="width: 17%;">Refund Unit Price</th>
+                                    <th style="width: 40%;" class="ps-3">{{ __('crm.product_details_serials') }}</th>
+                                    <th style="width: 25%;">{{ __('crm.restock_warehouse') }}</th>
+                                    <th class="text-end" style="width: 13%;">{{ __('crm.return_qty') }}</th>
+                                    <th class="text-end pe-3" style="width: 17%;">{{ __('crm.refund_unit_price') }}</th>
                                     <th class="text-center pe-3" style="width: 5%;"></th>
                                 </tr>
                             </thead>
                             <tbody id="returnItemsBody" class="fs-13 text-dark">
                                 <tr id="emptyItemsRow">
                                     <td colspan="5" class="text-center text-muted py-4 fs-12">
-                                        <i class="feather-info me-1"></i>Please select a Sales Order / Invoice to populate items.
+                                        <i class="feather-info me-1"></i>{{ __('crm.please_select_so_invoice') }}
                                     </td>
                                 </tr>
                             </tbody>
@@ -135,19 +135,20 @@
                     <!-- Add a line button outside table (Direct Mode) -->
                     <div class="mt-3" id="directAddContainer" style="display: none;">
                         <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addDirectItemBtn" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
-                            <i class="feather-plus me-1"></i>Add a line
+                            <i class="feather-plus me-1"></i>{{ __('crm.add_a_line') }}
                         </button>
                     </div>
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                    <x-ui.button href="{{ route('sales.returns.index') }}" variant="light" class="border px-4">Discard</x-ui.button>
-                    <x-ui.button type="submit" id="saveReturnBtnFooter" variant="primary" icon="feather-save" class="px-4" style="background-color: #714B67; border-color: #714B67;">Save Return Draft</x-ui.button>
+                    <x-ui.button href="{{ route('sales.returns.index') }}" variant="light" class="border px-4">{{ __('crm.discard') }}</x-ui.button>
+                    <x-ui.button type="submit" id="saveReturnBtnFooter" variant="primary" icon="feather-save" class="px-4" style="background-color: #714B67; border-color: #714B67;">{{ __('crm.save_return_draft') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>
     </div>
 @endsection
+
 
 @push('scripts')
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>

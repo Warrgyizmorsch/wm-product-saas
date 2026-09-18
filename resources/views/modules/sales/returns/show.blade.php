@@ -1,23 +1,23 @@
 @extends('layouts.duralux')
 
-@section('title', 'Sales Return | ' . $return->return_number)
-@section('page-title', 'Sales Return ' . $return->return_number)
-@section('breadcrumb', 'Sales / Returns / Details')
+@section('title', __('crm.sales_returns') . ' | ' . $return->return_number)
+@section('page-title', __('crm.sales_returns') . ' ' . $return->return_number)
+@section('breadcrumb', __('crm.sales') . ' / ' . __('crm.sales_returns') . ' / ' . __('crm.view_record'))
 
 @section('page-actions')
-    <a href="{{ route('sales.returns.index') }}" class="action-dropdown-btn" title="Back to Returns" data-bs-toggle="tooltip">
+    <a href="{{ route('sales.returns.index') }}" class="action-dropdown-btn" title="{{ __('crm.view_return_details') }}" data-bs-toggle="tooltip">
         <i class="feather feather-arrow-left"></i>
     </a>
 
     <a href="javascript:void(0)" onclick="window.print()" class="btn btn-sm btn-outline-secondary fw-bold px-3 d-print-none">
-        <i class="feather-printer me-1.5"></i>Print
+        <i class="feather-printer me-1.5"></i>{{ __('crm.print') }}
     </a>
 
     @if (in_array($return->status, ['Pending', 'Draft']))
         <form action="{{ route('sales.returns.approve', $return->id) }}" method="POST" id="approveReturnForm" class="d-inline d-print-none">
             @csrf
             <button type="button" class="btn btn-sm btn-success py-1.5 px-3 fw-bold" onclick="confirmAction({ title: 'Approve Sales Return', message: 'Approve sales return {{ $return->return_number }}? This will restore returned stock to inventory.', variant: 'success', confirmText: 'Approve & Restock' }, function() { document.getElementById('approveReturnForm').submit(); })">
-                <i class="feather-check-circle me-1"></i>Approve & Restock Inventory
+                <i class="feather-check-circle me-1"></i>{{ __('crm.approve_restock_inventory') }}
             </button>
         </form>
     @endif
@@ -213,7 +213,7 @@
                             </div>
                             <div>
                                 <h4 class="fw-bold text-dark mb-0 fs-17">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</h4>
-                                <span class="fs-11 text-muted">Sales Return / Credit Voucher Unit</span>
+                                <span class="fs-11 text-muted">{{ __('crm.sales_return_unit') }}</span>
                             </div>
                         </div>
                         <div class="fs-12 text-secondary leading-relaxed">
@@ -224,24 +224,24 @@
                     </div>
 
                     <div class="col-5 text-end">
-                        <h2 class="fw-black text-uppercase tracking-wide mb-1" style="color: #1e40af; font-size: 22px; letter-spacing: 1px;">CREDIT NOTE</h2>
+                        <h2 class="fw-black text-uppercase tracking-wide mb-1" style="color: #1e40af; font-size: 22px; letter-spacing: 1px;">{{ __('crm.credit_note') }}</h2>
                         <div class="fs-14 fw-bold text-dark"># {{ $return->return_number }}</div>
                         
                         <div class="mt-3 fs-12 text-secondary">
                             <div class="d-flex justify-content-end gap-2 mb-1">
-                                <span class="text-muted">Return Date:</span>
+                                <span class="text-muted">{{ __('crm.return_date') }}:</span>
                                 <strong class="text-dark">{{ date('d-M-Y', strtotime($return->return_date)) }}</strong>
                             </div>
                             @if ($return->salesOrder)
                                 <div class="d-flex justify-content-end gap-2 mb-1">
-                                    <span class="text-muted">Origin Order:</span>
+                                    <span class="text-muted">{{ __('crm.sales_order_ref') }}:</span>
                                     <a href="{{ route('sales.orders.show', $return->sales_order_id) }}" class="fw-bold text-primary">
                                         {{ $return->salesOrder->sales_order_number }}
                                     </a>
                                 </div>
                             @endif
                             <div class="d-flex justify-content-end gap-2">
-                                <span class="text-muted">Status:</span>
+                                <span class="text-muted">{{ __('crm.status') }}:</span>
                                 <strong class="{{ $return->status === 'Completed' ? 'text-success' : ($return->status === 'Cancelled' ? 'text-danger' : 'text-primary') }}">
                                     {{ $return->status }}
                                 </strong>
@@ -256,7 +256,7 @@
                     <div class="col-6">
                         <div class="p-3 bg-light bg-opacity-40 rounded border h-100 d-flex flex-column justify-content-between">
                             <div>
-                                <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-3" style="letter-spacing: 0.5px;">Customer / Client:</span>
+                                <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-3" style="letter-spacing: 0.5px;">{{ __('crm.customer') }}:</span>
                                 
                                 <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
                                     <div class="avatar-text bg-primary text-white fw-bold me-3 d-flex align-items-center justify-content-center rounded-3 shadow-sm" style="width: 42px; height: 42px; font-size: 16px; flex-shrink: 0; background-color: #1e40af !important;">
@@ -283,7 +283,7 @@
 
                                 @if ($return->reason)
                                     <div class="mt-2 pt-2 border-top text-secondary fs-11">
-                                        <strong class="text-dark d-block mb-1"><i class="feather-alert-circle me-1 fs-11 text-muted"></i>Return Reason:</strong>
+                                        <strong class="text-dark d-block mb-1"><i class="feather-alert-circle me-1 fs-11 text-muted"></i>{{ __('crm.reason_for_return') }}:</strong>
                                         <span style="white-space: pre-wrap;" class="text-muted leading-relaxed">{{ $return->reason }}</span>
                                     </div>
                                 @endif
@@ -294,7 +294,7 @@
                     <!-- Right: Return & Refund Summary -->
                     <div class="col-6">
                         <div class="p-3 bg-light bg-opacity-40 rounded border h-100">
-                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">Return & Refund Summary:</span>
+                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">{{ __('crm.return_details') }}:</span>
 
                             @php
                                 $displayRefundTotal = $return->total_refund_amount > 0
@@ -305,13 +305,13 @@
                             @endphp
 
                             <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                <span class="text-muted">Total Refund Amount:</span>
-                                <strong class="fw-black text-danger fs-15">₹{{ number_format($displayRefundTotal, 2) }}</strong>
+                                <span class="text-muted">{{ __('crm.refund_amount') }}:</span>
+                                <strong class="fw-black text-danger fs-15">{{ format_currency($displayRefundTotal) }}</strong>
                             </div>
 
                             @if ($return->salesOrder)
                                 <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                    <span class="text-muted">Originating Order:</span>
+                                    <span class="text-muted">{{ __('crm.sales_order_ref') }}:</span>
                                     <a href="{{ route('sales.orders.show', $return->sales_order_id) }}" class="fw-bold text-primary">
                                         {{ $return->salesOrder->sales_order_number }}
                                     </a>
@@ -319,12 +319,12 @@
                             @endif
 
                             <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                <span class="text-muted">Return Date:</span>
+                                <span class="text-muted">{{ __('crm.return_date') }}:</span>
                                 <span class="fw-semibold text-dark">{{ date('d-M-Y', strtotime($return->return_date)) }}</span>
                             </div>
 
                             <div class="d-flex justify-content-between">
-                                <span class="text-muted">Inventory Action:</span>
+                                <span class="text-muted">{{ __('crm.status') }}:</span>
                                 <span class="fw-bold {{ $return->status === 'Completed' ? 'text-success' : 'text-warning' }}">
                                     {{ $return->status === 'Completed' ? 'Restocked to Warehouse' : 'Pending Restock' }}
                                 </span>
@@ -335,16 +335,16 @@
 
                 <!-- 3. Line Items Table -->
                 <div class="mb-4">
-                    <h6 class="fw-bold text-dark fs-13 mb-3"><i class="feather-rotate-ccw me-1 text-danger"></i> Returned Line Items</h6>
+                    <h6 class="fw-bold text-dark fs-13 mb-3"><i class="feather-rotate-ccw me-1 text-danger"></i> {{ __('crm.items_to_return') }}</h6>
                     <div class="table-responsive">
                         <table class="table return-table align-middle w-100 mb-0">
                             <thead>
                                 <tr>
                                     <th style="width: 5%;" class="text-center">#</th>
-                                    <th style="width: 45%;">Product Details</th>
-                                    <th style="width: 25%;">Restock Warehouse</th>
-                                    <th class="text-end" style="width: 10%;">Qty</th>
-                                    <th class="text-end" style="width: 15%;">Refund Price (₹)</th>
+                                    <th style="width: 45%;">{{ __('crm.product_details_serials') }}</th>
+                                    <th style="width: 25%;">{{ __('crm.restock_warehouse') }}</th>
+                                    <th class="text-end" style="width: 10%;">{{ __('crm.return_qty') }}</th>
+                                    <th class="text-end" style="width: 15%;">{{ __('crm.refund_unit_price') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -371,15 +371,15 @@
                                         </td>
                                         <td class="text-end fw-bold text-danger">{{ (int)$item->quantity }}</td>
                                         <td class="text-end fw-bold text-dark">
-                                            ₹{{ number_format($item->unit_price, 2) }}
+                                            {{ format_currency($item->unit_price) }}
                                         </td>
                                     </tr>
                                 @endforeach
                             </tbody>
                             <tfoot>
                                 <tr>
-                                    <td colspan="4" class="text-end text-muted fw-semibold">Total Credit Refund:</td>
-                                    <td class="text-end fw-black text-danger fs-14">₹{{ number_format($displayRefundTotal, 2) }}</td>
+                                    <td colspan="4" class="text-end text-muted fw-semibold">{{ __('crm.refund_amount') }}:</td>
+                                    <td class="text-end fw-black text-danger fs-14">{{ format_currency($displayRefundTotal) }}</td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -401,3 +401,4 @@
         </div>
     </div>
 @endsection
+

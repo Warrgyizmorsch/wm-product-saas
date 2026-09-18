@@ -54,19 +54,11 @@
                     @csrf
                     @method('PUT')
 
-                    <!-- Actions Top bar -->
+                    <!-- Header bar -->
                     <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-2">
                         <div>
                             <h4 class="fw-bold text-dark mb-0">{{ __('purchase.edit_purchase_order') }}: {{ $order->purchase_order_number }}</h4>
                             <small class="text-muted fs-12">{{ __('purchase.modify_draft_po_help') }}</small>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <x-ui.button href="{{ route('purchase.orders.show', $order->id) }}" variant="light" size="sm">
-                                {{ __('purchase.cancel') }}
-                            </x-ui.button>
-                            <x-ui.button type="submit" variant="primary" size="sm" icon="feather-save" style="background-color: #714B67; border-color: #714B67;">
-                                {{ __('purchase.update_draft') }}
-                            </x-ui.button>
                         </div>
                     </div>
 
@@ -151,6 +143,15 @@
                                     <option value="igst" @selected(old('gst_type', $order->gst_type) === 'igst')>{{ __('purchase.gst_inter_state') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
+
+                            <x-ui.odoo-form-ui type="select" :label="__('purchase.freight_terms')" name="freight_terms" id="freightTermsSelect">
+                                <option value="to_pay" @selected(old('freight_terms', $order->freight_terms ?? 'to_pay') === 'to_pay')>{{ __('purchase.freight_to_pay') }}</option>
+                                <option value="to_be_billed" @selected(old('freight_terms', $order->freight_terms) === 'to_be_billed')>{{ __('purchase.freight_to_be_billed') }}</option>
+                                <option value="prepaid" @selected(old('freight_terms', $order->freight_terms) === 'prepaid')>{{ __('purchase.freight_prepaid') }}</option>
+                                <option value="customer_pickup" @selected(old('freight_terms', $order->freight_terms) === 'customer_pickup')>{{ __('purchase.freight_customer_pickup') }}</option>
+                            </x-ui.odoo-form-ui>
+
+                            <x-ui.odoo-form-ui type="input" :label="__('purchase.freight_amount') . ' (' . active_currency_symbol() . ')'" name="freight_amount" id="freightAmountInput" inputType="number" step="0.01" min="0" :value="old('freight_amount', number_format($order->freight_amount ?? 0, 2, '.', ''))" />
                         </div>
                     </div>
 
@@ -163,18 +164,18 @@
                                     <tr>
                                         <th style="width: 32%">{{ __('purchase.product') }} <span class="text-danger">*</span></th>
                                         <th class="text-end" style="width: 8%">{{ __('purchase.qty') }} <span class="text-danger">*</span></th>
-                                        <th class="text-end" style="width: 8%">{{ __('purchase.rate') }} <span class="text-danger">*</span></th>
-                                        <th class="text-end" style="width: 8%">{{ __('purchase.amount') }}</th>
+                                        <th class="text-end" style="width: 8%">{{ __('purchase.rate') }} ({{ active_currency_symbol() }}) <span class="text-danger">*</span></th>
+                                        <th class="text-end" style="width: 8%">{{ __('purchase.amount') }} ({{ active_currency_symbol() }})</th>
                                         
                                         <!-- Discount Columns -->
                                         <th class="text-end discount-column" style="width: 6%">{{ __('purchase.disc_percent') }}</th>
-                                        <th class="text-end discount-column" style="width: 8%">{{ __('purchase.disc_amt') }}</th>
+                                        <th class="text-end discount-column" style="width: 8%">{{ __('purchase.disc_amt') }} ({{ active_currency_symbol() }})</th>
                                         
                                         <!-- Tax Columns (Item Wise) -->
                                         <th class="text-end tax-column" style="width: 8%">{{ __('purchase.tax_percent') }}</th>
-                                        <th class="text-end tax-column" style="width: 10%">{{ __('purchase.tax_amt') }}</th>
+                                        <th class="text-end tax-column" style="width: 10%">{{ __('purchase.tax_amt') }} ({{ active_currency_symbol() }})</th>
 
-                                        <th class="text-end" style="width: 11%">{{ __('purchase.total_amt') }}</th>
+                                        <th class="text-end" style="width: 11%">{{ __('purchase.total_amt') }} ({{ active_currency_symbol() }})</th>
                                         <th style="width: 3%"></th>
                                     </tr>
                                 </thead>
@@ -258,7 +259,7 @@
                                 <div class="p-3 bg-white text-dark">
                                     <!-- Items Subtotal (Gross) -->
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryItemsSubtotalRow">
-                                        <span class="text-muted fs-13 fw-semibold">Items Subtotal:</span>
+                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.items_subtotal') }}:</span>
                                         <input type="text" id="summaryItemsSubtotalText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format($order->subtotal, 2, '.', '') }}">
                                         <input type="hidden" name="subtotal" id="summarySubtotal" value="{{ (float)$order->subtotal }}">
                                     </div>
@@ -302,7 +303,7 @@
 
                                     <!-- Freight Charges -->
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryFreightRow">
-                                        <span class="text-muted fs-13 fw-semibold">Freight Charges</span>
+                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.freight_charges') }}</span>
                                         <input type="text" id="summaryFreightText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format($order->freight_amount ?? 0, 2, '.', '') }}">
                                     </div>
 
@@ -315,6 +316,16 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Bottom Action Buttons (like Lead form) -->
+                    <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <x-ui.button href="{{ route('purchase.orders.show', $order->id) }}" variant="light" class="border px-4 py-2 fs-13">
+                            {{ __('purchase.cancel') }}
+                        </x-ui.button>
+                        <x-ui.button type="submit" variant="primary" icon="feather-save" class="px-4 py-2 fs-13 fw-bold shadow-sm">
+                            {{ __('purchase.update_draft') }}
+                        </x-ui.button>
                     </div>
                 </form>
             </div>
