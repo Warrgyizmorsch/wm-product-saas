@@ -7,36 +7,36 @@
 @push('styles')
     <style>
         .btn-purple {
-            background-color: #6b21a8 !important;
-            border-color: #6b21a8 !important;
+            background-color: var(--bs-primary) !important;
+            border-color: var(--bs-primary) !important;
             color: #ffffff !important;
         }
 
         .btn-purple:hover {
-            background-color: #581c87 !important;
-            border-color: #581c87 !important;
+            background-color: color-mix(in srgb, var(--bs-primary) 85%, #000000) !important;
+            border-color: color-mix(in srgb, var(--bs-primary) 85%, #000000) !important;
             color: #ffffff !important;
         }
 
         .bg-purple {
-            background-color: #6b21a8 !important;
+            background-color: var(--bs-primary) !important;
             color: #ffffff !important;
         }
 
         .bg-soft-purple {
-            background-color: rgba(107, 33, 168, 0.08) !important;
+            background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent) !important;
         }
 
         .bg-soft-purple-subtle {
-            background-color: rgba(107, 33, 168, 0.04) !important;
+            background-color: color-mix(in srgb, var(--bs-primary) 4%, transparent) !important;
         }
 
         .text-purple {
-            color: #6b21a8 !important;
+            color: var(--bs-primary) !important;
         }
 
         .border-purple-subtle {
-            border-color: rgba(107, 33, 168, 0.25) !important;
+            border-color: color-mix(in srgb, var(--bs-primary) 25%, transparent) !important;
         }
 
         .mes-op-card {
@@ -353,11 +353,9 @@
         @endif
     </x-ui.workflow-guide>
 
-    <div class="erp-single-panel bg-transparent border-0 p-0">
-        <div class="row">
-            <div class="col-12">
+    <div class="erp-single-panel">
 
-                {{-- SECTION 1: Active Manufacturing Projects --}}
+        {{-- SECTION 1: Active Manufacturing Projects --}}
                 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
                     <div class="d-flex align-items-center">
                         <h5 class="fw-bold text-dark mb-0 d-flex align-items-center">
@@ -1685,8 +1683,6 @@
                     </div>
                 @endforelse
 
-            </div>
-        </div>
     </div>
 
     @push('scripts')

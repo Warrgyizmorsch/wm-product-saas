@@ -36,6 +36,8 @@ class NcrService
             'event_source'                   => 'NcrService',
         ]);
 
+        app(ProductionNotificationService::class)->notifyNcrCreated($ncr);
+
         return $ncr;
     }
 
@@ -71,6 +73,8 @@ class NcrService
             'severity' => 'warning',
             'event_source' => 'NcrService',
         ]);
+
+        app(ProductionNotificationService::class)->notifyNcrCreated($ncr);
 
         return $ncr;
     }

@@ -52,6 +52,8 @@ class OperatorAssignmentService
                 'changed_by'             => $assignedBy,
             ]);
 
+            app(ProductionNotificationService::class)->notifyOperatorAssignment($operatorId, $op, $assignedBy);
+
             return $assignment;
         });
     }
@@ -89,6 +91,8 @@ class OperatorAssignmentService
                 'remarks'                => $remarks,
                 'changed_by'             => $changerId,
             ]);
+
+            app(ProductionNotificationService::class)->notifyOperatorAssignment($newOperatorId, $op, $changerId);
 
             return $assignment;
         });

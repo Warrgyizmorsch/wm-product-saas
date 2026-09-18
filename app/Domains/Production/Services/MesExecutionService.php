@@ -981,6 +981,8 @@ class MesExecutionService
                 }
             }
 
+            app(ProductionNotificationService::class)->notifyAndonAlert($schedOp, $category, $severity, $reason);
+
             return [
                 'operation_id' => $schedOp->id,
                 'category' => $category,
