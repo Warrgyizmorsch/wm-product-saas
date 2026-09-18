@@ -1866,9 +1866,12 @@
                                                          <button type="submit" class="btn btn-sm btn-success">{{ __('crm.accept_quotation') }}</button>
                                                      </form>
                                                  @elseif ($activeQuotation->status === 'Accepted')
-                                                     <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-success">
-                                                         <i class="feather-shopping-cart me-1"></i>{{ __('crm.convert_to_sales_order') }}
-                                                     </a>
+                                                      <a href="{{ $activeQuotation->crm_deal_id ? route('crm.deals.showConvertForm', $activeQuotation->crm_deal_id) : route('crm.quotations.showConvertForm', $activeQuotation->id) }}" class="btn btn-sm btn-warning text-dark fw-bold px-2.5 py-1.5">
+                                                          <i class="feather-user-check me-1"></i>{{ __('crm.convert_to_customer') }}
+                                                      </a>
+                                                      <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-success">
+                                                          <i class="feather-shopping-cart me-1"></i>{{ __('crm.convert_to_sales_order') }}
+                                                      </a>
                                                  @endif
                                             </div>
                                         </div>

@@ -1853,8 +1853,17 @@ return array (
   'payment_date' => 'Payment Date',
   'payments' => 'Payments',
   'record' => 'Record',
-  'quick_add_transporter' => 'Quick Add Transporter Master',
   'taxation_contact_details' => '2. Taxation & Contact Details',
+  'status_draft' => 'Draft',
+  'status_pending_approval' => 'Pending Approval',
+  'status_approved' => 'Approved',
+  'status_sent' => 'Sent',
+  'status_quotation_sent' => 'Quotation Sent',
+  'status_accepted' => 'Accepted',
+  'status_pending' => 'Pending',
+  'status_converted' => 'Converted',
+  'status_rejected' => 'Rejected',
+  'status_quotation_rework' => 'Quotation Rework',
 );
 
 

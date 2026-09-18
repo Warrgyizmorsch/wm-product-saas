@@ -136,11 +136,7 @@
                                     elseif ($quotation->status === 'Approved') $badgeClass = 'bg-soft-success text-success';
                                     elseif ($quotation->status === 'Rejected') $badgeClass = 'bg-soft-danger text-danger';
                                     elseif ($quotation->status === 'Pending Approval') $badgeClass = 'bg-soft-warning text-warning';
-                                    elseif ($quotation->status === 'Quotation Rework') $badgeClass = 'bg-soft-warning text-warning';
-                                    elseif ($quotation->status === 'Accepted') {
-                                        $badgeClass = 'bg-soft-warning text-warning';
-                                        $displayStatus = 'Pending';
-                                    }
+                                    elseif ($quotation->status === 'Accepted') $badgeClass = 'bg-soft-primary text-primary';
                                     elseif ($quotation->status === 'Converted') $badgeClass = 'bg-soft-success text-success';
                                 @endphp
                                 <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">

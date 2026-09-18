@@ -1849,9 +1849,18 @@ return array (
   'payment_number' => 'भुगतान संख्या',
   'payment_date' => 'भुगतान तिथि',
   'payments' => 'भुगतान',
-  'record' => 'दर्ज करें',
   'quick_add_transporter' => 'त्वरित ट्रांसपोर्टर मास्टर जोड़ें',
   'taxation_contact_details' => '2. कराधान और संपर्क विवरण',
+  'status_draft' => 'ड्राफ्ट',
+  'status_pending_approval' => 'अनुमोदन लंबित',
+  'status_approved' => 'स्वीकृत',
+  'status_sent' => 'भेजा गया',
+  'status_quotation_sent' => 'कोटेशन भेजा गया',
+  'status_accepted' => 'स्वीकृत (Accepted)',
+  'status_pending' => 'लंबित (Pending)',
+  'status_converted' => 'कन्वर्टेड (Converted)',
+  'status_rejected' => 'अस्वीकृत (Rejected)',
+  'status_quotation_rework' => 'कोटेशन पुनः कार्य',
 );
 
 

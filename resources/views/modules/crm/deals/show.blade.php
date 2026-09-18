@@ -440,7 +440,8 @@
 
                 @php
                     $hasAcceptedQuotation = $deal->quotations->contains(fn($q) => in_array($q->status, ['Accepted', 'Converted', 'Won']));
-                    $hasCustomer = !empty($deal->account?->customer_id);
+                    $isDealWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+                    $hasCustomer = !empty($deal->account?->customer_id) && $isDealWon;
                     $acceptedQuote = $deal->quotations->firstWhere('status', 'Accepted') ?: ($deal->quotations->firstWhere('status', 'Converted') ?: $activeQuotation);
                 @endphp
 

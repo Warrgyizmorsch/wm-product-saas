@@ -441,7 +441,7 @@ class QuotationController extends Controller
         }
 
         $this->quotationService->handleQuotationStatusChange($quotation, $newStatus, $quotation->lead_id);
-        return back()->with('success', 'Quotation status updated successfully!');
+        return back()->with('success', 'Quotation status updated to ' . $newStatus . ' successfully!');
     }
 
     public function approve(int $id): RedirectResponse
