@@ -18,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class RecruitmentController extends Controller
@@ -545,7 +546,7 @@ class RecruitmentController extends Controller
         $request->validate([
             'to_email'   => 'required|email|max:255',
             'subject'    => 'required|string|max:255',
-            'account_id' => 'nullable|exists:email_configurations,id',
+            'account_id' => ['nullable', Rule::exists('email_configurations', 'id')->where('tenant_id', current_tenant_id())],
         ]);
 
         $application = $offer->application;

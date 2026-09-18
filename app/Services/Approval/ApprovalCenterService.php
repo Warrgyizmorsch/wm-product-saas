@@ -58,10 +58,16 @@ class ApprovalCenterService
         // 2. Production Domain Permission Checks
         $canApproveBom = $this->hasPermission($user, 'production.bom.approve');
         $canApproveRouting = $this->hasPermission($user, 'production.routing.approve');
-        $canApprovePlan = $this->hasPermission($user, 'production.planning.approve') || $user->role === 'admin';
+        // hasPermission() already routes through AccessService::allows(), which
+        // grants a tenant-bound 'admin'/'super_admin' role-text user every
+        // non-platform permission in their own tenant via
+        // legacyAdminRoleTextAllows() — the separate `|| $user->role === 'admin'`
+        // checks that used to live here were pure redundant duplication of that
+        // same rule, bypassing AccessService instead of relying on it.
+        $canApprovePlan = $this->hasPermission($user, 'production.planning.approve');
         $canApproveScrap = $this->hasPermission($user, 'production.quality.approve');
-        // ECO changes involve BOMs and/or Routings; authorized engineering/production managers or admins can review
-        $canApproveEco = $canApproveBom || $canApproveRouting || $user->role === 'admin';
+        // ECO changes involve BOMs and/or Routings; authorized engineering/production managers can review
+        $canApproveEco = $canApproveBom || $canApproveRouting;
 
         // Short-circuit if user has no Production approval permissions
         if (! $canApproveBom && ! $canApproveRouting && ! $canApprovePlan && ! $canApproveScrap && ! $canApproveEco) {

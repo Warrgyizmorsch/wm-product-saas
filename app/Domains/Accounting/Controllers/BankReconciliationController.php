@@ -9,6 +9,7 @@ use App\Domains\Accounting\Services\ChartOfAccountsService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 use InvalidArgumentException;
 
@@ -95,6 +96,27 @@ class BankReconciliationController extends Controller
                 ->orderBy('created_at')
                 ->get(),
             'canComplete' => $this->authorizeOptional('complete', $reconciliation),
+        ]);
+    }
+
+    public function downloadTemplate(): Response
+    {
+        $this->authorize('create', BankReconciliation::class);
+
+        $rows = [
+            ['date', 'description', 'amount'],
+            ['2026-09-02', 'NEFT Credit - Customer', '45000.00'],
+            ['2026-09-09', 'Vendor payment debit', '-12500.00'],
+        ];
+
+        $csv = implode("\n", array_map(
+            fn (array $row) => implode(',', array_map(fn ($value) => '"' . str_replace('"', '""', $value) . '"', $row)),
+            $rows
+        ));
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="bank-statement-template.csv"',
         ]);
     }
 

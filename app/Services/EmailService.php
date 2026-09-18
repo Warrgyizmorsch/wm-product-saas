@@ -27,7 +27,10 @@ class EmailService
 
         $account = null;
         if (!empty($data['account_id'])) {
-            $account = EmailConfiguration::whereKey($data['account_id'])->where('is_active', true)->first();
+            $account = EmailConfiguration::whereKey($data['account_id'])
+                ->where('tenant_id', current_tenant_id())
+                ->where('is_active', true)
+                ->first();
         }
         if (!$account) {
             $account = EmailConfiguration::forCurrentContext()->where('is_default', true)->where('is_active', true)->first()
@@ -123,7 +126,10 @@ class EmailService
 
         $account = null;
         if (!empty($data['account_id'])) {
-            $account = EmailConfiguration::whereKey($data['account_id'])->where('is_active', true)->first();
+            $account = EmailConfiguration::whereKey($data['account_id'])
+                ->where('tenant_id', current_tenant_id())
+                ->where('is_active', true)
+                ->first();
         }
         if (!$account) {
             $account = EmailConfiguration::forCurrentContext()->where('is_default', true)->where('is_active', true)->first()

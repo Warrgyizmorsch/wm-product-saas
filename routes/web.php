@@ -7,19 +7,30 @@ use App\Http\Controllers\CompanySwitchController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\TenantSwitchController;
+use App\Domains\Platform\Controllers\RazorpayWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/locale/{locale}', LocaleController::class)
     ->whereIn('locale', array_keys(config('localization.supported', [])))
     ->name('locale.switch');
 
+// Public — Razorpay's servers call this directly, no tenant/session context.
+// Authenticity is verified inside the controller via the webhook signature,
+// not by tenant resolution. Excluded from CSRF in bootstrap/app.php.
+Route::post('/webhooks/razorpay', [RazorpayWebhookController::class, 'handle'])
+    ->name('webhooks.razorpay');
+
 Route::middleware(['tenant'])->group(function (): void {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
-    Route::post('/login', [LoginController::class, 'store'])->name('login.store');
+    Route::post('/login', [LoginController::class, 'store'])
+        ->middleware('throttle:5,1')
+        ->name('login.store');
 
     // Public RFQ Vendor Portal
-    Route::get('/purchase/rfq-portal/{token}', [\App\Domains\Purchase\Controllers\PurchaseRfqController::class, 'showPortal'])->name('purchase.rfqs.portal');
-    Route::post('/purchase/rfq-portal/{token}/submit', [\App\Domains\Purchase\Controllers\PurchaseRfqController::class, 'submitPortal'])->name('purchase.rfqs.portal-submit');
+    Route::middleware(['throttle:30,1'])->group(function (): void {
+        Route::get('/purchase/rfq-portal/{token}', [\App\Domains\Purchase\Controllers\PurchaseRfqController::class, 'showPortal'])->name('purchase.rfqs.portal');
+        Route::post('/purchase/rfq-portal/{token}/submit', [\App\Domains\Purchase\Controllers\PurchaseRfqController::class, 'submitPortal'])->name('purchase.rfqs.portal-submit');
+    });
 
     // Public WhatsApp Webhook Route for Node.js Bridge
     Route::post('/crm/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'handleWebhook'])->name('crm.whatsapp.webhook');
@@ -61,7 +72,7 @@ Route::middleware(['tenant'])->group(function (): void {
         });
     });
 
-    Route::middleware(['company', 'branch'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'company', 'branch'])->group(function (): void {
         foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/api.php'))) as $moduleApiRoutes) {
             require $moduleApiRoutes;
         }

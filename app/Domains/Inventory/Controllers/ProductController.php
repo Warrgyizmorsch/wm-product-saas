@@ -386,8 +386,9 @@ class ProductController extends Controller
                 ->first();
 
             if (!$snRecord) {
-                // Case-insensitive or without tenant filter fallback
+                // Case-insensitive fallback, still tenant-scoped
                 $snRecord = SerialNumber::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
                     ->where('serial_number', 'LIKE', $code)
                     ->with(['product', 'warehouse'])
                     ->first();

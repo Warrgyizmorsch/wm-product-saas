@@ -29,7 +29,10 @@ class PayrollAccountingService
      */
     public function postPayrollRunJournal(PayrollRun $run): ?Journal
     {
-        $tenantId = $run->tenant_id ?? tenant_id() ?? 1;
+        // Fail closed rather than silently posting into tenant 1's ledger if
+        // both the run's own tenant_id and the bound request context are
+        // somehow unresolvable.
+        $tenantId = $run->tenant_id ?? require_tenant_id();
 
         // Check if journal already posted for this payroll run to prevent duplicate entries
         $existingJournal = Journal::where('tenant_id', $tenantId)
@@ -233,7 +236,7 @@ class PayrollAccountingService
 
         $meta = [
             'tenant_id'             => $tenantId,
-            'company_id'            => $run->company_id ?? company_id() ?? 1,
+            'company_id'            => $run->company_id ?? require_company_id(),
             'journal_date'          => $journalDate,
             'source'                => 'payroll',
             'voucher_type'          => 'payroll',
@@ -254,7 +257,10 @@ class PayrollAccountingService
      */
     public function postPayrollPayoutJournal(PayrollRun $run): ?Journal
     {
-        $tenantId = $run->tenant_id ?? tenant_id() ?? 1;
+        // Fail closed rather than silently posting into tenant 1's ledger if
+        // both the run's own tenant_id and the bound request context are
+        // somehow unresolvable.
+        $tenantId = $run->tenant_id ?? require_tenant_id();
 
         $existingJournal = Journal::where('tenant_id', $tenantId)
             ->where('reference_type', 'PayrollRunPayout')
@@ -331,7 +337,7 @@ class PayrollAccountingService
 
         $meta = [
             'tenant_id'             => $tenantId,
-            'company_id'            => $run->company_id ?? company_id() ?? 1,
+            'company_id'            => $run->company_id ?? require_company_id(),
             'journal_date'          => $payoutDate,
             'source'                => 'payroll',
             'voucher_type'          => 'payment',
@@ -390,7 +396,6 @@ class PayrollAccountingService
     private function getOrCreateAccount(int $tenantId, string $code, string $name, string $type, string $balance, string $subtype): ChartOfAccount
     {
         return ChartOfAccount::where('tenant_id', $tenantId)->where('code', $code)->first()
-            ?? ChartOfAccount::where('code', $code)->first()
             ?? ChartOfAccount::create([
                 'tenant_id'      => $tenantId,
                 'code'           => $code,

@@ -14,7 +14,7 @@
                 ['label' => 'Tenants', 'route' => 'platform.tenants.index'],
                 ['label' => 'Plans', 'route' => 'platform.plans.index'],
                 ['label' => 'Currencies', 'route' => 'platform.currencies.index'],
-                ['label' => 'Subscriptions'],
+                ['label' => 'Subscriptions', 'route' => 'platform.subscription.index'],
                 ['label' => 'Usage Limits', 'route' => 'platform.usage.index'],
                 ['label' => 'Payment Terms', 'route' => 'platform.payment-terms.index'],
                 ['label' => 'Email & SMTP Setup', 'route' => 'crm.emailSettings.index'],

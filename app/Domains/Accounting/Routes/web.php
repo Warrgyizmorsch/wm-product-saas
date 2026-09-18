@@ -80,6 +80,7 @@ Route::prefix('accounting')
         Route::get('bank-reconciliation', [BankReconciliationController::class, 'index'])->name('bank-reconciliation.index');
         Route::get('bank-reconciliation/create', [BankReconciliationController::class, 'create'])->name('bank-reconciliation.create');
         Route::post('bank-reconciliation', [BankReconciliationController::class, 'store'])->name('bank-reconciliation.store');
+        Route::get('bank-reconciliation/template', [BankReconciliationController::class, 'downloadTemplate'])->name('bank-reconciliation.template');
         Route::get('bank-reconciliation/{reconciliation}', [BankReconciliationController::class, 'show'])->name('bank-reconciliation.show');
         Route::post('bank-reconciliation/{reconciliation}/import', [BankReconciliationController::class, 'import'])->name('bank-reconciliation.import');
         Route::post('bank-reconciliation/{reconciliation}/auto-match', [BankReconciliationController::class, 'autoMatch'])->name('bank-reconciliation.auto-match');

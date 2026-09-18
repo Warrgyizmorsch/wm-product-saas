@@ -75,6 +75,10 @@ class RbacSeeder extends Seeder
             'crm.leads.create' => $permissions['crm.leads.create'],
             'crm.leads.update' => $permissions['crm.leads.update'],
             'crm.leads.delete' => $permissions['crm.leads.delete'],
+            'crm.deals.view' => $permissions['crm.deals.view'],
+            'crm.deals.create' => $permissions['crm.deals.create'],
+            'crm.deals.update' => $permissions['crm.deals.update'],
+            'crm.deals.delete' => $permissions['crm.deals.delete'],
             'crm.customers.view' => $permissions['crm.customers.view'],
             'crm.customers.create' => $permissions['crm.customers.create'],
             'crm.customers.update' => $permissions['crm.customers.update'],
@@ -90,6 +94,7 @@ class RbacSeeder extends Seeder
         // tenant scope — the creator naturally becomes the owner of what they create.
         $this->grant($roles['sales_executive'], [
             'crm.leads.create' => $permissions['crm.leads.create'],
+            'crm.deals.create' => $permissions['crm.deals.create'],
             'crm.quotations.create' => $permissions['crm.quotations.create'],
             'crm.customers.view' => $permissions['crm.customers.view'],
             'crm.customers.create' => $permissions['crm.customers.create'],
@@ -99,6 +104,8 @@ class RbacSeeder extends Seeder
         $this->grant($roles['sales_executive'], [
             'crm.leads.view' => $permissions['crm.leads.view'],
             'crm.leads.update' => $permissions['crm.leads.update'],
+            'crm.deals.view' => $permissions['crm.deals.view'],
+            'crm.deals.update' => $permissions['crm.deals.update'],
             'crm.quotations.view' => $permissions['crm.quotations.view'],
         ], RolePermission::SCOPE_OWN);
 
@@ -397,8 +404,19 @@ class RbacSeeder extends Seeder
         $definitions = [
             ['name' => 'platform.tenants.manage', 'module' => 'platform', 'entity' => 'tenants', 'action' => 'manage'],
             ['name' => 'platform.plans.manage', 'module' => 'platform', 'entity' => 'plans', 'action' => 'manage'],
+            // NOT 'platform.*': MenuBuilder::permitted() deliberately checks every
+            // 'platform.'-prefixed permission with NO tenant context, specifically
+            // so a tenant_owner's blanket SCOPE_TENANT grant (which covers every
+            // permission) can never satisfy it and open the genuinely cross-tenant
+            // platform.tenants.manage / platform.plans.manage screens. This is a
+            // per-tenant self-service permission (SubscriptionController always
+            // resolves tenant() from context, never a route param) and must stay
+            // outside that special-cased prefix so its normal tenant-scoped grant
+            // actually takes effect in the sidebar and the policy check.
+            ['name' => 'tenant.subscription.manage', 'module' => 'tenant', 'entity' => 'subscription', 'action' => 'manage'],
             ['name' => 'platform.currencies.manage', 'module' => 'platform', 'entity' => 'currencies', 'action' => 'manage'],
             ['name' => 'platform.usage.view', 'module' => 'platform', 'entity' => 'usage', 'action' => 'view'],
+            ['name' => 'platform.payment_gateway.manage', 'module' => 'platform', 'entity' => 'payment_gateway', 'action' => 'manage'],
             ['name' => 'access.roles.manage', 'module' => 'access', 'entity' => 'roles', 'action' => 'manage'],
             ['name' => 'access.permissions.manage', 'module' => 'access', 'entity' => 'permissions', 'action' => 'manage'],
             ['name' => 'access.users.manage', 'module' => 'access', 'entity' => 'users', 'action' => 'manage'],
@@ -520,6 +538,10 @@ class RbacSeeder extends Seeder
             ['name' => 'crm.leads.create', 'module' => 'crm', 'entity' => 'leads', 'action' => 'create'],
             ['name' => 'crm.leads.update', 'module' => 'crm', 'entity' => 'leads', 'action' => 'update'],
             ['name' => 'crm.leads.delete', 'module' => 'crm', 'entity' => 'leads', 'action' => 'delete'],
+            ['name' => 'crm.deals.view', 'module' => 'crm', 'entity' => 'deals', 'action' => 'view'],
+            ['name' => 'crm.deals.create', 'module' => 'crm', 'entity' => 'deals', 'action' => 'create'],
+            ['name' => 'crm.deals.update', 'module' => 'crm', 'entity' => 'deals', 'action' => 'update'],
+            ['name' => 'crm.deals.delete', 'module' => 'crm', 'entity' => 'deals', 'action' => 'delete'],
             ['name' => 'crm.customers.view', 'module' => 'crm', 'entity' => 'customers', 'action' => 'view'],
             ['name' => 'crm.customers.create', 'module' => 'crm', 'entity' => 'customers', 'action' => 'create'],
             ['name' => 'crm.customers.update', 'module' => 'crm', 'entity' => 'customers', 'action' => 'update'],

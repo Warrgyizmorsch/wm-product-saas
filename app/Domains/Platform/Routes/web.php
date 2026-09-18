@@ -1,7 +1,9 @@
 <?php
 
 use App\Domains\Platform\Controllers\CurrencyController;
+use App\Domains\Platform\Controllers\PaymentGatewaySettingsController;
 use App\Domains\Platform\Controllers\PlanController;
+use App\Domains\Platform\Controllers\SubscriptionController;
 use App\Domains\Platform\Controllers\TenantController;
 use App\Domains\Platform\Controllers\TransporterController;
 use App\Domains\Platform\Controllers\UsageOverviewController;
@@ -36,6 +38,20 @@ Route::prefix('platform')
 
         Route::get('usage', [UsageOverviewController::class, 'index'])
             ->name('usage.index');
+
+        Route::get('payment-gateway', [PaymentGatewaySettingsController::class, 'index'])
+            ->name('payment-gateway.index');
+        Route::put('payment-gateway', [PaymentGatewaySettingsController::class, 'update'])
+            ->name('payment-gateway.update');
+
+        Route::get('subscription', [SubscriptionController::class, 'index'])
+            ->name('subscription.index');
+        Route::put('subscription', [SubscriptionController::class, 'update'])
+            ->name('subscription.update');
+        Route::post('subscription/checkout', [SubscriptionController::class, 'checkout'])
+            ->name('subscription.checkout');
+        Route::post('subscription/verify', [SubscriptionController::class, 'verify'])
+            ->name('subscription.verify');
 
         Route::get('currencies', [CurrencyController::class, 'index'])
             ->name('currencies.index');

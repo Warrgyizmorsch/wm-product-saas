@@ -20,6 +20,8 @@ class CrmDealController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', CrmDeal::class);
+
         $tenantId = tenant_id() ?? 1;
         $search = $request->input('search');
         $stage = $request->input('stage');
@@ -107,6 +109,8 @@ class CrmDealController extends Controller
 
     public function kanban(Request $request): View
     {
+        $this->authorize('viewAny', CrmDeal::class);
+
         $tenantId = tenant_id() ?? 1;
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
@@ -166,6 +170,8 @@ class CrmDealController extends Controller
 
     public function create(Request $request): View
     {
+        $this->authorize('create', CrmDeal::class);
+
         $tenantId = tenant_id() ?? 1;
         $accounts = CrmAccount::where('tenant_id', $tenantId)->orderBy('name')->get();
         $selectedAccountId = $request->input('account_id') ?? $request->input('crm_account_id');
@@ -182,6 +188,8 @@ class CrmDealController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', CrmDeal::class);
+
         $tenantId = tenant_id() ?? 1;
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);

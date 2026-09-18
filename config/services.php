@@ -39,6 +39,12 @@ return [
         'key' => env('GOOGLE_MAPS_API_KEY'),
     ],
 
+    'razorpay' => [
+        'key' => env('RAZORPAY_KEY_ID'),
+        'secret' => env('RAZORPAY_KEY_SECRET'),
+        'webhook_secret' => env('RAZORPAY_WEBHOOK_SECRET'),
+    ],
+
     // Exchange-rate feed (ECB reference rates). No API key required.
     'frankfurter' => [
         'url' => env('FRANKFURTER_URL', 'https://api.frankfurter.app'),

@@ -55,6 +55,9 @@
                         <input type="file" name="file" class="form-control form-control-sm" required accept=".csv,.xlsx,.xls,.txt">
                     </div>
                     <x-ui.button type="submit" variant="light" size="sm" class="border">Import</x-ui.button>
+                    <a href="{{ route('accounting.bank-reconciliation.template') }}" class="fs-12 text-muted text-decoration-none d-inline-flex align-items-center gap-1" style="height: 31px;" title="Download a sample CSV with the expected columns">
+                        <i class="feather-download"></i> Download template
+                    </a>
                 </form>
 
                 <form action="{{ route('accounting.bank-reconciliation.auto-match', $reconciliation) }}" method="POST">

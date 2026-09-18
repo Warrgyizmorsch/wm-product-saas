@@ -3,6 +3,7 @@
 namespace App\Domains\Platform\Services;
 
 use App\Core\Tenant\TenantProvisioner;
+use App\Domains\Platform\Models\Plan;
 use App\Domains\Platform\Repositories\TenantRepository;
 use App\Models\Access\Role;
 use App\Models\Tenant;
@@ -61,6 +62,23 @@ class TenantService
     public function update(Tenant $tenant, array $data): bool
     {
         return $this->tenants->update($tenant, $this->payload($data, $tenant));
+    }
+
+    /**
+     * Self-service plan switch: unlike update(), this only ever touches the
+     * plan/subscription fields — a tenant user must never be able to set
+     * arbitrary tenant fields (status, domain, owner, limits) through this path.
+     */
+    public function switchOwnPlan(Tenant $tenant, int $planId): bool
+    {
+        $plan = Plan::query()->where('id', $planId)->where('is_active', true)->firstOrFail();
+
+        return $this->tenants->update($tenant, [
+            'plan' => $plan->slug,
+            'plan_id' => $plan->id,
+            'subscription_status' => Tenant::STATUS_ACTIVE,
+            'plan_started_at' => now(),
+        ]);
     }
 
     public function updateStatus(Tenant $tenant, string $status): bool

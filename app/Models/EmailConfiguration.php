@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class EmailConfiguration extends Model
+class EmailConfiguration extends BaseModel
 {
     protected $table = 'email_configurations';
 
