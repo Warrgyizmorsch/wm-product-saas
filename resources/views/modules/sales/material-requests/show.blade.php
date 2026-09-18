@@ -1,9 +1,9 @@
 @extends('layouts.duralux')
 
-@section('title', 'Slip Details | SaaS ERP')
-@section('page-title', 'Material Requisition Slip Details')
+@section('title', __('crm.slip_details_title'))
+@section('page-title', __('crm.material_requisition_slip_details'))
 @section('breadcrumb')
-    <a href="{{ route('sales.material-requests.index') }}">Material Requests</a> &gt; Details
+    <a href="{{ route('sales.material-requests.index') }}">{{ __('crm.material_requests') }}</a> &gt; {{ __('crm.details') }}
 @endsection
 
 @push('styles')
@@ -49,7 +49,7 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-0">
-        <a href="{{ route('sales.material-requests.index') }}" class="action-dropdown-btn me-2" title="Back to Slips" data-bs-toggle="tooltip">
+        <a href="{{ route('sales.material-requests.index') }}" class="action-dropdown-btn me-2" title="{{ __('crm.back_to_slips') }}" data-bs-toggle="tooltip">
             <i class="feather feather-arrow-left"></i>
         </a>
     </div>
@@ -63,20 +63,20 @@
             <!-- Header bar with title and status badge next to it -->
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 pb-3 mb-4 border-bottom">
                 <div>
-                    <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">Material Requisition Slip</span>
+                    <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">{{ __('crm.material_requisition_slip') }}</span>
                     <div class="d-flex align-items-center gap-2 mb-1">
                         <h4 class="fw-bold text-dark mb-0">{{ $slip->requisition_number }}</h4>
                         @php
                             $statusLower = strtolower($slip->status ?? 'pending');
                             $statusClass = 'danger';
-                            $statusLabel = 'Pending Issue';
+                            $statusLabel = __('crm.pending_issue');
 
                             if (in_array($statusLower, ['fully issued', 'completed', 'issued'])) {
                                 $statusClass = 'success';
-                                $statusLabel = 'Fully Issued';
+                                $statusLabel = __('crm.fully_issued');
                             } elseif (in_array($statusLower, ['partially issued', 'partial', 'reserved'])) {
                                 $statusClass = 'warning';
-                                $statusLabel = $statusLower === 'reserved' ? 'Reserved' : 'Partially Issued';
+                                $statusLabel = $statusLower === 'reserved' ? __('crm.reserved') : __('crm.partially_issued');
                             }
                         @endphp
                         <x-ui.badge :soft="true" :variant="$statusClass" class="px-2.5 py-1 fs-11 fw-bold">
@@ -84,7 +84,7 @@
                         </x-ui.badge>
                     </div>
                     <span class="fs-13 text-muted">
-                        Generated on:&nbsp;<strong class="text-dark">{{ date('d-M-Y', strtotime($slip->requisition_date)) }}</strong>
+                        {{ __('crm.generated_on') }}&nbsp;<strong class="text-dark">{{ date('d-M-Y', strtotime($slip->requisition_date)) }}</strong>
                     </span>
                 </div>
             </div>
@@ -92,56 +92,56 @@
             <!-- Metadata Row -->
             <div class="row g-3 mb-4 fs-13 text-dark pb-3 border-bottom">
                 <div class="col-md-3">
-                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">Production Order</span>
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.production_order') }}</span>
                     <strong class="fs-14 font-monospace text-primary">{{ $slip->order->order_number ?? 'MO #' . $slip->production_order_id }}</strong>
                 </div>
                 <div class="col-md-6">
-                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">Target Product (to Manufacture)</span>
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.target_product_mfg') }}</span>
                     <strong>{{ $slip->order->product->name ?? '—' }} ({{ $slip->order->product->sku ?? '—' }})</strong>
                 </div>
                 <div class="col-md-3">
-                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">Qty Ordered</span>
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.qty_ordered') }}</span>
                     <strong class="fs-14 font-monospace">{{ (float) ($slip->order->quantity_ordered ?? 0.0) }}</strong>
                 </div>
             </div>
 
             <!-- Items Table -->
-            <h5 class="fw-bold text-dark mb-3"><i class="feather-layers text-primary me-2"></i>Requested Components &amp; Raw Materials</h5>
+            <h5 class="fw-bold text-dark mb-3"><i class="feather-layers text-primary me-2"></i>{{ __('crm.requested_components_raw_materials') }}</h5>
             
             <!-- Bulk Actions Control Bar -->
             <div class="card border p-3 mb-4 bg-light">
                 <div class="row align-items-center g-3">
                     <div class="col-md-3">
-                        <label class="form-label fs-11 fw-bold text-muted mb-1 text-uppercase">1. Choose Bulk Action Type</label>
+                        <label class="form-label fs-11 fw-bold text-muted mb-1 text-uppercase">{{ __('crm.choose_bulk_action_type') }}</label>
                         <select id="bulkActionType" name="action_type" class="form-select form-select-sm" data-select2-selector="default" required style="width: 100%;">
-                            <option value="" selected>-- Select Bulk Action --</option>
-                            <option value="reserve">Reserve Stock</option>
-                            <option value="issue">Issue Stock</option>
-                            <option value="indent">Create Indent (Procurement)</option>
+                            <option value="" selected>{{ __('crm.select_bulk_action') }}</option>
+                            <option value="reserve">{{ __('crm.reserve_stock') }}</option>
+                            <option value="issue">{{ __('crm.issue_stock') }}</option>
+                            <option value="indent">{{ __('crm.create_indent_procurement') }}</option>
                         </select>
                     </div>
                     
                     <div class="col-md-3">
-                        <label class="form-label fs-11 fw-bold text-muted mb-1 text-uppercase" id="warehouseLabel">2. Select Warehouse</label>
+                        <label class="form-label fs-11 fw-bold text-muted mb-1 text-uppercase" id="warehouseLabel">{{ __('crm.select_warehouse_label') }}</label>
                         <select id="bulkWarehouseSelect" name="warehouse_id" class="form-select form-select-sm" data-select2-selector="default" data-master="warehouse" style="width: 100%;">
-                            <option value="">Select Warehouse...</option>
-                            <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="warehouse">+ Add New Warehouse</option>
+                            <option value="">{{ __('crm.select_warehouse_placeholder') }}</option>
+                            <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="warehouse">{{ __('crm.add_new_warehouse_opt') }}</option>
                             @foreach($warehouses as $wh)
                                 <option value="{{ $wh->id }}" @selected($wh->is_default)>
-                                    {{ $wh->name }} {{ $wh->is_default ? '(Default)' : '' }}
+                                    {{ $wh->name }} {{ $wh->is_default ? __('crm.default_wh_suffix') : '' }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
 
                     <div class="col-md-4 id-notes-field d-none">
-                        <label class="form-label fs-11 fw-bold text-muted mb-1 text-uppercase" id="notesLabel">Remarks / Notes</label>
-                        <input type="text" id="bulkRemarksNotes" name="remarks" class="form-control form-control-sm" placeholder="e.g. Bulk action remarks...">
+                        <label class="form-label fs-11 fw-bold text-muted mb-1 text-uppercase" id="notesLabel">{{ __('crm.remarks_notes') }}</label>
+                        <input type="text" id="bulkRemarksNotes" name="remarks" class="form-control form-control-sm" placeholder="{{ __('crm.bulk_action_remarks_placeholder') }}">
                     </div>
 
                     <div class="col-md-2 d-flex align-items-end justify-content-end ms-auto">
                         <button type="button" id="executeBulkActionBtn" class="btn btn-sm btn-primary w-100 py-1.5 fw-semibold d-none">
-                            <i class="feather-check-square me-1"></i>Execute Action
+                            <i class="feather-check-square me-1"></i>{{ __('crm.execute_action') }}
                         </button>
                     </div>
                 </div>
@@ -154,12 +154,12 @@
                             <th class="text-center" style="width: 5%">
                                 <input type="checkbox" id="selectAllCheckbox" class="form-check-input" disabled>
                             </th>
-                            <th style="width: 30%">Component Product</th>
-                            <th class="text-center" style="width: 12%">Planned Qty</th>
-                            <th class="text-center" style="width: 12%">Reserved Qty</th>
-                            <th class="text-center" style="width: 12%">Issued Qty</th>
-                            <th class="text-center" style="width: 16%">Available Stock</th>
-                            <th style="width: 13%">Actions</th>
+                            <th style="width: 30%">{{ __('crm.component_product') }}</th>
+                            <th class="text-center" style="width: 12%">{{ __('crm.planned_qty') }}</th>
+                            <th class="text-center" style="width: 12%">{{ __('crm.reserved_qty') }}</th>
+                            <th class="text-center" style="width: 12%">{{ __('crm.issued_qty') }}</th>
+                            <th class="text-center" style="width: 16%">{{ __('crm.available_stock') }}</th>
+                            <th style="width: 13%">{{ __('crm.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -185,7 +185,7 @@
                                 </td>
                                 <td>
                                     <div class="fw-bold">{{ $item->product->name }}</div>
-                                    <div class="text-muted fs-11">SKU: {{ $item->product->sku }} | Type: {{ ucfirst(str_replace('_', ' ', $item->product->type)) }}</div>
+                                    <div class="text-muted fs-11">{{ __('crm.sku_label') }} {{ $item->product->sku }} | {{ __('crm.type_label') }} {{ ucfirst(str_replace('_', ' ', $item->product->type)) }}</div>
                                 </td>
                                 <td class="text-center fw-semibold">{{ (float) $item->quantity_planned }} {{ $item->uom?->code ?? $item->product?->uom?->code ?? 'PCS' }}</td>
                                 <td class="text-center text-primary fw-semibold">{{ (float) $item->quantity_reserved }} {{ $item->uom?->code ?? $item->product?->uom?->code ?? 'PCS' }}</td>
@@ -197,27 +197,27 @@
                                     <div class="d-flex flex-column gap-1">
                                         @if($remainingToReserve > 0)
                                             <button type="button" class="btn btn-sm btn-soft-primary px-2 py-1 fs-11 fw-semibold w-100 text-start btn-row-reserve" data-bs-toggle="modal" data-bs-target="#reserveModal-{{ $item->id }}">
-                                                <i class="feather-archive me-1"></i>Reserve
+                                                <i class="feather-archive me-1"></i>{{ __('crm.reserve') }}
                                             </button>
                                         @endif
 
                                         @if($item->quantity_reserved > 0 || $remainingToIssue > 0)
                                             <button type="button" class="btn btn-sm btn-soft-success px-2 py-1 fs-11 fw-semibold w-100 text-start btn-row-issue" data-bs-toggle="modal" data-bs-target="#issueModal-{{ $item->id }}">
-                                                <i class="feather-check-circle me-1"></i>Issue
+                                                <i class="feather-check-circle me-1"></i>{{ __('crm.issue') }}
                                             </button>
                                         @endif
 
                                         @if($remainingToIssue > 0)
                                             <span class="badge bg-warning-soft text-warning px-2 py-1 fs-12 w-100 text-center badge-row-pr-raised">
-                                                <i class="feather-clock me-1"></i>PR Raised
+                                                <i class="feather-clock me-1"></i>{{ __('crm.pr_raised') }}
                                             </span>
                                             <button type="button" class="btn btn-sm btn-soft-danger px-2 py-1 fs-11 fw-semibold w-100 text-start btn-row-indent" data-bs-toggle="modal" data-bs-target="#shortageModal-{{ $item->id }}">
-                                                <i class="feather-shopping-cart me-1"></i>Create Indent
+                                                <i class="feather-shopping-cart me-1"></i>{{ __('crm.create_indent') }}
                                             </button>
                                         @endif
 
                                         @if($remainingToIssue <= 0)
-                                            <span class="text-success fs-12 fw-bold"><i class="feather-check-circle me-1"></i> Fully Issued</span>
+                                            <span class="text-success fs-12 fw-bold"><i class="feather-check-circle me-1"></i> {{ __('crm.fully_issued') }}</span>
                                         @endif
                                     </div>
                                 </td>
@@ -244,8 +244,8 @@
         @if($remainingToReserve > 0 && $totalAvailableStock > 0)
             <x-ui.modal
                 id="reserveModal-{{ $item->id }}"
-                title="Reserve Stock — {{ $item->product->name }}"
-                submitText="Confirm Reservation"
+                title="{{ __('crm.reserve_stock_title', ['product' => $item->product->name]) }}"
+                submitText="{{ __('crm.confirm_reservation') }}"
                 formAction="{{ route('sales.material-requests.reserve', $item->id) }}"
                 :centered="true"
             >
@@ -256,26 +256,26 @@
                         </div>
                         <div>
                             <h6 class="fw-bold text-dark mb-0">{{ $item->product->name }}</h6>
-                            <small class="text-muted font-monospace">SKU: {{ $item->product->sku }} | Planned: {{ (float) $item->quantity_planned }}</small>
+                            <small class="text-muted font-monospace">{{ __('crm.sku_label') }} {{ $item->product->sku }} | {{ __('crm.planned_label') }} {{ (float) $item->quantity_planned }}</small>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fs-11 fw-bold mb-1 text-muted">Select Warehouse</label>
+                        <label class="form-label fs-11 fw-bold mb-1 text-muted">{{ __('crm.select_warehouse') }}</label>
                         <select class="form-select form-select-sm reserve-warehouse-select" data-item-id="{{ $item->id }}" data-remaining="{{ $remainingToReserve }}" name="warehouse_id" onchange="updateReserveQtyLimit({{ $item->id }}, this, {{ $remainingToReserve }})">
                             @foreach($warehouses as $wh)
                                 @php
                                     $whAvail = \App\Domains\Inventory\Services\StockService::getAvailableStock($item->product_id, $wh->id);
                                 @endphp
                                 <option value="{{ $wh->id }}" data-avail="{{ $whAvail }}">
-                                    {{ $wh->name }} (Available: {{ (float)$whAvail }})
+                                    {{ __('crm.wh_available_qty', ['name' => $wh->name, 'qty' => (float)$whAvail]) }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fs-11 fw-bold mb-1 text-muted">Qty to Reserve (Max: <span id="reserve-max-label-{{ $item->id }}" class="fw-bold text-dark">0</span>)</label>
+                        <label class="form-label fs-11 fw-bold mb-1 text-muted">{{ __('crm.qty_to_reserve') ?? 'Qty to Reserve' }} (Max: <span id="reserve-max-label-{{ $item->id }}" class="fw-bold text-dark">0</span>)</label>
                         <input type="number" id="reserve-qty-input-{{ $item->id }}" name="quantity" class="form-control" step="0.0001" min="0.0001" required>
                     </div>
                 </div>
@@ -286,8 +286,8 @@
         @if($item->quantity_reserved > 0 || ($remainingToIssue > 0 && $totalAvailableStock > 0))
             <x-ui.modal
                 id="issueModal-{{ $item->id }}"
-                title="Issue Stock — {{ $item->product->name }}"
-                submitText="Confirm Issue"
+                title="{{ __('crm.issue_stock_title', ['product' => $item->product->name]) }}"
+                submitText="{{ __('crm.confirm_issue') }}"
                 formAction="{{ route('sales.material-requests.issue', $item->id) }}"
                 :centered="true"
             >
@@ -298,32 +298,32 @@
                         </div>
                         <div>
                             <h6 class="fw-bold text-dark mb-0">{{ $item->product->name }}</h6>
-                            <small class="text-muted font-monospace">SKU: {{ $item->product->sku }} | Reserved: {{ (float) $item->quantity_reserved }} | Planned: {{ (float) $item->quantity_planned }}</small>
+                            <small class="text-muted font-monospace">{{ __('crm.sku_label') }} {{ $item->product->sku }} | {{ __('crm.reserved_label') }} {{ (float) $item->quantity_reserved }} | {{ __('crm.planned_label') }} {{ (float) $item->quantity_planned }}</small>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fs-11 fw-bold mb-1 text-muted">Select Warehouse</label>
+                        <label class="form-label fs-11 fw-bold mb-1 text-muted">{{ __('crm.select_warehouse') }}</label>
                         <select class="form-select form-select-sm issue-warehouse-select" data-item-id="{{ $item->id }}" data-remaining-issue="{{ $remainingToIssue }}" data-reserved="{{ $item->quantity_reserved }}" name="warehouse_id" onchange="updateIssueQtyLimit({{ $item->id }}, this, {{ $remainingToIssue }}, {{ $item->quantity_reserved }})">
                             @foreach($warehouses as $wh)
                                 @php
                                     $whAvail = \App\Domains\Inventory\Services\StockService::getAvailableStock($item->product_id, $wh->id);
                                 @endphp
                                 <option value="{{ $wh->id }}" data-avail="{{ $whAvail }}" {{ $item->warehouse_id == $wh->id ? 'selected' : '' }}>
-                                    {{ $wh->name }} (Available: {{ (float)$whAvail }})
+                                    {{ __('crm.wh_available_qty', ['name' => $wh->name, 'qty' => (float)$whAvail]) }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fs-11 fw-bold mb-1 text-muted">Qty to Issue (Max: <span id="issue-max-label-{{ $item->id }}" class="fw-bold text-dark">0</span>)</label>
+                        <label class="form-label fs-11 fw-bold mb-1 text-muted">{{ __('crm.qty_to_issue') ?? 'Qty to Issue' }} (Max: <span id="issue-max-label-{{ $item->id }}" class="fw-bold text-dark">0</span>)</label>
                         <input type="number" id="issue-qty-input-{{ $item->id }}" name="quantity" class="form-control" step="0.0001" min="0.0001" required>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fs-11 fw-bold mb-1 text-muted">Remarks</label>
-                        <input type="text" name="remarks" class="form-control" placeholder="e.g. Issued to shop floor">
+                        <label class="form-label fs-11 fw-bold mb-1 text-muted">{{ __('crm.remarks') }}</label>
+                        <input type="text" name="remarks" class="form-control" placeholder="{{ __('crm.issued_remarks_placeholder') }}">
                     </div>
                 </div>
             </x-ui.modal>
@@ -333,8 +333,8 @@
         @if($remainingToIssue > 0)
             <x-ui.modal
                 id="shortageModal-{{ $item->id }}"
-                title="Create Indent — {{ $item->product->name }}"
-                submitText="Raise Purchase Requisition"
+                title="{{ __('crm.create_indent_title', ['product' => $item->product->name]) }}"
+                submitText="{{ __('crm.raise_purchase_requisition') }}"
                 formAction="{{ route('sales.material-requests.create-pr', $item->id) }}"
                 :centered="true"
             >
@@ -345,14 +345,14 @@
                         </div>
                         <div>
                             <h6 class="fw-bold text-dark mb-0">{{ $item->product->name }}</h6>
-                            <small class="text-muted font-monospace">SKU: {{ $item->product->sku }} | Shortage: <span class="shortage-badge-val-{{ $item->id }}">{{ $shortageQty }}</span></small>
+                            <small class="text-muted font-monospace">{{ __('crm.sku_label') }} {{ $item->product->sku }} | {{ __('crm.shortage_label') }} <span class="shortage-badge-val-{{ $item->id }}">{{ $shortageQty }}</span></small>
                         </div>
                     </div>
 
-                    <p class="mb-3">This will generate a Draft Purchase Requisition for the shortage quantity of <strong><span class="shortage-text-val-{{ $item->id }}">{{ $shortageQty }}</span> {{ $item->uom?->code ?? $item->product?->uom?->code ?? 'PCS' }}</strong>.</p>
+                    <p class="mb-3">{{ __('crm.draft_pr_shortage_desc') }} <strong><span class="shortage-text-val-{{ $item->id }}">{{ $shortageQty }}</span> {{ $item->uom?->code ?? $item->product?->uom?->code ?? 'PCS' }}</strong>.</p>
 
                     <div class="mb-3">
-                        <label class="form-label fs-11 fw-bold mb-1 text-muted">Destination Warehouse <span class="text-danger">*</span></label>
+                        <label class="form-label fs-11 fw-bold mb-1 text-muted">{{ __('crm.destination_warehouse') }} <span class="text-danger">*</span></label>
                         <select class="form-select form-select-sm shortage-warehouse-select" name="warehouse_id" required>
                             @foreach($warehouses as $wh)
                                 <option value="{{ $wh->id }}" @selected($wh->id == $item->warehouse_id)>
@@ -360,12 +360,12 @@
                                 </option>
                             @endforeach
                         </select>
-                        <div class="text-muted fs-11 mt-1">Select the target warehouse for procurement.</div>
+                        <div class="text-muted fs-11 mt-1">{{ __('crm.target_warehouse_procurement_help') }}</div>
                     </div>
 
                     <div class="mb-0">
-                        <label class="form-label fs-11 fw-bold mb-1 text-muted">Notes</label>
-                        <textarea class="form-control form-control-sm" name="notes" rows="2" placeholder="e.g. Urgent shortage for MO"></textarea>
+                        <label class="form-label fs-11 fw-bold mb-1 text-muted">{{ __('crm.notes') }}</label>
+                        <textarea class="form-control form-control-sm" name="notes" rows="2" placeholder="{{ __('crm.urgent_shortage_notes_placeholder') }}"></textarea>
                     </div>
                 </div>
             </x-ui.modal>
@@ -375,8 +375,8 @@
     <!-- Confirm Bulk Action Modal -->
     <x-ui.modal
         id="confirmBulkActionModal"
-        title="Confirm Bulk Action"
-        submitText="Confirm & Execute"
+        title="{{ __('crm.confirm_bulk_action') }}"
+        submitText="{{ __('crm.confirm_execute') }}"
         formAction="{{ route('sales.material-requests.bulk-action', $slip->id) }}"
         :centered="true"
         size="lg"
@@ -386,16 +386,16 @@
             <div id="bulk-hidden-fields"></div>
 
             <div class="alert alert-info border py-2 mb-3">
-                <i class="feather-info me-1"></i> Review and adjust quantities for the selected items below before executing the action.
+                <i class="feather-info me-1"></i> {{ __('crm.review_adjust_quantities_desc') }}
             </div>
 
             <div class="table-responsive shadow-sm border rounded" style="max-height: 350px; overflow-y: auto; overflow-x: hidden !important;">
                 <table class="table table-bordered table-sm align-middle fs-13 mb-0">
                     <thead class="bg-light fw-bold text-muted">
                         <tr>
-                            <th>Product</th>
-                            <th class="text-center" style="width: 25%">Stock</th>
-                            <th class="text-center" style="width: 30%">Qty to Action</th>
+                            <th>{{ __('crm.product') }}</th>
+                            <th class="text-center" style="width: 25%">{{ __('crm.stock') }}</th>
+                            <th class="text-center" style="width: 30%">{{ __('crm.qty_to_action') }}</th>
                         </tr>
                     </thead>
                     <tbody id="confirm-items-tbody">
@@ -603,20 +603,20 @@
                 $executeBtn.removeClass('d-none');
 
                 if (action === 'reserve') {
-                    $('#warehouseLabel').text('2. Select Warehouse');
+                    $('#warehouseLabel').text("{{ __('crm.select_warehouse_label') }}");
                     $('.id-notes-field').addClass('d-none');
                     $bulkWarehouseSelect.prop('required', true);
                 } else if (action === 'issue') {
-                    $('#warehouseLabel').text('2. Select Warehouse');
+                    $('#warehouseLabel').text("{{ __('crm.select_warehouse_label') }}");
                     $('.id-notes-field').removeClass('d-none');
-                    $('#notesLabel').text('Remarks');
-                    $('#bulkRemarksNotes').attr('placeholder', 'e.g. Bulk issued to production line');
+                    $('#notesLabel').text("{{ __('crm.remarks') }}");
+                    $('#bulkRemarksNotes').attr('placeholder', "{{ __('crm.issued_remarks_placeholder') }}");
                     $bulkWarehouseSelect.prop('required', true);
                 } else if (action === 'indent') {
-                    $('#warehouseLabel').text('2. Destination Warehouse');
+                    $('#warehouseLabel').text("{{ __('crm.destination_warehouse_label') }}");
                     $('.id-notes-field').removeClass('d-none');
-                    $('#notesLabel').text('Notes');
-                    $('#bulkRemarksNotes').attr('placeholder', 'e.g. Consolidated shortages for MO');
+                    $('#notesLabel').text("{{ __('crm.notes') }}");
+                    $('#bulkRemarksNotes').attr('placeholder', "{{ __('crm.urgent_shortage_notes_placeholder') }}");
                     $bulkWarehouseSelect.prop('required', true);
                 }
 

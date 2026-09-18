@@ -23,15 +23,6 @@
                     <h3 class="fw-bold text-dark mb-0">Create Direct Service Bill</h3>
                     <p class="text-muted fs-12 mb-0">Book standalone Freight, Logistics, Customs, or Handling Service Bills with optional GRN reference.</p>
                 </div>
-
-                <div class="d-flex gap-2">
-                    <x-ui.button href="{{ route('purchase.bills.index') }}" variant="light" size="sm">
-                        Cancel
-                    </x-ui.button>
-                    <x-ui.button type="submit" variant="primary" size="sm" icon="feather-save">
-                        Save Service Bill
-                    </x-ui.button>
-                </div>
             </div>
 
             <!-- Form Body Grid -->
@@ -164,6 +155,16 @@
             <!-- Notes Section -->
             <div class="mt-3 pt-3 border-top">
                 <x-ui.odoo-form-ui type="textarea" label="Notes / Remarks" name="notes" :value="old('notes', $prefilled['notes'] ?? request('notes'))" placeholder="Enter additional bill remarks, Bilty details or references..." rows="2" />
+            </div>
+
+            <!-- Bottom Action Buttons (like Lead form) -->
+            <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                <x-ui.button href="{{ route('purchase.bills.index') }}" variant="light" class="border px-4 py-2 fs-13">
+                    Cancel
+                </x-ui.button>
+                <x-ui.button type="submit" variant="primary" icon="feather-save" class="px-4 py-2 fs-13 fw-bold shadow-sm">
+                    Save Service Bill
+                </x-ui.button>
             </div>
         </form>
     </div>

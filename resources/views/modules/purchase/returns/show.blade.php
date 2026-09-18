@@ -12,7 +12,7 @@
     @if (in_array($return->status, ['Pending', 'Draft']))
         <form action="{{ route('purchase.returns.approve', $return->id) }}" method="POST" id="approveReturnForm" class="d-inline">
             @csrf
-            <x-ui.button type="submit" variant="success" size="md" icon="feather-check-circle">
+            <x-ui.button type="submit" variant="success" icon="feather-check-circle">
                 Approve &amp; Remove from Inventory
             </x-ui.button>
         </form>

@@ -1,33 +1,33 @@
 @extends('layouts.duralux')
 
-@section('title', 'Tax Invoice ' . $invoice->invoice_number . ' | SaaS ERP')
-@section('page-title', 'Tax Invoice')
+@section('title', __('crm.tax_invoice') . ' ' . $invoice->invoice_number . ' | SaaS ERP')
+@section('page-title', __('crm.tax_invoice'))
 @section('breadcrumb')
-    <a href="{{ route('sales.invoices.index') }}">Invoices</a> &gt; {{ $invoice->invoice_number }}
+    <a href="{{ route('sales.invoices.index') }}">{{ __('crm.invoices') }}</a> &gt; {{ $invoice->invoice_number }}
 @endsection
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <a href="{{ route('sales.invoices.index') }}" class="action-dropdown-btn" title="Back to Invoices" data-bs-toggle="tooltip">
+        <a href="{{ route('sales.invoices.index') }}" class="action-dropdown-btn" title="{{ __('crm.back_to_invoices') }}" data-bs-toggle="tooltip">
             <i class="feather feather-arrow-left"></i>
         </a>
 
         <a href="javascript:void(0)" onclick="window.print()" class="btn btn-sm btn-outline-secondary fw-bold px-3">
-            <i class="feather-printer me-1.5"></i>Print
+            <i class="feather-printer me-1.5"></i>{{ __('crm.print') }}
         </a>
 
         @if ($invoice->status === 'Draft')
             <form action="{{ route('sales.invoices.send', $invoice->id) }}" method="POST" class="d-inline">
                 @csrf
                 <button type="submit" class="btn btn-sm btn-primary fw-bold px-3">
-                    <i class="feather-send me-1.5"></i>Mark as Sent
+                    <i class="feather-send me-1.5"></i>{{ __('crm.mark_as_sent') }}
                 </button>
             </form>
         @endif
 
         @if (in_array($invoice->status, ['Sent', 'Partially Paid', 'Posted', 'Draft']))
             <a href="{{ route('sales.payments.create', ['invoice_id' => $invoice->id, 'customer_id' => $invoice->customer_id ?: $invoice->salesOrder?->customer_id]) }}" class="btn btn-sm btn-success fw-bold px-3">
-                <i class="feather-dollar-sign me-1.5"></i>Register Payment
+                <i class="feather-dollar-sign me-1.5"></i>{{ __('crm.register_payment') }}
             </a>
         @endif
     </div>
@@ -366,7 +366,7 @@
     <div class="row text-dark">
         <div class="col-12">
 
-            <!-- Standard ERP Customer Tax Invoice Sheet (Odoo / Zoho Standard) -->
+            <!-- Standard ERP Customer Tax Invoice Sheet -->
             <div class="invoice-sheet print-area mb-5">
                 <!-- Status Corner Ribbon Tag Patti -->
                 <div class="invoice-corner-ribbon">
@@ -378,9 +378,17 @@
                             'Cancelled' => 'ribbon-cancelled',
                             default => 'ribbon-draft',
                         };
+
+                        $statusLabel = match($invoice->status) {
+                            'Paid' => __('crm.status_paid'),
+                            'Partially Paid' => __('crm.status_partially_paid'),
+                            'Sent' => __('crm.status_sent'),
+                            'Cancelled' => __('crm.status_cancelled'),
+                            default => __('crm.status_draft'),
+                        };
                     @endphp
                     <div class="ribbon-inner {{ $ribbonClass }}">
-                        {{ $invoice->status }}
+                        {{ $statusLabel }}
                     </div>
                 </div>
 
@@ -393,7 +401,7 @@
                             </div>
                             <div>
                                 <h4 class="fw-bold text-dark mb-0 fs-17">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</h4>
-                                <span class="fs-11 text-muted">Official Corporate Billing Unit</span>
+                                <span class="fs-11 text-muted">{{ __('crm.official_corporate_billing_unit') }}</span>
                             </div>
                         </div>
                         <div class="fs-12 text-secondary leading-relaxed">
@@ -404,32 +412,32 @@
                     </div>
 
                     <div class="col-5 text-end">
-                        <h2 class="fw-black text-uppercase tracking-wide mb-1" style="color: #1e40af; font-size: 22px; letter-spacing: 1px;">TAX INVOICE</h2>
+                        <h2 class="fw-black text-uppercase tracking-wide mb-1" style="color: #1e40af; font-size: 22px; letter-spacing: 1px;">{{ __('crm.tax_invoice') }}</h2>
                         <div class="fs-14 fw-bold text-dark"># {{ $invoice->invoice_number }}</div>
                         
                         <div class="mt-3 fs-12 text-secondary">
                             <div class="d-flex justify-content-end gap-2 mb-1">
-                                <span class="text-muted">Invoice Date:</span>
+                                <span class="text-muted">{{ __('crm.invoice_date') }}:</span>
                                 <strong class="text-dark">{{ date('d-M-Y', strtotime($invoice->invoice_date)) }}</strong>
                             </div>
                             <div class="d-flex justify-content-end gap-2 mb-1">
-                                <span class="text-muted">Due Date:</span>
+                                <span class="text-muted">{{ __('crm.due_date') }}:</span>
                                 <strong class="text-dark">{{ $invoice->due_date ? date('d-M-Y', strtotime($invoice->due_date)) : '—' }}</strong>
                             </div>
                             <div class="d-flex justify-content-end gap-2">
-                                <span class="text-muted">Terms:</span>
-                                <strong class="text-dark">{{ $invoice->salesOrder?->payment_terms ?: 'Immediate Payment' }}</strong>
+                                <span class="text-muted">{{ __('crm.payment_terms') }}:</span>
+                                <strong class="text-dark">{{ $invoice->salesOrder?->payment_terms ?: __('crm.immediate_payment') }}</strong>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. Address & Order Details Section (2 Box Columns) -->
+                <!-- 2. Address & Order Details Section -->
                 <div class="row g-4 mb-4 fs-12 text-dark">
                     <!-- Left: Customer Details -->
                     <div class="col-6">
                         <div class="p-3 bg-light bg-opacity-40 rounded border h-100">
-                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">Billed To (Customer):</span>
+                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">{{ __('crm.billed_to_customer') }}</span>
                             <h6 class="fw-bold text-dark mb-1 fs-14">{{ $invoice->customer?->name ?: ($invoice->salesOrder?->customer?->name ?: '—') }}</h6>
                             @if($invoice->customer?->company_name)
                                 <div class="text-muted fw-semibold mb-1">{{ $invoice->customer->company_name }}</div>
@@ -441,7 +449,7 @@
                             </div>
                             @if ($invoice->salesOrder?->billing_address)
                                 <div class="mt-2 pt-2 border-top text-secondary fs-11" style="white-space: pre-wrap;">
-                                    <strong>Billing Address:</strong><br>{{ $invoice->salesOrder->billing_address }}
+                                    <strong>{{ __('crm.billing_address') }}:</strong><br>{{ $invoice->salesOrder->billing_address }}
                                 </div>
                             @endif
                         </div>
@@ -450,11 +458,11 @@
                     <!-- Right: Order References & Dispatch Info -->
                     <div class="col-6">
                         <div class="p-3 bg-light bg-opacity-40 rounded border h-100">
-                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">Order & Dispatch References:</span>
+                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">{{ __('crm.order_dispatch_references') }}</span>
                             
                             @if ($invoice->salesOrder)
                                 <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                    <span class="text-muted">Sales Order Ref:</span>
+                                    <span class="text-muted">{{ __('crm.sales_order_reference') }}:</span>
                                     <a href="{{ route('sales.orders.show', $invoice->sales_order_id) }}" class="fw-bold text-primary">
                                         {{ $invoice->salesOrder->sales_order_number }}
                                     </a>
@@ -463,7 +471,7 @@
 
                             @if ($invoice->materialRequirement)
                                 <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                    <span class="text-muted">Dispatch Ref:</span>
+                                    <span class="text-muted">{{ __('crm.dispatch_order_reference') }}:</span>
                                     <a href="{{ route('sales.material-requirements.show', $invoice->material_requirement_id) }}" class="fw-bold text-info">
                                         {{ $invoice->materialRequirement->requirement_number }}
                                     </a>
@@ -471,35 +479,35 @@
                             @endif
 
                             <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                <span class="text-muted">Place of Supply:</span>
+                                <span class="text-muted">{{ __('crm.place_of_supply') }}</span>
                                 <span class="fw-semibold text-dark">Rajasthan (08)</span>
                             </div>
 
                             <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                <span class="text-muted">GST Option:</span>
-                                <span class="fw-bold text-dark">{{ $invoice->gst_type === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)' }}</span>
+                                <span class="text-muted">{{ __('crm.gst_option') }}</span>
+                                <span class="fw-bold text-dark">{{ $invoice->gst_type === 'igst' ? __('crm.inter_state_gst') : __('crm.intra_state_gst') }}</span>
                             </div>
 
                             <div class="d-flex justify-content-between">
-                                <span class="text-muted">Payment Status:</span>
-                                <span class="fw-bold {{ $balanceDue > 0 ? 'text-danger' : 'text-success' }}">{{ $balanceDue > 0 ? 'Balance Outstanding' : 'Fully Paid' }}</span>
+                                <span class="text-muted">{{ __('crm.payment_status') }}</span>
+                                <span class="fw-bold {{ $balanceDue > 0 ? 'text-danger' : 'text-success' }}">{{ $balanceDue > 0 ? __('crm.balance_outstanding') : __('crm.fully_paid') }}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 3. Line Items Table (Odoo / Zoho Clean Invoice Standard) -->
+                <!-- 3. Line Items Table -->
                 <div class="mb-4">
                     <div class="table-responsive">
                         <table class="table invoice-table align-middle w-100 mb-0">
                             <thead>
                                 <tr>
                                     <th style="width: 5%;" class="text-center">#</th>
-                                    <th style="width: 45%;">Item & Description</th>
-                                    <th class="text-end" style="width: 12%;">Qty</th>
-                                    <th class="text-end" style="width: 13%;">Rate (₹)</th>
-                                    <th class="text-end" style="width: 10%;">Tax %</th>
-                                    <th class="text-end" style="width: 15%;">Amount (₹)</th>
+                                    <th style="width: 45%;">{{ __('crm.item_and_description') }}</th>
+                                    <th class="text-end" style="width: 12%;">{{ __('crm.qty') }}</th>
+                                    <th class="text-end" style="width: 13%;">{{ __('crm.rate') }}</th>
+                                    <th class="text-end" style="width: 10%;">{{ __('crm.tax_rate') }}</th>
+                                    <th class="text-end" style="width: 15%;">{{ __('crm.amount') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -516,7 +524,7 @@
                                             @endif
                                         </td>
                                         <td class="text-end fw-semibold">{{ (float)$item->quantity }}</td>
-                                        <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
+                                        <td class="text-end">{{ format_currency($item->unit_price) }}</td>
                                         <td class="text-end text-muted">{{ (float)$item->tax_rate }}%</td>
                                         <td class="text-end fw-bold text-dark">
                                             @php
@@ -524,7 +532,7 @@
                                                     ? $item->total_amount
                                                     : ($item->subtotal > 0 ? $item->subtotal : ($item->quantity * $item->unit_price));
                                             @endphp
-                                            ₹{{ number_format($lineTotal, 2) }}
+                                            {{ format_currency($lineTotal) }}
                                         </td>
                                     </tr>
                                 @endforeach
@@ -543,7 +551,7 @@
                         @if ($taxGroups->count() > 0 && $invoice->tax_amount > 0)
                             <div class="card border shadow-none mb-3 gst-summary-box" style="border-radius: 6px; overflow: hidden; border-color: #cbd5e1 !important;">
                                 <div class="py-1 px-3 bg-light border-bottom text-muted fw-bold fs-11 text-uppercase d-flex justify-content-between align-items-center">
-                                    <span><i class="feather-pie-chart me-1 text-primary"></i>GST Tax Summary</span>
+                                    <span><i class="feather-pie-chart me-1 text-primary"></i>{{ __('crm.gst_tax_summary') }}</span>
                                     <span class="badge bg-soft-primary text-primary fs-10" style="font-size: 10px;">{{ $invoice->gst_type === 'igst' ? 'IGST' : 'CGST + SGST' }}</span>
                                 </div>
                                 <div class="table-responsive" style="overflow-x: visible;">
@@ -551,16 +559,16 @@
                                         <thead class="bg-light text-secondary fw-bold">
                                             @if($invoice->gst_type === 'igst')
                                                 <tr>
-                                                    <th class="py-1" style="width: 30%;">Tax Rate</th>
-                                                    <th class="py-1 text-end" style="width: 35%;">Total Tax</th>
-                                                    <th class="py-1 text-end" style="width: 35%;">IGST Amt</th>
+                                                    <th class="py-1" style="width: 30%;">{{ __('crm.tax_rate') }}</th>
+                                                    <th class="py-1 text-end" style="width: 35%;">{{ __('crm.total_amount') }}</th>
+                                                    <th class="py-1 text-end" style="width: 35%;">IGST</th>
                                                 </tr>
                                             @else
                                                 <tr>
-                                                    <th class="py-1" style="width: 25%;">Tax Rate</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">Total Tax</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">CGST Amt</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">SGST Amt</th>
+                                                    <th class="py-1" style="width: 25%;">{{ __('crm.tax_rate') }}</th>
+                                                    <th class="py-1 text-end" style="width: 25%;">{{ __('crm.total_amount') }}</th>
+                                                    <th class="py-1 text-end" style="width: 25%;">CGST</th>
+                                                    <th class="py-1 text-end" style="width: 25%;">SGST</th>
                                                 </tr>
                                             @endif
                                         </thead>
@@ -584,8 +592,8 @@
                                                     @endphp
                                                     <tr>
                                                         <td class="py-1 fw-bold">GST {{ $rate }}%</td>
-                                                        <td class="py-1 text-end fw-bold text-dark">₹{{ number_format($grpTax, 2) }}</td>
-                                                        <td class="py-1 text-end">₹{{ number_format($grpIgst, 2) }}</td>
+                                                        <td class="py-1 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
+                                                        <td class="py-1 text-end">{{ format_currency($grpIgst) }}</td>
                                                     </tr>
                                                 @else
                                                     @php
@@ -596,9 +604,9 @@
                                                     @endphp
                                                     <tr>
                                                         <td class="py-1 fw-bold">GST {{ $rate }}%</td>
-                                                        <td class="py-1 text-end fw-bold text-dark">₹{{ number_format($grpTax, 2) }}</td>
-                                                        <td class="py-1 text-end">₹{{ number_format($grpCgst, 2) }}</td>
-                                                        <td class="py-1 text-end">₹{{ number_format($grpSgst, 2) }}</td>
+                                                        <td class="py-1 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
+                                                        <td class="py-1 text-end">{{ format_currency($grpCgst) }}</td>
+                                                        <td class="py-1 text-end">{{ format_currency($grpSgst) }}</td>
                                                     </tr>
                                                 @endif
                                             @endforeach
@@ -607,15 +615,15 @@
                                             @if($invoice->gst_type === 'igst')
                                                 <tr>
                                                     <td class="py-1">Total</td>
-                                                    <td class="py-1 text-end text-primary">₹{{ number_format($totTax, 2) }}</td>
-                                                    <td class="py-1 text-end">₹{{ number_format($totIgst, 2) }}</td>
+                                                    <td class="py-1 text-end text-primary">{{ format_currency($totTax) }}</td>
+                                                    <td class="py-1 text-end">{{ format_currency($totIgst) }}</td>
                                                 </tr>
                                             @else
                                                 <tr>
                                                     <td class="py-1">Total</td>
-                                                    <td class="py-1 text-end text-primary">₹{{ number_format($totTax, 2) }}</td>
-                                                    <td class="py-1 text-end">₹{{ number_format($totCgst, 2) }}</td>
-                                                    <td class="py-1 text-end">₹{{ number_format($totSgst, 2) }}</td>
+                                                    <td class="py-1 text-end text-primary">{{ format_currency($totTax) }}</td>
+                                                    <td class="py-1 text-end">{{ format_currency($totCgst) }}</td>
+                                                    <td class="py-1 text-end">{{ format_currency($totSgst) }}</td>
                                                 </tr>
                                             @endif
                                         </tfoot>
@@ -625,18 +633,18 @@
                         @endif
 
                         <div class="p-3 bg-light bg-opacity-30 rounded border mb-3 bank-details-box" style="border-color: #cbd5e1 !important;">
-                            <h6 class="fw-bold text-dark fs-11 text-uppercase mb-2" style="letter-spacing: 0.5px;">Bank Payment Details:</h6>
+                            <h6 class="fw-bold text-dark fs-11 text-uppercase mb-2" style="letter-spacing: 0.5px;">{{ __('crm.bank_payment_details') }}</h6>
                             <div class="row fs-11 text-secondary g-2">
-                                <div class="col-6"><strong>Bank Name:</strong> State Bank of India</div>
-                                <div class="col-6"><strong>Account Name:</strong> {{ tenant() ? tenant()->name : 'SaaS ERP' }}</div>
-                                <div class="col-6"><strong>Account No:</strong> 398402948201</div>
-                                <div class="col-6"><strong>IFSC Code:</strong> SBIN0001234</div>
+                                <div class="col-6"><strong>{{ __('crm.bank_name') }}</strong> State Bank of India</div>
+                                <div class="col-6"><strong>{{ __('crm.account_name') }}</strong> {{ tenant() ? tenant()->name : 'SaaS ERP' }}</div>
+                                <div class="col-6"><strong>{{ __('crm.account_no') }}</strong> 398402948201</div>
+                                <div class="col-6"><strong>{{ __('crm.ifsc_code') }}</strong> SBIN0001234</div>
                             </div>
                         </div>
 
                         @if ($invoice->notes)
                             <div class="p-3 bg-light bg-opacity-30 rounded border terms-box" style="border-color: #cbd5e1 !important;">
-                                <h6 class="fw-bold text-dark fs-11 text-uppercase mb-1" style="letter-spacing: 0.5px;">Terms & Conditions / Customer Notes:</h6>
+                                <h6 class="fw-bold text-dark fs-11 text-uppercase mb-1" style="letter-spacing: 0.5px;">{{ __('crm.terms_conditions_notes') }}</h6>
                                 <div class="mb-0 text-muted fs-12">{!! $invoice->notes !!}</div>
                             </div>
                         @endif
@@ -693,54 +701,54 @@
 
                             <!-- 1. Subtotal (Excl. Tax) -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                <span class="text-muted fw-semibold">Subtotal (Excl. Tax):</span>
-                                <span class="fw-bold text-dark">₹{{ number_format($grossSubtotal, 2) }}</span>
+                                <span class="text-muted fw-semibold">{{ __('crm.subtotal_excl_tax') }}</span>
+                                <span class="fw-bold text-dark">{{ format_currency($grossSubtotal) }}</span>
                             </div>
 
                             <!-- 2. Less: Item Discounts -->
                             @if($invoice->discount_type !== 'without_discount' && $effectiveDiscount > 0)
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12 text-danger">
-                                    <span class="fw-semibold">Less: Item Discounts:</span>
-                                    <span class="fw-bold">-₹{{ number_format($effectiveDiscount, 2) }}</span>
+                                    <span class="fw-semibold">{{ __('crm.less_item_discounts') }}</span>
+                                    <span class="fw-bold">-{{ format_currency($effectiveDiscount) }}</span>
                                 </div>
                             @endif
 
                             <!-- 3. Items Taxable Value -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                <span class="text-muted fw-semibold">Items Taxable Value:</span>
-                                <span class="fw-bold text-dark">₹{{ number_format($taxableBase, 2) }}</span>
+                                <span class="text-muted fw-semibold">{{ __('crm.items_taxable_value') }}</span>
+                                <span class="fw-bold text-dark">{{ format_currency($taxableBase) }}</span>
                             </div>
 
                             <!-- 4. Add: Items GST Tax -->
                             @if($invoice->tax_type !== 'without_tax' && $itemsTaxAmount > 0)
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                    <span class="text-muted fw-medium">Add: Items GST Tax:</span>
-                                    <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount, 2) }}</span>
+                                    <span class="text-muted fw-medium">{{ __('crm.add_items_gst_tax') }}</span>
+                                    <span class="text-muted font-monospace">+{{ format_currency($itemsTaxAmount) }}</span>
                                 </div>
                             @endif
 
                             <!-- 5. Billed Items Total (Incl. GST) -->
                             <div class="d-flex justify-content-between align-items-center my-2 py-1.5 px-2.5 rounded bg-white border fs-12 fw-bold text-dark" style="border-color: #e2e8f0 !important;">
-                                <span>Billed Items Total (Incl. GST):</span>
-                                <span>₹{{ number_format($itemsTotalInclGst, 2) }}</span>
+                                <span>{{ __('crm.billed_items_total') }}</span>
+                                <span>{{ format_currency($itemsTotalInclGst) }}</span>
                             </div>
 
                             <!-- 6. Freight Charges -->
                             @if($freightAmount > 0)
                                 <hr class="my-2 border-slate">
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                    <span class="text-muted fw-semibold">Freight Charges:</span>
-                                    <span class="fw-bold text-primary">₹{{ number_format($freightAmount, 2) }}</span>
+                                    <span class="text-muted fw-semibold">{{ __('crm.freight_charges') }}</span>
+                                    <span class="fw-bold text-primary">{{ format_currency($freightAmount) }}</span>
                                 </div>
                                 @if($freightTax > 0)
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-semibold">Add: Freight GST Tax:</span>
-                                        <span class="text-muted font-monospace">+₹{{ number_format($freightTax, 2) }}</span>
+                                        <span class="text-muted fw-semibold">{{ __('crm.add_freight_gst_tax') }}</span>
+                                        <span class="text-muted font-monospace">+{{ format_currency($freightTax) }}</span>
                                     </div>
                                 @endif
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12 fw-bold text-primary">
-                                    <span>Total Freight (Incl. GST):</span>
-                                    <span>₹{{ number_format($totalFreightInclGst, 2) }}</span>
+                                    <span>{{ __('crm.total_freight_incl_gst') }}</span>
+                                    <span>{{ format_currency($totalFreightInclGst) }}</span>
                                 </div>
                             @endif
 
@@ -749,17 +757,17 @@
                                 <hr class="my-2 border-slate">
                                 @if($gstType === 'cgst_sgst')
                                     <div class="d-flex justify-content-between align-items-center mb-1.5 fs-12">
-                                        <span class="text-muted fw-medium">CGST (Central Tax):</span>
-                                        <span class="text-muted font-monospace">+₹{{ number_format($totalInvoiceTaxAmount / 2, 2) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.cgst_central_tax') }}</span>
+                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount / 2) }}</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-medium">SGST (State Tax):</span>
-                                        <span class="text-muted font-monospace">+₹{{ number_format($totalInvoiceTaxAmount / 2, 2) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.sgst_state_tax') }}</span>
+                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount / 2) }}</span>
                                     </div>
                                 @else
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-medium">IGST (Integrated Tax):</span>
-                                        <span class="text-muted font-monospace">+₹{{ number_format($totalInvoiceTaxAmount, 2) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.igst_integrated_tax') }}</span>
+                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount) }}</span>
                                     </div>
                                 @endif
                             @endif
@@ -767,15 +775,15 @@
                             <!-- 7. Adjustment -->
                             @if($adjustment != 0)
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                    <span class="text-muted fw-semibold">Adjustment:</span>
-                                    <span class="fw-bold text-dark">₹{{ number_format($adjustment, 2) }}</span>
+                                    <span class="text-muted fw-semibold">{{ __('crm.adjustment') }}</span>
+                                    <span class="fw-bold text-dark">{{ format_currency($adjustment) }}</span>
                                 </div>
                             @endif
 
                             <!-- 8. Grand Total -->
                             <div class="d-flex justify-content-between align-items-center pt-2.5 border-top mt-2" style="border-color: #cbd5e1 !important;">
-                                <span class="fw-bold text-dark fs-13 text-uppercase" style="letter-spacing: 0.5px;">Grand Total:</span>
-                                <span class="fw-bold text-primary fs-16">₹{{ number_format($grandTotal, 2) }}</span>
+                                <span class="fw-bold text-dark fs-13 text-uppercase" style="letter-spacing: 0.5px;">{{ __('crm.grand_total') }}</span>
+                                <span class="fw-bold text-primary fs-16">{{ format_currency($grandTotal) }}</span>
                             </div>
 
                             <!-- 9. Balance Due (if applicable) -->
@@ -785,12 +793,12 @@
                             @endphp
                             @if($totalPaid > 0)
                                 <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top text-success fs-12">
-                                    <span class="fw-semibold">Amount Paid:</span>
-                                    <span class="fw-bold">-₹{{ number_format($totalPaid, 2) }}</span>
+                                    <span class="fw-semibold">{{ __('crm.amount_paid') }}:</span>
+                                    <span class="fw-bold">-{{ format_currency($totalPaid) }}</span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mt-1 pt-1 text-danger fs-13">
-                                    <span class="fw-bold">Balance Due:</span>
-                                    <span class="fw-bold">₹{{ number_format($balDue, 2) }}</span>
+                                    <span class="fw-bold">{{ __('crm.balance_due') }}:</span>
+                                    <span class="fw-bold">{{ format_currency($balDue) }}</span>
                                 </div>
                             @endif
                         </div>
@@ -800,12 +808,12 @@
                 <!-- 5. Signature Footer Block -->
                 <div class="row pt-4 border-top fs-11 text-muted align-items-end mt-4 signature-footer-block">
                     <div class="col-7">
-                        <div>Thank you for your business!</div>
-                        <div class="mt-1">This is a computer generated invoice and does not require physical signature.</div>
+                        <div>{{ __('crm.thank_you_for_your_business') }}</div>
+                        <div class="mt-1">{{ __('crm.computer_generated_invoice_notice') }}</div>
                     </div>
                     <div class="col-5 text-end">
                         <div class="fw-bold text-dark mb-5">For {{ tenant() ? tenant()->name : 'SaaS ERP' }}</div>
-                        <div class="border-top d-inline-block pt-1 px-4 text-muted fw-semibold">Authorized Signatory</div>
+                        <div class="border-top d-inline-block pt-1 px-4 text-muted fw-semibold">{{ __('crm.authorized_signatory') }}</div>
                     </div>
                 </div>
             </div>

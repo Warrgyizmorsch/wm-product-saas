@@ -110,21 +110,21 @@
 
                 @if($lead->crm_deal_id)
                     <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="btn btn-xs btn-soft-success fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-git-branch me-1"></i> View Deal
+                        <i class="feather-git-branch me-1"></i> {{ __('crm.view_deal') }}
                     </a>
                 @else
                     <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST" class="d-inline m-0 p-0">
                         @csrf
                         @method('PATCH')
                         <button type="submit" class="btn btn-xs btn-warning text-dark fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
-                            <i class="feather-user-check me-1"></i> Convert to Deal
+                            <i class="feather-user-check me-1"></i> {{ __('crm.convert_to_deal') }}
                         </button>
                     </form>
                 @endif
 
                 @if($lead->crm_account_id)
                     <a href="{{ route('crm.accounts.show', $lead->crm_account_id) }}" class="btn btn-xs btn-soft-primary fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-briefcase me-1"></i> View Account
+                        <i class="feather-briefcase me-1"></i> {{ __('crm.view_account') }}
                     </a>
                 @endif
 
@@ -138,13 +138,13 @@
                         data-lead-priority="{{ $lead->priority }}" 
                         data-next-followup="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}"
                         style="background-color: var(--bs-primary); border-color: var(--bs-primary); font-size: 11px;">
-                    <i class="feather-calendar me-1"></i> + Followup
+                    <i class="feather-calendar me-1"></i> + {{ __('crm.followup') }}
                 </button>
 
                 <!-- Send Email Button -->
                 @if ($lead->email)
                     <a href="mailto:{{ $lead->email }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-2 rounded d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-mail me-1"></i> Email
+                        <i class="feather-mail me-1"></i> {{ __('crm.email') }}
                     </a>
                 @endif
 
@@ -194,7 +194,7 @@
                             <a href="#sectionLeadInfo" class="nav-link active py-1.5 px-2 fs-12 rounded text-dark fw-medium">{{ __('crm.lead_information') }}</a>
                         </li>
                         <li class="nav-item">
-                            <a href="#sectionLeadProducts" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">Products & Quantities</a>
+                            <a href="#sectionLeadProducts" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.product_and_quantity') }}</a>
                         </li>
                         <li class="nav-item">
                             <a href="#sectionAddressInfo" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.address_details') }}</a>
@@ -283,18 +283,18 @@
                                             <div class="col-md-6 border-end">
                                                  <!-- B2B vs B2C Segment Toggle -->
                                                  <div class="mb-3 p-3 bg-soft-primary rounded-3 border border-primary-subtle shadow-2xs">
-                                                     <label class="fw-bold text-dark mb-2 d-block fs-13"><i class="feather-layers me-1 text-primary"></i> Customer Type (Lead Segment):</label>
+                                                     <label class="fw-bold text-dark mb-2 d-block fs-13"><i class="feather-layers me-1 text-primary"></i> {{ __('crm.customer_type_lead_segment') }}</label>
                                                      <div class="d-flex gap-4">
                                                          <div class="form-check form-check-inline">
                                                              <input class="form-check-input" type="radio" name="lead_type" id="edit_lead_type_b2b" value="b2b" {{ old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b' ? 'checked' : '' }} onchange="toggleLeadType('b2b')">
                                                              <label class="form-check-label fw-bold text-dark cursor-pointer" for="edit_lead_type_b2b">
-                                                                 🏢 B2B (Business Client)
+                                                                 {{ __('crm.b2b_business_client') }}
                                                              </label>
                                                          </div>
                                                          <div class="form-check form-check-inline">
                                                              <input class="form-check-input" type="radio" name="lead_type" id="edit_lead_type_b2c" value="b2c" {{ old('lead_type', $lead->lead_type) === 'b2c' ? 'checked' : '' }} onchange="toggleLeadType('b2c')">
                                                              <label class="form-check-label fw-bold text-dark cursor-pointer" for="edit_lead_type_b2c">
-                                                                 👤 B2C (Individual Customer)
+                                                                 {{ __('crm.b2c_individual_customer') }}
                                                              </label>
                                                          </div>
                                                      </div>
@@ -306,15 +306,15 @@
 
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="company_name" id="edit_company_name_input" :value="old('company_name', $lead->company_name)" :placeholder="__('crm.company_name')" :errorText="$errors->first('company_name')" />
 
-                                                <x-ui.odoo-form-ui type="input" label="GSTIN / Tax No." name="gstin" id="edit_gstin_input" :value="old('gstin', $lead->gstin ?? '')" placeholder="e.g. 27AAAAA0000A1Z5" />
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.gstin_tax_no')" name="gstin" id="edit_gstin_input" :value="old('gstin', $lead->gstin ?? '')" :placeholder="__('crm.gstin_placeholder')" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Company Email" name="company_email" id="edit_company_email_input" inputType="email" :value="old('company_email', $lead->company_email ?? '')" placeholder="company@office.com" />
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.company_email')" name="company_email" id="edit_company_email_input" inputType="email" :value="old('company_email', $lead->company_email ?? '')" :placeholder="__('crm.company_email_placeholder')" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Company Phone" name="company_phone" id="edit_company_phone_input" :value="old('company_phone', $lead->company_phone ?? '')" placeholder="Company Landline / Phone" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.company_phone')" name="company_phone" id="edit_company_phone_input" :value="old('company_phone', $lead->company_phone ?? '')" :placeholder="__('crm.company_phone_placeholder')" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
 
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.contact_person')" name="contact_person" :value="old('contact_person', $lead->contact_person)" :placeholder="__('crm.contact_person')" :errorText="$errors->first('contact_person')" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Designation / Role" name="designation" :value="old('designation', $lead->designation)" placeholder="e.g. Purchase Manager / Doctor" :errorText="$errors->first('designation')" />
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.designation_role')" name="designation" :value="old('designation', $lead->designation)" :placeholder="__('crm.designation_placeholder')" :errorText="$errors->first('designation')" />
 
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" inputType="email" :value="old('email', $lead->email)" placeholder="email@address.com" :errorText="$errors->first('email')" />
 
@@ -343,11 +343,11 @@
                                                  <div class="my-3 border-top pt-3">
                                                      <div class="d-flex align-items-center justify-content-between mb-2">
                                                          <div class="d-flex align-items-center gap-2">
-                                                             <h6 class="fw-bold text-dark mb-0 fs-13">Additional Contacts</h6>
+                                                             <h6 class="fw-bold text-dark mb-0 fs-13">{{ __('crm.additional_contacts') }}</h6>
                                                              <span class="badge bg-soft-primary text-primary rounded-circle px-2 py-0.5 font-monospace fs-11" id="showAddlContactCountBadge">{{ count($savedAddlContacts) }}</span>
                                                          </div>
                                                          <button type="button" class="btn btn-xs btn-primary fw-bold px-2.5 py-1 text-uppercase text-white d-inline-flex align-items-center" id="showCloneContactMainBtn" style="border-radius: 4px; font-size: 11px;">
-                                                             <i class="feather-plus me-1 fs-12"></i> CLONE CONTACT
+                                                             <i class="feather-plus me-1 fs-12"></i> {{ __('crm.clone_contact') }}
                                                          </button>
                                                      </div>
 
@@ -355,20 +355,20 @@
                                                          @forelse($savedAddlContacts as $idx => $ac)
                                                              <div class="addl-contact-card p-2 px-3 mb-1 bg-white position-relative shadow-2xs" style="border: 1.5px solid var(--bs-primary) !important; border-radius: 8px !important;">
                                                                  <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom">
-                                                                     <span class="fs-11 fw-bold text-muted text-uppercase letter-spacing-1"><i class="feather-user me-1 text-primary"></i> Contact Person #<span class="contact-num">{{ $loop->iteration }}</span></span>
+                                                                     <span class="fs-11 fw-bold text-muted text-uppercase letter-spacing-1"><i class="feather-user me-1 text-primary"></i> {{ __('crm.contact_person_num') }}<span class="contact-num">{{ $loop->iteration }}</span></span>
                                                                      <button type="button" class="btn btn-xs btn-soft-danger rounded-circle remove-contact-btn p-0 d-inline-flex align-items-center justify-content-center" title="Delete Contact" style="width: 22px; height: 22px; border-radius: 50%;">
                                                                          <i class="feather-trash-2 text-danger fs-11"></i>
                                                                      </button>
                                                                  </div>
                                                                  <div class="row g-2">
                                                                      <div class="col-md-6">
-                                                                         <x-ui.odoo-form-ui type="input" label="Name" name="additional_contacts[{{ $idx }}][name]" :value="$ac['name'] ?? ''" placeholder="Contact Name" class="contact-name-input" />
+                                                                         <x-ui.odoo-form-ui type="input" :label="__('crm.name')" name="additional_contacts[{{ $idx }}][name]" :value="$ac['name'] ?? ''" :placeholder="__('crm.contact_name_placeholder')" class="contact-name-input" />
                                                                      </div>
                                                                      <div class="col-md-6">
-                                                                         <x-ui.odoo-form-ui type="input" label="Phone No." name="additional_contacts[{{ $idx }}][phone]" :value="$ac['phone'] ?? ''" placeholder="Phone Number" class="contact-phone-input" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+                                                                         <x-ui.odoo-form-ui type="input" :label="__('crm.phone_no')" name="additional_contacts[{{ $idx }}][phone]" :value="$ac['phone'] ?? ''" :placeholder="__('crm.phone_number_placeholder')" class="contact-phone-input" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
                                                                      </div>
                                                                      <div class="col-md-12">
-                                                                         <x-ui.odoo-form-ui type="input" label="Email" name="additional_contacts[{{ $idx }}][email]" inputType="email" :value="$ac['email'] ?? ''" placeholder="Email" class="contact-email-input" />
+                                                                         <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="additional_contacts[{{ $idx }}][email]" inputType="email" :value="$ac['email'] ?? ''" :placeholder="__('crm.email_placeholder')" class="contact-email-input" />
                                                                      </div>
                                                                  </div>
                                                              </div>
@@ -456,89 +456,89 @@
                                                     }
                                                 </style>
 
-                                                <div class="mb-3 mt-4" id="editProductItemsContainer">
-                                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                                        <label class="form-label fw-bold text-dark fs-12 mb-0">
-                                                            <i class="feather-package me-1 text-primary"></i>{{ __('crm.product') }} & Quantity
-                                                        </label>
-                                                        <button type="button" class="btn btn-xs btn-outline-primary fw-semibold px-2 py-1 fs-11" id="editAddProductRowBtn" style="border-radius: 6px;">
-                                                            <i class="feather-plus me-1"></i>Add Product
-                                                        </button>
-                                                    </div>
-                                                    
-                                                    <div class="border rounded-3 bg-white p-2 shadow-sm" style="max-height: 270px; overflow-x: hidden; overflow-y: auto;">
-                                                        <table class="table table-sm table-borderless align-middle mb-0" id="editProductItemsTable">
-                                                            <thead>
-                                                                <tr class="border-bottom text-muted fs-11" style="background-color: #f8fafc;">
-                                                                    <th style="width: 58%; font-weight: 600;" class="py-1 ps-2">Product</th>
-                                                                    <th style="width: 28%; font-weight: 600;" class="py-1 text-center">Qty</th>
-                                                                    <th style="width: 14%; font-weight: 600;" class="py-1 text-center"></th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody id="editProductItemsBody">
-                                                                @php
-                                                                    $savedItems = old('items', $lead->product_items ?? []);
-                                                                    if (empty($savedItems) && !empty($lead->product_ids)) {
-                                                                        foreach ($lead->product_ids as $pid) {
-                                                                            $savedItems[] = ['product_id' => $pid, 'quantity' => 1];
-                                                                        }
-                                                                    }
-                                                                    if (empty($savedItems)) {
-                                                                        $savedItems = [['product_id' => '', 'quantity' => 1]];
-                                                                    }
-                                                                    $finished = $products->filter(fn($p) => $p->type === 'finished_good');
-                                                                    $semiFinished = $products->filter(fn($p) => $p->type === 'semi_finished');
-                                                                    $services = $products->filter(fn($p) => $p->item_type === 'Service' || $p->type === 'service');
-                                                                    $others = $products->filter(fn($p) => !in_array($p->type, ['finished_good', 'semi_finished', 'service']) && $p->item_type !== 'Service');
-                                                                @endphp
+                                                 <div class="mb-3 mt-4" id="editProductItemsContainer">
+                                                     <div class="d-flex justify-content-between align-items-center mb-2">
+                                                         <label class="form-label fw-bold text-dark fs-12 mb-0">
+                                                             <i class="feather-package me-1 text-primary"></i>{{ __('crm.product_and_quantity') }}
+                                                         </label>
+                                                         <button type="button" class="btn btn-xs btn-outline-primary fw-semibold px-2 py-1 fs-11" id="editAddProductRowBtn" style="border-radius: 6px;">
+                                                             <i class="feather-plus me-1"></i>{{ __('crm.add_product_btn') }}
+                                                         </button>
+                                                     </div>
+                                                     
+                                                     <div class="border rounded-3 bg-white p-2 shadow-sm" style="max-height: 270px; overflow-x: hidden; overflow-y: auto;">
+                                                         <table class="table table-sm table-borderless align-middle mb-0" id="editProductItemsTable">
+                                                             <thead>
+                                                                 <tr class="border-bottom text-muted fs-11" style="background-color: #f8fafc;">
+                                                                     <th style="width: 58%; font-weight: 600;" class="py-1 ps-2">{{ __('crm.product') }}</th>
+                                                                     <th style="width: 28%; font-weight: 600;" class="py-1 text-center">{{ __('crm.qty') }}</th>
+                                                                     <th style="width: 14%; font-weight: 600;" class="py-1 text-center"></th>
+                                                                 </tr>
+                                                             </thead>
+                                                             <tbody id="editProductItemsBody">
+                                                                 @php
+                                                                     $savedItems = old('items', $lead->product_items ?? []);
+                                                                     if (empty($savedItems) && !empty($lead->product_ids)) {
+                                                                         foreach ($lead->product_ids as $pid) {
+                                                                             $savedItems[] = ['product_id' => $pid, 'quantity' => 1];
+                                                                         }
+                                                                     }
+                                                                     if (empty($savedItems)) {
+                                                                         $savedItems = [['product_id' => '', 'quantity' => 1]];
+                                                                     }
+                                                                     $finished = $products->filter(fn($p) => $p->type === 'finished_good');
+                                                                     $semiFinished = $products->filter(fn($p) => $p->type === 'semi_finished');
+                                                                     $services = $products->filter(fn($p) => $p->item_type === 'Service' || $p->type === 'service');
+                                                                     $others = $products->filter(fn($p) => !in_array($p->type, ['finished_good', 'semi_finished', 'service']) && $p->item_type !== 'Service');
+                                                                 @endphp
 
-                                                                @foreach($savedItems as $idx => $item)
-                                                                    <tr class="lead-item-row border-bottom">
-                                                                        <td class="py-1 ps-1 pe-1 align-top">
-                                                                            <select name="items[{{ $idx }}][product_id]" class="form-select form-select-sm odoo-select2 product-row-select" searchable="true" data-master="product">
-                                                                                <option value="">Select Product...</option>
-                                                                                <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ {{ __('crm.add_new_product') }}</option>
-                                                                                
-                                                                                @if($finished->count())
-                                                                                    <optgroup label="📦 Finished Goods">
-                                                                                        @foreach($finished as $p)
-                                                                                            <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
-                                                                                                {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
-                                                                                            </option>
-                                                                                        @endforeach
-                                                                                    </optgroup>
-                                                                                @endif
+                                                                 @foreach($savedItems as $idx => $item)
+                                                                     <tr class="lead-item-row border-bottom">
+                                                                         <td class="py-1 ps-1 pe-1 align-top">
+                                                                             <select name="items[{{ $idx }}][product_id]" class="form-select form-select-sm odoo-select2 product-row-select" searchable="true" data-master="product">
+                                                                                 <option value="">{{ __('crm.select_product') }}</option>
+                                                                                 <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ {{ __('crm.add_new_product') }}</option>
+                                                                                 
+                                                                                 @if($finished->count())
+                                                                                     <optgroup label="{{ __('crm.optgroup_finished_goods') }}">
+                                                                                         @foreach($finished as $p)
+                                                                                             <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                                                 {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
+                                                                                             </option>
+                                                                                         @endforeach
+                                                                                     </optgroup>
+                                                                                 @endif
 
-                                                                                @if($semiFinished->count())
-                                                                                    <optgroup label="⚙️ Semi-Finished Goods">
-                                                                                        @foreach($semiFinished as $p)
-                                                                                            <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
-                                                                                                {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
-                                                                                            </option>
-                                                                                        @endforeach
-                                                                                    </optgroup>
-                                                                                @endif
+                                                                                 @if($semiFinished->count())
+                                                                                     <optgroup label="{{ __('crm.optgroup_semi_finished') }}">
+                                                                                         @foreach($semiFinished as $p)
+                                                                                             <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                                                 {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
+                                                                                             </option>
+                                                                                         @endforeach
+                                                                                     </optgroup>
+                                                                                 @endif
 
-                                                                                @if($services->count())
-                                                                                    <optgroup label="🛠️ Services">
-                                                                                        @foreach($services as $p)
-                                                                                            <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
-                                                                                                {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
-                                                                                            </option>
-                                                                                        @endforeach
-                                                                                    </optgroup>
-                                                                                @endif
+                                                                                 @if($services->count())
+                                                                                     <optgroup label="{{ __('crm.optgroup_services') }}">
+                                                                                         @foreach($services as $p)
+                                                                                             <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                                                 {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
+                                                                                             </option>
+                                                                                         @endforeach
+                                                                                     </optgroup>
+                                                                                 @endif
 
-                                                                                @if($others->count())
-                                                                                    <optgroup label="🧱 Raw Materials & Components">
-                                                                                        @foreach($others as $p)
-                                                                                            <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
-                                                                                                {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
-                                                                                            </option>
-                                                                                        @endforeach
-                                                                                    </optgroup>
-                                                                                @endif
-                                                                            </select>
+                                                                                 @if($others->count())
+                                                                                     <optgroup label="{{ __('crm.optgroup_raw_materials') }}">
+                                                                                         @foreach($others as $p)
+                                                                                             <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                                                 {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
+                                                                                             </option>
+                                                                                         @endforeach
+                                                                                     </optgroup>
+                                                                                 @endif
+                                                                             </select>
                                                                         </td>
                                                                         <td class="py-1 px-1 align-top">
                                                                             <input type="number" name="items[{{ $idx }}][quantity]" class="form-control form-control-sm text-center qty-row-input @error('items.'.$idx.'.quantity') is-invalid @enderror" value="{{ $item['quantity'] ?? 1 }}" min="1" step="1">
@@ -623,12 +623,12 @@
                                                  </div>
 
                                                  <div class="zoho-field-row">
-                                                     <div class="zoho-field-label">GSTIN / Tax No.</div>
+                                                     <div class="zoho-field-label">{{ __('crm.gstin_tax_no') }}</div>
                                                      <div class="zoho-field-value text-dark fw-semibold">{{ $lead->gstin ?: '—' }}</div>
                                                  </div>
 
                                                  <div class="zoho-field-row">
-                                                     <div class="zoho-field-label">Company Email</div>
+                                                     <div class="zoho-field-label">{{ __('crm.company_email') }}</div>
                                                      <div class="zoho-field-value">
                                                          @if($lead->company_email)
                                                              <a href="mailto:{{ $lead->company_email }}" class="text-primary hover-underline">{{ $lead->company_email }}</a>
@@ -639,7 +639,7 @@
                                                  </div>
 
                                                  <div class="zoho-field-row">
-                                                     <div class="zoho-field-label">Company Phone</div>
+                                                     <div class="zoho-field-label">{{ __('crm.company_phone') }}</div>
                                                      <div class="zoho-field-value text-dark">{{ $lead->company_phone ?: '—' }}</div>
                                                  </div>
 
@@ -649,12 +649,12 @@
                                                  </div>
 
                                                  <div class="zoho-field-row">
-                                                      <div class="zoho-field-label">Designation / Role</div>
+                                                      <div class="zoho-field-label">{{ __('crm.designation_role') }}</div>
                                                       <div class="zoho-field-value text-dark">{{ $lead->designation ?: '—' }}</div>
                                                   </div>
 
                                                  <div class="zoho-field-row">
-                                                     <div class="zoho-field-label">Contact Email</div>
+                                                     <div class="zoho-field-label">{{ __('crm.contact_email') }}</div>
                                                      <div class="zoho-field-value">
                                                          @if($lead->email)
                                                              <a href="mailto:{{ $lead->email }}" class="text-primary hover-underline">{{ $lead->email }}</a>
@@ -665,7 +665,7 @@
                                                  </div>
 
                                                  <div class="zoho-field-row">
-                                                     <div class="zoho-field-label">Contact Phone</div>
+                                                     <div class="zoho-field-label">{{ __('crm.contact_phone') }}</div>
                                                      <div class="zoho-field-value text-dark">{{ $lead->phone ?: '—' }}</div>
                                                  </div>
 
@@ -752,7 +752,7 @@
                                                  </div>
                                                  <div class="zoho-field-row">
                                                      <div class="zoho-field-label">{{ __('crm.expected_revenue_label') }}</div>
-                                                     <div class="zoho-field-value text-dark fw-bold">₹{{ $lead->expected_amount ? number_format($lead->expected_amount, 2) : '0.00' }}</div>
+                                                     <div class="zoho-field-value text-dark fw-bold">{{ format_currency($lead->expected_amount ?? 0) }}</div>
                                                  </div>
                                                  <div class="zoho-field-row">
                                                      <div class="zoho-field-label">{{ __('crm.expected_sale_date') }}</div>
@@ -877,10 +877,10 @@
                                     <div class="card-body p-3">
                                         <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
                                             <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0" style="border-bottom: none;">
-                                                <i class="feather-box text-primary me-1.5"></i>Interested Products & Quantities
+                                                <i class="feather-box text-primary me-1.5"></i>{{ __('crm.product_and_quantity') }}
                                             </h5>
                                             @if($leadProductsMap->isNotEmpty())
-                                                <span class="badge bg-soft-primary text-primary fs-11 fw-semibold">{{ count($leadItems) }} Product(s) Selected</span>
+                                                <span class="badge bg-soft-primary text-primary fs-11 fw-semibold">{{ count($leadItems) }} {{ __('crm.products_selected') }}</span>
                                             @endif
                                         </div>
                                         @if($leadProductsMap->isNotEmpty())
@@ -888,11 +888,11 @@
                                                 <table class="table table-sm table-bordered align-middle mb-0 fs-13">
                                                     <thead class="table-light text-muted">
                                                         <tr>
-                                                            <th>Product / Item Name</th>
+                                                            <th>{{ __('crm.product_description') }}</th>
                                                             <th>SKU</th>
-                                                            <th class="text-center">Quantity</th>
-                                                            <th class="text-end">Unit Price (₹)</th>
-                                                            <th class="text-end">Total Estimated Value (₹)</th>
+                                                            <th class="text-center">{{ __('crm.quantity') }}</th>
+                                                            <th class="text-end">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                                            <th class="text-end">{{ __('crm.total_estimated_value') }} ({{ active_currency_symbol() }})</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -912,23 +912,23 @@
                                                                 </td>
                                                                 <td class="font-monospace text-muted">{{ $pObj->sku ?: '—' }}</td>
                                                                 <td class="text-center fw-bold text-primary">{{ number_format($pQty, 0) }} {{ $pObj->uom?->code ?? 'Pcs' }}</td>
-                                                                <td class="text-end">₹{{ number_format($pPrice, 2) }}</td>
-                                                                <td class="text-end fw-bold text-success">₹{{ number_format($lineVal, 2) }}</td>
+                                                                <td class="text-end">{{ format_currency($pPrice) }}</td>
+                                                                <td class="text-end fw-bold text-success">{{ format_currency($lineVal) }}</td>
                                                             </tr>
                                                         @endforeach
                                                     </tbody>
                                                     @if($grandLeadProductTotal > 0)
                                                         <tfoot class="table-light fw-bold">
                                                             <tr>
-                                                                <td colspan="4" class="text-end text-uppercase fs-12">Total Estimated Product Value:</td>
-                                                                <td class="text-end text-success fs-14">₹{{ number_format($grandLeadProductTotal, 2) }}</td>
+                                                                <td colspan="4" class="text-end text-uppercase fs-12">{{ __('crm.total_estimated_product_value') }}:</td>
+                                                                <td class="text-end text-success fs-14">{{ format_currency($grandLeadProductTotal) }}</td>
                                                             </tr>
                                                         </tfoot>
                                                     @endif
                                                 </table>
                                             </div>
                                         @else
-                                            <p class="text-muted fs-12 mb-0 py-2">No specific products selected for this lead.</p>
+                                            <p class="text-muted fs-12 mb-0 py-2">{{ __('crm.no_specific_products') }}</p>
                                         @endif
                                     </div>
                                 </div>
@@ -969,7 +969,7 @@
                                             <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0" style="font-family: 'Inter', sans-serif; border-bottom: none;">
                                                 <i class="feather-file-text text-primary me-1.5"></i>{{ __('crm.requirements_details') }}
                                             </h5>
-                                            <span class="text-muted fs-11 d-none d-sm-inline-block"><i class="feather-info me-1 text-primary"></i>Click box below to edit</span>
+                                            <span class="text-muted fs-11 d-none d-sm-inline-block"><i class="feather-info me-1 text-primary"></i>{{ __('crm.click_box_to_edit') }}</span>
                                         </div>
 
                                         <!-- View Mode (Clickable to Edit) -->
@@ -979,7 +979,7 @@
                                                     <div class="d-flex align-items-start justify-content-between gap-3">
                                                         <div class="text-dark fs-13 flex-grow-1" style="white-space: pre-wrap; line-height: 1.6; font-family: 'Inter', sans-serif;" id="viewRequirementText">{{ $lead->requirement }}</div>
                                                         <span class="badge bg-white text-primary border shadow-2xs px-2.5 py-1.5 fs-11 flex-shrink-0 edit-hint-badge" style="border-color: #cbd5e1 !important; transition: all 0.2s ease;">
-                                                            <i class="feather-edit-2 me-1"></i>Click to Edit
+                                                            <i class="feather-edit-2 me-1"></i>{{ __('crm.click_to_edit') }}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -988,8 +988,8 @@
                                                     <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2">
                                                         <i class="feather-edit-3 fs-5"></i>
                                                     </div>
-                                                    <h6 class="fw-bold text-dark fs-13 mb-1">No Requirements Details Specified</h6>
-                                                    <p class="text-muted fs-12 mb-0">Click here to add client requirements, scope of work, or project specifications.</p>
+                                                    <h6 class="fw-bold text-dark fs-13 mb-1">{{ __('crm.no_requirements_details_specified') }}</h6>
+                                                    <p class="text-muted fs-12 mb-0">{{ __('crm.click_here_to_add_requirements') }}</p>
                                                 </div>
                                             @endif
                                         </div>
@@ -1004,13 +1004,13 @@
                                                 </div>
                                                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                                                     <span class="text-muted fs-11">
-                                                        <i class="feather-corner-down-left me-1"></i>Press <kbd class="bg-light text-dark border px-1 py-0.5 rounded fs-10">Ctrl + Enter</kbd> or click save
+                                                        <i class="feather-corner-down-left me-1"></i>{{ __('crm.press_ctrl_enter_or_save') }}
                                                     </span>
                                                     <div class="d-flex align-items-center gap-2">
                                                         <span class="text-muted fs-11 me-2" id="reqCharCounter">0 chars</span>
-                                                        <button type="button" class="btn btn-xs btn-light border px-3 py-1.5 fw-bold rounded" onclick="cancelRequirementEdit()">CANCEL</button>
+                                                        <button type="button" class="btn btn-xs btn-light border px-3 py-1.5 fw-bold rounded" onclick="cancelRequirementEdit()">{{ strtoupper(__('crm.cancel')) }}</button>
                                                         <button type="submit" id="btnSaveRequirement" class="btn btn-xs btn-primary px-3 py-1.5 fw-bold shadow-2xs text-white rounded d-inline-flex align-items-center" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
-                                                            <i class="feather-check me-1"></i> SAVE REQUIREMENT
+                                                            <i class="feather-check me-1"></i> {{ strtoupper(__('crm.save_requirement')) }}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -1656,7 +1656,7 @@
                                                         <tr>
                                                             <th style="width: 45%;">{{ __('crm.product_description') }}</th>
                                                             <th class="text-end" style="width: 12%;">{{ __('crm.quantity') }}</th>
-                                                            <th class="text-end" style="width: 15%;">{{ __('crm.unit_price') }} (₹)</th>
+                                                            <th class="text-end" style="width: 15%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
                                                             <th class="text-end" style="width: 12%;">{{ __('crm.taxes') }} (%)</th>
                                                             <th class="text-end" style="width: 16%;">{{ __('crm.amount') }}</th>
                                                             <th class="text-center" style="width: 5%;"></th>
@@ -1685,11 +1685,11 @@
                                              <div class="col-md-4">
                                                  <div class="d-flex justify-content-between py-1 border-bottom">
                                                      <span class="text-muted fw-semibold">{{ __('crm.untaxed_amount') }}:</span>
-                                                     <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
+                                                     <span class="fw-bold text-dark" id="calcSubtotal">{{ active_currency_symbol() }}0.00</span>
                                                  </div>
                                                  <div class="d-flex justify-content-between py-1 border-bottom">
                                                      <span class="text-muted fw-semibold">{{ __('crm.taxes') }}:</span>
-                                                     <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
+                                                     <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
                                                  </div>
                                                  <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                                                      <span class="text-muted fw-semibold me-2">{{ __('crm.discount_colon') }}</span>
@@ -1697,7 +1697,7 @@
                                                  </div>
                                                  <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
                                                      <span class="text-dark fw-bold">{{ __('crm.total_colon') }}</span>
-                                                     <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                                                     <span class="fw-extrabold text-primary" id="calcTotal">{{ active_currency_symbol() }}0.00</span>
                                                  </div>
                                              </div>
                                          </div>
@@ -1779,7 +1779,7 @@
                                                         <tr>
                                                             <th style="width: 45%;">{{ __('crm.product_description') }}</th>
                                                             <th class="text-end" style="width: 12%;">{{ __('crm.quantity') }}</th>
-                                                            <th class="text-end" style="width: 15%;">{{ __('crm.unit_price') }} (₹)</th>
+                                                            <th class="text-end" style="width: 15%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
                                                             <th class="text-end" style="width: 12%;">{{ __('crm.taxes') }} (%)</th>
                                                             <th class="text-end" style="width: 16%;">{{ __('crm.amount') }}</th>
                                                             <th class="text-center" style="width: 5%;"></th>
@@ -1808,11 +1808,11 @@
                                             <div class="col-md-4">
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
                                                     <span class="text-muted fw-semibold">{{ __('crm.untaxed_amount') }}:</span>
-                                                    <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
+                                                    <span class="fw-bold text-dark" id="calcSubtotal">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
                                                     <span class="text-muted fw-semibold">{{ __('crm.taxes') }}:</span>
-                                                    <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                                                     <span class="text-muted fw-semibold me-2">{{ __('crm.discount_colon') }}</span>
@@ -1820,7 +1820,7 @@
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
                                                     <span class="text-dark fw-bold">{{ __('crm.total_colon') }}</span>
-                                                    <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                                                    <span class="fw-extrabold text-primary" id="calcTotal">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1957,9 +1957,9 @@
                                                                     @endif
                                                                 </td>
                                                                 <td class="text-center">{{ $item->quantity }}</td>
-                                                                <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
+                                                                <td class="text-end">{{ format_currency($item->unit_price) }}</td>
                                                                 <td class="text-end">{{ number_format($item->tax_rate, 2) }}%</td>
-                                                                <td class="text-end pe-3 fw-bold">₹{{ number_format($item->amount, 2) }}</td>
+                                                                <td class="text-end pe-3 fw-bold">{{ format_currency($item->amount) }}</td>
                                                             </tr>
                                                         @endforeach
                                                     </tbody>
@@ -1988,21 +1988,21 @@
                                             <div class="col-md-4">
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
                                                     <span class="text-muted fw-semibold">{{ __('crm.untaxed_amount') }}:</span>
-                                                    <span class="fw-bold text-dark">₹{{ number_format($activeQuotation->subtotal, 2) }}</span>
+                                                    <span class="fw-bold text-dark">{{ format_currency($activeQuotation->subtotal) }}</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
                                                     <span class="text-muted fw-semibold">{{ __('crm.taxes') }}:</span>
-                                                    <span class="fw-bold text-dark">₹{{ number_format($activeQuotation->tax_amount, 2) }}</span>
+                                                    <span class="fw-bold text-dark">{{ format_currency($activeQuotation->tax_amount) }}</span>
                                                 </div>
                                                 @if($activeQuotation->discount > 0)
                                                     <div class="d-flex justify-content-between py-1 border-bottom">
                                                         <span class="text-muted fw-semibold">{{ __('crm.discount') }}:</span>
-                                                        <span class="fw-bold text-danger">-₹{{ number_format($activeQuotation->discount, 2) }}</span>
+                                                        <span class="fw-bold text-danger">-{{ format_currency($activeQuotation->discount) }}</span>
                                                     </div>
                                                 @endif
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
                                                     <span class="text-dark fw-bold">{{ __('crm.total_colon') }}</span>
-                                                    <span class="fw-extrabold text-primary fs-16">₹{{ number_format($activeQuotation->total_amount, 2) }}</span>
+                                                    <span class="fw-extrabold text-primary fs-16">{{ format_currency($activeQuotation->total_amount) }}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -2031,7 +2031,7 @@
                                                                 <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'view_quotation' => 1, 'active_quotation_id' => $rev->id]) }}" class="fw-bold text-dark text-decoration-none">
                                                                     {{ $rev->quotation_number }}
                                                                 </a>
-                                                                <span class="text-muted mt-0.5" style="font-size: 9px;">₹{{ number_format($rev->total_amount, 2) }}</span>
+                                                                <span class="text-muted mt-0.5" style="font-size: 9px;">{{ format_currency($rev->total_amount) }}</span>
                                                             </div>
                                                         </div>
                                                     @endforeach
@@ -2900,7 +2900,7 @@
                             <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="max-width: 80px; margin-left: auto; text-align: right;">
                         </td>
                         <td class="text-end fw-bold text-dark amount-display pe-3">
-                            ₹0.00
+                            {{ active_currency_symbol() }}0.00
                         </td>
                         <td class="text-center">
                             <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn mt-1">
@@ -3093,15 +3093,17 @@
                     subtotal += amount;
                     taxTotal += tax;
 
-                    $(this).find('.amount-display').text('₹' + amount.toFixed(2));
+                    const currSym = window.AppCurrency?.symbol || @json(active_currency_symbol());
+                    $(this).find('.amount-display').text(currSym + amount.toFixed(2));
                 });
 
                 const discount = parseFloat($('#discountInput').val()) || 0;
                 const grandTotal = subtotal + taxTotal - discount;
 
-                $('#calcSubtotal').text('₹' + subtotal.toFixed(2));
-                $('#calcTax').text('₹' + taxTotal.toFixed(2));
-                $('#calcTotal').text('₹' + Math.max(0, grandTotal).toFixed(2));
+                const currSym = window.AppCurrency?.symbol || @json(active_currency_symbol());
+                $('#calcSubtotal').text(currSym + subtotal.toFixed(2));
+                $('#calcTax').text(currSym + taxTotal.toFixed(2));
+                $('#calcTotal').text(currSym + Math.max(0, grandTotal).toFixed(2));
             }
 
             // Edit Lead Form Product Rows JavaScript
@@ -3476,8 +3478,8 @@
                     <i class="feather-calendar"></i>
                 </div>
                 <div>
-                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="leadFollowupOffcanvasTitle">Edit Followup for {{ $lead->company_name }}</h5>
-                    <span class="text-muted fs-11">Log interaction & next followup or schedule activity</span>
+                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="leadFollowupOffcanvasTitle">{{ __('crm.edit_followup_for', ['company' => $lead->company_name]) }}</h5>
+                    <span class="text-muted fs-11">{{ __('crm.log_interaction_next_followup') }}</span>
                 </div>
             </div>
             <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -3491,76 +3493,76 @@
                 <!-- 2-Mode Switcher Tabs -->
                 <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
                     <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 offcanvas-mode-btn active btn-primary text-white shadow-sm" data-mode="log_note" style="font-size: 12px; padding: 8px 6px; background-color: var(--bs-primary); border-radius: 6px; transition: all 0.2s ease;">
-                        LOG DISCUSSION & NEXT
+                        {{ __('crm.log_discussion_next') }}
                     </button>
                     <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 offcanvas-mode-btn" data-mode="schedule" style="font-size: 12px; padding: 8px 6px; color: #64748b; background-color: transparent; border-radius: 6px; transition: all 0.2s ease;">
-                        DIRECT SCHEDULE ACTIVITY
+                        {{ __('crm.direct_schedule_activity') }}
                     </button>
                 </div>
 
                 <!-- Past Interaction Section (Tab 1: Log Activity) -->
                 <div id="sectionPastInteraction">
-                    <x-ui.modal-form-ui type="select" name="type" id="offcanvasFollowupType" label="Follow Up / Interaction Type" :searchable="true">
-                        <option value="Call">Call</option>
-                        <option value="Email">Email</option>
-                        <option value="Meeting">Meeting</option>
-                        <option value="Demo">Demo</option>
-                        <option value="WhatsApp">WhatsApp</option>
+                    <x-ui.modal-form-ui type="select" name="type" id="offcanvasFollowupType" :label="__('crm.followup_interaction_type')" :searchable="true">
+                        <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
+                        <option value="Email">{{ __('crm.interaction_types.Email') }}</option>
+                        <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
+                        <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
+                        <option value="WhatsApp">{{ __('crm.activity_types.WhatsApp') }}</option>
                     </x-ui.modal-form-ui>
 
-                    <x-ui.modal-form-ui type="select" name="status" id="offcanvasFollowupStatus" label="Follow Up Status / Outcome" :searchable="true">
-                        <option value="Connected">Connected</option>
-                        <option value="Not Connected">Not Connected</option>
-                        <option value="Not Answering">Not Answering</option>
+                    <x-ui.modal-form-ui type="select" name="status" id="offcanvasFollowupStatus" :label="__('crm.followup_status_outcome')" :searchable="true">
+                        <option value="Connected">{{ __('crm.outcomes.Connected') }}</option>
+                        <option value="Not Connected">{{ __('crm.outcomes.Not Connected') }}</option>
+                        <option value="Not Answering">{{ __('crm.outcomes.Not Answering') }}</option>
                     </x-ui.modal-form-ui>
 
-                    <x-ui.modal-form-ui type="textarea" name="notes" id="offcanvasNotes" label="Discussion Notes / Summary" rows="3" placeholder="Write discussion notes..." />
+                    <x-ui.modal-form-ui type="textarea" name="notes" id="offcanvasNotes" :label="__('crm.notes_summary')" rows="3" :placeholder="__('crm.notes_summary_placeholder')" />
 
                     <!-- Next Follow-up Section inside Log Mode -->
                     <div class="border-top pt-3 mt-3">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <h6 class="fs-12 fw-bold text-dark mb-0">
-                                <i class="feather-calendar text-primary me-1"></i> NEXT ACTIVITY SCHEDULE
+                                <i class="feather-calendar text-primary me-1"></i> {{ __('crm.next_activity_schedule') }}
                             </h6>
                             <button type="button" class="btn btn-xs btn-outline-primary fw-bold px-2.5 py-1 rounded-pill d-inline-flex align-items-center gap-1" id="btnToggleNextScheduleShow">
                                 <i class="feather-plus fs-11" id="iconToggleNextScheduleShow"></i>
-                                <span id="textToggleNextScheduleShow">Schedule Next Activity</span>
+                                <span id="textToggleNextScheduleShow">{{ __('crm.schedule_next_activity_btn') }}</span>
                             </button>
                         </div>
                         
                         <div id="containerNextScheduleFieldsShow" class="mt-3 p-3 bg-light rounded-3 border" style="display: none;">
-                            <x-ui.modal-form-ui type="input" name="next_title" id="offcanvasNextTitle" label="Next Event Title" placeholder="e.g. Followup Call / Next Meeting" value="" />
+                            <x-ui.modal-form-ui type="input" name="next_title" id="offcanvasNextTitle" :label="__('crm.next_activity_title')" :placeholder="__('crm.next_activity_title_placeholder')" value="" />
 
                             <div class="row g-2">
                                 <div class="col-6">
-                                    <x-ui.modal-form-ui type="select" name="next_activity_type" id="offcanvasNextActivityType" label="Next Activity Type" :searchable="true">
-                                        <option value="Call">Call</option>
-                                        <option value="Meeting">Meeting</option>
-                                        <option value="Demo">Demo</option>
-                                        <option value="Email">Email</option>
-                                        <option value="WhatsApp">WhatsApp</option>
+                                    <x-ui.modal-form-ui type="select" name="next_activity_type" id="offcanvasNextActivityType" :label="__('crm.next_activity_type')" :searchable="true">
+                                        <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
+                                        <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
+                                        <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
+                                        <option value="Email">{{ __('crm.interaction_types.Email') }}</option>
+                                        <option value="WhatsApp">{{ __('crm.activity_types.WhatsApp') }}</option>
                                     </x-ui.modal-form-ui>
                                 </div>
                                 <div class="col-6">
-                                    <x-ui.modal-form-ui type="select" name="next_duration_minutes" id="offcanvasNextDuration" label="Next Duration (Mins)" :searchable="true">
-                                        <option value="15">15 Mins</option>
-                                        <option value="30" selected>30 Mins</option>
-                                        <option value="45">45 Mins</option>
-                                        <option value="60">60 Mins (1 Hr)</option>
-                                        <option value="90">90 Mins</option>
-                                        <option value="120">120 Mins</option>
+                                    <x-ui.modal-form-ui type="select" name="next_duration_minutes" id="offcanvasNextDuration" :label="__('crm.duration_minutes')" :searchable="true">
+                                        <option value="15">{{ __('crm.duration_options.15') }}</option>
+                                        <option value="30" selected>{{ __('crm.duration_options.30') }}</option>
+                                        <option value="45">{{ __('crm.duration_options.45') }}</option>
+                                        <option value="60">{{ __('crm.duration_options.60') }}</option>
+                                        <option value="90">{{ __('crm.duration_options.90') }}</option>
+                                        <option value="120">{{ __('crm.duration_options.120') }}</option>
                                     </x-ui.modal-form-ui>
                                 </div>
                             </div>
 
-                            <x-ui.modal-form-ui type="input" inputType="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" label="Next Follow-up Date & Time (Optional)" />
+                            <x-ui.modal-form-ui type="input" inputType="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" :label="__('crm.next_followup_datetime_optional')" />
 
                             <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                                 <div class="row g-2">
                                     <div class="col-6">
                                         <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
                                             <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextSyncGoogle" style="cursor: pointer;">
-                                                <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                                <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
                                             </label>
                                             <input type="hidden" name="next_sync_google_calendar" value="0">
                                             <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_sync_google_calendar" value="1" id="offcanvasNextSyncGoogle" style="cursor: pointer;">
@@ -3569,7 +3571,7 @@
                                     <div class="col-6">
                                         <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
                                             <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextCreateMeet" style="cursor: pointer;">
-                                                <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                                <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
                                             </label>
                                             <input type="hidden" name="next_create_meet_link" value="0">
                                             <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_create_meet_link" value="1" id="offcanvasNextCreateMeet" style="cursor: pointer;">
@@ -3578,9 +3580,9 @@
                                 </div>
                             </div>
 
-                            <x-ui.modal-form-ui type="input" name="next_guest_emails" id="offcanvasNextGuestEmails" label="Guest / Attendee Emails" placeholder="e.g. client@company.com (comma separated)" />
+                            <x-ui.modal-form-ui type="input" name="next_guest_emails" id="offcanvasNextGuestEmails" :label="__('crm.guest_attendee_emails')" :placeholder="__('crm.guest_emails_placeholder')" />
 
-                            <x-ui.modal-form-ui type="select" name="tagged_user_ids[]" id="offcanvasTagUser" label="Tag / Assign Persons" multiple="true" :searchable="true">
+                            <x-ui.modal-form-ui type="select" name="tagged_user_ids[]" id="offcanvasTagUser" :label="__('crm.tag_assign_persons')" multiple="true" :searchable="true">
                                 @foreach($users as $u)
                                     <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
                                 @endforeach
@@ -3591,28 +3593,28 @@
 
                 <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
                 <div id="sectionDirectSchedule" style="display: none;">
-                    <x-ui.modal-form-ui type="input" name="title" id="offcanvasEventTitle" label="Event / Meeting Title" placeholder="e.g. CRM Followup Call / Client Demo" value="" />
+                    <x-ui.modal-form-ui type="input" name="title" id="offcanvasEventTitle" :label="__('crm.event_meeting_title')" :placeholder="__('crm.event_title_placeholder')" value="" />
 
-                    <x-ui.modal-form-ui type="select" name="schedule_type" id="offcanvasScheduleType" label="Activity Type *" :searchable="true" onchange="$('#offcanvasFollowupType').val(this.value)">
-                        <option value="Call">Call</option>
-                        <option value="Meeting">Meeting</option>
-                        <option value="Demo">Demo</option>
-                        <option value="Email">Email</option>
-                        <option value="WhatsApp">WhatsApp</option>
+                    <x-ui.modal-form-ui type="select" name="schedule_type" id="offcanvasScheduleType" :label="__('crm.activity_type')" :searchable="true" onchange="$('#offcanvasFollowupType').val(this.value)">
+                        <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
+                        <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
+                        <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
+                        <option value="Email">{{ __('crm.interaction_types.Email') }}</option>
+                        <option value="WhatsApp">{{ __('crm.activity_types.WhatsApp') }}</option>
                     </x-ui.modal-form-ui>
 
                     <div class="row g-2">
                         <div class="col-6">
-                            <x-ui.modal-form-ui type="input" inputType="datetime-local" name="followup_date" id="offcanvasFollowupDate" label="Due Date & Time *" value="" />
+                            <x-ui.modal-form-ui type="input" inputType="datetime-local" name="followup_date" id="offcanvasFollowupDate" :label="__('crm.due_date_time')" value="" />
                         </div>
                         <div class="col-6">
-                            <x-ui.modal-form-ui type="select" name="duration_minutes" id="offcanvasDuration" label="Duration (Minutes)" :searchable="true">
-                                <option value="15">15 Mins</option>
-                                <option value="30" selected>30 Mins</option>
-                                <option value="45">45 Mins</option>
-                                <option value="60">60 Mins (1 Hr)</option>
-                                <option value="90">90 Mins</option>
-                                <option value="120">120 Mins</option>
+                            <x-ui.modal-form-ui type="select" name="duration_minutes" id="offcanvasDuration" :label="__('crm.duration_minutes')" :searchable="true">
+                                <option value="15">{{ __('crm.duration_options.15') }}</option>
+                                <option value="30" selected>{{ __('crm.duration_options.30') }}</option>
+                                <option value="45">{{ __('crm.duration_options.45') }}</option>
+                                <option value="60">{{ __('crm.duration_options.60') }}</option>
+                                <option value="90">{{ __('crm.duration_options.90') }}</option>
+                                <option value="120">{{ __('crm.duration_options.120') }}</option>
                             </x-ui.modal-form-ui>
                         </div>
                     </div>
@@ -3622,7 +3624,7 @@
                             <div class="col-6">
                                 <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
                                     <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasSyncGoogle" style="cursor: pointer;">
-                                        <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                        <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
                                     </label>
                                     <input type="hidden" name="sync_google_calendar" value="0">
                                     <input class="form-check-input ms-0 mt-0" type="checkbox" name="sync_google_calendar" value="1" id="offcanvasSyncGoogle" style="cursor: pointer;">
@@ -3631,7 +3633,7 @@
                             <div class="col-6">
                                 <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
                                     <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasCreateMeet" style="cursor: pointer;">
-                                        <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                        <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
                                     </label>
                                     <input type="hidden" name="create_meet_link" value="0">
                                     <input class="form-check-input ms-0 mt-0" type="checkbox" name="create_meet_link" value="1" id="offcanvasCreateMeet" style="cursor: pointer;">
@@ -3640,14 +3642,14 @@
                         </div>
                     </div>
 
-                    <x-ui.modal-form-ui type="input" name="guest_emails" id="offcanvasGuestEmails" label="Guest / Attendee Emails" placeholder="e.g. client@company.com (comma separated)" />
+                    <x-ui.modal-form-ui type="input" name="guest_emails" id="offcanvasGuestEmails" :label="__('crm.guest_attendee_emails')" :placeholder="__('crm.guest_emails_placeholder')" />
 
-                    <x-ui.modal-form-ui type="textarea" name="schedule_notes" id="offcanvasScheduleNotes" label="Description / Plan" rows="3" placeholder="Agenda / plan for upcoming activity..." oninput="$('#offcanvasNotes').val(this.value)" />
+                    <x-ui.modal-form-ui type="textarea" name="schedule_notes" id="offcanvasScheduleNotes" :label="__('crm.description_plan')" rows="3" :placeholder="__('crm.agenda_plan_placeholder')" oninput="$('#offcanvasNotes').val(this.value)" />
                 </div>
 
                 <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
-                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>
-                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">SAVE</button>
+                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">{{ __('crm.close') }}</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">{{ __('crm.save') }}</button>
                 </div>
             </form>
         </div>

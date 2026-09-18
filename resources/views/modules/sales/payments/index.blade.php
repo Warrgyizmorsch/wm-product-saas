@@ -1,23 +1,23 @@
 @extends('layouts.duralux')
 
-@section('title', 'Customer Payments | SaaS ERP')
-@section('page-title', 'Customer Payments')
-@section('breadcrumb', 'Sales / Payments')
+@section('title', __('crm.customer_payments') . ' | SaaS ERP')
+@section('page-title', __('crm.customer_payments'))
+@section('breadcrumb', __('crm.sales') . ' / ' . __('crm.payments'))
 
 @section('page-actions')
     <div class="d-flex gap-2">
         <a href="{{ route('sales.payments.create') }}" class="btn btn-primary">
-            <i class="feather-plus me-2"></i>Record Payment
+            <i class="feather-plus me-2"></i>{{ __('crm.record_payment') }}
         </a>
     </div>
 @endsection
 
 @section('content')
 
-    <div class="card border-0 shadow-sm">
+    <div class="erp-single-panel card border-0 shadow-sm">
         <div class="card-header bg-transparent border-bottom py-3">
             <h5 class="card-title mb-0 fw-bold text-dark">
-                <i class="feather-dollar-sign me-2 text-primary"></i>Customer Payments (Receipts)
+                <span class="me-2 text-primary fw-bold fs-16">{{ active_currency_symbol() }}</span>{{ __('crm.customer_payments_receipts_title') }}
             </h5>
         </div>
         <div class="card-body p-0">
@@ -25,14 +25,14 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                         <tr>
-                            <th class="ps-4">Payment Number</th>
-                            <th>Date</th>
-                            <th>Customer</th>
-                            <th>Method</th>
-                            <th>Reference No</th>
-                            <th class="text-end">Amount</th>
-                            <th>Status</th>
-                            <th class="text-end pe-4">Actions</th>
+                            <th class="ps-4">{{ __('crm.payment_number_col') }}</th>
+                            <th>{{ __('crm.date') }}</th>
+                            <th>{{ __('crm.customer') }}</th>
+                            <th>{{ __('crm.method') }}</th>
+                            <th>{{ __('crm.reference_no') }}</th>
+                            <th class="text-end">{{ __('crm.amount') }}</th>
+                            <th>{{ __('crm.status') }}</th>
+                            <th class="text-end pe-4">{{ __('crm.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody class="fs-13 text-dark">
@@ -49,7 +49,7 @@
                                 </td>
                                 <td>{{ $payment->payment_method }}</td>
                                 <td class="text-muted">{{ $payment->reference_no ?: '—' }}</td>
-                                <td class="text-end fw-bold text-dark">₹{{ number_format($payment->amount, 2) }}</td>
+                                <td class="text-end fw-bold text-dark">{{ format_currency($payment->amount) }}</td>
                                 <td>
                                     @php
                                         $badgeClass = 'bg-soft-secondary text-secondary';
@@ -60,7 +60,7 @@
                                 </td>
                                 <td class="text-end pe-4">
                                     <div class="d-flex justify-content-end gap-2 align-items-center">
-                                        <a href="{{ route('sales.payments.show', $payment->id) }}" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="View Payment Details">
+                                        <a href="{{ route('sales.payments.show', $payment->id) }}" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="{{ __('crm.view_payment_details') }}">
                                             <i class="feather feather-eye"></i>
                                         </a>
                                     </div>
@@ -69,8 +69,8 @@
                         @empty
                             <tr>
                                 <td colspan="8" class="text-center py-5 text-muted">
-                                    <i class="feather-dollar-sign fs-1 mb-2 d-block text-gray-300"></i>
-                                    No customer payments recorded yet.
+                                    <span class="fs-1 text-gray-400 mb-2 d-block fw-bold opacity-50">{{ active_currency_symbol() }}</span>
+                                    {{ __('crm.no_customer_payments_recorded') }}
                                 </td>
                             </tr>
                         @endforelse
@@ -80,3 +80,6 @@
         </div>
     </div>
 @endsection
+
+
+

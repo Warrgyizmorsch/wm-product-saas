@@ -418,7 +418,7 @@
                 <div class="d-flex align-items-center gap-2">
                     <i class="feather-info text-warning fs-18"></i>
                     <div>
-                        <strong class="text-dark fs-13">Freight Terms: To Pay (Freight Collect on Delivery)</strong>
+                        <strong class="text-dark fs-13">{{ __('purchase.freight_terms') }}: {{ __('purchase.freight_to_pay') }}</strong>
                         <p class="mb-0 fs-12 text-muted">Freight charges were <strong>not</strong> added to this Material Vendor Invoice. Pay 3rd party Transporter via <strong>Landed Cost Voucher</strong> to update item stock valuation.</p>
                     </div>
                 </div>

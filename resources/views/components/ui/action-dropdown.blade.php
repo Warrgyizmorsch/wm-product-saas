@@ -33,11 +33,11 @@
                 border-color: var(--bs-primary) !important;
                 color: var(--bs-primary) !important;
             }
-            /* Explicitly align dropdown menu to the right edge and open leftwards */
-            .dropdown {
+            /* Explicitly align action-dropdown menu to the right edge and open leftwards */
+            .action-dropdown-wrapper {
                 position: relative !important;
             }
-            .dropdown-menu-end {
+            .action-dropdown-wrapper .dropdown-menu {
                 right: 0 !important;
                 left: auto !important;
                 transform: none !important;
@@ -72,7 +72,7 @@
     @endif
 
     @if(isset($slot) && trim($slot) !== '')
-        <div class="dropdown" id="{{ $dropdownId }}">
+        <div class="dropdown action-dropdown-wrapper" id="{{ $dropdownId }}">
             <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" data-offset="{{ $offset }}" title="More Actions">
                 <i class="feather feather-more-horizontal"></i>
             </a>

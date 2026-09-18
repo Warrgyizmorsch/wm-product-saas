@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Deals Kanban Pipeline | CRM | SaaS ERP')
-@section('page-title', 'Deals Pipeline Kanban')
-@section('breadcrumb', 'CRM > Deals Kanban')
+@section('title', __('crm.deals_pipeline') . ' | CRM | SaaS ERP')
+@section('page-title', __('crm.deals_pipeline'))
+@section('breadcrumb', __('crm.deals'))
 
 @push('styles')
 <style>
@@ -68,7 +68,7 @@
 
 @section('page-actions')
     <x-ui.button href="{{ route('crm.deals.create') }}" variant="primary" icon="feather-plus">
-        New Deal
+        {{ __('crm.new_deal') }}
     </x-ui.button>
 @endsection
 
@@ -77,7 +77,7 @@
 
     <!-- Toolbar: View Switcher & Search (Matching Lead Kanban) -->
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-        <h5 class="fw-bold text-dark mb-0 me-2">Deals Pipeline Kanban</h5>
+        <h5 class="fw-bold text-dark mb-0 me-2">{{ __('crm.deals_pipeline') }}</h5>
         <div class="d-flex align-items-center flex-wrap gap-2">
             <!-- Outside Search Box -->
             <form method="GET" action="{{ route('crm.deals.kanban') }}" class="d-flex align-items-center bg-light border rounded px-2.5 py-0.5 me-1" style="height: 34px; min-width: 240px;">
@@ -87,7 +87,7 @@
                     @endif
                 @endforeach
                 <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
-                <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="Search deals by title, account..." value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('crm.search_placeholder_deals') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
                 @if(request('search'))
                     <a href="{{ route('crm.deals.kanban', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search">
                         <i class="feather-x fs-12"></i>
@@ -100,28 +100,28 @@
 
             <!-- Common Filter Component -->
             <form method="GET" action="{{ route('crm.deals.kanban') }}" class="d-inline">
-                <x-ui.filter :label="__('ui.filter')" offset="0, 5">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Deals</h6>
+                <x-ui.filter :label="__('crm.filter_options')" offset="0, 5">
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                     
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
-                        <x-ui.odoo-form-ui type="input" name="search" placeholder="Search title or company..." value="{{ request('search') }}" />
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
+                        <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_placeholder_deals')" value="{{ request('search') }}" />
                     </div>
 
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date From</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_from') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="date_from" value="{{ request('date_from') }}" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date To</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_to') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="date_to" value="{{ request('date_to') }}" />
                         </div>
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('crm.deals.kanban') }}" class="btn btn-sm btn-light border">Reset</a>
-                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                        <a href="{{ route('crm.deals.kanban') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
+                        <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
                     </div>
                 </x-ui.filter>
             </form>
@@ -143,11 +143,17 @@
 
         @foreach($stages as $stageKey => $info)
             @php
+                $translatedStage = __('crm.stages.' . $stageKey);
+                if ($translatedStage === 'crm.stages.' . $stageKey) {
+                    $translatedStage = $stageKey;
+                }
+                $prob = $info['prob'] ?? 50;
                 $config = $stageHeaderConfigs[$stageKey] ?? [
                     'color' => '#3b82f6',
                     'badge' => 'bg-soft-primary text-primary',
-                    'title' => $info['label'] . ' (' . ($info['prob'] ?? 50) . '%)'
+                    'title' => $translatedStage . ' (' . $prob . '%)'
                 ];
+                $columnTitle = $translatedStage . ' (' . $prob . '%)';
                 $columnData = $kanbanData[$stageKey] ?? ['deals' => collect(), 'total' => 0];
                 $deals = $columnData['deals'];
             @endphp
@@ -156,14 +162,14 @@
                 <div class="kanban-column-header" style="border-top: 3.5px solid {{ $config['color'] }};">
                     <div class="d-flex align-items-center justify-content-between">
                         <span class="fw-bold fs-13 text-dark d-flex align-items-center gap-1.5">
-                            {{ $config['title'] }}
+                            {{ $columnTitle }}
                         </span>
                         <span class="badge {{ $config['badge'] }} rounded-pill px-2 py-1 fs-11 col-count">
                             {{ $deals->count() }}
                         </span>
                     </div>
                     <div class="fs-11 text-muted fw-semibold mt-1">
-                        Total Value: <span class="text-dark font-monospace col-total">₹ {{ number_format($columnData['total'], 2) }}</span>
+                        {{ __('crm.total_amount') }}: <span class="text-dark font-monospace col-total">{{ format_currency($columnData['total']) }}</span>
                     </div>
                 </div>
 
@@ -188,7 +194,7 @@
                                     {{ $deal->title }}
                                 </a>
                                 <span class="badge bg-soft-success text-success fs-10 font-monospace fw-bold">
-                                    ₹ {{ number_format($dealValue, 0) }}
+                                    {{ format_currency($dealValue) }}
                                 </span>
                             </div>
 
@@ -223,11 +229,11 @@
                                 </div>
                                 <div class="d-flex align-items-center gap-1">
                                     @if(!$isWonOrLost)
-                                        <a href="{{ route('crm.deals.edit', $deal->id) }}" class="text-secondary hover-primary px-1" title="Edit Deal">
+                                        <a href="{{ route('crm.deals.edit', $deal->id) }}" class="text-secondary hover-primary px-1" title="{{ __('crm.edit_deal_details') }}">
                                             <i class="feather-edit fs-12"></i>
                                         </a>
                                     @endif
-                                    <a href="{{ route('crm.deals.show', $deal->id) }}" class="text-secondary hover-primary px-1" title="View Profile">
+                                    <a href="{{ route('crm.deals.show', $deal->id) }}" class="text-secondary hover-primary px-1" title="{{ __('crm.view_details') }}">
                                         <i class="feather-external-link fs-12"></i>
                                     </a>
                                 </div>
@@ -235,7 +241,7 @@
                         </div>
                     @empty
                         <div class="text-center py-4 text-muted fs-12 border border-dashed rounded-3 opacity-75 empty-col-msg">
-                            No deals in {{ $info['label'] }}
+                            {{ __('crm.no_deals_found') }}
                         </div>
                     @endforelse
                 </div>
@@ -245,11 +251,11 @@
 </div>
 
 <!-- Modal: Mark Deal Closed Lost -->
-<x-ui.modal id="closeReasonModal" title="Mark Deal as Lost" :centered="true" :showFooter="false">
+<x-ui.modal id="closeReasonModal" :title="__('crm.mark_deal_as_lost')" :centered="true" :showFooter="false">
     <input type="hidden" id="modalDealId">
     <input type="hidden" id="modalTargetStage">
     <div class="mb-3">
-        <label class="form-label fw-semibold fs-12 text-dark">Select Reason / Notes for Lost Deal</label>
+        <label class="form-label fw-semibold fs-12 text-dark">{{ __('crm.select_reason_notes') }}</label>
         <select id="modalCloseReasonSelect" class="form-select mb-2 fs-13">
             <option value="Lost to Competitor">Lost to Competitor</option>
             <option value="Price Too High">Price Too High</option>
@@ -259,8 +265,8 @@
         <textarea id="modalCloseNotes" class="form-control fs-13" rows="2" placeholder="Additional notes or competitor details..."></textarea>
     </div>
     <div class="d-flex justify-content-end gap-2 border-top pt-3 mt-3">
-        <button type="button" class="btn btn-sm btn-light border" id="cancelCloseReasonBtn" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-sm btn-danger px-4" id="saveCloseReasonBtn">Confirm & Change Stage</button>
+        <button type="button" class="btn btn-sm btn-light border" id="cancelCloseReasonBtn" data-bs-dismiss="modal">{{ __('crm.cancel') }}</button>
+        <button type="button" class="btn btn-sm btn-danger px-4" id="saveCloseReasonBtn">{{ __('crm.confirm_change_stage') }}</button>
     </div>
 </x-ui.modal>
 @endsection
@@ -461,8 +467,9 @@
                     totalVal += parseFloat(card.getAttribute('data-amount')) || 0;
                 });
 
+                const currencySymbol = @json(active_currency_symbol());
                 if (countBadge) countBadge.textContent = cards.length;
-                if (totalSpan) totalSpan.textContent = '₹ ' + totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                if (totalSpan) totalSpan.textContent = currencySymbol + ' ' + totalVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             });
         }
     });

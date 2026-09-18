@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Edit Sales Order | SaaS ERP')
-@section('page-title', 'Edit Sales Order ' . $order->sales_order_number)
-@section('breadcrumb', 'Sales / Sales Orders / Edit / ' . $order->sales_order_number)
+@section('title', __('crm.edit_sales_order_title') . ' | SaaS ERP')
+@section('page-title', __('crm.edit_sales_order_title') . ' ' . $order->sales_order_number)
+@section('breadcrumb', __('crm.sales') . ' / ' . __('crm.sales_orders') . ' / ' . __('crm.edit') . ' / ' . $order->sales_order_number)
 
 @section('content')
     <div class="erp-single-panel bg-white">
@@ -13,15 +13,15 @@
         
         <x-ui.odoo-form-ui type="sheet">
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
-                <h5 class="fw-bold text-dark mb-0">Edit Sales Order: {{ $order->sales_order_number }}</h5>
-                <x-ui.button href="{{ route('sales.orders.show', $order->id) }}" variant="light" size="sm" class="border">Cancel</x-ui.button>
+                <h5 class="fw-bold text-dark mb-0">{{ __('crm.edit_sales_order_title') }}: {{ $order->sales_order_number }}</h5>
+                <x-ui.button href="{{ route('sales.orders.show', $order->id) }}" variant="light" size="sm" class="border">{{ __('crm.cancel') }}</x-ui.button>
             </div>
 
             <div class="row g-4 mb-4 fs-13 text-dark">
                 <!-- Column 1: Customer, Sales Rep & Dates -->
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="select" label="Customer" name="customer_id" id="customerSelect" :required="true">
-                        <option value="">Select Customer...</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.customer')" name="customer_id" id="customerSelect" :required="true">
+                        <option value="">{{ __('crm.select_customer') }}</option>
                         @foreach ($customers as $c)
                             <option value="{{ $c->id }}" @selected(old('customer_id', $order->customer_id) == $c->id)>
                                 {{ $c->name }} ({{ $c->email ?: $c->phone ?: 'No Contact' }})
@@ -29,17 +29,17 @@
                         @endforeach
                     </x-ui.odoo-form-ui>
 
-                    <x-ui.odoo-form-ui type="select" label="Quotation Ref" name="quotation_id" id="quotationSelect">
-                        <option value="">Select Quotation Reference (Optional)...</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.quotation_ref')" name="quotation_id" id="quotationSelect">
+                        <option value="">{{ __('crm.select_quotation_ref') }}</option>
                         @foreach ($quotations as $q)
                             <option value="{{ $q->id }}" @selected(old('quotation_id', $order->quotation_id) == $q->id)>
-                                {{ $q->quotation_number }} - {{ $q->customer?->name }} (₹{{ number_format($q->total_amount, 2) }})
+                                {{ $q->quotation_number }} - {{ $q->customer?->name }} ({{ format_currency($q->total_amount) }})
                             </option>
                         @endforeach
                     </x-ui.odoo-form-ui>
 
-                    <x-ui.odoo-form-ui type="select" label="Sales Rep" name="sales_person_id">
-                        <option value="">Select Sales Rep...</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.sales_rep')" name="sales_person_id">
+                        <option value="">{{ __('crm.select_sales_rep') }}</option>
                         @foreach ($salesReps as $u)
                             <option value="{{ $u->id }}" @selected(old('sales_person_id', $order->sales_person_id) == $u->id)>
                                 {{ $u->name }}
@@ -47,70 +47,70 @@
                         @endforeach
                     </x-ui.odoo-form-ui>
 
-                    <x-ui.odoo-form-ui type="input" label="Order Number" name="sales_order_number" :value="old('sales_order_number', $order->sales_order_number)" :readonly="true" :required="true" style="font-weight: bold; color: #495057;" />
+                    <x-ui.odoo-form-ui type="input" :label="__('crm.order_number')" name="sales_order_number" :value="old('sales_order_number', $order->sales_order_number)" :readonly="true" :required="true" style="font-weight: bold; color: #495057;" />
 
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="Order Date" name="order_date" :value="old('order_date', $order->order_date ? $order->order_date->format('Y-m-d') : date('Y-m-d'))" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.order_date')" name="order_date" :value="old('order_date', $order->order_date ? $order->order_date->format('Y-m-d') : date('Y-m-d'))" :required="true" />
 
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="Shipment Date" name="shipment_date" :value="old('shipment_date', $order->shipment_date ? $order->shipment_date->format('Y-m-d') : '')" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.shipment_date')" name="shipment_date" :value="old('shipment_date', $order->shipment_date ? $order->shipment_date->format('Y-m-d') : '')" />
                 </div>
 
                 <!-- Column 2: Commercial, Tax & Delivery Options -->
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="select" label="Discount Option" name="discount_type" id="discountTypeSelect" :required="true">
-                        <option value="without_discount" @selected(old('discount_type', $order->discount_type ?? 'item_wise') === 'without_discount')>Without Discount</option>
-                        <option value="item_wise" @selected(old('discount_type', $order->discount_type ?? 'item_wise') === 'item_wise')>Item-level Discount</option>
-                        <option value="order_wise" @selected(old('discount_type', $order->discount_type ?? 'item_wise') === 'order_wise')>Order-level Discount</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.discount_option')" name="discount_type" id="discountTypeSelect" :required="true">
+                        <option value="without_discount" @selected(old('discount_type', $order->discount_type ?? 'item_wise') === 'without_discount')>{{ __('crm.without_discount') }}</option>
+                        <option value="item_wise" @selected(old('discount_type', $order->discount_type ?? 'item_wise') === 'item_wise')>{{ __('crm.item_level_discount') }}</option>
+                        <option value="order_wise" @selected(old('discount_type', $order->discount_type ?? 'item_wise') === 'order_wise')>{{ __('crm.order_level_discount') }}</option>
                     </x-ui.odoo-form-ui>
 
-                    <x-ui.odoo-form-ui type="select" label="Tax Option" name="tax_type" id="taxTypeSelect" :required="true">
-                        <option value="without_tax" @selected(old('tax_type', $order->tax_type ?? 'item_wise_tax') === 'without_tax')>Without Tax</option>
-                        <option value="item_wise_tax" @selected(old('tax_type', $order->tax_type ?? 'item_wise_tax') === 'item_wise_tax')>Item-wise Tax</option>
-                        <option value="order_wise_tax" @selected(old('tax_type', $order->tax_type ?? 'item_wise_tax') === 'order_wise_tax')>Order-wise Tax</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.tax_option')" name="tax_type" id="taxTypeSelect" :required="true">
+                        <option value="without_tax" @selected(old('tax_type', $order->tax_type ?? 'item_wise_tax') === 'without_tax')>{{ __('crm.without_tax') }}</option>
+                        <option value="item_wise_tax" @selected(old('tax_type', $order->tax_type ?? 'item_wise_tax') === 'item_wise_tax')>{{ __('crm.item_wise_tax') }}</option>
+                        <option value="order_wise_tax" @selected(old('tax_type', $order->tax_type ?? 'item_wise_tax') === 'order_wise_tax')>{{ __('crm.order_wise_tax') }}</option>
                     </x-ui.odoo-form-ui>
 
                     <div id="gstTypeContainer">
-                        <x-ui.odoo-form-ui type="select" label="GST Type" name="gst_type" id="gstTypeSelect" :required="true">
-                            <option value="cgst_sgst" @selected(old('gst_type', $order->gst_type ?? 'cgst_sgst') === 'cgst_sgst')>Intra-State GST (CGST + SGST)</option>
-                            <option value="igst" @selected(old('gst_type', $order->gst_type ?? '') === 'igst')>Inter-State GST (IGST)</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('crm.gst_type')" name="gst_type" id="gstTypeSelect" :required="true">
+                            <option value="cgst_sgst" @selected(old('gst_type', $order->gst_type ?? 'cgst_sgst') === 'cgst_sgst')>{{ __('crm.intra_state_gst') }}</option>
+                            <option value="igst" @selected(old('gst_type', $order->gst_type ?? '') === 'igst')>{{ __('crm.inter_state_gst') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
 
-                    <x-ui.odoo-form-ui type="input" label="Payment Terms" name="payment_terms" :value="old('payment_terms', $order->payment_terms)" placeholder="e.g. Net 30, Due on Receipt" />
+                    <x-ui.odoo-form-ui type="input" :label="__('crm.payment_terms')" name="payment_terms" :value="old('payment_terms', $order->payment_terms)" placeholder="e.g. Net 30, Due on Receipt" />
 
-                    <x-ui.odoo-form-ui type="select" label="Freight Terms" name="freight_terms" id="freightTermsSelect">
-                        <option value="To Pay" @selected(old('freight_terms', $order->freight_terms ?? 'To Pay') == 'To Pay')>To Pay (Freight Collect by Driver from Customer)</option>
-                        <option value="To Be Billed" @selected(old('freight_terms', $order->freight_terms ?? '') == 'To Be Billed')>To Be Billed (Prepaid & Added to Invoice)</option>
-                        <option value="Prepaid" @selected(old('freight_terms', $order->freight_terms ?? '') == 'Prepaid')>Prepaid (Freight Included / Seller Paid)</option>
-                        <option value="Customer Pickup" @selected(old('freight_terms', $order->freight_terms ?? '') == 'Customer Pickup')>Customer Pickup (Self Vehicle)</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.freight_terms')" name="freight_terms" id="freightTermsSelect">
+                        <option value="To Pay" @selected(old('freight_terms', $order->freight_terms ?? 'To Pay') == 'To Pay')>{{ __('crm.freight_to_pay') }}</option>
+                        <option value="To Be Billed" @selected(old('freight_terms', $order->freight_terms ?? '') == 'To Be Billed')>{{ __('crm.freight_to_be_billed') }}</option>
+                        <option value="Prepaid" @selected(old('freight_terms', $order->freight_terms ?? '') == 'Prepaid')>{{ __('crm.freight_prepaid') }}</option>
+                        <option value="Customer Pickup" @selected(old('freight_terms', $order->freight_terms ?? '') == 'Customer Pickup')>{{ __('crm.freight_customer_pickup') }}</option>
                     </x-ui.odoo-form-ui>
 
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount (₹)" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', $order->freight_amount ?? 0)" min="0" step="0.01" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.freight_amount')" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', $order->freight_amount ?? 0)" min="0" step="0.01" />
                 </div>
             </div>
 
             <!-- Address fields -->
             <div class="row g-4 mt-1 border-top pt-3 fs-13 text-dark">
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="textarea" label="Billing Address" name="billing_address" rows="2" placeholder="Enter billing details...">{{ old('billing_address', $order->billing_address) }}</x-ui.odoo-form-ui>
+                    <x-ui.odoo-form-ui type="textarea" :label="__('crm.billing_address')" name="billing_address" rows="2" :placeholder="__('crm.enter_billing_details')">{{ old('billing_address', $order->billing_address) }}</x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="textarea" label="Shipping Address" name="shipping_address" rows="2" placeholder="Enter shipping details...">{{ old('shipping_address', $order->shipping_address) }}</x-ui.odoo-form-ui>
+                    <x-ui.odoo-form-ui type="textarea" :label="__('crm.shipping_address')" name="shipping_address" rows="2" :placeholder="__('crm.enter_shipping_details')">{{ old('shipping_address', $order->shipping_address) }}</x-ui.odoo-form-ui>
                 </div>
             </div>
 
             <!-- Order Lines Table -->
             <div class="border-top pt-4">
-                <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
+                <h5 class="fw-bold text-dark mb-3 fs-14">{{ __('crm.order_lines') }}</h5>
                 <div class="table-responsive">
                     <x-ui.odoo-form-ui type="table" id="itemsTable">
                         <thead>
                             <tr style="background-color: #f1f5f9;">
-                                <th style="width: 38%; min-width: 200px;">Product / Description</th>
-                                <th class="text-end" style="width: 9%;">Quantity</th>
-                                <th class="text-end" style="width: 13%;">Unit Price (₹)</th>
-                                <th class="text-end col-discount" style="width: 11%;">Discount (₹)</th>
-                                <th class="text-end col-tax" style="width: 11%;">Taxes (%)</th>
-                                <th class="text-end pe-3" style="width: 13%;">Amount</th>
+                                <th style="width: 38%; min-width: 200px;">{{ __('crm.product_description') }}</th>
+                                <th class="text-end" style="width: 9%;">{{ __('crm.quantity') }}</th>
+                                <th class="text-end" style="width: 13%;">{{ __('crm.unit_price') }}</th>
+                                <th class="text-end col-discount" style="width: 11%;">{{ __('crm.discount') }}</th>
+                                <th class="text-end col-tax" style="width: 11%;">{{ __('crm.taxes_percent') }}</th>
+                                <th class="text-end pe-3" style="width: 13%;">{{ __('crm.amount') }}</th>
                                 <th class="text-center" style="width: 5%;"></th>
                             </tr>
                         </thead>
@@ -121,7 +121,7 @@
                 </div>
                 <div class="mt-2.5">
                     <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
-                        <i class="feather-plus me-1"></i>Add a product
+                        <i class="feather-plus me-1"></i>{{ __('crm.add_a_product') }}
                     </button>
                 </div>
             </div>
@@ -131,10 +131,10 @@
                 <div class="col-md-7">
                     <div class="pe-md-4">
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="editor" label="Terms & Conditions" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions', $order->terms_conditions) !!}</x-ui.odoo-form-ui>
+                            <x-ui.odoo-form-ui type="editor" :label="__('crm.terms_conditions')" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions', $order->terms_conditions) !!}</x-ui.odoo-form-ui>
                         </div>
                         <div class="mb-3">
-                            <label class="fw-semibold text-muted mb-1 fs-12">Internal Notes</label>
+                            <label class="fw-semibold text-muted mb-1 fs-12">{{ __('crm.internal_notes_remarks') }}</label>
                             <textarea name="notes" class="form-control" rows="2" placeholder="Private internal remarks..." style="border-radius: 4px; font-size: 13px;">{{ old('notes', $order->notes) }}</textarea>
                         </div>
                     </div>
@@ -142,76 +142,76 @@
                 <div class="col-md-5 d-flex flex-column align-items-end fs-13">
                     <div class="card shadow-sm border-0 rounded-3 overflow-hidden w-100" style="border: 1px solid #e2e8f0 !important;">
                         <div class="fw-bold py-2.5 px-3 text-white" style="background-color: #2563eb; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase;">
-                            Financial Summary
+                            {{ __('crm.financial_summary') }}
                         </div>
                         <div class="p-3 bg-white text-dark">
                             <!-- 1. Subtotal (Excl. Tax) -->
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <span class="text-muted fs-13 fw-semibold">Subtotal (Excl. Tax):</span>
-                                <input type="text" id="calcSubtotal" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="₹0.00">
+                                <span class="text-muted fs-13 fw-semibold">{{ __('crm.subtotal_excl_tax') }}</span>
+                                <input type="text" id="calcSubtotal" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                             </div>
 
                             <!-- 2. Less: Item Discounts -->
                             <div class="d-flex justify-content-between align-items-center mb-3 d-none" id="summaryDiscountRow">
-                                <span class="text-muted fs-13 fw-semibold" id="summaryDiscountLabel">Less: Item Discounts:</span>
-                                <input type="text" id="calcDiscountDisplay" class="form-control form-control-sm text-end fw-bold text-danger" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="-₹0.00">
+                                <span class="text-muted fs-13 fw-semibold" id="summaryDiscountLabel">{{ __('crm.less_item_discounts') }}</span>
+                                <input type="text" id="calcDiscountDisplay" class="form-control form-control-sm text-end fw-bold text-danger" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="-0.00">
                                 <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold text-danger d-none" style="width: 150px; height: 34px; border: 1px solid #fca5a5; border-radius: 4px; background-color: #fef2f2;" value="{{ old('discount', $order->discount ?: 0) }}" step="0.01">
                             </div>
 
                             <!-- 3. Items Taxable Value -->
                             <div class="d-flex justify-content-between align-items-center mb-3" id="calcTaxableRow">
-                                <span class="text-muted fs-13 fw-semibold">Items Taxable Value:</span>
-                                <input type="text" id="calcTaxableAmount" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="₹0.00">
+                                <span class="text-muted fs-13 fw-semibold">{{ __('crm.items_taxable_value') }}</span>
+                                <input type="text" id="calcTaxableAmount" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                             </div>
 
                             <!-- 4. Order Tax Rate (%) -->
                             <div class="d-flex justify-content-between align-items-center mb-3 d-none" id="summaryOrderTaxRow">
-                                <span class="text-muted fs-13 fw-semibold">Order Tax Rate (%):</span>
+                                <span class="text-muted fs-13 fw-semibold">{{ __('crm.order_tax_rate') }}</span>
                                 <input type="number" name="order_tax_rate" id="orderTaxInput" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('order_tax_rate', 18) }}" min="0" max="100" step="0.01">
                             </div>
 
                             <!-- 5. CGST (Central Tax) & SGST (State Tax) -->
                             <div id="cgstSgstRows" style="display: none;">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-13 fw-semibold">Add: CGST (Central Tax):</span>
-                                    <input type="text" id="calcCgst" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
+                                    <span class="text-muted fs-13 fw-semibold">{{ __('crm.add_cgst') }}</span>
+                                    <input type="text" id="calcCgst" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-13 fw-semibold">Add: SGST (State Tax):</span>
-                                    <input type="text" id="calcSgst" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
+                                    <span class="text-muted fs-13 fw-semibold">{{ __('crm.add_sgst') }}</span>
+                                    <input type="text" id="calcSgst" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                 </div>
                             </div>
 
                             <!-- 6. IGST (Integrated Tax) -->
                             <div id="igstRow" style="display: none;">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-13 fw-semibold">Add: IGST (Integrated Tax):</span>
-                                    <input type="text" id="calcIgst" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
+                                    <span class="text-muted fs-13 fw-semibold">{{ __('crm.add_igst') }}</span>
+                                    <input type="text" id="calcIgst" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                 </div>
                             </div>
 
                             <!-- 7. Billed Items Total (Incl. GST) -->
                             <div class="d-flex justify-content-between align-items-center mb-3 fw-bold text-dark" id="calcItemsTotalRow">
-                                <span class="fs-13">Billed Items Total (Incl. GST):</span>
-                                <input type="text" id="calcItemsTotalInclGst" class="form-control form-control-sm text-end fw-bold text-dark" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f1f5f9;" readonly value="₹0.00">
+                                <span class="fs-13">{{ __('crm.billed_items_total') }}</span>
+                                <input type="text" id="calcItemsTotalInclGst" class="form-control form-control-sm text-end fw-bold text-dark" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f1f5f9;" readonly value="0.00">
                             </div>
 
                             <!-- 8. Freight Charges -->
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <span class="text-muted fs-13 fw-semibold">Freight Charges:</span>
+                                <span class="text-muted fs-13 fw-semibold">{{ __('crm.freight_charges') }}</span>
                                 <input type="number" name="freight_amount_display" id="freightAmountDisplay" class="form-control form-control-sm text-end fw-bold text-primary" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="0.00">
                             </div>
 
                             <!-- 9. Adjustment -->
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <span class="text-muted fs-13 fw-semibold">Adjustment:</span>
+                                <span class="text-muted fs-13 fw-semibold">{{ __('crm.adjustment') }}</span>
                                 <input type="number" name="adjustment" id="adjustmentInput" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('adjustment', $order->adjustment) }}" step="0.01">
                             </div>
 
                             <!-- 10. Grand Total -->
                             <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-3">
-                                <span class="fw-bold text-primary fs-13">Grand Total:</span>
-                                <input type="text" id="calcTotal" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 36px; border: 1.5px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb; font-size: 14px; font-weight: 800;" readonly value="₹0.00">
+                                <span class="fw-bold text-primary fs-13">{{ __('crm.grand_total') }}</span>
+                                <input type="text" id="calcTotal" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 36px; border: 1.5px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb; font-size: 14px; font-weight: 800;" readonly value="0.00">
                             </div>
                         </div>
                     </div>
@@ -219,8 +219,8 @@
             </div>
 
             <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                <x-ui.button href="{{ route('sales.orders.show', $order->id) }}" variant="light" size="md" class="border py-2 px-4 fs-12 shadow-sm">Discard</x-ui.button>
-                <x-ui.button type="submit" variant="primary" size="md" class="py-2 px-5 fw-bold fs-12 shadow-sm" style="background-color: #1e40af; border-color: #1e40af;">Save Changes</x-ui.button>
+                <x-ui.button href="{{ route('sales.orders.show', $order->id) }}" variant="light" size="md" class="border py-2 px-4 fs-12 shadow-sm">{{ __('crm.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" variant="primary" size="md" class="py-2 px-5 fw-bold fs-12 shadow-sm" style="background-color: #1e40af; border-color: #1e40af;">{{ __('crm.update_sales_order') }}</x-ui.button>
             </div>
         </x-ui.odoo-form-ui>
     </form>

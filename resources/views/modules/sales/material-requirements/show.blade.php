@@ -1,28 +1,28 @@
 @extends('layouts.duralux')
 
-@section('title', 'Material Requirement ' . $delivery->requirement_number . ' | SaaS ERP')
-@section('page-title', 'Material Requirement ' . $delivery->requirement_number)
-@section('breadcrumb', 'Sales / Material Requirements / ' . $delivery->requirement_number)
+@section('title', __('crm.material_requirements') . ' ' . $delivery->requirement_number . ' | SaaS ERP')
+@section('page-title', __('crm.material_requirements') . ' ' . $delivery->requirement_number)
+@section('breadcrumb', __('ui.sales') . ' / ' . __('crm.material_requirements') . ' / ' . $delivery->requirement_number)
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <x-ui.button href="{{ route('sales.material-requirements.index') }}" variant="light" size="sm" class="border" icon="feather-arrow-left">
-            Back
+        <x-ui.button href="{{ route('sales.material-requirements.index') }}" variant="light" class="border" icon="feather-arrow-left">
+            {{ __('crm.back') }}
         </x-ui.button>
-        <x-ui.button href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" variant="light" size="sm" class="border" icon="feather-external-link">
-            SO Details
+        <x-ui.button href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" variant="light" class="border" icon="feather-external-link">
+            {{ __('crm.so_details') }}
         </x-ui.button>
         @if (!in_array($delivery->status, ['Delivered', 'Cancelled']))
-            <x-ui.button href="{{ route('sales.dispatches.create', ['material_requirement_id' => $delivery->id, 'sales_order_id' => $delivery->sales_order_id]) }}" variant="primary" size="sm" class="fw-bold px-3" icon="feather-truck">
-                Dispatch Order
+            <x-ui.button href="{{ route('sales.dispatches.create', ['material_requirement_id' => $delivery->id, 'sales_order_id' => $delivery->sales_order_id]) }}" variant="primary" class="fw-bold px-3" icon="feather-truck">
+                {{ __('crm.dispatch_order') }}
             </x-ui.button>
         @endif
 
         @if ($delivery->status === 'Dispatched')
             <form action="{{ route('sales.material-requirements.deliver', $delivery->id) }}" method="POST" class="d-inline">
                 @csrf
-                <x-ui.button type="submit" variant="success" size="sm" class="fw-bold px-3" icon="feather-check-circle">
-                    Mark Delivered
+                <x-ui.button type="submit" variant="success" class="fw-bold px-3" icon="feather-check-circle">
+                    {{ __('crm.mark_delivered') }}
                 </x-ui.button>
             </form>
         @endif
@@ -30,17 +30,17 @@
         <x-ui.action-dropdown id="mrActionsDropdown">
             <li>
                 <a href="{{ route('inventory.mrp-shortage.index', ['mr_ids' => [$delivery->id]]) }}" class="dropdown-item py-2">
-                    <i class="feather-cpu me-2 text-muted fs-12"></i>MRP Shortage Analysis
+                    <i class="feather-cpu me-2 text-muted fs-12"></i>{{ __('crm.mrp_shortage_analysis') }}
                 </a>
             </li>
             <li>
                 <a href="javascript:void(0)" onclick="window.print()" class="dropdown-item py-2">
-                    <i class="feather-printer me-2 text-muted fs-12"></i>Print Requirement Sheet
+                    <i class="feather-printer me-2 text-muted fs-12"></i>{{ __('crm.print_requirement_sheet') }}
                 </a>
             </li>
             <li>
                 <a href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" class="dropdown-item py-2">
-                    <i class="feather-shopping-cart me-2 text-muted fs-12"></i>View Sales Order #{{ $delivery->salesOrder?->sales_order_number }}
+                    <i class="feather-shopping-cart me-2 text-muted fs-12"></i>{{ __('crm.view_sales_order') }} #{{ $delivery->salesOrder?->sales_order_number }}
                 </a>
             </li>
         </x-ui.action-dropdown>
@@ -141,19 +141,19 @@
     {{-- Session Alerts --}}
     @if (session('success'))
         <x-ui.alert variant="success" :dismissible="true" icon="feather-check-circle" class="shadow-sm mb-4">
-            <strong>Success!</strong> {{ session('success') }}
+            <strong>{{ __('crm.success') ?: 'Success!' }}</strong> {{ session('success') }}
         </x-ui.alert>
     @endif
 
     @if (session('error'))
         <x-ui.alert variant="danger" :dismissible="true" icon="feather-alert-triangle" class="shadow-sm mb-4">
-            <strong>Error!</strong> {{ session('error') }}
+            <strong>{{ __('crm.error') ?: 'Error!' }}</strong> {{ session('error') }}
         </x-ui.alert>
     @endif
 
     @if ($errors->any())
         <x-ui.alert variant="danger" :dismissible="true" icon="feather-alert-triangle" class="shadow-sm mb-4">
-            <strong>Please fix the following errors:</strong>
+            <strong>{{ __('crm.fix_following_errors') ?: 'Please fix the following errors:' }}</strong>
             <ul class="mb-0 mt-1 ps-3">
                 @foreach ($errors->all() as $error)
                     <li class="fs-12">{{ $error }}</li>
@@ -187,51 +187,51 @@
         };
     @endphp
 
-    {{-- ERP Single Panel Odoo Sheet (Matching purchase/orders/show & sales/orders/show) --}}
+    {{-- ERP Single Panel Odoo Sheet --}}
     <div class="erp-single-panel">
         <x-ui.odoo-form-ui type="sheet" class="p-0">
 
             {{-- Top Status Bar (Pipeline + Quick Status Badge) --}}
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 px-4 py-2.5 bg-light border-bottom">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <span class="fs-11 text-uppercase fw-bold text-muted letter-spacing-1 me-1">STATUS:</span>
+                    <span class="fs-11 text-uppercase fw-bold text-muted letter-spacing-1 me-1">{{ __('crm.status') }}:</span>
                     <x-ui.badge :soft="true" :variant="$doStatusClass" class="fs-11 px-2.5 py-1 fw-bold me-2">
                         {{ $delivery->status }}
                     </x-ui.badge>
 
                     {{-- Quick KPI summary pills --}}
                     <div class="d-flex align-items-center gap-3 fs-12 text-muted ms-1">
-                        <span><i class="feather-package text-primary me-1"></i>Order: <strong class="text-dark">{{ (int)$delivery->total_ordered_qty }} Units</strong></span>
-                        <span><i class="feather-check-circle text-success me-1"></i>Reserved: <strong class="text-success">{{ (int)$delivery->total_reserved_qty }} Units</strong></span>
+                        <span><i class="feather-package text-primary me-1"></i>{{ __('crm.order_qty_th') }}: <strong class="text-dark">{{ (int)$delivery->total_ordered_qty }} Units</strong></span>
+                        <span><i class="feather-check-circle text-success me-1"></i>{{ __('crm.reserved_th') }}: <strong class="text-success">{{ (int)$delivery->total_reserved_qty }} Units</strong></span>
                         @if($delivery->total_dispatched_qty > 0)
-                            <span><i class="feather-truck text-info me-1"></i>Dispatched: <strong class="text-info">{{ (int)$delivery->total_dispatched_qty }} Units</strong></span>
+                            <span><i class="feather-truck text-info me-1"></i>{{ __('crm.shipped_qty') }}: <strong class="text-info">{{ (int)$delivery->total_dispatched_qty }} Units</strong></span>
                         @endif
-                        <span><i class="feather-clock text-warning me-1"></i>Pending: <strong class="{{ $delivery->total_pending_qty > 0 ? 'text-warning' : 'text-muted' }}">{{ (int)$delivery->total_pending_qty }} Units</strong></span>
-                        <span class="badge bg-soft-primary text-primary px-2 py-0.5 font-monospace fs-11">{{ $delivery->fulfillment_rate }}% Fulfilled</span>
+                        <span><i class="feather-clock text-warning me-1"></i>{{ __('crm.pending_th') }}: <strong class="{{ $delivery->total_pending_qty > 0 ? 'text-warning' : 'text-muted' }}">{{ (int)$delivery->total_pending_qty }} Units</strong></span>
+                        <span class="badge bg-soft-primary text-primary px-2 py-0.5 font-monospace fs-11">{{ $delivery->fulfillment_rate }}% {{ __('crm.fulfilled') }}</span>
                     </div>
                 </div>
 
                 {{-- Chevron Status Pipeline --}}
                 <div class="mr-status-pipeline d-none d-md-inline-flex">
                     <div class="pipeline-step {{ $statusStep > 1 ? 'completed' : ($statusStep === 1 ? 'active' : '') }}">
-                        1. DRAFT
+                        {{ __('crm.step_draft') }}
                     </div>
                     <div class="pipeline-step {{ $statusStep > 2 ? 'completed' : ($statusStep === 2 ? 'active' : '') }}">
-                        2. PROCESSING
+                        {{ __('crm.step_processing') }}
                     </div>
                     <div class="pipeline-step {{ $statusStep > 3 ? 'completed' : ($statusStep === 3 ? 'active' : '') }}">
-                        3. READY
+                        {{ __('crm.step_ready') }}
                     </div>
                     <div class="pipeline-step {{ $statusStep > 4 ? 'completed' : ($statusStep === 4 ? 'active' : '') }}">
-                        4. DISPATCHED
+                        {{ __('crm.step_dispatched') }}
                     </div>
                     <div class="pipeline-step {{ $statusStep === 5 ? 'active' : '' }}">
-                        5. DELIVERED
+                        {{ __('crm.step_delivered') }}
                     </div>
                 </div>
             </div>
 
-        {{-- Document Header Metadata + 3 Compact Right Stat Boxes --}}
+        {{-- Document Header Metadata --}}
         <div class="p-4 border-bottom">
             <div class="row align-items-center justify-content-between g-4">
                     <div class="col-md-7">
@@ -240,24 +240,24 @@
                                 <i class="feather-clipboard fs-3"></i>
                             </div>
                             <div>
-                                <span class="fs-10 text-uppercase fw-bold text-muted letter-spacing-1 d-block mb-1">MATERIAL REQUIREMENT DOCUMENT</span>
+                                <span class="fs-10 text-uppercase fw-bold text-muted letter-spacing-1 d-block mb-1">{{ __('crm.mr_document_header') }}</span>
                                 <h3 class="fw-bold text-dark mb-2">{{ $delivery->requirement_number }}</h3>
                                 
                                 <div class="d-flex align-items-center flex-wrap gap-x-4 gap-y-2 fs-13 text-muted">
                                     <div>
                                         <i class="feather-shopping-bag text-primary me-1"></i>
-                                        Sales Order: 
+                                        {{ __('crm.sales_order') }}: 
                                         <a href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" class="fw-bold text-primary">
                                             {{ $delivery->salesOrder->sales_order_number }}
                                         </a>
                                     </div>
                                     <div>
                                         <i class="feather-user me-1 text-muted"></i>
-                                        Customer: <strong class="text-dark">{{ $delivery->salesOrder->customer?->name ?? 'Walk-in Customer' }}</strong>
+                                        {{ __('crm.customer') }}: <strong class="text-dark">{{ $delivery->salesOrder->customer?->name ?? 'Walk-in Customer' }}</strong>
                                     </div>
                                     <div>
                                         <i class="feather-calendar me-1 text-muted"></i>
-                                        Date: <strong class="text-dark">{{ $delivery->requirement_date ? $delivery->requirement_date->format('d M Y') : $delivery->created_at->format('d M Y') }}</strong>
+                                        {{ __('crm.date') }}: <strong class="text-dark">{{ $delivery->requirement_date ? $delivery->requirement_date->format('d M Y') : $delivery->created_at->format('d M Y') }}</strong>
                                     </div>
                                 </div>
                             </div>
@@ -270,10 +270,10 @@
         <div class="p-4">
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <h6 class="fw-bold text-dark mb-0 fs-14">
-                            <i class="feather-list me-2 text-primary"></i>Material Requirement Lines
+                            <i class="feather-list me-2 text-primary"></i>{{ __('crm.mr_lines_header') }}
                         </h6>
                         <span class="badge bg-soft-primary text-primary fw-bold px-2.5 py-1 fs-12">
-                            {{ count($delivery->items) }} Item(s)
+                            {{ count($delivery->items) }} {{ __('crm.items_to_return') }}
                         </span>
                     </div>
 
@@ -281,15 +281,15 @@
                         <x-ui.odoo-form-ui type="table" class="align-middle fs-13 mb-0 mr-line-table" style="margin-top:0;">
                             <thead class="fs-11 text-uppercase fw-bold text-muted">
                                 <tr>
-                                    <th style="width:25%" class="ps-4">Product Details</th>
-                                    <th style="width:9%" class="text-center">Method</th>
-                                    <th style="width:8%" class="text-end">Order Qty</th>
-                                    <th style="width:8%" class="text-end">Reserved</th>
-                                    <th style="width:8%" class="text-end">Pending</th>
-                                    <th style="width:18%">Warehouse</th>
-                                    <th style="width:7%" class="text-end">Avail.</th>
-                                    <th style="width:10%" class="text-center">Status</th>
-                                    <th style="width:11%" class="text-center pe-4">Action</th>
+                                    <th style="width:25%" class="ps-4">{{ __('crm.product_details') }}</th>
+                                    <th style="width:9%" class="text-center">{{ __('crm.method') }}</th>
+                                    <th style="width:8%" class="text-end">{{ __('crm.order_qty_th') }}</th>
+                                    <th style="width:8%" class="text-end">{{ __('crm.reserved_th') }}</th>
+                                    <th style="width:8%" class="text-end">{{ __('crm.pending_th') }}</th>
+                                    <th style="width:18%">{{ __('crm.warehouse_th') }}</th>
+                                    <th style="width:7%" class="text-end">{{ __('crm.avail_th') }}</th>
+                                    <th style="width:10%" class="text-center">{{ __('crm.status_th') }}</th>
+                                    <th style="width:11%" class="text-center pe-4">{{ __('crm.action_th') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="text-dark">
@@ -362,8 +362,8 @@
                                                     data-master="warehouse"
                                                     style="width: 100%;"
                                                 >
-                                                    <option value="">Select Warehouse...</option>
-                                                    <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="warehouse">+ Add New Warehouse</option>
+                                                    <option value="">{{ __('crm.select_warehouse') }}</option>
+                                                    <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="warehouse">+ {{ __('crm.add_new_warehouse') }}</option>
                                                     @foreach ($warehouses as $w)
                                                         <option value="{{ $w->id }}" {{ ($item->warehouse_id ?: $defaultWarehouseId) == $w->id ? 'selected' : '' }}>
                                                             {{ $w->name }}
@@ -397,14 +397,14 @@
                                             @if (!$isLocked)
                                                 <div class="d-flex flex-column align-items-center gap-1">
                                                     @if ($pendingQty > 0)
-                                                        {{-- Reserve Button (always rendered in wrapper so JS can toggle display dynamically on warehouse change) --}}
+                                                        {{-- Reserve Button --}}
                                                         <div id="reserve-btn-wrap-{{ $item->id }}" class="w-100 {{ $availableQty > 0 ? '' : 'd-none' }}" style="{{ $availableQty > 0 ? '' : 'display: none;' }}">
                                                             <button
                                                                 type="button"
                                                                 class="btn btn-sm btn-soft-primary px-2 py-1 fs-11 fw-bold w-100"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#reserveModal-{{ $item->id }}"
-                                                            ><i class="feather-archive me-1"></i>Reserve</button>
+                                                            ><i class="feather-archive me-1"></i>{{ __('crm.reserve') }}</button>
                                                         </div>
 
                                                         @if ($method === 'buy' || $method === 'trade')
@@ -415,30 +415,30 @@
 
                                                             @if ($item->status === 'Waiting Purchase' || ($prRaised > 0 && $remainingPrQty <= 0))
                                                                 <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 w-100 text-center fw-semibold">
-                                                                    <i class="feather-check-circle me-1"></i>PR Raised ({{ (int)$prRaised }}/{{ (int)$pendingQty }})
+                                                                    <i class="feather-check-circle me-1"></i>{{ __('crm.pr_raised') }} ({{ (int)$prRaised }}/{{ (int)$pendingQty }})
                                                                 </span>
                                                             @elseif ($prRaised > 0 && $remainingPrQty > 0)
                                                                 <span class="badge bg-soft-info text-info px-2 py-1 fs-11 w-100 text-center mb-1 fw-semibold">
-                                                                    <i class="feather-clock me-1"></i>PR Raised ({{ (int)$prRaised }}/{{ (int)$pendingQty }})
+                                                                    <i class="feather-clock me-1"></i>{{ __('crm.pr_raised') }} ({{ (int)$prRaised }}/{{ (int)$pendingQty }})
                                                                 </span>
                                                                 <button
                                                                     type="button"
                                                                     class="btn btn-sm btn-soft-warning px-2 py-1 fs-11 fw-bold w-100"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#indentModal-{{ $item->id }}"
-                                                                ><i class="feather-plus-circle me-1"></i>Create Indent (+{{ (int)$remainingPrQty }})</button>
+                                                                ><i class="feather-plus-circle me-1"></i>{{ __('crm.create_indent') }} (+{{ (int)$remainingPrQty }})</button>
                                                             @else
                                                                 <button
                                                                     type="button"
                                                                     class="btn btn-sm btn-soft-warning px-2 py-1 fs-11 fw-bold w-100"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#indentModal-{{ $item->id }}"
-                                                                ><i class="feather-file-text me-1"></i>Indent</button>
+                                                                ><i class="feather-file-text me-1"></i>{{ __('crm.indent') }}</button>
                                                             @endif
                                                         @elseif ($method === 'manufacture')
                                                             @if ($item->status === 'Waiting Production')
                                                                 <x-ui.badge :soft="true" variant="warning" class="fs-11 px-2 py-1 w-100 text-center fw-semibold">
-                                                                    <i class="feather-clock me-1"></i>MO Raised
+                                                                    <i class="feather-clock me-1"></i>{{ __('crm.mo_raised') }}
                                                                 </x-ui.badge>
                                                             @else
                                                                 <button
@@ -446,18 +446,18 @@
                                                                     class="btn btn-sm btn-soft-danger px-2 py-1 fs-11 fw-bold w-100"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#generateMoModal-{{ $item->id }}"
-                                                                ><i class="feather-cpu me-1"></i>Gen MO</button>
+                                                                ><i class="feather-cpu me-1"></i>{{ __('crm.gen_mo') }}</button>
                                                             @endif
                                                         @endif
                                                     @else
                                                         <x-ui.badge :soft="true" variant="success" class="fs-11 px-2.5 py-1 fw-bold">
-                                                            <i class="feather-check-circle me-1"></i>Fulfilled
+                                                            <i class="feather-check-circle me-1"></i>{{ __('crm.fulfilled') }}
                                                         </x-ui.badge>
                                                     @endif
                                                 </div>
                                             @else
                                                 <span class="text-muted fs-12 fw-semibold">
-                                                    <i class="feather-lock me-1"></i>Locked
+                                                    <i class="feather-lock me-1"></i>{{ __('crm.locked') }}
                                                 </span>
                                             @endif
                                         </td>
@@ -493,8 +493,8 @@
             {{-- Reserve Stock Modal --}}
             <x-ui.modal
                 id="reserveModal-{{ $item->id }}"
-                title="Reserve Stock — {{ $item->product?->name }}"
-                submitText="Confirm Reservation"
+                :title="__('crm.reserve_stock') . ' — ' . $item->product?->name"
+                :submitText="__('crm.confirm_reservation')"
                 formAction="{{ route('sales.material-requirements.reserve-qty', $item->id) }}"
                 :centered="true"
             >
@@ -512,7 +512,7 @@
 
                     {{-- Warehouse Selector --}}
                     <div class="odoo-form-group mb-3">
-                        <label class="odoo-form-label" for="reserve-warehouse-{{ $item->id }}">Warehouse</label>
+                        <label class="odoo-form-label" for="reserve-warehouse-{{ $item->id }}">{{ __('crm.warehouse_th') }}</label>
                         <div class="flex-grow-1">
                             <select
                                 id="reserve-warehouse-{{ $item->id }}"
@@ -536,19 +536,19 @@
                     <div class="row g-2 mb-3">
                         <div class="col-4">
                             <div class="bg-light rounded p-2 text-center border">
-                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Available</span>
+                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">{{ __('crm.avail_th') }}</span>
                                 <span id="reserve-modal-avail-{{ $item->id }}" class="fs-16 fw-bold text-success">{{ (int)$availableQty }}</span>
                             </div>
                         </div>
                         <div class="col-4">
                             <div class="bg-light rounded p-2 text-center border">
-                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Order Qty</span>
+                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">{{ __('crm.order_qty_th') }}</span>
                                 <span class="fs-16 fw-bold text-dark">{{ (int)$orderedQty }}</span>
                             </div>
                         </div>
                         <div class="col-4">
                             <div class="bg-light rounded p-2 text-center border">
-                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Pending</span>
+                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">{{ __('crm.pending_th') }}</span>
                                 <span class="fs-16 fw-bold text-danger">{{ (int)$pendingQty }}</span>
                             </div>
                         </div>
@@ -557,7 +557,7 @@
                     {{-- Qty to Reserve --}}
                     <div class="odoo-form-group mb-0">
                         <label class="odoo-form-label" for="reserve-qty-input-{{ $item->id }}">
-                            Qty to Reserve <span class="text-danger">*</span>
+                            {{ __('crm.qty_to_reserve') }} <span class="text-danger">*</span>
                         </label>
                         <div class="flex-grow-1">
                             <input
@@ -589,8 +589,8 @@
                 {{-- Create Indent Modal --}}
                 <x-ui.modal
                     id="indentModal-{{ $item->id }}"
-                    title="Create Purchase Indent — {{ $item->product?->name }}"
-                    submitText="Submit Indent Request"
+                    :title="__('crm.create_purchase_indent') . ' — ' . $item->product?->name"
+                    :submitText="__('crm.submit_indent_request')"
                     formAction="{{ route('sales.material-requirements.mock-indent', $item->id) }}"
                     :centered="true"
                     :showFooter="true"
@@ -607,38 +607,38 @@
                         </div>
 
                         <x-ui.alert variant="warning" icon="feather-info" class="border-0 fs-12 py-2 mb-3">
-                            This will raise a <strong>Purchase Indent</strong> for the required procurement quantity.
+                            {{ __('crm.purchase_indent_alert') }}
                         </x-ui.alert>
 
                         <div class="row g-2 mb-3">
                             <div class="col-3">
                                 <div class="bg-light rounded p-2 text-center border">
-                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Order Qty</span>
+                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">{{ __('crm.order_qty_th') }}</span>
                                     <span class="fs-15 fw-bold text-dark">{{ (int)$orderedQty }}</span>
                                 </div>
                             </div>
                             <div class="col-3">
                                 <div class="bg-light rounded p-2 text-center border">
-                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Reserved</span>
+                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">{{ __('crm.reserved_th') }}</span>
                                     <span class="fs-15 fw-bold text-success">{{ (int)$reservedQty }}</span>
                                 </div>
                             </div>
                             <div class="col-3">
                                 <div class="bg-light rounded p-2 text-center border">
-                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">PR Raised</span>
+                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">{{ __('crm.pr_raised') }}</span>
                                     <span class="fs-15 fw-bold text-info">{{ (int)$prRaised }}</span>
                                 </div>
                             </div>
                             <div class="col-3">
                                 <div class="bg-light rounded p-2 text-center border">
-                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Remaining</span>
+                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">{{ __('crm.pending_th') }}</span>
                                     <span class="fs-15 fw-bold text-danger">{{ (int)$remainingPrQty }}</span>
                                 </div>
                             </div>
                         </div>
 
                         <div class="odoo-form-group">
-                            <label class="odoo-form-label">Qty to Indent <span class="text-danger">*</span></label>
+                            <label class="odoo-form-label">{{ __('crm.qty_to_indent') }} <span class="text-danger">*</span></label>
                             <div class="flex-grow-1">
                                 <input type="number" class="odoo-form-control" name="quantity_request" min="1" max="{{ (int)$remainingPrQty }}" value="{{ (int)$remainingPrQty }}" required>
                                 <div class="text-muted fs-11 mt-1">Pre-filled with remaining un-indented quantity ({{ (int)$remainingPrQty }} unit(s)). You can adjust.</div>
@@ -646,7 +646,7 @@
                         </div>
 
                         <div class="odoo-form-group">
-                            <label class="odoo-form-label">Destination Warehouse <span class="text-danger">*</span></label>
+                            <label class="odoo-form-label">{{ __('crm.destination_warehouse') }} <span class="text-danger">*</span></label>
                             <div class="flex-grow-1">
                                 <select class="odoo-form-control" name="warehouse_id" required>
                                     @foreach($warehouses as $w)
@@ -658,7 +658,7 @@
                         </div>
 
                         <div class="odoo-form-group">
-                            <label class="odoo-form-label">Expected Date</label>
+                            <label class="odoo-form-label">{{ __('crm.expected_date') }}</label>
                             <div class="flex-grow-1">
                                 <input type="date" class="odoo-form-control" name="expected_date">
                                 <div class="text-muted fs-11 mt-1">Target date by which required items should arrive.</div>
@@ -666,7 +666,7 @@
                         </div>
 
                         <div class="odoo-form-group mb-0">
-                            <label class="odoo-form-label">Notes</label>
+                            <label class="odoo-form-label">{{ __('crm.notes') }}</label>
                             <div class="flex-grow-1">
                                 <textarea class="odoo-form-control" name="notes" rows="2" placeholder="Reason, urgency, etc…"></textarea>
                             </div>
@@ -680,8 +680,8 @@
             {{-- Generate MO Modal --}}
             <x-ui.modal
                 id="generateMoModal-{{ $item->id }}"
-                title="Generate Manufacturing Order — {{ $item->product?->name }}"
-                submitText="Raise MO Request"
+                :title="__('crm.generate_mo') . ' — ' . $item->product?->name"
+                :submitText="__('crm.raise_mo_request')"
                 formAction="{{ route('sales.material-requirements.mock-mo', $item->id) }}"
                 :centered="true"
             >
@@ -697,33 +697,33 @@
                     </div>
 
                     <x-ui.alert variant="danger" icon="feather-cpu" class="border-0 fs-12 py-2 mb-3">
-                        This will create a <strong>Manufacturing Order</strong> for the required quantity.
+                        {{ __('crm.mo_alert') }}
                     </x-ui.alert>
 
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <div class="bg-light rounded p-2 text-center border">
-                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Order Qty</span>
+                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">{{ __('crm.order_qty_th') }}</span>
                                 <span class="fs-16 fw-bold text-dark">{{ (int)$orderedQty }}</span>
                             </div>
                         </div>
                         <div class="col-6">
                             <div class="bg-light rounded p-2 text-center border">
-                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">To Manufacture</span>
+                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">{{ __('crm.qty_to_mfg') }}</span>
                                 <span class="fs-16 fw-bold text-danger">{{ (int)$pendingQty }}</span>
                             </div>
                         </div>
                     </div>
 
                     <div class="odoo-form-group">
-                        <label class="odoo-form-label">Qty to Mfg <span class="text-danger">*</span></label>
+                        <label class="odoo-form-label">{{ __('crm.qty_to_mfg') }} <span class="text-danger">*</span></label>
                         <div class="flex-grow-1">
                             <input type="number" name="quantity_mfg" class="odoo-form-control" value="{{ (int)$pendingQty }}" min="1" required>
                         </div>
                     </div>
 
                     <div class="odoo-form-group mb-0">
-                        <label class="odoo-form-label">Notes / Priority</label>
+                        <label class="odoo-form-label">{{ __('crm.notes_priority') }}</label>
                         <div class="flex-grow-1">
                             <textarea name="notes" class="odoo-form-control" rows="2" placeholder="Priority, due date, special instructions…"></textarea>
                         </div>
@@ -743,24 +743,24 @@
             id="dispatchModal"
             title="Transporter & Shipment Details"
             formAction="{{ route('sales.material-requirements.dispatch', $delivery->id) }}"
-            submitText="Confirm Dispatch"
+            :submitText="__('crm.dispatch_order')"
             :centered="true"
         >
             <div class="fs-13 text-dark">
                 <div class="odoo-form-group">
-                    <label class="odoo-form-label">Carrier <span class="text-danger">*</span></label>
+                    <label class="odoo-form-label">{{ __('crm.carrier_courier') }} <span class="text-danger">*</span></label>
                     <div class="flex-grow-1">
                         <input type="text" name="carrier" class="odoo-form-control" placeholder="e.g. DHL, BlueDart, SafeExpress" required>
                     </div>
                 </div>
                 <div class="odoo-form-group">
-                    <label class="odoo-form-label">Tracking No. <span class="text-danger">*</span></label>
+                    <label class="odoo-form-label">{{ __('crm.tracking_number') }} <span class="text-danger">*</span></label>
                     <div class="flex-grow-1">
                         <input type="text" name="tracking_number" class="odoo-form-control" placeholder="e.g. TRK983742 or MH-12-XX-XXXX" required>
                     </div>
                 </div>
                 <div class="odoo-form-group mb-0">
-                    <label class="odoo-form-label">Notes</label>
+                    <label class="odoo-form-label">{{ __('crm.notes') }}</label>
                     <div class="flex-grow-1">
                         <textarea name="notes" class="odoo-form-control" rows="3" placeholder="Remarks regarding dispatch…"></textarea>
                     </div>

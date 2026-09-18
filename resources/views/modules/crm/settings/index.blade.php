@@ -1,15 +1,15 @@
 @extends('layouts.duralux')
 
-@section('title', 'CRM & Sales Settings | SaaS ERP')
-@section('page-title', 'CRM & Sales Settings')
-@section('breadcrumb', 'Revenue Cycle / CRM / Settings')
+@section('title', __('crm.crm_sales_settings') . ' | SaaS ERP')
+@section('page-title', __('crm.crm_sales_settings'))
+@section('breadcrumb', __('crm.revenue_cycle') . ' / CRM / ' . __('crm.settings'))
 
 @section('content')
 <div class="container-fluid px-4 py-3">
     <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
-            <h4 class="fw-bold mb-1"><i class="feather-settings me-2 text-primary"></i>CRM & Sales Settings</h4>
-            <p class="text-muted fs-12 mb-0">Configure invoicing policy and workflow automation rules for Revenue Cycle.</p>
+            <h4 class="fw-bold mb-1"><i class="feather-settings me-2 text-primary"></i>{{ __('crm.crm_sales_settings') }}</h4>
+            <p class="text-muted fs-12 mb-0">{{ __('crm.configure_invoicing_policy_subtext') }}</p>
         </div>
     </div>
 
@@ -25,17 +25,17 @@
             <div class="card border-0 shadow-sm rounded-3">
                 <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
                     <h6 class="fw-bold mb-0 text-dark">
-                        <i class="feather-file-text me-2 text-primary"></i>Invoicing Policy & Workflow Mode
+                        <i class="feather-file-text me-2 text-primary"></i>{{ __('crm.invoicing_policy_workflow_mode') }}
                     </h6>
-                    <span class="badge bg-soft-primary text-primary font-monospace fs-11">Revenue Cycle Setting</span>
+                    <span class="badge bg-soft-primary text-primary font-monospace fs-11">{{ __('crm.revenue_cycle_setting') }}</span>
                 </div>
                 <div class="card-body p-4">
                     <form action="{{ route('crm.settings.update-invoicing-policy') }}" method="POST">
                         @csrf
                         <div class="mb-4">
-                            <label class="form-label fw-bold text-dark fs-13">Select Default Invoicing Policy</label>
+                            <label class="form-label fw-bold text-dark fs-13">{{ __('crm.select_default_invoicing_policy') }}</label>
                             <p class="text-muted fs-12 mb-3">
-                                Controls how customer invoices are generated in the system and configures option visibility on the Generate Invoice screen.
+                                {{ __('crm.controls_how_invoices_generated') }}
                             </p>
 
                             <div class="row g-3">
@@ -46,12 +46,12 @@
                                         <label class="form-check-label ms-2 cursor-pointer w-100" for="policy_so">
                                             <div class="d-flex align-items-center justify-content-between">
                                                 <span class="fw-bold text-dark fs-14">
-                                                    <i class="feather-file-text me-1.5 text-primary"></i>Against Sales Order Only
+                                                    <i class="feather-file-text me-1.5 text-primary"></i>{{ __('crm.against_sales_order_only') }}
                                                 </span>
-                                                <span class="badge bg-soft-primary text-primary fs-11">Order-Based Billing</span>
+                                                <span class="badge bg-soft-primary text-primary fs-11">{{ __('crm.order_based_billing') }}</span>
                                             </div>
                                             <div class="text-muted fs-12 mt-1">
-                                                Invoices are generated directly against Sales Orders. Hides the top 3-mode selection radio bar on the Generate Invoice screen and defaults strictly to Sales Order mode.
+                                                {{ __('crm.so_only_policy_desc') }}
                                             </div>
                                         </label>
                                     </div>
@@ -64,12 +64,12 @@
                                         <label class="form-check-label ms-2 cursor-pointer w-100" for="policy_do">
                                             <div class="d-flex align-items-center justify-content-between">
                                                 <span class="fw-bold text-dark fs-14">
-                                                    <i class="feather-truck me-1.5 text-info"></i>Against Dispatch Order Only
+                                                    <i class="feather-truck me-1.5 text-info"></i>{{ __('crm.against_dispatch_order_only') }}
                                                 </span>
-                                                <span class="badge bg-soft-info text-info fs-11">Delivery-Based Billing</span>
+                                                <span class="badge bg-soft-info text-info fs-11">{{ __('crm.delivery_based_billing') }}</span>
                                             </div>
                                             <div class="text-muted fs-12 mt-1">
-                                                Invoices are generated strictly against Dispatch / Delivery Orders. Hides the top 3-mode selection radio bar on the Generate Invoice screen and defaults to Dispatch Order mode.
+                                                {{ __('crm.do_only_policy_desc') }}
                                             </div>
                                         </label>
                                     </div>
@@ -82,12 +82,12 @@
                                         <label class="form-check-label ms-2 cursor-pointer w-100" for="policy_both">
                                             <div class="d-flex align-items-center justify-content-between">
                                                 <span class="fw-bold text-dark fs-14">
-                                                    <i class="feather-layers me-1.5 text-success"></i>Both Options Allowed (Flexible Mode)
+                                                    <i class="feather-layers me-1.5 text-success"></i>{{ __('crm.both_options_allowed_flexible') }}
                                                 </span>
-                                                <span class="badge bg-soft-success text-success fs-11">Default Full Access</span>
+                                                <span class="badge bg-soft-success text-success fs-11">{{ __('crm.default_full_access') }}</span>
                                             </div>
                                             <div class="text-muted fs-12 mt-1">
-                                                Allows full flexibility. Displays the 3-mode selection radio bar (Against Sales Order, Against Dispatch Order, Standalone Direct Invoice) on top of the Generate Invoice screen for user selection.
+                                                {{ __('crm.both_policy_desc') }}
                                             </div>
                                         </label>
                                     </div>
@@ -97,7 +97,7 @@
 
                         <div class="d-flex justify-content-end pt-3 border-top">
                             <button type="submit" class="btn btn-primary fw-semibold px-4">
-                                <i class="feather-save me-1.5"></i>Save Settings
+                                <i class="feather-save me-1.5"></i>{{ __('crm.save_settings') }}
                             </button>
                         </div>
                     </form>
@@ -108,17 +108,17 @@
             <div class="card border-0 shadow-sm rounded-3 mt-4">
                 <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
                     <h6 class="fw-bold mb-0 text-dark">
-                        <i class="feather-check-square me-2 text-primary"></i>Quotation Approval Policy
+                        <i class="feather-check-square me-2 text-primary"></i>{{ __('crm.quotation_approval_policy') }}
                     </h6>
-                    <span class="badge bg-soft-info text-info font-monospace fs-11">Approval Automation</span>
+                    <span class="badge bg-soft-info text-info font-monospace fs-11">{{ __('crm.approval_automation') }}</span>
                 </div>
                 <div class="card-body p-4">
                     <form action="{{ route('crm.settings.update-quotation-approval-policy') }}" method="POST">
                         @csrf
                         <div class="mb-4">
-                            <label class="form-label fw-bold text-dark fs-13">Select Quotation Approval Mode</label>
+                            <label class="form-label fw-bold text-dark fs-13">{{ __('crm.select_quotation_approval_mode') }}</label>
                             <p class="text-muted fs-12 mb-3">
-                                Controls whether newly created or updated quotations require explicit approval or are auto-approved upon creation.
+                                {{ __('crm.controls_quotation_approval_desc') }}
                             </p>
 
                             <div class="row g-3">
@@ -129,12 +129,12 @@
                                         <label class="form-check-label ms-2 cursor-pointer w-100" for="policy_approval_req">
                                             <div class="d-flex align-items-center justify-content-between">
                                                 <span class="fw-bold text-dark fs-14">
-                                                    <i class="feather-shield me-1.5 text-primary"></i>Require Approval (Standard Workflow)
+                                                    <i class="feather-shield me-1.5 text-primary"></i>{{ __('crm.require_approval_standard') }}
                                                 </span>
-                                                <span class="badge bg-soft-primary text-primary fs-11">Multi-Stage Approval</span>
+                                                <span class="badge bg-soft-primary text-primary fs-11">{{ __('crm.multi_stage_approval') }}</span>
                                             </div>
                                             <div class="text-muted fs-12 mt-1">
-                                                Quotations must start as Draft / Pending Approval and go through manager approval. All standard quotation status stages (Pending Approval, Approved, Rejected, etc.) are strictly maintained.
+                                                {{ __('crm.require_approval_desc') }}
                                             </div>
                                         </label>
                                     </div>
@@ -147,12 +147,12 @@
                                         <label class="form-check-label ms-2 cursor-pointer w-100" for="policy_auto_approve">
                                             <div class="d-flex align-items-center justify-content-between">
                                                 <span class="fw-bold text-dark fs-14">
-                                                    <i class="feather-check-circle me-1.5 text-success"></i>Auto-Approve (Direct Approval)
+                                                    <i class="feather-check-circle me-1.5 text-success"></i>{{ __('crm.auto_approve_direct') }}
                                                 </span>
-                                                <span class="badge bg-soft-success text-success fs-11">Fast-Track Mode</span>
+                                                <span class="badge bg-soft-success text-success fs-11">{{ __('crm.fast_track_mode') }}</span>
                                             </div>
                                             <div class="text-muted fs-12 mt-1">
-                                                Bypasses manual approval. Quotations are automatically saved with status "Approved" immediately upon creation, allowing instant sharing and conversion.
+                                                {{ __('crm.auto_approve_desc') }}
                                             </div>
                                         </label>
                                     </div>
@@ -162,7 +162,7 @@
 
                         <div class="d-flex justify-content-end pt-3 border-top">
                             <button type="submit" class="btn btn-primary fw-semibold px-4">
-                                <i class="feather-save me-1.5"></i>Save Approval Policy
+                                <i class="feather-save me-1.5"></i>{{ __('crm.save_approval_policy') }}
                             </button>
                         </div>
                     </form>
@@ -173,27 +173,27 @@
         <div class="col-lg-4">
             <div class="card border-0 shadow-sm rounded-3">
                 <div class="card-body p-4">
-                    <h6 class="fw-bold text-dark mb-3"><i class="feather-info me-2 text-primary"></i>Invoicing Policy Summary</h6>
+                    <h6 class="fw-bold text-dark mb-3"><i class="feather-info me-2 text-primary"></i>{{ __('crm.invoicing_policy_summary') }}</h6>
                     <p class="text-muted fs-12 leading-relaxed mb-3">
-                        Choosing an Invoicing Policy helps streamline your billing process according to your enterprise workflow:
+                        {{ __('crm.choosing_invoicing_policy_intro') }}
                     </p>
                     <ul class="text-muted fs-12 ps-3 mb-0">
-                        <li class="mb-2"><strong>Order-Based:</strong> Best for prepayments, advance billing, or services.</li>
-                        <li class="mb-2"><strong>Delivery-Based:</strong> Best for physical goods manufacturing & trading where billing depends on actual dispatched quantities.</li>
-                        <li><strong>Flexible Mode:</strong> Recommended if your business uses a mix of both workflows.</li>
+                        <li class="mb-2"><strong>{{ __('crm.order_based_colon') }}</strong> {{ __('crm.order_based_summary_desc') }}</li>
+                        <li class="mb-2"><strong>{{ __('crm.delivery_based_colon') }}</strong> {{ __('crm.delivery_based_summary_desc') }}</li>
+                        <li><strong>{{ __('crm.flexible_mode_colon') }}</strong> {{ __('crm.flexible_mode_summary_desc') }}</li>
                     </ul>
                 </div>
             </div>
 
             <div class="card border-0 shadow-sm rounded-3 mt-4">
                 <div class="card-body p-4">
-                    <h6 class="fw-bold text-dark mb-3"><i class="feather-help-circle me-2 text-info"></i>Approval Policy Summary</h6>
+                    <h6 class="fw-bold text-dark mb-3"><i class="feather-help-circle me-2 text-info"></i>{{ __('crm.approval_policy_summary') }}</h6>
                     <p class="text-muted fs-12 leading-relaxed mb-3">
-                        Configure quotation approval based on your sales authority structure:
+                        {{ __('crm.configure_approval_intro') }}
                     </p>
                     <ul class="text-muted fs-12 ps-3 mb-0">
-                        <li class="mb-2"><strong>Standard Approval:</strong> Requires managerial check before quotes can be dispatched or accepted.</li>
-                        <li><strong>Auto-Approve:</strong> Ideal for flat teams or fast-paced sales where representatives issue quotes directly.</li>
+                        <li class="mb-2"><strong>{{ __('crm.standard_approval_colon') }}</strong> {{ __('crm.standard_approval_summary_desc') }}</li>
+                        <li><strong>{{ __('crm.auto_approve_colon') }}</strong> {{ __('crm.auto_approve_summary_desc') }}</li>
                     </ul>
                 </div>
             </div>

@@ -1,23 +1,23 @@
 @extends('layouts.duralux')
 
-@section('title', 'Sales Returns | SaaS ERP')
-@section('page-title', 'Sales Returns')
-@section('breadcrumb', 'Sales / Returns')
+@section('title', __('crm.sales_returns') . ' | SaaS ERP')
+@section('page-title', __('crm.sales_returns'))
+@section('breadcrumb', __('crm.sales') . ' / ' . __('crm.sales_returns'))
 
 @section('page-actions')
     <div class="d-flex gap-2">
         <a href="{{ route('sales.returns.create') }}" class="btn btn-primary">
-            <i class="feather-plus me-2"></i>Create Return
+            <i class="feather-plus me-2"></i>{{ __('crm.create_return') }}
         </a>
     </div>
 @endsection
 
 @section('content')
 
-    <div class="card border-0 shadow-sm">
+    <div class="erp-single-panel single-panal-erp card border-0 shadow-sm">
         <div class="card-header bg-transparent border-bottom py-3">
             <h5 class="card-title mb-0 fw-bold text-dark">
-                <i class="feather-rotate-ccw me-2 text-primary"></i>Sales Returns (Credit Notes)
+                <i class="feather-rotate-ccw me-2 text-primary"></i>{{ __('crm.sales_returns_credit_notes') }}
             </h5>
         </div>
         <div class="card-body p-0">
@@ -25,13 +25,13 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                         <tr>
-                            <th class="ps-4">Return Number</th>
-                            <th>Date</th>
-                            <th>Sales Order</th>
-                            <th>Customer</th>
-                            <th class="text-end">Refund Amount</th>
-                            <th>Status</th>
-                            <th class="text-end pe-4">Actions</th>
+                            <th class="ps-4">{{ __('crm.return_number') }}</th>
+                            <th>{{ __('crm.date') }}</th>
+                            <th>{{ __('crm.sales_order_ref') }}</th>
+                            <th>{{ __('crm.customer') }}</th>
+                            <th class="text-end">{{ __('crm.refund_amount') }}</th>
+                            <th>{{ __('crm.status') }}</th>
+                            <th class="text-end pe-4">{{ __('crm.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody class="fs-13 text-dark">
@@ -49,7 +49,7 @@
                                             {{ $ret->salesOrder->sales_order_number }}
                                         </a>
                                     @else
-                                        <span class="badge bg-soft-success text-success font-monospace">Direct Return</span>
+                                        <span class="badge bg-soft-success text-success font-monospace">{{ __('crm.direct_return_badge') }}</span>
                                     @endif
                                 </td>
                                 <td>
@@ -63,7 +63,7 @@
                                                 ? $ret->total_amount
                                                 : $ret->items->sum(fn($i) => (float)$i->quantity * (float)$i->unit_price));
                                     @endphp
-                                    ₹{{ number_format($retTotal, 2) }}
+                                    {{ format_currency($retTotal) }}
                                 </td>
                                 <td>
                                     @php
@@ -76,7 +76,7 @@
                                 </td>
                                 <td class="text-end pe-4">
                                     <div class="d-flex justify-content-end gap-2 align-items-center">
-                                        <a href="{{ route('sales.returns.show', $ret->id) }}" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="View Return Details">
+                                        <a href="{{ route('sales.returns.show', $ret->id) }}" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="{{ __('crm.view_return_details') }}">
                                             <i class="feather feather-eye"></i>
                                         </a>
                                     </div>
@@ -86,7 +86,7 @@
                             <tr>
                                 <td colspan="7" class="text-center py-5 text-muted">
                                     <i class="feather-rotate-ccw fs-1 mb-2 d-block text-gray-300"></i>
-                                    No sales returns processed yet.
+                                    {{ __('crm.no_sales_returns_processed') }}
                                 </td>
                             </tr>
                         @endforelse
@@ -96,3 +96,4 @@
         </div>
     </div>
 @endsection
+

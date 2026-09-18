@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'New Stock Transfer | SaaS ERP')
-@section('page-title', 'New Stock Transfer')
-@section('breadcrumb', 'Inventory / Stock Transfers / Create')
+@section('title', __('inventory.new_stock_transfer') . ' | SaaS ERP')
+@section('page-title', __('inventory.new_stock_transfer'))
+@section('breadcrumb', __('inventory.stock_transfers_create'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -35,49 +35,49 @@
             <!-- Header Bar -->
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2 flex-wrap gap-2">
                 <div>
-                    <h4 class="fw-bold text-dark mb-0">New Stock Transfer</h4>
-                    <span class="fs-12 text-muted">Create an inter-warehouse inventory movement order with real-time stock validation.</span>
+                    <h4 class="fw-bold text-dark mb-0">{{ __('inventory.new_stock_transfer') }}</h4>
+                    <span class="fs-12 text-muted">{{ __('inventory.new_stock_transfer_help') }}</span>
                 </div>
                 <div class="d-flex gap-2">
-                    <x-ui.button href="{{ route('inventory.transfers.index') }}" variant="light" class="border">Discard</x-ui.button>
-                    <x-ui.button type="submit" variant="primary" icon="feather-check" id="submitBtn">Create Transfer</x-ui.button>
+                    <x-ui.button href="{{ route('inventory.transfers.index') }}" variant="light" class="border">{{ __('inventory.discard') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" icon="feather-check" id="submitBtn">{{ __('inventory.create_transfer') }}</x-ui.button>
                 </div>
             </div>
 
             <!-- Form Grid -->
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="From Warehouse" name="from_warehouse_id" id="fromWarehouseSelect" class="select2-select" :required="true" :error-text="$errors->first('from_warehouse_id')">
-                        <option value="">Select Source Warehouse</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('inventory.from_warehouse')" name="from_warehouse_id" id="fromWarehouseSelect" class="select2-select" :required="true" :error-text="$errors->first('from_warehouse_id')">
+                        <option value="">{{ __('inventory.select_source_warehouse') }}</option>
                         @foreach($warehouses as $wh)
                             <option value="{{ $wh->id }}" {{ old('from_warehouse_id') == $wh->id ? 'selected' : '' }}>{{ $wh->name }}</option>
                         @endforeach
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="To Warehouse" name="to_warehouse_id" id="toWarehouseSelect" class="select2-select" :required="true" :error-text="$errors->first('to_warehouse_id')">
-                        <option value="">Select Target Warehouse</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('inventory.to_warehouse')" name="to_warehouse_id" id="toWarehouseSelect" class="select2-select" :required="true" :error-text="$errors->first('to_warehouse_id')">
+                        <option value="">{{ __('inventory.select_target_warehouse') }}</option>
                         @foreach($warehouses as $wh)
                             <option value="{{ $wh->id }}" {{ old('to_warehouse_id') == $wh->id ? 'selected' : '' }}>{{ $wh->name }}</option>
                         @endforeach
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="Transfer Date" name="transfer_date" value="{{ old('transfer_date', date('Y-m-d')) }}" :required="true" :error-text="$errors->first('transfer_date')" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" :label="__('inventory.transfer_date')" name="transfer_date" value="{{ old('transfer_date', date('Y-m-d')) }}" :required="true" :error-text="$errors->first('transfer_date')" />
                 </div>
                 <div class="col-md-12">
-                    <x-ui.odoo-form-ui type="textarea" label="Notes / Reason" name="notes" rows="2" placeholder="Optional transfer comments..." :error-text="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
+                    <x-ui.odoo-form-ui type="textarea" :label="__('inventory.notes_reason')" name="notes" rows="2" :placeholder="__('inventory.optional_transfer_comments')" :error-text="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
                 </div>
             </div>
 
             <!-- Line Items Table Section -->
             <div class="border-top pt-4">
                 <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-                    <h5 class="fw-bold text-dark mb-0 fs-14"><i class="feather-layers text-primary me-2"></i>Items to Transfer</h5>
+                    <h5 class="fw-bold text-dark mb-0 fs-14"><i class="feather-layers text-primary me-2"></i>{{ __('inventory.items_to_transfer') }}</h5>
                     <div class="d-flex align-items-center gap-2" style="width: 420px;">
                         <div class="input-group input-group-sm shadow-2xs rounded overflow-hidden" style="border: 1px solid #cbd5e1 !important;">
                             <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
-                            <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
+                            <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="{{ __('inventory.scan_barcode_sku_placeholder') }}" autocomplete="off" style="font-size: 13px;">
                             <button type="button" class="btn btn-primary border-0 px-3" id="fastBarcodeScanBtn"><i class="feather-search"></i></button>
                         </div>
                     </div>
@@ -87,9 +87,9 @@
                     <x-ui.odoo-form-ui type="table" id="items-table">
                         <thead class="table-light fs-12">
                             <tr>
-                                <th style="width: 45%;" class="ps-3">Product <span class="text-danger">*</span></th>
-                                <th style="width: 15%;" class="text-center">Quantity <span class="text-danger">*</span></th>
-                                <th style="width: 35%;">Serial Numbers (Comma separated)</th>
+                                <th style="width: 45%;" class="ps-3">{{ __('inventory.product') }} <span class="text-danger">*</span></th>
+                                <th style="width: 15%;" class="text-center">{{ __('inventory.quantity') }} <span class="text-danger">*</span></th>
+                                <th style="width: 35%;">{{ __('inventory.serial_numbers_comma') }}</th>
                                 <th style="width: 5%;" class="text-center"></th>
                             </tr>
                         </thead>
@@ -97,7 +97,7 @@
                             <tr class="transfer-row">
                                 <td class="ps-3 align-top py-3">
                                     <select name="items[0][product_id]" class="form-select odoo-table-select product-select" required>
-                                        <option value="">Select Product</option>
+                                        <option value="">{{ __('inventory.select_product') }}</option>
                                         @foreach($products as $prod)
                                             <option value="{{ $prod->id }}">{{ $prod->name }} (SKU: {{ $prod->sku }})</option>
                                         @endforeach
@@ -106,20 +106,20 @@
                                     <!-- Enterprise Live Stock Status Badge -->
                                     <div class="stock-badge-container d-flex align-items-center flex-wrap gap-1 mt-1" style="display: none !important;">
                                         <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 rounded-pill fw-medium">
-                                            <i class="feather-check-circle me-1"></i>Net Avail: <span class="avail-val">0</span>
+                                            <i class="feather-check-circle me-1"></i>{{ __('inventory.net_avail') }}: <span class="avail-val">0</span>
                                         </span>
                                         <span class="badge bg-soft-warning text-warning border border-warning-subtle px-2 py-0.5 rounded-pill fw-medium">
-                                            Reserved: <span class="res-val">0</span>
+                                            {{ __('inventory.reserved') }}: <span class="res-val">0</span>
                                         </span>
                                         <span class="badge bg-soft-secondary text-muted border border-secondary-subtle px-2 py-0.5 rounded-pill fw-medium">
-                                            Physical: <span class="phys-val">0</span>
+                                            {{ __('inventory.physical') }}: <span class="phys-val">0</span>
                                         </span>
                                     </div>
                                 </td>
                                 <td class="text-center align-top py-3">
-                                    <input type="number" name="items[0][quantity]" class="odoo-table-input text-center qty-input mx-auto" step="0.01" min="0.01" placeholder="Qty" value="1" required style="width: 100px;" data-max-avail="999999">
+                                    <input type="number" name="items[0][quantity]" class="odoo-table-input text-center qty-input mx-auto" step="0.01" min="0.01" placeholder="{{ __('inventory.qty') }}" value="1" required style="width: 100px;" data-max-avail="999999">
                                     <div class="stock-error-text">
-                                        <i class="feather-alert-triangle me-1"></i>Exceeds Available Stock (<span class="max-avail-display">0</span>)!
+                                        <i class="feather-alert-triangle me-1"></i><span class="error-msg-text">Exceeds Available Stock</span> (<span class="max-avail-display">0</span>)!
                                     </div>
                                 </td>
                                 <td class="align-top py-3">
@@ -137,15 +137,15 @@
 
                 <div class="mt-3">
                     <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="add-item" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
-                        <i class="feather-plus me-1"></i>Add a product item
+                        <i class="feather-plus me-1"></i>{{ __('inventory.add_product_item') }}
                     </button>
                 </div>
             </div>
 
             <!-- Footer Action Bar -->
             <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                <x-ui.button href="{{ route('inventory.transfers.index') }}" variant="light" class="border px-4">Discard</x-ui.button>
-                <x-ui.button type="submit" variant="primary" icon="feather-check" class="px-4">Save Stock Transfer</x-ui.button>
+                <x-ui.button href="{{ route('inventory.transfers.index') }}" variant="light" class="border px-4">{{ __('inventory.discard') }}</x-ui.button>
+                <x-ui.button type="submit" variant="primary" icon="feather-check" class="px-4">{{ __('inventory.save_stock_transfer') }}</x-ui.button>
             </div>
         </x-ui.odoo-form-ui>
     </form>

@@ -759,12 +759,13 @@
                                 $('#dupAccountNameText').text(res.account_name + ' (' + res.account_number + ')');
                                 $('#dupAccountGstinText').text(res.gstin || 'N/A');
                                 
-                                $('#dupRevenueContainer').html('<span><i class="feather-dollar-sign me-1 text-success"></i>Lifetime Revenue: <strong id="dupAccountRevenueText" class="text-success">₹' + res.lifetime_revenue + '</strong></span>');
-                                $('#dupDealsContainer').html('<span><i class="feather-layers me-1 text-info"></i>Active Deals: <strong id="dupAccountDealsText" class="text-dark">' + res.open_deals_count + ' Open Deals</strong></span>');
-                                $('#dupDateContainer').html('<span><i class="feather-calendar me-1 text-primary"></i>Last Purchase: <strong id="dupAccountLastPurchaseText" class="text-dark">' + res.last_purchase_date + '</strong></span>');
+                                var currSym = window.AppCurrency?.symbol || @json(active_currency_symbol());
+                                $('#dupRevenueContainer').html('<span><i class="feather-dollar-sign me-1 text-success"></i>{{ __('crm.lifetime_revenue') }}: <strong id="dupAccountRevenueText" class="text-success">' + currSym + res.lifetime_revenue + '</strong></span>');
+                                $('#dupDealsContainer').html('<span><i class="feather-layers me-1 text-info"></i>{{ __('crm.active_deals') }}: <strong id="dupAccountDealsText" class="text-dark">' + res.open_deals_count + ' {{ __('crm.open_deals') }}</strong></span>');
+                                $('#dupDateContainer').html('<span><i class="feather-calendar me-1 text-primary"></i>{{ __('crm.last_purchase') }}: <strong id="dupAccountLastPurchaseText" class="text-dark">' + res.last_purchase_date + '</strong></span>');
                                 
-                                $('#dupViewAccountBtn').html('<i class="feather-external-link me-1"></i>View Account').attr('href', '/crm/accounts/' + res.account_id);
-                                $('#dupCreateDealBtn').show().html('<i class="feather-plus me-1"></i>Create New Deal').attr('href', '/crm/deals/create?account_id=' + res.account_id);
+                                $('#dupViewAccountBtn').html('<i class="feather-external-link me-1"></i>{{ __('crm.view_account') }}').attr('href', '/crm/accounts/' + res.account_id);
+                                $('#dupCreateDealBtn').show().html('<i class="feather-plus me-1"></i>{{ __('crm.create_new_deal') }}').attr('href', '/crm/deals/create?account_id=' + res.account_id);
                                 
                                 showDuplicateModal();
                             } else if (res.is_duplicate) {
@@ -777,7 +778,8 @@
                                 $('#dupAccountNameText').text(leadName);
                                 $('#dupAccountGstinText').text('Lead #' + (res.lead ? res.lead.id : ''));
                                 
-                                $('#dupRevenueContainer').html('<span><i class="feather-dollar-sign me-1 text-success"></i>Expected Amount: <strong id="dupAccountRevenueText" class="text-success">₹' + expAmt + '</strong></span>');
+                                var currSym = window.AppCurrency?.symbol || @json(active_currency_symbol());
+                                $('#dupRevenueContainer').html('<span><i class="feather-dollar-sign me-1 text-success"></i>Expected Amount: <strong id="dupAccountRevenueText" class="text-success">' + currSym + expAmt + '</strong></span>');
                                 $('#dupDealsContainer').html('<span><i class="feather-tag me-1 text-info"></i>Status: <strong id="dupAccountDealsText" class="text-dark">' + (res.lead ? (res.lead.status || 'New') : 'N/A') + '</strong></span>');
                                 $('#dupDateContainer').html('<span><i class="feather-calendar me-1 text-primary"></i>Created On: <strong id="dupAccountLastPurchaseText" class="text-dark">' + createdAt + '</strong></span>');
 
@@ -907,7 +909,7 @@
                         </div>
                         <div class="row g-2 fs-12 text-muted mt-1">
                             <div class="col-6" id="dupRevenueContainer">
-                                <span><i class="feather-dollar-sign me-1 text-success"></i>Revenue: <strong id="dupAccountRevenueText" class="text-success">₹0.00</strong></span>
+                                <span><i class="feather-dollar-sign me-1 text-success"></i>Revenue: <strong id="dupAccountRevenueText" class="text-success">{{ active_currency_symbol() }}0.00</strong></span>
                             </div>
                             <div class="col-6" id="dupDealsContainer">
                                 <span><i class="feather-layers me-1 text-info"></i>Active: <strong id="dupAccountDealsText" class="text-dark">0 Deals</strong></span>

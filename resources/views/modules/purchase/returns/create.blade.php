@@ -23,7 +23,6 @@
             <x-ui.odoo-form-ui type="sheet">
                 <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
                     <h5 class="fw-bold text-dark mb-0">Purchase Return Details</h5>
-                    <x-ui.button href="{{ route('purchase.returns.index') }}" variant="light" size="sm" class="border">Cancel</x-ui.button>
                 </div>
 
                 <!-- 2-Mode Selection Radio Bar -->
@@ -122,8 +121,8 @@
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                    <x-ui.button href="{{ route('purchase.returns.index') }}" variant="light" size="md" class="border">Discard</x-ui.button>
-                    <x-ui.button type="submit" variant="primary" size="md" class="fw-bold">Save Return</x-ui.button>
+                    <x-ui.button href="{{ route('purchase.returns.index') }}" variant="light" class="border">Discard</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" class="fw-bold">Save Return</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

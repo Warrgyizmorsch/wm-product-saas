@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Stock Reservations | SaaS ERP')
-@section('page-title', 'Active Stock Reservations')
-@section('breadcrumb', 'Inventory / Stock Reservations')
+@section('title', __('inventory.stock_reservations') . ' | SaaS ERP')
+@section('page-title', __('inventory.stock_reservations'))
+@section('breadcrumb', __('inventory.inventory_stock_reservations'))
 
 @section('content')
 
@@ -17,19 +17,19 @@
             <!-- Toolbar: Tabs, Sort & Filters -->
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4 pb-3 border-bottom">
                 <div class="d-flex align-items-center flex-wrap gap-2">
-                    <h5 class="fw-bold text-dark mb-0 me-2">Stock Reservations Listing</h5>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="btn btn-xs {{ !request('status') ? 'btn-dark text-white fw-bold' : 'btn-light text-muted border' }}">
-                        All Reservations
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => 'Active']) }}" class="btn btn-xs {{ request('status') === 'Active' ? 'btn-soft-warning text-warning border border-warning-subtle fw-bold' : 'btn-light text-muted border' }}">
-                        Active
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => 'Completed']) }}" class="btn btn-xs {{ request('status') === 'Completed' ? 'btn-soft-success text-success border border-success-subtle fw-bold' : 'btn-light text-muted border' }}">
-                        Released
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => 'Expired']) }}" class="btn btn-xs {{ request('status') === 'Expired' ? 'btn-soft-danger text-danger border border-danger-subtle fw-bold' : 'btn-light text-muted border' }}">
-                        Expired
-                    </a>
+                    <h5 class="fw-bold text-dark mb-0 me-2">{{ __('inventory.stock_reservations_listing') }}</h5>
+                    <x-ui.button href="{{ request()->fullUrlWithQuery(['status' => null]) }}" variant="{{ !request('status') ? 'primary' : 'light' }}" class="{{ !request('status') ? '' : 'text-muted border' }}">
+                        {{ __('inventory.all_reservations') }}
+                    </x-ui.button>
+                    <x-ui.button href="{{ request()->fullUrlWithQuery(['status' => 'Active']) }}" variant="{{ request('status') === 'Active' ? 'primary' : 'light' }}" class="{{ request('status') === 'Active' ? '' : 'text-muted border' }}">
+                        {{ __('inventory.active') }}
+                    </x-ui.button>
+                    <x-ui.button href="{{ request()->fullUrlWithQuery(['status' => 'Completed']) }}" variant="{{ request('status') === 'Completed' ? 'primary' : 'light' }}" class="{{ request('status') === 'Completed' ? '' : 'text-muted border' }}">
+                        {{ __('inventory.released') }}
+                    </x-ui.button>
+                    <x-ui.button href="{{ request()->fullUrlWithQuery(['status' => 'Expired']) }}" variant="{{ request('status') === 'Expired' ? 'primary' : 'light' }}" class="{{ request('status') === 'Expired' ? '' : 'text-muted border' }}">
+                        {{ __('inventory.expired') }}
+                    </x-ui.button>
                 </div>
 
                 <div class="d-flex align-items-center flex-wrap gap-2">
@@ -42,44 +42,44 @@
                             type="text" 
                             name="search" 
                             class="form-control border-0 bg-transparent p-0 fs-13" 
-                            placeholder="Product name or SKU..." 
+                            placeholder="{{ __('inventory.search_product_sku_placeholder') }}" 
                             value="{{ request('search') }}"
                             style="box-shadow: none; height: 32px; width: 220px;"
                         >
                     </form>
 
                     <!-- Custom Sort Component -->
-                    <x-ui.sort-dropdown label="Sort">
+                    <x-ui.sort-dropdown :label="__('inventory.sort')">
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'desc' ? 'active' : '' }}">
-                            <span>Latest Created</span>
+                            <span>{{ __('inventory.latest_created') }}</span>
                         </a>
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'asc' ? 'active' : '' }}">
-                            <span>Oldest Created</span>
+                            <span>{{ __('inventory.oldest_created') }}</span>
                         </a>
                         <div class="dropdown-divider"></div>
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'reserved_qty', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'reserved_qty' && $sortOrder === 'desc' ? 'active' : '' }}">
-                            <span>Highest Reserved Qty</span>
+                            <span>{{ __('inventory.highest_reserved_qty') }}</span>
                         </a>
                     </x-ui.sort-dropdown>
 
                     <!-- System Filter Component -->
                     <form method="GET" action="{{ route('inventory.reservations.index') }}" class="d-inline">
-                        <x-ui.filter label="Filter" offset="0, 5">
-                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Reservations</h6>
+                        <x-ui.filter :label="__('inventory.filter')" offset="0, 5">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('inventory.filter_reservations') }}</h6>
                             
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.status') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="status">
-                                    <option value="">All Statuses</option>
-                                    <option value="Active" {{ request('status') === 'Active' ? 'selected' : '' }}>Active Reservations</option>
-                                    <option value="Completed" {{ request('status') === 'Completed' ? 'selected' : '' }}>Completed / Released</option>
-                                    <option value="Expired" {{ request('status') === 'Expired' ? 'selected' : '' }}>Expired</option>
+                                    <option value="">{{ __('inventory.all_statuses') }}</option>
+                                    <option value="Active" {{ request('status') === 'Active' ? 'selected' : '' }}>{{ __('inventory.active_reservations') }}</option>
+                                    <option value="Completed" {{ request('status') === 'Completed' ? 'selected' : '' }}>{{ __('inventory.completed_released') }}</option>
+                                    <option value="Expired" {{ request('status') === 'Expired' ? 'selected' : '' }}>{{ __('inventory.expired') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('inventory.reservations.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                                <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                                <a href="{{ route('inventory.reservations.index') }}" class="btn btn-sm btn-light border">{{ __('inventory.reset') }}</a>
+                                <button type="submit" class="btn btn-sm btn-primary">{{ __('inventory.apply_filters') }}</button>
                             </div>
                         </x-ui.filter>
                     </form>
@@ -94,13 +94,13 @@
                             <th style="width: 3%" class="text-center">
                                 <input type="checkbox" class="form-check-input">
                             </th>
-                            <th>Product Name</th>
-                            <th>Warehouse</th>
-                            <th class="text-end">Reserved Qty</th>
-                            <th>Reference Doc</th>
-                            <th>Expires At</th>
-                            <th class="text-center">Status</th>
-                            <th class="text-end pe-4">Actions</th>
+                            <th>{{ __('inventory.product_name') }}</th>
+                            <th>{{ __('inventory.warehouse') }}</th>
+                            <th class="text-end">{{ __('inventory.reserved_qty') }}</th>
+                            <th>{{ __('inventory.reference_doc') }}</th>
+                            <th>{{ __('inventory.expires_at') }}</th>
+                            <th class="text-center">{{ __('inventory.status') }}</th>
+                            <th class="text-end pe-4">{{ __('inventory.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody class="text-dark">
@@ -134,7 +134,7 @@
                                 </td>
                                 <td>
                                     <span class="text-muted fs-12">
-                                        <i class="feather-clock me-1 text-muted fs-11"></i>{{ $res->expires_at ? \Carbon\Carbon::parse($res->expires_at)->format('d M Y, h:i A') : 'No Expiry' }}
+                                        <i class="feather-clock me-1 text-muted fs-11"></i>{{ $res->expires_at ? \Carbon\Carbon::parse($res->expires_at)->format('d M Y, h:i A') : __('inventory.no_expiry') }}
                                     </span>
                                 </td>
                                 <td class="text-center">
@@ -146,8 +146,8 @@
                                         <li>
                                             <form action="{{ route('inventory.reservations.release', $res->id) }}" method="POST" id="releaseForm_{{ $res->id }}">
                                                 @csrf
-                                                <button type="button" class="dropdown-item text-danger fw-semibold" onclick="if(confirm('Are you sure you want to release this stock reservation?')) document.getElementById('releaseForm_{{ $res->id }}').submit();">
-                                                    <i class="feather-unlock me-2 text-danger fs-12"></i>Release Stock
+                                                <button type="button" class="dropdown-item text-danger fw-semibold" onclick="if(confirm('{{ __('inventory.confirm_release_reservation') }}')) document.getElementById('releaseForm_{{ $res->id }}').submit();">
+                                                    <i class="feather-unlock me-2 text-danger fs-12"></i>{{ __('inventory.release_stock') }}
                                                 </button>
                                             </form>
                                         </li>
@@ -159,7 +159,7 @@
                         <tr>
                             <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="feather-lock fs-1 d-block mb-3 text-light"></i>
-                                No stock reservations found.
+                                {{ __('inventory.no_stock_reservations_found') }}
                             </td>
                         </tr>
                     @endforelse

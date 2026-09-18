@@ -138,7 +138,7 @@ $masterDefinitions = [
     @if(isset($masterDefinitions[$masterKey]))
         @php $def = $masterDefinitions[$masterKey]; @endphp
         @if($masterKey === 'contact' || \Illuminate\Support\Facades\Route::has($def['route']))
-        <x-ui.modal id="quickCreateModal_{{ $masterKey }}" title="Quick Create {{ $def['label'] }}" size="{{ in_array($masterKey, ['product', 'contact', 'customer']) ? 'lg' : '' }}">
+        <x-ui.modal id="quickCreateModal_{{ $masterKey }}" :title="$masterKey === 'customer' ? __('crm.quick_create_customer') : ($masterKey === 'contact' ? (__('crm.quick_create') . ' ' . __('crm.contact_person')) : ('Quick Create ' . $def['label']))" size="{{ in_array($masterKey, ['product', 'contact', 'customer']) ? 'lg' : '' }}">
             @if($masterKey === 'product')
                 <!-- Handcrafted Premium Product Modal layout matching Inventory Create screen section headers -->
                 <div data-action="{{ route('products.quick-create') }}"
@@ -338,65 +338,65 @@ $masterDefinitions = [
                     <div class="row g-4 text-dark fs-13">
                         <!-- Column 1: Primary Details -->
                         <div class="col-md-6 border-end-md">
-                            <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-1.5"></i>Basic Information</h6>
+                            <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-1.5"></i>{{ __('crm.basic_information') }}</h6>
                             
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="text"
-                                label="Customer Name"
+                                :label="__('crm.customer_name')"
                                 name="name"
-                                placeholder="e.g. Acme Corp or Manish Patidar"
+                                :placeholder="__('crm.customer_name_placeholder')"
                                 :required="true"
                             />
 
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="text"
-                                label="GSTIN / Tax ID"
+                                :label="__('crm.gstin_tax_id')"
                                 name="gstin"
-                                placeholder="e.g. 22AAAAA0000A1Z5"
+                                :placeholder="__('crm.gstin_placeholder')"
                             />
 
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="email"
-                                label="Email Address"
+                                :label="__('crm.email_address')"
                                 name="email"
-                                placeholder="e.g. contact@acme.com"
+                                :placeholder="__('crm.company_email_placeholder')"
                                 :required="true"
                             />
 
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="tel"
-                                label="Phone Number"
+                                :label="__('crm.phone_number')"
                                 name="phone"
-                                placeholder="e.g. +91 9876543210"
+                                :placeholder="__('crm.company_phone_placeholder')"
                             />
                         </div>
 
                         <!-- Column 2: Address Details -->
                         <div class="col-md-6">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="fw-bold text-primary mb-0"><i class="feather-map-pin me-1.5"></i>Address Details</h6>
+                                <h6 class="fw-bold text-primary mb-0"><i class="feather-map-pin me-1.5"></i>{{ __('crm.address_information') }}</h6>
                                 <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 fs-12 text-primary" onclick="var b = document.querySelector('#quickCreateForm_customer [name=billing_address]'); var s = document.querySelector('#quickCreateForm_customer [name=shipping_address]'); if(b && s) s.value = b.value;">
-                                    <i class="feather-copy me-1"></i>Copy Billing to Shipping
+                                    <i class="feather-copy me-1"></i>{{ __('crm.copy_billing_shipping') }}
                                 </button>
                             </div>
 
                             <x-ui.odoo-form-ui
                                 type="textarea"
-                                label="Billing Address"
+                                :label="__('crm.billing_address')"
                                 name="billing_address"
-                                placeholder="Street, City, State, Pincode..."
+                                :placeholder="__('crm.address_placeholder')"
                                 :rows="3"
                             />
 
                             <x-ui.odoo-form-ui
                                 type="textarea"
-                                label="Shipping Address"
+                                :label="__('crm.shipping_address')"
                                 name="shipping_address"
-                                placeholder="Street, City, State, Pincode..."
+                                :placeholder="__('crm.address_placeholder')"
                                 :rows="3"
                             />
                         </div>
@@ -449,11 +449,11 @@ $masterDefinitions = [
                 </div>
             @endif
             <x-slot name="footer">
-                <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('crm.cancel') }}</button>
                 <button type="button"
                         class="btn btn-primary btn-save-master"
                         data-form="quickCreateForm_{{ $masterKey }}">
-                    Save {{ $def['label'] }}
+                    {{ $masterKey === 'customer' ? __('crm.save_customer') : ($masterKey === 'contact' ? __('crm.save_contact') : ('Save ' . $def['label'])) }}
                 </button>
             </x-slot>
         </x-ui.modal>

@@ -270,7 +270,7 @@
 
                     <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
                         <span class="text-muted">Total Amount Received:</span>
-                        <strong class="fw-black text-primary fs-15">₹{{ number_format($payment->amount, 2) }}</strong>
+                        <strong class="fw-black text-primary fs-15">{{ format_currency($payment->amount) }}</strong>
                     </div>
 
                     @php
@@ -280,13 +280,13 @@
 
                     <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
                         <span class="text-muted">Allocated Amount:</span>
-                        <span class="fw-bold text-dark">₹{{ number_format($allocTotal, 2) }}</span>
+                        <span class="fw-bold text-dark">{{ format_currency($allocTotal) }}</span>
                     </div>
 
                     @if($unallocated > 0)
                         <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
                             <span class="text-muted">Unallocated (Advance):</span>
-                            <span class="fw-bold text-warning">₹{{ number_format($unallocated, 2) }}</span>
+                            <span class="fw-bold text-warning">{{ format_currency($unallocated) }}</span>
                         </div>
                     @endif
 
@@ -367,7 +367,7 @@
                             {{ $alloc->invoice?->invoice_date ? date('d M Y', strtotime($alloc->invoice->invoice_date)) : '—' }}
                         </td>
                         <td class="text-end fw-bold text-dark">
-                            ₹{{ number_format($alloc->allocated_amount, 2) }}
+                            {{ format_currency($alloc->allocated_amount) }}
                         </td>
                     </tr>
                 @empty
@@ -386,7 +386,7 @@
                 <tfoot>
                     <tr>
                         <td colspan="3" class="text-end text-muted fw-semibold">Total Allocated Amount:</td>
-                        <td class="text-end" style="color:#0284c7;">₹{{ number_format($payment->allocations->sum('allocated_amount'), 2) }}</td>
+                        <td class="text-end" style="color:#0284c7;">{{ format_currency($payment->allocations->sum('allocated_amount')) }}</td>
                     </tr>
                 </tfoot>
                 @endif
@@ -415,3 +415,4 @@
 
     </div>
 @endsection
+
