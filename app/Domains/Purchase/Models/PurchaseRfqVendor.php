@@ -50,6 +50,6 @@ class PurchaseRfqVendor extends BaseModel
 
     public function rates(): HasMany
     {
-        return $this->hasMany(PurchaseRfqVendorRate::class, 'purchase_rfq_vendor_id')->orderBy('id', 'desc');
+        return $this->hasMany(PurchaseRfqVendorRate::class, 'purchase_rfq_vendor_id')->withoutGlobalScopes()->orderBy('id', 'desc');
     }
 }

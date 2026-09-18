@@ -296,13 +296,16 @@ class PurchaseRfqController extends Controller
                     ]);
 
                     foreach ($qData['rates'] as $productId => $rData) {
-                        PurchaseRfqVendorRate::updateOrCreate(
+                        PurchaseRfqVendorRate::withoutGlobalScopes()->updateOrCreate(
                             [
                                 'purchase_rfq_vendor_id' => $rfqVendor->id,
                                 'product_id' => $productId,
                             ],
                             [
-                                'rate' => $rData['rate'],
+                                'tenant_id'  => $rfq->tenant_id,
+                                'company_id' => $rfq->company_id,
+                                'branch_id'  => $rfq->branch_id,
+                                'rate'       => $rData['rate'],
                             ]
                         );
                     }
@@ -379,12 +382,15 @@ class PurchaseRfqController extends Controller
                     foreach ($quotesData[$rvId] as $productId => $qItem) {
                         if (isset($qItem['rate']) && $qItem['rate'] !== null && $qItem['rate'] !== '') {
                             $hasRates = true;
-                            PurchaseRfqVendorRate::updateOrCreate(
+                            PurchaseRfqVendorRate::withoutGlobalScopes()->updateOrCreate(
                                 [
                                     'purchase_rfq_vendor_id' => $rvId,
                                     'product_id'             => $productId,
                                 ],
                                 [
+                                    'tenant_id'     => $rfq->tenant_id,
+                                    'company_id'    => $rfq->company_id,
+                                    'branch_id'     => $rfq->branch_id,
                                     'rate'          => (float) $qItem['rate'],
                                     'quantity'      => isset($qItem['quantity']) && $qItem['quantity'] !== '' ? (float) $qItem['quantity'] : null,
                                     'delivery_date' => !empty($qItem['delivery_date']) ? $qItem['delivery_date'] : null,
@@ -545,30 +551,37 @@ class PurchaseRfqController extends Controller
             $attachmentPath = $request->file('attachment')->store('rfq_attachments', 'public');
         }
 
-        DB::transaction(function () use ($validated, $rfqVendor, $attachmentPath) {
+        DB::transaction(function () use ($validated, $rfqVendor, $attachmentPath, $rfq) {
             $rfqVendor->update([
                 'quotation_number' => $validated['quotation_number'] ?? null,
                 'payment_type'     => $validated['payment_type'] ?? null,
                 'terms_conditions' => $validated['terms_conditions'] ?? null,
                 'attachment_path'  => $attachmentPath,
-                'status'           => 'Submitted',
+                'status'           => 'Received',
                 'submitted_at'     => now(),
             ]);
 
             foreach ($validated['rates'] as $itemData) {
                 $productId = (int) $itemData['product_id'];
-                PurchaseRfqVendorRate::updateOrCreate(
+                PurchaseRfqVendorRate::withoutGlobalScopes()->updateOrCreate(
                     [
                         'purchase_rfq_vendor_id' => $rfqVendor->id,
                         'product_id'             => $productId,
                     ],
                     [
+                        'tenant_id'     => $rfqVendor->tenant_id ?? $rfq?->tenant_id,
+                        'company_id'    => $rfqVendor->company_id ?? $rfq?->company_id,
+                        'branch_id'     => $rfqVendor->branch_id ?? $rfq?->branch_id,
                         'quantity'      => $itemData['quantity'] ?? null,
                         'rate'          => $itemData['rate'],
                         'delivery_date' => $itemData['delivery_date'] ?? null,
                         'validity_date' => $itemData['validity_date'] ?? null,
                     ]
                 );
+            }
+
+            if ($rfq && in_array($rfq->status, ['Draft', 'Sent'])) {
+                $rfq->update(['status' => 'Received']);
             }
         });
 

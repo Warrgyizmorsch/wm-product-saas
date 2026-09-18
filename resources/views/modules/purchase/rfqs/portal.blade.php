@@ -112,7 +112,7 @@
                         <form action="{{ route('purchase.rfqs.portal-submit', $rfqVendor->token) }}" method="POST" enctype="multipart/form-data">
                             @php
                                 $tenant = \App\Models\Tenant::find($rfq->tenant_id);
-                                $currency = $tenant?->settings['currency'] ?? 'INR';
+                                $currency = $tenant?->settings['currency'] ?? active_currency_symbol();
                             @endphp
                             <!-- Vendor & Client Summary Row -->
                             <div class="row g-4 mb-5 pb-4 border-bottom bg-light p-3 rounded">

@@ -257,7 +257,7 @@ class LeadService
                 app(\App\Domains\CRM\Repositories\LeadRepository::class)->qualifyLead($lead);
             }
             $message = 'Lead status updated to Dealing.';
-        } elseif ($newStatus === 'Won' || $newStatus === 'Converted') {
+        } elseif ($newStatus === 'Won') {
             if (!$lead->crm_account_id) {
                 $acc = \App\Domains\CRM\Models\CrmAccount::where('tenant_id', $lead->tenant_id ?? 1)
                     ->where(function($q) use ($lead) {
