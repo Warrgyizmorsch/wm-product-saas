@@ -114,7 +114,7 @@
 @section('content')
     @php
         $currency = tenant()?->settings['currency'] ?? 'INR';
-        $currencySymbol = ($currency === 'INR') ? '₹' : $currency . ' ';
+        $currencySymbol = active_currency_symbol();
     @endphp
 
     <div class="erp-single-panel text-dark">
@@ -238,28 +238,28 @@
                     <!-- Column 1: Vendor Details -->
                     <div class="col-md-4 border-end-md">
                         <h6 class="fw-bold text-dark text-uppercase fs-11 letter-spacing-1 mb-3">
-                            <i class="feather-truck text-primary me-1.5"></i>Supplier Information
+                            <i class="feather-truck text-primary me-1.5"></i>{{ __('purchase.supplier_information') }}
                         </h6>
                         <table class="table table-borderless table-sm mb-0">
                             <tbody>
                                 <tr>
-                                    <td class="text-muted ps-0" style="width: 110px;">Vendor:</td>
+                                    <td class="text-muted ps-0" style="width: 110px;">{{ __('purchase.vendor') }}:</td>
                                     <td class="fw-bold text-dark fs-14">{{ $order->vendor->name ?? '—' }}</td>
                                 </tr>
                                 @if($order->vendor?->code)
                                     <tr>
-                                        <td class="text-muted ps-0">Vendor Code:</td>
+                                        <td class="text-muted ps-0">{{ __('purchase.supplier_code') }}:</td>
                                         <td class="fw-semibold text-secondary font-monospace">{{ $order->vendor->code }}</td>
                                     </tr>
                                 @endif
                                 @if($order->supplier_quotation_number)
                                     <tr>
-                                        <td class="text-muted ps-0">Quote Ref:</td>
+                                        <td class="text-muted ps-0">{{ __('purchase.quote_ref') }}:</td>
                                         <td class="fw-bold text-primary font-monospace">{{ $order->supplier_quotation_number }}</td>
                                     </tr>
                                 @endif
                                 <tr>
-                                    <td class="text-muted ps-0">Address:</td>
+                                    <td class="text-muted ps-0">{{ __('purchase.address') }}:</td>
                                     <td class="text-dark" style="line-height: 1.4;">{{ $order->vendor->address ?? '—' }}</td>
                                 </tr>
                             </tbody>
@@ -269,34 +269,34 @@
                     <!-- Column 2: Dates & Warehouse -->
                     <div class="col-md-4 border-end-md">
                         <h6 class="fw-bold text-dark text-uppercase fs-11 letter-spacing-1 mb-3">
-                            <i class="feather-calendar text-primary me-1.5"></i>Dates & Calculation Options
+                            <i class="feather-calendar text-primary me-1.5"></i>{{ __('purchase.dates_calc_options') }}
                         </h6>
                         <table class="table table-borderless table-sm mb-0">
                             <tbody>
                                 <tr>
-                                    <td class="text-muted ps-0" style="width: 120px;">Order Date:</td>
+                                    <td class="text-muted ps-0" style="width: 120px;">{{ __('purchase.order_date') }}:</td>
                                     <td class="fw-semibold text-dark">{{ $order->date ? $order->date->format('d-m-Y') : '—' }}</td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted ps-0">Expected Delivery Date:</td>
+                                    <td class="text-muted ps-0">{{ __('purchase.expected_delivery_date_label') }}:</td>
                                     <td class="fw-semibold text-info">{{ $order->delivery_date ? $order->delivery_date->format('d-m-Y') : '—' }}</td>
                                 </tr>
                                 @if($order->completed_at)
                                     <tr>
-                                        <td class="text-muted ps-0">Completion Date:</td>
+                                        <td class="text-muted ps-0">{{ __('purchase.completion_date_label') }}:</td>
                                         <td class="fw-bold text-success">{{ $order->completed_at->format('d-m-Y H:i') }}</td>
                                     </tr>
                                 @endif
                                 <tr>
-                                    <td class="text-muted ps-0">Warehouse:</td>
-                                    <td class="fw-semibold text-dark">{{ $order->location ?: 'Main Warehouse' }}</td>
+                                    <td class="text-muted ps-0">{{ __('purchase.location') }}:</td>
+                                    <td class="fw-semibold text-dark">{{ $order->location ?: __('purchase.main_warehouse') }}</td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted ps-0">Discount Option:</td>
+                                    <td class="text-muted ps-0">{{ __('purchase.discount_option_label') }}:</td>
                                     <td class="fw-semibold text-dark text-capitalize">{{ str_replace('_', ' ', $order->discount_type) }}</td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted ps-0">Tax Option:</td>
+                                    <td class="text-muted ps-0">{{ __('purchase.tax_option_label') }}:</td>
                                     <td class="fw-semibold text-dark text-capitalize">{{ str_replace('_', ' ', $order->tax_type) }}</td>
                                 </tr>
                                 @if($order->freight_terms)
@@ -315,7 +315,7 @@
                                 @if($order->freight_amount > 0)
                                     <tr>
                                         <td class="text-muted ps-0">{{ __('purchase.freight_amount') }}:</td>
-                                        <td class="fw-bold text-primary">{{ active_currency_symbol() }}{{ number_format($order->freight_amount, 2) }}</td>
+                                        <td class="fw-bold text-primary">{{ format_currency($order->freight_amount) }}</td>
                                     </tr>
                                 @endif
                             </tbody>
@@ -326,33 +326,33 @@
                     <div class="col-md-4">
                         <div class="d-flex align-items-center justify-content-between mb-3">
                             <h6 class="fw-bold text-dark text-uppercase fs-11 letter-spacing-1 mb-0">
-                                <i class="feather-link text-primary me-1.5"></i>Traceability & Audit
+                                <i class="feather-link text-primary me-1.5"></i>{{ __('purchase.traceability_audit') }}
                             </h6>
                         </div>
                         <table class="table table-borderless table-sm mb-0">
                             <tbody>
                                 <tr>
-                                    <td class="text-muted ps-0" style="width: 130px;">Source Requisition:</td>
+                                    <td class="text-muted ps-0" style="width: 130px;">{{ __('purchase.source_requisition_label') }}:</td>
                                     <td class="fw-bold">
                                         @if($order->requisition)
                                             <a href="{{ route('purchase.requisitions.show', $order->purchase_requisition_id) }}" class="text-primary hover-underline font-monospace">
                                                 <i class="feather-file-text me-1"></i>{{ $order->requisition->requisition_number }}
                                             </a>
                                         @else
-                                            <span class="text-muted">Direct Creation</span>
+                                            <span class="text-muted">{{ __('purchase.direct_creation') }}</span>
                                         @endif
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted ps-0">Reference / Note:</td>
+                                    <td class="text-muted ps-0">{{ __('purchase.reference_note_label') }}:</td>
                                     <td class="fw-semibold text-dark">{{ $order->reference ?: '—' }}</td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted ps-0">Created By:</td>
-                                    <td class="fw-semibold text-dark">{{ $order->creator->name ?? 'System Admin' }}</td>
+                                    <td class="text-muted ps-0">{{ __('purchase.created_by_label') }}:</td>
+                                    <td class="fw-semibold text-dark">{{ $order->creator->name ?? __('purchase.system') }}</td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted ps-0">GST Treatment:</td>
+                                    <td class="text-muted ps-0">{{ __('purchase.gst_treatment_label') }}:</td>
                                     <td class="fw-semibold text-dark text-uppercase">{{ $order->gst_type === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)' }}</td>
                                 </tr>
                             </tbody>
@@ -365,7 +365,7 @@
             <div class="px-4 py-4 border-bottom">
                 <div class="d-flex align-items-center justify-content-between mb-3">
                     <h5 class="fw-bold text-dark mb-0">
-                        <i class="feather-list text-primary me-2"></i>Purchase Order Line Items
+                        <i class="feather-list text-primary me-2"></i>{{ __('purchase.po_line_items_heading') }}
                     </h5>
                     <span class="badge bg-light text-dark border px-2.5 py-1 font-monospace fs-12">
                         {{ $order->items->count() }} Line(s)
@@ -377,22 +377,22 @@
                         <thead>
                             <tr>
                                 <th style="width: 4%;">#</th>
-                                <th style="width: 28%;">Product & SKU</th>
-                                <th class="text-end" style="width: 8%;">Qty</th>
-                                <th class="text-end" style="width: 12%;">Rate</th>
-                                <th class="text-end" style="width: 12%;">Gross Amount</th>
+                                <th style="width: 28%;">{{ __('purchase.product_name') }} & SKU</th>
+                                <th class="text-end" style="width: 8%;">{{ __('purchase.qty') }}</th>
+                                <th class="text-end" style="width: 12%;">{{ __('purchase.rate') }} ({{ active_currency_symbol() }})</th>
+                                <th class="text-end" style="width: 12%;">{{ __('purchase.gross_amount') }} ({{ active_currency_symbol() }})</th>
 
                                 @if($order->discount_type === 'item_wise')
-                                    <th class="text-end text-danger" style="width: 10%;">Disc %</th>
+                                    <th class="text-end text-danger" style="width: 10%;">{{ __('purchase.disc_percent') }}</th>
                                 @endif
 
-                                <th class="text-end text-dark" style="width: 13%;">Taxable Amt</th>
+                                <th class="text-end text-dark" style="width: 13%;">{{ __('purchase.taxable_amt') }} ({{ active_currency_symbol() }})</th>
 
                                 @if($order->tax_type === 'item_wise_tax')
-                                    <th class="text-end text-muted" style="width: 10%;">Tax Rate</th>
+                                    <th class="text-end text-muted" style="width: 10%;">{{ __('purchase.tax_rate') }}</th>
                                 @endif
 
-                                <th class="text-end" style="width: 13%;">Total Amount</th>
+                                <th class="text-end" style="width: 13%;">{{ __('purchase.total_amount') }} ({{ active_currency_symbol() }})</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -501,10 +501,10 @@
                     <!-- Terms & Notes -->
                     <div class="col-md-7">
                         <h6 class="fw-bold text-dark text-uppercase fs-11 letter-spacing-1 mb-3">
-                            <i class="feather-file-text me-1.5 text-primary"></i>Terms & Notes
+                            <i class="feather-file-text me-1.5 text-primary"></i>{{ __('purchase.terms_and_notes') }}
                         </h6>
                         <div class="bg-light p-3 border rounded-3 text-muted" style="min-height: 90px; white-space: pre-line; line-height: 1.5;">
-                            {!! $order->notes ? e($order->notes) : '<span class="italic"><i class="feather-info me-1"></i>No additional terms or notes specified for this purchase order.</span>' !!}
+                            {!! $order->notes ? e($order->notes) : '<span class="italic"><i class="feather-info me-1"></i>' . __('purchase.no_additional_terms_specified') . '</span>' !!}
                         </div>
                     </div>
 
@@ -512,25 +512,25 @@
                     <div class="col-md-5">
                         <div class="summary-box">
                             <h6 class="fw-bold text-dark text-uppercase fs-11 letter-spacing-1 mb-3 border-bottom pb-2">
-                                Financial Summary
+                                {{ __('purchase.financial_summary') }}
                             </h6>
 
                             <!-- Subtotal -->
                             <div class="summary-row">
                                 <span class="text-muted fw-semibold">{{ __('purchase.subtotal') }}:</span>
-                                <span class="fw-bold text-dark font-monospace">{{ $currencySymbol }}{{ number_format($order->subtotal, 2) }}</span>
+                                <span class="fw-bold text-dark font-monospace">{{ format_currency($order->subtotal) }}</span>
                             </div>
 
                             <!-- Discount Row (ONLY if discount > 0) -->
                             @if(($order->discount_type !== 'without_discount' || $order->discount_amount > 0) && $order->discount_amount > 0)
                                 <div class="summary-row text-danger">
-                                    <span class="fw-semibold">Discount ({{ str_replace('_', ' ', $order->discount_type) }}):</span>
-                                    <span class="fw-bold font-monospace">-{{ $currencySymbol }}{{ number_format($order->discount_amount, 2) }}</span>
+                                    <span class="fw-semibold">{{ __('purchase.discount') }} ({{ str_replace('_', ' ', $order->discount_type) }}):</span>
+                                    <span class="fw-bold font-monospace">-{{ format_currency($order->discount_amount) }}</span>
                                 </div>
 
                                 <div class="summary-row">
                                     <span class="text-muted fw-semibold">{{ __('purchase.gross_total_before_tax') }}:</span>
-                                    <span class="fw-bold text-dark font-monospace">{{ $currencySymbol }}{{ number_format(max(0, $order->subtotal - $order->discount_amount), 2) }}</span>
+                                    <span class="fw-bold text-dark font-monospace">{{ format_currency(max(0, $order->subtotal - $order->discount_amount)) }}</span>
                                 </div>
                             @endif
 
@@ -548,29 +548,29 @@
                                     @endphp
                                     <div class="summary-row">
                                         <span class="text-muted fw-semibold">CGST ({{ $halfRate }}%):</span>
-                                        <span class="fw-semibold text-dark font-monospace">+{{ $currencySymbol }}{{ number_format($cgst, 2) }}</span>
+                                        <span class="fw-semibold text-dark font-monospace">+{{ format_currency($cgst) }}</span>
                                     </div>
                                     <div class="summary-row">
                                         <span class="text-muted fw-semibold">SGST ({{ $halfRate }}%):</span>
-                                        <span class="fw-semibold text-dark font-monospace">+{{ $currencySymbol }}{{ number_format($sgst, 2) }}</span>
+                                        <span class="fw-semibold text-dark font-monospace">+{{ format_currency($sgst) }}</span>
                                     </div>
                                 @elseif($order->gst_type === 'igst' || $order->igst_amount > 0)
                                     <div class="summary-row">
                                         <span class="text-muted fw-semibold">IGST ({{ round($effectiveTaxRate, 2) }}%):</span>
-                                        <span class="fw-semibold text-dark font-monospace">+{{ $currencySymbol }}{{ number_format($order->tax_amount, 2) }}</span>
+                                        <span class="fw-semibold text-dark font-monospace">+{{ format_currency($order->tax_amount) }}</span>
                                     </div>
                                 @else
                                     <div class="summary-row">
-                                        <span class="text-muted fw-semibold">Taxes ({{ round($effectiveTaxRate, 2) }}%):</span>
-                                        <span class="fw-semibold text-dark font-monospace">+{{ $currencySymbol }}{{ number_format($order->tax_amount, 2) }}</span>
+                                        <span class="text-muted fw-semibold">{{ __('purchase.taxes') }} ({{ round($effectiveTaxRate, 2) }}%):</span>
+                                        <span class="fw-semibold text-dark font-monospace">+{{ format_currency($order->tax_amount) }}</span>
                                     </div>
                                 @endif
                             @endif
 
                             <hr class="my-2">
                             <div class="d-flex justify-content-between align-items-center pt-1">
-                                <span class="fs-14 fw-bold text-dark">Grand Total:</span>
-                                <span class="fs-16 fw-bold text-primary font-monospace">{{ $currencySymbol }}{{ number_format($order->grand_total, 2) }}</span>
+                                <span class="fs-14 fw-bold text-dark">{{ __('purchase.grand_total') }}:</span>
+                                <span class="fs-16 fw-bold text-primary font-monospace">{{ format_currency($order->grand_total) }}</span>
                             </div>
                         </div>
                     </div>
@@ -580,13 +580,13 @@
                 <div class="row mt-4 pt-3 text-dark">
                     <div class="col-6 text-start">
                         <p class="fs-11 text-muted mb-0">
-                            For queries regarding fulfillment, please refer to the purchase department.
+                            {{ __('purchase.po_queries_fulfillment') }}
                         </p>
                     </div>
                     <div class="col-6 text-end">
                         <div class="d-inline-block text-center" style="width: 180px;">
                             <hr class="mb-1 mt-2">
-                            <span class="fs-11 text-muted text-uppercase fw-bold letter-spacing-1">Authorized Signature</span>
+                            <span class="fs-11 text-muted text-uppercase fw-bold letter-spacing-1">{{ __('purchase.authorized_signature') }}</span>
                         </div>
                     </div>
                 </div>
@@ -598,13 +598,13 @@
                     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                         <div>
                             <h6 class="fw-bold text-dark mb-0">
-                                <i class="feather-credit-card text-success me-1.5"></i>Vendor Advance Payments & Accounting
+                                <i class="feather-credit-card text-success me-1.5"></i>{{ __('purchase.vendor_advance_payments_accounting') }}
                             </h6>
-                            <small class="text-muted fs-12">Record advance payments to vendor before bill receiving.</small>
+                            <small class="text-muted fs-12">{{ __('purchase.record_advance_payments_help') }}</small>
                         </div>
                         @if($order->balance_due > 0)
                             <button type="button" class="btn btn-sm btn-success fw-bold px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#advancePaymentModal">
-                                <i class="feather-plus-circle me-1.5"></i>Register Advance Payment
+                                <i class="feather-plus-circle me-1.5"></i>{{ __('purchase.register_advance_payment') }}
                             </button>
                         @endif
                     </div>
@@ -612,20 +612,20 @@
                     <div class="row g-3 mb-3 text-dark">
                         <div class="col-md-4">
                             <div class="bg-white p-3 border rounded-3">
-                                <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Total PO Amount</span>
-                                <h4 class="fw-bold text-dark mb-0 font-monospace">{{ $currencySymbol }}{{ number_format($order->grand_total, 2) }}</h4>
+                                <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">{{ __('purchase.total_po_amount') }}</span>
+                                <h4 class="fw-bold text-dark mb-0 font-monospace">{{ format_currency($order->grand_total) }}</h4>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="bg-white p-3 border rounded-3">
-                                <span class="fs-11 text-uppercase text-success fw-bold d-block mb-1">Advance Paid & Posted</span>
-                                <h4 class="fw-bold text-success mb-0 font-monospace">{{ $currencySymbol }}{{ number_format($order->total_advance_paid, 2) }}</h4>
+                                <span class="fs-11 text-uppercase text-success fw-bold d-block mb-1">{{ __('purchase.advance_paid_posted') }}</span>
+                                <h4 class="fw-bold text-success mb-0 font-monospace">{{ format_currency($order->total_advance_paid) }}</h4>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="bg-white p-3 border rounded-3">
-                                <span class="fs-11 text-uppercase text-primary fw-bold d-block mb-1">Balance Due</span>
-                                <h4 class="fw-bold text-primary mb-0 font-monospace">{{ $currencySymbol }}{{ number_format($order->balance_due, 2) }}</h4>
+                                <span class="fs-11 text-uppercase text-primary fw-bold d-block mb-1">{{ __('purchase.balance_due') }}</span>
+                                <h4 class="fw-bold text-primary mb-0 font-monospace">{{ format_currency($order->balance_due) }}</h4>
                             </div>
                         </div>
                     </div>
@@ -635,11 +635,11 @@
                             <table class="table table-sm align-middle fs-13 text-dark mb-0">
                                 <thead class="table-light fs-11 text-uppercase text-muted fw-semibold">
                                     <tr>
-                                        <th class="ps-3">Payment No</th>
-                                        <th>Date</th>
-                                        <th>Method</th>
-                                        <th>Reference No</th>
-                                        <th class="text-end pe-3">Amount</th>
+                                        <th class="ps-3">{{ __('purchase.payment_no') }}</th>
+                                        <th>{{ __('purchase.payment_date') }}</th>
+                                        <th>{{ __('purchase.method') }}</th>
+                                        <th>{{ __('purchase.reference_no') }}</th>
+                                        <th class="text-end pe-3">{{ __('purchase.amount') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -648,8 +648,8 @@
                                             <td class="ps-3 fw-bold text-primary font-monospace">{{ $adv->payment_number }}</td>
                                             <td>{{ $adv->payment_date ? $adv->payment_date->format('d-M-Y') : '—' }}</td>
                                             <td><span class="badge bg-soft-info text-info fs-11 fw-semibold">{{ $adv->payment_method }}</span></td>
-                                            <td class="font-monospace">{{ $adv->reference_number ?: 'N/A' }}</td>
-                                            <td class="text-end pe-3 font-monospace fw-bold text-success">{{ $currencySymbol }}{{ number_format($adv->amount, 2) }}</td>
+                                            <td class="font-monospace">{{ $adv->reference_number ?: __('purchase.not_applicable') }}</td>
+                                            <td class="text-end pe-3 font-monospace fw-bold text-success">{{ format_currency($adv->amount) }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -657,7 +657,7 @@
                         </div>
                     @else
                         <div class="text-center py-3 text-muted fs-12 bg-white border rounded-3">
-                            <i class="feather-info me-1"></i>No advance payments registered yet.
+                            <i class="feather-info me-1"></i>{{ __('purchase.no_advance_payments_registered') }}
                         </div>
                     @endif
                 </div>
@@ -674,23 +674,23 @@
                         @csrf
                         <div class="modal-header border-bottom bg-light">
                             <h5 class="modal-title fw-bold text-danger" id="rejectPoModalLabel">
-                                <i class="feather-x-circle me-1.5"></i>Reject Purchase Order
+                                <i class="feather-x-circle me-1.5"></i>{{ __('purchase.reject_purchase_order') }}
                             </h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body p-4">
                             <p class="fs-13 text-muted mb-3">
-                                Please specify the reason for rejecting Purchase Order <strong class="text-dark">{{ $order->purchase_order_number }}</strong>.
+                                {{ __('purchase.reject_po_help_text') }} <strong class="text-dark">{{ $order->purchase_order_number }}</strong>.
                             </p>
                             <div class="mb-3">
-                                <label for="rejection_reason" class="form-label fs-12 fw-bold text-dark">Rejection Reason <span class="text-danger">*</span></label>
-                                <textarea name="rejection_reason" id="rejection_reason" rows="3" class="form-control fs-13" placeholder="Enter reason for rejection..." required></textarea>
+                                <label for="rejection_reason" class="form-label fs-12 fw-bold text-dark">{{ __('purchase.rejection_reason_remarks') }} <span class="text-danger">*</span></label>
+                                <textarea name="rejection_reason" id="rejection_reason" rows="3" class="form-control fs-13" placeholder="{{ __('purchase.reject_po_reason_placeholder') }}" required></textarea>
                             </div>
                         </div>
                         <div class="modal-footer border-top bg-light">
-                            <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('ui.cancel') ?? 'Cancel' }}</button>
                             <button type="submit" class="btn btn-sm btn-danger fw-bold px-3">
-                                <i class="feather-x-circle me-1"></i>Confirm Rejection
+                                <i class="feather-x-circle me-1"></i>{{ __('purchase.confirm_rejection') }}
                             </button>
                         </div>
                     </form>
@@ -701,7 +701,7 @@
 
     <!-- Register Advance Payment Modal -->
     @if($order->status === 'Approved')
-        <x-ui.modal id="advancePaymentModal" title="Register Vendor Advance Payment" size="lg">
+        <x-ui.modal id="advancePaymentModal" :title="__('purchase.register_vendor_advance_payment')" size="lg">
             <form action="{{ route('purchase.orders.advance-payments.store') }}" method="POST" class="odoo-sheet">
                 @csrf
                 <input type="hidden" name="purchase_order_id" value="{{ $order->id }}">
@@ -710,48 +710,48 @@
                 <div class="p-3">
                     <div class="alert alert-info py-2 px-3 fs-12 mb-3">
                         <i class="feather-info me-1"></i>
-                        Register advance payment for this Purchase Order. An accounting journal entry will be automatically posted to Vendor Advance account.
+                        {{ __('purchase.advance_payment_journal_help') }}
                     </div>
 
                     <div class="row g-2">
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" label="Vendor" name="vendor_display" value="{{ $order->vendor?->name }}" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" :label="__('purchase.vendor')" name="vendor_display" value="{{ $order->vendor?->name }}" readonly="true" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" label="PO Number" name="po_display" value="{{ $order->purchase_order_number }}" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" :label="__('purchase.po_number')" name="po_display" value="{{ $order->purchase_order_number }}" readonly="true" />
                         </div>
                     </div>
 
                     <div class="row g-2">
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" inputType="number" label="Advance Amount" name="amount" id="advance_amount" value="{{ min($order->balance_due, $order->grand_total) }}" step="0.01" min="0.01" max="{{ $order->balance_due }}" required="true" placeholder="Enter amount..." />
+                            <x-ui.odoo-form-ui type="input" inputType="number" :label="__('purchase.advance_amount')" name="amount" id="advance_amount" value="{{ min($order->balance_due, $order->grand_total) }}" step="0.01" min="0.01" max="{{ $order->balance_due }}" required="true" :placeholder="__('purchase.enter_amount_placeholder')" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="select" label="Payment Method" name="payment_method" id="payment_method" required="true">
-                                <option value="Bank Transfer" selected>Bank Transfer</option>
-                                <option value="Cheque">Cheque</option>
-                                <option value="Cash">Cash</option>
-                                <option value="UPI">UPI</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('purchase.payment_method')" name="payment_method" id="payment_method" required="true">
+                                <option value="Bank Transfer" selected>{{ __('purchase.bank_transfer') }}</option>
+                                <option value="Cheque">{{ __('purchase.cheque') }}</option>
+                                <option value="Cash">{{ __('purchase.cash') }}</option>
+                                <option value="UPI">{{ __('purchase.upi') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
                     </div>
 
                     <div class="row g-2">
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Payment Date" name="payment_date" id="payment_date" value="{{ date('Y-m-d') }}" required="true" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" :label="__('purchase.payment_date')" name="payment_date" id="payment_date" value="{{ date('Y-m-d') }}" required="true" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" label="Transaction / UTR Ref" name="reference_number" id="reference_number" placeholder="e.g. UTR123456789" />
+                            <x-ui.odoo-form-ui type="input" :label="__('purchase.ref_transaction_no')" name="reference_number" id="reference_number" placeholder="e.g. UTR123456789" />
                         </div>
                     </div>
 
-                    <x-ui.odoo-form-ui type="textarea" label="Notes / Remarks" name="notes" placeholder="Payment notes..." rows="2" />
+                    <x-ui.odoo-form-ui type="textarea" :label="__('purchase.payment_notes_remarks')" name="notes" :placeholder="__('purchase.enter_payment_notes_placeholder')" rows="2" />
                 </div>
 
                 <div class="modal-footer border-top px-3 py-2 bg-light d-flex justify-content-end gap-2">
-                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('ui.cancel') ?? 'Cancel' }}</button>
                     <button type="submit" class="btn btn-sm btn-primary fw-semibold">
-                        <i class="feather-check me-1"></i>Post Advance Payment
+                        <i class="feather-check me-1"></i>{{ __('purchase.post_advance_payment') }}
                     </button>
                 </div>
             </form>
@@ -764,7 +764,7 @@
             <div class="modal-content border-0 shadow-lg rounded-3">
                 <div class="modal-header bg-soft-warning border-bottom py-3">
                     <h6 class="modal-title fw-bold text-dark fs-14">
-                        <i class="feather-bell text-warning me-1.5 fs-15"></i> Send Quick Approval Reminder
+                        <i class="feather-bell text-warning me-1.5 fs-15"></i> {{ __('purchase.send_quick_approval_reminder') }}
                     </h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -773,17 +773,17 @@
                     <div class="modal-body p-4">
                         <div class="alert alert-warning border border-warning-subtle py-2 px-3 fs-12 mb-3">
                             <i class="feather-info me-1"></i>
-                            Sending an in-app reminder for document <strong id="remindDocNumberText" class="text-dark"></strong>.
+                            {{ __('purchase.sending_reminder_for_doc') }} <strong id="remindDocNumberText" class="text-dark"></strong>.
                         </div>
                         <div class="mb-3 text-start">
-                            <label class="form-label fw-bold text-dark fs-12 mb-1">Optional Note / Message for Approver</label>
-                            <textarea name="note" class="form-control form-control-sm shadow-2xs" rows="3" placeholder="e.g. Urgent stock required for client delivery..."></textarea>
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('purchase.optional_note_for_approver') }}</label>
+                            <textarea name="note" class="form-control form-control-sm shadow-2xs" rows="3" placeholder="{{ __('purchase.reminder_note_placeholder') }}"></textarea>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 px-3 border-top">
-                        <button type="button" class="btn btn-sm btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-sm btn-light border fw-semibold" data-bs-dismiss="modal">{{ __('ui.cancel') ?? 'Cancel' }}</button>
                         <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 shadow-2xs text-white" style="background-color: #f59e0b; border-color: #d97706;">
-                            <i class="feather-send me-1"></i> Send Reminder
+                            <i class="feather-send me-1"></i> {{ __('purchase.send_reminder') }}
                         </button>
                     </div>
                 </form>
@@ -797,7 +797,7 @@
             <div class="modal-content border-0 shadow-lg rounded-3">
                 <div class="modal-header bg-soft-warning border-bottom py-3">
                     <h6 class="modal-title fw-bold text-dark fs-14">
-                        <i class="feather-bell text-warning me-1.5 fs-15"></i> Approval Reminders Log — <span id="reminderModalDocNumber" class="text-primary font-monospace"></span>
+                        <i class="feather-bell text-warning me-1.5 fs-15"></i> {{ __('purchase.approval_reminders_log') }} — <span id="reminderModalDocNumber" class="text-primary font-monospace"></span>
                     </h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -807,7 +807,7 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 px-3 border-top">
-                    <button type="button" class="btn btn-sm btn-secondary fw-semibold px-3" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-sm btn-secondary fw-semibold px-3" data-bs-dismiss="modal">{{ __('purchase.close') }}</button>
                 </div>
             </div>
         </div>
@@ -828,7 +828,7 @@
             container.innerHTML = '';
 
             if (!reminders || reminders.length === 0) {
-                container.innerHTML = '<div class="text-muted fs-12 text-center py-3">No reminder messages found.</div>';
+                container.innerHTML = '<div class="text-muted fs-12 text-center py-3">{{ __('purchase.no_reminder_messages') }}</div>';
             } else {
                 reminders.forEach(r => {
                     const item = document.createElement('div');
@@ -838,7 +838,7 @@
                             <span class="fw-bold text-dark fs-12"><i class="feather-user text-primary me-1"></i>${r.user}</span>
                             <span class="text-muted fs-10 font-monospace">${r.time}</span>
                         </div>
-                        ${r.note ? `<div class="text-dark fst-italic fs-12 bg-white p-2 rounded border border-warning-subtle mt-1"><i class="feather-message-square me-1 text-warning"></i>"${r.note}"</div>` : '<div class="text-muted fs-11 fst-italic mt-1">(No note provided)</div>'}
+                        ${r.note ? `<div class="text-dark fst-italic fs-12 bg-white p-2 rounded border border-warning-subtle mt-1"><i class="feather-message-square me-1 text-warning"></i>"${r.note}"</div>` : '<div class="text-muted fs-11 fst-italic mt-1">{{ __('purchase.no_note_provided') }}</div>'}
                     `;
                     container.appendChild(item);
                 });

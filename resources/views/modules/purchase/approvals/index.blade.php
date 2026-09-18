@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'PR Approvals | SaaS ERP')
-@section('page-title', 'PR Approvals')
-@section('breadcrumb', 'Purchase / PR Approvals')
+@section('title', __('purchase.pr_approvals') . ' | SaaS ERP')
+@section('page-title', __('purchase.pr_approvals'))
+@section('breadcrumb', __('ui.purchase') . ' / ' . __('purchase.pr_approvals'))
 
 @section('content')
     @php
@@ -15,8 +15,8 @@
 
         <div class="d-flex align-items-center mb-3">
             <div>
-                <h5 class="fw-bold text-dark mb-0">PR Approvals</h5>
-                <p class="text-muted fs-12 mb-0">Purchase Requisitions pending your approval</p>
+                <h5 class="fw-bold text-dark mb-0">{{ __('purchase.pr_approvals') }}</h5>
+                <p class="text-muted fs-12 mb-0">{{ __('purchase.pr_approvals_help') }}</p>
             </div>
 
             <div class="d-flex gap-2 ms-auto">
@@ -45,20 +45,20 @@
                 <form method="GET" action="{{ route('purchase.pr-approvals.index') }}" class="d-inline">
                     <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3">
-                            <i class="feather-sliders me-1 text-primary"></i> Filter Options
+                            <i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}
                         </h6>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.search') }}</label>
                             <x-ui.odoo-form-ui type="input" name="search"
-                                placeholder="Search PR number..."
+                                placeholder="{{ __('purchase.search_req_placeholder') }}"
                                 value="{{ request('search') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Source Type</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.source_type') }}</label>
                             <x-ui.odoo-form-ui type="select" name="source_type">
-                                <option value="">All Sources</option>
+                                <option value="">{{ __('purchase.all_sources') }}</option>
                                 <option value="direct"       @selected(request('source_type') === 'direct')>{{ __('purchase.source_direct') }}</option>
                                 <option value="so"           @selected(request('source_type') === 'so')>{{ __('purchase.source_so') }}</option>
                                 <option value="mo"           @selected(request('source_type') === 'mo')>{{ __('purchase.source_mo') }}</option>
@@ -100,7 +100,7 @@
         <div class="d-flex gap-2 mb-3">
             <span class="badge bg-warning-subtle text-warning border border-warning-subtle fs-12 px-3 py-2 rounded-pill">
                 <i class="feather-clock me-1"></i>
-                {{ $requisitions->total() }} Pending {{ Str::plural('Approval', $requisitions->total()) }}
+                {{ $requisitions->total() }} {{ $requisitions->total() == 1 ? __('purchase.pending_approval_badge') : __('purchase.pending_approvals_badge') }}
             </span>
         </div>
 
@@ -205,14 +205,14 @@
                                 @endif
                             </td>
                             <td>
-                                <x-ui.badge :soft="true" variant="warning">Draft</x-ui.badge>
+                                <x-ui.badge :soft="true" variant="warning">{{ __('purchase.status_draft') }}</x-ui.badge>
                             </td>
                             <td class="text-end" style="white-space: nowrap;">
                                 <div class="d-inline-flex align-items-center gap-1 justify-content-end">
                                     {{-- View (offcanvas) --}}
                                     <button type="button"
                                             class="action-dropdown-btn pr-view-btn flex-shrink-0"
-                                            title="View Details"
+                                            title="{{ __('purchase.view_details') }}"
                                             data-bs-toggle="tooltip"
                                             data-id="{{ $req->id }}">
                                         <i class="feather feather-eye"></i>
@@ -221,13 +221,13 @@
                                     {{-- Approve --}}
                                      <form action="{{ route('purchase.requisitions.approve', $req->id) }}" method="POST" class="d-inline-flex flex-shrink-0" id="approvePrForm_{{ $req->id }}">
                                          @csrf
-                                         <button type="button" class="action-dropdown-btn action-btn-approve" title="Approve" data-bs-toggle="tooltip" onclick="confirmAction({ title: 'Approve Requisition', message: '{{ __('purchase.confirm_approve') }}', variant: 'success', confirmText: 'Approve' }, function() { document.getElementById('approvePrForm_{{ $req->id }}').submit(); })">
+                                         <button type="button" class="action-dropdown-btn action-btn-approve" title="{{ __('purchase.approve') }}" data-bs-toggle="tooltip" onclick="confirmAction({ title: '{{ __('purchase.approve_pr') }}', message: '{{ __('purchase.confirm_approve') }}', variant: 'success', confirmText: '{{ __('purchase.approve') }}' }, function() { document.getElementById('approvePrForm_{{ $req->id }}').submit(); })">
                                              <i class="feather feather-check-circle"></i>
                                          </button>
                                      </form>
 
                                      {{-- Reject --}}
-                                     <button type="button" class="action-dropdown-btn action-btn-reject flex-shrink-0" title="Reject" data-bs-toggle="tooltip" onclick="openRejectModal('{{ route('purchase.requisitions.reject', $req->id) }}', '{{ $req->requisition_number }}')">
+                                     <button type="button" class="action-dropdown-btn action-btn-reject flex-shrink-0" title="{{ __('purchase.reject') }}" data-bs-toggle="tooltip" onclick="openRejectModal('{{ route('purchase.requisitions.reject', $req->id) }}', '{{ $req->requisition_number }}')">
                                          <i class="feather feather-x-circle"></i>
                                      </button>
 
@@ -241,10 +241,10 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted fs-14">
+                            <td colspan="10" class="text-center py-5 text-muted fs-14">
                                 <i class="feather-check-circle fs-24 mb-2 d-block text-success opacity-75"></i>
-                                <strong class="d-block text-dark mb-1">All caught up!</strong>
-                                No Purchase Requisitions pending approval.
+                                <strong class="d-block text-dark mb-1">{{ __('purchase.all_caught_up') }}</strong>
+                                {{ __('purchase.no_pr_pending_approval') }}
                             </td>
                         </tr>
                     @endforelse
@@ -263,23 +263,23 @@
     </div>
 
     {{-- ── Offcanvas Drawer (reuses same partial as PR index) ── --}}
-    <x-ui.drawer id="prApprovalDrawer" title="Purchase Requisition Details" position="end" style="width: 580px; max-width: 95vw;">
+    <x-ui.drawer id="prApprovalDrawer" :title="__('purchase.purchase_requisition_details')" position="end" style="width: 580px; max-width: 95vw;">
         <div id="prApprovalDrawerContent">
             <div id="prApprovalDrawerLoading" class="text-center py-5">
                 <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
+                    <span class="visually-hidden">{{ __('purchase.loading') ?? 'Loading...' }}</span>
                 </div>
-                <p class="text-muted mt-2 fs-13">Loading details…</p>
+                <p class="text-muted mt-2 fs-13">{{ __('purchase.loading_details') }}</p>
             </div>
             <div id="prApprovalDrawerBody" style="display:none;"></div>
         </div>
 
         <x-slot:footer>
             <a id="prApprovalFullViewLink" href="#" class="btn btn-outline-primary btn-sm">
-                <i class="feather-external-link me-1"></i> View Full Details
+                <i class="feather-external-link me-1"></i> {{ __('purchase.view_full_details') }}
             </a>
             <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="offcanvas">
-                <i class="feather-x me-1"></i> Close
+                <i class="feather-x me-1"></i> {{ __('purchase.close') }}
             </button>
         </x-slot:footer>
     </x-ui.drawer>
@@ -372,22 +372,22 @@
                 @csrf
                 <div class="modal-header bg-soft-danger text-danger border-bottom-0">
                     <h5 class="modal-title fw-bold" id="rejectActionModalLabel">
-                        <i class="feather-x-circle me-2"></i>Reject Requisition <span id="rejectModalDocNumber" class="text-dark"></span>
+                        <i class="feather-x-circle me-2"></i>{{ __('purchase.reject_requisition') }} <span id="rejectModalDocNumber" class="text-dark"></span>
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
-                    <p class="text-muted fs-12 mb-3">Please specify the reason for rejecting this requisition. This reason will be saved in audit history and displayed on details screen.</p>
+                    <p class="text-muted fs-12 mb-3">{{ __('purchase.reject_pr_help_text') }}</p>
                     
                     <div class="mb-3 text-start">
-                        <label for="rejectionReasonInput" class="form-label fw-bold text-dark fs-12 mb-1">Rejection Reason / Remarks <span class="text-danger">*</span></label>
-                        <textarea class="form-control" id="rejectionReasonInput" name="rejection_reason" rows="4" placeholder="Enter reason for rejection (e.g., Budget constraints, Requirements changed, Duplicate request, etc.)..." required></textarea>
+                        <label for="rejectionReasonInput" class="form-label fw-bold text-dark fs-12 mb-1">{{ __('purchase.rejection_reason_remarks') }} <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="rejectionReasonInput" name="rejection_reason" rows="4" placeholder="{{ __('purchase.reject_pr_reason_placeholder') }}" required></textarea>
                     </div>
                 </div>
                 <div class="modal-footer bg-light border-top-0 px-4 py-3">
-                    <button type="button" class="btn btn-light btn-sm border text-uppercase fs-11 fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-light btn-sm border text-uppercase fs-11 fw-bold" data-bs-dismiss="modal">{{ __('purchase.cancel') }}</button>
                     <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold text-uppercase fs-11" style="background-color: #ea580c; border-color: #ea580c;">
-                        <i class="feather-x-circle me-1"></i> Confirm Rejection
+                        <i class="feather-x-circle me-1"></i> {{ __('purchase.confirm_rejection') }}
                     </button>
                 </div>
             </form>
@@ -401,7 +401,7 @@
         <div class="modal-content border-0 shadow-lg rounded-3">
             <div class="modal-header bg-soft-warning border-bottom py-3">
                 <h6 class="modal-title fw-bold text-dark fs-14">
-                    <i class="feather-bell text-warning me-1.5 fs-15"></i> Send Quick Approval Reminder
+                    <i class="feather-bell text-warning me-1.5 fs-15"></i> {{ __('purchase.send_quick_approval_reminder') }}
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -410,17 +410,17 @@
                 <div class="modal-body p-4">
                     <div class="alert alert-warning border border-warning-subtle py-2 px-3 fs-12 mb-3">
                         <i class="feather-info me-1"></i>
-                        Sending an in-app reminder for document <strong id="remindDocNumberText" class="text-dark"></strong>.
+                        {{ __('purchase.sending_reminder_for_doc') }} <strong id="remindDocNumberText" class="text-dark"></strong>.
                     </div>
                     <div class="mb-3 text-start">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Optional Note / Message for Approver</label>
-                        <textarea name="note" class="form-control form-control-sm shadow-2xs" rows="3" placeholder="e.g. Urgent stock required for client delivery..."></textarea>
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('purchase.optional_note_for_approver') }}</label>
+                        <textarea name="note" class="form-control form-control-sm shadow-2xs" rows="3" placeholder="{{ __('purchase.reminder_note_placeholder') }}"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 px-3 border-top">
-                    <button type="button" class="btn btn-sm btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-light border fw-semibold" data-bs-dismiss="modal">{{ __('purchase.cancel') }}</button>
                     <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 shadow-2xs text-white" style="background-color: #f59e0b; border-color: #d97706;">
-                        <i class="feather-send me-1"></i> Send Reminder
+                        <i class="feather-send me-1"></i> {{ __('purchase.send_reminder') }}
                     </button>
                 </div>
             </form>
@@ -432,7 +432,7 @@
 <div class="offcanvas offcanvas-end border-0 shadow-lg" tabindex="-1" id="reminderHistoryOffcanvas" style="width: 420px; z-index: 1060;">
     <div class="offcanvas-header bg-soft-warning border-bottom py-3">
         <h6 class="offcanvas-title fw-bold text-dark fs-14">
-            <i class="feather-bell text-warning me-1.5 fs-15"></i> Approval Reminders Log — <span id="reminderOffcanvasDocNumber" class="text-primary font-monospace"></span>
+            <i class="feather-bell text-warning me-1.5 fs-15"></i> {{ __('purchase.approval_reminders_log') }} — <span id="reminderOffcanvasDocNumber" class="text-primary font-monospace"></span>
         </h6>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
@@ -442,7 +442,7 @@
         </div>
     </div>
     <div class="offcanvas-footer bg-light p-3 border-top text-end">
-        <button type="button" class="btn btn-sm btn-secondary fw-semibold px-4" data-bs-dismiss="offcanvas">Close</button>
+        <button type="button" class="btn btn-sm btn-secondary fw-semibold px-4" data-bs-dismiss="offcanvas">{{ __('purchase.close') }}</button>
     </div>
 </div>
 
@@ -460,7 +460,7 @@
         container.innerHTML = '';
 
         if (!reminders || reminders.length === 0) {
-            container.innerHTML = '<div class="text-muted fs-12 text-center py-4"><i class="feather-info me-1"></i>No reminder messages recorded.</div>';
+            container.innerHTML = '<div class="text-muted fs-12 text-center py-4"><i class="feather-info me-1"></i>{{ __('purchase.no_reminder_messages') }}</div>';
         } else {
             reminders.forEach((r, idx) => {
                 const item = document.createElement('div');
@@ -470,7 +470,7 @@
                         <span class="fw-bold text-dark fs-12"><i class="feather-user text-primary me-1"></i>${r.user}</span>
                         <span class="badge bg-soft-secondary text-muted font-monospace fs-10">${r.time}</span>
                     </div>
-                    ${r.note ? `<div class="text-dark fst-italic fs-12 bg-light p-2 rounded border border-warning-subtle mt-1.5"><i class="feather-message-square me-1 text-warning"></i>"${r.note}"</div>` : '<div class="text-muted fs-11 fst-italic mt-1">(No note provided)</div>'}
+                    ${r.note ? `<div class="text-dark fst-italic fs-12 bg-light p-2 rounded border border-warning-subtle mt-1.5"><i class="feather-message-square me-1 text-warning"></i>"${r.note}"</div>` : '<div class="text-muted fs-11 fst-italic mt-1">{{ __('purchase.no_note_provided') }}</div>'}
                 `;
                 container.appendChild(item);
             });

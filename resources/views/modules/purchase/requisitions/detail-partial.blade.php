@@ -39,7 +39,7 @@
                 @endphp
                 <button type="button" class="btn btn-xs btn-soft-danger border border-danger-subtle px-2 py-1 fs-11 fw-bold"
                         onclick="showReminderHistoryModal('{{ $requisition->requisition_number }}', {{ json_encode($remData) }})">
-                    <i class="feather-bell me-1"></i>Reminded ({{ $requisition->reminder_count }})
+                    <i class="feather-bell me-1"></i>{{ __('purchase.reminded') }} ({{ $requisition->reminder_count }})
                 </button>
             @endif
         </div>
@@ -49,11 +49,11 @@
             <strong class="text-dark">{{ $requisition->requester->name ?? __('purchase.system') }}</strong>
         </span>
         <span><i class="feather-calendar me-1"></i>
-            Req Date: <strong class="text-dark">{{ $requisition->requisition_date ? $requisition->requisition_date->format('d M Y') : '—' }}</strong>
+            {{ __('purchase.req_date') }}: <strong class="text-dark">{{ $requisition->requisition_date ? $requisition->requisition_date->format('d M Y') : '—' }}</strong>
         </span>
         @if($requisition->expected_date)
             <span><i class="feather-clock me-1 text-primary"></i>
-                Exp Date: <strong class="text-primary">{{ $requisition->expected_date->format('d M Y') }}</strong>
+                {{ __('purchase.exp_date') }}: <strong class="text-primary">{{ $requisition->expected_date->format('d M Y') }}</strong>
             </span>
         @endif
     </div>
@@ -64,7 +64,7 @@
     <div class="d-flex gap-2 mb-3">
         <form action="{{ route('purchase.requisitions.approve', $requisition->id) }}" method="POST" class="flex-fill" id="approvePrDrawerForm_{{ $requisition->id }}">
             @csrf
-            <button type="button" class="btn btn-success btn-sm w-100" onclick="confirmAction({ title: 'Approve Requisition', message: '{{ __('purchase.confirm_approve') }}', variant: 'success', confirmText: 'Approve' }, function() { document.getElementById('approvePrDrawerForm_{{ $requisition->id }}').submit(); })">
+            <button type="button" class="btn btn-success btn-sm w-100" onclick="confirmAction({ title: '{{ __('purchase.approve_pr') }}', message: '{{ __('purchase.confirm_approve') }}', variant: 'success', confirmText: '{{ __('purchase.approve') }}' }, function() { document.getElementById('approvePrDrawerForm_{{ $requisition->id }}').submit(); })">
                 <i class="feather-check-circle me-1"></i> {{ __('purchase.approve') }}
             </button>
         </form>
@@ -155,8 +155,8 @@
                         @endif
                     </td>
                     <td class="text-center fw-semibold">{{ (float)$item->quantity }}</td>
-                    <td class="text-end">₹{{ number_format($item->estimated_cost, 2) }}</td>
-                    <td class="text-end fw-bold">₹{{ number_format($lineTotal, 2) }}</td>
+                    <td class="text-end">{{ format_currency($item->estimated_cost) }}</td>
+                    <td class="text-end fw-bold">{{ format_currency($lineTotal) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -165,7 +165,7 @@
                 <td colspan="3" class="text-end text-uppercase fs-10 text-muted letter-spacing-1">
                     {{ __('purchase.estimated_requisition_total') }}
                 </td>
-                <td class="text-end text-primary fs-14">₹{{ number_format($grandTotal, 2) }}</td>
+                <td class="text-end text-primary fs-14">{{ format_currency($grandTotal) }}</td>
             </tr>
         </tfoot>
     </table>

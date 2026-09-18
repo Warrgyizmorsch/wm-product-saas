@@ -355,11 +355,12 @@
                                         <th class="text-center">{{ __('purchase.received') }}</th>
                                         <th class="text-center">{{ __('purchase.rejected') }}</th>
                                         <th class="text-center">{{ __('purchase.accepted') }}</th>
-                                        <th class="text-end">{{ __('purchase.unit_rate') }} ({{ $currency }})</th>
-                                        <th class="text-end pe-3">{{ __('purchase.total_amount') }} ({{ $currency }})</th>
+                                        <th class="text-end">{{ __('purchase.unit_rate') }} ({{ active_currency_symbol() }})</th>
+                                        <th class="text-end pe-3">{{ __('purchase.total_amount') }} ({{ active_currency_symbol() }})</th>
                                     </tr>
                                 </thead>
-                                                        @php
+                                <tbody>
+                                    @php
                                          $totRec = 0; $totRej = 0; $totAcc = 0; $totAmt = 0;
                                          $groupedItems = $grn->items->groupBy('product_id')->map(function($items) {
                                              $first = $items->first();
@@ -404,7 +405,7 @@
                                                  'remarks' => $items->pluck('remarks')->filter()->implode(', '),
                                              ];
                                          })->values();
-                                     @endphp              @endphp
+                                    @endphp
                                     @foreach($groupedItems as $idx => $item)
                                         @php
                                             $totRec += (float)$item->received_qty;
@@ -438,7 +439,7 @@
                                         <td class="text-center font-monospace text-danger fs-14">{{ number_format($totRej, 2) }}</td>
                                         <td class="text-center font-monospace text-success fs-14">{{ number_format($totAcc, 2) }}</td>
                                         <td></td>
-                                        <td class="text-end pe-3 font-monospace text-dark fs-14">{{ $currency }} {{ number_format($totAmt, 2) }}</td>
+                                        <td class="text-end pe-3 font-monospace text-dark fs-14">{{ format_currency($totAmt) }}</td>
                                     </tr>
                                 </tfoot>
                             </table>

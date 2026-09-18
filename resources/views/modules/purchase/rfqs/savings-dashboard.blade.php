@@ -8,8 +8,7 @@
 
 @section('content')
     @php
-        $currency = tenant()?->settings['currency'] ?? 'INR';
-        $currencySymbol = ($currency === 'INR') ? '₹' : $currency . ' ';
+        $currencySymbol = active_currency_symbol();
     @endphp
 
     <div class="row text-dark">

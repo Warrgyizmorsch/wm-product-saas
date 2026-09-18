@@ -47,7 +47,7 @@
             </div>
             <div class="col-md-3 text-md-end">
                 <span class="text-muted d-block fs-11 text-uppercase fw-bold">{{ __('purchase.paid_amount') }}</span>
-                <strong class="fs-18 font-monospace text-success">₹{{ number_format($payment->amount, 2) }}</strong>
+                <strong class="fs-18 font-monospace text-success">{{ format_currency($payment->amount) }}</strong>
             </div>
         </div>
 
@@ -69,15 +69,15 @@
                                 <td class="ps-3 fw-bold text-primary">
                                     @if($alloc->bill)
                                         <a href="{{ route('purchase.bills.show', $alloc->bill->id) }}">
-                                            {{ $alloc->bill->bill_number }}
+                                             {{ $alloc->bill->bill_number }}
                                         </a>
                                     @else
                                         —
                                     @endif
                                 </td>
                                 <td>{{ $alloc->bill?->bill_date ? $alloc->bill->bill_date->format('d-M-Y') : '—' }}</td>
-                                <td class="text-end font-monospace">₹{{ number_format($alloc->bill?->grand_total ?: 0, 2) }}</td>
-                                <td class="text-end pe-3 font-monospace fw-bold text-success">₹{{ number_format($alloc->allocated_amount, 2) }}</td>
+                                <td class="text-end font-monospace">{{ format_currency($alloc->bill?->grand_total ?: 0) }}</td>
+                                <td class="text-end pe-3 font-monospace fw-bold text-success">{{ format_currency($alloc->allocated_amount) }}</td>
                             </tr>
                         @endforeach
                     </tbody>
