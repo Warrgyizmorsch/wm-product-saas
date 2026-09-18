@@ -1836,6 +1836,15 @@ return array (
   'direct_phone_number' => 'Direct Phone Number',
   'direct_email_address' => 'Direct Email Address',
   'validation_errors' => 'Validation Errors:',
+  'amount' => 'Amount',
+  'record_customer_payment' => 'Record Customer Payment',
+  'payment_method' => 'Payment Method',
+  'payment_number' => 'Payment Number',
+  'payment_date' => 'Payment Date',
+  'payments' => 'Payments',
+  'record' => 'Record',
+  'quick_add_transporter' => 'Quick Add Transporter Master',
+  'taxation_contact_details' => '2. Taxation & Contact Details',
 );
 
 

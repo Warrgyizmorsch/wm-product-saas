@@ -93,7 +93,7 @@
                                 <span class="badge bg-soft-info text-info px-2.5 py-1 fs-11 fw-semibold">{{ $pay->payment_method ?: 'Bank Transfer' }}</span>
                             </td>
                             <td class="font-monospace fs-12 text-secondary">{{ $pay->reference_number ?: 'N/A' }}</td>
-                            <td class="text-end font-monospace fw-bold text-success">₹{{ number_format($pay->amount, 2) }}</td>
+                            <td class="text-end font-monospace fw-bold text-success">{{ format_currency($pay->amount) }}</td>
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
                                     <a href="{{ route('purchase.payments.show', $pay->id) }}" class="action-icon-btn view-btn" title="{{ __('purchase.view_details') }}" data-bs-toggle="tooltip">

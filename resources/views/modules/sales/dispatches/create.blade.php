@@ -109,7 +109,7 @@
                             <option value="Customer Pickup" @selected(old('freight_terms', $prefillSalesOrder?->freight_terms ?? '') == 'Customer Pickup')>Customer Pickup (Self Vehicle)</option>
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount (₹)" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', $prefillSalesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
+                        <x-ui.odoo-form-ui type="input" inputType="number" :label="__('purchase.freight_amount') . ' (' . active_currency_symbol() . ')'" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', $prefillSalesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
                     </div>
 
                     <div class="col-md-6 ps-md-4">
@@ -197,29 +197,29 @@
         </x-slot:footer>
     </x-ui.modal>
     <!-- Quick Transporter Add Modal Component -->
-    <x-ui.modal id="quickTransporterModal" title="<i class='feather-truck text-primary me-2'></i>Quick Add Transporter Master" size="lg" :centered="true" :showFooter="false">
+    <x-ui.modal id="quickTransporterModal" :title="'<i class=\'feather-truck text-primary me-2\'></i>' . __('crm.quick_add_transporter')" size="lg" :centered="true" :showFooter="false">
         <form id="quickTransporterForm">
             @csrf
             <div class="p-1">
                 <!-- Section 1: Basic Logistics Info -->
-                <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-1.5"></i>1. Basic Transporter Information</h6>
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-1.5"></i>{{ __('crm.basic_transporter_info') }}</h6>
                 <div class="row g-3 mb-3">
                     <div class="col-md-7">
-                        <x-ui.odoo-form-ui type="input" label="Transporter Name" name="name" placeholder="e.g. V-Trans, TCI Logistics, GATI KWE" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.transporter_name_field')" name="name" placeholder="e.g. V-Trans, TCI Logistics, GATI KWE" :required="true" />
                     </div>
                     <div class="col-md-5">
-                        <x-ui.odoo-form-ui type="input" label="Transporter Code" name="code" value="{{ $autoCode }}" placeholder="e.g. TRP-0005" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.transporter_master_code')" name="code" value="{{ $autoCode }}" placeholder="e.g. TRP-0005" />
                     </div>
                     <div class="col-md-7">
-                        <x-ui.odoo-form-ui type="input" label="15-Digit E-Way Transporter ID" name="transporter_id" placeholder="e.g. 27AAACM1234F1Z1" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.transporter_id_eway')" name="transporter_id" placeholder="e.g. 27AAACM1234F1Z1" />
                     </div>
                     <div class="col-md-5">
-                        <x-ui.odoo-form-ui type="select" label="Transport Mode" name="transport_mode" :searchable="false">
-                            <option value="road">Road Transport</option>
-                            <option value="rail">Rail Logistics</option>
-                            <option value="air">Air Freight</option>
-                            <option value="sea">Sea Cargo</option>
-                            <option value="multimodal">Multimodal</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('crm.transport_mode')" name="transport_mode" :searchable="false">
+                            <option value="road">{{ __('crm.road_transport') }}</option>
+                            <option value="rail">{{ __('crm.rail_logistics') }}</option>
+                            <option value="air">{{ __('crm.air_freight') }}</option>
+                            <option value="sea">{{ __('crm.sea_cargo') }}</option>
+                            <option value="multimodal">{{ __('crm.multimodal') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
                 </div>
@@ -227,33 +227,33 @@
                 <hr class="my-3 text-muted opacity-25">
 
                 <!-- Section 2: Taxation & Contact Info -->
-                <h6 class="fw-bold text-primary mb-3"><i class="feather-shield me-1.5"></i>2. Taxation & Contact Details</h6>
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-shield me-1.5"></i>{{ __('crm.taxation_contact_details') }}</h6>
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="GSTIN Number" name="gstin" placeholder="e.g. 27AAAAA0000A1Z5" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.gstin_number_field')" name="gstin" placeholder="e.g. 27AAAAA0000A1Z5" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="PAN Number" name="pan_number" placeholder="e.g. ABCDE1234F" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.pan_number_field')" name="pan_number" placeholder="e.g. ABCDE1234F" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="Phone / Mobile" name="phone" placeholder="Contact number" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.primary_office_phone')" name="phone" placeholder="Contact number" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" inputType="email" label="Email Address" name="email" placeholder="dispatch@transporter.com" />
+                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.official_email_address')" name="email" placeholder="dispatch@transporter.com" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="City" name="city" placeholder="City" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.city')" name="city" placeholder="City" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="State" name="state" placeholder="State" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.state')" name="state" placeholder="State" />
                     </div>
                 </div>
 
                 <!-- Footer Action Buttons -->
                 <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top mt-3">
-                    <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">{{ __('crm.cancel') }}</button>
                     <button type="submit" class="btn btn-primary fw-bold px-4" id="saveQuickTransporterBtn">
-                        <i class="feather-save me-1.5"></i>Save Transporter
+                        <i class="feather-save me-1.5"></i>{{ __('crm.save_transporter_master') }}
                     </button>
                 </div>
             </div>
@@ -483,8 +483,9 @@
                     if (res && res.invoices && res.invoices.length > 0) {
                         activeSalesOrderInvoices = res.invoices;
                         $select.empty().append('<option value="">-- Dispatch Full Sales Order / Material Requirement --</option>');
+                        const currencySymbol = "{{ active_currency_symbol() }}";
                         res.invoices.forEach(function(inv) {
-                            $select.append(`<option value="${inv.id}">Invoice #${inv.invoice_number} (${inv.invoice_date}) - Total ₹${inv.total_amount} [${inv.items.length} unfulfilled item(s)]</option>`);
+                            $select.append(`<option value="${inv.id}">Invoice #${inv.invoice_number} (${inv.invoice_date}) - {{ __('crm.total') }} ${currencySymbol}${inv.total_amount} [${inv.items.length} unfulfilled item(s)]</option>`);
                         });
                         $wrapper.removeClass('d-none');
                     } else {

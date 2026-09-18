@@ -4,6 +4,11 @@
 
 return [
     [
+        'section' => 'supply_chain', 'order' => 1, 'module' => 'inventory',
+        'label' => 'inventory.supply_chain_dashboard', 'default' => 'Supply Chain Dashboard', 'icon' => 'feather-grid',
+        'route' => 'supply-chain.dashboard',
+    ],
+    [
         'section' => 'supply_chain', 'order' => 10, 'module' => 'inventory',
         'label' => 'inventory.store', 'default' => 'Store', 'icon' => 'feather-archive',
         'children' => [

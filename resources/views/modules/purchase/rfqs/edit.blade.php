@@ -111,7 +111,7 @@
                                         <th style="width: 32%">{{ __('purchase.product') }} <span class="text-danger">*</span></th>
                                         <th style="width: 30%">{{ __('purchase.assigned_suppliers') }} <span class="text-danger">*</span></th>
                                         <th class="text-end" style="width: 14%">{{ __('purchase.quantity') }} <span class="text-danger">*</span></th>
-                                        <th class="text-end" style="width: 15%">{{ __('purchase.est_cost_rs') }}</th>
+                                        <th class="text-end" style="width: 15%">{{ __('purchase.est_cost_rs') }} ({{ active_currency_symbol() }})</th>
                                         <th class="text-center" style="width: 5%"></th>
                                     </tr>
                                 </thead>

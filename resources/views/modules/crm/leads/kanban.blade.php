@@ -152,11 +152,11 @@
 
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date From</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_from') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="date_from" value="{{ request('date_from') ?? request('start_date') }}" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date To</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_to') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="date_to" value="{{ request('date_to') ?? request('end_date') }}" />
                         </div>
                     </div>

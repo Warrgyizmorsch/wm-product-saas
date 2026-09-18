@@ -104,8 +104,8 @@
                         <th style="width: 14%">{{ __('purchase.warehouse') }}</th>
                         <th style="width: 12%">{{ __('purchase.receipt_date') }}</th>
                         <th style="width: 10%" class="text-center">{{ __('purchase.received_qty') }}</th>
-                        <th style="width: 10%" class="text-center">STORE STATUS</th>
-                        <th style="width: 11%" class="text-center">BILLING STATUS</th>
+                        <th style="width: 10%" class="text-center">{{ __('purchase.store_status') }}</th>
+                        <th style="width: 11%" class="text-center">{{ __('purchase.billing_status') }}</th>
                         <th style="width: 10%">{{ __('purchase.created_by') }}</th>
                         <th style="width: 12%" class="text-end">{{ __('purchase.actions') }}</th>
                     </tr>
