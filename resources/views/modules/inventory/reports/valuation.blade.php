@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Stock Valuation Report | SaaS ERP')
-@section('page-title', 'Inventory Asset Valuation Report')
-@section('breadcrumb', 'Inventory / Reports / Valuation')
+@section('title', __('inventory.stock_valuation_report') . ' | SaaS ERP')
+@section('page-title', __('inventory.inventory_asset_valuation_report'))
+@section('breadcrumb', __('inventory.inventory_reports_valuation'))
 
 @push('styles')
 <style>
@@ -47,17 +47,17 @@
             <a href="{{ request()->fullUrlWithQuery(['item_category' => 'all', 'page' => 1]) }}" 
                class="ledger-tab-link {{ request('item_category', 'all') === 'all' ? 'active' : '' }}">
                 <i class="feather-pie-chart fs-15 text-primary"></i>
-                <span>All Items Valuation (₹{{ number_format($totalValuation, 0) }})</span>
+                <span>{{ __('inventory.all_items_valuation') }} ({!! format_currency($totalValuation) !!})</span>
             </a>
             <a href="{{ request()->fullUrlWithQuery(['item_category' => 'fg', 'page' => 1]) }}" 
                class="ledger-tab-link {{ request('item_category') === 'fg' ? 'active' : '' }}">
                 <i class="feather-package fs-15 text-success"></i>
-                <span>Finished Goods (FG) Valuation (₹{{ number_format($fgValuation, 0) }})</span>
+                <span>{{ __('inventory.finished_goods_valuation') }} ({!! format_currency($fgValuation) !!})</span>
             </a>
             <a href="{{ request()->fullUrlWithQuery(['item_category' => 'rm', 'page' => 1]) }}" 
                class="ledger-tab-link {{ request('item_category') === 'rm' ? 'active' : '' }}">
                 <i class="feather-layers fs-15 text-info"></i>
-                <span>Raw Materials & Components (₹{{ number_format($rmValuation, 0) }})</span>
+                <span>{{ __('inventory.raw_materials_valuation') }} ({!! format_currency($rmValuation) !!})</span>
             </a>
         </div>
     </div>
@@ -70,9 +70,9 @@
                     <i class="feather-dollar-sign fs-5"></i>
                 </div>
                 <div class="overflow-hidden flex-grow-1">
-                    <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="TOTAL STOCK VALUATION">TOTAL STOCK VALUATION</span>
-                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="₹{{ number_format($totalValuation, 2) }}">₹{{ number_format($totalValuation, 2) }}</div>
-                    <span class="fs-11 text-muted d-block text-truncate mt-0.5">Total physical asset value</span>
+                    <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="{{ __('inventory.total_stock_valuation') }}">{{ __('inventory.total_stock_valuation') }}</span>
+                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate">{!! format_currency($totalValuation) !!}</div>
+                    <span class="fs-11 text-muted d-block text-truncate mt-0.5">{{ __('inventory.total_physical_asset_value') }}</span>
                 </div>
             </div>
         </div>
@@ -83,9 +83,9 @@
                     <i class="feather-package fs-5"></i>
                 </div>
                 <div class="overflow-hidden flex-grow-1">
-                    <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="FINISHED GOODS VALUATION">FINISHED GOODS VALUATION</span>
-                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="₹{{ number_format($fgValuation, 2) }}">₹{{ number_format($fgValuation, 2) }}</div>
-                    <span class="fs-11 text-muted d-block text-truncate mt-0.5">Finished stock ({{ number_format($fgQty, 2) }} Units)</span>
+                    <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="{{ __('inventory.finished_goods_fg_valuation') }}">{{ __('inventory.finished_goods_fg_valuation') }}</span>
+                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate">{!! format_currency($fgValuation) !!}</div>
+                    <span class="fs-11 text-muted d-block text-truncate mt-0.5">{{ __('inventory.finished_stock') }} ({{ number_format($fgQty, 2) }} {{ __('inventory.units') }})</span>
                 </div>
             </div>
         </div>
@@ -96,9 +96,9 @@
                     <i class="feather-layers fs-5"></i>
                 </div>
                 <div class="overflow-hidden flex-grow-1">
-                    <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="RAW MATERIALS VALUATION">RAW MATERIALS VALUATION</span>
-                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="₹{{ number_format($rmValuation, 2) }}">₹{{ number_format($rmValuation, 2) }}</div>
-                    <span class="fs-11 text-muted d-block text-truncate mt-0.5">Raw materials & WIP ({{ number_format($rmQty, 2) }} Units)</span>
+                    <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="{{ __('inventory.raw_materials_wip_valuation') }}">{{ __('inventory.raw_materials_wip_valuation') }}</span>
+                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate">{!! format_currency($rmValuation) !!}</div>
+                    <span class="fs-11 text-muted d-block text-truncate mt-0.5">{{ __('inventory.raw_materials_and_wip') }} ({{ number_format($rmQty, 2) }} {{ __('inventory.units') }})</span>
                 </div>
             </div>
         </div>
@@ -109,9 +109,9 @@
                     <i class="feather-box fs-5"></i>
                 </div>
                 <div class="overflow-hidden flex-grow-1">
-                    <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="TOTAL ON-HAND QUANTITY">TOTAL ON-HAND QUANTITY</span>
-                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="{{ number_format($totalQty, 2) }} Units">{{ number_format($totalQty, 2) }} Units</div>
-                    <span class="fs-11 text-muted d-block text-truncate mt-0.5">Physical stock across warehouses</span>
+                    <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="{{ __('inventory.total_on_hand_quantity') }}">{{ __('inventory.total_on_hand_quantity') }}</span>
+                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate">{{ number_format($totalQty, 2) }} {{ __('inventory.units') }}</div>
+                    <span class="fs-11 text-muted d-block text-truncate mt-0.5">{{ __('inventory.physical_stock_across_warehouses') }}</span>
                 </div>
             </div>
         </div>
@@ -122,7 +122,7 @@
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom">
             <div class="d-flex align-items-center flex-wrap gap-2">
                 <h5 class="fw-bold text-dark mb-0 me-2">
-                    <i class="feather-pie-chart text-primary me-2"></i>Stock Asset Valuation Matrix
+                    <i class="feather-pie-chart text-primary me-2"></i>{{ __('inventory.stock_asset_valuation_matrix') }}
                 </h5>
             </div>
 
@@ -137,7 +137,7 @@
                         type="text" 
                         name="search" 
                         class="form-control border-0 bg-transparent p-0 fs-13" 
-                        placeholder="Search product or SKU..." 
+                        placeholder="{{ __('inventory.search_product_or_sku') }}" 
                         value="{{ request('search') }}"
                         style="box-shadow: none; height: 32px; width: 220px;"
                     >
@@ -148,13 +148,13 @@
                     @if(request('item_category')) <input type="hidden" name="item_category" value="{{ request('item_category') }}"> @endif
                     @if(request('search')) <input type="hidden" name="search" value="{{ request('search') }}"> @endif
 
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Valuation</h6>
+                    <x-ui.filter :label="__('inventory.filter')" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('inventory.filter_valuation') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Warehouse Location</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.warehouse_location') }}</label>
                             <x-ui.odoo-form-ui type="select" name="warehouse_id">
-                                <option value="">— All Warehouses —</option>
+                                <option value="">— {{ __('inventory.all_warehouses') }} —</option>
                                 @foreach($warehouses as $wh)
                                     <option value="{{ $wh->id }}" @selected(request('warehouse_id') == $wh->id)>{{ $wh->name }}</option>
                                 @endforeach
@@ -162,15 +162,15 @@
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('inventory.reports.valuation') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filter</button>
+                            <a href="{{ route('inventory.reports.valuation') }}" class="btn btn-sm btn-light border">{{ __('inventory.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('inventory.apply_filter') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
 
                 <a href="{{ route('inventory.reports.valuation.export', request()->all()) }}" class="btn btn-sm btn-success text-white shadow-xs d-inline-flex align-items-center gap-1.5" title="Export unpaginated valuation data with active filters to Excel/CSV">
                     <i class="feather-download"></i>
-                    <span>Download Report (Excel / CSV)</span>
+                    <span>{{ __('inventory.download_report_excel_csv') }}</span>
                 </a>
             </div>
         </div>
@@ -180,12 +180,12 @@
             <x-ui.odoo-form-ui type="table" id="stockValuationTable">
                 <thead class="table-light bg-light">
                     <tr>
-                        <th>Product Name</th>
-                        <th>SKU Code</th>
-                        <th>Warehouse Location</th>
-                        <th class="text-end">On Hand Qty</th>
-                        <th class="text-end">Unit Cost Rate</th>
-                        <th class="text-end pe-3">Total Asset Value</th>
+                        <th>{{ __('inventory.product_name') }}</th>
+                        <th>{{ __('inventory.sku_code') }}</th>
+                        <th>{{ __('inventory.warehouse_location') }}</th>
+                        <th class="text-end">{{ __('inventory.on_hand_qty') }}</th>
+                        <th class="text-end">{{ __('inventory.unit_cost_rate') }}</th>
+                        <th class="text-end pe-3">{{ __('inventory.total_asset_value') }}</th>
                     </tr>
                 </thead>
                 <tbody class="text-dark">
@@ -219,17 +219,17 @@
                                 {{ number_format($stock->quantity, 2) }}
                             </td>
                             <td class="text-end font-monospace text-muted fs-12">
-                                ₹{{ number_format($unitCost, 2) }}
+                                {!! format_currency($unitCost) !!}
                             </td>
                             <td class="text-end pe-3 font-monospace fw-bold fs-13 text-primary">
-                                ₹{{ number_format($value, 2) }}
+                                {!! format_currency($value) !!}
                             </td>
                         </tr>
                     @empty
                         <tr>
                             <td colspan="6" class="text-center py-5 text-muted">
                                 <i class="feather-archive fs-1 d-block mb-3 text-light"></i>
-                                No physical stock valuation data available.
+                                {{ __('inventory.no_physical_stock_valuation_data') }}
                             </td>
                         </tr>
                     @endforelse

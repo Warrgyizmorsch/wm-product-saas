@@ -156,27 +156,27 @@
                                     @endif
                                 </td>
                                 <td class="text-end">
-                                    <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_structure_confirm') }}', { title: 'Delete Salary Structure', variant: 'danger', confirmButtonText: 'Delete' });">
-                                        @csrf
-                                        @method('DELETE')
-                                        <div class="hstack gap-2 justify-content-end align-items-center">
-                                            <a href="javascript:void(0)" class="action-dropdown-btn toggle-structure-details text-secondary" data-target="#structure-details-{{ $structure->id }}" title="{{ __('hrms.salary.show_components') }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;">
-                                                <i class="feather feather-chevron-down"></i>
-                                            </a>
-                                            <x-ui.action-dropdown>
-                                                <li>
-                                                    <a class="dropdown-item edit-structure-btn" href="javascript:void(0)" data-structure="{{ base64_encode($structure->toJson()) }}">
-                                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.salary.edit') }}
-                                                    </a>
-                                                </li>
-                                                <li>
+                                    <div class="hstack gap-2 justify-content-end align-items-center">
+                                        <a href="javascript:void(0)" class="toggle-structure-details text-secondary" data-target="#structure-details-{{ $structure->id }}" title="{{ __('hrms.salary.show_components') }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;">
+                                            <i class="feather feather-chevron-down"></i>
+                                        </a>
+                                        <x-ui.action-dropdown>
+                                            <li>
+                                                <a class="dropdown-item edit-structure-btn" href="javascript:void(0)" data-structure="{{ base64_encode($structure->toJson()) }}">
+                                                    <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.salary.edit') }}
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_structure_confirm') }}', { title: 'Delete Salary Structure', variant: 'danger', confirmButtonText: 'Delete' });">
+                                                    @csrf
+                                                    @method('DELETE')
                                                     <button type="submit" class="dropdown-item text-danger">
                                                         <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.salary.delete') }}
                                                     </button>
-                                                </li>
-                                            </x-ui.action-dropdown>
-                                        </div>
-                                    </form>
+                                                </form>
+                                            </li>
+                                        </x-ui.action-dropdown>
+                                    </div>
                                 </td>
                             </tr>
                             <tr id="structure-details-{{ $structure->id }}" class="table-light d-none">
@@ -559,7 +559,23 @@
     </form>
 </x-ui.modal>
 
+@push('scripts')
 <script>
+    // Safe UTF-8 Base64 JSON decoding helper
+    function safeBase64Decode(str) {
+        if (!str) return null;
+        try {
+            return JSON.parse(decodeURIComponent(escape(atob(str))));
+        } catch(e) {
+            try {
+                return JSON.parse(atob(str));
+            } catch(e2) {
+                console.error('Base64 decode error:', e2);
+                return null;
+            }
+        }
+    }
+
     // Handle Quick Add Component form submission via AJAX (keeps parent Salary Structure modal open)
     $(document).on('submit', '#quickAddComponentForm', function(e) {
         e.preventDefault();
@@ -655,24 +671,27 @@
     }
 
     // Modal populate edit scripts & detail toggles
-    document.addEventListener("DOMContentLoaded", function() {
+    $(document).ready(function() {
         // Load initial simulator values
         calculateSimulator();
 
         // Toggle structure components details row
-        $(document).on('click', '.toggle-structure-details', function() {
-            let targetId = $(this).attr('data-target');
+        $(document).on('click', '.toggle-structure-details', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            let btn = $(this).closest('.toggle-structure-details');
+            let targetId = btn.attr('data-target');
             let targetRow = $(targetId);
-            let icon = $(this).find('i');
+            let icon = btn.find('i');
             
             if (targetRow.hasClass('d-none')) {
                 targetRow.removeClass('d-none');
                 icon.removeClass('feather-chevron-down').addClass('feather-chevron-up');
-                $(this).attr('title', '{{ __('hrms.salary.hide_components') }}');
+                btn.attr('title', '{{ __('hrms.salary.hide_components') }}');
             } else {
                 targetRow.addClass('d-none');
                 icon.removeClass('feather-chevron-up').addClass('feather-chevron-down');
-                $(this).attr('title', '{{ __('hrms.salary.show_components') }}');
+                btn.attr('title', '{{ __('hrms.salary.show_components') }}');
             }
         });
 
@@ -683,12 +702,21 @@
         });
 
         // Use robust event delegation for the edit handler
-        $(document).on('click', '.edit-structure-btn', function() {
-            let dataStr = $(this).attr('data-structure');
+        $(document).on('click', '.edit-structure-btn', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Close any open action dropdown menu
+            $('.dropdown-menu.show').removeClass('show');
+            $('.dropdown.show').removeClass('show');
+
+            let btn = $(this).closest('.edit-structure-btn');
+            let dataStr = btn.attr('data-structure');
             if (!dataStr) return;
 
-            // Decode structure data from base64
-            let structure = JSON.parse(atob(dataStr));
+            // Decode structure data from base64 safely (handles UTF-8)
+            let structure = safeBase64Decode(dataStr);
+            if (!structure) return;
             
             let id = structure.id;
             let name = structure.name;
@@ -724,7 +752,7 @@
                 });
             }
 
-            // Open the modal programmatically to avoid tooltip/modal toggle attribute collision
+            // Open the modal programmatically
             $('#editSalaryStructureModal').modal('show');
         });
 
@@ -994,3 +1022,4 @@
     }
 
 </script>
+@endpush

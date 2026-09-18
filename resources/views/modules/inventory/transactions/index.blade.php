@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Stock Ledger & Transactions | SaaS ERP')
-@section('page-title', 'Stock Ledger & Movement History')
-@section('breadcrumb', 'Inventory / Stock Ledger')
+@section('title', __('inventory.stock_ledger_and_transactions') . ' | SaaS ERP')
+@section('page-title', __('inventory.stock_ledger_movement_history'))
+@section('breadcrumb', __('inventory.inventory_stock_ledger'))
 
 @push('styles')
 <style>
@@ -53,17 +53,17 @@
                 <a href="{{ request()->fullUrlWithQuery(['item_category' => 'all', 'page' => 1]) }}" 
                    class="ledger-tab-link {{ request('item_category', 'all') === 'all' ? 'active' : '' }}">
                     <i class="feather-box fs-15 text-primary"></i>
-                    <span>All Items Ledger</span>
+                    <span>{{ __('inventory.all_items_ledger') }}</span>
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['item_category' => 'fg', 'page' => 1]) }}" 
                    class="ledger-tab-link {{ request('item_category') === 'fg' ? 'active' : '' }}">
                     <i class="feather-package fs-15 text-warning"></i>
-                    <span>Finished Goods (FG) Ledger</span>
+                    <span>{{ __('inventory.finished_goods_fg_ledger') }}</span>
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['item_category' => 'rm', 'page' => 1]) }}" 
                    class="ledger-tab-link {{ request('item_category') === 'rm' ? 'active' : '' }}">
                     <i class="feather-layers fs-15 text-info"></i>
-                    <span>Raw Materials & Other Items</span>
+                    <span>{{ __('inventory.raw_materials_other_items') }}</span>
                 </a>
             </div>
         </div>
@@ -76,9 +76,9 @@
                         <i class="feather-arrow-down-left fs-5"></i>
                     </div>
                     <div class="overflow-hidden flex-grow-1">
-                        <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="TOTAL INWARD (IN)">TOTAL INWARD (IN)</span>
-                        <div class="fs-16 fw-bold text-success text-nowrap text-truncate" title="+{{ number_format($totalInQty, 2) }} Units">+{{ number_format($totalInQty, 2) }} Units</div>
-                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">Inward Value: ₹{{ number_format($totalInValue, 2) }}</span>
+                        <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="{{ __('inventory.total_inward_in') }}">{{ __('inventory.total_inward_in') }}</span>
+                        <div class="fs-16 fw-bold text-success text-nowrap text-truncate" title="+{{ number_format($totalInQty, 2) }} {{ __('inventory.units') }}">+{{ number_format($totalInQty, 2) }} {{ __('inventory.units') }}</div>
+                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">{{ __('inventory.inward_value') }}: {!! format_currency($totalInValue) !!}</span>
                     </div>
                 </div>
             </div>
@@ -89,9 +89,9 @@
                         <i class="feather-arrow-up-right fs-5"></i>
                     </div>
                     <div class="overflow-hidden flex-grow-1">
-                        <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="TOTAL OUTWARD (OUT)">TOTAL OUTWARD (OUT)</span>
-                        <div class="fs-16 fw-bold text-danger text-nowrap text-truncate" title="-{{ number_format($totalOutQty, 2) }} Units">-{{ number_format($totalOutQty, 2) }} Units</div>
-                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">Outward Value: ₹{{ number_format($totalOutValue, 2) }}</span>
+                        <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="{{ __('inventory.total_outward_out') }}">{{ __('inventory.total_outward_out') }}</span>
+                        <div class="fs-16 fw-bold text-danger text-nowrap text-truncate" title="-{{ number_format($totalOutQty, 2) }} {{ __('inventory.units') }}">-{{ number_format($totalOutQty, 2) }} {{ __('inventory.units') }}</div>
+                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">{{ __('inventory.outward_value') }}: {!! format_currency($totalOutValue) !!}</span>
                     </div>
                 </div>
             </div>
@@ -102,9 +102,9 @@
                         <i class="feather-activity fs-5"></i>
                     </div>
                     <div class="overflow-hidden flex-grow-1">
-                        <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="NET MOVEMENT DELTA">NET MOVEMENT DELTA</span>
-                        <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="{{ $netQty >= 0 ? '+' : '' }}{{ number_format($netQty, 2) }} Units">{{ $netQty >= 0 ? '+' : '' }}{{ number_format($netQty, 2) }} Units</div>
-                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">Net stock change balance</span>
+                        <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="{{ __('inventory.net_movement_delta') }}">{{ __('inventory.net_movement_delta') }}</span>
+                        <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="{{ $netQty >= 0 ? '+' : '' }}{{ number_format($netQty, 2) }} {{ __('inventory.units') }}">{{ $netQty >= 0 ? '+' : '' }}{{ number_format($netQty, 2) }} {{ __('inventory.units') }}</div>
+                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">{{ __('inventory.net_stock_change_balance') }}</span>
                     </div>
                 </div>
             </div>
@@ -115,9 +115,9 @@
                         <i class="feather-list fs-5"></i>
                     </div>
                     <div class="overflow-hidden flex-grow-1">
-                        <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="TOTAL MOVEMENT LOGS">TOTAL MOVEMENT LOGS</span>
-                        <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="{{ number_format($totalTransactionsCount) }} Entries">{{ number_format($totalTransactionsCount) }} Entries</div>
-                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">Stock ledger transaction logs</span>
+                        <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="{{ __('inventory.total_movement_logs') }}">{{ __('inventory.total_movement_logs') }}</span>
+                        <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="{{ number_format($totalTransactionsCount) }} {{ __('inventory.entries') }}">{{ number_format($totalTransactionsCount) }} {{ __('inventory.entries') }}</div>
+                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">{{ __('inventory.stock_ledger_transaction_logs') }}</span>
                     </div>
                 </div>
             </div>
@@ -126,46 +126,46 @@
         <!-- Toolbar: Tabs, Sort, Filter & Download (Matching Lead Module Standards) -->
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
             <div class="d-flex align-items-center flex-wrap gap-2">
-                <h5 class="fw-bold text-dark mb-0 me-1">Stock Movement History</h5>
-                <a href="{{ request()->fullUrlWithQuery(['type' => null]) }}" class="btn btn-xs {{ !request('type') ? 'btn-primary' : 'btn-light border' }}">
-                    All Movements
-                </a>
-                <a href="{{ request()->fullUrlWithQuery(['type' => 'IN']) }}" class="btn btn-xs {{ request('type') === 'IN' ? 'btn-success text-white' : 'btn-soft-success text-success' }}">
-                    IN
-                </a>
-                <a href="{{ request()->fullUrlWithQuery(['type' => 'OUT']) }}" class="btn btn-xs {{ request('type') === 'OUT' ? 'btn-danger text-white' : 'btn-soft-danger text-danger' }}">
-                    OUT
-                </a>
+                <h5 class="fw-bold text-dark mb-0 me-1">{{ __('inventory.stock_movement_history') }}</h5>
+                <x-ui.button href="{{ request()->fullUrlWithQuery(['type' => null]) }}" variant="{{ !request('type') ? 'primary' : 'light' }}" class="{{ !request('type') ? '' : 'text-muted border' }}">
+                    {{ __('inventory.all_movements') }}
+                </x-ui.button>
+                <x-ui.button href="{{ request()->fullUrlWithQuery(['type' => 'IN']) }}" variant="{{ request('type') === 'IN' ? 'primary' : 'light' }}" class="{{ request('type') === 'IN' ? '' : 'text-muted border' }}">
+                    {{ __('inventory.in') }}
+                </x-ui.button>
+                <x-ui.button href="{{ request()->fullUrlWithQuery(['type' => 'OUT']) }}" variant="{{ request('type') === 'OUT' ? 'primary' : 'light' }}" class="{{ request('type') === 'OUT' ? '' : 'text-muted border' }}">
+                    {{ __('inventory.out') }}
+                </x-ui.button>
             </div>
 
             <div class="d-flex align-items-center flex-wrap gap-2">
                 <!-- Custom Sort Component -->
-                <x-ui.sort-dropdown label="Sort">
+                <x-ui.sort-dropdown :label="__('inventory.sort')">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Latest Date & Time</span>
+                        <span>{{ __('inventory.latest_date_time') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Oldest Date & Time</span>
+                        <span>{{ __('inventory.oldest_date_time') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'quantity', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'quantity' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Highest Quantity</span>
+                        <span>{{ __('inventory.highest_quantity') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'total_value', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'total_value' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Highest Valuation</span>
+                        <span>{{ __('inventory.highest_valuation') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
                 <!-- System Filter Component -->
                 <form method="GET" action="{{ route('inventory.transactions.index') }}" class="d-inline">
                     <input type="hidden" name="item_category" value="{{ request('item_category', 'all') }}">
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Stock Ledger</h6>
+                    <x-ui.filter :label="__('inventory.filter')" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('inventory.filter_stock_ledger') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Product</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.product') }}</label>
                             <x-ui.odoo-form-ui type="select" name="product_id">
-                                <option value="">All Products</option>
+                                <option value="">{{ __('inventory.all_products') }}</option>
                                 @foreach($products as $prod)
                                     <option value="{{ $prod->id }}" {{ request('product_id') == $prod->id ? 'selected' : '' }}>
                                         {{ $prod->name }} ({{ $prod->sku }})
@@ -175,9 +175,9 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Warehouse</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.warehouse') }}</label>
                             <x-ui.odoo-form-ui type="select" name="warehouse_id">
-                                <option value="">All Warehouses</option>
+                                <option value="">{{ __('inventory.all_warehouses') }}</option>
                                 @foreach($warehouses as $wh)
                                     <option value="{{ $wh->id }}" {{ request('warehouse_id') == $wh->id ? 'selected' : '' }}>
                                         {{ $wh->name }}
@@ -187,37 +187,36 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Movement Type</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.movement_type') }}</label>
                             <x-ui.odoo-form-ui type="select" name="type">
-                                <option value="">IN & OUT</option>
-                                <option value="IN" {{ request('type') === 'IN' ? 'selected' : '' }}>IN</option>
-                                <option value="OUT" {{ request('type') === 'OUT' ? 'selected' : '' }}>OUT</option>
+                                <option value="">{{ __('inventory.in_and_out') }}</option>
+                                <option value="IN" {{ request('type') === 'IN' ? 'selected' : '' }}>{{ __('inventory.in') }}</option>
+                                <option value="OUT" {{ request('type') === 'OUT' ? 'selected' : '' }}>{{ __('inventory.out') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="row g-2 mb-3">
                             <div class="col-6">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date From</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.date_from') }}</label>
                                 <x-ui.odoo-form-ui type="input" inputType="date" name="date_from" value="{{ request('date_from') }}" />
                             </div>
                             <div class="col-6">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date To</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.date_to') }}</label>
                                 <x-ui.odoo-form-ui type="input" inputType="date" name="date_to" value="{{ request('date_to') }}" />
                             </div>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('inventory.transactions.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('inventory.transactions.index') }}" class="btn btn-sm btn-light border">{{ __('inventory.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('inventory.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
 
                 <!-- Export Download Button -->
-                <a href="{{ route('inventory.transactions.export', request()->all()) }}" class="btn btn-sm btn-success text-white shadow-xs d-inline-flex align-items-center gap-1.5" title="Export stock ledger transactions with active filters to Excel/CSV">
-                    <i class="feather-download"></i>
-                    <span>Download Ledger (Excel / CSV)</span>
-                </a>
+                <x-ui.button href="{{ route('inventory.transactions.export', request()->all()) }}" variant="success" icon="feather-download" class="text-white" title="Export stock ledger transactions with active filters to Excel/CSV">
+                    {{ __('inventory.download_ledger_excel_csv') }}
+                </x-ui.button>
             </div>
         </div>
 
@@ -226,15 +225,15 @@
             <x-ui.odoo-form-ui type="table" id="stockLedgerTable">
                 <thead>
                     <tr>
-                        <th>Date & Time</th>
-                        <th>Product</th>
-                        <th>Warehouse</th>
-                        <th>Type</th>
-                        <th class="text-end">Quantity</th>
-                        <th class="text-end">Balance Qty</th>
-                        <th class="text-end">Unit Cost</th>
-                        <th class="text-end">Total Value</th>
-                        <th>Reference Document</th>
+                        <th>{{ __('inventory.date_time') }}</th>
+                        <th>{{ __('inventory.product') }}</th>
+                        <th>{{ __('inventory.warehouse') }}</th>
+                        <th>{{ __('inventory.type') }}</th>
+                        <th class="text-end">{{ __('inventory.quantity') }}</th>
+                        <th class="text-end">{{ __('inventory.balance_qty') }}</th>
+                        <th class="text-end">{{ __('inventory.unit_cost') }}</th>
+                        <th class="text-end">{{ __('inventory.total_value') }}</th>
+                        <th>{{ __('inventory.reference_document') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -260,9 +259,9 @@
                                 @if($trx->batch)
                                     <div class="mt-1">
                                         <span class="badge bg-soft-warning text-dark border border-warning-subtle fs-11 px-2 py-0.5" title="Batch Expiry: {{ $trx->batch->expiry_date ? $trx->batch->expiry_date->format('d M Y') : 'N/A' }}">
-                                            <i class="feather-box text-warning me-1"></i>Batch: {{ $trx->batch->batch_number }}
+                                            <i class="feather-box text-warning me-1"></i>{{ __('inventory.batch') }}: {{ $trx->batch->batch_number }}
                                             @if($trx->batch->expiry_date)
-                                                <span class="text-muted ms-1">(Exp: {{ $trx->batch->expiry_date->format('d M Y') }})</span>
+                                                <span class="text-muted ms-1">({{ __('inventory.exp') }}: {{ $trx->batch->expiry_date->format('d M Y') }})</span>
                                             @endif
                                         </span>
                                     </div>
@@ -275,7 +274,7 @@
                                 @if($serials && $serials->count() > 0)
                                     <div class="mt-1">
                                         <span class="badge bg-soft-info text-info border border-info-subtle fs-11 px-2 py-0.5" title="Serial Numbers: {{ $serials->pluck('serial_number')->join(', ') }}">
-                                            <i class="feather-hash me-1"></i>S/N: {{ $serials->pluck('serial_number')->take(2)->join(', ') }}{{ $serials->count() > 2 ? ' +'.($serials->count() - 2).' more' : '' }}
+                                            <i class="feather-hash me-1"></i>{{ __('inventory.sn_prefix') }}: {{ $serials->pluck('serial_number')->take(2)->join(', ') }}{{ $serials->count() > 2 ? ' +'.($serials->count() - 2).' '.__('inventory.more') : '' }}
                                         </span>
                                     </div>
                                 @endif
@@ -286,11 +285,11 @@
                             <td>
                                 @if($trx->type === 'IN')
                                     <span class="badge bg-soft-success text-success border border-success-subtle px-2.5 py-1 fs-11 fw-bold">
-                                        IN
+                                        {{ __('inventory.in') }}
                                     </span>
                                 @else
                                     <span class="badge bg-soft-danger text-danger border border-danger-subtle px-2.5 py-1 fs-11 fw-bold">
-                                        OUT
+                                        {{ __('inventory.out') }}
                                     </span>
                                 @endif
                             </td>
@@ -300,12 +299,12 @@
                             <td class="text-end font-monospace fw-bold text-dark fs-13">
                                 {{ number_format($trx->balance_qty ?? 0, 2) }}
                             </td>
-                            <td class="text-end font-monospace text-muted fs-12">₹{{ number_format($trx->unit_cost, 2) }}</td>
-                            <td class="text-end font-monospace fw-bold text-dark fs-13">₹{{ number_format($trx->total_value, 2) }}</td>
+                            <td class="text-end font-monospace text-muted fs-12">{!! format_currency($trx->unit_cost) !!}</td>
+                            <td class="text-end font-monospace fw-bold text-dark fs-13">{!! format_currency($trx->total_value) !!}</td>
                             <td>
                                 <div class="d-flex flex-column align-items-start gap-1">
                                     <span class="badge bg-light text-secondary border fs-11 fw-medium">
-                                        {{ $trx->reference_type ?: 'Direct Movement' }}
+                                        {{ $trx->reference_type ?: __('inventory.direct_movement') }}
                                     </span>
                                     @if($trx->document_url)
                                         <a href="{{ $trx->document_url }}" class="fw-bold text-primary text-decoration-underline-hover fs-12 d-inline-flex align-items-center gap-1" title="Click to view {{ $trx->document_number }}">
@@ -322,7 +321,7 @@
                         <tr>
                             <td colspan="9" class="text-center py-5 text-muted">
                                 <i class="feather-archive fs-1 d-block mb-3 text-light"></i>
-                                No stock movement transactions found.
+                                {{ __('inventory.no_stock_transactions_found') }}
                             </td>
                         </tr>
                     @endforelse

@@ -188,7 +188,7 @@
             <div class="d-flex align-items-center gap-3">
                 <span class="text-muted fw-semibold fs-13">{{ __('inventory.total_inventory_value') }}</span>
                 <span id="grand-total-display" class="fw-bold fs-4 text-dark">
-                    ₹<span id="grand-total-value">0.00</span>
+                    {{ active_currency_symbol() }}<span id="grand-total-value">0.00</span>
                 </span>
             </div>
         </div>

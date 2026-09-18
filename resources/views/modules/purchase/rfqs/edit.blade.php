@@ -44,19 +44,11 @@
                     @csrf
                     @method('PUT')
 
-                    <!-- Top buttons bar -->
+                    <!-- Top header bar -->
                     <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-2">
                         <div>
                             <h4 class="fw-bold text-dark mb-0">{{ __('purchase.edit_rfq') }}: {{ $rfq->rfq_number }}</h4>
                             <small class="text-muted fs-12">{{ __('purchase.edit_rfq_help') }}</small>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <x-ui.button href="{{ route('purchase.rfqs.show', $rfq->id) }}" variant="light" size="sm">
-                                {{ __('purchase.cancel') }}
-                            </x-ui.button>
-                            <x-ui.button type="submit" variant="primary" size="sm" icon="feather-save" style="background-color: #714B67; border-color: #714B67;">
-                                {{ __('purchase.update_rfq') }}
-                            </x-ui.button>
                         </div>
                     </div>
 
@@ -171,6 +163,16 @@
                                 <i class="feather-plus me-1"></i> {{ __('purchase.add_line') }}
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Bottom Action Buttons (like Lead form) -->
+                    <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <x-ui.button href="{{ route('purchase.rfqs.show', $rfq->id) }}" variant="light" class="border px-4 py-2 fs-13">
+                            {{ __('purchase.cancel') }}
+                        </x-ui.button>
+                        <x-ui.button type="submit" variant="primary" icon="feather-save" class="px-4 py-2 fs-13 fw-bold shadow-sm">
+                            {{ __('purchase.update_rfq') }}
+                        </x-ui.button>
                     </div>
                 </form>
             </div>

@@ -164,8 +164,8 @@
                     @php
                         $usersList = $isEdit ? ($allTenantUsers ?? $unmappedUsers ?? collect()) : ($unmappedUsers ?? collect());
                     @endphp
-                    <x-ui.odoo-form-ui type="select" label="User Account (Link to login)" name="user_id" id="{{ $prefix }}_user_id" :required="true" select2-selector="default" :errorText="$errors->first('user_id')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService">
-                        <option value="">Select User Account</option>
+                    <x-ui.odoo-form-ui type="select" label="User Account" name="user_id" id="{{ $prefix }}_user_id" :required="true" select2-selector="default" :errorText="$errors->first('user_id')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService">
+                        <option value="auto_create" @selected((string) $fieldValue('user_id', $isEdit ? ($employee->user_id ?? '') : '') === 'auto_create' || (!$isEdit && empty($fieldValue('user_id'))))>Auto-Create New User (Pass: 12345678)</option>
                         @foreach($usersList as $u)
                             <option value="{{ $u->id }}" data-user-name="{{ $u->name }}" data-user-email="{{ $u->email }}" data-user-role-id="{{ $u->role_id ?? $u->roles->first()?->id ?? '' }}" @selected((string) $fieldValue('user_id', $isEdit ? ($employee->user_id ?? '') : '') === (string) $u->id)>
                                 {{ $u->name }} ({{ $u->email }})
@@ -190,7 +190,19 @@
                     <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_job_title') }}" name="job_title" id="{{ $prefix }}_job_title" :required="true" :value="$fieldValue('job_title')" placeholder="{{ __('hrms.employees.frm_job_title_placeholder') }}" :errorText="$errors->first('job_title')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_office_email') }}" name="office_email" id="{{ $prefix }}_office_email" inputType="email" :value="$fieldValue('office_email')" placeholder="{{ __('hrms.employees.frm_office_email_placeholder') }}" :errorText="$errors->first('office_email')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService" />
+                    @php
+                        $linkedUser = ($isEdit && $empObj && $empObj->user) ? $empObj->user : null;
+                        $officeEmailVal = $linkedUser ? $linkedUser->email : $fieldValue('office_email');
+                        $currentUserIdVal = (string) $fieldValue('user_id', $isEdit ? ($empObj->user_id ?? '') : '');
+                        $isExistingUserLinked = !empty($currentUserIdVal) && $currentUserIdVal !== 'auto_create';
+                    @endphp
+                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_office_email') }}" name="office_email" id="{{ $prefix }}_office_email" inputType="email" :value="$officeEmailVal" placeholder="{{ __('hrms.employees.frm_office_email_placeholder') }}" :errorText="$errors->first('office_email')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService" :readonly="$isExistingUserLinked" class="{{ $isExistingUserLinked ? 'bg-light' : '' }}" />
+                    <small id="{{ $prefix }}_office_email_help" class="text-muted fs-11 mt-1 d-block {{ $isExistingUserLinked ? '' : 'd-none' }}">
+                        <i class="feather-lock me-1"></i>Synced from User account
+                    </small>
+                    <small id="{{ $prefix }}_office_email_autocreate_help" class="text-primary fs-11 mt-1 d-block {{ !$isExistingUserLinked ? '' : 'd-none' }}">
+                        <i class="feather-user-plus me-1"></i>Auto-creates user (Pass: 12345678)
+                    </small>
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_gender') }}" name="gender" id="{{ $prefix }}_gender" :required="true" select2-selector="default" :errorText="$errors->first('gender')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService">
@@ -515,16 +527,24 @@ const runEmployeeFormSetup = () => {
 
         const prefix = "{{ $prefix }}";
 
-        // Auto-fill Full Name and System Role from linked User Account selection
+        // Auto-fill Full Name, System Role, and Office Email from linked User Account selection
         $('#' + prefix + '_user_id').on('change', function() {
             const selectedOpt = $(this).find('option:selected');
             const userName = selectedOpt.attr('data-user-name') || selectedOpt.data('user-name') || '';
+            const userEmail = selectedOpt.attr('data-user-email') || selectedOpt.data('user-email') || '';
             const userRoleId = selectedOpt.attr('data-user-role-id') || selectedOpt.data('user-role-id') || '';
             if (userName) {
                 $('#' + prefix + '_full_name').val(userName);
             }
             if (userRoleId) {
                 $('#' + prefix + '_role_id').val(userRoleId).trigger('change');
+            }
+            if (userEmail) {
+                $('#' + prefix + '_office_email').val(userEmail).prop('readonly', true).addClass('bg-light');
+                $('#' + prefix + '_office_email_help').removeClass('d-none');
+            } else {
+                $('#' + prefix + '_office_email').prop('readonly', false).removeClass('bg-light');
+                $('#' + prefix + '_office_email_help').addClass('d-none');
             }
         });
 

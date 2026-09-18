@@ -39,7 +39,7 @@ class ProductionOrderController extends Controller
     {
         Gate::authorize('viewAny', ProductionOrder::class);
 
-        $filters = $request->only(['search', 'status', 'production_mode', 'start_date', 'end_date']);
+        $filters = $request->only(['search', 'status', 'production_mode', 'start_date', 'end_date', 'sort_by', 'sort_order']);
         $orders = $this->orderRepository->paginateWithFilters($filters, 15)->withQueryString();
         $statusCounts = $this->orderRepository->getStatusCounts();
 

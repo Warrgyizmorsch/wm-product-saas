@@ -28,9 +28,9 @@
     </td>
     <td>
         @if($isManufactured)
-            <span class="badge bg-soft-primary text-primary">Make (BOM)</span>
+            <span class="badge bg-soft-primary text-primary">{{ __('crm.make_bom') }}</span>
         @else
-            <span class="badge bg-soft-success text-success">Buy (Direct)</span>
+            <span class="badge bg-soft-success text-success">{{ __('crm.buy_direct') }}</span>
         @endif
         <small class="d-block text-muted fs-10 mt-1">{{ ucfirst(str_replace('_', ' ', $type)) }}</small>
     </td>
@@ -45,9 +45,9 @@
     </td>
     <td>
         @if($hasShortage)
-            <span class="badge bg-danger text-white">Shortage</span>
+            <span class="badge bg-danger text-white">{{ __('crm.shortage') }}</span>
         @else
-            <span class="badge bg-success text-white">Available</span>
+            <span class="badge bg-success text-white">{{ __('crm.available') }}</span>
         @endif
     </td>
 </tr>

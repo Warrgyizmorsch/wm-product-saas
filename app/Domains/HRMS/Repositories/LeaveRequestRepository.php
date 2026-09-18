@@ -194,10 +194,18 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         $query = LeaveRequest::query()->with(['employee', 'leaveType']);
         $encashQuery = LeaveEncashment::query()->with(['employee', 'leaveType', 'approver']);
 
-        // 🔒 Restrict ordinary employees to their OWN records only
+        // 🔒 Restrict ordinary employees to their OWN records + team reportees (for managers/dept heads)
         if (!$isHrAdmin) {
             $empId = $employee ? $employee->id : 0;
-            $query->where('employee_id', $empId);
+            $query->where(function ($q) use ($empId) {
+                $q->where('employee_id', $empId)
+                  ->orWhereHas('employee', function ($eq) use ($empId) {
+                      $eq->where('reporting_manager_id', $empId)
+                        ->orWhereHas('department', function ($dq) use ($empId) {
+                            $dq->where('head_employee_id', $empId);
+                        });
+                  });
+            });
             $encashQuery->where('employee_id', $empId);
         }
 
@@ -305,7 +313,18 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
             $attachmentPath = $request->file('attachment')->store('leave_attachments', 'public');
         }
 
-        return LeaveRequest::create([
+        $leaveType = LeaveType::find($validated['leave_type_id']);
+        $rules = $leaveType ? ($leaveType->rules ?? []) : [];
+        $workflowLevel = $rules['approval']['workflow_level'] ?? '1_level';
+
+        $status = 'pending';
+        $currentLevel = '1';
+        if ($workflowLevel === 'auto') {
+            $status = 'approved';
+            $currentLevel = 'approved';
+        }
+
+        $leaveRequest = LeaveRequest::create([
             'company_id'        => $validated['company_id'],
             'employee_id'       => $validated['employee_id'],
             'leave_type_id'     => $validated['leave_type_id'],
@@ -318,10 +337,21 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
             'reason'            => $validated['reason'],
             'attachment_path'   => $attachmentPath,
             'notified_contacts' => $validated['notified_contacts'] ?? null,
-            'status'            => 'pending',
-            'current_level'     => 1,
+            'status'            => $status,
+            'current_level'     => $currentLevel,
         ]);
 
+        if ($status === 'approved') {
+            $balance = LeaveBalance::where('employee_id', $validated['employee_id'])
+                ->where('leave_type_id', $validated['leave_type_id'])
+                ->first();
+
+            if ($balance) {
+                $balance->increment('used', floatval($validated['duration']));
+            }
+        }
+
+        return $leaveRequest;
     }
 
     public function updateStatus(LeaveRequest $leaveRequest, array $validated, Request $request): bool
@@ -330,33 +360,77 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         $comment = $validated['rejection_reason'] ?? null;
         $oldStatus = $leaveRequest->status;
 
-        if ($oldStatus === $action) {
-            return true;
+        $user = auth()->user();
+        $adminEmployee = null;
+        if ($user && $user->email) {
+            $adminEmployee = Employee::where('personal_email', $user->email)
+                ->orWhere('office_email', $user->email)
+                ->first();
         }
 
-        // Perform database status update
-        $leaveRequest->update([
-            'status' => $action,
-            'rejection_reason' => ($action === 'rejected') ? $comment : null,
-        ]);
+        $rules = $leaveRequest->leaveType->rules ?? [];
+        $workflowLevel = $rules['approval']['workflow_level'] ?? '1_level';
 
-        // Adjust employee leave balance if approval state changes
-        if ($oldStatus === 'approved' && $action !== 'approved') {
-            $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
-                ->where('leave_type_id', $leaveRequest->leave_type_id)
-                ->first();
-
-            if ($balance) {
-                $balance->decrement('used', floatval($leaveRequest->duration));
+        if ($action === 'approved') {
+            // Check if 2-level approval policy is active and still at Level 1
+            if ($workflowLevel === '2_level' && ((string) $leaveRequest->current_level === '1' || (string) $leaveRequest->current_level === '')) {
+                $leaveRequest->update([
+                    'current_level' => '2',
+                ]);
+                return true;
             }
-        } elseif ($oldStatus !== 'approved' && $action === 'approved') {
-            $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
-                ->where('leave_type_id', $leaveRequest->leave_type_id)
-                ->first();
 
-            if ($balance) {
-                $balance->increment('used', floatval($leaveRequest->duration));
+            // Final Approval (Level 2 or 1_level)
+            $leaveRequest->update([
+                'status'           => 'approved',
+                'current_level'    => 'approved',
+                'approved_by'      => $adminEmployee ? $adminEmployee->id : null,
+                'rejection_reason' => null,
+            ]);
+
+            // Adjust employee leave balance if approval state changes to approved
+            if ($oldStatus !== 'approved') {
+                $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
+                    ->where('leave_type_id', $leaveRequest->leave_type_id)
+                    ->first();
+
+                if ($balance) {
+                    $balance->increment('used', floatval($leaveRequest->duration));
+                }
             }
+        } elseif ($action === 'rejected') {
+            // Restore balance if previously approved
+            if ($oldStatus === 'approved') {
+                $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
+                    ->where('leave_type_id', $leaveRequest->leave_type_id)
+                    ->first();
+
+                if ($balance) {
+                    $balance->decrement('used', floatval($leaveRequest->duration));
+                }
+            }
+
+            $leaveRequest->update([
+                'status'           => 'rejected',
+                'current_level'    => 'rejected',
+                'rejection_reason' => $comment,
+            ]);
+        } else {
+            // Adjust balance if status was approved and is changed away from approved
+            if ($oldStatus === 'approved' && $action !== 'approved') {
+                $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
+                    ->where('leave_type_id', $leaveRequest->leave_type_id)
+                    ->first();
+
+                if ($balance) {
+                    $balance->decrement('used', floatval($leaveRequest->duration));
+                }
+            }
+
+            $leaveRequest->update([
+                'status'           => $action,
+                'rejection_reason' => null,
+            ]);
         }
 
         return true;

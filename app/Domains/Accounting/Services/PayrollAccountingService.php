@@ -228,7 +228,9 @@ class PayrollAccountingService
         }
 
         $journalDate = $run->payroll_month . '-28';
-        if (!Carbon::hasFormat($journalDate, 'Y-m-d')) {
+        try {
+            $journalDate = Carbon::parse($journalDate)->format('Y-m-d');
+        } catch (\Throwable $e) {
             $journalDate = now()->format('Y-m-d');
         }
 

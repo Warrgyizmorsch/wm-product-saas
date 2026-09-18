@@ -663,7 +663,7 @@
                                                         'wfh_longitude'             => $employee->wfh_longitude,
                                                         'personal_mobile_number'    => $employee->personal_mobile_number,
                                                         'personal_email'            => $employee->personal_email,
-                                                        'office_email'              => $employee->office_email,
+                                                        'office_email'              => $employee->user?->email ?? $employee->office_email,
                                                         'home_phone'                => $employee->home_phone,
                                                         'city'                      => $employee->city,
                                                         'postal_code'               => $employee->postal_code,
@@ -1243,6 +1243,7 @@
                 });
                 
                 $('#edit_office').trigger('change');
+                $('#edit_user_id').trigger('change');
                 
                 // Store original leave plan ID for migration detection
                 $('#edit_leave_plan_id').attr('data-original-val', employee.leave_plan_id || '');

@@ -300,3 +300,1014 @@ html.app-skin-dark .production-flow-tab-item.active-step .step-circle-badge {
 html.app-skin-dark .production-workflow-card .step-connector-arrow i {
     color: #475569 !important;
 }
+
+/* Dark Mode Support for Production Order Detail Content Area */
+html.app-skin-dark .production-main-content-scroll {
+    background-color: #111a2e !important;
+    border: 1px solid #1e293b !important;
+}
+html.app-skin-dark .production-order-tab-content {
+    background-color: transparent !important;
+}
+html.app-skin-dark .production-main-content-scroll .bg-light,
+html.app-skin-dark .production-main-content-scroll .bg-light-subtle {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .production-main-content-scroll .bg-white {
+    background-color: #131b2e !important;
+    border-color: #283c50 !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .production-main-content-scroll .card {
+    background-color: #131b2e !important;
+    border-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .production-main-content-scroll .text-dark {
+    color: #f1f5f9 !important;
+}
+html.app-skin-dark .production-main-content-scroll .text-muted {
+    color: #94a3b8 !important;
+}
+html.app-skin-dark .production-main-content-scroll .border,
+html.app-skin-dark .production-main-content-scroll .border-end,
+html.app-skin-dark .production-main-content-scroll .border-bottom,
+html.app-skin-dark .production-main-content-scroll .border-top {
+    border-color: #1e293b !important;
+}
+html.app-skin-dark .mobile-tabs-wrapper {
+    background-color: #131b2e !important;
+    border-color: #1e293b !important;
+}
+html.app-skin-dark .production-main-content-scroll table thead.bg-light th,
+html.app-skin-dark .production-main-content-scroll table th {
+    background-color: #162038 !important;
+    color: #94a3b8 !important;
+    border-color: #283c50 !important;
+}
+html.app-skin-dark .production-main-content-scroll table tr.bg-white,
+html.app-skin-dark .production-main-content-scroll table td.bg-white,
+html.app-skin-dark .production-main-content-scroll table td {
+    background-color: #0f172a !important;
+    color: #cbd5e1 !important;
+    border-color: #1b2436 !important;
+}
+
+/* ==========================================================================
+   Production Dashboard Common Cards, Tiles & Dark Mode Support
+   ========================================================================== */
+
+.dash-card {
+    background-color: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease-in-out;
+}
+
+.dash-card .card-header {
+    background-color: transparent;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.dash-card-icon-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+    background-color: color-mix(in srgb, var(--bs-primary, #3454d1) 12%, transparent);
+    color: var(--bs-primary, #3454d1);
+}
+
+.dash-tile,
+.dash-tile-default,
+.action-tile-card,
+.machine-state-box,
+.quality-tile-box,
+.loss-tile-box,
+.maintenance-tile-box,
+.subcontract-pipeline-box {
+    border-radius: 10px;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease-in-out;
+}
+
+.dash-tile:hover,
+.dash-tile-default:hover,
+.action-tile-card:hover,
+.machine-state-box:hover,
+.quality-tile-box:hover,
+.loss-tile-box:hover,
+.maintenance-tile-box:hover,
+.subcontract-pipeline-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.dash-panel-subtle {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.dash-card-inner {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+}
+
+.dash-mini-tile {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.dash-table-head th {
+    background-color: #f8fafc;
+    color: #64748b;
+    border-color: #e2e8f0;
+}
+
+.ready-start-banner {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--bs-primary, #3454d1) 8%, transparent) 0%, color-mix(in srgb, var(--bs-primary, #3454d1) 3%, transparent) 100%);
+    border-left: 5px solid var(--bs-primary, #3454d1);
+    border-radius: 10px;
+}
+
+/* --------------------------------------------------------------------------
+   DARK MODE OVERRIDES (html.app-skin-dark, body.app-skin-dark, [data-bs-theme="dark"])
+   -------------------------------------------------------------------------- */
+html.app-skin-dark .production-dashboard-wrapper,
+html.app-skin-dark .production-dashboard-wrapper .card,
+html.app-skin-dark .dash-card,
+body.app-skin-dark .production-dashboard-wrapper,
+body.app-skin-dark .production-dashboard-wrapper .card,
+body.app-skin-dark .dash-card,
+[data-bs-theme="dark"] .production-dashboard-wrapper,
+[data-bs-theme="dark"] .production-dashboard-wrapper .card,
+[data-bs-theme="dark"] .dash-card,
+[data-theme="dark"] .production-dashboard-wrapper,
+[data-theme="dark"] .production-dashboard-wrapper .card,
+[data-theme="dark"] .dash-card {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .dash-card .card-header,
+html.app-skin-dark .production-dashboard-wrapper .card-header,
+body.app-skin-dark .dash-card .card-header,
+body.app-skin-dark .production-dashboard-wrapper .card-header,
+[data-bs-theme="dark"] .dash-card .card-header,
+[data-bs-theme="dark"] .production-dashboard-wrapper .card-header,
+[data-theme="dark"] .dash-card .card-header,
+[data-theme="dark"] .production-dashboard-wrapper .card-header {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+/* All Dashboard Tiles in Dark Mode */
+html.app-skin-dark .dash-tile,
+html.app-skin-dark .dash-tile-default,
+html.app-skin-dark .action-tile-card,
+html.app-skin-dark .machine-state-box,
+html.app-skin-dark .quality-tile-box,
+html.app-skin-dark .loss-tile-box,
+html.app-skin-dark .maintenance-tile-box,
+html.app-skin-dark .subcontract-pipeline-box,
+body.app-skin-dark .dash-tile,
+body.app-skin-dark .dash-tile-default,
+body.app-skin-dark .action-tile-card,
+body.app-skin-dark .machine-state-box,
+body.app-skin-dark .quality-tile-box,
+body.app-skin-dark .loss-tile-box,
+body.app-skin-dark .maintenance-tile-box,
+body.app-skin-dark .subcontract-pipeline-box,
+[data-bs-theme="dark"] .dash-tile,
+[data-bs-theme="dark"] .dash-tile-default,
+[data-bs-theme="dark"] .action-tile-card,
+[data-bs-theme="dark"] .machine-state-box,
+[data-bs-theme="dark"] .quality-tile-box,
+[data-bs-theme="dark"] .loss-tile-box,
+[data-bs-theme="dark"] .maintenance-tile-box,
+[data-bs-theme="dark"] .subcontract-pipeline-box,
+[data-theme="dark"] .dash-tile,
+[data-theme="dark"] .dash-tile-default,
+[data-theme="dark"] .action-tile-card,
+[data-theme="dark"] .machine-state-box,
+[data-theme="dark"] .quality-tile-box,
+[data-theme="dark"] .loss-tile-box,
+[data-theme="dark"] .maintenance-tile-box,
+[data-theme="dark"] .subcontract-pipeline-box {
+    background-color: #131c31 !important;
+    border-color: #1e2a42 !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .dash-tile:hover,
+html.app-skin-dark .dash-tile-default:hover,
+html.app-skin-dark .action-tile-card:hover,
+html.app-skin-dark .machine-state-box:hover,
+html.app-skin-dark .quality-tile-box:hover,
+html.app-skin-dark .loss-tile-box:hover,
+html.app-skin-dark .maintenance-tile-box:hover,
+html.app-skin-dark .subcontract-pipeline-box:hover,
+body.app-skin-dark .dash-tile:hover,
+body.app-skin-dark .dash-tile-default:hover,
+body.app-skin-dark .action-tile-card:hover,
+body.app-skin-dark .machine-state-box:hover,
+body.app-skin-dark .quality-tile-box:hover,
+body.app-skin-dark .loss-tile-box:hover,
+body.app-skin-dark .maintenance-tile-box:hover,
+body.app-skin-dark .subcontract-pipeline-box:hover,
+[data-bs-theme="dark"] .dash-tile:hover,
+[data-bs-theme="dark"] .dash-tile-default:hover,
+[data-bs-theme="dark"] .action-tile-card:hover,
+[data-bs-theme="dark"] .machine-state-box:hover,
+[data-bs-theme="dark"] .quality-tile-box:hover,
+[data-bs-theme="dark"] .loss-tile-box:hover,
+[data-bs-theme="dark"] .maintenance-tile-box:hover,
+[data-bs-theme="dark"] .subcontract-pipeline-box:hover,
+[data-theme="dark"] .dash-tile:hover,
+[data-theme="dark"] .dash-tile-default:hover,
+[data-theme="dark"] .action-tile-card:hover,
+[data-theme="dark"] .machine-state-box:hover,
+[data-theme="dark"] .quality-tile-box:hover,
+[data-theme="dark"] .loss-tile-box:hover,
+[data-theme="dark"] .maintenance-tile-box:hover,
+[data-theme="dark"] .subcontract-pipeline-box:hover {
+    background-color: #182440 !important;
+    border-color: #263859 !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Subtle Nested Panels in Dark Mode */
+html.app-skin-dark .dash-panel-subtle,
+html.app-skin-dark .production-dashboard-wrapper .dash-panel-subtle,
+body.app-skin-dark .dash-panel-subtle,
+body.app-skin-dark .production-dashboard-wrapper .dash-panel-subtle,
+[data-bs-theme="dark"] .dash-panel-subtle,
+[data-bs-theme="dark"] .production-dashboard-wrapper .dash-panel-subtle,
+[data-theme="dark"] .dash-panel-subtle,
+[data-theme="dark"] .production-dashboard-wrapper .dash-panel-subtle {
+    background-color: #111a2d !important;
+    border-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+
+/* Inner Nested Cards in Dark Mode */
+html.app-skin-dark .dash-card-inner,
+html.app-skin-dark .production-dashboard-wrapper .dash-card-inner,
+body.app-skin-dark .dash-card-inner,
+body.app-skin-dark .production-dashboard-wrapper .dash-card-inner,
+[data-bs-theme="dark"] .dash-card-inner,
+[data-bs-theme="dark"] .production-dashboard-wrapper .dash-card-inner,
+[data-theme="dark"] .dash-card-inner,
+[data-theme="dark"] .production-dashboard-wrapper .dash-card-inner {
+    background-color: #151f36 !important;
+    border-color: #22304d !important;
+    color: #cbd5e1 !important;
+}
+
+/* Mini Status Tiles in Dark Mode */
+html.app-skin-dark .dash-mini-tile,
+html.app-skin-dark .production-dashboard-wrapper .dash-mini-tile,
+body.app-skin-dark .dash-mini-tile,
+body.app-skin-dark .production-dashboard-wrapper .dash-mini-tile,
+[data-bs-theme="dark"] .dash-mini-tile,
+[data-bs-theme="dark"] .production-dashboard-wrapper .dash-mini-tile,
+[data-theme="dark"] .dash-mini-tile,
+[data-theme="dark"] .production-dashboard-wrapper .dash-mini-tile {
+    background-color: #111a2d !important;
+    border-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+
+/* Catch-all for any nested bg-light or bg-white in dashboard */
+html.app-skin-dark .production-dashboard-wrapper .bg-light,
+html.app-skin-dark .production-dashboard-wrapper .bg-white,
+body.app-skin-dark .production-dashboard-wrapper .bg-light,
+body.app-skin-dark .production-dashboard-wrapper .bg-white,
+[data-bs-theme="dark"] .production-dashboard-wrapper .bg-light,
+[data-bs-theme="dark"] .production-dashboard-wrapper .bg-white,
+[data-theme="dark"] .production-dashboard-wrapper .bg-light,
+[data-theme="dark"] .production-dashboard-wrapper .bg-white {
+    background-color: #131c31 !important;
+    border-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+
+/* Material Readiness Banner in Dark Mode */
+html.app-skin-dark .ready-start-banner,
+body.app-skin-dark .ready-start-banner,
+[data-bs-theme="dark"] .ready-start-banner,
+[data-theme="dark"] .ready-start-banner {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--bs-primary, #3454d1) 18%, transparent) 0%, color-mix(in srgb, var(--bs-primary, #3454d1) 5%, transparent) 100%) !important;
+    border-left: 5px solid var(--bs-primary, #3454d1) !important;
+    border-top: 1px solid color-mix(in srgb, var(--bs-primary, #3454d1) 25%, transparent) !important;
+    border-right: 1px solid color-mix(in srgb, var(--bs-primary, #3454d1) 25%, transparent) !important;
+    border-bottom: 1px solid color-mix(in srgb, var(--bs-primary, #3454d1) 25%, transparent) !important;
+}
+
+/* Table Head and Rows in Dark Mode */
+html.app-skin-dark .production-dashboard-wrapper table thead.dash-table-head th,
+html.app-skin-dark .production-dashboard-wrapper table thead th,
+body.app-skin-dark .production-dashboard-wrapper table thead.dash-table-head th,
+body.app-skin-dark .production-dashboard-wrapper table thead th,
+[data-bs-theme="dark"] .production-dashboard-wrapper table thead.dash-table-head th,
+[data-bs-theme="dark"] .production-dashboard-wrapper table thead th,
+[data-theme="dark"] .production-dashboard-wrapper table thead.dash-table-head th,
+[data-theme="dark"] .production-dashboard-wrapper table thead th {
+    background-color: #131c31 !important;
+    color: #94a3b8 !important;
+    border-color: #1e293b !important;
+}
+
+html.app-skin-dark .production-dashboard-wrapper table tbody td,
+body.app-skin-dark .production-dashboard-wrapper table tbody td,
+[data-bs-theme="dark"] .production-dashboard-wrapper table tbody td,
+[data-theme="dark"] .production-dashboard-wrapper table tbody td {
+    background-color: transparent !important;
+    border-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .production-dashboard-wrapper table tbody tr:hover td,
+body.app-skin-dark .production-dashboard-wrapper table tbody tr:hover td,
+[data-bs-theme="dark"] .production-dashboard-wrapper table tbody tr:hover td,
+[data-theme="dark"] .production-dashboard-wrapper table tbody tr:hover td {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Typography Overrides inside Dashboard */
+html.app-skin-dark .production-dashboard-wrapper .text-dark,
+body.app-skin-dark .production-dashboard-wrapper .text-dark,
+[data-bs-theme="dark"] .production-dashboard-wrapper .text-dark,
+[data-theme="dark"] .production-dashboard-wrapper .text-dark {
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .production-dashboard-wrapper .text-muted,
+body.app-skin-dark .production-dashboard-wrapper .text-muted,
+[data-bs-theme="dark"] .production-dashboard-wrapper .text-muted,
+[data-theme="dark"] .production-dashboard-wrapper .text-muted {
+    color: #94a3b8 !important;
+}
+
+html.app-skin-dark .production-dashboard-wrapper .text-secondary,
+body.app-skin-dark .production-dashboard-wrapper .text-secondary,
+[data-bs-theme="dark"] .production-dashboard-wrapper .text-secondary,
+[data-theme="dark"] .production-dashboard-wrapper .text-secondary {
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .production-dashboard-wrapper .border,
+html.app-skin-dark .production-dashboard-wrapper .border-top,
+html.app-skin-dark .production-dashboard-wrapper .border-bottom,
+html.app-skin-dark .production-dashboard-wrapper .border-start,
+html.app-skin-dark .production-dashboard-wrapper .border-end,
+body.app-skin-dark .production-dashboard-wrapper .border,
+body.app-skin-dark .production-dashboard-wrapper .border-top,
+body.app-skin-dark .production-dashboard-wrapper .border-bottom,
+body.app-skin-dark .production-dashboard-wrapper .border-start,
+body.app-skin-dark .production-dashboard-wrapper .border-end,
+[data-bs-theme="dark"] .production-dashboard-wrapper .border,
+[data-bs-theme="dark"] .production-dashboard-wrapper .border-top,
+[data-bs-theme="dark"] .production-dashboard-wrapper .border-bottom,
+[data-bs-theme="dark"] .production-dashboard-wrapper .border-start,
+[data-bs-theme="dark"] .production-dashboard-wrapper .border-end,
+[data-theme="dark"] .production-dashboard-wrapper .border,
+[data-theme="dark"] .production-dashboard-wrapper .border-top,
+[data-theme="dark"] .production-dashboard-wrapper .border-bottom,
+[data-theme="dark"] .production-dashboard-wrapper .border-start,
+[data-theme="dark"] .production-dashboard-wrapper .border-end {
+    border-color: #1e293b !important;
+}
+
+/* --------------------------------------------------------------------------
+   WIP PAGE DARK MODE STYLES
+   -------------------------------------------------------------------------- */
+.wip-filter-strip {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0 !important;
+}
+
+html.app-skin-dark .wip-filter-strip,
+body.app-skin-dark .wip-filter-strip,
+[data-bs-theme="dark"] .wip-filter-strip,
+[data-theme="dark"] .wip-filter-strip {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .wip-filter-strip label,
+body.app-skin-dark .wip-filter-strip label,
+[data-bs-theme="dark"] .wip-filter-strip label,
+[data-theme="dark"] .wip-filter-strip label {
+    color: #94a3b8 !important;
+}
+
+html.app-skin-dark .wip-filter-strip .form-select,
+body.app-skin-dark .wip-filter-strip .form-select,
+[data-bs-theme="dark"] .wip-filter-strip .form-select,
+[data-theme="dark"] .wip-filter-strip .form-select {
+    background-color: #0f172a !important;
+    border-color: #283c50 !important;
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .wip-filter-strip .btn.btn-light,
+body.app-skin-dark .wip-filter-strip .btn.btn-light,
+[data-bs-theme="dark"] .wip-filter-strip .btn.btn-light,
+[data-theme="dark"] .wip-filter-strip .btn.btn-light {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .wip-filter-strip .btn.btn-light:hover,
+body.app-skin-dark .wip-filter-strip .btn.btn-light:hover,
+[data-bs-theme="dark"] .wip-filter-strip .btn.btn-light:hover,
+[data-theme="dark"] .wip-filter-strip .btn.btn-light:hover {
+    background-color: #283c50 !important;
+    border-color: #3b82f6 !important;
+    color: #ffffff !important;
+}
+
+/* WIP Accordions & Sub-Cards in Dark Mode */
+html.app-skin-dark .wip-order-collapse,
+body.app-skin-dark .wip-order-collapse,
+[data-bs-theme="dark"] .wip-order-collapse,
+[data-theme="dark"] .wip-order-collapse {
+    background-color: #111a2e !important;
+    border-color: #1e293b !important;
+}
+
+html.app-skin-dark .wip-order-collapse .bg-light,
+body.app-skin-dark .wip-order-collapse .bg-light,
+[data-bs-theme="dark"] .wip-order-collapse .bg-light,
+[data-theme="dark"] .wip-order-collapse .bg-light {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .wip-order-collapse .bg-white,
+body.app-skin-dark .wip-order-collapse .bg-white,
+[data-bs-theme="dark"] .wip-order-collapse .bg-white,
+[data-theme="dark"] .wip-order-collapse .bg-white {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .wip-order-collapse thead.bg-light,
+body.app-skin-dark .wip-order-collapse thead.bg-light,
+[data-bs-theme="dark"] .wip-order-collapse thead.bg-light,
+[data-theme="dark"] .wip-order-collapse thead.bg-light {
+    background-color: #162038 !important;
+    color: #94a3b8 !important;
+}
+
+html.app-skin-dark .wip-order-collapse .card,
+body.app-skin-dark .wip-order-collapse .card,
+[data-bs-theme="dark"] .wip-order-collapse .card,
+[data-theme="dark"] .wip-order-collapse .card {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+/* ==========================================================================
+   Scheduling Screen - Capacity Analysis Dark Mode
+   ========================================================================== */
+.capacity-info-box {
+    background-color: color-mix(in srgb, var(--bs-primary) 8%, #ffffff);
+    border-left: 4px solid var(--bs-primary) !important;
+    color: #1e293b;
+}
+
+.capacity-grouping-bar {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0 !important;
+}
+
+.capacity-expanded-cell {
+    background-color: #f8fafc;
+}
+
+.capacity-breakdown-card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0 !important;
+}
+
+.capacity-breakdown-row {
+    background-color: #ffffff;
+}
+
+.capacity-breakdown-row.is-overloaded {
+    background-color: #fff5f5;
+}
+
+html.app-skin-dark .capacity-info-box,
+body.app-skin-dark .capacity-info-box,
+[data-bs-theme="dark"] .capacity-info-box,
+[data-theme="dark"] .capacity-info-box {
+    background-color: color-mix(in srgb, var(--bs-primary) 15%, #162038) !important;
+    border-left: 4px solid var(--bs-primary) !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .capacity-info-box h6,
+body.app-skin-dark .capacity-info-box h6,
+[data-bs-theme="dark"] .capacity-info-box h6,
+[data-theme="dark"] .capacity-info-box h6 {
+    color: var(--bs-primary) !important;
+}
+
+html.app-skin-dark .capacity-info-box p,
+body.app-skin-dark .capacity-info-box p,
+[data-bs-theme="dark"] .capacity-info-box p,
+[data-theme="dark"] .capacity-info-box p {
+    color: #94a3b8 !important;
+}
+
+html.app-skin-dark .capacity-info-box .text-dark,
+body.app-skin-dark .capacity-info-box .text-dark,
+[data-bs-theme="dark"] .capacity-info-box .text-dark,
+[data-theme="dark"] .capacity-info-box .text-dark {
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .capacity-grouping-bar,
+body.app-skin-dark .capacity-grouping-bar,
+[data-bs-theme="dark"] .capacity-grouping-bar,
+[data-theme="dark"] .capacity-grouping-bar {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .capacity-grouping-bar .text-dark,
+body.app-skin-dark .capacity-grouping-bar .text-dark,
+[data-bs-theme="dark"] .capacity-grouping-bar .text-dark,
+[data-theme="dark"] .capacity-grouping-bar .text-dark {
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .capacity-expanded-cell,
+body.app-skin-dark .capacity-expanded-cell,
+[data-bs-theme="dark"] .capacity-expanded-cell,
+[data-theme="dark"] .capacity-expanded-cell {
+    background-color: #111a2e !important;
+}
+
+html.app-skin-dark .capacity-breakdown-card,
+body.app-skin-dark .capacity-breakdown-card,
+[data-bs-theme="dark"] .capacity-breakdown-card,
+[data-theme="dark"] .capacity-breakdown-card {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .capacity-breakdown-card .table thead,
+body.app-skin-dark .capacity-breakdown-card .table thead,
+[data-bs-theme="dark"] .capacity-breakdown-card .table thead,
+[data-theme="dark"] .capacity-breakdown-card .table thead {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .capacity-breakdown-card .table thead th,
+body.app-skin-dark .capacity-breakdown-card .table thead th,
+[data-bs-theme="dark"] .capacity-breakdown-card .table thead th,
+[data-theme="dark"] .capacity-breakdown-card .table thead th {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .capacity-breakdown-card .table td,
+body.app-skin-dark .capacity-breakdown-card .table td,
+[data-bs-theme="dark"] .capacity-breakdown-card .table td,
+[data-theme="dark"] .capacity-breakdown-card .table td {
+    border-color: #1e293b !important;
+}
+
+html.app-skin-dark .capacity-breakdown-row,
+body.app-skin-dark .capacity-breakdown-row,
+[data-bs-theme="dark"] .capacity-breakdown-row,
+[data-theme="dark"] .capacity-breakdown-row {
+    background-color: #0f172a !important;
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .capacity-breakdown-row.is-overloaded,
+body.app-skin-dark .capacity-breakdown-row.is-overloaded,
+[data-bs-theme="dark"] .capacity-breakdown-row.is-overloaded,
+[data-theme="dark"] .capacity-breakdown-row.is-overloaded {
+    background-color: rgba(239, 68, 68, 0.12) !important;
+}
+
+/* ==========================================================================
+   Dispatch Board Dark Mode
+   ========================================================================== */
+.dispatch-stat-card {
+    background-color: #f8fafc;
+    border-color: #e2e8f0 !important;
+    transition: all 0.2s ease;
+}
+
+.dispatch-legend-bar {
+    background-color: #f8fafc;
+    border-color: #e2e8f0 !important;
+}
+
+html.app-skin-dark .dispatch-stat-card,
+body.app-skin-dark .dispatch-stat-card,
+[data-bs-theme="dark"] .dispatch-stat-card,
+[data-theme="dark"] .dispatch-stat-card {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+}
+
+html.app-skin-dark .dispatch-stat-card .text-dark,
+body.app-skin-dark .dispatch-stat-card .text-dark,
+[data-bs-theme="dark"] .dispatch-stat-card .text-dark,
+[data-theme="dark"] .dispatch-stat-card .text-dark {
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .dispatch-stat-card .text-muted,
+body.app-skin-dark .dispatch-stat-card .text-muted,
+[data-bs-theme="dark"] .dispatch-stat-card .text-muted,
+[data-theme="dark"] .dispatch-stat-card .text-muted {
+    color: #94a3b8 !important;
+}
+
+html.app-skin-dark .dispatch-legend-bar,
+body.app-skin-dark .dispatch-legend-bar,
+[data-bs-theme="dark"] .dispatch-legend-bar,
+[data-theme="dark"] .dispatch-legend-bar {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .dispatch-legend-bar .text-dark,
+body.app-skin-dark .dispatch-legend-bar .text-dark,
+[data-bs-theme="dark"] .dispatch-legend-bar .text-dark,
+[data-theme="dark"] .dispatch-legend-bar .text-dark {
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .gantt-board-wrapper,
+body.app-skin-dark .gantt-board-wrapper,
+[data-bs-theme="dark"] .gantt-board-wrapper,
+[data-theme="dark"] .gantt-board-wrapper {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+html.app-skin-dark .gantt-header,
+body.app-skin-dark .gantt-header,
+[data-bs-theme="dark"] .gantt-header,
+[data-theme="dark"] .gantt-header {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .gantt-header .gantt-resource-col,
+body.app-skin-dark .gantt-header .gantt-resource-col,
+[data-bs-theme="dark"] .gantt-header .gantt-resource-col,
+[data-theme="dark"] .gantt-header .gantt-resource-col {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .gantt-header .text-dark,
+body.app-skin-dark .gantt-header .text-dark,
+[data-bs-theme="dark"] .gantt-header .text-dark,
+[data-theme="dark"] .gantt-header .text-dark {
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .gantt-header-tick,
+body.app-skin-dark .gantt-header-tick,
+[data-bs-theme="dark"] .gantt-header-tick,
+[data-theme="dark"] .gantt-header-tick {
+    border-color: #283c50 !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .gantt-row-wc,
+body.app-skin-dark .gantt-row-wc,
+[data-bs-theme="dark"] .gantt-row-wc,
+[data-theme="dark"] .gantt-row-wc {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .gantt-row-wc .text-muted,
+body.app-skin-dark .gantt-row-wc .text-muted,
+[data-bs-theme="dark"] .gantt-row-wc .text-muted,
+[data-theme="dark"] .gantt-row-wc .text-muted {
+    color: #94a3b8 !important;
+}
+
+html.app-skin-dark .gantt-row-machine,
+body.app-skin-dark .gantt-row-machine,
+[data-bs-theme="dark"] .gantt-row-machine,
+[data-theme="dark"] .gantt-row-machine {
+    border-color: #1e293b !important;
+}
+
+html.app-skin-dark .gantt-row-machine .gantt-resource-col,
+body.app-skin-dark .gantt-row-machine .gantt-resource-col,
+[data-bs-theme="dark"] .gantt-row-machine .gantt-resource-col,
+[data-theme="dark"] .gantt-row-machine .gantt-resource-col {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .gantt-row-machine .gantt-resource-col strong,
+body.app-skin-dark .gantt-row-machine .gantt-resource-col strong,
+[data-bs-theme="dark"] .gantt-row-machine .gantt-resource-col strong,
+[data-theme="dark"] .gantt-row-machine .gantt-resource-col strong {
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .gantt-timeline-lane,
+body.app-skin-dark .gantt-timeline-lane,
+[data-bs-theme="dark"] .gantt-timeline-lane,
+[data-theme="dark"] .gantt-timeline-lane {
+    background-color: #0b1120 !important;
+    border-color: #1e293b !important;
+}
+
+/* Focus & Scenario Banners Base Styles */
+.dispatch-focus-banner {
+    background-color: color-mix(in srgb, var(--bs-primary) 8%, #ffffff);
+    border: 1px solid color-mix(in srgb, var(--bs-primary) 20%, transparent) !important;
+    border-left: 4px solid var(--bs-primary) !important;
+    color: #1e293b;
+}
+
+.dispatch-focus-banner .banner-title {
+    color: #0f172a;
+}
+
+.dispatch-focus-banner .banner-subtitle {
+    color: #475569;
+}
+
+/* Focus & Scenario Banners Dark Mode */
+html.app-skin-dark .dispatch-focus-banner,
+body.app-skin-dark .dispatch-focus-banner,
+[data-bs-theme="dark"] .dispatch-focus-banner,
+[data-theme="dark"] .dispatch-focus-banner {
+    background-color: color-mix(in srgb, var(--bs-primary) 12%, #111a2e) !important;
+    border: 1px solid color-mix(in srgb, var(--bs-primary) 25%, #1e293b) !important;
+    border-left: 4px solid var(--bs-primary) !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .dispatch-focus-banner .text-dark,
+body.app-skin-dark .dispatch-focus-banner .text-dark,
+[data-bs-theme="dark"] .dispatch-focus-banner .text-dark,
+[data-theme="dark"] .dispatch-focus-banner .text-dark,
+html.app-skin-dark .dispatch-focus-banner .banner-title,
+body.app-skin-dark .dispatch-focus-banner .banner-title,
+[data-bs-theme="dark"] .dispatch-focus-banner .banner-title,
+[data-theme="dark"] .dispatch-focus-banner .banner-title {
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .dispatch-focus-banner .text-muted,
+body.app-skin-dark .dispatch-focus-banner .text-muted,
+[data-bs-theme="dark"] .dispatch-focus-banner .text-muted,
+[data-theme="dark"] .dispatch-focus-banner .text-muted,
+html.app-skin-dark .dispatch-focus-banner .banner-subtitle,
+body.app-skin-dark .dispatch-focus-banner .banner-subtitle,
+[data-bs-theme="dark"] .dispatch-focus-banner .banner-subtitle,
+[data-theme="dark"] .dispatch-focus-banner .banner-subtitle {
+    color: #94a3b8 !important;
+}
+
+html.app-skin-dark .dispatch-focus-banner .btn-outline-secondary,
+body.app-skin-dark .dispatch-focus-banner .btn-outline-secondary,
+[data-bs-theme="dark"] .dispatch-focus-banner .btn-outline-secondary,
+[data-theme="dark"] .dispatch-focus-banner .btn-outline-secondary {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .dispatch-focus-banner .btn-outline-secondary:hover,
+body.app-skin-dark .dispatch-focus-banner .btn-outline-secondary:hover,
+[data-bs-theme="dark"] .dispatch-focus-banner .btn-outline-secondary:hover,
+[data-theme="dark"] .dispatch-focus-banner .btn-outline-secondary:hover {
+    background-color: #283c50 !important;
+    border-color: #64748b !important;
+    color: #ffffff !important;
+}
+
+html.app-skin-dark .dispatch-scenario-banner,
+body.app-skin-dark .dispatch-scenario-banner,
+[data-bs-theme="dark"] .dispatch-scenario-banner,
+[data-theme="dark"] .dispatch-scenario-banner {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .dispatch-scenario-banner .text-dark,
+body.app-skin-dark .dispatch-scenario-banner .text-dark,
+[data-bs-theme="dark"] .dispatch-scenario-banner .text-dark,
+[data-theme="dark"] .dispatch-scenario-banner .text-dark {
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .dispatch-scenario-banner .text-muted,
+body.app-skin-dark .dispatch-scenario-banner .text-muted,
+[data-bs-theme="dark"] .dispatch-scenario-banner .text-muted,
+[data-theme="dark"] .dispatch-scenario-banner .text-muted {
+    color: #94a3b8 !important;
+}
+
+html.app-skin-dark .dispatch-scenario-banner .btn-outline-dark,
+body.app-skin-dark .dispatch-scenario-banner .btn-outline-dark,
+[data-bs-theme="dark"] .dispatch-scenario-banner .btn-outline-dark,
+[data-theme="dark"] .dispatch-scenario-banner .btn-outline-dark {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark #dispatchWarningsContainer .alert-warning,
+body.app-skin-dark #dispatchWarningsContainer .alert-warning,
+[data-bs-theme="dark"] #dispatchWarningsContainer .alert-warning,
+[data-theme="dark"] #dispatchWarningsContainer .alert-warning {
+    background-color: rgba(245, 158, 11, 0.12) !important;
+    border-color: rgba(245, 158, 11, 0.35) !important;
+    color: #fde68a !important;
+}
+
+html.app-skin-dark #dispatchWarningsContainer .text-dark,
+body.app-skin-dark #dispatchWarningsContainer .text-dark,
+[data-bs-theme="dark"] #dispatchWarningsContainer .text-dark,
+[data-theme="dark"] #dispatchWarningsContainer .text-dark {
+    color: #fef08a !important;
+}
+
+/* ==========================================================================
+   MES Shop Floor Dashboard Dark Mode
+   ========================================================================== */
+html.app-skin-dark .mes-project-card,
+body.app-skin-dark .mes-project-card,
+[data-bs-theme="dark"] .mes-project-card,
+[data-theme="dark"] .mes-project-card {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+html.app-skin-dark .mes-project-header,
+body.app-skin-dark .mes-project-header,
+[data-bs-theme="dark"] .mes-project-header,
+[data-theme="dark"] .mes-project-header {
+    background-color: #162038 !important;
+    border-color: #283c50 !important;
+}
+
+html.app-skin-dark .mes-project-header .text-dark,
+body.app-skin-dark .mes-project-header .text-dark,
+[data-bs-theme="dark"] .mes-project-header .text-dark,
+[data-theme="dark"] .mes-project-header .text-dark,
+html.app-skin-dark .mes-project-product,
+body.app-skin-dark .mes-project-product,
+[data-bs-theme="dark"] .mes-project-product,
+[data-theme="dark"] .mes-project-product {
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .mes-project-header .text-muted,
+body.app-skin-dark .mes-project-header .text-muted,
+[data-bs-theme="dark"] .mes-project-header .text-muted,
+[data-theme="dark"] .mes-project-header .text-muted {
+    color: #94a3b8 !important;
+}
+
+html.app-skin-dark .mes-project-header .text-secondary,
+body.app-skin-dark .mes-project-header .text-secondary,
+[data-bs-theme="dark"] .mes-project-header .text-secondary,
+[data-theme="dark"] .mes-project-header .text-secondary {
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .mes-project-header .progress,
+body.app-skin-dark .mes-project-header .progress,
+[data-bs-theme="dark"] .mes-project-header .progress,
+[data-theme="dark"] .mes-project-header .progress {
+    background-color: #0f172a !important;
+    border-color: #283c50 !important;
+}
+
+html.app-skin-dark .mes-project-card .card-body,
+body.app-skin-dark .mes-project-card .card-body,
+[data-bs-theme="dark"] .mes-project-card .card-body,
+[data-theme="dark"] .mes-project-card .card-body {
+    background-color: #0f172a !important;
+}
+
+html.app-skin-dark .mes-project-card .table,
+body.app-skin-dark .mes-project-card .table,
+[data-bs-theme="dark"] .mes-project-card .table,
+[data-theme="dark"] .mes-project-card .table {
+    background-color: #0f172a !important;
+    color: #cbd5e1 !important;
+    border-color: #1e293b !important;
+}
+
+html.app-skin-dark .mes-project-card .table td,
+body.app-skin-dark .mes-project-card .table td,
+[data-bs-theme="dark"] .mes-project-card .table td,
+[data-theme="dark"] .mes-project-card .table td,
+html.app-skin-dark .mes-project-card .table th,
+body.app-skin-dark .mes-project-card .table th,
+[data-bs-theme="dark"] .mes-project-card .table th,
+[data-theme="dark"] .mes-project-card .table th {
+    border-color: #1e293b !important;
+}
+
+html.app-skin-dark .action-icon-btn,
+body.app-skin-dark .action-icon-btn,
+[data-bs-theme="dark"] .action-icon-btn,
+[data-theme="dark"] .action-icon-btn {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .action-icon-btn:hover,
+body.app-skin-dark .action-icon-btn:hover,
+[data-bs-theme="dark"] .action-icon-btn:hover,
+[data-theme="dark"] .action-icon-btn:hover {
+    background-color: color-mix(in srgb, var(--bs-primary) 20%, #1e293b) !important;
+    border-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+}
+
+html.app-skin-dark .action-icon-btn.action-start-btn,
+body.app-skin-dark .action-icon-btn.action-start-btn,
+[data-bs-theme="dark"] .action-icon-btn.action-start-btn,
+[data-theme="dark"] .action-icon-btn.action-start-btn {
+    background-color: #10b981 !important;
+    border-color: #10b981 !important;
+    color: #ffffff !important;
+}
+
+html.app-skin-dark .mes-empty-card,
+body.app-skin-dark .mes-empty-card,
+[data-bs-theme="dark"] .mes-empty-card,
+[data-theme="dark"] .mes-empty-card {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .mes-empty-card .text-dark,
+body.app-skin-dark .mes-empty-card .text-dark,
+[data-bs-theme="dark"] .mes-empty-card .text-dark,
+[data-theme="dark"] .mes-empty-card .text-dark {
+    color: #f1f5f9 !important;
+}
+
+html.app-skin-dark .running-card,
+body.app-skin-dark .running-card,
+[data-bs-theme="dark"] .running-card,
+[data-theme="dark"] .running-card {
+    background-color: #0f172a !important;
+}
+
+html.app-skin-dark .paused-card,
+body.app-skin-dark .paused-card,
+[data-bs-theme="dark"] .paused-card,
+[data-theme="dark"] .paused-card {
+    background-color: #0f172a !important;
+}
+
+html.app-skin-dark .ready-card,
+body.app-skin-dark .ready-card,
+[data-bs-theme="dark"] .ready-card,
+[data-theme="dark"] .ready-card {
+    background-color: #0f172a !important;
+}

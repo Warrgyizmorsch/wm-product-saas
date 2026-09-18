@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Expense Policies & Categories | SaaS ERP')
-@section('page-title', 'Expense Policy Master')
-@section('breadcrumb', 'HRMS / Masters / Expense Policies')
+@section('title', 'Expense Master | SaaS ERP')
+@section('page-title', 'Expense Master')
+@section('breadcrumb', 'HRMS / Masters / Expense Master')
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -62,15 +62,15 @@
     {{-- Tabs header navigation --}}
     <ul class="nav gap-2 border-bottom pb-2 mb-4" id="policyTabs" role="tablist">
         <li class="nav-item">
-            <a class="nav-link {{ $activeTab === 'policies' ? 'active' : 'text-muted' }}" 
-               href="{{ route('hrms.expense-policy.index', ['tab' => 'policies']) }}">
-                <i class="feather-file-text me-1"></i> Expense Policies
-            </a>
-        </li>
-        <li class="nav-item">
             <a class="nav-link {{ $activeTab === 'categories' ? 'active' : 'text-muted' }}" 
                href="{{ route('hrms.expense-policy.index', ['tab' => 'categories']) }}">
                 <i class="feather-tag me-1"></i> Expense Categories
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {{ $activeTab === 'policies' ? 'active' : 'text-muted' }}" 
+               href="{{ route('hrms.expense-policy.index', ['tab' => 'policies']) }}">
+                <i class="feather-file-text me-1"></i> Expense Policies
             </a>
         </li>
     </ul>

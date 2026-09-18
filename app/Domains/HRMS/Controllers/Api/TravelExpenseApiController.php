@@ -1157,7 +1157,7 @@ class TravelExpenseApiController extends Controller
 
         $expenseReport->update(['status' => 'submitted']);
         $expenseReport->claims()->update(['status' => 'submitted']);
-        return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh(), true), 'Expense report submitted for approval.');
+        return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh()->load(['claims.category', 'employee', 'travelRequest', 'cashAdvance']), true), 'Expense report submitted for approval.');
     }
 
     /**

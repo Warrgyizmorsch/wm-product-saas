@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Transfer Details #' . $transfer->transfer_number . ' | SaaS ERP')
-@section('page-title', 'Stock Transfer Details')
-@section('breadcrumb', 'Inventory / Stock Transfers / Details')
+@section('title', __('inventory.stock_transfers_details') . ' #' . $transfer->transfer_number . ' | SaaS ERP')
+@section('page-title', __('inventory.stock_transfers_details'))
+@section('breadcrumb', __('inventory.stock_transfers_details'))
 
 @section('content')
 <div class="erp-single-panel text-dark">
@@ -17,7 +17,7 @@
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom flex-wrap gap-3">
             <div>
                 <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">
-                    <i class="feather-box text-primary me-1"></i>Stock Transfer Document
+                    <i class="feather-box text-primary me-1"></i>{{ __('inventory.stock_transfer_document') }}
                 </span>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <h3 class="fw-bold text-dark mb-0">{{ $transfer->transfer_number }}</h3>
@@ -25,52 +25,52 @@
                     @if($isSubcontractTransfer)
                         @if($isWipDispatch)
                             <span class="badge bg-soft-warning text-dark border border-warning px-2.5 py-1 fs-11 fw-bold me-2">
-                                <i class="feather-truck me-1"></i>Subcontract WIP Dispatch
+                                <i class="feather-truck me-1"></i>{{ __('inventory.subcontract_wip_dispatch') }}
                             </span>
                         @else
                             <span class="badge bg-soft-info text-info border border-info px-2.5 py-1 fs-11 fw-bold me-2">
-                                <i class="feather-box me-1"></i>Subcontract Material Dispatch
+                                <i class="feather-box me-1"></i>{{ __('inventory.subcontract_material_dispatch') }}
                             </span>
                         @endif
                     @endif
                 </div>
                 <small class="text-muted fs-12">
-                    <i class="feather-clock me-1"></i>Created on {{ \Carbon\Carbon::parse($transfer->created_at)->format('d M Y, h:i A') }}
+                    <i class="feather-clock me-1"></i>{{ __('inventory.created_on') }} {{ \Carbon\Carbon::parse($transfer->created_at)->format('d M Y, h:i A') }}
                 </small>
             </div>
 
             <!-- Action Buttons -->
             <div class="d-flex gap-2 flex-wrap align-items-center">
                 @if(in_array($transfer->status, ['Draft', 'Pending']))
-                    <form action="{{ route('inventory.transfers.dispatch', $transfer->id) }}" method="POST" onsubmit="return confirm('Dispatch items and mark as In-Transit?')">
+                    <form action="{{ route('inventory.transfers.dispatch', $transfer->id) }}" method="POST" onsubmit="return confirm('{{ __('inventory.dispatch_transfer') }}?')">
                         @csrf
                         <x-ui.button type="submit" variant="primary" icon="feather-truck">
-                            Dispatch Transfer
+                            {{ __('inventory.dispatch_transfer') }}
                         </x-ui.button>
                     </form>
-                    <form action="{{ route('inventory.transfers.cancel', $transfer->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to cancel this transfer?')">
+                    <form action="{{ route('inventory.transfers.cancel', $transfer->id) }}" method="POST" onsubmit="return confirm('{{ __('inventory.confirm_cancel_transfer') }}')">
                         @csrf
                         <x-ui.button type="submit" variant="danger" icon="feather-x-circle">
-                            Cancel
+                            {{ __('inventory.cancel') }}
                         </x-ui.button>
                     </form>
                 @elseif(in_array($transfer->status, ['In Transit', 'In-Transit']))
-                    <form action="{{ route('inventory.transfers.receive', $transfer->id) }}" method="POST" onsubmit="return confirm('Receive items at target warehouse?')">
+                    <form action="{{ route('inventory.transfers.receive', $transfer->id) }}" method="POST" onsubmit="return confirm('{{ __('inventory.receive_stock') }}?')">
                         @csrf
                         <x-ui.button type="submit" variant="success" icon="feather-check-circle" class="text-white">
-                            Receive Stock
+                            {{ __('inventory.receive_stock') }}
                         </x-ui.button>
                     </form>
-                    <form action="{{ route('inventory.transfers.cancel', $transfer->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to cancel this transfer?')">
+                    <form action="{{ route('inventory.transfers.cancel', $transfer->id) }}" method="POST" onsubmit="return confirm('{{ __('inventory.confirm_cancel_transfer') }}')">
                         @csrf
                         <x-ui.button type="submit" variant="danger" icon="feather-x-circle">
-                            Cancel
+                            {{ __('inventory.cancel') }}
                         </x-ui.button>
                     </form>
                 @endif
 
                 <x-ui.button href="{{ route('inventory.transfers.index') }}" variant="light" icon="feather-arrow-left">
-                    Back to List
+                    {{ __('inventory.back_to_list') }}
                 </x-ui.button>
             </div>
         </div>
@@ -80,9 +80,9 @@
                 <div class="d-flex align-items-top">
                     <i class="feather-info fs-18 text-info me-3 mt-0.5"></i>
                     <div>
-                        <h6 class="fw-bold text-info mb-1">Subcontract Material / WIP Dispatch</h6>
+                        <h6 class="fw-bold text-info mb-1">{{ __('inventory.subcontract_material_dispatch') }}</h6>
                         <p class="fs-12 text-dark mb-0">
-                            This document represents company-owned material or WIP physically dispatched to subcontractor <strong>{{ $transfer->toWarehouse?->name ?? 'Vendor Warehouse' }}</strong> for processing. It is an internal stock movement, <strong>not</strong> a purchase or consumption transaction.
+                            {{ __('inventory.subcontract_dispatch_info', ['warehouse' => $transfer->toWarehouse?->name ?? 'Vendor Warehouse']) }}
                         </p>
                     </div>
                 </div>
@@ -93,7 +93,7 @@
         <div class="row g-3 mb-4">
             <div class="col-md-3 col-6">
                 <div class="p-3 bg-light rounded border h-100">
-                    <span class="text-muted d-block fs-11 fw-bold text-uppercase mb-1" style="letter-spacing:0.5px;">From Warehouse</span>
+                    <span class="text-muted d-block fs-11 fw-bold text-uppercase mb-1" style="letter-spacing:0.5px;">{{ __('inventory.from_warehouse') }}</span>
                     <span class="fw-bold text-dark fs-14 d-flex align-items-center">
                         <i class="feather-arrow-up-right text-danger me-1 fs-14"></i>{{ $transfer->fromWarehouse->name ?? 'N/A' }}
                     </span>
@@ -101,7 +101,7 @@
             </div>
             <div class="col-md-3 col-6">
                 <div class="p-3 bg-light rounded border h-100">
-                    <span class="text-muted d-block fs-11 fw-bold text-uppercase mb-1" style="letter-spacing:0.5px;">To Warehouse</span>
+                    <span class="text-muted d-block fs-11 fw-bold text-uppercase mb-1" style="letter-spacing:0.5px;">{{ __('inventory.to_warehouse') }}</span>
                     <span class="fw-bold text-dark fs-14 d-flex align-items-center">
                         <i class="feather-arrow-down-left text-success me-1 fs-14"></i>{{ $transfer->toWarehouse->name ?? 'N/A' }}
                     </span>
@@ -109,7 +109,7 @@
             </div>
             <div class="col-md-3 col-6">
                 <div class="p-3 bg-light rounded border h-100">
-                    <span class="text-muted d-block fs-11 fw-bold text-uppercase mb-1" style="letter-spacing:0.5px;">Transfer Date</span>
+                    <span class="text-muted d-block fs-11 fw-bold text-uppercase mb-1" style="letter-spacing:0.5px;">{{ __('inventory.transfer_date') }}</span>
                     <span class="fw-bold text-dark fs-14 d-flex align-items-center">
                         <i class="feather-calendar text-muted me-1 fs-13"></i>{{ $transfer->transfer_date ? \Carbon\Carbon::parse($transfer->transfer_date)->format('d M Y') : 'N/A' }}
                     </span>
@@ -117,7 +117,7 @@
             </div>
             <div class="col-md-3 col-6">
                 <div class="p-3 bg-light rounded border h-100">
-                    <span class="text-muted d-block fs-11 fw-bold text-uppercase mb-1" style="letter-spacing:0.5px;">Current Status</span>
+                    <span class="text-muted d-block fs-11 fw-bold text-uppercase mb-1" style="letter-spacing:0.5px;">{{ __('inventory.current_status') }}</span>
                     <div class="mt-1">
                         <x-ui.status-badge :status="$transfer->status" size="sm" />
                     </div>
@@ -128,7 +128,7 @@
         <!-- Transferred Items Section -->
         <div class="mb-4">
             <h5 class="fw-bold text-dark mb-3">
-                <i class="feather-layers text-primary me-2"></i>Transferred Items
+                <i class="feather-layers text-primary me-2"></i>{{ __('inventory.transferred_items') }}
             </h5>
             
             <div class="table-responsive">
@@ -136,11 +136,11 @@
                     <thead class="table-light bg-light">
                         <tr>
                             <th style="width: 5%;" class="text-center">#</th>
-                            <th style="width: 30%;">Product Details</th>
-                            <th style="width: 15%;">SKU</th>
-                            <th style="width: 15%;" class="text-end">Transfer Qty</th>
-                            <th style="width: 15%;" class="text-end">Received Qty</th>
-                            <th style="width: 20%;">Tracked Serial Numbers</th>
+                            <th style="width: 30%;">{{ __('inventory.variant_details') }}</th>
+                            <th style="width: 15%;">{{ __('inventory.sku') }}</th>
+                            <th style="width: 15%;" class="text-end">{{ __('inventory.transfer_qty') }}</th>
+                            <th style="width: 15%;" class="text-end">{{ __('inventory.received_qty') }}</th>
+                            <th style="width: 20%;">{{ __('inventory.tracked_serial_numbers') }}</th>
                         </tr>
                     </thead>
                     <tbody class="text-dark">
@@ -197,7 +197,7 @@
         @if($transfer->notes)
             <div class="p-3 bg-light rounded border">
                 <h6 class="fw-bold text-dark mb-1">
-                    <i class="feather-file-text text-primary me-1"></i>Notes & Remarks:
+                    <i class="feather-file-text text-primary me-1"></i>{{ __('inventory.notes_remarks') }}
                 </h6>
                 <p class="mb-0 text-muted fs-13">{{ $transfer->notes }}</p>
             </div>

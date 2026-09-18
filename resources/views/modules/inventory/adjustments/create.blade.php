@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'New Stock Adjustment | SaaS ERP')
-@section('page-title', 'New Stock Adjustment')
-@section('breadcrumb', 'Inventory / Stock Adjustments / Create')
+@section('title', __('inventory.new_stock_adjustment') . ' | SaaS ERP')
+@section('page-title', __('inventory.new_stock_adjustment'))
+@section('breadcrumb', __('inventory.inventory_stock_adjustments_create'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -24,52 +24,52 @@
             <!-- Header Bar -->
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2 flex-wrap gap-2">
                 <div>
-                    <h4 class="fw-bold text-dark mb-0">New Stock Adjustment</h4>
-                    <span class="fs-12 text-muted">Create a physical stock count variance or inventory adjustment order.</span>
+                    <h4 class="fw-bold text-dark mb-0">{{ __('inventory.new_stock_adjustment') }}</h4>
+                    <span class="fs-12 text-muted">{{ __('inventory.new_stock_adjustment_help') }}</span>
                 </div>
                 <div class="d-flex gap-2">
-                    <x-ui.button href="{{ route('inventory.adjustments.index') }}" variant="light" class="border">Discard</x-ui.button>
-                    <x-ui.button type="submit" variant="primary" icon="feather-check">Save Adjustment</x-ui.button>
+                    <x-ui.button href="{{ route('inventory.adjustments.index') }}" variant="light" class="border">{{ __('inventory.discard') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" icon="feather-check">{{ __('inventory.save_adjustment') }}</x-ui.button>
                 </div>
             </div>
 
             <!-- Form Grid -->
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="Warehouse" name="warehouse_id" class="select2-select" :required="true" :error-text="$errors->first('warehouse_id')">
-                        <option value="">Select Warehouse</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('inventory.warehouse')" name="warehouse_id" class="select2-select" :required="true" :error-text="$errors->first('warehouse_id')">
+                        <option value="">{{ __('inventory.select_warehouse') }}</option>
                         @foreach($warehouses as $wh)
                             <option value="{{ $wh->id }}" {{ old('warehouse_id') == $wh->id ? 'selected' : '' }}>{{ $wh->name }}</option>
                         @endforeach
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="Adjustment Date" name="adjustment_date" value="{{ old('adjustment_date', date('Y-m-d')) }}" :required="true" :error-text="$errors->first('adjustment_date')" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" :label="__('inventory.adjustment_date')" name="adjustment_date" value="{{ old('adjustment_date', date('Y-m-d')) }}" :required="true" :error-text="$errors->first('adjustment_date')" />
                 </div>
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="Reason" name="reason" class="select2-select" :required="true" :error-text="$errors->first('reason')">
-                        <option value="Stock Count Variance" {{ old('reason') === 'Stock Count Variance' ? 'selected' : '' }}>Stock Count Variance</option>
-                        <option value="Damaged" {{ old('reason') === 'Damaged' ? 'selected' : '' }}>Damaged</option>
-                        <option value="Expired" {{ old('reason') === 'Expired' ? 'selected' : '' }}>Expired</option>
-                        <option value="Theft/Loss" {{ old('reason') === 'Theft/Loss' ? 'selected' : '' }}>Theft/Loss</option>
-                        <option value="Scrap" {{ old('reason') === 'Scrap' ? 'selected' : '' }}>Scrap</option>
-                        <option value="Sample" {{ old('reason') === 'Sample' ? 'selected' : '' }}>Sample</option>
-                        <option value="Other" {{ old('reason') === 'Other' ? 'selected' : '' }}>Other</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('inventory.reason')" name="reason" class="select2-select" :required="true" :error-text="$errors->first('reason')">
+                        <option value="Stock Count Variance" {{ old('reason') === 'Stock Count Variance' ? 'selected' : '' }}>{{ __('inventory.stock_count_variance') }}</option>
+                        <option value="Damaged" {{ old('reason') === 'Damaged' ? 'selected' : '' }}>{{ __('inventory.damaged') }}</option>
+                        <option value="Expired" {{ old('reason') === 'Expired' ? 'selected' : '' }}>{{ __('inventory.expired') }}</option>
+                        <option value="Theft/Loss" {{ old('reason') === 'Theft/Loss' ? 'selected' : '' }}>{{ __('inventory.theft_loss') }}</option>
+                        <option value="Scrap" {{ old('reason') === 'Scrap' ? 'selected' : '' }}>{{ __('inventory.scrap') }}</option>
+                        <option value="Sample" {{ old('reason') === 'Sample' ? 'selected' : '' }}>{{ __('inventory.sample') }}</option>
+                        <option value="Other" {{ old('reason') === 'Other' ? 'selected' : '' }}>{{ __('inventory.other') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-12">
-                    <x-ui.odoo-form-ui type="textarea" label="Notes / Description" name="notes" rows="2" placeholder="Describe reason for adjustment..." :error-text="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
+                    <x-ui.odoo-form-ui type="textarea" :label="__('inventory.notes_description')" name="notes" rows="2" :placeholder="__('inventory.describe_adjustment_reason')" :error-text="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
                 </div>
             </div>
 
             <!-- Line Items Table Section -->
             <div class="border-top pt-4">
                 <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-                    <h5 class="fw-bold text-dark mb-0 fs-14"><i class="feather-layers text-primary me-2"></i>Adjustment Line Items</h5>
+                    <h5 class="fw-bold text-dark mb-0 fs-14"><i class="feather-layers text-primary me-2"></i>{{ __('inventory.adjustment_line_items') }}</h5>
                     <div class="d-flex align-items-center gap-2" style="width: 420px;">
                         <div class="input-group input-group-sm shadow-2xs rounded overflow-hidden" style="border: 1px solid #cbd5e1 !important;">
-                            <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
-                            <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
+                            <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> {{ __('inventory.barcode') }}</span>
+                            <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="{{ __('inventory.scan_barcode_sku_press_enter') }}" autocomplete="off" style="font-size: 13px;">
                             <button type="button" class="btn btn-primary border-0 px-3" id="fastBarcodeScanBtn"><i class="feather-search"></i></button>
                         </div>
                     </div>
@@ -79,11 +79,11 @@
                     <x-ui.odoo-form-ui type="table" id="items-table">
                         <thead class="table-light fs-12">
                             <tr>
-                                <th style="width: 40%;" class="ps-3">Product <span class="text-danger">*</span></th>
-                                <th style="width: 15%;">Type <span class="text-danger">*</span></th>
-                                <th style="width: 12%;" class="text-center">Quantity <span class="text-danger">*</span></th>
-                                <th style="width: 13%;" class="text-center">Unit Cost</th>
-                                <th style="width: 15%;">Serial Numbers</th>
+                                <th style="width: 40%;" class="ps-3">{{ __('inventory.product') }} <span class="text-danger">*</span></th>
+                                <th style="width: 15%;">{{ __('inventory.type') }} <span class="text-danger">*</span></th>
+                                <th style="width: 12%;" class="text-center">{{ __('inventory.quantity') }} <span class="text-danger">*</span></th>
+                                <th style="width: 13%;" class="text-center">{{ __('inventory.unit_cost') }} ({{ active_currency_symbol() }})</th>
+                                <th style="width: 15%;">{{ __('inventory.serial_numbers') }}</th>
                                 <th style="width: 5%;" class="text-center"></th>
                             </tr>
                         </thead>
@@ -91,7 +91,7 @@
                             <tr class="adjustment-row">
                                 <td class="ps-3">
                                     <select name="items[0][product_id]" class="form-select odoo-table-select product-select" required>
-                                        <option value="">Select Product</option>
+                                        <option value="">{{ __('inventory.select_product') }}</option>
                                         @foreach($products as $prod)
                                             <option value="{{ $prod->id }}">{{ $prod->name }} (SKU: {{ $prod->sku }})</option>
                                         @endforeach
@@ -99,18 +99,18 @@
                                 </td>
                                 <td>
                                     <select name="items[0][type]" class="form-select odoo-table-select" required>
-                                        <option value="Deduction">Deduction (-)</option>
-                                        <option value="Addition">Addition (+)</option>
+                                        <option value="Deduction">{{ __('inventory.deduction_sign') }}</option>
+                                        <option value="Addition">{{ __('inventory.addition_sign') }}</option>
                                     </select>
                                 </td>
                                 <td class="text-center">
                                     <input type="number" name="items[0][quantity]" class="odoo-table-input text-center qty-input mx-auto" step="0.01" min="0.01" placeholder="Qty" value="1" required style="width: 90px;">
                                 </td>
                                 <td class="text-center">
-                                    <input type="number" name="items[0][unit_cost]" class="odoo-table-input text-center cost-input mx-auto" step="0.01" min="0" placeholder="Cost" style="width: 90px;">
+                                    <input type="number" name="items[0][unit_cost]" class="odoo-table-input text-center cost-input mx-auto" step="0.01" min="0" placeholder="0.00" style="width: 90px;">
                                 </td>
                                 <td>
-                                    <input type="text" name="items[0][serial_numbers]" class="odoo-table-input" placeholder="SN1, SN2...">
+                                    <input type="text" name="items[0][serial_numbers]" class="odoo-table-input" placeholder="{{ __('inventory.serial_numbers_placeholder') }}">
                                 </td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row mt-1"><i class="feather-trash-2"></i></button>
@@ -122,15 +122,15 @@
 
                 <div class="mt-3">
                     <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="add-item" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
-                        <i class="feather-plus me-1"></i>Add line item
+                        <i class="feather-plus me-1"></i>{{ __('inventory.add_line_item') }}
                     </button>
                 </div>
             </div>
 
             <!-- Footer Action Bar -->
             <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                <x-ui.button href="{{ route('inventory.adjustments.index') }}" variant="light" class="border px-4">Discard</x-ui.button>
-                <x-ui.button type="submit" variant="primary" icon="feather-check" class="px-4">Save Adjustment</x-ui.button>
+                <x-ui.button href="{{ route('inventory.adjustments.index') }}" variant="light" class="border px-4">{{ __('inventory.discard') }}</x-ui.button>
+                <x-ui.button type="submit" variant="primary" icon="feather-check" class="px-4">{{ __('inventory.save_adjustment') }}</x-ui.button>
             </div>
         </x-ui.odoo-form-ui>
     </form>

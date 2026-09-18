@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
-    <title>Print Barcode Labels - {{ $product->name }}</title>
+    <title>{{ __('inventory.print_barcode_labels') }} - {{ $product->name }}</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
         body {
@@ -71,7 +71,7 @@
 <body>
     <div class="no-print" style="max-width: 900px; margin: 0 auto 20px auto; text-align: right;">
         <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">
-            🖨️ Print Labels Now
+            🖨️ {{ __('inventory.print_labels_now') }}
         </button>
     </div>
 
@@ -87,7 +87,7 @@
                     @endif
                 </div>
                 <svg class="barcode-svg" id="barcode-{{ $index }}"></svg>
-                <div class="price-tag">Price: ₹{{ number_format($lbl['price'], 2) }}</div>
+                <div class="price-tag">{{ __('inventory.price') }}: {!! format_currency($lbl['price']) !!}</div>
             </div>
         @endforeach
     </div>

@@ -21,6 +21,7 @@
             padding-right: 8px;
             padding-top: 10px;
             background-color: #F8FAFC;
+            border-radius: 8px;
         }
 
         .production-main-content-scroll::-webkit-scrollbar {
@@ -66,6 +67,84 @@
                 overflow-y: visible !important;
                 padding-right: 0 !important;
             }
+        }
+
+        /* ── Dark Mode Overrides for Production Order Detail ── */
+        html.app-skin-dark .production-main-content-scroll {
+            background-color: #111a2e !important;
+            border: 1px solid #1e293b !important;
+        }
+
+        html.app-skin-dark .production-main-content-scroll::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        html.app-skin-dark .production-order-tab-content {
+            background-color: transparent !important;
+        }
+
+        html.app-skin-dark .production-main-content-scroll .bg-light,
+        html.app-skin-dark .production-main-content-scroll .bg-light-subtle {
+            background-color: #162038 !important;
+            border-color: #283c50 !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .production-main-content-scroll .bg-white {
+            background-color: #131b2e !important;
+            border-color: #283c50 !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .production-main-content-scroll .card {
+            background-color: #131b2e !important;
+            border-color: #1e293b !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .production-main-content-scroll .text-dark,
+        html.app-skin-dark .erp-single-panel .text-dark {
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .production-main-content-scroll .text-muted,
+        html.app-skin-dark .erp-single-panel .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .production-main-content-scroll .border,
+        html.app-skin-dark .production-main-content-scroll .border-end,
+        html.app-skin-dark .production-main-content-scroll .border-bottom,
+        html.app-skin-dark .production-main-content-scroll .border-top,
+        html.app-skin-dark .erp-single-panel .border-end,
+        html.app-skin-dark .erp-single-panel .border-bottom {
+            border-color: #1e293b !important;
+        }
+
+        html.app-skin-dark .mobile-tabs-wrapper {
+            background-color: #131b2e !important;
+            border-color: #1e293b !important;
+        }
+
+        html.app-skin-dark .production-main-content-scroll .alert.alert-warning {
+            background-color: rgba(245, 158, 11, 0.12) !important;
+            border-color: rgba(245, 158, 11, 0.3) !important;
+            color: #fbbf24 !important;
+        }
+
+        html.app-skin-dark .production-main-content-scroll table thead.bg-light th,
+        html.app-skin-dark .production-main-content-scroll table th {
+            background-color: #162038 !important;
+            color: #94a3b8 !important;
+            border-color: #283c50 !important;
+        }
+
+        html.app-skin-dark .production-main-content-scroll table tr.bg-white,
+        html.app-skin-dark .production-main-content-scroll table td.bg-white,
+        html.app-skin-dark .production-main-content-scroll table td {
+            background-color: #0f172a !important;
+            color: #cbd5e1 !important;
+            border-color: #1b2436 !important;
         }
     </style>
 @endpush
@@ -457,10 +536,10 @@
             <div class="col-md-9 col-lg-10 ps-md-2 production-main-content-scroll">
 
                 {{-- Top Horizontal Navigation Bar (Mobile Screens Only) --}}
-                <div class="d-block d-md-none mb-3 bg-white p-2 rounded border">
+                <div class="d-block d-md-none mb-3 mobile-tabs-wrapper p-2 rounded border">
                     <x-ui.horizontal-tabs id="mobileProductionOrderTabs" :tabs="$verticalTabs" />
                 </div>
-                <div class="tab-content" style="background-color: white; padding: 10px;"
+                <div class="tab-content production-order-tab-content p-2"
                     id="productionOrderVerticalTabsContent">
 
                     {{-- Tab 1: Overview --}}

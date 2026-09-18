@@ -1,12 +1,12 @@
 @extends('layouts.duralux')
 
-@section('title', 'Accounts (Companies) | SaaS ERP')
-@section('page-title', 'CRM Accounts')
-@section('breadcrumb', 'Accounts')
+@section('title', __('crm.accounts_sidebar') . ' | SaaS ERP')
+@section('page-title', __('crm.accounts_sidebar'))
+@section('breadcrumb', __('crm.accounts_sidebar'))
 
 @section('page-actions')
     <x-ui.button href="{{ route('crm.accounts.create') }}" variant="primary" icon="feather-plus">
-        Add New Account
+        {{ __('crm.add_new_account') }}
     </x-ui.button>
 @endsection
 
@@ -31,7 +31,7 @@
 
         {{-- 1. Header: Title & Actions --}}
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-            <h5 class="fw-bold text-dark mb-0">Accounts Listing</h5>
+            <h5 class="fw-bold text-dark mb-0">{{ __('crm.accounts_listing') }}</h5>
             <div class="d-flex align-items-center flex-wrap gap-2">
                 <!-- Outside Search Box (HRMS Style) -->
                 <form method="GET" action="{{ route('crm.accounts.index') }}" class="d-flex align-items-center bg-light border rounded px-2.5 py-0.5 me-1" style="height: 34px; min-width: 280px; max-width: 360px;">
@@ -41,33 +41,33 @@
                         @endif
                     @endforeach
                     <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
-                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="Search accounts, GSTIN, email..." value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('crm.search_accounts_placeholder') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
                     @if(request('search'))
-                        <a href="{{ route('crm.accounts.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search">
+                        <a href="{{ route('crm.accounts.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="{{ __('crm.clear_search') }}">
                             <i class="feather-x fs-12"></i>
                         </a>
                     @endif
                 </form>
 
-                <x-ui.sort-dropdown label="Sort">
+                <x-ui.sort-dropdown :label="__('crm.sort')">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Latest Accounts</span>
+                        <span>{{ __('crm.latest_accounts') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Company Name (A - Z)</span>
+                        <span>{{ __('crm.company_name_az') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
                 <form method="GET" action="{{ route('crm.accounts.index') }}" class="d-inline">
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter :label="__('crm.filter')" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Keywords</label>
-                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Company, GSTIN, Email..." value="{{ request('search') }}" />
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.keywords') }}</label>
+                            <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_accounts_placeholder')" value="{{ request('search') }}" />
                         </div>
                         <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                            <a href="{{ route('crm.accounts.index') }}" class="btn btn-xs btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-xs btn-primary" style="background-color: #1e40af; border-color: #1e40af;">Apply Filters</button>
+                            <a href="{{ route('crm.accounts.index') }}" class="btn btn-xs btn-light border">{{ __('crm.reset') }}</a>
+                            <button type="submit" class="btn btn-xs btn-primary" style="background-color: #1e40af; border-color: #1e40af;">{{ __('crm.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -77,12 +77,12 @@
         {{-- Active Filters Badges Row --}}
         @if(request('search'))
             <div class="d-flex align-items-center flex-wrap gap-2 mb-3 bg-light p-2 rounded border">
-                <span class="fs-11 fw-bold text-uppercase text-muted me-1"><i class="feather-filter me-1"></i>Active Filters:</span>
+                <span class="fs-11 fw-bold text-uppercase text-muted me-1"><i class="feather-filter me-1"></i>{{ __('crm.active_filters') }}</span>
                 <span class="badge bg-white text-dark border font-monospace fs-11">
                     Search: "{{ request('search') }}"
                     <a href="{{ route('crm.accounts.index', request()->except('search')) }}" class="text-danger ms-1 text-decoration-none">×</a>
                 </span>
-                <a href="{{ route('crm.accounts.index') }}" class="text-muted fs-11 ms-auto fw-bold text-decoration-none">Clear All</a>
+                <a href="{{ route('crm.accounts.index') }}" class="text-muted fs-11 ms-auto fw-bold text-decoration-none">{{ __('crm.clear_all') }}</a>
             </div>
         @endif
 
@@ -91,14 +91,14 @@
             <x-ui.odoo-form-ui type="table" id="accountsTable" class="mb-0">
                 <thead>
                     <tr style="background-color: #e8ecf1 !important;">
-                        <th style="background-color: #e8ecf1 !important;">ACCOUNT #</th>
-                        <th style="background-color: #e8ecf1 !important;">COMPANY NAME</th>
-                        <th style="background-color: #e8ecf1 !important;">GSTIN</th>
-                        <th style="background-color: #e8ecf1 !important;">PRIMARY CONTACT</th>
-                        <th style="background-color: #e8ecf1 !important;">PHONE / EMAIL</th>
-                        <th style="background-color: #e8ecf1 !important;" class="text-end">DEALS</th>
-                        <th style="background-color: #e8ecf1 !important;" class="text-end">LIFETIME REVENUE (LTV)</th>
-                        <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">ACTIONS</th>
+                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.account_no') }}</th>
+                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.company_name') }}</th>
+                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.gstin') }}</th>
+                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.primary_contact') }}</th>
+                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.phone_email') }}</th>
+                        <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.deals') }}</th>
+                        <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.lifetime_revenue') }}</th>
+                        <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody class="fs-13 text-dark">
@@ -156,35 +156,35 @@
                                     <div class="d-inline-flex flex-column align-items-end gap-1">
                                         <div class="d-flex gap-1 justify-content-end">
                                             @if($openCount > 0)
-                                                <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fw-bold" title="{{ $openCount }} Active Open Deals">
-                                                    {{ $openCount }} Open
+                                                <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fw-bold" title="{{ $openCount }} {{ __('crm.open') }}">
+                                                    {{ $openCount }} {{ __('crm.open') }}
                                                 </span>
                                             @endif
                                             @if($wonCount > 0)
-                                                <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2 py-0.5 fw-bold" title="{{ $wonCount }} Closed Won Deals">
-                                                    {{ $wonCount }} Won
+                                                <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2 py-0.5 fw-bold" title="{{ $wonCount }} {{ __('crm.won') }}">
+                                                    {{ $wonCount }} {{ __('crm.won') }}
                                                 </span>
                                             @endif
                                             @if($openCount == 0 && $wonCount == 0)
                                                 <span class="badge bg-soft-secondary text-secondary border px-2 py-0.5 fw-bold">
-                                                    {{ $totalDeals }} Deals
+                                                    {{ $totalDeals }} {{ __('crm.deals') }}
                                                 </span>
                                             @endif
                                         </div>
-                                        <span class="text-muted fs-11 font-monospace">Total: {{ $totalDeals }}</span>
+                                        <span class="text-muted fs-11 font-monospace">{{ __('crm.total_colon') }} {{ $totalDeals }}</span>
                                     </div>
                                 @else
-                                    <span class="badge bg-light text-muted border px-2 py-0.5 font-monospace">0 Deals</span>
+                                    <span class="badge bg-light text-muted border px-2 py-0.5 font-monospace">0 {{ __('crm.deals') }}</span>
                                 @endif
                             </td>
                             <td class="text-end fw-bold text-success fs-14">
-                                ₹{{ number_format($acc->lifetime_revenue, 2) }}
+                                {{ format_currency($acc->lifetime_revenue) }}
                             </td>
                             <td class="text-end pe-3">
                                 <x-ui.action-dropdown :viewUrl="route('crm.accounts.show', $acc)">
                                     <li>
                                         <a href="{{ route('crm.accounts.edit', $acc) }}" class="dropdown-item fs-12 py-1.5 text-dark">
-                                            <i class="feather-edit me-2 text-muted"></i>Edit Account
+                                            <i class="feather-edit me-2 text-muted"></i>{{ __('crm.edit_account') }}
                                         </a>
                                     </li>
                                 </x-ui.action-dropdown>
@@ -194,7 +194,7 @@
                         <tr>
                             <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="feather-briefcase fs-1 text-muted d-block mb-2"></i>
-                                No accounts found matching your criteria.
+                                {{ __('crm.no_accounts_found') }}
                             </td>
                         </tr>
                     @endforelse

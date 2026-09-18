@@ -42,33 +42,33 @@
 
                 <form method="GET" action="{{ route('purchase.po-approvals.index') }}" class="d-inline">
                     <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filters</h6>
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter') }}</h6>
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.search') }}</label>
                             <x-ui.odoo-form-ui type="input" name="search" placeholder="PO number or supplier..." value="{{ request('search') }}" />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Has Reminders</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.has_reminders') }}</label>
                             <x-ui.odoo-form-ui type="select" name="has_reminders">
-                                <option value="">All</option>
-                                <option value="1" @selected(request('has_reminders') === '1')>Yes (Reminded)</option>
-                                <option value="0" @selected(request('has_reminders') === '0')>No</option>
+                                <option value="">{{ __('purchase.all') }}</option>
+                                <option value="1" @selected(request('has_reminders') === '1')>{{ __('purchase.yes_reminded') }}</option>
+                                <option value="0" @selected(request('has_reminders') === '0')>{{ __('purchase.no') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Reminder Date From</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.reminder_date_from') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="reminder_date_from" value="{{ request('reminder_date_from') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Reminder Date To</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.reminder_date_to') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="reminder_date_to" value="{{ request('reminder_date_to') }}" />
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('purchase.po-approvals.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+                            <a href="{{ route('purchase.po-approvals.index') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('purchase.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -94,11 +94,11 @@
                         <th style="width: 12%">{{ __('purchase.po_no') }}</th>
                         <th style="width: 18%">{{ __('purchase.supplier_name') }}</th>
                         <th style="width: 12%">{{ __('purchase.ref_document') }}</th>
-                        <th style="width: 15%">DATES</th>
+                        <th style="width: 15%">{{ __('purchase.dates') }}</th>
                         <th style="width: 11%" class="text-end">{{ __('purchase.grand_total') }}</th>
-                        <th style="width: 13%">Last Reminder</th>
-                        <th style="width: 8%" class="text-center">Status</th>
-                        <th style="width: 12%" class="text-end">Actions</th>
+                        <th style="width: 13%">{{ __('purchase.last_reminder') }}</th>
+                        <th style="width: 8%" class="text-center">{{ __('purchase.status') }}</th>
+                        <th style="width: 12%" class="text-end">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -155,7 +155,7 @@
                                             class="btn btn-xs btn-soft-danger border border-danger-subtle font-monospace px-2 py-0.5 fs-10 fw-bold d-inline-flex align-items-center gap-1 mb-1"
                                             title="Click to view all reminders"
                                             onclick="showReminderHistoryModal('{{ $order->purchase_order_number }}', {{ json_encode($remData) }})">
-                                        <i class="feather-bell"></i>Reminded ({{ $order->reminder_count }})
+                                        <i class="feather-bell"></i>{{ __('purchase.reminded') }} ({{ $order->reminder_count }})
                                     </button>
                                     <div class="fs-11 text-muted font-monospace">
                                         {{ $order->last_reminded_at ? $order->last_reminded_at->format('d-m-Y H:i') : '' }}

@@ -78,9 +78,9 @@ Route::prefix('production')
         // ── Import/Export (Centralized Master Data) ───────────────────────────
         Route::get('import-export/download-template/{type}', [ProductionImportExportController::class, 'downloadTemplate'])
             ->name('import-export.download-template');
-        Route::post('import-export/import-preview/{type}', [ProductionImportExportController::class, 'importPreview'])
+        Route::match(['get', 'post'], 'import-export/import-preview/{type}', [ProductionImportExportController::class, 'importPreview'])
             ->name('import-export.import-preview');
-        Route::post('import-export/import-confirm/{type}', [ProductionImportExportController::class, 'importConfirm'])
+        Route::match(['get', 'post'], 'import-export/import-confirm/{type}', [ProductionImportExportController::class, 'importConfirm'])
             ->name('import-export.import-confirm');
         Route::get('import-export/export/{type}', [ProductionImportExportController::class, 'export'])
             ->name('import-export.export');

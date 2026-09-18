@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Deal Activity Calendar & Scheduler | CRM | SaaS ERP')
-@section('page-title', 'Deal Activity Calendar & Scheduler')
-@section('breadcrumb', 'CRM > Deal Activity Calendar')
+@section('title', __('crm.deal_activity_scheduler') . ' | CRM | SaaS ERP')
+@section('page-title', __('crm.deal_activity_scheduler'))
+@section('breadcrumb', 'CRM > ' . __('crm.deal_activity_calendar'))
 
 @push('styles')
 <style>
@@ -118,15 +118,15 @@
 @section('page-actions')
     @if(!empty($isGoogleConnected))
         <span class="badge bg-success-subtle text-success border border-success-subtle py-1.5 px-3 fs-12 fw-bold me-2 align-middle" title="Google Account is Synced & Linked">
-            <i class="feather-check-circle me-1"></i>Google Calendar Synced
+            <i class="feather-check-circle me-1"></i>{{ __('crm.google_calendar_synced') }}
         </span>
     @else
         <a href="{{ route('crm.google-calendar.connect') }}" target="_blank" class="btn btn-outline-danger btn-sm fw-semibold me-2">
-            <i class="feather-calendar me-1"></i>Connect Google Account
+            <i class="feather-calendar me-1"></i>{{ __('crm.connect_google_account') }}
         </a>
     @endif
     <button type="button" class="btn btn-primary btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#scheduleDealActivityModal">
-        <i class="feather-plus me-1"></i>Log Deal Activity / Follow-up
+        <i class="feather-plus me-1"></i>{{ __('crm.log_deal_activity') }}
     </button>
 @endsection
 
@@ -150,7 +150,7 @@
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-3 border-bottom">
         <!-- Left Section: Title & Date Navigation Controls -->
         <div class="d-flex align-items-center flex-wrap gap-2">
-            <h5 class="fw-bold text-dark mb-0 me-2">Deal Activity Calendar</h5>
+            <h5 class="fw-bold text-dark mb-0 me-2">{{ __('crm.deal_activity_calendar') }}</h5>
 
             <!-- Date Prev / Next / Today Controls -->
             <div class="d-flex align-items-center gap-1 me-2">
@@ -160,7 +160,7 @@
                 <a href="{{ request()->fullUrlWithQuery(['start' => $nextStart->toDateString()]) }}" class="btn btn-xs btn-light border py-1 px-2" title="Next">
                     <i class="feather-chevron-right"></i>
                 </a>
-                <a href="{{ request()->fullUrlWithQuery(['start' => now()->toDateString()]) }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-2">Today</a>
+                <a href="{{ request()->fullUrlWithQuery(['start' => now()->toDateString()]) }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-2">{{ __('crm.today') }}</a>
             </div>
 
             <h5 class="fw-bold text-dark mb-0 fs-14 me-2">
@@ -178,9 +178,9 @@
         <div class="d-flex align-items-center flex-wrap gap-2">
             <!-- Day / Week / Month Selector -->
             <div class="d-flex align-items-center me-2" style="gap: 4px;">
-                <a href="{{ request()->fullUrlWithQuery(['view' => 'day']) }}" class="btn btn-xs {{ $view === 'day' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">Day</a>
-                <a href="{{ request()->fullUrlWithQuery(['view' => 'week']) }}" class="btn btn-xs {{ $view === 'week' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">Week</a>
-                <a href="{{ request()->fullUrlWithQuery(['view' => 'month']) }}" class="btn btn-xs {{ $view === 'month' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">Month</a>
+                <a href="{{ request()->fullUrlWithQuery(['view' => 'day']) }}" class="btn btn-xs {{ $view === 'day' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">{{ __('crm.day') }}</a>
+                <a href="{{ request()->fullUrlWithQuery(['view' => 'week']) }}" class="btn btn-xs {{ $view === 'week' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">{{ __('crm.week') }}</a>
+                <a href="{{ request()->fullUrlWithQuery(['view' => 'month']) }}" class="btn btn-xs {{ $view === 'month' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">{{ __('crm.month') }}</a>
             </div>
 
             <!-- Icon View Switcher -->
@@ -188,7 +188,7 @@
 
             <!-- Custom Filter Component -->
             <form method="GET" action="{{ route('crm.deals.activities') }}" class="d-inline">
-                <x-ui.filter :label="__('ui.filter')" offset="0, 5">
+                <x-ui.filter :label="__('crm.filter')" offset="0, 5">
                     <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                     
                     <div class="mb-3">
@@ -245,13 +245,13 @@
     <div class="calendar-container">
         <div class="calendar-grid">
             <!-- Weekday Headers -->
-            <div class="calendar-day-header">Sun</div>
-            <div class="calendar-day-header">Mon</div>
-            <div class="calendar-day-header">Tue</div>
-            <div class="calendar-day-header">Wed</div>
-            <div class="calendar-day-header">Thu</div>
-            <div class="calendar-day-header">Fri</div>
-            <div class="calendar-day-header">Sat</div>
+            <div class="calendar-day-header">{{ __('crm.weekdays.sun') }}</div>
+            <div class="calendar-day-header">{{ __('crm.weekdays.mon') }}</div>
+            <div class="calendar-day-header">{{ __('crm.weekdays.tue') }}</div>
+            <div class="calendar-day-header">{{ __('crm.weekdays.wed') }}</div>
+            <div class="calendar-day-header">{{ __('crm.weekdays.thu') }}</div>
+            <div class="calendar-day-header">{{ __('crm.weekdays.fri') }}</div>
+            <div class="calendar-day-header">{{ __('crm.weekdays.sat') }}</div>
 
             <!-- Date Cells -->
             @php
@@ -277,12 +277,12 @@
                         <span class="day-number-badge">{{ $currentDay->day }}</span>
                         <div class="d-flex align-items-center gap-1">
                             @if($isToday)
-                                <span class="badge bg-primary fs-10 px-1.5 py-0.5">Today</span>
+                                <span class="badge bg-primary fs-10 px-1.5 py-0.5">{{ __('crm.today') }}</span>
                             @endif
                             <button type="button" class="btn btn-xs btn-soft-primary p-0 d-inline-flex align-items-center justify-content-center" 
-                                    style="width: 20px; height: 20px; border-radius: 50%;" 
-                                    title="Schedule activity on {{ $currentDay->format('d M Y') }}"
-                                    onclick="openScheduleModalForDate('{{ $dateStr }}', event)">
+                                     style="width: 20px; height: 20px; border-radius: 50%;" 
+                                     title="Schedule activity on {{ $currentDay->format('d M Y') }}"
+                                     onclick="openScheduleModalForDate('{{ $dateStr }}', event)">
                                 <i class="feather-plus fs-10"></i>
                             </button>
                         </div>
@@ -347,7 +347,7 @@
 </div>
 
 <!-- Schedule Deal Activity Modal -->
-<x-ui.modal id="scheduleDealActivityModal" title="Schedule Google Calendar Event / Meeting for Deal" size="lg" :showFooter="false">
+<x-ui.modal id="scheduleDealActivityModal" :title="__('crm.schedule_activity_modal_title')" size="lg" :showFooter="false">
     <form action="" method="POST" id="quickDealScheduleForm">
         @csrf
         <input type="hidden" name="action_mode" value="schedule">
@@ -368,7 +368,7 @@
                     <span><strong>Google Calendar Integration:</strong> Schedule Google events, calls, and meetings directly into Google Calendar & Deal activities.</span>
                 </div>
                 <a href="{{ route('crm.google-calendar.connect') }}" target="_blank" class="btn btn-xs btn-primary fw-bold px-2 py-1" title="Click to grant Google Calendar & Gmail permissions">
-                    <i class="feather-external-link me-1"></i> Connect Google Account
+                    <i class="feather-external-link me-1"></i> {{ __('crm.connect_google_account') }}
                 </a>
             </div>
         @endif
@@ -377,14 +377,14 @@
             <div class="col-md-6">
                 <x-ui.modal-form-ui 
                     type="select" 
-                    label="Select CRM Deal" 
+                    :label="__('crm.select_crm_deal')" 
                     name="deal_id" 
                     id="modal_deal_id" 
                     :required="true" 
                     :searchable="true" 
                     :errorText="$errors->first('deal_id')"
                 >
-                    <option value="">— Select CRM Deal —</option>
+                    <option value="">— {{ __('crm.select_crm_deal') }} —</option>
                     @foreach($deals as $deal)
                         <option value="{{ $deal->id }}">{{ $deal->title }} — {{ $deal->account?->name ?: 'N/A' }} ({{ $deal->deal_number }})</option>
                     @endforeach
@@ -394,11 +394,11 @@
             <div class="col-md-6">
                 <x-ui.modal-form-ui 
                     type="input" 
-                    label="Event / Meeting Title" 
+                    :label="__('crm.event_meeting_title')" 
                     name="title" 
                     id="modal_event_title"
                     :required="true"
-                    placeholder="e.g. Deal Followup Call / Client Demo" 
+                    :placeholder="__('crm.event_title_placeholder')" 
                     value="Deal Followup Call" 
                 />
             </div>
@@ -406,17 +406,17 @@
             <div class="col-md-4">
                 <x-ui.modal-form-ui 
                     type="select" 
-                    label="Activity Type" 
+                    :label="__('crm.activity_type')" 
                     name="type" 
                     id="modal_activity_type"
                     :required="true"
                     :searchable="true"
                     :errorText="$errors->first('type')"
                 >
-                    <option value="Call">Scheduled Call</option>
-                    <option value="Meeting">Meeting / Demo</option>
-                    <option value="Email">Send Email / Proposal</option>
-                    <option value="Task">General Task</option>
+                    <option value="Call">{{ __('crm.activity_types.Call') ?? 'Call' }}</option>
+                    <option value="Meeting">{{ __('crm.activity_types.Meeting') ?? 'Meeting' }}</option>
+                    <option value="Email">{{ __('crm.activity_types.Email') ?? 'Email' }}</option>
+                    <option value="Demo">{{ __('crm.activity_types.Demo') ?? 'Demo' }}</option>
                 </x-ui.modal-form-ui>
             </div>
 
@@ -424,7 +424,7 @@
                 <x-ui.modal-form-ui 
                     type="input" 
                     inputType="datetime-local" 
-                    label="Meeting Date & Time" 
+                    :label="__('crm.meeting_date_time')" 
                     name="followup_date" 
                     :value="now()->addDay()->format('Y-m-d\TH:i')" 
                     :required="true"
@@ -435,17 +435,17 @@
             <div class="col-md-4">
                 <x-ui.modal-form-ui 
                     type="select" 
-                    label="Duration (Minutes)" 
+                    :label="__('crm.duration_minutes')" 
                     name="duration_minutes" 
                     id="modal_duration"
                     :searchable="true"
                 >
-                    <option value="15">15 Minutes</option>
-                    <option value="30" selected>30 Minutes</option>
-                    <option value="45">45 Minutes</option>
-                    <option value="60">60 Minutes (1 Hour)</option>
-                    <option value="90">90 Minutes (1.5 Hours)</option>
-                    <option value="120">120 Minutes (2 Hours)</option>
+                    <option value="15">{{ __('crm.duration_options.15') ?? '15 Mins' }}</option>
+                    <option value="30" selected>{{ __('crm.duration_options.30') ?? '30 Mins' }}</option>
+                    <option value="45">{{ __('crm.duration_options.45') ?? '45 Mins' }}</option>
+                    <option value="60">{{ __('crm.duration_options.60') ?? '60 Mins (1 Hr)' }}</option>
+                    <option value="90">{{ __('crm.duration_options.90') ?? '90 Mins' }}</option>
+                    <option value="120">{{ __('crm.duration_options.120') ?? '120 Mins' }}</option>
                 </x-ui.modal-form-ui>
             </div>
 
@@ -455,27 +455,23 @@
                         <div class="form-check form-switch mb-0">
                             <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="syncGoogleSwitch" checked>
                             <label class="form-check-label fw-bold fs-12 text-dark" for="syncGoogleSwitch">
-                                <i class="feather-calendar text-danger me-1"></i> Sync to Google Calendar
+                                <i class="feather-calendar text-danger me-1"></i> {{ __('crm.sync_to_google_calendar') }}
                             </label>
                         </div>
                         <div class="form-check form-switch mb-0">
                             <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="createMeetSwitchUnified">
                             <label class="form-check-label fw-bold fs-12 text-dark" for="createMeetSwitchUnified">
-                                <i class="feather-video text-primary me-1"></i> Generate Google Meet Video Room Link
+                                <i class="feather-video text-primary me-1"></i> {{ __('crm.generate_google_meet_room_link') }}
                             </label>
                         </div>
                     </div>
-                    <small class="text-muted fs-11 d-block mt-2">
-                        <strong>Checked:</strong> Generates an instant Google Meet video conference link.<br>
-                        <strong>Unchecked:</strong> Schedules a Google Calendar Call / Reminder (No Video Link). Google sends push notification reminders on the event date!
-                    </small>
                 </div>
             </div>
 
             <div class="col-md-6">
                 <x-ui.modal-form-ui 
                     type="input" 
-                    label="Guest / Attendee Email Addresses" 
+                    :label="__('crm.guest_attendee_email_addresses')" 
                     name="guest_emails" 
                     placeholder="e.g. client@company.com, rep@mycompany.com (comma separated)" 
                 />
@@ -484,7 +480,7 @@
             <div class="col-md-6">
                 <x-ui.modal-form-ui 
                     type="select" 
-                    label="Tag Persons (Internal Staff)" 
+                    :label="__('crm.tag_persons_internal_staff')" 
                     name="tagged_user_ids[]" 
                     :multiple="true" 
                     :searchable="true"
@@ -498,7 +494,7 @@
             <div class="col-12">
                 <x-ui.modal-form-ui 
                     type="textarea" 
-                    label="Agenda / Discussion Notes" 
+                    :label="__('crm.agenda_discussion_notes')" 
                     name="notes" 
                     placeholder="Enter meeting agenda or discussion points..." 
                     rows="3" 
@@ -507,8 +503,8 @@
         </div>
 
         <div class="d-flex gap-2 justify-content-end mt-4 pt-3 border-top">
-            <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">CANCEL</button>
-            <button type="submit" class="btn btn-primary px-4 fw-bold">SCHEDULE ACTIVITY</button>
+            <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('crm.cancel') }}</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold">{{ __('crm.schedule_activity_btn') }}</button>
         </div>
     </form>
 </x-ui.modal>

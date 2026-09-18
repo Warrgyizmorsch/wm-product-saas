@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Landed Cost Vouchers | SaaS ERP')
-@section('page-title', 'Landed Cost Vouchers')
-@section('breadcrumb', __('ui.purchase') . ' / Landed Cost Vouchers')
+@section('title', __('purchase.landed_cost_vouchers') . ' | SaaS ERP')
+@section('page-title', __('purchase.landed_cost_vouchers'))
+@section('breadcrumb', __('ui.purchase') . ' / ' . __('purchase.landed_cost_vouchers'))
 
 @push('styles')
     <style>
@@ -31,7 +31,7 @@
 @section('page-actions')
     <div class="d-flex gap-2 flex-wrap">
         <x-ui.button href="{{ route('purchase.landed-costs.create') }}" variant="primary" icon="feather-plus">
-            New Landed Cost Voucher
+            {{ __('purchase.new_landed_cost_voucher') }}
         </x-ui.button>
     </div>
 @endsection
@@ -41,39 +41,39 @@
         <!-- Header Title & Common Filter -->
         <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
             <div>
-                <h5 class="fw-bold text-dark mb-0"><i class="feather-dollar-sign text-primary me-2"></i>Landed Cost Vouchers</h5>
-                <p class="text-muted fs-12 mb-0">Allocate freight, customs duty, and transport expenses onto Goods Receipts stock valuation.</p>
+                <h5 class="fw-bold text-dark mb-0"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.landed_cost_vouchers') }}</h5>
+                <p class="text-muted fs-12 mb-0">{{ __('purchase.landed_cost_subtitle') }}</p>
             </div>
 
             <!-- Common Filter Panel -->
             <form method="GET" action="{{ route('purchase.landed-costs.index') }}" class="d-inline">
                 <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
 
                     <div class="mb-3">
-                        <x-ui.odoo-form-ui type="input" label="Search" name="search" placeholder="Search Voucher # or GRN #" value="{{ request('search') }}" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.search')" name="search" :placeholder="__('purchase.search_voucher_grn_placeholder')" value="{{ request('search') }}" />
                     </div>
 
                     <div class="mb-3">
-                        <x-ui.odoo-form-ui type="select" label="Status" name="status">
-                            <option value="">All Statuses</option>
-                            <option value="Draft" @selected(request('status') === 'Draft')>Draft</option>
-                            <option value="Posted" @selected(request('status') === 'Posted')>Posted</option>
-                            <option value="Cancelled" @selected(request('status') === 'Cancelled')>Cancelled</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('purchase.status')" name="status">
+                            <option value="">{{ __('purchase.all_statuses') }}</option>
+                            <option value="Draft" @selected(request('status') === 'Draft')>{{ __('purchase.status_draft') }}</option>
+                            <option value="Posted" @selected(request('status') === 'Posted')>{{ __('purchase.status_posted') }}</option>
+                            <option value="Cancelled" @selected(request('status') === 'Cancelled')>{{ __('purchase.status_cancelled') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
 
                     <div class="mb-3">
-                        <x-ui.odoo-form-ui type="input" label="Date From" inputType="date" name="date_from" value="{{ request('date_from') }}" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.date_from')" inputType="date" name="date_from" value="{{ request('date_from') }}" />
                     </div>
 
                     <div class="mb-3">
-                        <x-ui.odoo-form-ui type="input" label="Date To" inputType="date" name="date_to" value="{{ request('date_to') }}" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.date_to')" inputType="date" name="date_to" value="{{ request('date_to') }}" />
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('purchase.landed-costs.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                        <a href="{{ route('purchase.landed-costs.index') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
+                        <button type="submit" class="btn btn-sm btn-primary">{{ __('purchase.apply_filters') }}</button>
                     </div>
                 </x-ui.filter>
             </form>
@@ -84,12 +84,12 @@
             <x-ui.odoo-form-ui type="table" id="allLandedCostsTable">
                 <thead>
                     <tr>
-                        <th style="width: 15%">Voucher #</th>
-                        <th style="width: 12%">Voucher Date</th>
-                        <th style="width: 25%">Linked GRNs</th>
-                        <th style="width: 15%" class="text-end">Total Expenses</th>
-                        <th style="width: 12%" class="text-center">Status</th>
-                        <th style="width: 11%" class="text-end">Actions</th>
+                        <th style="width: 15%">{{ __('purchase.voucher_no') }}</th>
+                        <th style="width: 12%">{{ __('purchase.voucher_date') }}</th>
+                        <th style="width: 25%">{{ __('purchase.linked_grns') }}</th>
+                        <th style="width: 15%" class="text-end">{{ __('purchase.total_expenses') }} ({{ active_currency_symbol() }})</th>
+                        <th style="width: 12%" class="text-center">{{ __('purchase.status') }}</th>
+                        <th style="width: 11%" class="text-end">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -108,19 +108,20 @@
                                 <span class="font-monospace fs-12 text-dark">{{ $grnNumbers ?: '—' }}</span>
                             </td>
                             <td class="text-end fw-bold font-monospace text-dark">
-                                ₹{{ number_format($voucher->total_expenses, 2) }}
+                                {{ active_currency_symbol() }} {{ number_format($voucher->total_expenses, 2) }}
                             </td>
                             <td class="text-center">
                                 @php
                                     $statusLower = strtolower($voucher->status);
                                     $badgeVariant = $statusLower === 'posted' ? 'success' : ($statusLower === 'draft' ? 'warning' : 'danger');
+                                    $statusLabel = $statusLower === 'posted' ? __('purchase.status_posted') : ($statusLower === 'draft' ? __('purchase.status_draft') : __('purchase.status_cancelled'));
                                 @endphp
                                 <x-ui.badge :soft="true" :variant="$badgeVariant" class="px-2.5 py-1 fs-11 fw-bold">
-                                    {{ ucfirst($voucher->status) }}
+                                    {{ $statusLabel }}
                                 </x-ui.badge>
                             </td>
                             <td class="text-end">
-                                <a href="{{ route('purchase.landed-costs.show', $voucher->id) }}" class="action-icon-btn me-1" title="View Voucher" data-bs-toggle="tooltip">
+                                <a href="{{ route('purchase.landed-costs.show', $voucher->id) }}" class="action-icon-btn me-1" title="{{ __('purchase.view_voucher') }}" data-bs-toggle="tooltip">
                                     <i class="feather-eye fs-14"></i>
                                 </a>
                             </td>
@@ -128,7 +129,7 @@
                     @empty
                         <tr>
                             <td colspan="6" class="text-center py-4 text-muted fs-13">
-                                <i class="feather-info me-1"></i>No Landed Cost Vouchers found. Click <strong>New Landed Cost Voucher</strong> to create one.
+                                <i class="feather-info me-1"></i>{{ __('purchase.no_landed_cost_vouchers_found') }}
                             </td>
                         </tr>
                     @endforelse

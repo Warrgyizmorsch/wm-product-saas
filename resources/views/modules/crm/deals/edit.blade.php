@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Edit Deal | SaaS ERP')
-@section('page-title', 'Edit Deal: ' . $deal->title)
-@section('breadcrumb', 'Edit Deal')
+@section('title', __('crm.edit_deal') . ' | SaaS ERP')
+@section('page-title', __('crm.edit_deal') . ': ' . $deal->title)
+@section('breadcrumb', __('crm.edit_deal'))
 
 @push('styles')
     <!-- Select2 Theme Styles -->
@@ -12,7 +12,7 @@
 
 @section('page-actions')
     <a href="{{ route('crm.deals.show', $deal) }}" class="btn btn-light">
-        <i class="feather-arrow-left me-1"></i>Back to Deal
+        <i class="feather-arrow-left me-1"></i>{{ __('crm.back_to_deal') }}
     </a>
 @endsection
 
@@ -26,9 +26,9 @@
             <div class="row g-4 mb-4">
                 <!-- Left Column: Company & Contact Details, Deal Overview -->
                 <div class="col-lg-6">
-                    <h6 class="fw-bold text-primary mb-3"><i class="feather-briefcase me-2"></i>Company & Contact Details</h6>
+                    <h6 class="fw-bold text-primary mb-3"><i class="feather-briefcase me-2"></i>{{ __('crm.company_contact_details') }}</h6>
 
-                    <x-ui.odoo-form-ui type="select" label="Account (Company) *" name="crm_account_id" id="crm_account_id" required="true">
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.account_company') . ' *'" name="crm_account_id" id="crm_account_id" required="true">
                         @foreach($accounts as $acc)
                             <option value="{{ $acc->id }}" {{ (string)old('crm_account_id', $deal->crm_account_id) === (string)$acc->id ? 'selected' : '' }}>
                                 {{ $acc->name }} ({{ $acc->account_number }})
@@ -36,9 +36,9 @@
                         @endforeach
                     </x-ui.odoo-form-ui>
 
-                    <x-ui.odoo-form-ui type="select" label="Contact Person (Optional)" name="crm_contact_id" id="crm_contact_id" data-master="contact">
-                        <option value="">Select Contact Person</option>
-                        <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="contact">+ Add New Contact Person</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.contact_person_optional')" name="crm_contact_id" id="crm_contact_id" data-master="contact">
+                        <option value="">{{ __('crm.select_contact_person') }}</option>
+                        <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="contact">+ {{ __('crm.add_new_contact_person') }}</option>
                         @foreach($contacts as $cnt)
                             <option value="{{ $cnt->id }}" {{ (string)old('crm_contact_id', $deal->crm_contact_id) === (string)$cnt->id ? 'selected' : '' }}>
                                 {{ $cnt->name }} @if($cnt->role || $cnt->designation) ({{ $cnt->designation ?: $cnt->role }}) @endif
@@ -46,8 +46,8 @@
                         @endforeach
                     </x-ui.odoo-form-ui>
 
-                    <x-ui.odoo-form-ui type="select" label="Deal Owner / Manager" name="owner_id">
-                        <option value="">Select Deal Owner...</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.deal_owner_manager')" name="owner_id">
+                        <option value="">{{ __('crm.select_deal_owner') }}...</option>
                         @foreach($users as $user)
                             <option value="{{ $user->id }}" @selected(old('owner_id', $deal->owner_id) == $user->id)>
                                 {{ $user->name }}
@@ -59,11 +59,11 @@
                     <div class="my-3 border-top pt-3">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <div class="d-flex align-items-center gap-2">
-                                <h6 class="fw-bold text-dark mb-0 fs-13">Additional Contacts</h6>
+                                <h6 class="fw-bold text-dark mb-0 fs-13">{{ __('crm.additional_contacts') }}</h6>
                                 <span class="badge bg-soft-primary text-primary rounded-circle px-2 py-0.5 font-monospace fs-11" id="additionalContactsBadge">0</span>
                             </div>
                             <button type="button" class="btn btn-xs btn-primary fw-bold px-2.5 py-1 text-uppercase text-white d-inline-flex align-items-center" id="cloneContactBtn" style="border-radius: 4px; font-size: 11px;">
-                                <i class="feather-plus me-1 fs-12"></i> CLONE CONTACT
+                                <i class="feather-plus me-1 fs-12"></i> {{ __('crm.clone_contact') }}
                             </button>
                         </div>
 
@@ -71,18 +71,18 @@
                         </div>
                     </div>
 
-                    <h6 class="fw-bold text-primary mb-3 mt-4"><i class="feather-file-text me-2"></i>Deal Overview</h6>
+                    <h6 class="fw-bold text-primary mb-3 mt-4"><i class="feather-file-text me-2"></i>{{ __('crm.deal_overview') }}</h6>
 
-                    <x-ui.odoo-form-ui type="input" label="Project / Deal Title *" name="title" :value="old('title', $deal->title)" required="true" />
+                    <x-ui.odoo-form-ui type="input" :label="__('crm.deal_title') . ' *'" name="title" :value="old('title', $deal->title)" required="true" />
 
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="Estimated Value (₹) *" name="estimated_value" :value="old('estimated_value', $deal->estimated_value)" step="0.01" required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.est_value') . ' (' . active_currency_symbol() . ') *'" name="estimated_value" :value="old('estimated_value', $deal->estimated_value)" step="0.01" required="true" />
                 </div>
 
                 <!-- Right Column: Classification, Notes & Products -->
                 <div class="col-lg-6">
-                    <h6 class="fw-bold text-primary mb-3"><i class="feather-grid me-2"></i>Deal Classification</h6>
+                    <h6 class="fw-bold text-primary mb-3"><i class="feather-grid me-2"></i>{{ __('crm.deal_classification') }}</h6>
 
-                    <x-ui.odoo-form-ui type="select" label="Pipeline Stage *" name="stage" required="true">
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.pipeline_stage_label') . ' *'" name="stage" required="true">
                         @foreach($dealStatuses as $st)
                             <option value="{{ $st->name }}" @selected(old('stage', $deal->stage) == $st->name)>
                                 {{ $st->name }}
@@ -90,9 +90,9 @@
                         @endforeach
                     </x-ui.odoo-form-ui>
 
-                    <x-ui.odoo-form-ui type="input" label="Close Reason / Notes" name="close_reason" :value="old('close_reason', $deal->close_reason)" placeholder="e.g. Lowest Price / Lost to Competitor X" />
+                    <x-ui.odoo-form-ui type="input" :label="__('crm.close_reason_notes')" name="close_reason" :value="old('close_reason', $deal->close_reason)" placeholder="e.g. Lowest Price / Lost to Competitor X" />
 
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="Expected Closing Date" name="closing_date" :value="old('closing_date', $deal->closing_date ? $deal->closing_date->format('Y-m-d') : '')" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.expected_closing_date')" name="closing_date" :value="old('closing_date', $deal->closing_date ? $deal->closing_date->format('Y-m-d') : '')" />
 
                     <x-ui.odoo-form-ui type="select" :label="__('crm.source')" name="lead_source">
                         <option value="">{{ __('crm.select_option') }}</option>
@@ -109,9 +109,9 @@
                         <option value="Trade Show" @selected(old('lead_source', $deal->lead_source) === 'Trade Show')>{{ __('crm.sources.Trade Show') }}</option>
                     </x-ui.odoo-form-ui>
 
-                    <h6 class="fw-bold text-primary mb-3 mt-4"><i class="feather-file-minus me-2"></i>Requirements & Summary</h6>
+                    <h6 class="fw-bold text-primary mb-3 mt-4"><i class="feather-file-minus me-2"></i>{{ __('crm.requirements_summary') }}</h6>
 
-                    <x-ui.odoo-form-ui type="textarea" label="Notes & Requirement Summary" name="notes" :value="old('notes', $deal->notes)" />
+                    <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes_requirement_summary')" name="notes" :value="old('notes', $deal->notes)" />
 
                     <style>
                         #productItemsTable {
@@ -166,10 +166,10 @@
                     <div class="mb-3 mt-3" id="productItemsContainer">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <label class="form-label fw-bold text-dark fs-12 mb-0">
-                                <i class="feather-package me-1 text-primary"></i>Interested Products & Quantity
+                                <i class="feather-package me-1 text-primary"></i>{{ __('crm.interested_products_quantity') }}
                             </label>
                             <button type="button" class="btn btn-xs btn-outline-primary fw-semibold px-2 py-1 fs-11" id="addProductRowBtn" style="border-radius: 6px;">
-                                <i class="feather-plus me-1"></i>Add Product
+                                <i class="feather-plus me-1"></i>{{ __('crm.add_product_btn') }}
                             </button>
                         </div>
                         
@@ -177,8 +177,8 @@
                             <table class="table table-sm table-borderless align-middle mb-0" id="productItemsTable" style="table-layout: fixed; width: 100%;">
                                 <thead>
                                     <tr class="border-bottom text-muted fs-11" style="background-color: #f8fafc;">
-                                        <th style="width: 70%; font-weight: 600;" class="py-1 ps-2">Product</th>
-                                        <th style="width: 20%; font-weight: 600;" class="py-1 text-center">Qty</th>
+                                        <th style="width: 70%; font-weight: 600;" class="py-1 ps-2">{{ __('crm.product') }}</th>
+                                        <th style="width: 20%; font-weight: 600;" class="py-1 text-center">{{ __('crm.qty') }}</th>
                                         <th style="width: 10%; font-weight: 600;" class="py-1 text-center"></th>
                                     </tr>
                                 </thead>
@@ -204,11 +204,11 @@
                                         <tr class="lead-item-row border-bottom">
                                             <td class="py-1 ps-1 pe-1 align-top">
                                                 <select name="items[{{ $idx }}][product_id]" class="form-select form-select-sm odoo-select2 product-row-select" searchable="true" data-master="product">
-                                                    <option value="">Select Product...</option>
-                                                    <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ Add New Product</option>
+                                                    <option value="">{{ __('crm.select_product') }}</option>
+                                                    <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ {{ __('crm.add_new_product') }}</option>
 
                                                     @if($finished->count())
-                                                        <optgroup label="📦 Finished Goods">
+                                                        <optgroup label="📦 {{ __('crm.finished_goods') }}">
                                                             @foreach($finished as $p)
                                                                 @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
@@ -219,7 +219,7 @@
                                                     @endif
 
                                                     @if($semiFinished->count())
-                                                        <optgroup label="⚙️ Semi-Finished Goods">
+                                                        <optgroup label="⚙️ {{ __('crm.semi_finished_goods') }}">
                                                             @foreach($semiFinished as $p)
                                                                 @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
@@ -230,7 +230,7 @@
                                                     @endif
 
                                                     @if($services->count())
-                                                        <optgroup label="🛠️ Services">
+                                                        <optgroup label="🛠️ {{ __('crm.services') }}">
                                                             @foreach($services as $p)
                                                                 @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
@@ -241,7 +241,7 @@
                                                     @endif
 
                                                     @if($others->count())
-                                                        <optgroup label="🧱 Raw Materials & Components">
+                                                        <optgroup label="🧱 {{ __('crm.raw_materials_components') }}">
                                                             @foreach($others as $p)
                                                                 @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
@@ -256,7 +256,7 @@
                                                  <input type="text" inputmode="decimal" autocomplete="off" name="items[{{ $idx }}][quantity]" class="form-control form-control-sm text-center qty-row-input" value="{{ $item['quantity'] ?? 1 }}">
                                             </td>
                                             <td class="py-1 text-center align-top pt-2">
-                                                <button type="button" class="btn btn-link text-danger p-0 opacity-75 remove-product-row-btn" title="Remove Product">
+                                                <button type="button" class="btn btn-link text-danger p-0 opacity-75 remove-product-row-btn" title="{{ __('crm.remove_product') }}">
                                                     <i class="feather-trash-2 fs-13"></i>
                                                 </button>
                                             </td>
@@ -269,11 +269,11 @@
 
                     <template id="productRowSelectTemplate">
                         <select class="form-select form-select-sm product-row-select" searchable="true" data-master="product">
-                            <option value="">Select Product...</option>
-                            <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ Add New Product</option>
+                            <option value="">{{ __('crm.select_product') }}</option>
+                            <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ {{ __('crm.add_new_product') }}</option>
 
                             @if($finished->count())
-                                <optgroup label="📦 Finished Goods">
+                                <optgroup label="📦 {{ __('crm.finished_goods') }}">
                                     @foreach($finished as $p)
                                         @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
@@ -282,7 +282,7 @@
                             @endif
 
                             @if($semiFinished->count())
-                                <optgroup label="⚙️ Semi-Finished Goods">
+                                <optgroup label="⚙️ {{ __('crm.semi_finished_goods') }}">
                                     @foreach($semiFinished as $p)
                                         @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
@@ -291,7 +291,7 @@
                             @endif
 
                             @if($services->count())
-                                <optgroup label="🛠️ Services">
+                                <optgroup label="🛠️ {{ __('crm.services') }}">
                                     @foreach($services as $p)
                                         @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
@@ -300,7 +300,7 @@
                             @endif
 
                             @if($others->count())
-                                <optgroup label="🧱 Raw Materials & Components">
+                                <optgroup label="🧱 {{ __('crm.raw_materials_components') }}">
                                     @foreach($others as $p)
                                         @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
@@ -313,8 +313,8 @@
             </div>
 
             <div class="d-flex gap-2 justify-content-end border-top pt-4 mt-3">
-                <a href="{{ route('crm.deals.show', $deal) }}" class="btn btn-light px-4">Cancel</a>
-                <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm"><i class="feather-check me-1"></i>Update Deal</button>
+                <a href="{{ route('crm.deals.show', $deal) }}" class="btn btn-light px-4">{{ __('crm.cancel') }}</a>
+                <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm"><i class="feather-check me-1"></i>{{ __('crm.update_deal') }}</button>
             </div>
         </form>
     </div>

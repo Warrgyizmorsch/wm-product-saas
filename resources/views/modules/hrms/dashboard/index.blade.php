@@ -23,13 +23,13 @@
         font-size: 15px;
     }
     .action-inbox-pills {
-        background: #f1f5f9;
+        background: var(--bs-tertiary-bg, #f1f5f9);
         padding: 3px;
         border-radius: 8px;
     }
     .action-inbox-pills .nav-link {
         border-radius: 6px;
-        color: #64748b;
+        color: var(--bs-secondary-color, #64748b);
         font-weight: 600;
         font-size: 12px;
         padding: 5px 12px;
@@ -41,12 +41,12 @@
         gap: 6px;
     }
     .action-inbox-pills .nav-link:hover {
-        color: #1e293b;
-        background: rgba(255, 255, 255, 0.6);
+        color: var(--bs-body-color, #1e293b);
+        background: var(--bs-secondary-bg, rgba(255, 255, 255, 0.6));
     }
     .action-inbox-pills .nav-link.active {
-        background: #ffffff !important;
-        color: #1e293b !important;
+        background: var(--bs-card-bg, #ffffff) !important;
+        color: var(--bs-primary, #1c3faa) !important;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     }
     .action-inbox-pills .nav-link .tab-count-badge {
@@ -61,16 +61,16 @@
         border-radius: 8px;
         padding: 8px 4px;
         text-align: center;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
+        background: var(--bs-tertiary-bg, #f8fafc);
+        border: 1px solid var(--bs-border-color, #e2e8f0);
         transition: all 0.15s ease-in-out;
     }
     .day-strip-box:hover {
-        background: #f1f5f9;
+        background: var(--bs-secondary-bg, #f1f5f9);
     }
     .day-strip-box.is-today {
-        background: #eff6ff;
-        border-color: #93c5fd;
+        background: var(--bs-primary-bg-subtle, #eff6ff);
+        border-color: var(--bs-primary, #93c5fd);
     }
     .dash-card-icon-avatar {
         width: 28px;
@@ -88,13 +88,16 @@
     .modal {
         z-index: 1060 !important;
     }
+    .table-responsive {
+        overflow-y: visible !important;
+    }
 </style>
 @endpush
 
 @section('page-actions')
     @if($isHrOrAdmin ?? false)
         <div class="d-flex align-items-center gap-2 flex-wrap">
-            <a href="{{ route('hrms.employees.index') }}" class="btn btn-sm btn-primary fw-semibold shadow-sm d-inline-flex align-items-center gap-1.5" style="background-color: #1c3faa; border-color: #1c3faa;">
+            <a href="{{ route('hrms.employees.index') }}" class="btn btn-sm btn-primary fw-semibold shadow-sm d-inline-flex align-items-center gap-1.5">
                 <i class="feather-user-plus fs-14"></i> Add Employee
             </a>
         </div>
@@ -169,14 +172,8 @@
                         </div>
                         <a href="{{ $myProfileUrl }}" class="position-relative d-flex align-items-center justify-content-center flex-shrink-0" style="width: 58px; height: 58px;" title="Click to view & update Profile / KYC">
                             <svg width="58" height="58" viewBox="0 0 58 58" style="transform: rotate(-90deg);">
-                                <circle cx="29" cy="29" r="23" fill="none" stroke="#e2e8f0" stroke-width="4.5"></circle>
-                                <circle cx="29" cy="29" r="23" fill="none" stroke="url(#dashProfileGrad)" stroke-width="4.5" stroke-dasharray="144.5" stroke-dashoffset="{{ round(144.5 - (144.5 * $profileCompletion / 100)) }}" stroke-linecap="round"></circle>
-                                <defs>
-                                    <linearGradient id="dashProfileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%" stop-color="#1c3faa" />
-                                        <stop offset="100%" stop-color="#3b82f6" />
-                                    </linearGradient>
-                                </defs>
+                                <circle cx="29" cy="29" r="23" fill="none" stroke="var(--bs-border-color, #e2e8f0)" stroke-width="4.5"></circle>
+                                <circle cx="29" cy="29" r="23" fill="none" stroke="var(--bs-primary, #1c3faa)" stroke-width="4.5" stroke-dasharray="144.5" stroke-dashoffset="{{ round(144.5 - (144.5 * $profileCompletion / 100)) }}" stroke-linecap="round"></circle>
                             </svg>
                             <div class="position-absolute text-center">
                                 <i class="feather-user-check text-primary fs-5"></i>
@@ -202,8 +199,8 @@
                 }
             }
         @endphp
-        <div class="card border mb-4 bg-white rounded-3 shadow-sm overflow-hidden" style="border-color: #cbd5e1 !important;">
-            <div class="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="card border mb-4 rounded-3 shadow-sm overflow-hidden">
+            <div class="card-header border-bottom py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-3">
                     <div class="bg-soft-primary text-primary rounded-3 shadow-2xs" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -226,7 +223,7 @@
             </div>
 
             <div class="collapse {{ $hasUnacknowledgedBroadcasts ? 'show' : '' }}" id="broadcastsCollapseBody">
-            <div class="card-body p-3 bg-white">
+            <div class="card-body p-3">
                 <div class="d-flex flex-column gap-3">
                     @foreach($latestBroadcasts as $broadcast)
                         @php
@@ -240,13 +237,13 @@
                         @endphp
 
                         <!-- Compact Broadcast Item Card Container -->
-                        <div class="card border rounded-3 shadow-2xs overflow-hidden bg-white mb-0" style="border-color: #e2e8f0 !important;">
+                        <div class="card border rounded-3 shadow-2xs overflow-hidden mb-0">
                             <div class="card-body p-3">
                                 <div class="row g-2.5 align-items-start">
                                     
                                     @if($broadcast->banner_image_path)
                                         <div class="col-md-3 col-lg-2">
-                                            <div class="rounded-3 overflow-hidden border border-secondary border-opacity-20 shadow-2xs position-relative" style="height: 80px; background: #0f172a;">
+                                            <div class="rounded-3 overflow-hidden border border-secondary border-opacity-20 shadow-2xs position-relative bg-dark" style="height: 80px;">
                                                 <img src="{{ asset('storage/' . $broadcast->banner_image_path) }}" class="w-100 h-100" style="object-fit: cover; object-position: center;" alt="{{ $broadcast->title }}" />
                                             </div>
                                         </div>
@@ -307,7 +304,7 @@
                                             </h6>
 
                                             <!-- Content Body (Compact Line Clamp) -->
-                                            <div class="text-secondary fs-12 mb-0 mt-1" style="line-height: 1.45; color: #334155 !important; white-space: pre-line;">
+                                            <div class="text-secondary fs-12 mb-0 mt-1" style="line-height: 1.45; white-space: pre-line;">
                                                 {{ strip_tags($broadcast->content) }}
                                             </div>
 
@@ -316,7 +313,7 @@
                                                 $topLevelComments = $broadcast->comments->where('parent_id', null);
                                             @endphp
                                             @if($broadcast->allow_comments && $topLevelComments->isNotEmpty())
-                                                <div class="mt-2.5 pt-2 border-top" style="border-color: #f1f5f9 !important;">
+                                                <div class="mt-2.5 pt-2 border-top">
                                                     <div class="mb-1.5">
                                                         <span class="fs-11 fw-bold text-dark d-inline-flex align-items-center gap-1">
                                                             <i class="feather-message-square text-primary fs-11"></i> Comments & Discussion ({{ $topLevelComments->count() }})
@@ -325,13 +322,13 @@
 
                                                     <div class="d-flex flex-column gap-1" style="max-height: 120px; overflow-y: auto;">
                                                         @foreach($topLevelComments as $comm)
-                                                            <div class="py-1 px-0 border-bottom d-flex align-items-center justify-content-between gap-2 fs-11" style="border-color: #f1f5f9 !important; background: transparent;">
+                                                            <div class="py-1 px-0 border-bottom d-flex align-items-center justify-content-between gap-2 fs-11" style="background: transparent;">
                                                                 <div class="d-flex align-items-center gap-1.5 text-truncate" style="min-width: 0;">
-                                                                    <div class="avatar-text avatar-xs bg-primary text-white rounded-circle fw-bold fs-9 flex-shrink-0" style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; background-color: #1c3faa !important;">
+                                                                    <div class="avatar-text avatar-xs bg-primary text-white rounded-circle fw-bold fs-9 flex-shrink-0" style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center;">
                                                                         {{ strtoupper(substr($comm->employee->full_name ?? ($comm->user->name ?? 'U'), 0, 1)) }}
                                                                     </div>
                                                                     <strong class="fw-bold text-dark fs-11 text-nowrap me-1">{{ $comm->employee->full_name ?? ($comm->user->name ?? 'Employee') }}:</strong>
-                                                                    <span class="text-secondary fs-11 text-truncate" style="color: #334155 !important;" title="{{ $comm->comment_text }}">{{ $comm->comment_text }}</span>
+                                                                    <span class="text-secondary fs-11 text-truncate" title="{{ $comm->comment_text }}">{{ $comm->comment_text }}</span>
                                                                 </div>
                                                                 <div class="d-inline-flex align-items-center gap-1 text-muted fs-10 flex-shrink-0 ms-2" style="white-space: nowrap;">
                                                                     <i class="feather-clock fs-10 text-muted" style="font-style: normal; line-height: 1;"></i>
@@ -350,7 +347,7 @@
                     @endforeach
                 </div>
             </div>
-            <div class="card-footer bg-light bg-opacity-75 py-2.5 px-4 border-top d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-color: #e2e8f0 !important;">
+            <div class="card-footer bg-light py-2.5 px-4 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <span class="fs-12 text-muted fw-medium">
                     Showing {{ min(count($latestBroadcasts), $totalBroadcastsCount ?? count($latestBroadcasts)) }} of {{ $totalBroadcastsCount ?? count($latestBroadcasts) }} active announcements
                 </span>
@@ -376,7 +373,7 @@
                 <div class="modal fade" id="employeeBroadcastModal{{ $broadcast->id }}" tabindex="-1" aria-labelledby="employeeBroadcastModalLabel{{ $broadcast->id }}" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
-                            <div class="modal-header bg-white border-bottom py-3 px-4" style="border-top-left-radius: 14px; border-top-right-radius: 14px;">
+                            <div class="modal-header border-bottom py-3 px-4" style="border-top-left-radius: 14px; border-top-right-radius: 14px;">
                                 <div class="d-flex align-items-center gap-2.5">
                                     <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle shadow-2xs" style="width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center;">
                                         <i class="feather-message-square fs-16"></i>
@@ -390,15 +387,15 @@
                             </div>
                             <form action="{{ route('hrms.broadcasts.comment.store', $broadcast->id) }}" method="POST">
                                 @csrf
-                                <div class="modal-body p-4 text-dark bg-white">
+                                <div class="modal-body p-4 text-dark">
                                     <div class="mb-3">
                                         <label class="form-label fs-12 fw-bold text-dark mb-1">Your Comment / Reply</label>
-                                        <textarea name="comment_text" rows="4" class="form-control fs-12 p-3 text-dark rounded-3" placeholder="Write a comment, query or reply regarding this announcement..." required style="border: 1px solid #cbd5e1; resize: vertical;"></textarea>
+                                        <textarea name="comment_text" rows="4" class="form-control fs-12 p-3 text-dark rounded-3" placeholder="Write a comment, query or reply regarding this announcement..." required style="resize: vertical;"></textarea>
                                     </div>
                                 </div>
                                 <div class="modal-footer bg-light py-2.5 px-4 border-top d-flex justify-content-between align-items-center" style="border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;">
                                     <button type="button" class="btn btn-sm btn-light border border-secondary border-opacity-30 text-dark fw-bold px-4 py-1.5 rounded-pill fs-12" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-4 py-2 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5" style="background-color: #1c3faa; border-color: #1c3faa;">
+                                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-4 py-2 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5">
                                         <i class="feather-send fs-12 me-1"></i> <span>Post Comment</span>
                                     </button>
                                 </div>
@@ -774,8 +771,8 @@
                                                             <a href="{{ route('hrms.leaves.index') }}" class="btn btn-sm btn-light border p-0 d-inline-flex align-items-center justify-content-center text-muted rounded-circle" style="width: 28px; height: 28px;" title="View Details in Leave Module">
                                                                 <i class="feather-eye fs-13"></i>
                                                             </a>
-                                                            <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
-                                                                <button class="btn btn-sm bg-soft-warning text-warning border-0 py-1.5 px-3 rounded-pill fw-bold fs-11 dropdown-toggle d-inline-flex align-items-center gap-1 shadow-2xs" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" title="Change Leave Status">
+                                                            <div class="dropdown {{ ($loop->count >= 3 && $loop->iteration >= $loop->count - 1) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                                <button class="btn btn-sm bg-soft-warning text-warning border-0 py-1.5 px-3 rounded-pill fw-bold fs-11 dropdown-toggle d-inline-flex align-items-center gap-1 shadow-2xs" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Change Leave Status">
                                                                     <span><i class="feather-clock me-1"></i> Pending</span>
                                                                 </button>
                                                                 <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 p-1.5 mt-1 fs-12" style="min-width: 135px; border-radius: 8px; z-index: 1050;">
@@ -1566,10 +1563,10 @@
         <div class="col-md-4 col-lg-4" style="min-width: 0;">
 
             <!-- 1. Assigned Leave Plan Card (Matches requested design pattern) -->
-            <div class="card border-0 shadow-sm mb-3" style="border-radius: 16px; background-color: #ffffff;">
+            <div class="card border-0 shadow-sm mb-3" style="border-radius: 16px;">
                 <div class="card-header bg-transparent border-0 p-3 pb-1 d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center gap-2">
-                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle text-muted" style="width: 20px; height: 20px; border: 1.5px solid #64748b; font-size: 10px; font-weight: 700;">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle text-muted border border-secondary border-opacity-50" style="width: 20px; height: 20px; font-size: 10px; font-weight: 700;">
                             i
                         </span>
                         <h6 class="fw-bold text-dark mb-0 fs-14" style="letter-spacing: -0.2px;">Assigned Leave Plan</h6>
@@ -1578,19 +1575,19 @@
 
                 <div class="card-body p-3 pt-2">
                     <!-- Leave Plan Banner Box -->
-                    <div class="p-3 mb-3 rounded-3" style="background-color: #f1f5f9; border: 1px solid #e2e8f0;">
+                    <div class="p-3 mb-3 rounded-3 bg-light border">
                         <div class="d-flex align-items-start justify-content-between mb-1">
-                            <h6 class="fw-bold text-dark mb-0 fs-14">{{ $myAssignedPlan->name ?? 'Standard Leave Plan' }}</h6>
+                            <h6 class="fw-bold text-dark mb-0 fs-14">{{ $myAssignedPlan?->name ?? 'Standard Leave Plan' }}</h6>
                             <span class="badge bg-soft-success text-success fw-bold px-2 py-0.5 fs-11" style="border-radius: 4px;">Active</span>
                         </div>
-                        <p class="text-muted fs-11 mb-0">{{ $myAssignedPlan->description ?? 'Regular corporate leave plan' }}</p>
+                        <p class="text-muted fs-11 mb-0">{{ $myAssignedPlan?->description ?? 'Regular corporate leave plan' }}</p>
                     </div>
 
                     <!-- Effective From Row -->
                     <div class="d-flex align-items-center justify-content-between mb-3 pb-1">
                         <span class="text-muted fs-10 text-uppercase fw-bold" style="letter-spacing: 0.5px;">EFFECTIVE FROM</span>
                         <span class="fw-bold text-dark fs-12">
-                            {{ $myAssignedPlan && $myAssignedPlan->effective_from ? \Carbon\Carbon::parse($myAssignedPlan->effective_from)->format('d M, Y') : '01 Aug, 2026' }}
+                            {{ isset($myAssignedPlan) && $myAssignedPlan?->effective_from ? \Carbon\Carbon::parse($myAssignedPlan->effective_from)->format('d M, Y') : date('01 M, Y') }}
                         </span>
                     </div>
 
@@ -1598,7 +1595,7 @@
                     <div class="table-responsive mb-3 overflow-hidden">
                         <table class="w-100 align-middle">
                             <thead>
-                                <tr class="border-bottom" style="border-color: #f1f5f9 !important;">
+                                <tr class="border-bottom">
                                     <th class="text-muted fs-10 text-uppercase fw-bold pb-2" style="width: 55%; letter-spacing: 0.5px;">TYPE NAME</th>
                                     <th class="text-muted fs-10 text-uppercase fw-bold pb-2 text-center" style="width: 25%; letter-spacing: 0.5px;">BALANCE</th>
                                     <th class="text-muted fs-10 text-uppercase fw-bold pb-2 text-end" style="width: 20%; letter-spacing: 0.5px;">RULES</th>
@@ -1606,7 +1603,7 @@
                             </thead>
                             <tbody>
                                 @forelse($myLeaveTypesList as $lItem)
-                                    <tr class="border-bottom" style="border-color: #f8fafc !important;">
+                                    <tr class="border-bottom">
                                         <td class="py-2.5">
                                             <div class="d-flex align-items-center gap-2">
                                                 <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px; background-color: {{ $lItem['color'] }}; flex-shrink: 0;"></span>
@@ -1619,8 +1616,8 @@
                                         </td>
                                         <td class="py-2.5 text-end">
                                             <button type="button" 
-                                                    class="btn btn-sm btn-light border-0 p-0 rounded-3 d-inline-flex align-items-center justify-content-center view-leave-rules-btn"
-                                                    style="width: 32px; height: 32px; background-color: #f8fafc; color: #64748b;"
+                                                    class="btn btn-sm btn-light border-0 p-0 rounded-3 d-inline-flex align-items-center justify-content-center view-leave-rules-btn text-muted"
+                                                    style="width: 32px; height: 32px;"
                                                     data-name="{{ $lItem['name'] }}"
                                                     data-code="{{ $lItem['code'] }}"
                                                     data-quota="{{ (int)$lItem['allocated'] }}"
@@ -1642,20 +1639,20 @@
                         </table>
                     </div>
 
-                    <!-- Dark Action Buttons (Equal height, single line text) -->
+                    <!-- Action Buttons (Equal height, single line text) -->
                     <div class="row g-2 pt-1">
                         <div class="col-6">
                             <a href="{{ route('hrms.leaves.index') }}" 
-                               class="btn w-100 text-white fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
-                               style="background-color: #352627; border-color: #352627; border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
+                               class="btn btn-primary w-100 fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
+                               style="border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
                                title="Apply For Leave">
                                 <i class="feather-plus fs-12"></i> Apply Leave
                             </a>
                         </div>
                         <div class="col-6">
                             <a href="{{ route('hrms.leaves.index', ['tab' => 'encashments']) }}" 
-                               class="btn w-100 text-white fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
-                               style="background-color: #352627; border-color: #352627; border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
+                               class="btn btn-primary w-100 fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
+                               style="border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
                                title="Apply For Leave Encashment">
                                 <i class="feather-dollar-sign fs-12"></i> Encashment
                             </a>
@@ -1665,17 +1662,17 @@
             </div>
 
             <!-- 2. Current Shift Details Card -->
-            <div class="card border-0 shadow-sm mb-3" style="border-radius: 16px; background-color: #ffffff;">
+            <div class="card border-0 shadow-sm mb-3" style="border-radius: 16px;">
                 <div class="card-header bg-transparent border-0 p-3 pb-1 d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center gap-2">
-                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle text-muted" style="width: 20px; height: 20px; border: 1.5px solid #64748b; font-size: 10px; font-weight: 700;">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle text-muted border border-secondary border-opacity-50" style="width: 20px; height: 20px; font-size: 10px; font-weight: 700;">
                             i
                         </span>
                         <h6 class="fw-bold text-dark mb-0 fs-14" style="letter-spacing: -0.2px;">Current Shift Details</h6>
                     </div>
                 </div>
                 <div class="card-body p-3 pt-2">
-                    <div class="p-3 mb-3 rounded-3" style="background-color: #f1f5f9; border: 1px solid #e2e8f0;">
+                    <div class="p-3 mb-3 rounded-3 bg-light border">
                         <div class="d-flex align-items-start justify-content-between mb-2">
                             <h6 class="fw-bold text-dark mb-0 fs-14">{{ $myShiftDetails['name'] ?? 'Day Shift' }}</h6>
                             <span class="badge bg-soft-success text-success fw-bold px-2 py-0.5 fs-11" style="border-radius: 4px;">{{ $myShiftDetails['badge'] ?? 'Default' }}</span>
@@ -1700,7 +1697,7 @@
                     </div>
                     <div class="d-flex flex-column gap-2 mb-3">
                         @foreach($myWeeklyPattern as $wItem)
-                            <div class="d-flex align-items-center justify-content-between py-1 border-bottom" style="border-color: #f8fafc !important;">
+                            <div class="d-flex align-items-center justify-content-between py-1 border-bottom">
                                 <span class="fw-semibold text-dark fs-12">{{ $wItem['day'] }}</span>
                                 @if(!empty($wItem['is_off']))
                                     <span class="fw-bold text-danger fs-12">Day Off</span>
@@ -1713,16 +1710,16 @@
                     <div class="row g-2 pt-1">
                         <div class="col-6">
                             <a href="{{ route('hrms.shift-overtime.index', ['tab' => 'shift']) }}" 
-                               class="btn w-100 text-white fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
-                               style="background-color: #352627; border-color: #352627; border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
+                               class="btn btn-primary w-100 fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
+                               style="border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
                                title="Apply Shift Change Request">
                                 <i class="feather-plus fs-12"></i> Shift Change
                             </a>
                         </div>
                         <div class="col-6">
                             <a href="{{ route('hrms.shift-overtime.index', ['tab' => 'overtime']) }}" 
-                               class="btn w-100 text-white fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
-                               style="background-color: #352627; border-color: #352627; border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
+                               class="btn btn-primary w-100 fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
+                               style="border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
                                title="Apply Overtime Request">
                                 <i class="feather-plus fs-12"></i> Overtime
                             </a>
@@ -1744,7 +1741,7 @@
                 </div>
                 <div class="card-body p-2.5 px-3">
                     <p class="text-muted fs-11 mb-2.5">Download your official salary slip for the recent payroll disbursement period.</p>
-                    <a href="{{ route('hrms.payroll.mySalary') }}" class="btn btn-sm btn-primary w-100 fw-bold fs-11 d-flex align-items-center justify-content-center gap-1.5 shadow-sm" style="background-color: #1c3faa; border-color: #1c3faa;">
+                    <a href="{{ route('hrms.payroll.mySalary') }}" class="btn btn-sm btn-primary w-100 fw-bold fs-11 d-flex align-items-center justify-content-center gap-1.5 shadow-sm">
                         <i class="feather-download"></i> View & Download Payslip (PDF)
                     </a>
                 </div>
@@ -1937,7 +1934,7 @@
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body p-4" style="background-color: #f8fafc;">
+                    <div class="modal-body p-4">
                         <div class="row g-3">
                             <!-- Section 1: Quota & Accrual Rules -->
                             <div class="col-md-6">

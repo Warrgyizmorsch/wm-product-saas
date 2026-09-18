@@ -262,7 +262,7 @@
 
             <!-- Financial Summary -->
             <div class="card border p-3 mb-4 rounded">
-                <h6 class="fw-bold text-dark mb-3 fs-12 text-uppercase"><i class="feather-dollar-sign text-success me-1"></i> Financial Summary</h6>
+                <h6 class="fw-bold text-dark mb-3 fs-12 text-uppercase"><i class="feather-bar-chart-2 text-success me-1"></i> Financial Summary</h6>
                 <div class="d-flex justify-content-between py-1.5 border-bottom">
                     <span class="text-muted">Grand Total:</span>
                     <strong class="font-monospace text-dark fs-14" id="ocGrandTotal">₹0.00</strong>

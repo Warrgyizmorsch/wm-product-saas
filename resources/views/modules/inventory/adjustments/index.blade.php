@@ -1,12 +1,12 @@
 @extends('layouts.duralux')
 
-@section('title', 'Stock Adjustments | SaaS ERP')
-@section('page-title', 'Stock Adjustments')
-@section('breadcrumb', 'Inventory / Stock Adjustments')
+@section('title', __('inventory.stock_adjustments') . ' | SaaS ERP')
+@section('page-title', __('inventory.stock_adjustments'))
+@section('breadcrumb', __('inventory.inventory_stock_adjustments'))
 
 @section('page-actions')
     <x-ui.button href="{{ route('inventory.adjustments.create') }}" variant="primary" icon="feather-plus">
-        New Adjustment
+        {{ __('inventory.new_adjustment') }}
     </x-ui.button>
 @endsection
 
@@ -23,19 +23,19 @@
             <!-- Toolbar: Tabs, Sort & Filters -->
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4 pb-3 border-bottom">
                 <div class="d-flex align-items-center flex-wrap gap-2">
-                    <h5 class="fw-bold text-dark mb-0 me-2">Stock Adjustments Listing</h5>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="btn btn-xs {{ !request('status') ? 'btn-dark text-white fw-bold' : 'btn-light text-muted border' }}">
-                        All Adjustments
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => 'Draft']) }}" class="btn btn-xs {{ request('status') === 'Draft' ? 'btn-soft-secondary text-secondary border border-secondary-subtle fw-bold' : 'btn-light text-muted border' }}">
-                        Draft
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => 'Approved']) }}" class="btn btn-xs {{ request('status') === 'Approved' ? 'btn-soft-success text-success border border-success-subtle fw-bold' : 'btn-light text-muted border' }}">
-                        Approved
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => 'Cancelled']) }}" class="btn btn-xs {{ request('status') === 'Cancelled' ? 'btn-soft-danger text-danger border border-danger-subtle fw-bold' : 'btn-light text-muted border' }}">
-                        Cancelled
-                    </a>
+                    <h5 class="fw-bold text-dark mb-0 me-2">{{ __('inventory.stock_adjustments_listing') }}</h5>
+                    <x-ui.button href="{{ request()->fullUrlWithQuery(['status' => null]) }}" variant="{{ !request('status') ? 'primary' : 'light' }}" class="{{ !request('status') ? '' : 'text-muted border' }}">
+                        {{ __('inventory.all_adjustments') }}
+                    </x-ui.button>
+                    <x-ui.button href="{{ request()->fullUrlWithQuery(['status' => 'Draft']) }}" variant="{{ request('status') === 'Draft' ? 'primary' : 'light' }}" class="{{ request('status') === 'Draft' ? '' : 'text-muted border' }}">
+                        {{ __('inventory.draft') }}
+                    </x-ui.button>
+                    <x-ui.button href="{{ request()->fullUrlWithQuery(['status' => 'Approved']) }}" variant="{{ request('status') === 'Approved' ? 'primary' : 'light' }}" class="{{ request('status') === 'Approved' ? '' : 'text-muted border' }}">
+                        {{ __('inventory.approved') }}
+                    </x-ui.button>
+                    <x-ui.button href="{{ request()->fullUrlWithQuery(['status' => 'Cancelled']) }}" variant="{{ request('status') === 'Cancelled' ? 'primary' : 'light' }}" class="{{ request('status') === 'Cancelled' ? '' : 'text-muted border' }}">
+                        {{ __('inventory.cancelled') }}
+                    </x-ui.button>
                 </div>
                 <div class="d-flex align-items-center flex-wrap gap-2">
                     <!-- Quick Search (HRMS Common Component Style) -->
@@ -47,44 +47,44 @@
                             type="text" 
                             name="search" 
                             class="form-control border-0 bg-transparent p-0 fs-13" 
-                            placeholder="Adjustment # or reason..." 
+                            placeholder="{{ __('inventory.search_adjustment_placeholder') }}" 
                             value="{{ request('search') }}"
                             style="box-shadow: none; height: 32px; width: 220px;"
                         >
                     </form>
 
                     <!-- Custom Sort Component -->
-                    <x-ui.sort-dropdown label="Sort">
+                    <x-ui.sort-dropdown :label="__('inventory.sort')">
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'desc' ? 'active' : '' }}">
-                            <span>Latest Created</span>
+                            <span>{{ __('inventory.latest_created') }}</span>
                         </a>
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'asc' ? 'active' : '' }}">
-                            <span>Oldest Created</span>
+                            <span>{{ __('inventory.oldest_created') }}</span>
                         </a>
                         <div class="dropdown-divider"></div>
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'adjustment_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'adjustment_number' && $sortOrder === 'asc' ? 'active' : '' }}">
-                            <span>Adjustment # (A-Z)</span>
+                            <span>{{ __('inventory.adjustment_number_az') }}</span>
                         </a>
                     </x-ui.sort-dropdown>
 
                     <!-- Custom Filter Component -->
                     <form method="GET" action="{{ route('inventory.adjustments.index') }}" class="d-inline">
-                        <x-ui.filter label="Filter" offset="0, 5">
-                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <x-ui.filter :label="__('inventory.filter')" offset="0, 5">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('inventory.filter_options') }}</h6>
                             
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.status') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="status">
-                                    <option value="">All Statuses</option>
-                                    <option value="Draft" {{ request('status') === 'Draft' ? 'selected' : '' }}>Draft</option>
-                                    <option value="Approved" {{ request('status') === 'Approved' ? 'selected' : '' }}>Approved</option>
-                                    <option value="Cancelled" {{ request('status') === 'Cancelled' ? 'selected' : '' }}>Cancelled</option>
+                                    <option value="">{{ __('inventory.all_statuses') }}</option>
+                                    <option value="Draft" {{ request('status') === 'Draft' ? 'selected' : '' }}>{{ __('inventory.draft') }}</option>
+                                    <option value="Approved" {{ request('status') === 'Approved' ? 'selected' : '' }}>{{ __('inventory.approved') }}</option>
+                                    <option value="Cancelled" {{ request('status') === 'Cancelled' ? 'selected' : '' }}>{{ __('inventory.cancelled') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('inventory.adjustments.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                                <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                                <a href="{{ route('inventory.adjustments.index') }}" class="btn btn-sm btn-light border">{{ __('inventory.reset') }}</a>
+                                <button type="submit" class="btn btn-sm btn-primary">{{ __('inventory.apply_filters') }}</button>
                             </div>
                         </x-ui.filter>
                     </form>
@@ -99,13 +99,13 @@
                             <th style="width: 3%" class="text-center">
                                 <input type="checkbox" class="form-check-input">
                             </th>
-                            <th>Adjustment #</th>
-                            <th>Warehouse</th>
-                            <th>Adjustment Date</th>
-                            <th>Reason</th>
-                            <th class="text-center">Status</th>
-                            <th>Created By</th>
-                            <th class="text-end pe-4">Actions</th>
+                            <th>{{ __('inventory.adjustment_number') }}</th>
+                            <th>{{ __('inventory.warehouse') }}</th>
+                            <th>{{ __('inventory.adjustment_date') }}</th>
+                            <th>{{ __('inventory.reason') }}</th>
+                            <th class="text-center">{{ __('inventory.status') }}</th>
+                            <th>{{ __('inventory.created_by') }}</th>
+                            <th class="text-end pe-4">{{ __('inventory.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody class="text-dark">
@@ -145,7 +145,7 @@
                                             <form action="{{ route('inventory.adjustments.approve', $adjustment->id) }}" method="POST">
                                                 @csrf
                                                 <button type="submit" class="dropdown-item text-success fw-semibold">
-                                                    <i class="feather-check-circle me-2 text-success fs-12"></i>Approve & Apply
+                                                    <i class="feather-check-circle me-2 text-success fs-12"></i>{{ __('inventory.approve_apply') }}
                                                 </button>
                                             </form>
                                         </li>
@@ -153,8 +153,8 @@
                                         <li>
                                             <form action="{{ route('inventory.adjustments.cancel', $adjustment->id) }}" method="POST" id="cancelAdjForm_{{ $adjustment->id }}">
                                                 @csrf
-                                                <button type="button" class="dropdown-item text-danger fw-semibold" onclick="if(confirm('Cancel this adjustment?')) document.getElementById('cancelAdjForm_{{ $adjustment->id }}').submit();">
-                                                    <i class="feather-x-circle me-2 text-danger fs-12"></i>Cancel Adjustment
+                                                <button type="button" class="dropdown-item text-danger fw-semibold" onclick="if(confirm('{{ __('inventory.confirm_cancel_adjustment') }}')) document.getElementById('cancelAdjForm_{{ $adjustment->id }}').submit();">
+                                                    <i class="feather-x-circle me-2 text-danger fs-12"></i>{{ __('inventory.cancel_adjustment') }}
                                                 </button>
                                             </form>
                                         </li>
@@ -166,7 +166,7 @@
                         <tr>
                             <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="feather-box fs-1 d-block mb-3 text-light"></i>
-                                No Stock Adjustments found.
+                                {{ __('inventory.no_adjustments_found') }}
                             </td>
                         </tr>
                     @endforelse

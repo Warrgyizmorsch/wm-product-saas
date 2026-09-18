@@ -114,6 +114,149 @@
             border-color: #059669 !important;
             color: #ffffff !important;
         }
+
+        /* ==========================================================================
+           MES Shop Floor Dashboard Dark Mode
+           ========================================================================== */
+        html.app-skin-dark .mes-project-card,
+        body.app-skin-dark .mes-project-card,
+        [data-bs-theme="dark"] .mes-project-card,
+        [data-theme="dark"] .mes-project-card {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+        }
+
+        html.app-skin-dark .mes-project-header,
+        body.app-skin-dark .mes-project-header,
+        [data-bs-theme="dark"] .mes-project-header,
+        [data-theme="dark"] .mes-project-header {
+            background-color: #162038 !important;
+            border-color: #283c50 !important;
+        }
+
+        html.app-skin-dark .mes-project-header .text-dark,
+        body.app-skin-dark .mes-project-header .text-dark,
+        [data-bs-theme="dark"] .mes-project-header .text-dark,
+        [data-theme="dark"] .mes-project-header .text-dark,
+        html.app-skin-dark .mes-project-product,
+        body.app-skin-dark .mes-project-product,
+        [data-bs-theme="dark"] .mes-project-product,
+        [data-theme="dark"] .mes-project-product {
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .mes-project-header .text-muted,
+        body.app-skin-dark .mes-project-header .text-muted,
+        [data-bs-theme="dark"] .mes-project-header .text-muted,
+        [data-theme="dark"] .mes-project-header .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .mes-project-header .text-secondary,
+        body.app-skin-dark .mes-project-header .text-secondary,
+        [data-bs-theme="dark"] .mes-project-header .text-secondary,
+        [data-theme="dark"] .mes-project-header .text-secondary {
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .mes-project-header .progress,
+        body.app-skin-dark .mes-project-header .progress,
+        [data-bs-theme="dark"] .mes-project-header .progress,
+        [data-theme="dark"] .mes-project-header .progress {
+            background-color: #0f172a !important;
+            border-color: #283c50 !important;
+        }
+
+        html.app-skin-dark .mes-project-card .card-body,
+        body.app-skin-dark .mes-project-card .card-body,
+        [data-bs-theme="dark"] .mes-project-card .card-body,
+        [data-theme="dark"] .mes-project-card .card-body {
+            background-color: #0f172a !important;
+        }
+
+        html.app-skin-dark .mes-project-card .table,
+        body.app-skin-dark .mes-project-card .table,
+        [data-bs-theme="dark"] .mes-project-card .table,
+        [data-theme="dark"] .mes-project-card .table {
+            background-color: #0f172a !important;
+            color: #cbd5e1 !important;
+            border-color: #1e293b !important;
+        }
+
+        html.app-skin-dark .mes-project-card .table td,
+        body.app-skin-dark .mes-project-card .table td,
+        [data-bs-theme="dark"] .mes-project-card .table td,
+        [data-theme="dark"] .mes-project-card .table td,
+        html.app-skin-dark .mes-project-card .table th,
+        body.app-skin-dark .mes-project-card .table th,
+        [data-bs-theme="dark"] .mes-project-card .table th,
+        [data-theme="dark"] .mes-project-card .table th {
+            border-color: #1e293b !important;
+        }
+
+        html.app-skin-dark .action-icon-btn,
+        body.app-skin-dark .action-icon-btn,
+        [data-bs-theme="dark"] .action-icon-btn,
+        [data-theme="dark"] .action-icon-btn {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .action-icon-btn:hover,
+        body.app-skin-dark .action-icon-btn:hover,
+        [data-bs-theme="dark"] .action-icon-btn:hover,
+        [data-theme="dark"] .action-icon-btn:hover {
+            background-color: color-mix(in srgb, var(--bs-primary) 20%, #1e293b) !important;
+            border-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+        }
+
+        html.app-skin-dark .action-icon-btn.action-start-btn,
+        body.app-skin-dark .action-icon-btn.action-start-btn,
+        [data-bs-theme="dark"] .action-icon-btn.action-start-btn,
+        [data-theme="dark"] .action-icon-btn.action-start-btn {
+            background-color: #10b981 !important;
+            border-color: #10b981 !important;
+            color: #ffffff !important;
+        }
+
+        html.app-skin-dark .mes-empty-card,
+        body.app-skin-dark .mes-empty-card,
+        [data-bs-theme="dark"] .mes-empty-card,
+        [data-theme="dark"] .mes-empty-card {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .mes-empty-card .text-dark,
+        body.app-skin-dark .mes-empty-card .text-dark,
+        [data-bs-theme="dark"] .mes-empty-card .text-dark,
+        [data-theme="dark"] .mes-empty-card .text-dark {
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .running-card,
+        body.app-skin-dark .running-card,
+        [data-bs-theme="dark"] .running-card,
+        [data-theme="dark"] .running-card {
+            background-color: #0f172a !important;
+        }
+
+        html.app-skin-dark .paused-card,
+        body.app-skin-dark .paused-card,
+        [data-bs-theme="dark"] .paused-card,
+        [data-theme="dark"] .paused-card {
+            background-color: #0f172a !important;
+        }
+
+        html.app-skin-dark .ready-card,
+        body.app-skin-dark .ready-card,
+        [data-bs-theme="dark"] .ready-card,
+        [data-theme="dark"] .ready-card {
+            background-color: #0f172a !important;
+        }
     </style>
 @endpush
 
@@ -326,10 +469,10 @@
                         $activeOps = $ops->whereIn('status', ['running', 'paused', 'ready']);
                     @endphp
 
-                    <div class="card mb-4 border border-light shadow-sm" style="border-radius: 12px; overflow: hidden;">
+                    <div class="card mb-4 border border-light shadow-sm mes-project-card" style="border-radius: 12px; overflow: hidden;">
                         {{-- Card Header --}}
                         <div
-                            class="card-header bg-light border-bottom border-light p-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            class="card-header bg-light border-bottom border-light p-3 d-flex flex-wrap align-items-center justify-content-between gap-2 mes-project-header">
                             <div>
                                 <h6 class="fw-bold text-dark mb-1 fs-14 d-flex align-items-center gap-2">
                                     <i class="feather-box text-primary"></i>
@@ -337,7 +480,7 @@
                                         class="text-primary fw-bold text-decoration-underline"
                                         title="Assign operators under Operations tab">{{ $order->order_number ?? '' }}</a>
                                     <span class="text-muted">&middot;</span>
-                                    <span class="fw-bold">{{ $order->product->name ?? 'Unknown Product' }}</span>
+                                    <span class="fw-bold mes-project-product">{{ $order->product->name ?? 'Unknown Product' }}</span>
                                 </h6>
                                 <div class="text-muted fs-11">
                                     {{ __('production.schedule') }}: <strong
@@ -1533,7 +1676,7 @@
                             </x-ui.modal>
                     @endforeach
                 @empty
-                    <div class="card p-5 text-center border bg-white rounded-3 shadow-sm mb-4">
+                    <div class="card p-5 text-center border bg-white rounded-3 shadow-sm mb-4 mes-empty-card">
                         <div class="avatar-text avatar-lg bg-soft-light text-muted rounded mx-auto mb-3">
                             <i class="feather-grid fs-28"></i>
                         </div>
