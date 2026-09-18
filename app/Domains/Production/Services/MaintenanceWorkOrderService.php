@@ -132,6 +132,8 @@ class MaintenanceWorkOrderService
                 'event_source' => 'MaintenanceWorkOrderService',
             ]);
 
+            app(ProductionNotificationService::class)->notifyMaintenanceScheduled($wo);
+
             return $wo->fresh(['machine', 'technician', 'downtime']);
         });
     }
@@ -256,6 +258,8 @@ class MaintenanceWorkOrderService
                 'severity'     => 'danger',
                 'event_source' => 'MaintenanceWorkOrderService',
             ]);
+
+            app(ProductionNotificationService::class)->notifyMachineBreakdown($machine, $reason, $wo);
 
             return $wo->fresh(['machine', 'downtime']);
         });

@@ -253,6 +253,8 @@ class SubcontractDeliveryChallanController extends Controller
 
         if ($validated['status'] === 'dispatched') {
             $this->materialBalanceService->processDispatchActions($challan, $tenantId);
+            app(\App\Domains\Production\Services\ProductionNotificationService::class)
+                ->notifySubcontractChallanDispatched($challan);
         }
 
         return redirect()->route('production.subcontract.delivery-challans.show', $challan->id)
@@ -324,6 +326,9 @@ class SubcontractDeliveryChallanController extends Controller
 
         $this->repository->updateStatus($challan, 'dispatched');
         $this->materialBalanceService->processDispatchActions($challan, $tenantId);
+
+        app(\App\Domains\Production\Services\ProductionNotificationService::class)
+            ->notifySubcontractChallanDispatched($challan);
 
         return redirect()->back()->with('success', "Delivery Challan {$challan->challan_number} has been dispatched to vendor.");
     }

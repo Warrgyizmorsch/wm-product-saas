@@ -159,9 +159,9 @@
                                                        x-transition:leave-start="opacity-100 transform translate-x-0"
                                                        x-transition:leave-end="opacity-0 transform -translate-x-2">
                                                       <span class="fs-10 text-muted">Qty:</span>
-                                                      <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_batch_quantity" min="0.0001" />
+                                                      <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_batch_quantity" :min="(operation.queue_threshold_enabled == 1 || operation.queue_threshold_enabled === true || operation.overlap_enabled == 1 || operation.overlap_enabled === true) ? '0.0001' : '0'" :disabled="!operation.queue_threshold_enabled && !operation.overlap_enabled" />
                                                        <span class="fs-10 text-muted ms-1" title="Transit / handling delay before the first transfer batch reaches the downstream operation.">Lag (m):</span>
-                                                       <input type="number" step="1" x-bind:name="'operations['+index+'][transfer_lag_minutes]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_lag_minutes" min="0" placeholder="0" title="Transit / handling delay before the first transfer batch reaches the downstream operation." />
+                                                       <input type="number" step="1" x-bind:name="'operations['+index+'][transfer_lag_minutes]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_lag_minutes" min="0" placeholder="0" title="Transit / handling delay before the first transfer batch reaches the downstream operation." :disabled="!operation.queue_threshold_enabled && !operation.overlap_enabled" />
                                                   </div>
 
                                                   <span class="text-black-50 me-1">|</span>
@@ -175,7 +175,7 @@
                                                        :class="(operation.is_parallel == 1 || operation.is_parallel === true) ? 'd-inline-flex' : 'd-none'"
                                                        x-show="operation.is_parallel == 1 || operation.is_parallel === true">
                                                       <span class="fs-10 text-muted">Grp:</span>
-                                                      <input type="text" x-bind:name="'operations['+index+'][parallel_group]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 50px; height: 20px; min-height: 20px;" x-model="operation.parallel_group" placeholder="e.g. A" title="Optional Parallel Group Name" />
+                                                      <input type="text" x-bind:name="'operations['+index+'][parallel_group]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 50px; height: 20px; min-height: 20px;" x-model="operation.parallel_group" placeholder="e.g. A" title="Optional Parallel Group Name" :disabled="!operation.is_parallel" />
                                                   </div>
                                               </div>
 
@@ -286,7 +286,7 @@
                                          <td colspan="10" class="p-2 border-top-0">
                                              <div class="row g-2 align-items-center fs-12 px-2 py-2 bg-white rounded border">
                                                  <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="select" label="Vendor *" x-bind:name="'operations['+index+'][vendor_id]'" class="form-select form-select-sm fs-11" x-model="operation.vendor_id" x-bind:required="operation.is_external">
+                                                     <x-ui.odoo-form-ui type="select" label="Vendor *" x-bind:name="'operations['+index+'][vendor_id]'" class="form-select form-select-sm fs-11" x-model="operation.vendor_id" x-bind:required="operation.is_external" x-bind:disabled="!operation.is_external">
                                                          <option value="">Select Vendor</option>
                                                          @foreach($vendors as $v)
                                                              <option value="{{ $v->id }}">{{ $v->name }} ({{ $v->code }})</option>
@@ -294,7 +294,7 @@
                                                      </x-ui.odoo-form-ui>
                                                  </div>
                                                  <div class="col-md-3" x-show="operation.subcontract_input_type !== 'previous_operation_wip'">
-                                                     <x-ui.odoo-form-ui type="select" label="Supply Type" x-bind:name="'operations['+index+'][material_supply_type]'" class="form-select form-select-sm fs-11" x-model="operation.material_supply_type">
+                                                     <x-ui.odoo-form-ui type="select" label="Supply Type" x-bind:name="'operations['+index+'][material_supply_type]'" class="form-select form-select-sm fs-11" x-model="operation.material_supply_type" x-bind:disabled="!operation.is_external">
                                                          <option value="company_supplied">Company Supplied</option>
                                                          <option value="vendor_supplied">Vendor Supplied</option>
                                                      </x-ui.odoo-form-ui>
@@ -310,19 +310,19 @@
                                                      </div>
                                                  </div>
                                                  <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="select" label="Subcontract Processing Mode" x-bind:name="'operations['+index+'][subcontract_input_type]'" class="form-select form-select-sm fs-11" x-model="operation.subcontract_input_type">
+                                                     <x-ui.odoo-form-ui type="select" label="Subcontract Processing Mode" x-bind:name="'operations['+index+'][subcontract_input_type]'" class="form-select form-select-sm fs-11" x-model="operation.subcontract_input_type" x-bind:disabled="!operation.is_external">
                                                          <option value="bom_raw_materials">BOM Raw Materials (From Stock)</option>
                                                          <option value="previous_operation_wip">Previous Operation WIP (Job Work)</option>
                                                      </x-ui.odoo-form-ui>
                                                  </div>
                                                  <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="input" inputType="number" label="Lead Time (Days)" min="0" x-bind:name="'operations['+index+'][subcontract_lead_time_days]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_lead_time_days" placeholder="0" />
+                                                     <x-ui.odoo-form-ui type="input" inputType="number" label="Lead Time (Days)" min="0" x-bind:name="'operations['+index+'][subcontract_lead_time_days]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_lead_time_days" placeholder="0" x-bind:disabled="!operation.is_external" />
                                                  </div>
                                                  <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" min="0" label="Cost / Unit" x-bind:name="'operations['+index+'][subcontract_cost_per_unit]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_cost_per_unit" placeholder="0.00" />
+                                                     <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" min="0" label="Cost / Unit" x-bind:name="'operations['+index+'][subcontract_cost_per_unit]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_cost_per_unit" placeholder="0.00" x-bind:disabled="!operation.is_external" />
                                                  </div>
                                                  <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="select" label="Subcontract Service Product" x-bind:name="'operations['+index+'][subcontract_service_product_id]'" class="form-select form-select-sm fs-11" x-model="operation.subcontract_service_product_id">
+                                                     <x-ui.odoo-form-ui type="select" label="Subcontract Service Product" x-bind:name="'operations['+index+'][subcontract_service_product_id]'" class="form-select form-select-sm fs-11" x-model="operation.subcontract_service_product_id" x-bind:disabled="!operation.is_external">
                                                          <option value="">Select Service Product</option>
                                                          @foreach($serviceProducts as $sp)
                                                              <option value="{{ $sp->id }}">{{ $sp->name }} ({{ $sp->sku }})</option>
@@ -330,10 +330,10 @@
                                                      </x-ui.odoo-form-ui>
                                                  </div>
                                                  <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="input" inputType="number" min="0" label="Dispatch Buffer (Days)" x-bind:name="'operations['+index+'][dispatch_buffer_days]'" class="form-control form-control-sm fs-11" x-model="operation.dispatch_buffer_days" placeholder="0" />
+                                                     <x-ui.odoo-form-ui type="input" inputType="number" min="0" label="Dispatch Buffer (Days)" x-bind:name="'operations['+index+'][dispatch_buffer_days]'" class="form-control form-control-sm fs-11" x-model="operation.dispatch_buffer_days" placeholder="0" x-bind:disabled="!operation.is_external" />
                                                  </div>
                                                  <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="input" inputType="number" min="0" label="Return Buffer (Days)" x-bind:name="'operations['+index+'][return_buffer_days]'" class="form-control form-control-sm fs-11" x-model="operation.return_buffer_days" placeholder="0" />
+                                                     <x-ui.odoo-form-ui type="input" inputType="number" min="0" label="Return Buffer (Days)" x-bind:name="'operations['+index+'][return_buffer_days]'" class="form-control form-control-sm fs-11" x-model="operation.return_buffer_days" placeholder="0" x-bind:disabled="!operation.is_external" />
                                                  </div>
                                              </div>
                                          </td>
@@ -500,7 +500,12 @@
                         const clone = JSON.parse(JSON.stringify(original));
 
                         clone.uid = this.uidCounter++;
-                        clone.sequence = parseInt(original.sequence) + 5;
+                        let newSeq = parseInt(original.sequence) + 5;
+                        const existingSeqs = this.operations.map(o => parseInt(o.sequence));
+                        while (existingSeqs.includes(newSeq)) {
+                            newSeq += 5;
+                        }
+                        clone.sequence = newSeq;
 
                         this.operations.splice(index + 1, 0, clone);
                         this.recalculateSequences();
@@ -584,8 +589,14 @@
                             $select.data('select2-initialized', true);
                             $select.select2(self.select2RowOptions());
 
-                            // Sync value if dynamic
-                            if (nameAttr.indexOf('predecessor_sequence') !== -1) {
+                            // Sync values for select2
+                            if (nameAttr.indexOf('operation_type') !== -1) {
+                                if (operation.operation_type) $select.val(operation.operation_type).trigger('change.select2');
+                            } else if (nameAttr.indexOf('work_center_id') !== -1) {
+                                if (operation.work_center_id) $select.val(operation.work_center_id).trigger('change.select2');
+                            } else if (nameAttr.indexOf('material_id') !== -1) {
+                                if (operation.material_id) $select.val(operation.material_id).trigger('change.select2');
+                            } else if (nameAttr.indexOf('predecessor_sequence') !== -1) {
                                 if (operation.predecessor_sequence !== undefined && operation.predecessor_sequence !== '') {
                                     $select.val(operation.predecessor_sequence).trigger('change.select2');
                                 }
