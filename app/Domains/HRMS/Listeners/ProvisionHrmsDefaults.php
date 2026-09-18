@@ -5,6 +5,8 @@ namespace App\Domains\HRMS\Listeners;
 use App\Core\Tenant\Events\TenantProvisioning;
 use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Designation;
+use App\Domains\HRMS\Models\DocumentCategory;
+use App\Domains\HRMS\Models\DocumentTemplate;
 use App\Domains\HRMS\Models\LeavePlan;
 use App\Domains\HRMS\Models\LeaveType;
 use App\Domains\HRMS\Models\PayGroup;
@@ -12,9 +14,10 @@ use App\Domains\HRMS\Models\SalaryComponent;
 
 /**
  * Minimal starter HRMS masters for a new tenant: departments, designations,
- * a leave plan with standard leave types, a default pay group, and standard
- * salary components. Scoped to the tenant's default company/branch from the
- * TenantProvisioning event (see DefaultOrganization).
+ * a leave plan with standard leave types, a default pay group, standard
+ * salary components, and a starter "HR Letters" document category with
+ * Offer Letter / Selection Letter templates. Scoped to the tenant's default
+ * company/branch from the TenantProvisioning event (see DefaultOrganization).
  *
  * Scoping notes (confirmed against the live schema, not just migrations —
  * see 2026_07_15_000001_add_tenant_isolation_to_hrms_tables.php):
@@ -69,6 +72,7 @@ class ProvisionHrmsDefaults
         $this->provisionLeaveTypes($event);
         $payGroup = $this->provisionPayGroup($event);
         $this->provisionSalaryComponents($event, $payGroup);
+        $this->provisionDocumentTemplates($event);
     }
 
     /** @return array<string, Department> */
@@ -150,5 +154,119 @@ class ProvisionHrmsDefaults
                 ],
             );
         }
+    }
+
+    private function provisionDocumentTemplates(TenantProvisioning $event): void
+    {
+        $category = DocumentCategory::query()->firstOrCreate(
+            ['tenant_id' => $event->tenantId, 'company_id' => $event->companyId, 'name' => 'HR Letters'],
+            ['description' => 'Offer, selection and other candidate/employee correspondence templates'],
+        );
+
+        $letterCss = <<<'CSS'
+        .letter-header { text-align: center; margin-bottom: 24px; }
+        .letter-header h2 { margin: 0; font-size: 20px; }
+        .letter-header p { margin: 2px 0; color: #444; font-size: 13px; }
+        .letter-meta { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 13px; }
+        .letter-body p { line-height: 1.6; margin-bottom: 12px; }
+        .letter-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        .letter-table td { border: 1px solid #ccc; padding: 8px 12px; font-size: 13px; }
+        .letter-footer { margin-top: 32px; font-size: 13px; }
+        CSS;
+
+        DocumentTemplate::query()->firstOrCreate(
+            ['tenant_id' => $event->tenantId, 'code' => 'OFFERLT'],
+            [
+                'company_id' => $event->companyId,
+                'document_category_id' => $category->id,
+                'name' => 'Offer Letter',
+                'header_content' => <<<'HTML'
+                <div class="letter-header">
+                    <h2>{{company_name}}</h2>
+                    <p>{{company_address}}</p>
+                    <p>{{company_email}} | {{company_phone}}</p>
+                </div>
+                <div class="letter-meta">
+                    <span>Ref: {{reference_number}}</span>
+                    <span>Date: {{issue_date}}</span>
+                </div>
+                HTML,
+                'body_content' => <<<'HTML'
+                <div class="letter-body">
+                    <p>Dear {{employee_name}},</p>
+                    <p>We are pleased to offer you the position of <strong>{{designation}}</strong> in the <strong>{{department}}</strong> department at {{company_name}}, {{branch}}. This offer is made on the basis of the information provided by you and the discussions held during the interview process.</p>
+                    <p>Your date of joining will be <strong>{{joining_date}}</strong>. Your compensation and other terms of employment will be as per the appointment letter and company policy in force from time to time.</p>
+                    <table class="letter-table">
+                        <tr><td>Designation</td><td>{{designation}}</td></tr>
+                        <tr><td>Department</td><td>{{department}}</td></tr>
+                        <tr><td>Reporting Manager</td><td>{{reporting_manager}}</td></tr>
+                        <tr><td>Date of Joining</td><td>{{joining_date}}</td></tr>
+                    </table>
+                    <p>This offer is subject to satisfactory verification of the documents and references provided by you. Please sign and return a copy of this letter as a token of your acceptance and confirmation of the date of joining.</p>
+                    <p>We look forward to welcoming you to the {{company_name}} team.</p>
+                </div>
+                HTML,
+                'footer_content' => <<<'HTML'
+                <div class="letter-footer">
+                    <p>For {{company_name}}</p>
+                    <br><br>
+                    <p>{{hr_signature}}</p>
+                    <p>{{hr_name}}<br>{{hr_designation}}</p>
+                    <p style="margin-top:24px;">I accept the offer and the terms mentioned above.</p>
+                    <p>Signature: ________________________ &nbsp;&nbsp; Date: {{signature_date}}</p>
+                </div>
+                HTML,
+                'css_styles' => $letterCss,
+                'requires_signature' => true,
+                'is_default' => true,
+                'status' => 'active',
+            ],
+        );
+
+        DocumentTemplate::query()->firstOrCreate(
+            ['tenant_id' => $event->tenantId, 'code' => 'SELECTLT'],
+            [
+                'company_id' => $event->companyId,
+                'document_category_id' => $category->id,
+                'name' => 'Selection Letter',
+                'header_content' => <<<'HTML'
+                <div class="letter-header">
+                    <h2>{{company_name}}</h2>
+                    <p>{{company_address}}</p>
+                    <p>{{company_email}} | {{company_phone}}</p>
+                </div>
+                <div class="letter-meta">
+                    <span>Ref: {{reference_number}}</span>
+                    <span>Date: {{issue_date}}</span>
+                </div>
+                HTML,
+                'body_content' => <<<'HTML'
+                <div class="letter-body">
+                    <p>Dear {{employee_name}},</p>
+                    <p>Congratulations! Following your interview and assessment with {{company_name}}, we are pleased to inform you that you have been <strong>selected</strong> for the role of <strong>{{designation}}</strong> in the <strong>{{department}}</strong> department, reporting to {{reporting_manager}}.</p>
+                    <p>A formal offer letter with your compensation and complete terms of employment will follow shortly. To proceed with onboarding, please complete the necessary documentation and verification formalities at the earliest.</p>
+                    <table class="letter-table">
+                        <tr><td>Designation</td><td>{{designation}}</td></tr>
+                        <tr><td>Department</td><td>{{department}}</td></tr>
+                        <tr><td>Reporting Manager</td><td>{{reporting_manager}}</td></tr>
+                    </table>
+                    <p>Please confirm your acceptance of this selection at the earliest so that we can proceed with the next steps.</p>
+                    <p>We look forward to having you on board.</p>
+                </div>
+                HTML,
+                'footer_content' => <<<'HTML'
+                <div class="letter-footer">
+                    <p>For {{company_name}}</p>
+                    <br><br>
+                    <p>{{hr_signature}}</p>
+                    <p>{{hr_name}}<br>{{hr_designation}}</p>
+                </div>
+                HTML,
+                'css_styles' => $letterCss,
+                'requires_signature' => false,
+                'is_default' => true,
+                'status' => 'active',
+            ],
+        );
     }
 }
