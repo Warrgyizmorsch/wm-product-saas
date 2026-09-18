@@ -506,8 +506,8 @@
                                                 <i class="feather-rotate-ccw me-1"></i>Clear Canvas
                                             </button>
                                         </div>
-                                        <div class="border rounded bg-white p-1 text-center position-relative" style="border-color: #cbd5e1 !important;">
-                                            <canvas id="tmplHrSignatureCanvas" width="400" height="100" style="touch-action: none; cursor: crosshair; background: #ffffff; width: 100%; height: 100px;"></canvas>
+                                        <div class="p-1 text-center position-relative shadow-sm" style="border: 2px dashed #94a3b8 !important; background-color: #f8fafc; border-radius: 8px;">
+                                            <canvas id="tmplHrSignatureCanvas" width="400" height="100" style="touch-action: none; cursor: crosshair; background: #ffffff; width: 100%; height: 100px; border-radius: 6px;"></canvas>
                                         </div>
                                         <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> Draw HR signature using mouse or touch.</small>
                                     </div>

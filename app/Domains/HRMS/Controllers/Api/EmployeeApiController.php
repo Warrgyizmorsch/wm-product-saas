@@ -311,11 +311,22 @@ class EmployeeApiController extends Controller
             'payGroup', 'leavePlan', 'defaultShift', 'shift', 'documents.requestedBy', 'employmentHistories', 'user'
         ]);
 
+        $shiftObj = $employee->defaultShift ?: $employee->shift;
+        $employeeData = $employee->toArray();
+        $employeeData['shift'] = $shiftObj ? [
+            'id'            => $shiftObj->id,
+            'name'          => $shiftObj->name ?? '',
+            'code'          => $shiftObj->code ?? '',
+            'start_time'    => $shiftObj->start_time ?? '',
+            'end_time'      => $shiftObj->end_time ?? '',
+            'break_minutes' => (int) ($shiftObj->break_minutes ?? 0),
+        ] : null;
+
         $adhocComponents = EmployeeAdhocComponent::where('employee_id', $employee->id)->where('status', 'pending')->with('component')->get();
         $penalties       = EmployeePenalty::where('employee_id', $employee->id)->get();
 
         return $this->sendSuccess([
-            'employee'            => $employee,
+            'employee'            => $employeeData,
             'salary_structure'    => $salaryStructure,
             'computed_components' => array_values($computedComponents),
             'adhoc_components'    => $adhocComponents,
@@ -334,7 +345,27 @@ class EmployeeApiController extends Controller
         }
 
         try {
-            if ($request->filled('user_id')) {
+            $userIdInput = $request->input('user_id');
+            if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
+                if ($request->filled('office_email')) {
+                    $existingUser = \App\Models\User::where('email', $request->office_email)->first();
+                    if ($existingUser) {
+                        $request->merge(['user_id' => $existingUser->id]);
+                    } else {
+                        $newUser = \App\Models\User::create([
+                            'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id'),
+                            'company_id'    => $request->input('company_id'),
+                            'branch_id'     => $request->input('branch_id'),
+                            'department_id' => $request->input('department_id'),
+                            'role_id'       => $request->input('role_id'),
+                            'name'          => $request->input('full_name'),
+                            'email'         => $request->input('office_email'),
+                            'password'      => \Illuminate\Support\Facades\Hash::make('12345678'),
+                        ]);
+                        $request->merge(['user_id' => $newUser->id]);
+                    }
+                }
+            } elseif ($request->filled('user_id')) {
                 $targetUser = \App\Models\User::find($request->user_id);
                 if ($targetUser) {
                     if (!$request->filled('full_name')) {
@@ -343,6 +374,7 @@ class EmployeeApiController extends Controller
                     if (!$request->filled('personal_email')) {
                         $request->merge(['personal_email' => $targetUser->email]);
                     }
+                    $request->merge(['office_email' => $targetUser->email]);
                 }
             }
 

@@ -599,37 +599,36 @@
             if (inputAdhoc) inputAdhoc.value = isAdhocVal;
         });
 
-        // Edit Action Trigger for Salary Components
-        document.querySelectorAll('.btn-edit-salary-component').forEach(btn => {
-            btn.addEventListener('click', function() {
-                // Decode component data
-                let component = JSON.parse(atob(this.dataset.component));
-                
-                // Populate input fields in the Edit modal
-                document.getElementById('edit_sc_name').value = component.name || '';
-                document.getElementById('edit_sc_code').value = component.code || '';
-                document.getElementById('edit_sc_type').value = component.type || 'earning';
-                document.getElementById('edit_sc_calculation_type').value = component.calculation_type || 'fixed';
-                document.getElementById('edit_sc_company_id').value = component.company_id || '';
-                document.getElementById('edit_sc_pay_group_id').value = component.pay_group_id || '';
-                document.getElementById('edit_sc_is_adhoc').value = component.is_adhoc ? '1' : '0';
-                document.getElementById('edit_sc_description').value = component.description || '';
-                
-                // Populate status select dropdown
-                let statusSelect = document.getElementById('edit_sc_status');
-                if (statusSelect) {
-                    statusSelect.value = (component.status === true || component.status === 1 || component.status === '1') ? '1' : '0';
-                }
-                
-                // Trigger Change event on all select elements to notify Select2 to refresh its displayed value
-                $('#editSalaryComponentModal select').trigger('change');
-                
-                // Update form action URL to target this specific component id on the correct route
-                let form = document.getElementById('salary_component_edit_form');
-                if (form) {
-                    form.action = form.dataset.updateRoute.replace('__ID__', component.id);
-                }
-            });
+        // Edit Action Trigger for Salary Components (uses event delegation for AJAX table persistence)
+        $(document).on('click', '.btn-edit-salary-component', function() {
+            let dataComp = $(this).attr('data-component');
+            if (!dataComp) return;
+            let component = JSON.parse(atob(dataComp));
+            
+            // Populate input fields in the Edit modal
+            document.getElementById('edit_sc_name').value = component.name || '';
+            document.getElementById('edit_sc_code').value = component.code || '';
+            document.getElementById('edit_sc_type').value = component.type || 'earning';
+            document.getElementById('edit_sc_calculation_type').value = component.calculation_type || 'fixed';
+            document.getElementById('edit_sc_company_id').value = component.company_id || '';
+            document.getElementById('edit_sc_pay_group_id').value = component.pay_group_id || '';
+            document.getElementById('edit_sc_is_adhoc').value = component.is_adhoc ? '1' : '0';
+            document.getElementById('edit_sc_description').value = component.description || '';
+            
+            // Populate status select dropdown
+            let statusSelect = document.getElementById('edit_sc_status');
+            if (statusSelect) {
+                statusSelect.value = (component.status === true || component.status === 1 || component.status === '1') ? '1' : '0';
+            }
+            
+            // Trigger Change event on all select elements to notify Select2 to refresh its displayed value
+            $('#editSalaryComponentModal select').trigger('change');
+            
+            // Update form action URL to target this specific component id on the correct route
+            let form = document.getElementById('salary_component_edit_form');
+            if (form) {
+                form.action = form.dataset.updateRoute.replace('__ID__', component.id);
+            }
         });
     });
 </script>

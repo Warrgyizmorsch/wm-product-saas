@@ -266,6 +266,33 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'public');
         }
 
+        $userIdInput = $validated['user_id'] ?? $request->input('user_id');
+        if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
+            if (!empty($validated['office_email'])) {
+                $existingUser = \App\Models\User::where('email', $validated['office_email'])->first();
+                if ($existingUser) {
+                    $validated['user_id'] = $existingUser->id;
+                } else {
+                    $newUser = \App\Models\User::create([
+                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id'),
+                        'company_id'    => $validated['company_id'] ?? null,
+                        'branch_id'     => $validated['branch_id'] ?? null,
+                        'department_id' => $validated['department_id'] ?? null,
+                        'role_id'       => $request->input('role_id') ?: null,
+                        'name'          => $validated['full_name'],
+                        'email'         => $validated['office_email'],
+                        'password'      => \Illuminate\Support\Facades\Hash::make('12345678'),
+                    ]);
+                    $validated['user_id'] = $newUser->id;
+                }
+            }
+        } elseif (!empty($validated['user_id'])) {
+            $user = \App\Models\User::find($validated['user_id']);
+            if ($user && !empty($user->email)) {
+                $validated['office_email'] = $user->email;
+            }
+        }
+
         $employee = Employee::create($validated);
 
         if ($request->filled('role_id') && $employee->user) {

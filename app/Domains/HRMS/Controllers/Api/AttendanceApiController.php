@@ -129,6 +129,30 @@ class AttendanceApiController extends Controller
     }
 
     /**
+     * Helper to transform raw Attendance model into clean API DTO.
+     */
+    private function transformAttendance(Attendance $att): array
+    {
+        return [
+            'id'                  => $att->id,
+            'employee_id'         => $att->employee_id,
+            'employee_code'       => $att->employee?->employee_id ?? '',
+            'employee_name'       => $att->employee?->full_name ?? '',
+            'department'          => $att->employee?->department?->name ?? '',
+            'date'                => $att->date ? $att->date->format('Y-m-d') : null,
+            'check_in'            => $att->check_in ? $att->check_in->format('H:i:s') : null,
+            'check_out'           => $att->check_out ? $att->check_out->format('H:i:s') : null,
+            'location_type'       => $att->location_type ?? 'office',
+            'status'              => $att->status ?? 'present',
+            'total_work_hours'    => (float) ($att->total_work_hours ?? 0),
+            'total_break_hours'   => (float) ($att->total_break_hours ?? 0),
+            'formatted_work_time' => $att->formatted_work_hours,
+            'formatted_break_time'=> $att->formatted_break_hours,
+            'breaks_count'        => $att->breaks->count(),
+        ];
+    }
+
+    /**
      * GET /api/hrms/attendance
      * List all attendance logs with pagination & filters.
      */
@@ -139,7 +163,7 @@ class AttendanceApiController extends Controller
         }
 
         $filters = $request->only(['date', 'department_id', 'search', 'status']);
-        $date = $filters['date'] ?? Carbon::today()->format('Y-m-d');
+        $date = $filters['date'] ?? null;
         $departmentId = $filters['department_id'] ?? null;
         $search = $filters['search'] ?? null;
         $statusFilter = $filters['status'] ?? null;
@@ -156,7 +180,7 @@ class AttendanceApiController extends Controller
             $query->where('employee_id', $employee->id);
         }
 
-        if ($date) {
+        if ($date && $date !== 'all') {
             $query->where('date', $date);
         }
 
@@ -190,9 +214,19 @@ class AttendanceApiController extends Controller
             $query->orderBy('date', 'desc');
         }
 
-        $attendances = $query->paginate($request->integer('per_page', 10));
+        $paginated = $query->paginate($request->integer('per_page', 10));
 
-        return $this->sendSuccess($attendances, 'Attendance logs list retrieved successfully');
+        $response = [
+            'items' => collect($paginated->items())->map(fn($att) => $this->transformAttendance($att))->values(),
+            'pagination' => [
+                'current_page' => $paginated->currentPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+                'total_pages'  => $paginated->lastPage(),
+            ]
+        ];
+
+        return $this->sendSuccess($response, 'Attendance logs list retrieved successfully');
     }
 
     /**
@@ -223,9 +257,9 @@ class AttendanceApiController extends Controller
         }
 
         $query = Attendance::where('employee_id', $employee->id)
-            ->with('breaks');
+            ->with(['employee.department', 'breaks']);
 
-        if ($date) {
+        if ($date && $date !== 'all') {
             $query->where('date', $date);
         } elseif ($monthFilter) {
             $query->where('date', 'like', "{$monthFilter}%");
@@ -249,12 +283,26 @@ class AttendanceApiController extends Controller
             $query->orderBy('date', 'desc');
         }
 
-        $attendances = $query->paginate($request->integer('per_page', 10));
+        $paginated = $query->paginate($request->integer('per_page', 10));
 
-        return $this->sendSuccess([
-            'employee'    => $employee->load(['department', 'designation']),
-            'attendances' => $attendances
-        ], 'Personal attendance history loaded');
+        $response = [
+            'employee' => [
+                'id'            => $employee->id,
+                'employee_code' => $employee->employee_id,
+                'full_name'     => $employee->full_name,
+                'department'    => $employee->department?->name ?? '',
+                'designation'   => $employee->designation?->name ?? '',
+            ],
+            'items' => collect($paginated->items())->map(fn($att) => $this->transformAttendance($att))->values(),
+            'pagination' => [
+                'current_page' => $paginated->currentPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+                'total_pages'  => $paginated->lastPage(),
+            ]
+        ];
+
+        return $this->sendSuccess($response, 'Personal attendance history loaded');
     }
 
     /**

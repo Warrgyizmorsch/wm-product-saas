@@ -479,13 +479,13 @@ class LeaveRequestApiController extends Controller
             return $authError;
         }
 
-        if (!$this->isHrAdmin()) {
-            return $this->sendError('Unauthorized action. Only HR Admins can update leave status.', 403);
-        }
-
         $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$this->canApproveLeaveRequest(auth()->user(), $leaveRequest)) {
+            return $this->sendError('Unauthorized action. You do not have permission to approve or reject this leave request at its current stage.', 403);
         }
 
         if ($leaveRequest->status === 'cancelled') {
@@ -770,5 +770,57 @@ class LeaveRequestApiController extends Controller
 
         return $this->sendSuccess($leaveRequest, 'Cancellation request denied. Application remains approved.');
     }
+
+    private function canApproveLeaveRequest(?\App\Models\User $user, LeaveRequest $leaveRequest): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if ($this->isHrAdmin()) {
+            return true;
+        }
+
+        $authEmployee = $this->getAuthenticatedEmployee();
+        if (!$authEmployee) {
+            return false;
+        }
+
+        $emp = $leaveRequest->employee;
+        if (!$emp) {
+            return false;
+        }
+
+        $isReportingManager = (string) $emp->reporting_manager_id === (string) $authEmployee->id;
+        $isDepartmentHead   = $emp->department && (string) $emp->department->head_employee_id === (string) $authEmployee->id;
+
+        $rules = $leaveRequest->leaveType->rules ?? [];
+        $workflowLevel = $rules['approval']['workflow_level'] ?? '1_level';
+        $firstApprover = $rules['approval']['first_approver'] ?? 'reporting_manager';
+        $secondApprover = $rules['approval']['second_approver'] ?? 'hr_manager';
+
+        $currentLevel = (string) ($leaveRequest->current_level ?? '1');
+
+        if ($currentLevel === '1' || $currentLevel === '') {
+            if ($firstApprover === 'department_head') {
+                return $isDepartmentHead;
+            } elseif ($firstApprover === 'reporting_manager') {
+                return $isReportingManager;
+            } else {
+                return $isReportingManager || $isDepartmentHead;
+            }
+        } elseif ($currentLevel === '2' && $workflowLevel === '2_level') {
+            if ($secondApprover === 'department_head') {
+                return $isDepartmentHead;
+            } elseif ($secondApprover === 'reporting_manager') {
+                return $isReportingManager;
+            } else {
+                return false;
+            }
+        }
+
+        return false;
+    }
 }
+
 

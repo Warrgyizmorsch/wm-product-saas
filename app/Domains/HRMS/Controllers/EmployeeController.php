@@ -194,7 +194,27 @@ class EmployeeController extends Controller
     {
         $this->authorizeHrms('hrms.employees.create');
 
-        if ($request->filled('user_id')) {
+        $userIdInput = $request->input('user_id');
+        if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
+            if ($request->filled('office_email')) {
+                $existingUser = \App\Models\User::where('email', $request->office_email)->first();
+                if ($existingUser) {
+                    $request->merge(['user_id' => $existingUser->id]);
+                } else {
+                    $newUser = \App\Models\User::create([
+                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id'),
+                        'company_id'    => $request->input('company_id'),
+                        'branch_id'     => $request->input('branch_id'),
+                        'department_id' => $request->input('department_id'),
+                        'role_id'       => $request->input('role_id'),
+                        'name'          => $request->input('full_name'),
+                        'email'         => $request->input('office_email'),
+                        'password'      => \Illuminate\Support\Facades\Hash::make('12345678'),
+                    ]);
+                    $request->merge(['user_id' => $newUser->id]);
+                }
+            }
+        } elseif ($request->filled('user_id')) {
             $targetUser = \App\Models\User::find($request->user_id);
             if ($targetUser) {
                 if (!$request->filled('full_name')) {
@@ -203,6 +223,7 @@ class EmployeeController extends Controller
                 if (!$request->filled('personal_email')) {
                     $request->merge(['personal_email' => $targetUser->email]);
                 }
+                $request->merge(['office_email' => $targetUser->email]);
             }
         }
 
@@ -225,15 +246,18 @@ class EmployeeController extends Controller
                             $employee->update(['resume_path' => $candidateObj->resume_path]);
                         }
                     }
+                    $oldStage = $application->current_stage;
                     $application->update([
                         'current_stage' => 'hired',
                         'stage_updated_at' => now(),
                     ]);
-                    $req = $application->requisition;
-                    if ($req && $req->vacancies > 0) {
-                        $req->decrement('vacancies');
-                        if ($req->vacancies === 0) {
-                            $req->update(['status' => 'closed']);
+                    if ($oldStage !== 'hired') {
+                        $req = $application->requisition;
+                        if ($req && $req->vacancies > 0) {
+                            $req->decrement('vacancies');
+                            if ($req->fresh()->vacancies === 0) {
+                                $req->update(['status' => 'closed']);
+                            }
                         }
                     }
                 }

@@ -39,7 +39,7 @@ class ExpensePolicyController extends Controller
         $this->authorize('viewAny', ExpensePolicy::class);
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $activeTab = $request->query('tab', 'policies');
+        $activeTab = $request->query('tab', 'categories');
 
         // Policy tab filters
         $filters = [
