@@ -347,7 +347,7 @@
                             <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; max-width: 90px; margin-left: auto; display: block;">
                         </td>
                         <td style="width: 13%; text-align: right; vertical-align: middle; padding: 8px 12px 8px 6px;" class="fw-bold text-dark amount-display">
-                            ₹0.00
+                            {{ active_currency_symbol() }}0.00
                         </td>
                         <td style="width: 5%; text-align: center; vertical-align: middle; padding: 8px 6px;">
                             <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn">
@@ -389,6 +389,8 @@
                 }
             });
 
+            const currencySymbol = "{{ active_currency_symbol() }}";
+
             // Toggle Tax and Discount columns based on dropdown selections
             function toggleTaxAndDiscountOptions() {
                 const discountType = $('#discountTypeSelect').val() || 'item_wise';
@@ -408,7 +410,7 @@
                     $('.col-discount').addClass('d-none').hide();
                     $('#summaryDiscountRow').addClass('d-none').hide();
                     $('#discountInput').val('0.00');
-                    $('#calcDiscountDisplay').val('-₹0.00');
+                    $('#calcDiscountDisplay').val('-' + currencySymbol + '0.00');
                 }
 
                 if (taxType === 'item_wise_tax') {
@@ -431,9 +433,7 @@
                 calculateTotals();
             }
 
-            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #orderTaxInput').on('change input', function() {
-                toggleTaxAndDiscountOptions();
-            });
+            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect').on('change', toggleTaxAndDiscountOptions);
 
             // Input listeners for calculations
             $(document).on('input change', '.qty-input, .price-input, .tax-input, .line-discount-input, #discountInput, #orderTaxInput, #freightTermsSelect, #freightAmountInput, #adjustmentInput', function() {
@@ -481,22 +481,24 @@
                 toggleTaxAndDiscountOptions();
             }
 
+            // Live calculations calculation logic
             function calculateTotals() {
-                let subtotal = 0;
-                let totalItemDiscount = 0;
-                let taxTotal = 0;
                 const discountType = $('#discountTypeSelect').val() || 'item_wise';
                 const taxType = $('#taxTypeSelect').val() || 'item_wise_tax';
 
+                let subtotal = 0;
+                let totalItemDiscount = 0;
+                let taxTotal = 0;
+
                 $('.item-row').each(function() {
-                    const qty = parseInt($(this).find('.qty-input').val()) || 0;
+                    const qty = parseFloat($(this).find('.qty-input').val()) || 0;
                     const price = parseFloat($(this).find('.price-input').val()) || 0;
                     const lineDiscount = (discountType === 'item_wise') ? (parseFloat($(this).find('.line-discount-input').val()) || 0) : 0;
                     const taxRate = (taxType === 'item_wise_tax') ? (parseFloat($(this).find('.tax-input').val()) || 0) : 0;
 
                     const untaxedAmount = qty * price;
                     const lineTaxable = Math.max(0, untaxedAmount - lineDiscount);
-                    const lineTax = (taxType === 'item_wise_tax') ? (lineTaxable * (taxRate / 100)) : 0;
+                    const lineTax = lineTaxable * (taxRate / 100);
                     const lineTotalInclTax = lineTaxable + lineTax;
 
                     subtotal += untaxedAmount;
@@ -506,17 +508,17 @@
                         taxTotal += lineTax;
                     }
 
-                    $(this).find('.amount-display').text('₹' + lineTotalInclTax.toFixed(2));
+                    $(this).find('.amount-display').text(currencySymbol + lineTotalInclTax.toFixed(2));
                 });
 
                 let discountVal = 0;
                 if (discountType === 'item_wise') {
                     discountVal = totalItemDiscount;
                     $('#discountInput').val(discountVal.toFixed(2));
-                    $('#calcDiscountDisplay').val('-₹' + discountVal.toFixed(2));
+                    $('#calcDiscountDisplay').val('-' + currencySymbol + discountVal.toFixed(2));
                 } else if (discountType === 'order_wise') {
                     discountVal = parseFloat($('#discountInput').val()) || 0;
-                    $('#calcDiscountDisplay').val('-₹' + discountVal.toFixed(2));
+                    $('#calcDiscountDisplay').val('-' + currencySymbol + discountVal.toFixed(2));
                 }
 
                 if (taxType === 'order_wise_tax') {
@@ -539,10 +541,10 @@
                 const itemsTotalInclGst = taxableAmount + itemsTaxTotal;
                 const grandTotal = itemsTotalInclGst + effectiveFreight + adjustment;
 
-                $('#calcSubtotal').val('₹' + subtotal.toFixed(2));
-                $('#calcTaxableAmount').val('₹' + taxableAmount.toFixed(2));
-                $('#calcTaxAmount').val('+₹' + itemsTaxTotal.toFixed(2));
-                $('#calcItemsTotalInclGst').val('₹' + itemsTotalInclGst.toFixed(2));
+                $('#calcSubtotal').val(currencySymbol + subtotal.toFixed(2));
+                $('#calcTaxableAmount').val(currencySymbol + taxableAmount.toFixed(2));
+                $('#calcTaxAmount').val('+' + currencySymbol + itemsTaxTotal.toFixed(2));
+                $('#calcItemsTotalInclGst').val(currencySymbol + itemsTotalInclGst.toFixed(2));
 
                 const gstType = $('#gstTypeSelect').val() || 'cgst_sgst';
                 if (taxType !== 'without_tax' && itemsTaxTotal > 0) {
@@ -550,19 +552,19 @@
                         $('#cgstSgstRows').removeClass('d-none').show();
                         $('#igstRow').addClass('d-none').hide();
                         const halfTax = itemsTaxTotal / 2;
-                        $('#calcCgst').val('₹' + halfTax.toFixed(2));
-                        $('#calcSgst').val('₹' + halfTax.toFixed(2));
+                        $('#calcCgst').val(currencySymbol + halfTax.toFixed(2));
+                        $('#calcSgst').val(currencySymbol + halfTax.toFixed(2));
                     } else { // igst
                         $('#cgstSgstRows').addClass('d-none').hide();
                         $('#igstRow').removeClass('d-none').show();
-                        $('#calcIgst').val('₹' + itemsTaxTotal.toFixed(2));
+                        $('#calcIgst').val(currencySymbol + itemsTaxTotal.toFixed(2));
                     }
                 } else {
                     $('#cgstSgstRows').addClass('d-none').hide();
                     $('#igstRow').addClass('d-none').hide();
                 }
 
-                $('#calcTotal').val('₹' + Math.max(0, grandTotal).toFixed(2));
+                $('#calcTotal').val(currencySymbol + Math.max(0, grandTotal).toFixed(2));
             }
 
             $('#freightTermsSelect, #freightAmountInput, #discountInput, #adjustmentInput').on('input change', calculateTotals);

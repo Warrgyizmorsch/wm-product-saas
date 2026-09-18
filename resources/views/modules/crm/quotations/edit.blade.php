@@ -119,9 +119,9 @@
                                     <tr>
                                         <th style="width: 45%;">{{ __('crm.product_description') }}</th>
                                         <th class="text-end" style="width: 12%;">{{ __('crm.quantity') }}</th>
-                                        <th class="text-end" style="width: 15%;">{{ __('crm.unit_price') }} (₹)</th>
+                                        <th class="text-end" style="width: 15%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
                                         <th class="text-end" style="width: 12%;">{{ __('crm.taxes') }} (%)</th>
-                                        <th class="text-end pe-3" style="width: 16%;">{{ __('crm.amount') }}</th>
+                                        <th class="text-end pe-3" style="width: 16%;">{{ __('crm.amount') }} ({{ active_currency_symbol() }})</th>
                                         <th class="text-center" style="width: 5%;"></th>
                                     </tr>
                                 </thead>
@@ -148,7 +148,7 @@
                                                 <input type="number" name="items[{{ $idx }}][tax_rate]" class="odoo-table-input item-tax text-end" value="{{ $item->tax_rate ?: 18 }}" step="0.01" min="0">
                                             </td>
                                             <td class="text-end fw-bold item-amount pe-3" style="padding-top: 8px;">
-                                                ₹{{ number_format(($item->quantity * $item->unit_price) * (1 + (($item->tax_rate ?: 18) / 100)), 2) }}
+                                                {{ format_currency(($item->quantity * $item->unit_price) * (1 + (($item->tax_rate ?: 18) / 100))) }}
                                             </td>
                                             <td class="text-center" style="padding-top: 8px;">
                                                 <button type="button" class="btn btn-link text-danger p-0 remove-row" title="Remove"><i class="feather-trash-2 fs-14"></i></button>
@@ -160,7 +160,7 @@
                         </div>
                         <div class="mt-2.5">
                             <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 11px; padding: 3px 10px; text-transform: none !important;">
-                                <i class="feather-plus me-1"></i>Add a product
+                                <i class="feather-plus me-1"></i>{{ __('crm.add_line') ?? 'Add a product' }}
                             </button>
                         </div>
                     </div>
@@ -177,12 +177,12 @@
                             <div class="pe-md-2">
                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                                     <span class="text-muted fw-semibold fs-13">{{ __('crm.untaxed_amount') }}:</span>
-                                    <span class="fw-bold text-dark fs-14" id="calcSubtotal">₹{{ number_format($quotation->subtotal, 2) }}</span>
+                                    <span class="fw-bold text-dark fs-14" id="calcSubtotal">{{ format_currency($quotation->subtotal) }}</span>
                                 </div>
 
                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                                     <span class="text-muted fw-semibold fs-13">{{ __('crm.taxes') }}:</span>
-                                    <span class="fw-bold text-dark fs-14" id="calcTax">₹{{ number_format($quotation->tax, 2) }}</span>
+                                    <span class="fw-bold text-dark fs-14" id="calcTax">{{ format_currency($quotation->tax) }}</span>
                                 </div>
 
                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -192,7 +192,7 @@
 
                                 <div class="d-flex justify-content-between align-items-center py-3 border-top border-2 mt-3" style="border-top: 2px solid var(--bs-primary) !important;">
                                     <span class="text-dark fw-bold fs-15 text-uppercase">{{ __('crm.total_colon') }}</span>
-                                    <span class="fw-extrabold text-primary fs-20" id="calcTotal">₹{{ number_format($quotation->total_amount, 2) }}</span>
+                                    <span class="fw-extrabold text-primary fs-20" id="calcTotal">{{ format_currency($quotation->total_amount) }}</span>
                                 </div>
                             </div>
                         </div>
@@ -251,7 +251,7 @@
                             <input type="number" name="items[${itemIndex}][tax_rate]" class="odoo-table-input item-tax text-end" value="${taxRate}" step="0.01" min="0">
                         </td>
                         <td class="text-end fw-bold item-amount pe-3" style="padding-top: 8px;">
-                            ₹0.00
+                            {{ active_currency_symbol() }}0.00
                         </td>
                         <td class="text-center" style="padding-top: 8px;">
                             <button type="button" class="btn btn-link text-danger p-0 remove-row" title="Remove"><i class="feather-trash-2 fs-14"></i></button>
@@ -288,6 +288,8 @@
                 calculateTotals();
             });
 
+            const currencySymbol = "{{ active_currency_symbol() }}";
+
             function calculateTotals() {
                 var subtotal = 0;
                 var totalTax = 0;
@@ -303,15 +305,15 @@
                     subtotal += lineTotal;
                     totalTax += lineTax;
 
-                    $(this).find('.item-amount').text('₹' + (lineTotal + lineTax).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                    $(this).find('.item-amount').text(currencySymbol + (lineTotal + lineTax).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
                 });
 
                 var discount = parseFloat($('#discountInput').val()) || 0;
                 var grandTotal = Math.max(0, subtotal + totalTax - discount);
 
-                $('#calcSubtotal').text('₹' + subtotal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                $('#calcTax').text('₹' + totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                $('#calcTotal').text('₹' + grandTotal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $('#calcSubtotal').text(currencySymbol + subtotal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $('#calcTax').text(currencySymbol + totalTax.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $('#calcTotal').text(currencySymbol + grandTotal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
             }
 
             calculateTotals();

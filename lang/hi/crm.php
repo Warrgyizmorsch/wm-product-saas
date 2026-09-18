@@ -1833,6 +1833,15 @@ return array (
   'direct_phone_number' => 'सीधा फोन नंबर',
   'direct_email_address' => 'सीधा ईमेल पता',
   'validation_errors' => 'सत्यापन त्रुटियाँ:',
+  'amount' => 'राशि',
+  'record_customer_payment' => 'ग्राहक भुगतान दर्ज करें',
+  'payment_method' => 'भुगतान विधि',
+  'payment_number' => 'भुगतान संख्या',
+  'payment_date' => 'भुगतान तिथि',
+  'payments' => 'भुगतान',
+  'record' => 'दर्ज करें',
+  'quick_add_transporter' => 'त्वरित ट्रांसपोर्टर मास्टर जोड़ें',
+  'taxation_contact_details' => '2. कराधान और संपर्क विवरण',
 );
 
 

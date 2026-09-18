@@ -1835,6 +1835,15 @@ return array (
   'direct_phone_number' => 'Директен телефон',
   'direct_email_address' => 'Директен имейл',
   'validation_errors' => 'Грешки при валидация:',
+  'amount' => 'Сума',
+  'record_customer_payment' => 'Записване на плащане от клиент',
+  'payment_method' => 'Начин на плащане',
+  'payment_number' => 'Номер на плащане',
+  'payment_date' => 'Дата на плащане',
+  'payments' => 'Плащания',
+  'record' => 'Записване',
+  'quick_add_transporter' => 'Бързо добавяне на превозвач',
+  'taxation_contact_details' => '2. Данъчни и данни за контакт',
 );
 
 

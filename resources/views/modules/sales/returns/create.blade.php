@@ -378,9 +378,10 @@
                 }
 
                 // Populate Invoices belonging to this Sales Order
+                const currencySymbol = "{{ active_currency_symbol() }}";
                 const matchingInvoices = invoicesList.filter(inv => inv.sales_order_id == soId);
                 matchingInvoices.forEach(inv => {
-                    $invoiceSel.append(`<option value="${inv.id}">${inv.invoice_number} (Date: ${inv.invoice_date} - Total: ₹${inv.total_amount.toFixed(2)} - Tax: ${inv.gst_type})</option>`);
+                    $invoiceSel.append(`<option value="${inv.id}">${inv.invoice_number} ({{ __('crm.date') }}: ${inv.invoice_date} - {{ __('crm.total') }}: ${currencySymbol}${inv.total_amount.toFixed(2)} - {{ __('crm.taxes') }}: ${inv.gst_type})</option>`);
                 });
 
                 if (matchingInvoices.length > 0) {

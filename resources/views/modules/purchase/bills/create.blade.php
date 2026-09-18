@@ -210,21 +210,21 @@
                                         <th class="ps-3 py-2" style="width: 4%;">#</th>
                                         <th class="py-2" style="width: 26%;">{{ __('purchase.product') }}</th>
                                         <th class="text-center py-2" style="width: 10%;">{{ __('purchase.accepted_qty') }}</th>
-                                        <th class="text-end py-2" style="width: 12%;">{{ __('purchase.unit_rate') }} (₹)</th>
-                                        <th class="text-end py-2" style="width: 12%;">Amount (₹)</th>
+                                        <th class="text-end py-2" style="width: 12%;">{{ __('purchase.unit_rate') }} ({{ active_currency_symbol() }})</th>
+                                        <th class="text-end py-2" style="width: 12%;">Amount ({{ active_currency_symbol() }})</th>
                                         
                                         <!-- Item Level Discount Columns -->
                                         <th class="text-center py-2 discount-column" style="width: 9%;">Disc (%)</th>
-                                        <th class="text-end py-2 discount-column" style="width: 11%;">Disc Amt (₹)</th>
+                                        <th class="text-end py-2 discount-column" style="width: 11%;">Disc Amt ({{ active_currency_symbol() }})</th>
 
                                         <!-- Freight Share Column (Shown on Pro-Rata Method) -->
-                                        <th class="text-end py-2 freight-column text-primary" style="width: 12%;">Freight Share (₹)</th>
+                                        <th class="text-end py-2 freight-column text-primary" style="width: 12%;">Freight Share ({{ active_currency_symbol() }})</th>
 
                                         <!-- Item Level Tax Columns -->
                                         <th class="text-center py-2 tax-column" style="width: 9%;">Tax Rate (%)</th>
-                                        <th class="text-end py-2 tax-column" style="width: 11%;">Tax Amt (₹)</th>
+                                        <th class="text-end py-2 tax-column" style="width: 11%;">Tax Amt ({{ active_currency_symbol() }})</th>
 
-                                        <th class="text-end pe-3 py-2" style="width: 14%;">{{ __('purchase.line_total') }} (₹)</th>
+                                        <th class="text-end pe-3 py-2" style="width: 14%;">{{ __('purchase.line_total') }} ({{ active_currency_symbol() }})</th>
                                     </tr>
                                 </thead>
                                 <tbody>

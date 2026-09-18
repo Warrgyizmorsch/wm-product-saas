@@ -88,11 +88,6 @@
                             <h5 class="fw-bold text-dark mb-0 me-3"><i class="feather-plus-circle text-primary me-2"></i>{{ __('purchase.new_goods_receipt') }}</h5>
                             <span class="badge bg-soft-primary text-primary px-2.5 py-1 fw-bold fs-11 font-monospace">{{ $grnNumber }}</span>
                         </div>
-                        <div>
-                            <x-ui.button type="submit" variant="primary" icon="feather-save" class="fw-bold px-4 py-2">
-                                {{ __('purchase.save_grn') }}
-                            </x-ui.button>
-                        </div>
                     </div>
 
                     <div class="p-4 p-md-5">
@@ -164,9 +159,9 @@
                                 </div>
 
                                 <div class="mb-2">
-                                    <x-ui.odoo-form-ui type="select" label="Transporter Name" name="transporter_id" id="transporter_id" :error-text="$errors->first('transporter_id')">
-                                        <option value="">-- Choose Transporter --</option>
-                                        <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Transporter</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('purchase.transporter_name') }}" name="transporter_id" id="transporter_id" :error-text="$errors->first('transporter_id')">
+                                        <option value="">{{ __('purchase.choose_transporter') }}</option>
+                                        <option value="__ADD_NEW__" class="fw-bold text-primary">{{ __('purchase.add_new_transporter') }}</option>
                                         @foreach($transporters as $transporter)
                                             <option value="{{ $transporter->id }}" {{ old('transporter_id') == $transporter->id ? 'selected' : '' }}>
                                                 {{ $transporter->name }} @if($transporter->transporter_id) ({{ $transporter->transporter_id }}) @endif
@@ -197,13 +192,13 @@
                                 <div class="d-flex align-items-center gap-3">
                                     <h6 class="fw-bold text-primary mb-0"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.received_products_matrix') }}</h6>
                                     <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" id="btnAddItemRow">
-                                        <i class="feather-plus me-1"></i>+ Add Item
+                                        <i class="feather-plus me-1"></i>{{ __('purchase.add_item') }}
                                     </button>
                                 </div>
                                 <div class="d-flex align-items-center gap-2" style="width: 380px;">
                                     <div class="input-group input-group-sm shadow-2xs rounded overflow-hidden" style="border: 1px solid #cbd5e1 !important;">
-                                        <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
-                                        <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
+                                        <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> {{ __('purchase.barcode') }}</span>
+                                        <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="{{ __('purchase.scan_barcode_placeholder') }}" autocomplete="off" style="font-size: 13px;">
                                         <button type="button" class="btn btn-primary border-0 px-3" id="fastBarcodeScanBtn"><i class="feather-search"></i></button>
                                     </div>
                                 </div>
@@ -221,8 +216,8 @@
                                             <th style="width: 10%;" class="text-center">{{ __('purchase.receive_qty') }} <span class="text-danger">*</span></th>
                                             <th style="width: 9%;" class="text-center">{{ __('purchase.reject_qty') }}</th>
                                             <th style="width: 9%;" class="text-center">{{ __('purchase.accepted') }}</th>
-                                            <th style="width: 10%;" class="text-end">{{ __('purchase.unit_rate') }} ({{ $currency }})</th>
-                                            <th style="width: 11%;" class="text-end">{{ __('purchase.total_amount') }} ({{ $currency }})</th>
+                                            <th style="width: 10%;" class="text-end">{{ __('purchase.unit_rate') }} ({{ active_currency_symbol() }})</th>
+                                            <th style="width: 11%;" class="text-end">{{ __('purchase.total_amount') }} ({{ active_currency_symbol() }})</th>
                                             <th style="width: 4%;" class="text-center remove-col"></th>
                                         </tr>
                                     </thead>
@@ -247,6 +242,16 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                         </div>
+
+                        <!-- Bottom Action Buttons -->
+                        <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                            <x-ui.button href="{{ route('grns.index') }}" variant="light" class="border px-4 py-2 fs-13">
+                                {{ __('purchase.cancel') }}
+                            </x-ui.button>
+                            <x-ui.button type="submit" variant="primary" icon="feather-save" class="px-4 py-2 fs-13 fw-bold shadow-sm">
+                                {{ __('purchase.save_grn') }}
+                            </x-ui.button>
+                        </div>
                     </div>
                 </x-ui.odoo-form-ui>
             </form>
@@ -254,29 +259,29 @@
     </div>
 
     <!-- Quick Transporter Add Modal Component -->
-    <x-ui.modal id="quickTransporterModal" title="<i class='feather-truck text-primary me-2'></i>Quick Add Transporter Master" size="lg" :centered="true" :showFooter="false">
+    <x-ui.modal id="quickTransporterModal" title="<i class='feather-truck text-primary me-2'></i>{{ __('purchase.quick_add_transporter') }}" size="lg" :centered="true" :showFooter="false">
         <form id="quickTransporterForm">
             @csrf
             <div class="p-1">
                 <!-- Section 1: Basic Logistics Info -->
-                <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-1.5"></i>1. Basic Transporter Information</h6>
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-1.5"></i>{{ __('purchase.basic_transporter_info') }}</h6>
                 <div class="row g-3 mb-3">
                     <div class="col-md-7">
-                        <x-ui.odoo-form-ui type="input" label="Transporter Name" name="name" placeholder="e.g. V-Trans, TCI Logistics, GATI KWE" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.transporter_name')" name="name" :placeholder="__('purchase.transporter_placeholder')" :required="true" />
                     </div>
                     <div class="col-md-5">
-                        <x-ui.odoo-form-ui type="input" label="Transporter Code" name="code" value="{{ $autoCode }}" placeholder="e.g. TRP-0005" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.transporter_code')" name="code" value="{{ $autoCode }}" placeholder="e.g. TRP-0005" />
                     </div>
                     <div class="col-md-7">
-                        <x-ui.odoo-form-ui type="input" label="15-Digit E-Way Transporter ID" name="transporter_id" placeholder="e.g. 27AAACM1234F1Z1" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.eway_transporter_id')" name="transporter_id" placeholder="e.g. 27AAACM1234F1Z1" />
                     </div>
                     <div class="col-md-5">
-                        <x-ui.odoo-form-ui type="select" label="Transport Mode" name="transport_mode" :searchable="false">
-                            <option value="road">Road Transport</option>
-                            <option value="rail">Rail Logistics</option>
-                            <option value="air">Air Freight</option>
-                            <option value="sea">Sea Cargo</option>
-                            <option value="multimodal">Multimodal</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('purchase.transport_mode')" name="transport_mode" :searchable="false">
+                            <option value="road">{{ __('purchase.road_transport') }}</option>
+                            <option value="rail">{{ __('purchase.rail_logistics') }}</option>
+                            <option value="air">{{ __('purchase.air_freight') }}</option>
+                            <option value="sea">{{ __('purchase.sea_cargo') }}</option>
+                            <option value="multimodal">{{ __('purchase.multimodal') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
                 </div>
@@ -284,33 +289,33 @@
                 <hr class="my-3 text-muted opacity-25">
 
                 <!-- Section 2: Taxation & Contact Info -->
-                <h6 class="fw-bold text-primary mb-3"><i class="feather-shield me-1.5"></i>2. Taxation & Contact Details</h6>
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-shield me-1.5"></i>{{ __('purchase.taxation_contact_details') }}</h6>
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="GSTIN Number" name="gstin" placeholder="e.g. 27AAAAA0000A1Z5" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.gstin_number')" name="gstin" placeholder="e.g. 27AAAAA0000A1Z5" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="PAN Number" name="pan_number" placeholder="e.g. ABCDE1234F" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.pan_number')" name="pan_number" placeholder="e.g. ABCDE1234F" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="Phone / Mobile" name="phone" placeholder="Contact number" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.phone_mobile')" name="phone" :placeholder="__('purchase.phone_mobile')" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" inputType="email" label="Email Address" name="email" placeholder="dispatch@transporter.com" />
+                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('purchase.email_address')" name="email" placeholder="dispatch@transporter.com" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="City" name="city" placeholder="City" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.city')" name="city" :placeholder="__('purchase.city')" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="State" name="state" placeholder="State" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.state')" name="state" :placeholder="__('purchase.state')" />
                     </div>
                 </div>
 
                 <!-- Footer Action Buttons -->
                 <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top mt-3">
-                    <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">{{ __('purchase.cancel') }}</button>
                     <button type="submit" class="btn btn-primary fw-bold px-4" id="saveQuickTransporterBtn">
-                        <i class="feather-save me-1.5"></i>Save Transporter
+                        <i class="feather-save me-1.5"></i>{{ __('purchase.save_transporter') }}
                     </button>
                 </div>
             </div>
@@ -651,7 +656,7 @@
                                     
                                     <div class="${trackingSectionHtml ? 'col-md-5' : 'col-md-12'}">
                                         <label class="form-label fs-11 fw-bold text-uppercase text-muted mb-1.5">
-                                            <i class="feather-message-square me-1"></i>Rejection Reason / Remarks
+                                            <i class="feather-message-square me-1"></i>{{ __('purchase.rejection_reason_remarks') }}
                                         </label>
                                         <textarea class="form-control form-control-sm fs-12 text-dark" 
                                                   name="items[${idx}][remarks]" 
@@ -683,7 +688,7 @@
             var idx = 'm_' + (manualRowCounter++);
             var poSelected = !!$('#po_selector').val();
 
-            var prodOptions = '<option value="">-- Select Product --</option>';
+            var prodOptions = '<option value="">{{ __('purchase.select_product') }}</option>';
             availableProducts.forEach(function(p) {
                 var sel = (preselectProdId && preselectProdId == p.id) ? 'selected' : '';
                 prodOptions += `<option value="${p.id}" ${sel} data-code="${p.code}" data-hsn="${p.hsn_sac || ''}" data-uom="${p.uom_name}" data-rate="${p.cost_price}" data-serial="${p.track_serial_number ? 1 : 0}" data-batch="${p.track_batch ? 1 : 0}">${p.name} (${p.code || 'N/A'})</option>`;
@@ -711,24 +716,24 @@
                     <td class="text-center font-monospace text-muted po-col" style="${poSelected ? '' : 'display:none;'}">—</td>
                     <td>
                         <input type="number" step="0.0001" min="0.0001" 
-                               class="odoo-table-input text-center font-monospace fw-bold input-receive" 
-                               name="items[${idx}][received_qty]" 
-                               value="1.00" required>
+                                class="odoo-table-input text-center font-monospace fw-bold input-receive" 
+                                name="items[${idx}][received_qty]" 
+                                value="1.00" required>
                     </td>
                     <td>
                         <input type="number" step="0.0001" min="0" 
-                               class="odoo-table-input text-center font-monospace input-reject text-danger" 
-                               name="items[${idx}][rejected_qty]" 
-                               value="0.00">
+                                class="odoo-table-input text-center font-monospace input-reject text-danger" 
+                                name="items[${idx}][rejected_qty]" 
+                                value="0.00">
                     </td>
                     <td class="text-center font-monospace fw-bold text-success cell-accepted">
                         1.00
                     </td>
                     <td>
                         <input type="number" step="0.01" min="0" 
-                               class="odoo-table-input text-end font-monospace input-unit-rate" 
-                               name="items[${idx}][unit_rate]" 
-                               value="0.00">
+                                class="odoo-table-input text-end font-monospace input-unit-rate" 
+                                name="items[${idx}][unit_rate]" 
+                                value="0.00">
                     </td>
                     <td class="text-end font-monospace fw-bold text-dark cell-total">
                         0.00
@@ -747,7 +752,7 @@
                                 <div class="col-md-12 tracking-section-container" id="tracking_container_${idx}"></div>
                                 <div class="col-md-12">
                                     <label class="form-label fs-11 fw-bold text-uppercase text-muted mb-1.5">
-                                        <i class="feather-message-square me-1"></i>Rejection Reason / Remarks
+                                        <i class="feather-message-square me-1"></i>{{ __('purchase.rejection_reason_remarks') }}
                                     </label>
                                     <textarea class="form-control form-control-sm fs-12 text-dark" 
                                               name="items[${idx}][remarks]" 

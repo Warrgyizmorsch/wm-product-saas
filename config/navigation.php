@@ -29,11 +29,11 @@ return [
 
     'sections' => [
         'workspace' => ['label' => 'ui.workspace', 'default' => 'Workspace'],
-        'revenue_cycle' => ['label' => 'Revenue Cycle'],
+        'revenue_cycle' => ['label' => 'ui.revenue_cycle', 'default' => 'Revenue Cycle'],
         'supply_chain' => ['label' => 'ui.supply_chain', 'default' => 'Supply Chain'],
         'production' => ['label' => 'ui.production', 'default' => 'Production'],
-        'hrms' => ['label' => 'HRMS'],
-        'finance' => ['label' => 'Finance & People'],
+        'hrms' => ['label' => 'ui.hrms', 'default' => 'HRMS'],
+        'finance' => ['label' => 'ui.finance_people', 'default' => 'Finance & People'],
         'platform_admin' => ['label' => 'ui.platform_admin', 'default' => 'Platform Admin'],
     ],
 

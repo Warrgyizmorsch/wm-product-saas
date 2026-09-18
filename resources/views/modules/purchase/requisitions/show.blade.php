@@ -203,15 +203,15 @@
                                     </td>
                                     <td>{{ $item->warehouse->name ?? '—' }}</td>
                                     <td class="text-end fw-semibold">{{ (float)$item->quantity }}</td>
-                                    <td class="text-end">₹{{ number_format($item->estimated_cost, 2) }}</td>
-                                    <td class="text-end fw-bold">₹{{ number_format($lineTotal, 2) }}</td>
+                                    <td class="text-end">{{ format_currency($item->estimated_cost) }}</td>
+                                    <td class="text-end fw-bold">{{ format_currency($lineTotal) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                         <tfoot class="bg-soft-light fw-bold text-dark">
                             <tr>
                                 <td colspan="4" class="text-end text-uppercase fs-11 letter-spacing-1 text-muted">{{ __('purchase.estimated_requisition_total') }}</td>
-                                <td class="text-end fs-15 text-primary">₹{{ number_format($grandTotal, 2) }}</td>
+                                <td class="text-end fs-15 text-primary">{{ format_currency($grandTotal) }}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -226,7 +226,7 @@
             <div class="modal-content border-0 shadow-lg rounded-3">
                 <div class="modal-header bg-soft-warning border-bottom py-3">
                     <h6 class="modal-title fw-bold text-dark fs-14">
-                        <i class="feather-bell text-warning me-1.5 fs-15"></i> Send Quick Approval Reminder
+                        <i class="feather-bell text-warning me-1.5 fs-15"></i> {{ __('purchase.send_quick_approval_reminder') }}
                     </h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -235,17 +235,17 @@
                     <div class="modal-body p-4">
                         <div class="alert alert-warning border border-warning-subtle py-2 px-3 fs-12 mb-3">
                             <i class="feather-info me-1"></i>
-                            Sending an in-app reminder for document <strong id="remindDocNumberText" class="text-dark"></strong>.
+                            {{ __('purchase.sending_reminder_for_doc') }} <strong id="remindDocNumberText" class="text-dark"></strong>.
                         </div>
                         <div class="mb-3 text-start">
-                            <label class="form-label fw-bold text-dark fs-12 mb-1">Optional Note / Message for Approver</label>
-                            <textarea name="note" class="form-control form-control-sm shadow-2xs" rows="3" placeholder="e.g. Urgent stock required for client delivery..."></textarea>
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('purchase.optional_note_for_approver') }}</label>
+                            <textarea name="note" class="form-control form-control-sm shadow-2xs" rows="3" placeholder="{{ __('purchase.reminder_note_placeholder') }}"></textarea>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 px-3 border-top">
-                        <button type="button" class="btn btn-sm btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-sm btn-light border fw-semibold" data-bs-dismiss="modal">{{ __('ui.cancel') ?? 'Cancel' }}</button>
                         <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 shadow-2xs text-white" style="background-color: #f59e0b; border-color: #d97706;">
-                            <i class="feather-send me-1"></i> Send Reminder
+                            <i class="feather-send me-1"></i> {{ __('purchase.send_reminder') }}
                         </button>
                     </div>
                 </form>
@@ -257,7 +257,7 @@
     <div class="offcanvas offcanvas-end border-0 shadow-lg" tabindex="-1" id="reminderHistoryOffcanvas" style="width: 420px; z-index: 1060;">
         <div class="offcanvas-header bg-soft-warning border-bottom py-3">
             <h6 class="offcanvas-title fw-bold text-dark fs-14">
-                <i class="feather-bell text-warning me-1.5 fs-15"></i> Approval Reminders Log — <span id="reminderOffcanvasDocNumber" class="text-primary font-monospace"></span>
+                <i class="feather-bell text-warning me-1.5 fs-15"></i> {{ __('purchase.approval_reminders_log') }} — <span id="reminderOffcanvasDocNumber" class="text-primary font-monospace"></span>
             </h6>
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
@@ -267,7 +267,7 @@
             </div>
         </div>
         <div class="offcanvas-footer bg-light p-3 border-top text-end">
-            <button type="button" class="btn btn-sm btn-secondary fw-semibold px-4" data-bs-dismiss="offcanvas">Close</button>
+            <button type="button" class="btn btn-sm btn-secondary fw-semibold px-4" data-bs-dismiss="offcanvas">{{ __('purchase.close') }}</button>
         </div>
     </div>
 
@@ -286,7 +286,7 @@
             container.innerHTML = '';
 
             if (!reminders || reminders.length === 0) {
-                container.innerHTML = '<div class="text-muted fs-12 text-center py-4"><i class="feather-info me-1"></i>No reminder messages recorded.</div>';
+                container.innerHTML = '<div class="text-muted fs-12 text-center py-4"><i class="feather-info me-1"></i>{{ __('purchase.no_reminder_messages') }}</div>';
             } else {
                 reminders.forEach((r, idx) => {
                     const item = document.createElement('div');
@@ -296,7 +296,7 @@
                             <span class="fw-bold text-dark fs-12"><i class="feather-user text-primary me-1"></i>${r.user}</span>
                             <span class="badge bg-soft-secondary text-muted font-monospace fs-10">${r.time}</span>
                         </div>
-                        ${r.note ? `<div class="text-dark fst-italic fs-12 bg-light p-2 rounded border border-warning-subtle mt-1.5"><i class="feather-message-square me-1 text-warning"></i>"${r.note}"</div>` : '<div class="text-muted fs-11 fst-italic mt-1">(No note provided)</div>'}
+                        ${r.note ? `<div class="text-dark fst-italic fs-12 bg-light p-2 rounded border border-warning-subtle mt-1.5"><i class="feather-message-square me-1 text-warning"></i>"${r.note}"</div>` : '<div class="text-muted fs-11 fst-italic mt-1">{{ __('purchase.no_note_provided') }}</div>'}
                     `;
                     container.appendChild(item);
                 });

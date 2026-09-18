@@ -29,11 +29,6 @@
                             <h5 class="fw-bold text-dark mb-0 me-3"><i class="feather-edit text-warning me-2"></i>{{ __('purchase.edit_draft') }} {{ __('purchase.grn') }}</h5>
                             <span class="badge bg-soft-warning text-warning px-2.5 py-1 fw-bold fs-11 font-monospace">{{ $grn->grn_number }}</span>
                         </div>
-                        <div>
-                            <button type="submit" class="btn btn-primary text-white fw-bold px-4 py-2">
-                                <i class="feather-save me-1.5"></i>{{ __('purchase.update_draft') }}
-                            </button>
-                        </div>
                     </div>
 
                     <div class="card-body p-4 p-md-5">
@@ -60,9 +55,9 @@
                                 </div>
 
                                 <div class="mb-2">
-                                    <x-ui.odoo-form-ui type="select" label="Transporter Name" name="transporter_id" id="transporter_id" :error-text="$errors->first('transporter_id')">
-                                        <option value="">-- Choose Transporter --</option>
-                                        <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Transporter</option>
+                                    <x-ui.odoo-form-ui type="select" :label="__('purchase.transporter_name')" name="transporter_id" id="transporter_id" :error-text="$errors->first('transporter_id')">
+                                        <option value="">{{ __('purchase.choose_transporter') }}</option>
+                                        <option value="__ADD_NEW__" class="fw-bold text-primary">{{ __('purchase.add_new_transporter') }}</option>
                                         @foreach($transporters as $transporter)
                                             <option value="{{ $transporter->id }}" @selected(old('transporter_id', $grn->transporter_id) == $transporter->id)>
                                                 {{ $transporter->name }} @if($transporter->transporter_id) ({{ $transporter->transporter_id }}) @endif
@@ -103,8 +98,8 @@
                                             <th style="width: 11%;" class="text-center">{{ __('purchase.receive_qty') }} <span class="text-danger">*</span></th>
                                             <th style="width: 10%;" class="text-center">{{ __('purchase.reject_qty') }}</th>
                                             <th style="width: 10%;" class="text-center">{{ __('purchase.accepted') }}</th>
-                                            <th style="width: 10%;" class="text-end">{{ __('purchase.unit_rate') }}</th>
-                                            <th style="width: 12%;" class="text-end">{{ __('purchase.total_amount') }}</th>
+                                            <th style="width: 10%;" class="text-end">{{ __('purchase.unit_rate') }} ({{ active_currency_symbol() }})</th>
+                                            <th style="width: 12%;" class="text-end">{{ __('purchase.total_amount') }} ({{ active_currency_symbol() }})</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -154,34 +149,46 @@
                                 </table>
                             </div>
                         </div>
+
+                        <!-- Bottom Action Buttons -->
+                        <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                            <x-ui.button href="{{ route('grns.show', $grn->id) }}" variant="light" class="border px-4 py-2 fs-13">
+                                {{ __('purchase.cancel') }}
+                            </x-ui.button>
+                            <x-ui.button type="submit" variant="primary" icon="feather-save" class="px-4 py-2 fs-13 fw-bold shadow-sm">
+                                {{ __('purchase.update_draft') }}
+                            </x-ui.button>
+                        </div>
                     </div>
                 </div>
             </form>
         </div>
+    </div>
+
     <!-- Quick Transporter Add Modal Component -->
-    <x-ui.modal id="quickTransporterModal" title="<i class='feather-truck text-primary me-2'></i>Quick Add Transporter Master" size="lg" :centered="true" :showFooter="false">
+    <x-ui.modal id="quickTransporterModal" title="<i class='feather-truck text-primary me-2'></i>{{ __('purchase.quick_add_transporter') }}" size="lg" :centered="true" :showFooter="false">
         <form id="quickTransporterForm">
             @csrf
             <div class="p-1">
                 <!-- Section 1: Basic Logistics Info -->
-                <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-1.5"></i>1. Basic Transporter Information</h6>
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-1.5"></i>{{ __('purchase.basic_transporter_info') }}</h6>
                 <div class="row g-3 mb-3">
                     <div class="col-md-7">
-                        <x-ui.odoo-form-ui type="input" label="Transporter Name" name="name" placeholder="e.g. V-Trans, TCI Logistics, GATI KWE" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.transporter_name')" name="name" :placeholder="__('purchase.transporter_placeholder')" :required="true" />
                     </div>
                     <div class="col-md-5">
-                        <x-ui.odoo-form-ui type="input" label="Transporter Code" name="code" value="{{ $autoCode }}" placeholder="e.g. TRP-0005" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.transporter_code')" name="code" value="{{ $autoCode }}" placeholder="e.g. TRP-0005" />
                     </div>
                     <div class="col-md-7">
-                        <x-ui.odoo-form-ui type="input" label="15-Digit E-Way Transporter ID" name="transporter_id" placeholder="e.g. 27AAACM1234F1Z1" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.eway_transporter_id')" name="transporter_id" placeholder="e.g. 27AAACM1234F1Z1" />
                     </div>
                     <div class="col-md-5">
-                        <x-ui.odoo-form-ui type="select" label="Transport Mode" name="transport_mode" :searchable="false">
-                            <option value="road">Road Transport</option>
-                            <option value="rail">Rail Logistics</option>
-                            <option value="air">Air Freight</option>
-                            <option value="sea">Sea Cargo</option>
-                            <option value="multimodal">Multimodal</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('purchase.transport_mode')" name="transport_mode" :searchable="false">
+                            <option value="road">{{ __('purchase.road_transport') }}</option>
+                            <option value="rail">{{ __('purchase.rail_logistics') }}</option>
+                            <option value="air">{{ __('purchase.air_freight') }}</option>
+                            <option value="sea">{{ __('purchase.sea_cargo') }}</option>
+                            <option value="multimodal">{{ __('purchase.multimodal') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
                 </div>
@@ -189,33 +196,33 @@
                 <hr class="my-3 text-muted opacity-25">
 
                 <!-- Section 2: Taxation & Contact Info -->
-                <h6 class="fw-bold text-primary mb-3"><i class="feather-shield me-1.5"></i>2. Taxation & Contact Details</h6>
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-shield me-1.5"></i>{{ __('purchase.taxation_contact_details') }}</h6>
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="GSTIN Number" name="gstin" placeholder="e.g. 27AAAAA0000A1Z5" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.gstin_number')" name="gstin" placeholder="e.g. 27AAAAA0000A1Z5" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="PAN Number" name="pan_number" placeholder="e.g. ABCDE1234F" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.pan_number')" name="pan_number" placeholder="e.g. ABCDE1234F" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="Phone / Mobile" name="phone" placeholder="Contact number" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.phone_mobile')" name="phone" :placeholder="__('purchase.phone_mobile')" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" inputType="email" label="Email Address" name="email" placeholder="dispatch@transporter.com" />
+                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('purchase.email_address')" name="email" placeholder="dispatch@transporter.com" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="City" name="city" placeholder="City" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.city')" name="city" :placeholder="__('purchase.city')" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="State" name="state" placeholder="State" />
+                        <x-ui.odoo-form-ui type="input" :label="__('purchase.state')" name="state" :placeholder="__('purchase.state')" />
                     </div>
                 </div>
 
                 <!-- Footer Action Buttons -->
                 <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top mt-3">
-                    <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">{{ __('purchase.cancel') }}</button>
                     <button type="submit" class="btn btn-primary fw-bold px-4" id="saveQuickTransporterBtn">
-                        <i class="feather-save me-1.5"></i>Save Transporter
+                        <i class="feather-save me-1.5"></i>{{ __('purchase.save_transporter') }}
                     </button>
                 </div>
             </div>

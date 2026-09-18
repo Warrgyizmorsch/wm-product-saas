@@ -23,6 +23,7 @@
             ['label' => __('ui.approvals_center'), 'icon' => 'feather-check-square', 'url' => '#', 'children' => ['Pending', 'Delegated', 'Escalations', 'Workflow Rules']],
         ],
         'Revenue Cycle' => [
+            ['label' => __('crm.dashboard_sidebar') ?: 'CRM Executive Dashboard', 'icon' => 'feather-grid', 'route' => 'crm.dashboard'],
             ['label' => __('ui.crm'), 'icon' => 'feather-users', 'url' => '#', 'children' => [
                 ['label' => __('crm.leads') ?: 'Leads', 'route' => 'crm.leads.index'],
                 ['label' => __('crm.deals_sidebar') ?: 'Deals (Pipeline)', 'route' => 'crm.deals.index'],
@@ -86,16 +87,17 @@
                 ['label' => 'Landed Cost Vouchers', 'route' => 'purchase.landed-costs.index'],
                 ['label' => __('purchase.vendor_bills'), 'route' => 'purchase.bills.index'],
                 ['label' => __('purchase.vendor_payments'), 'route' => 'purchase.payments.index'],
-                ['label' => 'Purchase Returns', 'route' => 'purchase.returns.index'],
+                ['label' => __('purchase.advance_payments'), 'route' => 'purchase.advances.index'],
+                ['label' => __('purchase.purchase_returns'), 'route' => 'purchase.returns.index'],
             ]],
-            ['label' => 'GRN (Goods Receipts)', 'icon' => 'feather-package', 'url' => '#', 'children' => [
+            ['label' => __('purchase.goods_receipts'), 'icon' => 'feather-package', 'url' => '#', 'children' => [
                 ['label' => __('purchase.pending_grns'), 'route' => 'grns.pending'],
                 ['label' => __('purchase.all_goods_receipts'), 'route' => 'grns.index'],
-                ['label' => 'New Goods Receipt', 'route' => 'grns.create'],
+                ['label' => __('purchase.new_goods_receipt'), 'route' => 'grns.create'],
             ]],
-            ['label' => 'Purchase Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
-                ['label' => 'PR Approvals', 'route' => 'purchase.pr-approvals.index'],
-                ['label' => 'PO Approvals', 'route' => 'purchase.po-approvals.index'],
+            ['label' => __('purchase.purchase_approvals'), 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
+                ['label' => __('purchase.pr_approvals'), 'route' => 'purchase.pr-approvals.index'],
+                ['label' => __('purchase.po_approvals'), 'route' => 'purchase.po-approvals.index'],
             ]],
         ],
         __('ui.production') => [
