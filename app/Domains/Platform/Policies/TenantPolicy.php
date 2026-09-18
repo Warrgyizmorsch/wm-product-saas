@@ -47,4 +47,25 @@ class TenantPolicy
             'tenant_id' => $tenant->id,
         ]);
     }
+
+    /**
+     * Self-service: a tenant's own user viewing/changing ITS OWN subscription
+     * plan. Distinct from platform.tenants.manage (which lets a platform
+     * admin browse/edit every tenant) — this is scoped to the single tenant
+     * passed in, which callers must always resolve as the current tenant(),
+     * never an arbitrary tenant id from the request.
+     */
+    public function viewSubscription(User $user, Tenant $tenant): bool
+    {
+        return $this->access->allows($user, 'tenant.subscription.manage', [
+            'tenant_id' => $tenant->id,
+        ]);
+    }
+
+    public function updateSubscription(User $user, Tenant $tenant): bool
+    {
+        return $this->access->allows($user, 'tenant.subscription.manage', [
+            'tenant_id' => $tenant->id,
+        ]);
+    }
 }

@@ -17,7 +17,10 @@ class BroadcastService
     public function createBroadcast(array $data): Broadcast
     {
         return DB::transaction(function () use ($data) {
-            $tenantId = $data['tenant_id'] ?? (tenant_id() ?? 1);
+            $tenantId = $data['tenant_id'] ?? tenant_id();
+            if (empty($tenantId)) {
+                throw new \RuntimeException('Cannot create a Broadcast without a resolvable tenant_id.');
+            }
 
             // Generate Broadcast Number (e.g. BC-2026-0001)
             $year = date('Y');

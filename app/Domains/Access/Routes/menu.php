@@ -9,7 +9,6 @@ return [
         'children' => [
             ['label' => 'Users', 'route' => 'access.users.index', 'permission' => 'access.users.manage'],
             ['label' => 'Roles', 'route' => 'access.roles.index', 'permission' => 'access.roles.manage'],
-            ['label' => 'Permissions', 'route' => 'access.roles.index', 'permission' => 'access.permissions.manage'],
             ['label' => 'Teams'],
             ['label' => 'Policies'],
         ],

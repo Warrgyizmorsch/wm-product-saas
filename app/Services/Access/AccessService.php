@@ -144,7 +144,13 @@ class AccessService
      */
     public function allowedModulesFor(User $user): ?array
     {
-        if ($user->role === 'admin' || $user->role === 'super_admin') {
+        // Routed through legacyAdminRoleTextAllows() (the one place that already
+        // knows the platform-vs-tenant distinction for this legacy text field)
+        // rather than comparing $user->role inline here — keeps a single place
+        // to fix if that rule ever changes. The permission name passed is a
+        // placeholder: legacyAdminRoleTextAllows() only inspects its
+        // 'platform.' prefix, never looks up a real Permission row.
+        if ($this->legacyAdminRoleTextAllows($user, 'access.roles.manage', ['tenant_id' => $user->tenant_id])) {
             return null;
         }
 
@@ -282,15 +288,29 @@ class AccessService
      */
     private function roleIdsFor(User $user, ?int $tenantId): Collection
     {
-        // The legacy users.role_id column carries no tenant of its own, so it
-        // has to be validated against the Role it points at. Without this, a
-        // stale or hand-edited role_id referencing another tenant's role would
-        // be honoured outright — the shared-schema role-collision risk. A role
-        // with a null tenant_id is a system template and stays valid for
-        // everyone; the UserRole join below already does the same check.
+        // The legacy users.role_id column carries no tenant of its own — it is
+        // implicitly "this user's role in their own home tenant", never a
+        // per-tenant assignment. Both legacy branches below must therefore be
+        // gated on $tenantId matching the user's OWN tenant before they
+        // contribute anything: a system-template role (tenant_id null, e.g.
+        // tenant_owner) being "valid for everyone" describes who the ROLE
+        // DEFINITION applies to, not which TENANT it may be checked against —
+        // without this guard, any user whose role_id/role text resolves to a
+        // null-tenant template role would pass a permission check scoped to
+        // ANY OTHER tenant's id, a cross-tenant privilege-escalation hole
+        // (found while wiring the self-service Subscription page, which calls
+        // allows() with an explicit target tenant_id the way TenantPolicy
+        // does). The UserRole pivot below is a genuine per-assignment record
+        // (its own tenant_id column), so it does not need this guard.
         $roleIds = collect();
+        // A user with no home tenant (tenant_id null) is a true platform-level
+        // account — its legacy role_id/role-text is allowed to be evaluated
+        // against any target tenant (what that grants downstream is still
+        // decided by the permission/scope checks and the platform-admin-role
+        // check above). A user WITH a home tenant must match the target.
+        $isOwnTenant = $user->tenant_id === null || $this->sameValue($tenantId, $user->tenant_id);
 
-        if ($user->role_id !== null) {
+        if ($isOwnTenant && $user->role_id !== null) {
             $legacyRoleIsUsable = Role::query()
                 ->whereKey($user->role_id)
                 ->where(function ($query) use ($tenantId): void {
@@ -302,7 +322,7 @@ class AccessService
             if ($legacyRoleIsUsable) {
                 $roleIds->push($user->role_id);
             }
-        } elseif (filled($user->role) && ! in_array($user->role, ['admin', 'super_admin'], true)) {
+        } elseif ($isOwnTenant && filled($user->role) && ! in_array($user->role, ['admin', 'super_admin'], true)) {
             // Older accounts carry only the users.role text (e.g. 'production_engineer').
             // Resolve it to the system role of that slug so its real grants apply,
             // rather than the legacy Production permission map. admin/super_admin

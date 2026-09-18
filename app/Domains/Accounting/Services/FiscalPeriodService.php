@@ -58,6 +58,43 @@ class FiscalPeriodService
         });
     }
 
+    /**
+     * The current fiscal year every tenant starts with. Called both at tenant
+     * provisioning (ProvisionAccountingMasters listener) and by
+     * AccountingChartOfAccountsSeeder for local/demo data. Idempotent (checks
+     * for an existing fiscal year starting on the same date before creating),
+     * safe to re-run.
+     *
+     * India: statutory fiscal year is 1 April - 31 March, NOT calendar year.
+     * now()->startOfYear()/endOfYear() default to Jan-Dec and will silently
+     * produce the wrong FY for every Indian tenant.
+     */
+    public function provisionCurrentFiscalYearIfMissing(int $tenantId): ?FiscalYear
+    {
+        $today = now();
+        $fyStartYear = $today->month >= 4 ? $today->year : $today->year - 1;
+
+        $startDate = now()->setDate($fyStartYear, 4, 1)->startOfDay();
+        $endDate = (clone $startDate)->addYear()->subDay()->endOfDay();
+
+        $existing = FiscalYear::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereDate('start_date', $startDate->toDateString())
+            ->exists();
+
+        if ($existing) {
+            return null;
+        }
+
+        return $this->createFiscalYearWithMonthlyPeriods([
+            'tenant_id' => $tenantId,
+            'name' => 'FY ' . $fyStartYear . '-' . ($fyStartYear + 1),
+            'start_date' => $startDate->toDateString(),
+            'end_date' => $endDate->toDateString(),
+        ]);
+    }
+
     public function periodForDate(\DateTimeInterface $date): ?AccountingPeriod
     {
         return $this->periods->findByDate($date);

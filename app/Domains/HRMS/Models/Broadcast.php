@@ -2,12 +2,12 @@
 
 namespace App\Domains\HRMS\Models;
 
+use App\Core\Database\BaseModel;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Broadcast extends Model
+class Broadcast extends BaseModel
 {
     protected $fillable = [
         'tenant_id',

@@ -16,7 +16,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->name('auth.')->group(function () {
     // Public login route to obtain token
-    Route::post('/login', [LoginController::class, 'apiLogin'])->name('login');
+    Route::post('/login', [LoginController::class, 'apiLogin'])
+        ->middleware('throttle:5,1')
+        ->name('login');
 
     // Authenticated logout route to revoke token
     Route::post('/logout', [LoginController::class, 'apiLogout'])

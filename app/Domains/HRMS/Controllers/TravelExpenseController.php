@@ -1335,6 +1335,7 @@ class TravelExpenseController extends Controller
         }
 
         $groupAccountIds = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->whereNotNull('parent_id')
             ->pluck('parent_id')
             ->unique()
@@ -1351,8 +1352,9 @@ class TravelExpenseController extends Controller
             return $account;
         }
 
-        // Ultimate fallback: return the first account available (excluding headers)
+        // Ultimate fallback: return the first account available for this tenant (excluding headers)
         return \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->whereNotIn('id', $groupAccountIds)
             ->first();
     }

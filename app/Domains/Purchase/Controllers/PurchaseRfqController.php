@@ -508,7 +508,24 @@ class PurchaseRfqController extends Controller
 
     public function submitPortal(Request $request, string $token)
     {
-        $rfqVendor = PurchaseRfqVendor::where('token', $token)->firstOrFail();
+        $rfqVendor = PurchaseRfqVendor::with('rfq')->where('token', $token)->firstOrFail();
+
+        $rfq = $rfqVendor->rfq;
+        if ($rfq && in_array($rfq->status, ['Confirmed', 'Cancelled'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => $rfq->status === 'Confirmed'
+                    ? 'This RFQ has already been confirmed and a Purchase Order created from it. Quotations can no longer be submitted or updated.'
+                    : 'This RFQ has been cancelled and is no longer accepting quotations.',
+            ], 422);
+        }
+
+        if (!empty($rfqVendor->validity_date) && \Illuminate\Support\Carbon::parse($rfqVendor->validity_date)->isPast()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The submission validity period for this RFQ has expired.',
+            ], 422);
+        }
 
         $validated = $request->validate([
             'quotation_number' => 'required|string|max:255',

@@ -1445,6 +1445,7 @@ class TravelExpenseApiController extends Controller
         }
 
         $groupAccountIds = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->whereNotNull('parent_id')
             ->pluck('parent_id')
             ->unique()
@@ -1461,6 +1462,7 @@ class TravelExpenseApiController extends Controller
         }
 
         return \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->whereNotIn('id', $groupAccountIds)
             ->first();
     }

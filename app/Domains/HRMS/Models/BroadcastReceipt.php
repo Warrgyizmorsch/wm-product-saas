@@ -2,10 +2,10 @@
 
 namespace App\Domains\HRMS\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class BroadcastReceipt extends Model
+class BroadcastReceipt extends BaseModel
 {
     protected $fillable = [
         'tenant_id',

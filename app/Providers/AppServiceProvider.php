@@ -38,6 +38,18 @@ class AppServiceProvider extends ServiceProvider
         // Loads every module's Routes/menu.php once per request.
         $this->app->singleton(\App\Core\Navigation\MenuRegistry::class);
 
+        // Payment gateways: register every known PaymentGateway implementation
+        // here. Which one is actually used is a stored setting resolved at
+        // call time (PaymentGatewayManager::active()), not this list — adding
+        // a new gateway class means one more register() call here, nothing
+        // in SubscriptionController or the webhook dispatch changes.
+        $this->app->singleton(\App\Domains\Platform\Services\PaymentGatewayManager::class, function ($app) {
+            $manager = new \App\Domains\Platform\Services\PaymentGatewayManager();
+            $manager->register($app->make(\App\Domains\Platform\PaymentGateways\RazorpayGateway::class));
+
+            return $manager;
+        });
+
         \Illuminate\Support\Facades\Auth::provider('tenant-eloquent', function ($app, array $config) {
             return new \App\Support\Auth\TenantAwareUserProvider($app['hash'], $config['model']);
         });
@@ -398,10 +410,12 @@ class AppServiceProvider extends ServiceProvider
         // ── Tenant provisioning: each module adds its own default masters ─────
         foreach ([
             \App\Domains\Accounting\Listeners\ProvisionChartOfAccounts::class,
+            \App\Domains\Accounting\Listeners\ProvisionAccountingMasters::class,
             \App\Domains\Platform\Listeners\ProvisionPaymentTerms::class,
             \App\Domains\CRM\Listeners\ProvisionCrmDefaults::class,
             \App\Domains\Inventory\Listeners\ProvisionInventoryDefaults::class,
             \App\Domains\Production\Listeners\ProvisionProductionDefaults::class,
+            \App\Domains\HRMS\Listeners\ProvisionHrmsDefaults::class,
         ] as $listener) {
             \Illuminate\Support\Facades\Event::listen(\App\Core\Tenant\Events\TenantProvisioning::class, $listener);
         }
@@ -505,6 +519,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\CRM\Models\Lead::class,
             \App\Domains\CRM\Policies\LeadPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\CRM\Models\CrmDeal::class,
+            \App\Domains\CRM\Policies\CrmDealPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(

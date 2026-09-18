@@ -804,35 +804,4 @@ class PayrollRunController extends Controller
         return ($Rupees ? $Rupees . 'Rupees' : '') . $paise;
     }
 
-    private function getOrCreateAccount(int $tenantId, string $code, string $name, string $type, string $normalBalance, ?string $subtype = null)
-    {
-        $account = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('code', $code)
-            ->first();
-
-        if ($account) {
-            return $account;
-        }
-
-        $groupAccountIds = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
-            ->whereNotNull('parent_id')
-            ->pluck('parent_id')
-            ->unique()
-            ->toArray();
-
-        $account = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('type', $type)
-            ->whereNotIn('id', $groupAccountIds)
-            ->first();
-
-        if ($account) {
-            return $account;
-        }
-
-        return \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
-            ->whereNotIn('id', $groupAccountIds)
-            ->first();
-    }
 }

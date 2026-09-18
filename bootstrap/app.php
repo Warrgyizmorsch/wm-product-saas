@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'purchase/rfq-portal/*/submit',
             'crm/whatsapp/webhook',
+            'webhooks/razorpay',
             'api/*',
         ]);
 
