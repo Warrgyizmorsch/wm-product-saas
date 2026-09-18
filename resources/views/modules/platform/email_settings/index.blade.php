@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'SMTP Email Configurations | CRM Settings')
+@section('title', 'SMTP Email Configurations | Platform Settings')
 @section('page-title', 'Email Accounts & Database SMTP Setup')
-@section('breadcrumb', 'CRM / Settings / Email Accounts')
+@section('breadcrumb', 'Platform / Settings / Email Accounts')
 
 @section('page-actions')
     <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addAccountModal">
@@ -198,10 +198,10 @@
             <x-ui.modal-form-ui type="input" inputType="email" label="Recipient Email Address (To)" name="to_email" id="testMailToEmail" placeholder="recipient@example.com" :required="true" />
         </div>
         <div class="mb-3">
-            <x-ui.modal-form-ui type="input" label="Subject" name="subject" id="testMailSubject" value="Test Email from CRM System" :required="true" />
+            <x-ui.modal-form-ui type="input" label="Subject" name="subject" id="testMailSubject" value="Test Email from Platform System" :required="true" />
         </div>
         <div class="mb-3">
-            <x-ui.modal-form-ui type="textarea" label="Message Body" name="body_html" id="testMailBody" rows="4" :required="true">Hello! This is a test email sent from your CRM System to verify SMTP settings are working correctly.</x-ui.modal-form-ui>
+            <x-ui.modal-form-ui type="textarea" label="Message Body" name="body_html" id="testMailBody" rows="4" :required="true">Hello! This is a test email sent from your Platform System to verify SMTP settings are working correctly.</x-ui.modal-form-ui>
         </div>
         <div class="d-flex justify-content-end gap-2 pt-2 border-top">
             <button type="button" class="btn btn-sm btn-light border fw-bold" data-bs-dismiss="modal">Cancel</button>

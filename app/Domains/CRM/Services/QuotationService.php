@@ -259,10 +259,6 @@ class QuotationService
             $deal = $quotation->crm_deal_id ? CrmDeal::find($quotation->crm_deal_id) : null;
             $account = $quotation->crm_account_id ? CrmAccount::find($quotation->crm_account_id) : ($deal ? $deal->account : null);
 
-            // If account is not converted to customer yet, keep customer_id empty so user can click 'Convert to Customer'
-            if (!$account || !$account->customer_id) {
-                return;
-            }
             if (!$lead && $deal) {
                 if (!empty($deal->lead_id)) {
                     $lead = Lead::find($deal->lead_id);
@@ -529,21 +525,19 @@ class QuotationService
                 ]);
             }
 
-            // 5. Update Quotation with crm_account_id and crm_deal_id
+            // 5. Update Quotation with customer_id, crm_account_id and crm_deal_id
             $quotation->update([
+                'customer_id'    => $customer->id,
                 'crm_account_id' => $account->id,
                 'crm_deal_id'    => $deal->id,
             ]);
 
-            // 6. Update Lead status to 'Won' (Converted)
+            // 6. Update Lead with account, contact, and deal links
             if ($lead) {
                 $lead->update([
-                    'status'         => 'Won',
-                    'converted_at'   => now(),
                     'crm_account_id' => $account->id,
                     'crm_contact_id' => $contact ? $contact->id : null,
                     'crm_deal_id'    => $deal->id,
-                    'is_customer'    => true,
                 ]);
             }
 

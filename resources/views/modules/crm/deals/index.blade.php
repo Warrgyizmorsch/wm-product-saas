@@ -277,8 +277,8 @@
                                 <a href="{{ route('crm.deals.show', $deal) }}" class="fw-bold text-dark text-decoration-none hover-primary d-block" style="line-height: 1.3;">
                                     {{ $deal->title }}
                                 </a>
-                                @if($deal->lead_source)
-                                    <div class="text-muted fs-11 mt-0.5"><i class="feather-globe me-1 text-primary"></i>{{ $deal->lead_source }}</div>
+                                @if($deal->lead_source && !in_array($deal->lead_source, ['Select an Option', 'Select an option', 'Select Option'], true))
+                                    <div class="text-muted fs-11 mt-0.5"><i class="feather-globe me-1 text-primary"></i>{{ \Illuminate\Support\Facades\Lang::has('crm.sources.' . $deal->lead_source) ? __('crm.sources.' . $deal->lead_source) : $deal->lead_source }}</div>
                                 @endif
                             </td>
                             <td>

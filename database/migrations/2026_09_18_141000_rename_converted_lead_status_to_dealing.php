@@ -17,41 +17,18 @@ return new class extends Migration
             $defaultCompanyId = DB::table('companies')->where('is_default', true)->value('id') ?? DB::table('companies')->value('id');
             $defaultBranchId  = DB::table('branches')->where('is_default', true)->value('id') ?? DB::table('branches')->value('id');
 
-            // 1. Update any existing 'Dealing' record where company_id or branch_id is NULL
-            if ($defaultCompanyId !== null || $defaultBranchId !== null) {
-                $updateData = [];
-                if ($defaultCompanyId !== null) {
-                    $updateData['company_id'] = $defaultCompanyId;
-                }
-                if ($defaultBranchId !== null) {
-                    $updateData['branch_id'] = $defaultBranchId;
-                }
+            // 1. Rename existing 'Converted' to 'Dealing' in lead_statuses table
+            DB::table('lead_statuses')
+                ->where('name', 'Converted')
+                ->update([
+                    'name'         => 'Dealing',
+                    'sort_order'   => 3,
+                    'color'        => 'bg-info',
+                    'is_protected' => true,
+                    'updated_at'   => $now,
+                ]);
 
-                DB::table('lead_statuses')
-                    ->where('name', 'Dealing')
-                    ->where(function ($q) {
-                        $q->whereNull('company_id')->orWhereNull('branch_id');
-                    })
-                    ->update($updateData);
-            }
-
-            // 1. Update any existing 'Dealing' record where company_id or branch_id is NULL
-            $defaults = array_filter([
-                'company_id' => $defaultCompanyId,
-                'branch_id'  => $defaultBranchId,
-            ]);
-
-            if ($defaults !== []) {
-                DB::table('lead_statuses')
-                    ->where('name', 'Dealing')
-                    ->where(function ($q) {
-                        $q->whereNull('company_id')->orWhereNull('branch_id');
-                    })
-                    ->update($defaults);
-            }
-
-            // 2. Get distinct combinations of (tenant_id, company_id, branch_id) from lead_statuses.
-            // An empty table means nothing has been seeded yet, so there is nothing to add to.
+            // 2. Ensure every tenant/company/branch has 'Dealing' status
             $combinations = DB::table('lead_statuses')
                 ->select('tenant_id', 'company_id', 'branch_id')
                 ->distinct()
@@ -95,9 +72,17 @@ return new class extends Migration
                     ]);
                 }
             }
-            // Adjust sort order for Won and Lost so Dealing stays at position #3
+
+            // Ensure sort order for Won and Lost
             DB::table('lead_statuses')->where('name', 'Won')->where('sort_order', '<', 4)->update(['sort_order' => 4]);
             DB::table('lead_statuses')->where('name', 'Lost')->where('sort_order', '<', 5)->update(['sort_order' => 5]);
+        }
+
+        // 3. Update existing leads status from 'Converted' to 'Dealing'
+        if (Schema::hasTable('leads')) {
+            DB::table('leads')
+                ->where('status', 'Converted')
+                ->update(['status' => 'Dealing']);
         }
     }
 
@@ -107,7 +92,15 @@ return new class extends Migration
     public function down(): void
     {
         if (Schema::hasTable('lead_statuses')) {
-            DB::table('lead_statuses')->where('name', 'Dealing')->delete();
+            DB::table('lead_statuses')
+                ->where('name', 'Dealing')
+                ->update(['name' => 'Converted']);
+        }
+
+        if (Schema::hasTable('leads')) {
+            DB::table('leads')
+                ->where('status', 'Dealing')
+                ->update(['status' => 'Converted']);
         }
     }
 };

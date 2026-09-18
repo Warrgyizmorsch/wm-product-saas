@@ -553,6 +553,32 @@ app.post('/sessions/:key/send-document', async (req, res) => {
   }
 });
 
-app.listen(PORT, '127.0.0.1', () => {
+app.listen(PORT, '127.0.0.1', async () => {
   console.log(`[WhatsApp Bridge] Running on http://127.0.0.1:${PORT}`);
+
+  // Automatically restore and connect all existing saved WhatsApp sessions on startup
+  try {
+    if (fs.existsSync(SESSION_BASE_PATH)) {
+      const entries = fs.readdirSync(SESSION_BASE_PATH, { withFileTypes: true });
+      let restoredCount = 0;
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const sessionKey = entry.name;
+          const credsPath = path.join(SESSION_BASE_PATH, sessionKey, 'creds.json');
+          if (fs.existsSync(credsPath)) {
+            console.log(`[WhatsApp Bridge] Auto-initializing saved session: "${sessionKey}" in background...`);
+            initSession(sessionKey).catch(err => {
+              console.error(`[WhatsApp Bridge] Background init error for ${sessionKey}:`, err.message);
+            });
+            restoredCount++;
+          }
+        }
+      }
+      if (restoredCount === 0) {
+        console.log('[WhatsApp Bridge] No existing saved session found. Ready for QR linking.');
+      }
+    }
+  } catch (err) {
+    console.error('[WhatsApp Bridge] Error scanning session directory on startup:', err.message);
+  }
 });

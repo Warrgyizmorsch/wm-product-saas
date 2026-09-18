@@ -27,8 +27,10 @@ class MenuPermissionCoverageTest extends TestCase
      * @var list<string>
      */
     private const ALLOWED_UNGATED_ROUTES = [
-        // Workspace home — every authenticated user has a personal dashboard.
+        // Workspace & Module Dashboards — every authenticated user with module access can view.
         'dashboard',
+        'crm.dashboard',
+        'supply-chain.dashboard',
 
         // Purchase — no controller-level check.
         'purchase.rfqs.savings',
@@ -41,8 +43,6 @@ class MenuPermissionCoverageTest extends TestCase
         'crm.masters.lead-statuses.index',
         'crm.masters.deal-statuses.index',
         'crm.settings.index',
-        'crm.emailSettings.index',
-        'crm.whatsappSettings.index',
 
         // Inventory — policy classes exist for some of these but are never invoked.
         'inventory.mrp-shortage.index',
@@ -81,6 +81,8 @@ class MenuPermissionCoverageTest extends TestCase
 
         // Platform — no controller-level check.
         'platform.payment-terms.index',
+        'platform.emailSettings.index',
+        'platform.whatsappSettings.index',
 
         // HRMS — self-service actions gated only by an Employee record, not a
         // permission (MesController-style "own record" routes).

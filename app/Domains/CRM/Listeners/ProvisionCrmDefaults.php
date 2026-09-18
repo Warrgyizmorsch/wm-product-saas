@@ -12,7 +12,7 @@ class ProvisionCrmDefaults
     private const LEAD_STATUSES = [
         'New' => ['bg-primary', true],
         'Qualified' => ['bg-teal', true],
-        'Converted' => ['bg-info', true],
+        'Dealing' => ['bg-info', true],
         'Won' => ['bg-success', true],
         'Lost' => ['bg-danger', true],
     ];

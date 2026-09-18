@@ -252,12 +252,18 @@ class LeadService
                 }
             }
             $message = 'Lead status updated to Lost.';
-        } elseif ($newStatus === 'Converted') {
+        } elseif ($newStatus === 'Dealing' || $newStatus === 'Converted') {
             if (!$lead->crm_deal_id) {
                 app(\App\Domains\CRM\Repositories\LeadRepository::class)->qualifyLead($lead);
-                return ['success' => true, 'message' => 'Lead converted to Deal successfully!'];
             }
-            $message = 'Lead status updated to Converted.';
+            if ($newStatus === 'Converted') {
+                $updateData['is_customer'] = true;
+                $customer = $lead->getCustomer();
+                if ($customer) {
+                    $customer->update(['status' => 'active']);
+                }
+            }
+            $message = "Lead status updated to {$newStatus}.";
         } elseif ($newStatus === 'Won') {
             if (!$lead->crm_account_id) {
                 return [

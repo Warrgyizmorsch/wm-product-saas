@@ -33,6 +33,7 @@ Route::middleware(['tenant'])->group(function (): void {
     });
 
     // Public WhatsApp Webhook Route for Node.js Bridge
+    Route::post('/platform/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'handleWebhook'])->name('platform.whatsapp.webhook');
     Route::post('/crm/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'handleWebhook'])->name('crm.whatsapp.webhook');
 
     Route::middleware(['auth', 'company', 'branch'])->group(function (): void {

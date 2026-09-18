@@ -19,8 +19,8 @@ return [
             ['label' => 'Usage Limits', 'route' => 'platform.usage.index', 'permission' => 'platform.usage.view'],
             ['label' => 'Payment Gateway', 'route' => 'platform.payment-gateway.index', 'permission' => 'platform.payment_gateway.manage'],
             ['label' => 'Payment Terms', 'route' => 'platform.payment-terms.index'],
-            ['label' => 'Email & SMTP Setup', 'route' => 'crm.emailSettings.index'],
-            ['label' => 'WhatsApp Web Setup', 'route' => 'crm.whatsappSettings.index'],
+            ['label' => 'Email & SMTP Setup', 'route' => 'platform.emailSettings.index'],
+            ['label' => 'WhatsApp Web Setup', 'route' => 'platform.whatsappSettings.index'],
         ],
     ],
     [
