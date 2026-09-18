@@ -301,12 +301,12 @@
                                 </tr>
                                 @if($order->freight_terms)
                                     <tr>
-                                        <td class="text-muted ps-0">Freight Terms:</td>
-                                        <td class="fw-semibold text-dark text-capitalize">
-                                            @if($order->freight_terms === 'to_pay') To Pay (Freight Collect on Delivery)
-                                            @elseif($order->freight_terms === 'to_be_billed') To Be Billed (Vendor Prepaid & Added)
-                                            @elseif($order->freight_terms === 'prepaid') FOR Site (Freight Included in Price)
-                                            @elseif($order->freight_terms === 'customer_pickup') Self Pickup (Ex-Works)
+                                        <td class="text-muted ps-0">{{ __('purchase.freight_terms') }}:</td>
+                                        <td class="fw-semibold text-dark">
+                                            @if($order->freight_terms === 'to_pay') {{ __('purchase.freight_to_pay') }}
+                                            @elseif($order->freight_terms === 'to_be_billed') {{ __('purchase.freight_to_be_billed') }}
+                                            @elseif($order->freight_terms === 'prepaid') {{ __('purchase.freight_prepaid') }}
+                                            @elseif($order->freight_terms === 'customer_pickup') {{ __('purchase.freight_customer_pickup') }}
                                             @else {{ str_replace('_', ' ', $order->freight_terms) }}
                                             @endif
                                         </td>
@@ -314,8 +314,8 @@
                                 @endif
                                 @if($order->freight_amount > 0)
                                     <tr>
-                                        <td class="text-muted ps-0">Freight Amount:</td>
-                                        <td class="fw-bold text-primary">?{{ number_format($order->freight_amount, 2) }}</td>
+                                        <td class="text-muted ps-0">{{ __('purchase.freight_amount') }}:</td>
+                                        <td class="fw-bold text-primary">{{ active_currency_symbol() }}{{ number_format($order->freight_amount, 2) }}</td>
                                     </tr>
                                 @endif
                             </tbody>
@@ -598,7 +598,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                         <div>
                             <h6 class="fw-bold text-dark mb-0">
-                                <i class="feather-dollar-sign text-success me-1.5"></i>Vendor Advance Payments & Accounting
+                                <i class="feather-credit-card text-success me-1.5"></i>Vendor Advance Payments & Accounting
                             </h6>
                             <small class="text-muted fs-12">Record advance payments to vendor before bill receiving.</small>
                         </div>

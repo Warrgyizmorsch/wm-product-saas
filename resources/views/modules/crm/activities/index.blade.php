@@ -188,7 +188,7 @@
 
             <!-- Custom Filter Component (Identical to Lead Listing) -->
             <form method="GET" action="{{ route('crm.activities.index') }}" class="d-inline">
-                <x-ui.filter :label="__('ui.filter')" offset="0, 5">
+                <x-ui.filter :label="__('crm.filter')" offset="0, 5">
                     <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                     
                     <div class="mb-3">

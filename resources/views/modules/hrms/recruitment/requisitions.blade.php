@@ -207,7 +207,7 @@
 
                         <x-ui.odoo-form-ui type="select" label="Status" name="status">
                             <option value="">All Statuses</option>
-                            <option value="approved" {{ $filters['status'] === 'approved' ? 'selected' : '' }}>Approved / Active</option>
+                            <option value="approved" {{ $filters['status'] === 'approved' ? 'selected' : '' }}>Open</option>
                             <option value="pending_approval" {{ $filters['status'] === 'pending_approval' ? 'selected' : '' }}>Pending Approval</option>
                             <option value="closed" {{ $filters['status'] === 'closed' ? 'selected' : '' }}>Closed</option>
                         </x-ui.odoo-form-ui>
@@ -263,7 +263,7 @@
                                 @endif
                             </td>
                             <td>
-                                <x-ui.status-badge :status="$req->status" />
+                                <x-ui.status-badge :status="$req->status" :label="in_array($req->status, ['approved', 'published', 'open']) ? 'Open' : null" />
                             </td>
                             <td class="text-end">
                                 <x-ui.button :href="route('hrms.recruitment.pipeline', $req->id)" variant="primary" size="sm" icon="feather-columns">

@@ -64,6 +64,40 @@
             .erp-horizontal-tabs .nav-link.active i {
                 color: #ffffff !important;
             }
+            .erp-horizontal-tabs .erp-tab-header-badge {
+                letter-spacing: 0.08em;
+                font-size: 9px;
+                font-weight: 800;
+                color: #475569;
+                background-color: #f1f5f9;
+                border-radius: 4px;
+                flex-shrink: 0;
+                border: 1px solid #cbd5e1;
+            }
+
+            /* Dark Mode Support for Horizontal Tabs */
+            html.app-skin-dark .erp-horizontal-tabs {
+                border-bottom: 2px solid #1e293b !important;
+            }
+            html.app-skin-dark .erp-horizontal-tabs .nav-link {
+                color: #94a3b8 !important;
+            }
+            html.app-skin-dark .erp-horizontal-tabs .nav-link:hover {
+                color: #ffffff !important;
+                background-color: rgba(255, 255, 255, 0.08) !important;
+                border-color: rgba(255, 255, 255, 0.15) !important;
+            }
+            html.app-skin-dark .erp-horizontal-tabs .nav-link.active {
+                background-color: var(--bs-primary) !important;
+                color: #ffffff !important;
+                border-color: var(--bs-primary) !important;
+                box-shadow: 0 2px 10px color-mix(in srgb, var(--bs-primary) 40%, transparent) !important;
+            }
+            html.app-skin-dark .erp-horizontal-tabs .erp-tab-header-badge {
+                background-color: #162038 !important;
+                color: #cbd5e1 !important;
+                border-color: #283c50 !important;
+            }
         </style>
     @endpush
 @endonce
@@ -71,7 +105,7 @@
 <ul class="nav nav-tabs erp-horizontal-tabs" id="{{ $id }}" role="tablist" {{ $attributes }}>
     @foreach($tabs as $tab)
         @if(!empty($tab['is_header']) || !empty($tab['header']))
-            <li class="nav-item d-flex align-items-center px-2 py-1 text-uppercase fw-extrabold me-1 ms-1" style="letter-spacing: 0.08em; font-size: 9px; font-weight: 800; color: #475569; background-color: #f1f5f9; border-radius: 4px; flex-shrink: 0; border: 1px solid #cbd5e1;">
+            <li class="nav-item d-flex align-items-center px-2 py-1 text-uppercase fw-extrabold me-1 ms-1 erp-tab-header-badge">
                 <i class="feather-grid me-1 text-primary" style="font-size: 9px;"></i>
                 {{ $tab['header'] ?? $tab['label'] }}
             </li>

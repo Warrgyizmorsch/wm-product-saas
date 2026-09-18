@@ -300,6 +300,15 @@ class PayrollRunController extends Controller
         }
 
         $run->update(['status' => 'locked']);
+
+        // Post payroll accrual journal entry (Gross Expense vs PF/ESI/TDS/PT/Salary Payable)
+        try {
+            $payrollAccountingService = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
+            $payrollAccountingService->postPayrollRunJournal($run);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to post payroll accrual journal on lock: " . $e->getMessage());
+        }
+
         return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', 'Payroll run locked successfully.');
     }
 
@@ -547,8 +556,11 @@ class PayrollRunController extends Controller
             $payrollAccountingService = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
             $payrollAccountingService->postPayrollRunJournal($run);
             $payrollAccountingService->postPayrollPayoutJournal($run);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Payroll Accounting Journal Posting Failed on Payout: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to post payroll journal entry: " . $e->getMessage(), [
+                'run_id' => $run->id,
+                'trace' => $e->getTraceAsString()
+            ]);
         }
 
         return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', 'Payroll payouts released successfully.');

@@ -343,13 +343,56 @@ class RecruitmentController extends Controller
             'rejection_reason' => 'nullable|string',
         ]);
 
+        $oldStage = $application->current_stage;
+        $newStage = $request->current_stage;
+
+        $stageHierarchy = [
+            'applied'           => 0,
+            'screening'         => 1,
+            'interview'         => 2,
+            'interview_round_1' => 2,
+            'interview_round_2' => 2,
+            'interview_round_3' => 2,
+            'final_hr'          => 2,
+            'offer_sent'        => 3,
+            'hired'             => 4,
+        ];
+
+        $oldStageKey = in_array($oldStage, ['interview_round_1', 'interview_round_2', 'interview_round_3', 'final_hr']) ? 'interview' : $oldStage;
+        $newStageKey = in_array($newStage, ['interview_round_1', 'interview_round_2', 'interview_round_3', 'final_hr']) ? 'interview' : $newStage;
+
+        $oldIndex = $stageHierarchy[$oldStageKey] ?? 0;
+        $newIndex = $stageHierarchy[$newStageKey] ?? 0;
+
+        // Disallow backtracking to an earlier pipeline stage (unless moving to/from 'rejected')
+        if ($oldStage !== 'rejected' && $newStage !== 'rejected' && $newIndex < $oldIndex) {
+            return redirect()->back()->with('error', 'Backtracking candidates to a previous recruitment stage is not allowed.');
+        }
+
         $application->update([
-            'current_stage' => $request->current_stage,
-            'rejection_reason' => $request->current_stage === 'rejected' ? $request->rejection_reason : null,
+            'current_stage' => $newStage,
+            'rejection_reason' => $newStage === 'rejected' ? $request->rejection_reason : null,
             'stage_updated_at' => now(),
         ]);
 
-        return redirect()->back()->with('success', "Candidate stage updated to " . strtoupper(str_replace('_', ' ', $request->current_stage)));
+        $req = $application->requisition;
+        if ($req) {
+            if ($oldStage !== 'hired' && $newStage === 'hired') {
+                if ($req->vacancies > 0) {
+                    $req->decrement('vacancies');
+                    if ($req->fresh()->vacancies === 0) {
+                        $req->update(['status' => 'closed']);
+                    }
+                }
+            } elseif ($oldStage === 'hired' && $newStage !== 'hired') {
+                $req->increment('vacancies');
+                if ($req->status === 'closed') {
+                    $req->update(['status' => 'approved']);
+                }
+            }
+        }
+
+        return redirect()->back()->with('success', "Candidate stage updated to " . strtoupper(str_replace('_', ' ', $newStage)));
     }
 
     // Schedule Interview Round
@@ -449,6 +492,10 @@ class RecruitmentController extends Controller
             'joining_date'           => 'required|date',
             'document_template_id'   => 'nullable|exists:document_templates,id',
             'offer_letter_notes'     => 'nullable|string',
+            'hr_name'                => 'nullable|string|max:255',
+            'hr_designation'         => 'nullable|string|max:255',
+            'hr_signature_data'      => 'nullable|string',
+            'hr_signature_file'      => 'nullable|file|mimes:png,jpg,jpeg,webp|max:5120',
         ]);
 
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
@@ -474,6 +521,41 @@ class RecruitmentController extends Controller
                 $designation = Designation::find($request->offered_designation_id);
                 $company = $department?->company ?? \App\Domains\HRMS\Models\Company::first();
 
+                // Process HR Signature image (if provided via Canvas Draw or Image File Upload)
+                $hrName = $request->input('hr_name', auth()->user()?->name ?? 'HR Manager');
+                $hrDesignation = $request->input('hr_designation', 'HR Manager');
+                $hrSigUrl = null;
+
+                if ($request->hasFile('hr_signature_file') && $request->file('hr_signature_file')->isValid()) {
+                    $file = $request->file('hr_signature_file');
+                    $hrSigPath = $file->store("signatures/hr_tenant_{$tenantId}", 'public');
+                    $hrSigUrl = asset('storage/' . $hrSigPath);
+                } elseif ($request->filled('hr_signature_data')) {
+                    $hrSigData = $request->input('hr_signature_data');
+                    if (str_starts_with($hrSigData, 'data:image')) {
+                        $image = str_replace(' ', '+', preg_replace('/^data:image\/\w+;base64,/', '', $hrSigData));
+                        $imageName = 'hr_sig_' . time() . '_' . \Str::random(6) . '.png';
+                        $hrSigPath = "signatures/hr_tenant_{$tenantId}/{$imageName}";
+                        \Storage::disk('public')->put($hrSigPath, base64_decode($image));
+                        $hrSigUrl = asset('storage/' . $hrSigPath);
+                    } else {
+                        $hrSigUrl = $hrSigData;
+                    }
+                }
+
+                if ($hrSigUrl) {
+                    $hrSigHtml = '<div style="display:inline-block; text-align:left; margin:10px 0;">' .
+                                 '<img src="' . $hrSigUrl . '" style="max-height:60px; max-width:200px; object-fit:contain; display:block;" alt="HR Signature" />' .
+                                 '<div style="font-weight:bold; font-size:13px; margin-top:4px;">' . e($hrName) . '</div>' .
+                                 '<div style="font-size:11px; color:#64748b;">' . e($hrDesignation) . '</div>' .
+                                 '</div>';
+                } else {
+                    $hrSigHtml = '<div style="display:inline-block; text-align:left; margin:10px 0;">' .
+                                 '<div style="font-weight:bold; font-size:13px;">' . e($hrName) . '</div>' .
+                                 '<div style="font-size:11px; color:#64748b;">' . e($hrDesignation) . '</div>' .
+                                 '</div>';
+                }
+
                 $rawContent = trim(($template->header_content ?? '') . "\n" . ($template->body_content ?? '') . "\n" . ($template->footer_content ?? ''));
                 if (empty($rawContent)) {
                     $rawContent = $template->body_content ?? '';
@@ -497,6 +579,9 @@ class RecruitmentController extends Controller
                     'current_date'    => date('d M, Y'),
                     'date'            => date('d M, Y'),
                     'offer_notes'     => $request->offer_letter_notes ?? '',
+                    'hr_signature'   => $hrSigHtml,
+                    'hr_name'        => $hrName,
+                    'hr_designation' => $hrDesignation,
                 ];
 
                 foreach ($replacements as $key => $val) {
@@ -506,6 +591,8 @@ class RecruitmentController extends Controller
                         $rawContent
                     );
                 }
+                // Handle brackets like [HR Signature] or [hr_signature]
+                $rawContent = str_replace(['[HR Signature]', '[hr_signature]', '[HR SIGNATURE]'], $hrSigHtml, $rawContent);
                 // Strip any remaining curly braces around values e.g. {Sahil} -> Sahil
                 $rawContent = preg_replace('/\{([^{}\n]*)\}/', '$1', $rawContent);
                 $offerLetterContent = $rawContent;
@@ -724,16 +811,19 @@ class RecruitmentController extends Controller
         // 1. Immediately update Candidate status and Application stage to 'hired'
         $candidate->update(['status' => 'hired']);
         if ($application) {
+            $oldStage = $application->current_stage;
             $application->update([
                 'current_stage'    => 'hired',
                 'stage_updated_at' => now(),
             ]);
 
-            $req = $application->requisition;
-            if ($req && $req->vacancies > 0) {
-                $req->decrement('vacancies');
-                if ($req->vacancies === 0) {
-                    $req->update(['status' => 'closed']);
+            if ($oldStage !== 'hired') {
+                $req = $application->requisition;
+                if ($req && $req->vacancies > 0) {
+                    $req->decrement('vacancies');
+                    if ($req->fresh()->vacancies === 0) {
+                        $req->update(['status' => 'closed']);
+                    }
                 }
             }
         }

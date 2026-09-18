@@ -1,8 +1,9 @@
  @extends('layouts.duralux')
 
-@section('title', 'Create Dispatch Order | SaaS ERP')
-@section('page-title', 'Create Dispatch Order')
-@section('breadcrumb', 'Sales / Dispatch Orders / Create')
+@section('title', __('crm.create_dispatch_order') . ' | SaaS ERP')
+@section('page-title', __('crm.create_dispatch_order'))
+@section('breadcrumb', __('crm.dispatch_orders_create_breadcrumb'))
+
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -50,20 +51,20 @@
                 <!-- Actions Top Bar -->
                 <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2 flex-wrap gap-2">
                     <div>
-                        <h4 class="fw-bold text-dark mb-0">New Dispatch Order</h4>
-                        <span class="fs-12 text-muted">Issue an Outward Dispatch Order against a Sales Order / Material Requirement or create a Direct Outward Dispatch.</span>
+                        <h4 class="fw-bold text-dark mb-0">{{ __('crm.new_dispatch_order') }}</h4>
+                        <span class="fs-12 text-muted">{{ __('crm.issue_outward_desc') }}</span>
                     </div>
                 </div>
 
                 <!-- Header Details Section -->
                 <div class="row g-4 mb-4 fs-13 text-dark">
                     <div class="col-md-6 border-end pe-md-4">
-                        <h6 class="fw-bold text-primary mb-3"><i class="feather-layers me-2"></i>1. Fulfillment & Document Source Reference</h6>
+                        <h6 class="fw-bold text-primary mb-3"><i class="feather-layers me-2"></i>{{ __('crm.fulfillment_source_ref') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-12 text-dark">Sales Order / Material Requirement Reference *</label>
+                            <label class="form-label fw-bold fs-12 text-dark">{{ __('crm.so_mr_reference') }}</label>
                             <select id="orderSelectPicker" class="form-select odoo-select2 font-monospace fs-12 border-primary">
-                                <option value="">-- Choose Sales Order / Material Requirement --</option>
+                                <option value="">{{ __('crm.choose_so_mr') }}</option>
                                 @foreach($pendingDOs as $pDo)
                                     <option value="{{ $pDo->id }}" data-so-id="{{ $pDo->sales_order_id }}" @selected($mrId == $pDo->id || $soId == $pDo->sales_order_id)>
                                         {{ $pDo->salesOrder?->sales_order_number ?? 'N/A' }} ({{ $pDo->requirement_number }}) &mdash; {{ $pDo->salesOrder?->customer?->name ?? 'Customer' }}
@@ -72,7 +73,7 @@
                             </select>
                         </div>
 
-                        <x-ui.odoo-form-ui type="input" label="Customer Name" id="displayCustomerNameInput" :value="$prefillSalesOrder?->customer?->name ?: '—'" readonly="true" style="font-weight: bold; background-color: #f8fafc;" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.customer_name')" id="displayCustomerNameInput" :value="$prefillSalesOrder?->customer?->name ?: '—'" readonly="true" style="font-weight: bold; background-color: #f8fafc;" />
 
                         <div id="invoicePickerWrapper" class="mb-3 p-3 rounded border border-primary d-none" style="background-color: #eff6ff !important;">
                             <label for="invoiceSelect" class="form-label fw-bold fs-12 text-primary mb-1">

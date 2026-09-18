@@ -77,31 +77,35 @@
                         </span>
                     </div>
                     <div class="d-flex gap-2">
-                        <x-ui.button type="button" variant="primary" size="sm" class="btn-submit-bulk fw-bold px-3" data-action="po" icon="feather-plus-circle">
+                        <x-ui.button type="button" variant="primary" class="btn-submit-bulk fw-bold px-3" data-action="po" icon="feather-plus-circle">
                             {{ __('purchase.create_bulk_pos') }}
                         </x-ui.button>
-                        <x-ui.button type="button" variant="success" size="sm" class="btn-submit-bulk text-white fw-bold px-3" data-action="rfq" icon="feather-mail">
+                        <x-ui.button type="button" variant="success" class="btn-submit-bulk text-white fw-bold px-3" data-action="rfq" icon="feather-mail">
                             {{ __('purchase.create_bulk_rfqs') }}
                         </x-ui.button>
                     </div>
                 </div>
 
                 @if($groupBy === 'supplier')
+                    @php
+                        $supplierTabs = [
+                            [
+                                'id' => 'assigned-pane',
+                                'label' => __('purchase.assigned_suppliers') . ' (' . count($assignedItems) . ')',
+                                'icon' => 'feather-truck',
+                                'active' => true,
+                            ],
+                            [
+                                'id' => 'unassigned-pane',
+                                'label' => __('purchase.no_supplier') . ' (' . count($unassignedItems) . ')',
+                                'icon' => 'feather-help-circle',
+                                'active' => false,
+                            ],
+                        ];
+                    @endphp
+
                     <!-- Tab navigation for Supplier-wise grouping -->
-                    <ul class="nav nav-tabs nav-tabs-custom mb-4" id="pendingPrTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active fw-bold position-relative py-2 px-3" id="assigned-tab" data-bs-toggle="tab" data-bs-target="#assigned-pane" type="button" role="tab">
-                                <i class="feather-truck me-2"></i>{{ __('purchase.assigned_suppliers') }}
-                                <x-ui.badge :soft="true" variant="primary" class="ms-2 fs-11 fw-bold">{{ count($assignedItems) }}</x-ui.badge>
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link fw-bold position-relative py-2 px-3" id="unassigned-tab" data-bs-toggle="tab" data-bs-target="#unassigned-pane" type="button" role="tab">
-                                <i class="feather-help-circle text-danger me-2"></i>{{ __('purchase.no_supplier') }}
-                                <x-ui.badge :soft="true" variant="danger" class="ms-2 fs-11 fw-bold">{{ count($unassignedItems) }}</x-ui.badge>
-                            </button>
-                        </li>
-                    </ul>
+                    <x-ui.horizontal-tabs id="pendingPrTabs" :tabs="$supplierTabs" class="mb-4" />
 
                     <!-- Tab Content panes -->
                     <div class="tab-content" id="pendingPrTabsContent">

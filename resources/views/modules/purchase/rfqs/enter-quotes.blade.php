@@ -20,14 +20,6 @@
                             <h4 class="fw-bold text-dark mb-0">{{ __('purchase.record_vendor_rates_for') }} {{ $rfq->rfq_number }}</h4>
                             <small class="text-muted fs-12">{{ __('purchase.input_price_details_from') }} <strong>{{ $rfq->vendor?->name }}</strong>.</small>
                         </div>
-                        <div class="d-flex gap-2">
-                            <x-ui.button href="{{ route('purchase.rfqs.show', $rfq->id) }}" variant="light" size="sm">
-                                {{ __('purchase.cancel') }}
-                            </x-ui.button>
-                            <x-ui.button type="submit" variant="primary" size="sm" icon="feather-save" style="background-color: #714B67; border-color: #714B67;">
-                                {{ __('purchase.save_rates') }}
-                            </x-ui.button>
-                        </div>
                     </div>
 
                     <!-- Items Grid -->
@@ -38,7 +30,7 @@
                                     <tr>
                                         <th style="width: 45%">{{ __('purchase.product') }}</th>
                                         <th class="text-end" style="width: 20%">{{ __('purchase.inquired_qty') }}</th>
-                                        <th class="text-end" style="width: 35%">{{ __('purchase.quoted_rate_rs') }} <span class="text-danger">*</span></th>
+                                        <th class="text-end" style="width: 35%">{{ __('purchase.quoted_rate') }} ({{ active_currency_symbol() }}) <span class="text-danger">*</span></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -60,6 +52,16 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+
+                    <!-- Bottom Action Buttons (like Lead form) -->
+                    <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <x-ui.button href="{{ route('purchase.rfqs.show', $rfq->id) }}" variant="light" class="border px-4 py-2 fs-13">
+                            {{ __('purchase.cancel') }}
+                        </x-ui.button>
+                        <x-ui.button type="submit" variant="primary" icon="feather-save" class="px-4 py-2 fs-13 fw-bold shadow-sm">
+                            {{ __('purchase.save_rates') }}
+                        </x-ui.button>
                     </div>
                 </form>
             </div>

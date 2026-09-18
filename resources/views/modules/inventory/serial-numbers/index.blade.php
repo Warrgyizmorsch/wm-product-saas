@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Tracked Serial Numbers | Inventory | SaaS ERP')
-@section('page-title', 'Serial Number Master Index')
-@section('breadcrumb', 'Inventory > Serial Numbers')
+@section('title', __('inventory.tracked_serial_numbers') . ' | ' . __('inventory.inventory') . ' | SaaS ERP')
+@section('page-title', __('inventory.serial_number_master_index'))
+@section('breadcrumb', __('inventory.inventory_serial_numbers'))
 
 @section('content')
 <div class="erp-single-panel text-dark">
@@ -12,9 +12,9 @@
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4 pb-3 border-bottom">
             <div>
                 <h4 class="fw-bold text-dark mb-1">
-                    <i class="feather-hash text-primary me-2"></i>Tracked Serial Numbers
+                    <i class="feather-hash text-primary me-2"></i>{{ __('inventory.tracked_serial_numbers') }}
                 </h4>
-                <small class="text-muted fs-12">View, search, and track unique serial numbers across warehouses and products.</small>
+                <small class="text-muted fs-12">{{ __('inventory.serial_numbers_help_desc') }}</small>
             </div>
 
             <!-- Controls: Search, Sort, Filter -->
@@ -31,23 +31,23 @@
                         type="text" 
                         name="search" 
                         class="form-control border-0 bg-transparent p-0 fs-13" 
-                        placeholder="Search Serial, Product, SKU..." 
+                        placeholder="{{ __('inventory.search_serial_product_sku') }}" 
                         value="{{ request('search') }}"
                         style="box-shadow: none; height: 32px; width: 220px;"
                     >
                 </form>
 
                 <!-- Custom Sort Dropdown Component -->
-                <x-ui.sort-dropdown :label="__('crm.sort')">
+                <x-ui.sort-dropdown :label="__('inventory.sort')">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'desc']) }}" class="dropdown-item {{ request('sort_by', 'created_at') === 'created_at' && request('sort_order', 'desc') === 'desc' ? 'active' : '' }}">
-                        <span>Registered Date (Latest)</span>
+                        <span>{{ __('inventory.registered_date_latest') }}</span>
                     </a>
-                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'asc']) }}" class="dropdown-item {{ request('sort_by') === 'created_at' && request('sort_order') === 'asc' ? 'active' : '' }}">
-                        <span>Registered Date (Oldest)</span>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'asc']) }}" class="dropdown-item {{ request('sort_by', 'created_at') === 'created_at' && request('sort_order', 'asc') === 'asc' ? 'active' : '' }}">
+                        <span>{{ __('inventory.registered_date_oldest') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
-                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'serial_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ request('sort_by') === 'serial_number' ? 'active' : '' }}">
-                        <span>Serial Number (A-Z)</span>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'serial_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ request('sort_by', 'serial_number') === 'serial_number' ? 'active' : '' }}">
+                        <span>{{ __('inventory.serial_number_az') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
@@ -55,13 +55,13 @@
                 <form method="GET" action="{{ route('inventory.serial-numbers.index') }}" class="d-inline">
                     @if(request('search')) <input type="hidden" name="search" value="{{ request('search') }}"> @endif
                     
-                    <x-ui.filter :label="__('ui.filter')" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter :label="__('inventory.filter')" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('inventory.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Product</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.product') }}</label>
                             <x-ui.odoo-form-ui type="select" name="product_id">
-                                <option value="">— All Tracked Products —</option>
+                                <option value="">— {{ __('inventory.all_tracked_products') }} —</option>
                                 @foreach($products as $p)
                                     <option value="{{ $p->id }}" @selected(request('product_id') == $p->id)>{{ $p->name }} ({{ $p->sku }})</option>
                                 @endforeach
@@ -69,21 +69,21 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status">
-                                <option value="">— All Statuses —</option>
-                                <option value="Available" @selected(request('status') === 'Available')>Available</option>
-                                <option value="Sold" @selected(request('status') === 'Sold')>Sold</option>
-                                <option value="Reserved" @selected(request('status') === 'Reserved')>Reserved</option>
-                                <option value="Returned" @selected(request('status') === 'Returned')>Returned</option>
-                                <option value="Damaged" @selected(request('status') === 'Damaged')>Damaged</option>
+                                <option value="">— {{ __('inventory.all_statuses') }} —</option>
+                                <option value="Available" @selected(request('status') === 'Available')>{{ __('inventory.available') }}</option>
+                                <option value="Sold" @selected(request('status') === 'Sold')>{{ __('inventory.sold') }}</option>
+                                <option value="Reserved" @selected(request('status') === 'Reserved')>{{ __('inventory.reserved') }}</option>
+                                <option value="Returned" @selected(request('status') === 'Returned')>{{ __('inventory.returned') }}</option>
+                                <option value="Damaged" @selected(request('status') === 'Damaged')>{{ __('inventory.damaged') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Warehouse</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.warehouse') }}</label>
                             <x-ui.odoo-form-ui type="select" name="warehouse_id">
-                                <option value="">— All Warehouses —</option>
+                                <option value="">— {{ __('inventory.all_warehouses') }} —</option>
                                 @foreach($warehouses as $wh)
                                     <option value="{{ $wh->id }}" @selected(request('warehouse_id') == $wh->id)>{{ $wh->name }}</option>
                                 @endforeach
@@ -91,8 +91,8 @@
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('inventory.serial-numbers.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('inventory.serial-numbers.index') }}" class="btn btn-sm btn-light border">{{ __('inventory.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('inventory.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -105,14 +105,14 @@
             <x-ui.odoo-form-ui type="table" id="serialNumbersTable">
                 <thead class="table-light bg-light">
                     <tr>
-                        <th class="ps-3" style="width: 18%;">Serial Number</th>
-                        <th style="width: 22%;">Product Name & SKU</th>
-                        <th style="width: 12%;" class="text-center">Status</th>
-                        <th style="width: 15%;">Current Warehouse</th>
-                        <th style="width: 12%;">Purchase Rate</th>
-                        <th style="width: 12%;">Inward Ref (GRN/Stock)</th>
-                        <th style="width: 12%;">Outward Ref (Dispatch/Invoice)</th>
-                        <th class="pe-3" style="width: 15%;">Registered On</th>
+                        <th class="ps-3" style="width: 18%;">{{ __('inventory.serial_number') }}</th>
+                        <th style="width: 22%;">{{ __('inventory.product_name_sku') }}</th>
+                        <th style="width: 12%;" class="text-center">{{ __('inventory.status') }}</th>
+                        <th style="width: 15%;">{{ __('inventory.current_warehouse') }}</th>
+                        <th style="width: 12%;">{{ __('inventory.purchase_rate') }}</th>
+                        <th style="width: 12%;">{{ __('inventory.inward_ref') }}</th>
+                        <th style="width: 12%;">{{ __('inventory.outward_ref') }}</th>
+                        <th class="pe-3" style="width: 15%;">{{ __('inventory.registered_on') }}</th>
                     </tr>
                 </thead>
                 <tbody class="text-dark">
@@ -129,8 +129,8 @@
                                         {{ $sn->product->name }}
                                     </a>
                                     <div class="fs-11 text-muted font-monospace">SKU: {{ $sn->product->sku ?: '—' }}</div>
-                                @else
-                                    <span class="text-muted">Deleted Product</span>
+                                	@else
+                                    <span class="text-muted">{{ __('inventory.deleted_product') }}</span>
                                 @endif
                             </td>
                             <td class="text-center">
@@ -142,7 +142,7 @@
                                 </span>
                             </td>
                             <td class="font-monospace fw-semibold fs-12">
-                                ₹{{ number_format($sn->purchase_rate, 2) }}
+                                {{ format_currency($sn->purchase_rate) }}
                             </td>
                             <td>
                                 @if($sn->transactionIn)
@@ -182,7 +182,7 @@
                         <tr>
                             <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="feather-inbox fs-1 d-block mb-2 opacity-50"></i>
-                                No serial numbers found. Serials are registered automatically during Opening Stock or GRN Inward Receipts.
+                                {{ __('inventory.no_serials_found_desc') }}
                             </td>
                         </tr>
                     @endforelse

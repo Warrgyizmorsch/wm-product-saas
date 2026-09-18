@@ -1,16 +1,16 @@
 @extends('layouts.duralux')
 
-@section('title', 'Material Requirements Shortage & Procurement | SaaS ERP')
-@section('page-title', 'Material Requirements Shortage & Procurement')
-@section('breadcrumb', 'Store / MRP & Shortage Analysis')
+@section('title', __('crm.mrp_shortage_title') . ' | SaaS ERP')
+@section('page-title', __('crm.mrp_shortage_title'))
+@section('breadcrumb', __('inventory.store') . ' / ' . __('crm.mrp_shortage_analysis'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button href="{{ route('inventory.material-requirements.index') }}" variant="light" class="border shadow-sm" icon="feather-arrow-left">
-            Material Requirements
+            {{ __('crm.material_requirements') }}
         </x-ui.button>
         <x-ui.button href="{{ route('purchase.requisitions.index') }}" variant="light" class="border shadow-sm" icon="feather-file-text">
-            Purchase Requisitions
+            {{ __('crm.purchase_requisitions') }}
         </x-ui.button>
     </div>
 @endsection
@@ -23,19 +23,19 @@
         {{-- Header Bar --}}
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pb-2 mb-3 border-bottom">
             <div>
-                <span class="fs-10 text-muted text-uppercase fw-bold d-block letter-spacing-1">Material Requisition Procurement Analysis</span>
+                <span class="fs-10 text-muted text-uppercase fw-bold d-block letter-spacing-1">{{ __('crm.mr_procurement_analysis') }}</span>
                 <div class="d-flex align-items-center gap-2">
-                    <h5 class="fw-bold text-dark mb-0">Demanded vs Available Stock Shortage Summary</h5>
+                    <h5 class="fw-bold text-dark mb-0">{{ __('crm.demanded_vs_available_summary') }}</h5>
                     @php
                         $shortageCount = $calculationResult ? count(array_filter($calculationResult['consolidated'], fn($i) => $i['net_shortage_qty'] > 0)) : 0;
                     @endphp
                     @if($shortageCount > 0)
                         <x-ui.badge :soft="true" variant="danger" class="px-2 py-0.5 fs-10 fw-bold">
-                            {{ $shortageCount }} Shortage Item(s)
+                            {{ $shortageCount }} {{ __('crm.shortage_items_badge') }}
                         </x-ui.badge>
                     @else
                         <x-ui.badge :soft="true" variant="success" class="px-2 py-0.5 fs-10 fw-bold">
-                            Sufficient Stock Available
+                            {{ __('crm.sufficient_stock_badge') }}
                         </x-ui.badge>
                     @endif
                 </div>
@@ -52,25 +52,25 @@
             <div class="row g-2 mb-3">
                 <div class="col-md-3">
                     <div class="py-2 px-3 bg-light rounded border text-center">
-                        <span class="text-muted fs-10 text-uppercase fw-bold d-block">Demanded Items</span>
+                        <span class="text-muted fs-10 text-uppercase fw-bold d-block">{{ __('crm.demanded_items') }}</span>
                         <h5 class="fw-bold text-dark mb-0">{{ $summary['total_demanded_items'] }}</h5>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="py-2 px-3 bg-soft-info rounded border border-info-subtle text-center">
-                        <span class="text-muted fs-10 text-uppercase fw-bold d-block">Mfg Products</span>
+                        <span class="text-muted fs-10 text-uppercase fw-bold d-block">{{ __('crm.mfg_products') }}</span>
                         <h5 class="fw-bold text-info mb-0">{{ $summary['mfg_products_count'] }}</h5>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="py-2 px-3 bg-soft-danger rounded border border-danger-subtle text-center">
-                        <span class="text-muted fs-10 text-uppercase fw-bold d-block">Shortage Items</span>
+                        <span class="text-muted fs-10 text-uppercase fw-bold d-block">{{ __('crm.shortage_items') }}</span>
                         <h5 class="fw-bold text-danger mb-0">{{ $summary['shortage_items_count'] }}</h5>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="py-2 px-3 bg-soft-success rounded border border-success-subtle text-center">
-                        <span class="text-muted fs-10 text-uppercase fw-bold d-block">Est. PR Cost</span>
+                        <span class="text-muted fs-10 text-uppercase fw-bold d-block">{{ __('crm.est_pr_cost') }}</span>
                         <h5 class="fw-bold text-success mb-0">{{ format_currency($summary['estimated_pr_total_cost']) }}</h5>
                     </div>
                 </div>
@@ -79,8 +79,8 @@
             @if(empty($consolidated))
                 <div class="card border bg-light shadow-none p-4 rounded text-center my-3">
                     <i class="feather-check-circle fs-28 text-muted mb-2 d-block"></i>
-                    <h6 class="fw-bold text-dark mb-1">All Components Available in Stock!</h6>
-                    <p class="mb-0 text-muted fs-11">There are no material shortages for the pending MRs across the warehouse.</p>
+                    <h6 class="fw-bold text-dark mb-1">{{ __('crm.all_components_available') }}</h6>
+                    <p class="mb-0 text-muted fs-11">{{ __('crm.no_material_shortages_desc') }}</p>
                 </div>
             @else
                 <form method="POST" action="{{ route('inventory.mrp-shortage.generate-pr') }}">
@@ -91,24 +91,24 @@
                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
                         <div>
                             <h6 class="fw-bold text-dark mb-0">
-                                <i class="feather-layers text-primary me-1 fs-14"></i>Demanded vs Available Material Shortages
+                                <i class="feather-layers text-primary me-1 fs-14"></i>{{ __('crm.demanded_vs_available_shortages') }}
                             </h6>
                             <span class="text-muted fs-11">
-                                Scope: <strong>ALL Pending MRs ({{ $pendingMrs->count() }})</strong> | Showing <strong>{{ count($consolidated) }}</strong> of <strong>{{ $totalResults }}</strong> item(s) (Page {{ $currentPage }} of {{ $totalPages }})
+                                {{ __('crm.scope') }} <strong>{{ __('crm.all_pending_mrs') }} ({{ $pendingMrs->count() }})</strong> | {{ __('crm.showing') }} <strong>{{ count($consolidated) }}</strong> {{ __('crm.of') }} <strong>{{ $totalResults }}</strong> {{ __('crm.items_count_label') }} ({{ __('crm.page') }} {{ $currentPage }} {{ __('crm.of') }} {{ $totalPages }})
                             </span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-0 text-nowrap">Filter Store:</label>
+                            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-0 text-nowrap">{{ __('crm.filter_store') }}</label>
                             <select class="form-select form-select-sm erp-premium-select bg-white shadow-sm" style="min-width: 220px;" onchange="window.location.href='{{ route('inventory.mrp-shortage.index') }}?warehouse_id=' + this.value">
-                                <option value="">All Warehouses (Consolidated Stock)</option>
+                                <option value="">{{ __('crm.all_warehouses_consolidated') }}</option>
                                 @foreach($warehouses as $wh)
                                     <option value="{{ $wh->id }}" {{ $selectedWarehouseId == $wh->id ? 'selected' : '' }}>
-                                        {{ $wh->name }} {{ $wh->is_default ? '(Default Store)' : '' }}
+                                        {{ $wh->name }} {{ $wh->is_default ? '(' . __('crm.default_store') . ')' : '' }}
                                     </option>
                                 @endforeach
                             </select>
                             <x-ui.button type="submit" variant="success" class="fw-bold px-3 py-1.5 shadow-sm text-nowrap" icon="feather-shopping-cart">
-                                Generate PR
+                                {{ __('crm.generate_pr') }}
                             </x-ui.button>
                         </div>
                     </div>
@@ -121,14 +121,14 @@
                                     <th class="text-center py-2" style="width: 3%">
                                         <input type="checkbox" id="checkAllPr" class="form-check-input" checked onclick="toggleCheckAll(this)">
                                     </th>
-                                    <th class="py-2" style="width: 28%">Component / Material Product</th>
-                                    <th class="text-center py-2" style="width: 10%">Demanded</th>
-                                    <th class="text-center py-2" style="width: 8%">Reserved</th>
-                                    <th class="text-center py-2" style="width: 9%">Available</th>
-                                    <th class="text-center text-primary py-2" style="width: 17%">PR Pipeline (Raised / Approved)</th>
-                                    <th class="text-center text-danger py-2" style="width: 10%">Net Shortage</th>
-                                    <th class="text-center py-2" style="width: 9%">PR Qty to Order</th>
-                                    <th class="text-end py-2" style="width: 6%">Est. Cost</th>
+                                    <th class="py-2" style="width: 28%">{{ __('crm.component_material_product') }}</th>
+                                    <th class="text-center py-2" style="width: 10%">{{ __('crm.demanded') }}</th>
+                                    <th class="text-center py-2" style="width: 8%">{{ __('crm.reserved_th') }}</th>
+                                    <th class="text-center py-2" style="width: 9%">{{ __('crm.avail_th') }}</th>
+                                    <th class="text-center text-primary py-2" style="width: 17%">{{ __('crm.pr_pipeline') }}</th>
+                                    <th class="text-center text-danger py-2" style="width: 10%">{{ __('crm.net_shortage') }}</th>
+                                    <th class="text-center py-2" style="width: 9%">{{ __('crm.pr_qty_to_order') }}</th>
+                                    <th class="text-end py-2" style="width: 6%">{{ __('crm.est_cost') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -171,13 +171,13 @@
                                             @if(($row['pr_approved_qty'] ?? 0) > 0)
                                                 <div class="mb-1">
                                                     <div class="fw-bold font-monospace text-success fs-11">{{ number_format($row['pr_approved_qty'], 2) }} {{ $row['uom_code'] }}</div>
-                                                    <div class="fs-9 text-uppercase fw-semibold text-success" style="letter-spacing: 0.3px;">Approved</div>
+                                                    <div class="fs-9 text-uppercase fw-semibold text-success" style="letter-spacing: 0.3px;">{{ __('crm.approved') }}</div>
                                                 </div>
                                             @endif
                                             @if(($row['pr_draft_qty'] ?? 0) > 0)
                                                 <div>
                                                     <div class="fw-bold font-monospace text-warning fs-11">{{ number_format($row['pr_draft_qty'], 2) }} {{ $row['uom_code'] }}</div>
-                                                    <div class="fs-9 text-uppercase fw-semibold text-warning" style="letter-spacing: 0.3px;">Draft / Pending</div>
+                                                    <div class="fs-9 text-uppercase fw-semibold text-warning" style="letter-spacing: 0.3px;">{{ __('crm.draft_pending') }}</div>
                                                 </div>
                                             @endif
                                             @if(($row['pr_approved_qty'] ?? 0) <= 0 && ($row['pr_draft_qty'] ?? 0) <= 0)

@@ -391,8 +391,149 @@
                     .hover-bg-light:hover {
                         background-color: rgba(0, 0, 0, 0.03) !important;
                     }
+
+                    /* Capacity Info Box */
+                    .capacity-info-box {
+                        background-color: color-mix(in srgb, var(--bs-primary) 8%, #ffffff);
+                        border-left: 4px solid var(--bs-primary) !important;
+                        color: #1e293b;
+                    }
+
+                    /* Capacity Grouping Bar */
+                    .capacity-grouping-bar {
+                        background-color: #f8fafc;
+                        border: 1px solid #e2e8f0 !important;
+                    }
+
+                    .capacity-expanded-cell {
+                        background-color: #f8fafc;
+                    }
+
+                    .capacity-breakdown-card {
+                        background-color: #ffffff;
+                        border: 1px solid #e2e8f0 !important;
+                    }
+
+                    .capacity-breakdown-row {
+                        background-color: #ffffff;
+                    }
+
+                    .capacity-breakdown-row.is-overloaded {
+                        background-color: #fff5f5;
+                    }
+
+                    /* Dark Mode Overrides */
+                    html.app-skin-dark .capacity-info-box,
+                    body.app-skin-dark .capacity-info-box,
+                    [data-bs-theme="dark"] .capacity-info-box,
+                    [data-theme="dark"] .capacity-info-box {
+                        background-color: color-mix(in srgb, var(--bs-primary) 15%, #162038) !important;
+                        border-left: 4px solid var(--bs-primary) !important;
+                        color: #cbd5e1 !important;
+                    }
+
+                    html.app-skin-dark .capacity-info-box h6,
+                    body.app-skin-dark .capacity-info-box h6,
+                    [data-bs-theme="dark"] .capacity-info-box h6,
+                    [data-theme="dark"] .capacity-info-box h6 {
+                        color: var(--bs-primary) !important;
+                    }
+
+                    html.app-skin-dark .capacity-info-box p,
+                    body.app-skin-dark .capacity-info-box p,
+                    [data-bs-theme="dark"] .capacity-info-box p,
+                    [data-theme="dark"] .capacity-info-box p {
+                        color: #94a3b8 !important;
+                    }
+
+                    html.app-skin-dark .capacity-info-box .text-dark,
+                    body.app-skin-dark .capacity-info-box .text-dark,
+                    [data-bs-theme="dark"] .capacity-info-box .text-dark,
+                    [data-theme="dark"] .capacity-info-box .text-dark {
+                        color: #f1f5f9 !important;
+                    }
+
+                    html.app-skin-dark .capacity-grouping-bar,
+                    body.app-skin-dark .capacity-grouping-bar,
+                    [data-bs-theme="dark"] .capacity-grouping-bar,
+                    [data-theme="dark"] .capacity-grouping-bar {
+                        background-color: #162038 !important;
+                        border-color: #283c50 !important;
+                        color: #cbd5e1 !important;
+                    }
+
+                    html.app-skin-dark .capacity-grouping-bar .text-dark,
+                    body.app-skin-dark .capacity-grouping-bar .text-dark,
+                    [data-bs-theme="dark"] .capacity-grouping-bar .text-dark,
+                    [data-theme="dark"] .capacity-grouping-bar .text-dark {
+                        color: #f1f5f9 !important;
+                    }
+
+                    html.app-skin-dark .capacity-expanded-cell,
+                    body.app-skin-dark .capacity-expanded-cell,
+                    [data-bs-theme="dark"] .capacity-expanded-cell,
+                    [data-theme="dark"] .capacity-expanded-cell {
+                        background-color: #111a2e !important;
+                    }
+
+                    html.app-skin-dark .capacity-breakdown-card,
+                    body.app-skin-dark .capacity-breakdown-card,
+                    [data-bs-theme="dark"] .capacity-breakdown-card,
+                    [data-theme="dark"] .capacity-breakdown-card {
+                        background-color: #0f172a !important;
+                        border-color: #1e293b !important;
+                        color: #cbd5e1 !important;
+                    }
+
+                    html.app-skin-dark .capacity-breakdown-card .table thead,
+                    body.app-skin-dark .capacity-breakdown-card .table thead,
+                    [data-bs-theme="dark"] .capacity-breakdown-card .table thead,
+                    [data-theme="dark"] .capacity-breakdown-card .table thead {
+                        background-color: #162038 !important;
+                        border-color: #283c50 !important;
+                        color: #cbd5e1 !important;
+                    }
+
+                    html.app-skin-dark .capacity-breakdown-card .table thead th,
+                    body.app-skin-dark .capacity-breakdown-card .table thead th,
+                    [data-bs-theme="dark"] .capacity-breakdown-card .table thead th,
+                    [data-theme="dark"] .capacity-breakdown-card .table thead th {
+                        background-color: #162038 !important;
+                        border-color: #283c50 !important;
+                        color: #f1f5f9 !important;
+                    }
+
+                    html.app-skin-dark .capacity-breakdown-card .table td,
+                    body.app-skin-dark .capacity-breakdown-card .table td,
+                    [data-bs-theme="dark"] .capacity-breakdown-card .table td,
+                    [data-theme="dark"] .capacity-breakdown-card .table td {
+                        border-color: #283c50 !important;
+                    }
+
+                    html.app-skin-dark .capacity-breakdown-row,
+                    body.app-skin-dark .capacity-breakdown-row,
+                    [data-bs-theme="dark"] .capacity-breakdown-row,
+                    [data-theme="dark"] .capacity-breakdown-row {
+                        background-color: #0f172a !important;
+                        color: #cbd5e1 !important;
+                    }
+
+                    html.app-skin-dark .capacity-breakdown-row.is-overloaded,
+                    body.app-skin-dark .capacity-breakdown-row.is-overloaded,
+                    [data-bs-theme="dark"] .capacity-breakdown-row.is-overloaded,
+                    [data-theme="dark"] .capacity-breakdown-row.is-overloaded {
+                        background-color: rgba(239, 68, 68, 0.18) !important;
+                        color: #fca5a5 !important;
+                    }
+
+                    html.app-skin-dark .hover-bg-light:hover,
+                    body.app-skin-dark .hover-bg-light:hover,
+                    [data-bs-theme="dark"] .hover-bg-light:hover,
+                    [data-theme="dark"] .hover-bg-light:hover {
+                        background-color: rgba(255, 255, 255, 0.05) !important;
+                    }
                 </style>
-                <div class="alert alert-info border-0 shadow-sm d-flex align-items-start mb-4 p-3 bg-light text-dark fs-13" style="border-left: 4px solid #0d6efd !important;">
+                <div class="capacity-info-box alert border-0 shadow-sm d-flex align-items-start mb-4 p-3 rounded fs-13">
                     <i class="feather-info me-3 fs-20 text-primary mt-1"></i>
                     <div>
                         <h6 class="fw-bold text-primary mb-1">Understanding Work Center Capacity</h6>
@@ -403,7 +544,7 @@
                         </p>
                     </div>
                 </div>
-                <div class="d-flex justify-content-between align-items-center mb-4 p-2 bg-light rounded border border-light shadow-none">
+                <div class="capacity-grouping-bar d-flex justify-content-between align-items-center mb-4 p-2 rounded border shadow-none">
                     <div class="text-muted fs-12 ms-2">
                         @php
                             $currentGroup = $capacityDetails[0]['group_type'] ?? 'day';
@@ -468,8 +609,8 @@
                                     </td>
                                 </tr>
                                 <tr class="collapse" id="collapse-wc-{{ $detail['work_center']->id }}">
-                                    <td colspan="6" class="p-3 bg-light">
-                                        <div class="card card-body border border-light shadow-sm p-4 bg-white rounded">
+                                    <td colspan="6" class="p-3 capacity-expanded-cell">
+                                        <div class="capacity-breakdown-card card card-body shadow-sm p-4 rounded">
                                             @php
                                                 $groupType = $detail['group_type'] ?? 'day';
                                                 $headerTitle = $groupType === 'week' ? 'Weekly' : ($groupType === 'month' ? 'Monthly' : 'Day-by-Day');
@@ -497,7 +638,7 @@
                                                                 $isOverloaded = $day['scheduled_minutes'] > $day['capacity_minutes'];
                                                                 $isSundayOverload = $day['capacity_minutes'] == 0 && $day['scheduled_minutes'] > 0;
                                                             @endphp
-                                                            <tr style="background-color: {{ $isOverloaded ? '#fff5f5' : '#ffffff' }};">
+                                                            <tr class="capacity-breakdown-row {{ $isOverloaded ? 'is-overloaded' : '' }}">
                                                                 <td class="font-monospace align-middle">{{ $day['date'] }}</td>
                                                                 <td class="align-middle fw-medium">{{ $day['day_name'] }}</td>
                                                                 <td class="text-end align-middle font-monospace">{{ number_format($day['scheduled_minutes'], 1) }} mins</td>

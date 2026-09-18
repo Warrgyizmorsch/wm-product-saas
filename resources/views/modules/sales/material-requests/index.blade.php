@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Material Requests | SaaS ERP')
-@section('page-title', 'Material Request Slips')
-@section('breadcrumb', 'Material Requests')
+@section('title', __('crm.material_requests_page_title'))
+@section('page-title', __('crm.material_request_slips'))
+@section('breadcrumb', __('crm.material_requests'))
 
 @push('styles')
     <style>
@@ -35,30 +35,30 @@
         <!-- Header Controls & System Filter -->
         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2 pb-2 border-bottom">
             <div>
-                <h5 class="fw-bold text-dark mb-0">Material Request Slips</h5>
-                <p class="text-muted fs-12 mb-0">Manage material requisition slips generated from Production Orders (MOs).</p>
+                <h5 class="fw-bold text-dark mb-0">{{ __('crm.material_request_slips') }}</h5>
+                <p class="text-muted fs-12 mb-0">{{ __('crm.manage_material_requisition_slips_desc') }}</p>
             </div>
 
             <!-- Common Filter Component -->
             <form method="GET" action="{{ route('sales.material-requests.index') }}" class="d-inline">
-                <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                <x-ui.filter :label="__('crm.filter')" offset="0, 5">
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keyword</label>
-                        <x-ui.odoo-form-ui type="input" name="search" placeholder="Search Slip No or PO..." value="{{ request('search') }}" />
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keyword') }}</label>
+                        <x-ui.odoo-form-ui type="input" name="search" placeholder="{{ __('crm.search_slip_or_po_placeholder') }}" value="{{ request('search') }}" />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.status') }}</label>
                         <x-ui.odoo-form-ui type="select" name="status">
-                            <option value="">All Statuses</option>
-                            <option value="pending" @selected(request('status') === 'pending')>Pending</option>
-                            <option value="partial" @selected(request('status') === 'partial')>Partially Issued</option>
-                            <option value="completed" @selected(request('status') === 'completed')>Completed</option>
+                            <option value="">{{ __('crm.all_statuses') }}</option>
+                            <option value="pending" @selected(request('status') === 'pending')>{{ __('crm.pending_issue') }}</option>
+                            <option value="partial" @selected(request('status') === 'partial')>{{ __('crm.partially_issued') }}</option>
+                            <option value="completed" @selected(request('status') === 'completed')>{{ __('crm.completed') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('sales.material-requests.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                        <a href="{{ route('sales.material-requests.index') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
+                        <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
                     </div>
                 </x-ui.filter>
             </form>
@@ -69,11 +69,11 @@
             <x-ui.odoo-form-ui type="table" id="mrTable">
                 <thead>
                     <tr>
-                        <th style="width: 20%">Slip Number</th>
-                        <th style="width: 30%">Production Order</th>
-                        <th style="width: 20%">Requisition Date</th>
-                        <th style="width: 15%" class="text-center">Status</th>
-                        <th style="width: 15%" class="text-end">Actions</th>
+                        <th style="width: 20%">{{ __('crm.slip_number') }}</th>
+                        <th style="width: 30%">{{ __('crm.production_order') }}</th>
+                        <th style="width: 20%">{{ __('crm.requisition_date') }}</th>
+                        <th style="width: 15%" class="text-center">{{ __('crm.status') }}</th>
+                        <th style="width: 15%" class="text-end">{{ __('crm.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -89,7 +89,7 @@
                                     {{ $slip->order->order_number ?? 'MO #' . $slip->production_order_id }}
                                 </div>
                                 <div class="text-muted fs-11">
-                                    Product: {{ $slip->order->product->name ?? '—' }}
+                                    {{ __('crm.product_label') }} {{ $slip->order->product->name ?? '—' }}
                                 </div>
                             </td>
                             <td>{{ date('d-M-Y', strtotime($slip->requisition_date)) }}</td>
@@ -98,16 +98,16 @@
                                     $statusLower = strtolower($slip->status ?? 'pending');
                                 @endphp
                                 @if(in_array($statusLower, ['fully issued', 'completed', 'issued']))
-                                    <span class="badge bg-soft-success text-success px-2.5 py-1 fw-bold fs-11">Fully Issued</span>
+                                    <span class="badge bg-soft-success text-success px-2.5 py-1 fw-bold fs-11">{{ __('crm.fully_issued') }}</span>
                                 @elseif(in_array($statusLower, ['partially issued', 'partial', 'reserved']))
-                                    <span class="badge bg-soft-warning text-warning px-2.5 py-1 fw-bold fs-11">{{ $statusLower === 'reserved' ? 'Reserved' : 'Partially Issued' }}</span>
+                                    <span class="badge bg-soft-warning text-warning px-2.5 py-1 fw-bold fs-11">{{ $statusLower === 'reserved' ? __('crm.reserved') : __('crm.partially_issued') }}</span>
                                 @else
-                                    <span class="badge bg-soft-danger text-danger px-2.5 py-1 fw-bold fs-11">Pending Issue</span>
+                                    <span class="badge bg-soft-danger text-danger px-2.5 py-1 fw-bold fs-11">{{ __('crm.pending_issue') }}</span>
                                 @endif
                             </td>
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
-                                    <a href="{{ route('sales.material-requests.show', $slip->id) }}" class="action-icon-btn view-btn" title="View Details" data-bs-toggle="tooltip">
+                                    <a href="{{ route('sales.material-requests.show', $slip->id) }}" class="action-icon-btn view-btn" title="{{ __('crm.view_details') }}" data-bs-toggle="tooltip">
                                         <i class="feather feather-eye"></i>
                                     </a>
                                 </div>
@@ -117,8 +117,8 @@
                         <tr>
                             <td colspan="5" class="text-center py-5 text-muted">
                                 <i class="feather-info fs-36 text-secondary d-block mb-2"></i>
-                                <h6 class="fw-bold text-dark mb-1">No Material Request Slips Found</h6>
-                                <p class="fs-12 mb-0">There are currently no requisition slips matching the filters.</p>
+                                <h6 class="fw-bold text-dark mb-1">{{ __('crm.no_material_request_slips_found') }}</h6>
+                                <p class="fs-12 mb-0">{{ __('crm.no_requisition_slips_matching_filters') }}</p>
                             </td>
                         </tr>
                     @endforelse

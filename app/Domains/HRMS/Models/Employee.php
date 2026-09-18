@@ -129,6 +129,15 @@ class Employee extends BaseModel
                 $employee->employee_id = $prefix . '-' . str_pad((string) $nextSequence, 4, '0', STR_PAD_LEFT);
             }
         });
+
+        static::saving(function (self $employee) {
+            if ($employee->user_id) {
+                $user = $employee->user ?: \App\Models\User::find($employee->user_id);
+                if ($user && !empty($user->email)) {
+                    $employee->office_email = $user->email;
+                }
+            }
+        });
     }
 
     public function user(): BelongsTo

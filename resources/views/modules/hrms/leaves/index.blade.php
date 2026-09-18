@@ -1385,7 +1385,7 @@
 
                                                 $statusBadge = match($req->status) {
                                                     'approved'                => ['cls' => 'bg-soft-success text-success',    'icon' => 'feather-check-circle',  'lbl' => __('hrms.leave.app.status_approved')],
-                                                    'pending'                 => ['cls' => 'bg-soft-warning text-warning',    'icon' => 'feather-clock',          'lbl' => __('hrms.leave.app.status_pending')],
+                                                    'pending'                 => ['cls' => 'bg-soft-warning text-warning',    'icon' => 'feather-clock',          'lbl' => ((string)$req->current_level === '2') ? 'L1 Approved (L2 Pending)' : __('hrms.leave.app.status_pending')],
                                                     'rejected'                => ['cls' => 'bg-soft-danger text-danger',      'icon' => 'feather-x-circle',       'lbl' => __('hrms.leave.app.status_rejected')],
                                                     'cancellation_requested'  => ['cls' => 'bg-soft-info text-info',          'icon' => 'feather-rotate-ccw',     'lbl' => 'Cancellation Requested'],
                                                     'cancelled'               => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',          'lbl' => 'Cancelled'],

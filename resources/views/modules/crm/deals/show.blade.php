@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', $deal->title . ' | Zoho CRM Deals')
-@section('page-title', 'Deal Profile')
-@section('breadcrumb', 'CRM / Deals / ' . $deal->deal_number)
+@section('title', $deal->title . ' | SaaS ERP')
+@section('page-title', __('crm.deal_profile'))
+@section('breadcrumb', 'CRM / ' . __('crm.deals') . ' / ' . $deal->deal_number)
 
 @push('styles')
 <style>
@@ -422,10 +422,10 @@
                     
                     <!-- Subhead Details -->
                     <div class="mt-1 d-flex align-items-center gap-3 fs-11 text-muted">
-                        <span><strong class="text-dark">Deal #:</strong> <span class="font-monospace text-primary fw-bold">{{ $deal->deal_number }}</span></span>
-                        <span><strong class="text-dark">Deal Owner:</strong> {{ $deal->owner?->name ?: ($deal->user?->name ?: 'Unassigned') }}</span>
+                        <span><strong class="text-dark">{{ __('crm.deal_no') }}:</strong> <span class="font-monospace text-primary fw-bold">{{ $deal->deal_number }}</span></span>
+                        <span><strong class="text-dark">{{ __('crm.deal_owner') }}:</strong> {{ $deal->owner?->name ?: ($deal->user?->name ?: __('crm.unassigned')) }}</span>
                         @if($deal->contact)
-                            <span><strong class="text-dark">Contact:</strong> {{ $deal->contact->name }}</span>
+                            <span><strong class="text-dark">{{ __('crm.contact_person') }}:</strong> {{ $deal->contact->name }}</span>
                         @endif
                     </div>
                 </div>
@@ -433,7 +433,7 @@
             
             <!-- Right Action Buttons Toolbar -->
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-outline-secondary fw-bold py-1 px-2 rounded bg-white text-dark border-secondary d-inline-flex align-items-center" title="Back to Deals" style="font-size: 13px;">
+                <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-outline-secondary fw-bold py-1 px-2 rounded bg-white text-dark border-secondary d-inline-flex align-items-center" title="{{ __('crm.back_to_deal') }}" style="font-size: 13px;">
                     <i class="feather-arrow-left"></i>
                 </a>
 
@@ -445,28 +445,28 @@
                 @endphp
 
                 <button type="button" class="btn btn-xs btn-primary fw-bold py-1 px-2.5 rounded shadow-2xs d-inline-flex align-items-center text-white btn-open-deal-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas">
-                    <i class="feather-calendar me-1"></i> + Followup
+                    <i class="feather-calendar me-1"></i> + {{ __('crm.followup') }}
                 </button>
 
                 @if($deal->quotations->isEmpty())
                     <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-file-plus me-1"></i> Create Quotation
+                        <i class="feather-file-plus me-1"></i> + {{ __('crm.new_quotation') }}
                     </a>
                 @endif
 
                 @if($hasAcceptedQuotation && !$hasCustomer)
                     <a href="{{ route('crm.deals.showConvertForm', $deal->id) }}" class="btn btn-xs btn-warning text-dark fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-user-check me-1"></i> Convert to Customer
+                        <i class="feather-user-check me-1"></i> {{ __('crm.convert_to_customer') }}
                     </a>
                 @endif
 
                 @if($hasCustomer)
                     <span class="badge bg-soft-success text-success fw-bold px-2.5 py-1.5 fs-11 me-1">
-                        <i class="feather-check-circle me-1"></i> Customer Converted
+                        <i class="feather-check-circle me-1"></i> {{ __('crm.customer_converted') }}
                     </span>
                     @if($acceptedQuote && in_array($acceptedQuote->status, ['Accepted', 'Converted', 'Won']))
                         <a href="{{ route('sales.orders.create', ['quotation_id' => $acceptedQuote->id]) }}" class="btn btn-xs btn-success fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
-                            <i class="feather-shopping-cart me-1"></i> Convert to Sales Order
+                            <i class="feather-shopping-cart me-1"></i> {{ __('crm.convert_to_sales_order') }}
                         </a>
                     @endif
                 @endif
@@ -475,19 +475,19 @@
                 <!-- Action Dropdown -->
                 <x-ui.action-dropdown id="dealProfileActionsDropdown">
                     <li>
-                        <a class="dropdown-item py-2 btn-open-deal-followup-offcanvas" href="javascript:void(0)" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-mode="log_note">
-                            <i class="feather-calendar me-1.5 text-muted"></i> Log Activity / Discussion
+                        <a class="dropdown-item py-2 btn-open-deal-followup-offcanvas" href="javascript:void(0)" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-mode="log_note" style="white-space: normal; max-width: 250px;">
+                            <i class="feather-calendar me-1.5 text-muted"></i> {{ __('crm.log_interaction_next_followup') }}
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item py-2 btn-open-deal-followup-offcanvas" href="javascript:void(0)" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-mode="schedule">
-                            <i class="feather-clock me-1.5 text-muted"></i> Schedule Next Activity
+                        <a class="dropdown-item py-2 btn-open-deal-followup-offcanvas" href="javascript:void(0)" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-mode="schedule" style="white-space: normal; max-width: 250px;">
+                            <i class="feather-clock me-1.5 text-muted"></i> {{ __('crm.schedule_next_activity_btn') }}
                         </a>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a class="dropdown-item py-2" href="{{ route('crm.deals.edit', $deal) }}">
-                            <i class="feather-edit me-1.5 text-muted"></i> Edit Deal Details
+                        <a class="dropdown-item py-2" href="{{ route('crm.deals.edit', $deal) }}" style="white-space: normal; max-width: 250px;">
+                            <i class="feather-edit me-1.5 text-muted"></i> {{ __('crm.edit_deal_details') }}
                         </a>
                     </li>
                 </x-ui.action-dropdown>
@@ -495,7 +495,7 @@
                 <!-- Pagination Arrows -->
                 <div class="d-flex align-items-center ms-1 border rounded px-1 py-0.5 bg-white">
                     @if($prevDeal)
-                        <a href="{{ route('crm.deals.show', $prevDeal) }}" class="btn btn-xs btn-link text-dark p-1 border-0 d-inline-flex align-items-center justify-content-center" title="Previous Deal">
+                        <a href="{{ route('crm.deals.show', $prevDeal) }}" class="btn btn-xs btn-link text-dark p-1 border-0 d-inline-flex align-items-center justify-content-center" title="{{ __('crm.previous_deal') }}">
                             <i class="feather-chevron-left fs-12"></i>
                         </a>
                     @else
@@ -505,7 +505,7 @@
                     @endif
 
                     @if($nextDeal)
-                        <a href="{{ route('crm.deals.show', $nextDeal) }}" class="btn btn-xs btn-link text-dark p-1 border-0 d-inline-flex align-items-center justify-content-center" title="Next Deal">
+                        <a href="{{ route('crm.deals.show', $nextDeal) }}" class="btn btn-xs btn-link text-dark p-1 border-0 d-inline-flex align-items-center justify-content-center" title="{{ __('crm.next_deal') }}">
                             <i class="feather-chevron-right fs-12"></i>
                         </a>
                     @else
@@ -533,8 +533,12 @@
                         } elseif ($currentStageKey !== 'Lost' && $stgIndex < $currentIndex) {
                             $stepClass = 'passed';
                         }
+                        $stgTitleTrans = __('crm.stages.' . $stg);
+                        if ($stgTitleTrans === 'crm.stages.' . $stg) {
+                            $stgTitleTrans = $stg;
+                        }
                     @endphp
-                    <div class="zoho-pipeline-step {{ $stepClass }}" onclick="submitDealStage('{{ $stg }}')" title="Click to update deal stage to {{ $stg }} ({{ $prob }}%)">
+                    <div class="zoho-pipeline-step {{ $stepClass }}" onclick="submitDealStage('{{ $stg }}')" title="Click to update deal stage to {{ $stgTitleTrans }} ({{ $prob }}%)">
                         @if($stepClass === 'passed')
                             <i class="feather-check-circle fs-11"></i>
                         @elseif(str_contains($stepClass, 'active'))
@@ -542,7 +546,7 @@
                         @else
                             <i class="feather-circle fs-10 opacity-50"></i>
                         @endif
-                        <span>{{ $stg }} ({{ $prob }}%)</span>
+                        <span>{{ $stgTitleTrans }} ({{ $prob }}%)</span>
                     </div>
                 @endforeach
             </div>
@@ -567,60 +571,60 @@
             <!-- Left Sidebar Menu (STICKY RELATED LIST) -->
             <div class="zoho-sidebar-col border-end bg-white d-print-none h-100 overflow-auto" style="width: 210px; flex-shrink: 0; user-select: none;">
                 <div class="p-3">
-                    <h6 class="text-uppercase fw-bold text-muted mb-3" style="font-size: 10px; letter-spacing: 0.8px;">Related List Navigation</h6>
+                    <h6 class="text-uppercase fw-bold text-muted mb-3" style="font-size: 10px; letter-spacing: 0.8px;">{{ __('crm.related_list_navigation') }}</h6>
                     <ul class="nav flex-column zoho-sidebar-nav gap-1" id="zohoSidebarLinks">
                         <li class="nav-item">
                             <a href="#sectionDealInfo" class="nav-link active">
-                                <i class="feather-info fs-13 text-muted"></i> Deal Information
+                                <i class="feather-info fs-13 text-muted"></i> {{ __('crm.deal_information') }}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="#sectionDealProducts" class="nav-link">
-                                <i class="feather-box fs-13 text-muted"></i> Products & Quantities
+                                <i class="feather-box fs-13 text-muted"></i> {{ __('crm.product_interest') }}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="#sectionCustomerCard" class="nav-link">
-                                <i class="feather-users fs-13 text-muted"></i> Customer Details
+                                <i class="feather-users fs-13 text-muted"></i> {{ __('crm.customer_account_contact_info') }}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="#sectionNotes" class="nav-link">
-                                <i class="feather-grid fs-13 text-muted"></i> Notes & Requirements
+                                <i class="feather-grid fs-13 text-muted"></i> {{ __('crm.notes_requirement_summary') }}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="#sectionQuotations" class="nav-link">
-                                <i class="feather-file-text fs-13 text-muted"></i> Quotations
+                                <i class="feather-file-text fs-13 text-muted"></i> {{ __('crm.quotation_proposals') }}
                                 <span class="badge bg-soft-secondary text-muted border">{{ $deal->quotations->count() }}</span>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="#sectionQuotationHistory" class="nav-link">
-                                <i class="feather-git-commit fs-13 text-muted"></i> Revision History
+                                <i class="feather-git-commit fs-13 text-muted"></i> {{ __('crm.quotation_revision_history') }}
                                 <span class="badge bg-soft-secondary text-muted border">{{ $deal->quotations->count() }}</span>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="#sectionSalesOrders" class="nav-link">
-                                <i class="feather-shopping-cart fs-13 text-muted"></i> Sales Orders
+                                <i class="feather-shopping-cart fs-13 text-muted"></i> {{ __('crm.sales_orders') }}
                                 <span class="badge bg-soft-secondary text-muted border">{{ $deal->salesOrders->count() }}</span>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="#subtab-interactions" class="nav-link">
-                                <i class="feather-calendar fs-13 text-muted"></i> Activities & Calls
+                                <i class="feather-calendar fs-13 text-muted"></i> {{ __('crm.activities') }}
                                 <span class="badge bg-soft-secondary text-muted border">{{ $followups->count() }}</span>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="#subtab-history" class="nav-link">
-                                <i class="feather-clock fs-13 text-muted"></i> History & Audit
+                                <i class="feather-clock fs-13 text-muted"></i> {{ __('crm.timeline_audit') }}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="#sectionDocuments" class="nav-link">
-                                <i class="feather-paperclip fs-13 text-muted"></i> Documents
+                                <i class="feather-paperclip fs-13 text-muted"></i> {{ __('crm.lead_documents') }}
                                 <span class="badge bg-soft-secondary text-muted border">{{ $leadDocuments->count() }}</span>
                             </a>
                         </li>
@@ -636,29 +640,29 @@
                     <ul class="nav nav-pills zoho-nav-tabs" id="zohoDealTabs" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link px-3 py-1 fw-bold fs-12 {{ (!$isQuotationTabActive && !$isSalesOrdersTabActive) ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
-                                <i class="feather-grid me-1"></i>Overview
+                                <i class="feather-grid me-1"></i>{{ __('crm.overview') }}
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link px-3 py-1 fw-bold fs-12 {{ $isQuotationTabActive ? 'active' : '' }}" id="quotations-tab" data-bs-toggle="tab" data-bs-target="#quotations-pane" type="button" role="tab">
-                                <i class="feather-file-text me-1"></i>Quotation & Proposals ({{ $deal->quotations->count() }})
+                                <i class="feather-file-text me-1"></i>{{ __('crm.quotation_proposals') }} ({{ $deal->quotations->count() }})
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link px-3 py-1 fw-bold fs-12 {{ $isSalesOrdersTabActive ? 'active' : '' }}" id="salesorders-tab" data-bs-toggle="tab" data-bs-target="#salesorders-pane" type="button" role="tab">
-                                <i class="feather-shopping-cart me-1"></i>Sales Orders ({{ $deal->salesOrders->count() }})
+                                <i class="feather-shopping-cart me-1"></i>{{ __('crm.sales_orders') }} ({{ $deal->salesOrders->count() }})
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link px-3 py-1 fw-bold fs-12" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab">
-                                <i class="feather-clock me-1"></i>Timeline & Audit
+                                <i class="feather-clock me-1"></i>{{ __('crm.timeline_audit') }}
                             </button>
                         </li>
                     </ul>
 
                     <div class="d-flex align-items-center text-muted fs-11 fw-medium" style="font-family: 'Inter', sans-serif;">
                         <i class="feather-clock me-1.5 text-muted fs-12"></i> 
-                        Last Update : {{ $deal->updated_at ? $deal->updated_at->diffForHumans() : 'Recently' }}
+                        {{ __('crm.last_update') }} : {{ $deal->updated_at ? $deal->updated_at->diffForHumans() : __('crm.recently') }}
                     </div>
                 </div>
 
@@ -675,9 +679,9 @@
                                     <div class="deal-metric-icon bg-soft-success text-success">
                                         <i class="feather-dollar-sign"></i>
                                     </div>
-                                    <div class="min-w-0 flex-grow-1">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Estimated Deal Value</span>
-                                        <span class="fs-14 fw-extrabold text-dark d-block">₹{{ number_format($deal->estimated_value, 2) }}</span>
+                                     <div class="min-w-0 flex-grow-1">
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.estimated_deal_value') }}</span>
+                                        <span class="fs-14 fw-extrabold text-dark d-block">{{ format_currency($deal->estimated_value) }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -687,8 +691,8 @@
                                         <i class="feather-pie-chart"></i>
                                     </div>
                                     <div class="min-w-0 flex-grow-1">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Expected Revenue</span>
-                                        <span class="fs-14 fw-extrabold text-primary d-block">₹{{ number_format($expectedRevenue, 2) }} <span class="fs-10 text-muted">({{ $deal->probability }}%)</span></span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.expected_revenue') }}</span>
+                                        <span class="fs-14 fw-extrabold text-primary d-block">{{ format_currency($expectedRevenue) }} <span class="fs-10 text-muted">({{ $deal->probability }}%)</span></span>
                                     </div>
                                 </div>
                             </div>
@@ -698,7 +702,7 @@
                                         <i class="feather-calendar"></i>
                                     </div>
                                     <div class="min-w-0 flex-grow-1">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Target Closing Date</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.target_closing_date') }}</span>
                                         <span class="fs-14 fw-extrabold text-dark d-block">{{ $deal->closing_date ? $deal->closing_date->format('d M Y') : 'Not Set' }}</span>
                                     </div>
                                 </div>
@@ -709,7 +713,7 @@
                                         <i class="feather-briefcase"></i>
                                     </div>
                                     <div class="min-w-0 flex-grow-1 overflow-hidden">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Account / Customer</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.customer_account') }}</span>
                                         <span class="fs-13 fw-extrabold text-dark text-truncate d-block" title="{{ $deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A') }}">
                                             {{ $deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A') }}
                                         </span>
@@ -738,7 +742,7 @@
                                 <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
                                     <h5 class="fs-13 text-dark fw-bold mb-0 d-flex align-items-center gap-1.5">
                                         <i class="feather-cpu text-primary fs-16"></i>
-                                        <span>AI Deal Health & Action Intelligence</span>
+                                        <span>{{ __('crm.ai_deal_health') }}</span>
                                     </h5>
                                     <div class="d-flex align-items-center gap-2">
                                         <a href="https://love14-deal-health-scoring.hf.space/auth/login?user_id={{ auth()->id() ?? 1 }}&next={{ urlencode(url()->current()) }}" 
@@ -749,10 +753,10 @@
                                             <i class="feather-loader spin me-1"></i>Checking Gmail Auth...
                                         </a>
                                         <button type="button" id="btnSyncHealth" class="btn btn-xs btn-outline-primary fw-bold px-2.5 py-1 fs-11 rounded-1">
-                                            <i class="feather-refresh-cw me-1"></i>Sync AI Health
+                                            <i class="feather-refresh-cw me-1"></i>{{ __('crm.sync_ai_health') }}
                                         </button>
                                         <button type="button" id="btnGenerateDraft" class="btn btn-xs btn-primary fw-bold px-2.5 py-1 fs-11 rounded-1">
-                                            <i class="feather-mail me-1"></i>Generate AI Draft Reply
+                                            <i class="feather-mail me-1"></i>{{ __('crm.generate_ai_draft') }}
                                         </button>
                                     </div>
                                 </div>
@@ -761,27 +765,27 @@
                                     <div class="col-md-4">
                                         <div class="p-2.5 rounded border bg-white d-flex align-items-center justify-content-between">
                                             <div>
-                                                <span class="fs-11 text-muted fw-bold d-block text-uppercase">Deal Health Score</span>
-                                                <span class="fs-18 fw-extrabold text-dark" id="healthScoreDisplay">{{ $scoreVal }}</span>
+                                                <span class="fs-11 text-muted fw-bold d-block text-uppercase">{{ __('crm.deal_health_score') }}</span>
+                                                <span class="fs-18 fw-extrabold text-dark" id="healthScoreDisplay">{{ $scoreVal === 'Not Synced' ? __('crm.not_synced') : $scoreVal }}</span>
                                             </div>
                                             <span class="badge {{ $riskBadgeStyle }} px-2.5 py-1 fs-11 fw-bold" id="riskLevelDisplay">
-                                                {{ $isSynced ? ($riskVal . ' Risk') : 'Not Synced' }}
+                                                {{ $isSynced ? ($riskVal . ' Risk') : __('crm.not_synced') }}
                                             </span>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
                                         <div class="p-2.5 rounded border bg-white">
-                                            <span class="fs-11 text-muted fw-bold d-block text-uppercase">Client Sentiment</span>
+                                            <span class="fs-11 text-muted fw-bold d-block text-uppercase">{{ __('crm.client_sentiment') }}</span>
                                             <span class="fs-13 fw-bold text-dark" id="sentimentDisplay">
-                                                <i class="feather-smile text-primary me-1"></i>{{ $isSynced ? ($deal->sentiment_score ?: 'Neutral') : 'Not Synced' }}
+                                                <i class="feather-smile text-primary me-1"></i>{{ $isSynced ? ($deal->sentiment_score ?: 'Neutral') : __('crm.not_synced') }}
                                             </span>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
                                         <div class="p-2.5 rounded border bg-white">
-                                            <span class="fs-11 text-muted fw-bold d-block text-uppercase">Last AI Sync</span>
+                                            <span class="fs-11 text-muted fw-bold d-block text-uppercase">{{ __('crm.last_ai_sync') }}</span>
                                             <span class="fs-12 fw-semibold text-muted" id="syncedAtDisplay">
-                                                <i class="feather-clock me-1"></i>{{ $isSynced ? $deal->health_synced_at->diffForHumans() : 'Never Synced' }}
+                                                <i class="feather-clock me-1"></i>{{ $isSynced ? $deal->health_synced_at->diffForHumans() : __('crm.never_synced') }}
                                             </span>
                                         </div>
                                     </div>
@@ -789,10 +793,10 @@
 
                                 <div class="p-3 rounded border bg-soft-info border-info-subtle">
                                     <div class="fw-bold text-info-emphasis fs-12 mb-1 d-flex align-items-center gap-1">
-                                        <i class="feather-zap me-1"></i>AI Recommended Next Best Action:
+                                        <i class="feather-zap me-1"></i>{{ __('crm.ai_recommended_action') }}
                                     </div>
                                     <div class="fs-12 text-dark fw-medium" id="nextActionDisplay">
-                                        {{ $isSynced ? ($deal->next_best_action ?: 'No specific action recommended by AI.') : 'Click "Sync AI Health" above to fetch live AI evaluation from API.' }}
+                                        {{ $isSynced ? ($deal->next_best_action ?: 'No specific action recommended by AI.') : __('crm.sync_ai_health_notice') }}
                                     </div>
                                 </div>
 
@@ -806,22 +810,22 @@
                         <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionDealInfo">
                             <div class="card-body p-3">
                                 <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
-                                    <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0"><i class="feather-info text-info me-1.5"></i>Deal Information & Stage Controls</h5>
+                                     <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0"><i class="feather-info text-info me-1.5"></i>{{ __('crm.deal_information_controls') }}</h5>
                                 </div>
                                 <div class="row g-0">
                                     <div class="col-md-6 pe-md-4">
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Deal Title</div>
+                                            <div class="zoho-field-label">{{ __('crm.project_deal_title') }}</div>
                                             <div class="zoho-field-value text-dark fw-bold text-break">{{ $deal->title }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Deal Number</div>
+                                            <div class="zoho-field-label">{{ __('crm.deal_no') }}</div>
                                             <div class="zoho-field-value text-primary font-monospace fw-bold">{{ $deal->deal_number }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Account (Company)</div>
+                                            <div class="zoho-field-label">{{ __('crm.account_company') }}</div>
                                             <div class="zoho-field-value text-dark fw-bold text-break">
                                                 @if($deal->account)
                                                     <a href="{{ route('crm.accounts.show', $deal->account) }}" class="text-primary hover-underline text-break" title="{{ $deal->account->name }}">{{ $deal->account->name }}</a>
@@ -836,50 +840,50 @@
                                         </div>
 
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Contact Person</div>
+                                            <div class="zoho-field-label">{{ __('crm.contact_person') }}</div>
                                             <div class="zoho-field-value text-dark">{{ $deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->contact_person ?: $linkedLead->company_name) : '—') }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Designation / Role</div>
+                                            <div class="zoho-field-label">{{ __('crm.designation_role') }}</div>
                                             <div class="zoho-field-value text-dark">{{ ($deal->contact && $deal->contact->designation) ? $deal->contact->designation : '—' }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Target Closing Date</div>
+                                            <div class="zoho-field-label">{{ __('crm.target_closing_date') }}</div>
                                             <div class="zoho-field-value text-dark">{{ $deal->closing_date ? $deal->closing_date->format('d/m/Y') : '—' }}</div>
                                         </div>
                                     </div>
 
                                     <div class="col-md-6 ps-md-4">
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Closing Probability</div>
+                                            <div class="zoho-field-label">{{ __('crm.closing_probability') }}</div>
                                             <div class="zoho-field-value text-info fw-bold">{{ $deal->probability }}%</div>
                                         </div>
 
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Estimated Revenue</div>
-                                            <div class="zoho-field-value text-dark fw-bold">₹{{ number_format($deal->estimated_value, 2) }}</div>
+                                            <div class="zoho-field-label">{{ __('crm.estimated_revenue_val') }}</div>
+                                            <div class="zoho-field-value text-dark fw-bold">{{ format_currency($deal->estimated_value) }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Actual Realized Revenue</div>
-                                            <div class="zoho-field-value text-success fw-bold">₹{{ number_format($deal->actual_value, 2) }}</div>
+                                            <div class="zoho-field-label">{{ __('crm.actual_realized_revenue') }}</div>
+                                            <div class="zoho-field-value text-success fw-bold">{{ format_currency($deal->actual_value) }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Lead Source</div>
+                                            <div class="zoho-field-label">{{ __('crm.lead_source') }}</div>
                                             <div class="zoho-field-value text-dark">{{ ($deal->lead_source && !in_array($deal->lead_source, ['Select an Option', 'Select an option', 'Select Option'], true)) ? $deal->lead_source : '—' }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Deal Owner / Manager</div>
-                                            <div class="zoho-field-value text-dark fw-bold">{{ $deal->owner?->name ?: ($deal->user?->name ?: 'Unassigned') }}</div>
+                                            <div class="zoho-field-label">{{ __('crm.deal_owner_manager') }}</div>
+                                            <div class="zoho-field-value text-dark fw-bold">{{ $deal->owner?->name ?: ($deal->user?->name ?: __('crm.unassigned')) }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Account Manager</div>
-                                            <div class="zoho-field-value text-primary fw-bold">{{ $deal->account?->owner?->name ?: 'Unassigned' }}</div>
+                                            <div class="zoho-field-label">{{ __('crm.lead_owner') }}</div>
+                                            <div class="zoho-field-value text-primary fw-bold">{{ $deal->account?->owner?->name ?: __('crm.unassigned') }}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -913,19 +917,19 @@
                                     <div class="card-body p-3">
                                         <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
                                             <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0">
-                                                <i class="feather-box text-primary me-1.5"></i>Interested Products & Quantities for Deal
+                                                <i class="feather-box text-primary me-1.5"></i>{{ __('crm.interested_products_quantity') }}
                                             </h5>
-                                            <span class="badge bg-soft-primary text-primary fs-11 fw-semibold">{{ count($rawItems) }} Product(s) Selected</span>
+                                            <span class="badge bg-soft-primary text-primary fs-11 fw-semibold">{{ count($rawItems) }} {{ __('crm.products_selected') }}</span>
                                         </div>
                                         <div class="table-responsive">
                                             <table class="table table-sm table-bordered align-middle mb-0 fs-13">
                                                 <thead class="table-light text-muted">
                                                     <tr>
-                                                        <th>Product / Item Name</th>
+                                                        <th>{{ __('crm.product') }}</th>
                                                         <th>SKU</th>
-                                                        <th class="text-center">Quantity</th>
-                                                        <th class="text-end">Unit Price (₹)</th>
-                                                        <th class="text-end">Total Estimated Value (₹)</th>
+                                                        <th class="text-center">{{ __('crm.qty') }}</th>
+                                                        <th class="text-end">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                                        <th class="text-end">{{ __('crm.total_estimated_value') }} ({{ active_currency_symbol() }})</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -945,16 +949,16 @@
                                                             </td>
                                                             <td class="font-monospace text-muted">{{ $pObj->sku }}</td>
                                                             <td class="text-center fw-bold text-primary">{{ number_format($pQty, 0) }} {{ $pObj->uom?->code ?? 'Pcs' }}</td>
-                                                            <td class="text-end">₹{{ number_format($pPrice, 2) }}</td>
-                                                            <td class="text-end fw-bold text-success">₹{{ number_format($lineVal, 2) }}</td>
+                                                            <td class="text-end">{{ format_currency($pPrice) }}</td>
+                                                            <td class="text-end fw-bold text-success">{{ format_currency($lineVal) }}</td>
                                                         </tr>
                                                     @endforeach
                                                 </tbody>
                                                 @if($grandProductTotal > 0)
                                                     <tfoot class="table-light fw-bold">
                                                         <tr>
-                                                            <td colspan="4" class="text-end text-uppercase fs-12">Total Deal Product Value:</td>
-                                                            <td class="text-end text-success fs-14">₹{{ number_format($grandProductTotal, 2) }}</td>
+                                                            <td colspan="4" class="text-end text-uppercase fs-12">{{ __('crm.total_estimated_product_value') }}:</td>
+                                                            <td class="text-end text-success fs-14">{{ format_currency($grandProductTotal) }}</td>
                                                         </tr>
                                                     </tfoot>
                                                 @endif
@@ -968,14 +972,14 @@
                         <!-- CUSTOMER ACCOUNT & CONTACT QUICK CARD -->
                         <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionCustomerCard">
                             <div class="card-body p-3">
-                                <h5 class="fs-13 text-dark fw-bold mb-3"><i class="feather-users text-primary me-1.5"></i>Customer Account & Contact Information</h5>
+                                <h5 class="fs-13 text-dark fw-bold mb-3"><i class="feather-users text-primary me-1.5"></i>{{ __('crm.customer_account_contact_info') }}</h5>
                                 <div class="row g-3">
                                     <div class="col-md-6 border-end">
                                         <div class="p-3 bg-light-50 rounded border">
                                             <div class="fw-bold text-dark fs-14 mb-1">
-                                                {{ $deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'No Account Linked') }}
+                                                {{ $deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : __('crm.no_account_linked')) }}
                                             </div>
-                                            <div class="fs-12 text-muted mb-2"><i class="feather-map-pin me-1"></i>{{ $deal->account ? ($deal->account->billing_address ?: 'Billing address not added') : ($linkedLead ? ($linkedLead->address ?: 'Address not added') : '—') }}</div>
+                                            <div class="fs-12 text-muted mb-2"><i class="feather-map-pin me-1"></i>{{ $deal->account ? ($deal->account->billing_address ?: __('crm.billing_address_not_added')) : ($linkedLead ? ($linkedLead->address ?: __('crm.address_not_added')) : '—') }}</div>
                                             @php
                                                 $accPhone = $deal->account?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone);
                                                 $accEmail = $deal->account?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email);
@@ -992,11 +996,11 @@
                                         <div class="p-3 bg-light-50 rounded border">
                                             @php
                                                 $cName = $deal->contact?->name ?: ($linkedLead?->contact_person ?: $linkedLead?->company_name);
-                                                $cTitle = $deal->contact?->designation ?: ($deal->contact?->role ?: ($linkedLead?->designation ?: 'Primary Contact'));
+                                                $cTitle = $deal->contact?->designation ?: ($deal->contact?->role ?: ($linkedLead?->designation ?: __('crm.primary_contact')));
                                                 $cPhone = $deal->contact?->phone ?: ($linkedLead?->phone ?: $linkedLead?->company_phone);
                                                 $cEmail = $deal->contact?->email ?: ($linkedLead?->email ?: $linkedLead?->company_email);
                                             @endphp
-                                            <div class="fw-bold text-dark fs-14 mb-1">{{ $cName ?: 'No Contact Person' }}</div>
+                                            <div class="fw-bold text-dark fs-14 mb-1">{{ $cName ?: __('crm.no_contact_person') }}</div>
                                             <div class="fs-12 text-muted mb-2">{{ $cTitle ?: '—' }}</div>
                                             @if($cPhone)
                                                 <div class="fs-12 text-dark"><i class="feather-phone me-1 text-muted"></i>{{ $cPhone }}</div>
@@ -1015,9 +1019,9 @@
                             <div class="card-body p-3">
                                 <div class="d-flex align-items-center justify-content-between pb-2 border-bottom mb-3">
                                     <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0" style="font-family: 'Inter', sans-serif; border-bottom: none;">
-                                        <i class="feather-file-text text-primary me-1.5"></i>Requirements Details
+                                        <i class="feather-file-text text-primary me-1.5"></i>{{ __('crm.requirements_summary') }}
                                     </h5>
-                                    <span class="text-muted fs-11 d-none d-sm-inline-block"><i class="feather-info me-1 text-primary"></i>Click box below to edit</span>
+                                    <span class="text-muted fs-11 d-none d-sm-inline-block"><i class="feather-info me-1 text-primary"></i>{{ __('crm.click_box_to_edit') }}</span>
                                 </div>
 
                                 @php
@@ -1036,12 +1040,12 @@
                                             </div>
                                         </div>
                                     @else
-                                        <div class="position-relative requirement-empty-box p-4 rounded text-center cursor-pointer" onclick="enableDealRequirementEdit()" title="Click to add requirement" style="cursor: pointer; background: #f8fafc; border: 1px dashed #cbd5e1; transition: all 0.2s ease;">
+                                        <div class="position-relative requirement-empty-box p-4 rounded text-center cursor-pointer" onclick="enableDealRequirementEdit()" title="{{ __('crm.click_to_add_requirements') }}" style="cursor: pointer; background: #f8fafc; border: 1px dashed #cbd5e1; transition: all 0.2s ease;">
                                             <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2">
                                                 <i class="feather-edit-3 fs-5"></i>
                                             </div>
-                                            <h6 class="fw-bold text-dark fs-13 mb-1">No Requirements Details Specified</h6>
-                                            <p class="text-muted fs-12 mb-0">Click here to add deal notes, requirements, or scope of work.</p>
+                                            <h6 class="fw-bold text-dark fs-13 mb-1">{{ __('crm.no_requirements_specified') }}</h6>
+                                            <p class="text-muted fs-12 mb-0">{{ __('crm.click_to_add_requirements') }}</p>
                                         </div>
                                     @endif
                                 </div>
@@ -1052,7 +1056,7 @@
                                         @csrf
                                         @method('PATCH')
                                         <div class="mb-2">
-                                            <textarea name="notes" id="dealRequirementInput" rows="4" class="form-control form-control-sm shadow-2xs fs-13" placeholder="Enter detailed requirements or specifications for this deal..." style="border-color: var(--bs-primary); border-radius: 6px; font-family: 'Inter', sans-serif;" oninput="updateDealReqCharCount(this)">{{ old('notes', $currentReq) }}</textarea>
+                                            <textarea name="notes" id="dealRequirementInput" rows="4" class="form-control form-control-sm shadow-2xs fs-13" placeholder="{{ __('crm.requirements_placeholder') }}" style="border-color: var(--bs-primary); border-radius: 6px; font-family: 'Inter', sans-serif;" oninput="updateDealReqCharCount(this)">{{ old('notes', $currentReq) }}</textarea>
                                         </div>
                                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                                             <span class="text-muted fs-11">
@@ -1060,9 +1064,9 @@
                                             </span>
                                             <div class="d-flex align-items-center gap-2">
                                                 <span class="text-muted fs-11 me-2" id="dealReqCharCounter">0 chars</span>
-                                                <button type="button" class="btn btn-xs btn-light border px-3 py-1.5 fw-bold rounded" onclick="cancelDealRequirementEdit()">CANCEL</button>
+                                                <button type="button" class="btn btn-xs btn-light border px-3 py-1.5 fw-bold rounded" onclick="cancelDealRequirementEdit()">{{ __('crm.cancel_caps') }}</button>
                                                 <button type="submit" id="btnSaveDealRequirement" class="btn btn-xs btn-primary px-3 py-1.5 fw-bold shadow-2xs text-white rounded d-inline-flex align-items-center" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
-                                                    <i class="feather-check me-1"></i> SAVE REQUIREMENT
+                                                    <i class="feather-check me-1"></i> {{ __('crm.save_requirement') }}
                                                 </button>
                                             </div>
                                         </div>
@@ -1075,10 +1079,10 @@
                         <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionDocuments">
                             <div class="card-body p-3">
                                 <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                                    <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-folder me-2 text-primary"></i>Attached Documents & Files</h6>
+                                    <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-folder me-2 text-primary"></i>{{ __('crm.attached_documents_files') }}</h6>
                                     <form action="{{ route('crm.deals.documents.upload', $deal->id) }}" method="POST" enctype="multipart/form-data" class="m-0 p-0" id="dealDocUploadForm">
                                         @csrf
-                                        <button type="button" class="btn btn-xs btn-primary fw-bold" onclick="document.getElementById('dealDocInput').click();" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-upload me-1"></i> Upload</button>
+                                        <button type="button" class="btn btn-xs btn-primary fw-bold" onclick="document.getElementById('dealDocInput').click();" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-upload me-1"></i> {{ __('crm.upload') }}</button>
                                         <input type="file" name="documents[]" id="dealDocInput" onchange="if (this.files &amp;&amp; this.files.length > 0) { document.getElementById('dealDocUploadForm').submit(); }" multiple style="display: none;">
                                     </form>
                                 </div>
@@ -1086,8 +1090,9 @@
                                 @if($leadDocuments->isEmpty())
                                     <div class="text-center py-4 border border-dashed rounded bg-light-subtle">
                                         <i class="feather-file-text fs-24 text-muted mb-1 d-block opacity-50"></i>
-                                        <div class="text-muted fs-12">No documents attached yet for this deal.</div>
+                                        <div class="text-muted fs-12">{{ __('crm.no_documents_attached_deal') }}</div>
                                     </div>
+
                                 @else
                                     <div class="row g-3">
                                         @foreach($leadDocuments as $document)
@@ -1185,56 +1190,52 @@
                                     <form action="{{ route('crm.quotations.store') }}" method="POST" id="quotationForm" novalidate>
                                         @csrf
                                         <input type="hidden" name="crm_deal_id" value="{{ $deal->id }}">
-                                        <input type="hidden" name="form_type" value="quotation_create">
-
-                                        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
-                                            <h5 class="fw-bold text-dark mb-0 fs-16"><i class="feather-file-plus text-primary me-2"></i>New Quotation</h5>
-                                            <a href="{{ route('crm.deals.show', $deal->id) }}" class="btn btn-sm btn-light border">Cancel</a>
+                                        <input type="hidden" name="form_type" value="quotat                                        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+                                            <h5 class="fw-bold text-dark mb-0 fs-16"><i class="feather-file-plus text-primary me-2"></i>{{ __('crm.new_quotation_title') }}</h5>
+                                            <a href="{{ route('crm.deals.show', $deal->id) }}" class="btn btn-sm btn-light border">{{ __('crm.cancel') }}</a>
                                         </div>
 
                                         <div class="row g-4 mb-4 fs-13 text-dark">
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" label="Customer / Account" name="_customer_display"
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.customer_account')" name="_customer_display"
                                                     :value="$deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A'))"
                                                     readonly="true"
                                                     style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Contact Email" name="email" :value="old('email', $deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : ''))" :errorText="$errors->first('email')" />
-                                                <x-ui.odoo-form-ui type="input" label="Contact Phone" name="phone" :value="old('phone', $deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : ''))" :errorText="$errors->first('phone')" />
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" :value="old('email', $deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : ''))" :errorText="$errors->first('email')" />
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : ''))" :errorText="$errors->first('phone')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" label="Quotation Number" name="quotation_number"
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.quotation_number')" name="quotation_number"
                                                     :value="old('quotation_number', $nextQuotationNumber)" readonly="true"
                                                     style="font-weight: bold; color: #495057;"
                                                     :errorText="$errors->first('quotation_number')" />
 
-                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Quotation Date" name="quotation_date"
+                                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.quotation_date')" name="quotation_date"
                                                     :value="old('quotation_date', date('Y-m-d'))" :errorText="$errors->first('quotation_date')" />
 
-                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Expiration Date" name="expiry_date"
+                                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.expiration_date')" name="expiry_date"
                                                     :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" :errorText="$errors->first('expiry_date')" />
 
                                                 @if(!$isQuotationAutoApprove)
-                                                    <x-ui.odoo-form-ui type="select" label="Initial Status" name="status" :required="true" :errorText="$errors->first('status')">
-                                                         <option value="Draft" @selected(old('status') === 'Draft')>Draft</option>
-                                                         <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Sent for Approval</option>
+                                                    <x-ui.odoo-form-ui type="select" :label="__('crm.initial_status')" name="status" :required="true" :errorText="$errors->first('status')">
+                                                         <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.draft') }}</option>
+                                                         <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>{{ __('crm.sent_for_approval') }}</option>
                                                      </x-ui.odoo-form-ui>
                                                 @endif
                                             </div>
-                                        </div>
-
-                                        <!-- Order Lines Table -->
+                                                                           <!-- Order Lines Table -->
                                         <div class="border-top pt-4">
-                                            <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
+                                            <h5 class="fw-bold text-dark mb-3 fs-14">{{ __('crm.order_lines') }}</h5>
                                             <div class="table-responsive">
                                                 <x-ui.odoo-form-ui type="table" id="itemsTable">
                                                     <thead>
                                                         <tr>
-                                                            <th style="width: 38%;">Product Description</th>
-                                                            <th class="text-end" style="width: 10%;">Qty</th>
-                                                            <th class="text-end" style="width: 18%;">Unit Price (₹)</th>
-                                                            <th class="text-end" style="width: 12%;">Taxes (%)</th>
-                                                            <th class="text-end pe-3" style="width: 17%;">Amount</th>
+                                                            <th style="width: 38%;">{{ __('crm.product_description') }}</th>
+                                                            <th class="text-end" style="width: 10%;">{{ __('crm.qty') }}</th>
+                                                            <th class="text-end" style="width: 18%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                                            <th class="text-end" style="width: 12%;">{{ __('crm.taxes') }}</th>
+                                                            <th class="text-end pe-3" style="width: 17%;">{{ __('crm.amount') }}</th>
                                                             <th class="text-center" style="width: 5%;"></th>
                                                         </tr>
                                                     </thead>
@@ -1245,7 +1246,7 @@
                                             </div>
                                             <div class="mt-2.5">
                                                 <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
-                                                    <i class="feather-plus me-1"></i>Add a product
+                                                    <i class="feather-plus me-1"></i>{{ __('crm.add_product') }}
                                                 </button>
                                             </div>
                                         </div>
@@ -1254,34 +1255,35 @@
                                         <div class="row mt-4 pt-3 border-top text-dark fs-13">
                                             <div class="col-md-8">
                                                 <div class="pe-md-4">
-                                                    <x-ui.odoo-form-ui type="editor" label="Terms & Conditions" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions') !!}</x-ui.odoo-form-ui>
-                                                    <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="notes" rows="2" placeholder="Notes for internal view..." :errorText="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
+                                                    <x-ui.odoo-form-ui type="editor" :label="__('crm.terms_conditions')" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions') !!}</x-ui.odoo-form-ui>
+                                                    <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes')" name="notes" rows="2" placeholder="Notes for internal view..." :errorText="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
                                                 </div>
                                             </div>
                                             <div class="col-md-4">
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
-                                                    <span class="text-muted fw-semibold">Subtotal:</span>
-                                                    <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
+                                                    <span class="text-muted fw-semibold">{{ __('crm.subtotal') }}</span>
+                                                    <span class="fw-bold text-dark" id="calcSubtotal">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
-                                                    <span class="text-muted fw-semibold">Taxes:</span>
-                                                    <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
+                                                    <span class="text-muted fw-semibold">{{ __('crm.taxes_label') }}</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                                    <span class="text-muted fw-semibold me-2">Discount:</span>
+                                                    <span class="text-muted fw-semibold me-2">{{ __('crm.discount_colon') }}</span>
                                                     <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', 0)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
-                                                    <span class="text-dark fw-bold">Grand Total:</span>
-                                                    <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                                                    <span class="text-dark fw-bold">{{ __('crm.grand_total') }}</span>
+                                                    <span class="fw-extrabold text-primary" id="calcTotal">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                                            <a href="{{ route('crm.deals.show', $deal->id) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">Discard</a>
-                                            <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12">Save Quotation</button>
+                                            <a href="{{ route('crm.deals.show', $deal->id) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">{{ __('crm.discard') }}</a>
+                                            <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12">{{ __('crm.save_quotation') }}</button>
                                         </div>
+               </div>
                                     </form>
                                 </div>
                             </div>
@@ -1297,53 +1299,53 @@
                                         <input type="hidden" name="form_type" value="quotation_edit">
 
                                         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
-                                            <h5 class="fw-bold text-dark mb-0 fs-16"><i class="feather-edit text-warning me-2"></i>Edit Quotation: {{ $activeQuotation->quotation_number }}</h5>
-                                            <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-light border">Cancel</a>
+                                            <h5 class="fw-bold text-dark mb-0 fs-16"><i class="feather-edit text-warning me-2"></i>{{ __('crm.edit_quotation_title') }}: {{ $activeQuotation->quotation_number }}</h5>
+                                            <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-light border">{{ __('crm.cancel') }}</a>
                                         </div>
 
                                         <div class="row g-4 mb-4 fs-13 text-dark">
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" label="Customer / Account" name="_customer_display"
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.customer_account')" name="_customer_display"
                                                     :value="$deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A'))"
                                                     readonly="true"
                                                     style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Contact Email" name="email" :value="old('email', $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '')))" :errorText="$errors->first('email')" />
-                                                <x-ui.odoo-form-ui type="input" label="Contact Phone" name="phone" :value="old('phone', $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '')))" :errorText="$errors->first('phone')" />
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" :value="old('email', $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '')))" :errorText="$errors->first('email')" />
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '')))" :errorText="$errors->first('phone')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" label="Quotation Number" name="quotation_number"
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.quotation_number')" name="quotation_number"
                                                     :value="$activeQuotation->quotation_number" readonly="true"
                                                     style="font-weight: bold; color: #495057;"
                                                     :errorText="$errors->first('quotation_number')" />
 
-                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Quotation Date" name="quotation_date"
+                                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.quotation_date')" name="quotation_date"
                                                     :value="old('quotation_date', $activeQuotation->quotation_date ? \Illuminate\Support\Carbon::parse($activeQuotation->quotation_date)->format('Y-m-d') : date('Y-m-d'))" :errorText="$errors->first('quotation_date')" />
 
-                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Expiration Date" name="expiry_date"
+                                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.expiration_date')" name="expiry_date"
                                                     :value="old('expiry_date', $activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('Y-m-d') : '')" :errorText="$errors->first('expiry_date')" />
 
                                                 @if(!$isQuotationAutoApprove)
-                                                    <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true" :errorText="$errors->first('status')">
-                                                         <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>Draft</option>
-                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>Sent for Approval</option>
-                                                    </x-ui.odoo-form-ui>
+                                                    <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" :required="true" :errorText="$errors->first('status')">
+                                                         <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>{{ __('crm.draft') }}</option>
+                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>{{ __('crm.sent_for_approval') }}</option>
+                                                     </x-ui.odoo-form-ui>
                                                 @endif
                                             </div>
                                         </div>
 
                                         <!-- Order Lines Table -->
                                         <div class="border-top pt-4">
-                                            <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
+                                            <h5 class="fw-bold text-dark mb-3 fs-14">{{ __('crm.order_lines') }}</h5>
                                             <div class="table-responsive">
                                                 <x-ui.odoo-form-ui type="table" id="itemsTable">
                                                     <thead>
                                                         <tr>
-                                                            <th style="width: 38%;">Product Description</th>
-                                                            <th class="text-end" style="width: 10%;">Qty</th>
-                                                            <th class="text-end" style="width: 18%;">Unit Price (₹)</th>
-                                                            <th class="text-end" style="width: 12%;">Taxes (%)</th>
-                                                            <th class="text-end pe-3" style="width: 17%;">Amount</th>
+                                                            <th style="width: 38%;">{{ __('crm.product_description') }}</th>
+                                                            <th class="text-end" style="width: 10%;">{{ __('crm.qty') }}</th>
+                                                            <th class="text-end" style="width: 18%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                                            <th class="text-end" style="width: 12%;">{{ __('crm.taxes') }} (%)</th>
+                                                            <th class="text-end pe-3" style="width: 17%;">{{ __('crm.amount') }}</th>
                                                             <th class="text-center" style="width: 5%;"></th>
                                                         </tr>
                                                     </thead>
@@ -1354,7 +1356,7 @@
                                             </div>
                                             <div class="mt-2.5">
                                                 <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
-                                                    <i class="feather-plus me-1"></i>Add a product
+                                                    <i class="feather-plus me-1"></i>{{ __('crm.add_product') }}
                                                 </button>
                                             </div>
                                         </div>
@@ -1363,33 +1365,33 @@
                                         <div class="row mt-4 pt-3 border-top text-dark fs-13">
                                             <div class="col-md-8">
                                                 <div class="pe-md-4">
-                                                    <x-ui.odoo-form-ui type="editor" label="Terms & Conditions" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions', $activeQuotation->terms_conditions) !!}</x-ui.odoo-form-ui>
-                                                    <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="notes" rows="2" placeholder="Notes for internal view..." :errorText="$errors->first('notes')">{{ old('notes', $activeQuotation->notes) }}</x-ui.odoo-form-ui>
+                                                    <x-ui.odoo-form-ui type="editor" :label="__('crm.terms_conditions')" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions', $activeQuotation->terms_conditions) !!}</x-ui.odoo-form-ui>
+                                                    <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes')" name="notes" rows="2" placeholder="Notes for internal view..." :errorText="$errors->first('notes')">{{ old('notes', $activeQuotation->notes) }}</x-ui.odoo-form-ui>
                                                 </div>
                                             </div>
                                             <div class="col-md-4">
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
-                                                    <span class="text-muted fw-semibold">Subtotal:</span>
-                                                    <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
+                                                    <span class="text-muted fw-semibold">{{ __('crm.subtotal') }}</span>
+                                                    <span class="fw-bold text-dark" id="calcSubtotal">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
-                                                    <span class="text-muted fw-semibold">Taxes:</span>
-                                                    <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
+                                                    <span class="text-muted fw-semibold">{{ __('crm.taxes_label') }}</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                                    <span class="text-muted fw-semibold me-2">Discount:</span>
+                                                    <span class="text-muted fw-semibold me-2">{{ __('crm.discount_colon') }}</span>
                                                     <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', $activeQuotation->discount)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
-                                                    <span class="text-dark fw-bold">Grand Total:</span>
-                                                    <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                                                    <span class="text-dark fw-bold">{{ __('crm.grand_total') }}</span>
+                                                    <span class="fw-extrabold text-primary" id="calcTotal">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                                            <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'quotation_id' => $activeQuotation->id]) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">Discard</a>
-                                            <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12">Save Changes</button>
+                                            <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'quotation_id' => $activeQuotation->id]) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">{{ __('crm.discard') }}</a>
+                                            <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12">{{ __('crm.save_changes') }}</button>
                                         </div>
                                     </form>
                                 </div>
@@ -1401,12 +1403,12 @@
                                 <div class="card-body p-4">
                                     <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4 flex-wrap gap-2">
                                         <div>
-                                            <h4 class="fw-bold text-dark mb-0 fs-16">Quotation {{ $activeQuotation->quotation_number }}</h4>
+                                            <h4 class="fw-bold text-dark mb-0 fs-16">{{ __('crm.quotation') }} {{ $activeQuotation->quotation_number }}</h4>
                                             <span class="badge bg-light text-dark border font-monospace mt-1">Revision {{ $activeQuotation->revision_number }}</span>
                                         </div>
 
                                         <div class="d-flex align-items-center flex-wrap gap-2">
-                                            <!-- WhatsApp Action Button (listing index page action button style) -->
+                                            <!-- WhatsApp Action Button -->
                                             <button type="button" 
                                                     class="action-dropdown-btn action-btn-wa btn-open-send-quote-wa-modal" 
                                                     data-quotation-id="{{ $activeQuotation->id }}" 
@@ -1417,7 +1419,7 @@
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 2.15.68 4.14 1.838 5.776L2.5 21.5l3.876-1.303A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.086-1.125l-.293-.174-2.295.771.785-2.238-.191-.304A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" fill="#25D366"/><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.521.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z" fill="#25D366"/></svg>
                                             </button>
 
-                                            <!-- Send Email Action Button (listing index page action button style) -->
+                                            <!-- Send Email Action Button -->
                                             <button type="button" 
                                                     class="action-dropdown-btn action-btn-email btn-open-send-quote-modal" 
                                                     data-quotation-id="{{ $activeQuotation->id }}" 
@@ -1428,7 +1430,7 @@
                                                 <i class="feather-mail text-primary fs-14"></i>
                                             </button>
 
-                                            <!-- Download PDF Action Button (listing index page action button style) -->
+                                            <!-- Download PDF Action Button -->
                                             <a href="{{ route('crm.quotations.download', $activeQuotation->id) }}" 
                                                class="action-dropdown-btn action-btn-pdf" 
                                                title="Download PDF Document" data-bs-toggle="tooltip">
@@ -1465,27 +1467,27 @@
                                                 </form>
                                             @endif
 
-                                            <!-- Dropdown Menu for More Options (At Very End) -->
+                                            <!-- Dropdown Menu for More Options -->
                                             <div class="dropdown">
-                                                <button class="btn btn-sm btn-light border fw-bold px-2.5 py-1.5 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More Quotation Actions">
-                                                    <i class="feather-more-horizontal me-1"></i>More
+                                                <button class="btn btn-sm btn-light border fw-bold px-2.5 py-1.5 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="{{ __('crm.more') }}">
+                                                    <i class="feather-more-horizontal me-1"></i>{{ __('crm.more') }}
                                                 </button>
                                                 <ul class="dropdown-menu dropdown-menu-end shadow border-0 fs-12">
                                                     <li>
                                                         <a class="dropdown-item" href="{{ route('crm.quotations.show', $activeQuotation->id) }}">
-                                                            <i class="feather-eye me-2 text-info"></i>View Full Quotation Sheet
+                                                            <i class="feather-eye me-2 text-info"></i>{{ __('crm.view_full_quotation_sheet') }}
                                                         </a>
                                                     </li>
                                                     @if ($activeQuotation->status !== 'Accepted')
                                                         <li>
                                                             <a class="dropdown-item" href="{{ route('crm.deals.show', ['deal' => $deal->id, 'edit_quotation' => 1, 'quotation_id' => $activeQuotation->id]) }}">
-                                                                <i class="feather-edit-2 me-2 text-warning"></i>Edit Quotation
+                                                                <i class="feather-edit-2 me-2 text-warning"></i>{{ __('crm.edit_quotation_title') }}
                                                             </a>
                                                         </li>
                                                     @endif
                                                     <li>
                                                         <a class="dropdown-item" href="{{ route('crm.quotations.download', $activeQuotation->id) }}?print=1" target="_blank">
-                                                            <i class="feather-printer me-2 text-secondary"></i>Print Quotation
+                                                            <i class="feather-printer me-2 text-secondary"></i>{{ __('crm.print_quotation') }}
                                                         </a>
                                                     </li>
                                                 </ul>
@@ -1497,14 +1499,14 @@
                                     <div class="row g-4 mb-4 fs-13 text-dark">
                                         <div class="col-md-6 border-end">
                                             <div class="mb-3">
-                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Customer / Company</label>
+                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.customer_account') }}</label>
                                                 <div class="fw-bold text-dark fs-14">
                                                     {{ $deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A')) }}
                                                 </div>
                                             </div>
                                             <div class="row">
                                                 <div class="col-6">
-                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Contact Email</label>
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.contact_email') }}</label>
                                                     <div class="fs-12 text-primary d-flex align-items-center flex-nowrap gap-1">
                                                         <span class="fw-semibold text-truncate" title="{{ $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '—')) }}">{{ $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '—')) }}</span>
                                                         @if ($activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email)))
@@ -1522,7 +1524,7 @@
                                                     </div>
                                                 </div>
                                                 <div class="col-6">
-                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Contact Phone</label>
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.contact_phone') }}</label>
                                                     <div class="fs-12 text-dark d-flex align-items-center flex-nowrap gap-1">
                                                         <span class="fw-semibold text-truncate">{{ $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '—')) }}</span>
                                                         @if ($activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)))
@@ -1544,16 +1546,16 @@
                                         <div class="col-md-6 ps-md-4">
                                             <div class="row">
                                                 <div class="col-6 mb-3">
-                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Quotation Date</label>
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.quotation_date') }}</label>
                                                     <div class="fw-semibold text-dark">{{ $activeQuotation->quotation_date ? \Illuminate\Support\Carbon::parse($activeQuotation->quotation_date)->format('d M Y') : '—' }}</div>
                                                 </div>
                                                 <div class="col-6 mb-3">
-                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Expiration Date</label>
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.expiration_date') }}</label>
                                                     <div class="fw-semibold text-danger">{{ $activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('d M Y') : '—' }}</div>
                                                 </div>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Quotation Status</label>
+                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.quotation_status') }}</label>
                                                 @php
                                                     $qColors = [
                                                         'Draft' => 'secondary',
@@ -1573,17 +1575,17 @@
                                     </div>
 
                                     <!-- Order Lines Table -->
-                                    <h6 class="fw-bold text-dark mb-2 fs-13">Order Lines</h6>
+                                    <h6 class="fw-bold text-dark mb-2 fs-13">{{ __('crm.order_lines') }}</h6>
                                     <div class="table-responsive mb-4">
                                         <x-ui.odoo-form-ui type="table">
                                             <thead>
                                                 <tr>
                                                     <th>#</th>
-                                                    <th>Product Description</th>
-                                                    <th class="text-end">Qty</th>
-                                                    <th class="text-end">Unit Price (₹)</th>
-                                                    <th class="text-end">Tax (%)</th>
-                                                    <th class="text-end">Amount (₹)</th>
+                                                    <th>{{ __('crm.product_description') }}</th>
+                                                    <th class="text-end">{{ __('crm.qty') }}</th>
+                                                    <th class="text-end">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                                    <th class="text-end">{{ __('crm.taxes') }} (%)</th>
+                                                    <th class="text-end">{{ __('crm.amount') }} ({{ active_currency_symbol() }})</th>
                                                 </tr>
                                             </thead>
                                             <tbody class="fs-13 text-dark">
@@ -1597,13 +1599,13 @@
                                                             @endif
                                                         </td>
                                                         <td class="text-end font-monospace fw-bold">{{ $item->quantity }}</td>
-                                                        <td class="text-end font-monospace">₹{{ number_format($item->unit_price, 2) }}</td>
+                                                        <td class="text-end font-monospace">{{ format_currency($item->unit_price) }}</td>
                                                         <td class="text-end font-monospace">{{ $item->tax_rate }}%</td>
-                                                        <td class="text-end font-monospace fw-bold text-success">₹{{ number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
+                                                        <td class="text-end font-monospace fw-bold text-success">{{ format_currency($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price))) }}</td>
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="6" class="text-center py-3 text-muted">No line items in this quotation.</td>
+                                                        <td colspan="6" class="text-center py-3 text-muted">{{ __('crm.no_line_items_quotation') }}</td>
                                                     </tr>
                                                 @endforelse
                                             </tbody>
@@ -1615,23 +1617,23 @@
                                         <div class="col-md-7">
                                             @if($activeQuotation->terms_conditions)
                                                 <div class="mb-2">
-                                                    <strong class="text-muted fs-11 text-uppercase fw-bold d-block">Terms & Conditions:</strong>
+                                                    <strong class="text-muted fs-11 text-uppercase fw-bold d-block">{{ __('crm.terms_conditions') }}:</strong>
                                                     <div class="fs-12 text-muted mt-1">{!! $activeQuotation->terms_conditions !!}</div>
                                                 </div>
                                             @endif
                                         </div>
                                         <div class="col-md-5">
                                             <div class="d-flex justify-content-between py-1 border-bottom">
-                                                <span class="text-muted">Subtotal:</span>
-                                                <span class="fw-bold">₹{{ number_format($activeQuotation->subtotal ?? 0, 2) }}</span>
+                                                <span class="text-muted">{{ __('crm.subtotal') }}</span>
+                                                <span class="fw-bold">{{ format_currency($activeQuotation->subtotal ?? 0) }}</span>
                                             </div>
                                             <div class="d-flex justify-content-between py-1 border-bottom">
-                                                <span class="text-muted">Tax Amount:</span>
-                                                <span class="fw-bold">₹{{ number_format($activeQuotation->tax ?? $activeQuotation->tax_amount ?? 0, 2) }}</span>
+                                                <span class="text-muted">{{ __('crm.taxes_label') }}</span>
+                                                <span class="fw-bold">{{ format_currency($activeQuotation->tax ?? $activeQuotation->tax_amount ?? 0) }}</span>
                                             </div>
                                             <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1">
-                                                <span class="fw-bold text-dark">Grand Total:</span>
-                                                <span class="fw-extrabold text-primary">₹{{ number_format($activeQuotation->total_amount, 2) }}</span>
+                                                <span class="fw-bold text-dark">{{ __('crm.grand_total') }}</span>
+                                                <span class="fw-extrabold text-primary">{{ format_currency($activeQuotation->total_amount) }}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1641,11 +1643,11 @@
                             <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionQuotations">
                                 <div class="card-body p-4 text-center">
                                     <i class="feather-file-text fs-36 text-muted mb-2 d-block opacity-50"></i>
-                                    <h5 class="fw-bold text-dark fs-14">No Quotation Created Yet</h5>
-                                    <p class="text-muted fs-12 mb-3">Create a quotation for this deal to generate quotation sheets and track revisions.</p>
+                                    <h5 class="fw-bold text-dark fs-14">{{ __('crm.no_quotation_created_yet') }}</h5>
+                                    <p class="text-muted fs-12 mb-3">{{ __('crm.create_quotation_desc') }}</p>
                                     <div class="d-flex justify-content-center">
                                         <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-sm btn-success fw-bold px-4 py-2 d-inline-flex align-items-center justify-content-center shadow-xs" style="width: auto !important; max-width: fit-content !important;">
-                                            <i class="feather-plus me-1.5 fs-13"></i>Create Quotation Now
+                                            <i class="feather-plus me-1.5 fs-13"></i>{{ __('crm.create_quotation_now') }}
                                         </a>
                                     </div>
                                 </div>
@@ -1658,7 +1660,7 @@
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <h5 class="fs-13 text-dark fw-bold mb-0">
-                                            <i class="feather-git-commit me-1.5 text-primary"></i>Quotation Revision History
+                                            <i class="feather-git-commit me-1.5 text-primary"></i>{{ __('crm.quotation_revision_history') }}
                                         </h5>
                                     </div>
 
@@ -1671,7 +1673,7 @@
                                             @foreach($revisions as $rev)
                                                 <div class="d-flex align-items-center gap-2 p-2 border rounded bg-white" style="min-width: 170px; border-color: {{ $activeQuotation && $rev->id === $activeQuotation->id ? '#3b82f6 !important' : '#e2e8f0' }} !important; transition: all 0.2s; position: relative; {{ $activeQuotation && $rev->id === $activeQuotation->id ? 'box-shadow: 0 0 0 1px rgba(59,130,246,0.1); background-color: #f0f9ff !important;' : '' }}">
                                                     @if($activeQuotation && $rev->id === $activeQuotation->id)
-                                                        <span class="position-absolute top-0 end-0 translate-middle-y badge rounded-pill bg-primary fs-8 text-uppercase px-1" style="font-size: 8px !important; margin-right: 10px;">Viewing</span>
+                                                        <span class="position-absolute top-0 end-0 translate-middle-y badge rounded-pill bg-primary fs-8 text-uppercase px-1" style="font-size: 8px !important; margin-right: 10px;">{{ __('crm.viewing') }}</span>
                                                     @endif
                                                     <div class="avatar-text avatar-sm bg-soft-secondary text-secondary rounded-circle fw-bold d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; font-size: 10px;">
                                                         R{{ $rev->revision_number }}
@@ -1680,7 +1682,7 @@
                                                         <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'quotation_id' => $rev->id]) }}" class="fw-bold text-dark text-decoration-none">
                                                             {{ $rev->quotation_number }}
                                                         </a>
-                                                        <span class="text-muted mt-0.5" style="font-size: 9px;">₹{{ number_format($rev->total_amount, 2) }}</span>
+                                                        <span class="text-muted mt-0.5" style="font-size: 9px;">{{ format_currency($rev->total_amount) }}</span>
                                                     </div>
                                                 </div>
                                             @endforeach
@@ -1697,12 +1699,12 @@
                             <div class="card-body p-4">
                                 <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4">
                                     <div>
-                                        <h5 class="fs-15 text-dark fw-bold mb-0"><i class="feather-shopping-cart text-success me-2"></i>Converted Sales Orders & Realized Revenue</h5>
-                                        <span class="text-muted fs-12">Track sales orders, order status, and billing generated from this deal.</span>
+                                        <h5 class="fs-15 text-dark fw-bold mb-0"><i class="feather-shopping-cart text-success me-2"></i>{{ __('crm.converted_sales_orders_revenue') }}</h5>
+                                        <span class="text-muted fs-12">{{ __('crm.track_sales_orders_desc') }}</span>
                                     </div>
                                     @if($activeQuotation && $activeQuotation->status === 'Accepted')
                                         <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-success fw-bold px-3">
-                                            <i class="feather-plus me-1"></i>New Sales Order
+                                            <i class="feather-plus me-1"></i>{{ __('crm.new_sales_order') }}
                                         </a>
                                     @endif
                                 </div>
@@ -1710,20 +1712,20 @@
                                 @if($deal->salesOrders->isEmpty())
                                     <div class="text-center py-5 text-muted border border-dashed rounded bg-light-50">
                                         <i class="feather-shopping-bag fs-36 text-muted mb-2 d-block opacity-50"></i>
-                                        <h6 class="fw-bold text-dark fs-13">No Sales Orders Generated Yet</h6>
-                                        <p class="fs-12 text-muted max-w-md mx-auto">When a customer accepts a quotation for this deal, convert it into a Sales Order to track fulfillment and invoicing.</p>
+                                        <h6 class="fw-bold text-dark fs-13">{{ __('crm.no_sales_orders_generated') }}</h6>
+                                        <p class="fs-12 text-muted max-w-md mx-auto">{{ __('crm.sales_order_convert_desc') }}</p>
                                     </div>
                                 @else
                                     <div class="table-responsive">
                                         <x-ui.odoo-form-ui type="table">
                                             <thead>
                                                 <tr>
-                                                    <th>Sales Order #</th>
-                                                    <th>Order Date</th>
-                                                    <th>Customer Name</th>
-                                                    <th>Total Amount (₹)</th>
-                                                    <th>Order Status</th>
-                                                    <th class="text-end pe-3">Action</th>
+                                                    <th>{{ __('crm.sales_order_num') }}</th>
+                                                    <th>{{ __('crm.order_date') }}</th>
+                                                    <th>{{ __('crm.customer_name') }}</th>
+                                                    <th>{{ __('crm.total_amount') }} ({{ active_currency_symbol() }})</th>
+                                                    <th>{{ __('crm.order_status') }}</th>
+                                                    <th class="text-end pe-3">{{ __('crm.actions') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody class="fs-13 text-dark">
@@ -1732,7 +1734,7 @@
                                                         <td class="font-monospace fw-bold text-primary">{{ $so->order_number }}</td>
                                                         <td>{{ $so->order_date ? \Illuminate\Support\Carbon::parse($so->order_date)->format('d/m/Y') : '—' }}</td>
                                                         <td class="fw-bold text-dark">{{ $so->customer_name }}</td>
-                                                        <td class="fw-bold text-success font-monospace">₹{{ number_format($so->total_amount, 2) }}</td>
+                                                        <td class="fw-bold text-success font-monospace">{{ format_currency($so->total_amount) }}</td>
                                                         <td>
                                                             <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fw-bold">
                                                                 {{ $so->status }}
@@ -1740,7 +1742,7 @@
                                                         </td>
                                                         <td class="text-end pe-3">
                                                             <a href="{{ route('sales.orders.show', $so) }}" class="btn btn-xs btn-soft-primary fw-bold">
-                                                                <i class="feather-eye me-1"></i>View Order
+                                                                <i class="feather-eye me-1"></i>{{ __('crm.view_order') }}
                                                             </a>
                                                         </td>
                                                     </tr>
@@ -1763,12 +1765,12 @@
                                     <ul class="nav nav-tabs border-bottom-0 zoho-timeline-subtabs" id="zohoTimelineSubTabs" role="tablist">
                                         <li class="nav-item" role="presentation">
                                             <button class="nav-link active py-2 px-3 border-0 bg-transparent" id="subtab-history-tab" data-bs-toggle="tab" data-bs-target="#subtab-history" type="button" role="tab">
-                                                History & Audit Stream
+                                                {{ __('crm.history_audit_stream') }}
                                             </button>
                                         </li>
                                         <li class="nav-item" role="presentation">
                                             <button class="nav-link py-2 px-3 border-0 bg-transparent" id="subtab-interactions-tab" data-bs-toggle="tab" data-bs-target="#subtab-interactions" type="button" role="tab">
-                                                Interactions & Scheduled Calls
+                                                {{ __('crm.interactions_scheduled_calls') }}
                                             </button>
                                         </li>
                                     </ul>
@@ -1781,7 +1783,7 @@
                                     <div class="tab-pane fade show active" id="subtab-history" role="tabpanel">
                                         <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
                                             <div class="d-flex align-items-center gap-2">
-                                                <h5 class="fw-bold text-dark fs-14 mb-0">Timeline History & Audit Stream</h5>
+                                                <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.timeline_history_audit_stream') }}</h5>
                                             </div>
                                         </div>
 
@@ -1795,8 +1797,9 @@
                                             @if($groupedHistory->isEmpty())
                                                 <div class="text-center py-5 text-muted border border-dashed rounded bg-white fs-12">
                                                     <i class="feather-clock fs-24 mb-1.5 d-block text-muted opacity-50"></i>
-                                                    No history events recorded yet.
+                                                    {{ __('crm.no_history_events') }}
                                                 </div>
+                    </div>
                                             @else
                                                 @foreach($groupedHistory as $date => $items)
                                                     <!-- Date Header -->
@@ -1852,7 +1855,7 @@
                                     <!-- SUBTAB 2: INTERACTIONS & ACTIVITIES -->
                                     <div class="tab-pane fade" id="subtab-interactions" role="tabpanel">
                                         <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
-                                            <h5 class="fw-bold text-dark fs-14 mb-0">Interactions / Scheduled Activities</h5>
+                                            <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.interactions_scheduled_activities') }}</h5>
                                         </div>
 
                                         @php
@@ -1866,8 +1869,8 @@
                                         @if($groupedFollowups->isEmpty())
                                             <div class="text-center py-5 text-muted border border-dashed rounded-3 bg-light fs-12" style="border-color:#cbd5e1!important;">
                                                 <i class="feather-calendar fs-28 d-block mb-2 opacity-40"></i>
-                                                <span class="fw-semibold">No activities scheduled yet.</span><br>
-                                                <span class="fs-11">Click &ldquo;Schedule Activity&rdquo; to add one.</span>
+                                                <span class="fw-semibold">{{ __('crm.no_activities_scheduled') }}</span><br>
+                                                <span class="fs-11">{{ __('crm.click_schedule_activity') }}</span>
                                             </div>
                                         @else
                                             @foreach($groupedFollowups as $date => $items)
@@ -1916,11 +1919,11 @@
                                                             elseif($item->type === 'Demo')    { $actIcon = 'feather-monitor'; $actIconBg = 'bg-soft-danger';  $actIconColor = 'text-danger'; }
 
                                                             $statusBadgeClass = 'bg-primary text-white';
-                                                            $statusLabel = 'Pending';
-                                                            if($item->status === 'Completed') { $statusBadgeClass = 'bg-success text-white'; $statusLabel = 'Connected'; }
-                                                            elseif($item->status === 'Not Connected') { $statusBadgeClass = 'bg-warning text-white'; $statusLabel = 'Not Connected'; }
-                                                            elseif($item->status === 'Cancelled') { $statusBadgeClass = 'bg-danger text-white'; $statusLabel = 'Cancelled'; }
-                                                            elseif($item->status === 'Rescheduled') { $statusBadgeClass = 'bg-purple text-white'; $statusLabel = 'Rescheduled'; }
+                                                            $statusLabel = __('crm.pending') ?? 'Pending';
+                                                            if($item->status === 'Completed') { $statusBadgeClass = 'bg-success text-white'; $statusLabel = __('crm.connected'); }
+                                                            elseif($item->status === 'Not Connected') { $statusBadgeClass = 'bg-warning text-white'; $statusLabel = __('crm.not_connected'); }
+                                                            elseif($item->status === 'Cancelled') { $statusBadgeClass = 'bg-danger text-white'; $statusLabel = __('crm.cancelled'); }
+                                                            elseif($item->status === 'Rescheduled') { $statusBadgeClass = 'bg-purple text-white'; $statusLabel = __('crm.reschedule'); }
                                                         @endphp
 
                                                         <div class="activity-card mb-2">
@@ -1972,7 +1975,7 @@
                                                                         <a href="{{ $meetLink }}" target="_blank"
                                                                            class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill text-white fw-semibold fs-11 text-decoration-none"
                                                                            style="background: linear-gradient(135deg, #1a73e8, #0d47a1); box-shadow: 0 2px 6px rgba(26,115,232,0.35);">
-                                                                            <i class="feather-video me-1"></i> Join Google Meet
+                                                                            <i class="feather-video me-1"></i> {{ __('crm.join_google_meet') }}
                                                                         </a>
                                                                     </div>
                                                                 @endif
@@ -1982,7 +1985,7 @@
                                                                         <a href="{{ $calEventLink }}" target="_blank"
                                                                            class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill text-white fw-semibold fs-11 text-decoration-none"
                                                                            style="background: linear-gradient(135deg, #34a853, #1e7e34); box-shadow: 0 2px 6px rgba(52,168,83,0.35);">
-                                                                            <i class="feather-calendar me-1"></i> View in Google Calendar
+                                                                            <i class="feather-calendar me-1"></i> {{ __('crm.view_in_google_calendar') }}
                                                                         </a>
                                                                     </div>
                                                                 @endif
@@ -2010,16 +2013,16 @@
                                                                 @if($item->status === 'Pending')
                                                                     <div class="activity-footer-actions d-flex gap-2 mt-3 d-print-none">
                                                                         <!-- Connected -->
-                                                                        <x-ui.button type="button" variant="soft-success" size="sm" icon="feather-phone-call" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed">Connected</x-ui.button>
+                                                                        <x-ui.button type="button" variant="soft-success" size="sm" icon="feather-phone-call" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed">{{ __('crm.connected') }}</x-ui.button>
 
                                                                         <!-- Not Connected -->
-                                                                        <x-ui.button type="button" variant="soft-warning" size="sm" icon="feather-phone-off" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected">Not Connected</x-ui.button>
+                                                                        <x-ui.button type="button" variant="soft-warning" size="sm" icon="feather-phone-off" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected">{{ __('crm.not_connected') }}</x-ui.button>
 
                                                                         <!-- Cancelled -->
-                                                                        <x-ui.button type="button" variant="soft-danger" size="sm" icon="feather-x-circle" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">Cancelled</x-ui.button>
+                                                                        <x-ui.button type="button" variant="soft-danger" size="sm" icon="feather-x-circle" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">{{ __('crm.cancelled') }}</x-ui.button>
 
                                                                         <!-- Reschedule -->
-                                                                        <x-ui.button type="button" variant="soft-primary" size="sm" icon="feather-refresh-cw" data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">Reschedule</x-ui.button>
+                                                                        <x-ui.button type="button" variant="soft-primary" size="sm" icon="feather-refresh-cw" data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">{{ __('crm.reschedule') }}</x-ui.button>
                                                                     </div>
                                                                 @endif
                                                             </div>
@@ -2033,72 +2036,72 @@
                                                             <!-- Status Modal: Connected / Completed -->
                                                             <x-ui.modal
                                                                 :id="'statusModal_' . $item->id . '_Completed'"
-                                                                title="Update Activity: Mark as Connected"
+                                                                :title="__('crm.mark_as_connected')"
                                                                 size="md"
                                                                 :centered="true"
                                                                 :formAction="route('crm.followups.update', $item->id)"
                                                                 formMethod="PUT"
-                                                                submitText="Save &amp; Mark Connected"
+                                                                :submitText="__('crm.save_mark_connected')"
                                                                 :closeText="__('crm.cancel')"
                                                             >
                                                                 <input type="hidden" name="status" value="Completed">
-                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
                                                                     @foreach($users as $u)
                                                                         <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
                                                                     @endforeach
                                                                 </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" label="Notes / Discussion Summary" name="notes" rows="3" placeholder="Enter notes or discussion outcome...">{{ $item->notes }}</x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes_discussion_summary')" name="notes" rows="3" placeholder="Enter notes or discussion outcome...">{{ $item->notes }}</x-ui.odoo-form-ui>
                                                             </x-ui.modal>
 
                                                             <!-- Status Modal: Not Connected -->
                                                             <x-ui.modal
                                                                 :id="'statusModal_' . $item->id . '_NotConnected'"
-                                                                title="Update Activity: Mark as Not Connected"
+                                                                :title="__('crm.mark_as_not_connected')"
                                                                 size="md"
                                                                 :centered="true"
                                                                 :formAction="route('crm.followups.update', $item->id)"
                                                                 formMethod="PUT"
-                                                                submitText="Save Status"
+                                                                :submitText="__('crm.save_status')"
                                                                 :closeText="__('crm.cancel')"
                                                             >
                                                                 <input type="hidden" name="status" value="Not Connected">
-                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
                                                                     @foreach($users as $u)
                                                                         <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
                                                                     @endforeach
                                                                 </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" label="Notes / Reason" name="notes" rows="3" placeholder="Reason / notes...">{{ $item->notes }}</x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes_reason')" name="notes" rows="3" placeholder="Reason / notes...">{{ $item->notes }}</x-ui.odoo-form-ui>
                                                             </x-ui.modal>
 
                                                             <!-- Status Modal: Cancelled -->
                                                             <x-ui.modal
                                                                 :id="'statusModal_' . $item->id . '_Cancelled'"
-                                                                title="Update Activity: Cancel Activity"
+                                                                :title="__('crm.cancel_activity')"
                                                                 size="md"
                                                                 :centered="true"
                                                                 :formAction="route('crm.followups.update', $item->id)"
                                                                 formMethod="PUT"
-                                                                submitText="Confirm Cancel"
+                                                                :submitText="__('crm.confirm_cancel')"
                                                                 :closeText="__('crm.cancel')"
                                                             >
                                                                 <input type="hidden" name="status" value="Cancelled">
-                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
                                                                     @foreach($users as $u)
                                                                         <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
                                                                     @endforeach
                                                                 </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" label="Cancellation Note" name="notes" rows="3" placeholder="Reason for cancellation...">{{ $item->notes }}</x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.cancellation_note')" name="notes" rows="3" placeholder="Reason for cancellation...">{{ $item->notes }}</x-ui.odoo-form-ui>
                                                             </x-ui.modal>
 
                                                             <!-- Reschedule Modal -->
                                                             <x-ui.modal
                                                                 :id="'rescheduleModal_' . $item->id"
-                                                                title="Reschedule Activity"
+                                                                :title="__('crm.reschedule_activity')"
                                                                 size="md"
                                                                 :centered="true"
                                                                 :formAction="route('crm.followups.update', $item->id)"
                                                                 formMethod="PUT"
-                                                                :submitText="'Confirm Reschedule'"
+                                                                :submitText="__('crm.confirm_reschedule')"
                                                                 :closeText="__('crm.cancel')"
                                                             >
                                                                 <input type="hidden" name="is_reschedule" value="1">
@@ -2107,13 +2110,13 @@
                                                                     {{ __('crm.activity_types.' . $item->type) ?? $item->type }}
                                                                     &bull; Current: <strong>{{ $item->followup_date->format('d M Y, h:i A') }}</strong>
                                                                 </p>
-                                                                <x-ui.odoo-form-ui type="input" inputType="datetime-local" label="New Date & Time" name="followup_date" :required="true" />
-                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                <x-ui.odoo-form-ui type="input" inputType="datetime-local" :label="__('crm.new_date_time')" name="followup_date" :required="true" />
+                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
                                                                     @foreach($users as $u)
                                                                         <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
                                                                     @endforeach
                                                                 </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" label="Note (optional)" name="notes" rows="2" placeholder="Reason for rescheduling...">{{ $item->notes }}</x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.note_optional')" name="notes" rows="2" :placeholder="__('crm.reason_rescheduling')">{{ $item->notes }}</x-ui.odoo-form-ui>
                                                             </x-ui.modal>
                                                         @endif
                                                     @endforeach
@@ -2140,8 +2143,8 @@
                     <i class="feather-calendar"></i>
                 </div>
                 <div>
-                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="dealFollowupOffcanvasTitle">Log / Schedule Activity for {{ $deal->title }}</h5>
-                    <span class="text-muted fs-11">Log interaction & next followup or schedule activity</span>
+                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="dealFollowupOffcanvasTitle">{{ __('crm.log_schedule_activity_for', ['title' => $deal->title]) }}</h5>
+                    <span class="text-muted fs-11">{{ __('crm.log_interaction_sub') }}</span>
                 </div>
             </div>
             <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -2155,37 +2158,37 @@
                 <!-- 2-Mode Switcher Tabs -->
                 <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
                     <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn active btn-primary text-white shadow-sm" data-mode="log_note" style="font-size: 12px; padding: 8px 6px; background-color: var(--bs-primary); border-radius: 6px; transition: all 0.2s ease;">
-                        LOG DISCUSSION & NEXT
+                        {{ __('crm.log_discussion_next') }}
                     </button>
                     <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn" data-mode="schedule" style="font-size: 12px; padding: 8px 6px; color: #64748b; background-color: transparent; border-radius: 6px; transition: all 0.2s ease;">
-                        DIRECT SCHEDULE ACTIVITY
+                        {{ __('crm.direct_schedule_activity') }}
                     </button>
                 </div>
 
                 <!-- Past Interaction Section (Tab 1: Log Activity) -->
                 <div id="dealSectionPastInteraction">
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up / Interaction Type</label>
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.followup_interaction_type') }}</label>
                         <select name="type" id="dealOffcanvasFollowupType" class="form-select form-select-sm shadow-2xs">
-                            <option value="Call">Call</option>
-                            <option value="Email">Email</option>
-                            <option value="Meeting">Meeting</option>
-                            <option value="Demo">Demo</option>
+                            <option value="Call">{{ __('crm.activity_types.Call') ?? 'Call' }}</option>
+                            <option value="Email">{{ __('crm.activity_types.Email') ?? 'Email' }}</option>
+                            <option value="Meeting">{{ __('crm.activity_types.Meeting') ?? 'Meeting' }}</option>
+                            <option value="Demo">{{ __('crm.activity_types.Demo') ?? 'Demo' }}</option>
                             <option value="WhatsApp">WhatsApp</option>
                         </select>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up Status / Outcome</label>
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.followup_status_outcome') }}</label>
                         <select name="status" id="dealOffcanvasFollowupStatus" class="form-select form-select-sm shadow-2xs">
-                            <option value="Connected">Connected</option>
-                            <option value="Not Connected">Not Connected</option>
-                            <option value="Not Answering">Not Answering</option>
+                            <option value="Connected">{{ __('crm.outcomes.Connected') ?? 'Connected' }}</option>
+                            <option value="Not Connected">{{ __('crm.outcomes.Not Connected') ?? 'Not Connected' }}</option>
+                            <option value="Not Answering">{{ __('crm.outcomes.Not Answering') ?? 'Not Answering' }}</option>
                         </select>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Discussion Notes / Summary</label>
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.discussion_notes_summary') }}</label>
                         <textarea name="notes" id="dealOffcanvasNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Write discussion notes..."></textarea>
                     </div>
 
@@ -2193,46 +2196,46 @@
                     <div class="border-top pt-3 mt-3">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <h6 class="fs-12 fw-bold text-dark mb-0">
-                                <i class="feather-calendar text-primary me-1"></i> NEXT ACTIVITY SCHEDULE
+                                <i class="feather-calendar text-primary me-1"></i> {{ __('crm.next_activity_schedule') }}
                             </h6>
                             <button type="button" class="btn btn-xs btn-outline-primary fw-bold px-2.5 py-1 rounded-pill d-inline-flex align-items-center gap-1" id="btnToggleDealNextScheduleShow">
                                 <i class="feather-plus fs-11" id="iconToggleDealNextScheduleShow"></i>
-                                <span id="textToggleDealNextScheduleShow">Schedule Next Activity</span>
+                                <span id="textToggleDealNextScheduleShow">{{ __('crm.schedule_next_activity_btn') }}</span>
                             </button>
                         </div>
                         
                         <div id="containerDealNextScheduleFieldsShow" class="mt-3 p-3 bg-light rounded-3 border" style="display: none;">
                             <div class="mb-2">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Title</label>
-                                <input type="text" name="next_title" id="dealOffcanvasNextTitle" class="form-control form-control-sm shadow-2xs" placeholder="e.g. Followup Call / Next Meeting" value="">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.next_activity_title') }}</label>
+                                <input type="text" name="next_title" id="dealOffcanvasNextTitle" class="form-control form-control-sm shadow-2xs" placeholder="{{ __('crm.next_activity_title_placeholder') }}" value="">
                             </div>
 
                             <div class="row g-2 mb-2">
                                 <div class="col-6">
-                                    <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type</label>
+                                    <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.next_activity_type') }}</label>
                                     <select name="next_activity_type" id="dealOffcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
-                                        <option value="Call">Call</option>
-                                        <option value="Meeting">Meeting</option>
-                                        <option value="Demo">Demo</option>
-                                        <option value="Email">Email</option>
+                                        <option value="Call">{{ __('crm.activity_types.Call') ?? 'Call' }}</option>
+                                        <option value="Meeting">{{ __('crm.activity_types.Meeting') ?? 'Meeting' }}</option>
+                                        <option value="Demo">{{ __('crm.activity_types.Demo') ?? 'Demo' }}</option>
+                                        <option value="Email">{{ __('crm.activity_types.Email') ?? 'Email' }}</option>
                                         <option value="WhatsApp">WhatsApp</option>
                                     </select>
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label fw-bold text-dark fs-12 mb-1">Next Duration (Mins)</label>
+                                    <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.duration_minutes') }}</label>
                                     <select name="next_duration_minutes" id="dealOffcanvasNextDuration" class="form-select form-select-sm shadow-2xs">
-                                        <option value="15">15 Mins</option>
-                                        <option value="30" selected>30 Mins</option>
-                                        <option value="45">45 Mins</option>
-                                        <option value="60">60 Mins (1 Hr)</option>
-                                        <option value="90">90 Mins</option>
-                                        <option value="120">120 Mins</option>
+                                        <option value="15">{{ __('crm.duration_options.15') ?? '15 Mins' }}</option>
+                                        <option value="30" selected>{{ __('crm.duration_options.30') ?? '30 Mins' }}</option>
+                                        <option value="45">{{ __('crm.duration_options.45') ?? '45 Mins' }}</option>
+                                        <option value="60">{{ __('crm.duration_options.60') ?? '60 Mins (1 Hr)' }}</option>
+                                        <option value="90">{{ __('crm.duration_options.90') ?? '90 Mins' }}</option>
+                                        <option value="120">{{ __('crm.duration_options.120') ?? '120 Mins' }}</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div class="mb-2">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.next_followup_datetime_optional') }}</label>
                                 <input type="datetime-local" name="next_followup_date" id="dealOffcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs">
                             </div>
 
@@ -2241,7 +2244,7 @@
                                     <div class="col-6">
                                         <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
                                             <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="dealOffcanvasNextSyncGoogle" style="cursor: pointer;">
-                                                <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                                <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
                                             </label>
                                             <input type="hidden" name="next_sync_google_calendar" value="0">
                                             <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_sync_google_calendar" value="1" id="dealOffcanvasNextSyncGoogle" style="cursor: pointer;">
@@ -2250,7 +2253,7 @@
                                     <div class="col-6">
                                         <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
                                             <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="dealOffcanvasNextCreateMeet" style="cursor: pointer;">
-                                                <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                                <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
                                             </label>
                                             <input type="hidden" name="next_create_meet_link" value="0">
                                             <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_create_meet_link" value="1" id="dealOffcanvasNextCreateMeet" style="cursor: pointer;">
@@ -2259,11 +2262,11 @@
                                 </div>
                             </div>
 
-                            <x-ui.modal-form-ui type="input" name="next_guest_emails" id="dealOffcanvasNextGuestEmails" label="Guest / Attendee Emails" placeholder="e.g. client@company.com (comma separated)" />
+                            <x-ui.modal-form-ui type="input" name="next_guest_emails" id="dealOffcanvasNextGuestEmails" :label="__('crm.guest_attendee_emails')" :placeholder="__('crm.guest_emails_placeholder')" />
 
                             <div class="mt-3">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Tag / Assign Persons</label>
-                                <select name="tagged_user_ids[]" id="dealOffcanvasTagUser" class="form-select form-select-sm shadow-2xs" multiple data-placeholder="Select persons to tag...">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.tag_assign_persons') }}</label>
+                                <select name="tagged_user_ids[]" id="dealOffcanvasTagUser" class="form-select form-select-sm shadow-2xs" multiple data-placeholder="{{ __('crm.select_persons_to_tag') }}">
                                     @foreach(($users ?? \App\Models\User::orderBy('name')->get()) as $u)
                                         <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
                                     @endforeach
@@ -2276,35 +2279,35 @@
                 <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
                 <div id="dealSectionDirectSchedule" style="display: none;">
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Event / Meeting Title</label>
-                        <input type="text" name="title" id="dealOffcanvasEventTitle" class="form-control form-control-sm shadow-2xs" placeholder="e.g. CRM Followup Call / Client Demo" value="CRM Followup Call">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.event_meeting_title') }}</label>
+                        <input type="text" name="title" id="dealOffcanvasEventTitle" class="form-control form-control-sm shadow-2xs" placeholder="{{ __('crm.event_title_placeholder') }}" value="CRM Followup Call">
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Activity Type <span class="text-danger">*</span></label>
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.activity_type') }} <span class="text-danger">*</span></label>
                         <select name="schedule_type" id="dealOffcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#dealOffcanvasFollowupType').val(this.value)">
-                            <option value="Call">Call</option>
-                            <option value="Meeting">Meeting</option>
-                            <option value="Demo">Demo</option>
-                            <option value="Email">Email</option>
+                            <option value="Call">{{ __('crm.activity_types.Call') ?? 'Call' }}</option>
+                            <option value="Meeting">{{ __('crm.activity_types.Meeting') ?? 'Meeting' }}</option>
+                            <option value="Demo">{{ __('crm.activity_types.Demo') ?? 'Demo' }}</option>
+                            <option value="Email">{{ __('crm.activity_types.Email') ?? 'Email' }}</option>
                             <option value="WhatsApp">WhatsApp</option>
                         </select>
                     </div>
 
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.due_date_time') }} <span class="text-danger">*</span></label>
                             <input type="datetime-local" name="followup_date" id="dealOffcanvasFollowupDate" class="form-control form-control-sm shadow-2xs">
                         </div>
                         <div class="col-6">
-                            <label class="form-label fw-bold text-dark fs-12 mb-1">Duration (Minutes)</label>
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.duration_minutes') }}</label>
                             <select name="duration_minutes" id="dealOffcanvasDuration" class="form-select form-select-sm shadow-2xs">
-                                <option value="15">15 Mins</option>
-                                <option value="30" selected>30 Mins</option>
-                                <option value="45">45 Mins</option>
-                                <option value="60">60 Mins (1 Hr)</option>
-                                <option value="90">90 Mins</option>
-                                <option value="120">120 Mins</option>
+                                <option value="15">{{ __('crm.duration_options.15') ?? '15 Mins' }}</option>
+                                <option value="30" selected>{{ __('crm.duration_options.30') ?? '30 Mins' }}</option>
+                                <option value="45">{{ __('crm.duration_options.45') ?? '45 Mins' }}</option>
+                                <option value="60">{{ __('crm.duration_options.60') ?? '60 Mins (1 Hr)' }}</option>
+                                <option value="90">{{ __('crm.duration_options.90') ?? '90 Mins' }}</option>
+                                <option value="120">{{ __('crm.duration_options.120') ?? '120 Mins' }}</option>
                             </select>
                         </div>
                     </div>
@@ -2314,31 +2317,31 @@
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="dealOffcanvasSyncGoogle" checked>
                                 <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasSyncGoogle">
-                                    <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                    <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
                                 </label>
                             </div>
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="dealOffcanvasCreateMeet">
                                 <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasCreateMeet">
-                                    <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                    <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
                                 </label>
                             </div>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Guest / Attendee Emails</label>
-                        <input type="text" name="guest_emails" id="dealOffcanvasGuestEmails" class="form-control form-control-sm shadow-2xs" placeholder="e.g. client@company.com (comma separated)">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.guest_attendee_emails') }}</label>
+                        <input type="text" name="guest_emails" id="dealOffcanvasGuestEmails" class="form-control form-control-sm shadow-2xs" placeholder="{{ __('crm.guest_emails_placeholder') }}">
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Description / Plan</label>
-                        <textarea name="schedule_notes" id="dealOffcanvasScheduleNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Agenda / plan for upcoming activity..." oninput="$('#dealOffcanvasNotes').val(this.value)"></textarea>
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.description_plan') }}</label>
+                        <textarea name="schedule_notes" id="dealOffcanvasScheduleNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="{{ __('crm.agenda_plan_placeholder') }}" oninput="$('#dealOffcanvasNotes').val(this.value)"></textarea>
                     </div>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label fw-bold text-dark fs-12 mb-1">Deal Stage</label>
+                    <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.deal_stage') }}</label>
                     <select name="stage" id="dealOffcanvasStage" class="form-select form-select-sm shadow-2xs">
                         @php
                             $dStatuses = $dealStatuses ?? \App\Domains\CRM\Models\DealStatus::getOrderedStatuses();
@@ -2350,8 +2353,8 @@
                 </div>
 
                 <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
-                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>
-                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">SAVE</button>
+                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">{{ __('crm.close') }}</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">{{ __('crm.save') }}</button>
                 </div>
             </form>
         </div>
@@ -2401,7 +2404,7 @@
                             <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
                         </td>
                         <td class="text-end fw-bold text-dark amount-display pe-3" style="font-size: 13px; padding-top: 8px;">
-                            ₹0.00
+                            {{ active_currency_symbol() }}0.00
                         </td>
                         <td class="text-center" style="padding-top: 6px;">
                             <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn">
@@ -2493,16 +2496,17 @@
                     subtotal += amount;
                     taxTotal += tax;
 
-                    $(this).find('.amount-display').text('₹' + amount.toFixed(2));
+                    $(this).find('.amount-display').text('{{ active_currency_symbol() }}' + amount.toFixed(2));
                 });
 
                 const discount = parseFloat($('#discountInput').val()) || 0;
                 const grandTotal = subtotal + taxTotal - discount;
 
-                $('#calcSubtotal').text('₹' + subtotal.toFixed(2));
-                $('#calcTax').text('₹' + taxTotal.toFixed(2));
-                $('#calcTotal').text('₹' + Math.max(0, grandTotal).toFixed(2));
+                $('#calcSubtotal').text('{{ active_currency_symbol() }}' + subtotal.toFixed(2));
+                $('#calcTax').text('{{ active_currency_symbol() }}' + taxTotal.toFixed(2));
+                $('#calcTotal').text('{{ active_currency_symbol() }}' + Math.max(0, grandTotal).toFixed(2));
             }
+
 
             $('#addItemRow').on('click', function() { addRow(); });
 

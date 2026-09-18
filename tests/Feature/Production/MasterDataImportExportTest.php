@@ -317,4 +317,146 @@ class MasterDataImportExportTest extends TestCase
         $response->assertStatus(200);
         // Clean download execution
     }
+
+    /** @test */
+    public function import_preview_supports_get_request_when_session_present()
+    {
+        $sessionRows = [
+            [
+                'row_number' => 2,
+                'key' => 'ROUT-TEST',
+                'valid' => true,
+                'errors' => [],
+                'data' => [
+                    'routing_number' => 'ROUT-TEST',
+                    'name' => 'Test Routing',
+                    'operations' => []
+                ]
+            ]
+        ];
+
+        $response = $this->actingAs($this->manager)
+            ->withHeader('X-Tenant', 'import-corp')
+            ->withSession(['production_import_preview_routings' => $sessionRows])
+            ->get(route('production.import-export.import-preview', 'routings'));
+
+        $response->assertStatus(200);
+        $response->assertViewIs('modules.production.import_preview');
+        $response->assertViewHas('type', 'routings');
+        $response->assertViewHas('errorCount', 0);
+    }
+
+    /** @test */
+    public function import_preview_get_redirects_to_index_when_no_session()
+    {
+        $response = $this->actingAs($this->manager)
+            ->withHeader('X-Tenant', 'import-corp')
+            ->get(route('production.import-export.import-preview', 'routings'));
+
+        $response->assertRedirect(route('production.routing.index'));
+        $response->assertSessionHas('info');
+    }
+
+    /** @test */
+    public function import_confirm_get_redirects_to_index()
+    {
+        $response = $this->actingAs($this->manager)
+            ->withHeader('X-Tenant', 'import-corp')
+            ->get(route('production.import-export.import-confirm', 'routings'));
+
+        $response->assertRedirect(route('production.routing.index'));
+    }
+
+    /** @test */
+    public function import_confirm_update_strategy_recreates_operations_without_sequence_collision()
+    {
+        $product = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Assembly Table',
+            'sku' => 'SKU-ROUT-TBL',
+            'type' => 'product',
+        ]);
+
+        $workCenter = WorkCenter::create([
+            'tenant_id' => $this->tenant->id,
+            'code' => 'WC-MAIN-ASSEMBLY',
+            'name' => 'Main Assembly Line',
+        ]);
+
+        // Existing routing with sequence 60
+        $routing = \App\Domains\Production\Models\Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-TBL-FG',
+            'name' => 'Old Routing Name',
+            'product_id' => $product->id,
+            'version' => '1.0',
+            'status' => 'draft',
+            'created_by' => $this->manager->id,
+        ]);
+
+        \App\Domains\Production\Models\RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 60,
+            'operation_number' => 'OP60',
+            'name' => 'Old Operation 60',
+            'operation_type' => 'manufacturing',
+            'work_center_id' => $workCenter->id,
+            'setup_time_minutes' => 5,
+            'processing_time_minutes' => 10,
+            'expected_yield_percentage' => 100,
+            'is_external' => false,
+        ]);
+
+        // Incoming import preview with update strategy and the same sequence 60
+        $sessionRows = [
+            [
+                'row_number' => 2,
+                'key' => 'RT-TBL-FG',
+                'valid' => true,
+                'errors' => [],
+                'data' => [
+                    'routing_number' => 'RT-TBL-FG',
+                    'name' => 'Updated Routing Name',
+                    'product_id' => $product->id,
+                    'version' => '1.1',
+                    'operations' => [
+                        [
+                            'sequence' => 60,
+                            'operation_number' => 'OP60',
+                            'name' => 'Final Dining Table Assembly',
+                            'operation_type' => 'manufacturing',
+                            'work_center_id' => $workCenter->id,
+                            'machine_id' => null,
+                            'setup_time_minutes' => 10,
+                            'processing_time_minutes' => 15,
+                            'expected_yield_percentage' => 100,
+                            'is_external' => false,
+                            'materials' => []
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        $response = $this->actingAs($this->manager)
+            ->withHeader('X-Tenant', 'import-corp')
+            ->withSession(['production_import_preview_routings' => $sessionRows])
+            ->post(route('production.import-export.import-confirm', 'routings'), [
+                'strategy' => 'update'
+            ]);
+
+        $response->assertRedirect(route('production.routing.index'));
+        $response->assertSessionHas('success');
+
+        // Confirm database has updated operation without integrity violation
+        $this->assertDatabaseHas('production_routing_operations', [
+            'routing_id' => $routing->id,
+            'sequence' => 60,
+            'name' => 'Final Dining Table Assembly',
+            'deleted_at' => null
+        ]);
+    }
 }
+
+

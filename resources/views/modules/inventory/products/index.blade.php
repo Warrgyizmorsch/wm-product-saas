@@ -134,7 +134,7 @@
                         </th>
                         <th>{{ __('inventory.item_name_sku') }}</th>
                         <th>{{ __('inventory.type') }}</th>
-                        <th>Material Type</th>
+                        <th>{{ __('inventory.material_type') }}</th>
                         <th>{{ __('inventory.variation') }}</th>
                         <th class="text-end">{{ __('inventory.selling_price') }}</th>
                         <th class="text-end">{{ __('inventory.cost_price') }}</th>
@@ -167,12 +167,12 @@
                             <td>
                                 @php
                                     $mtMap = [
-                                        'raw_material'  => ['label' => 'Raw Material',  'color' => 'warning'],
-                                        'semi_finished' => ['label' => 'Semi-Finished', 'color' => 'info'],
-                                        'finished_good' => ['label' => 'Finished Good', 'color' => 'success'],
-                                        'consumable'    => ['label' => 'Consumable',    'color' => 'secondary'],
-                                        'component'     => ['label' => 'Component',     'color' => 'danger'],
-                                        'service'       => ['label' => 'Service',       'color' => 'primary'],
+                                        'raw_material'  => ['label' => __('inventory.raw_material'),  'color' => 'warning'],
+                                        'semi_finished' => ['label' => __('inventory.semi_finished'), 'color' => 'info'],
+                                        'finished_good' => ['label' => __('inventory.finished_good'), 'color' => 'success'],
+                                        'consumable'    => ['label' => __('inventory.consumable'),    'color' => 'secondary'],
+                                        'component'     => ['label' => __('inventory.component'),     'color' => 'danger'],
+                                        'service'       => ['label' => __('inventory.service'),       'color' => 'primary'],
                                     ];
                                     $mt = $mtMap[$product->type] ?? ['label' => ucfirst(str_replace('_', ' ', $product->type ?? '—')), 'color' => 'secondary'];
                                 @endphp
@@ -190,10 +190,10 @@
                                 @endif
                             </td>
                             <td class="text-end fw-bold">
-                                ₹{{ number_format($product->selling_price, 2) }}
+                                {{ format_currency($product->selling_price) }}
                             </td>
                             <td class="text-end text-muted">
-                                ₹{{ number_format($product->cost_price, 2) }}
+                                {{ format_currency($product->cost_price) }}
                             </td>
                             <td class="text-end">
                                 @if($product->item_type === 'Service')
@@ -257,15 +257,15 @@
     </div>
 
     {{-- Import Products Modal --}}
-    <x-ui.modal id="importProductsModal" title="Import Items / Products" submitText="Import File" :centered="true">
+    <x-ui.modal id="importProductsModal" :title="__('inventory.import_items_products')" :submitText="__('inventory.import_file')" :centered="true">
         <form method="POST" action="{{ route('inventory.products.import') }}" enctype="multipart/form-data" id="importProductsForm">
             @csrf
-            <p class="fs-13 text-muted mb-3">Upload an Excel (.xlsx, .xls) or CSV (.csv) file containing item details.</p>
-            <x-ui.odoo-form-ui type="file" name="file" label="Excel / CSV File" required placeholder="Choose File" />
+            <p class="fs-13 text-muted mb-3">{{ __('inventory.upload_file_help') }}</p>
+            <x-ui.odoo-form-ui type="file" name="file" :label="__('inventory.excel_csv_file')" required :placeholder="__('inventory.choose_file')" />
         </form>
         <x-slot name="footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" form="importProductsForm" class="btn btn-primary">Import File</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('inventory.cancel') }}</button>
+            <button type="submit" form="importProductsForm" class="btn btn-primary">{{ __('inventory.import_file') }}</button>
         </x-slot>
     </x-ui.modal>
 @endsection

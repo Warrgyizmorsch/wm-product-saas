@@ -130,7 +130,7 @@
                     </div>
                 </div>
                 <div>
-                    <x-ui.status-badge status="{{ $requisition->status }}" label="Status: {{ strtoupper($requisition->status) }}" size="lg" />
+                    <x-ui.status-badge :status="$requisition->status" :label="in_array($requisition->status, ['approved', 'published', 'open']) ? 'Open' : (in_array($requisition->status, ['closed']) ? 'Closed' : null)" size="lg" />
                 </div>
             </div>
         </div>
@@ -255,19 +255,59 @@
                                     @if($canUpdateRecruitment || $canManageRecruitment)
                                         <div class="mt-auto pt-2 border-top d-flex align-items-center flex-nowrap gap-1 w-100 overflow-x-auto pb-1">
                                             @if($canUpdateRecruitment)
+                                                @php
+                                                    $stageOrderMap = [
+                                                        'applied'    => 0,
+                                                        'screening'  => 1,
+                                                        'interview'  => 2,
+                                                        'offer_sent' => 3,
+                                                        'hired'      => 4,
+                                                        'rejected'   => 99,
+                                                    ];
+                                                    $curStageNormalized = in_array($app->current_stage, ['interview', 'interview_round_1', 'interview_round_2', 'interview_round_3', 'final_hr']) ? 'interview' : $app->current_stage;
+                                                    $curOrderIdx = $stageOrderMap[$curStageNormalized] ?? 0;
+                                                @endphp
+
                                                 <!-- Change Stage Dropdown (Left) -->
                                                 <div class="dropdown flex-shrink-0 me-auto">
                                                     <button class="btn btn-sm btn-light text-secondary border dropdown-toggle fw-semibold fs-11 px-2 py-1" type="button" data-bs-toggle="dropdown" title="Move Stage">
                                                         Move
                                                     </button>
-                                                    <ul class="dropdown-menu fs-12 shadow-sm border-0">
+                                                    <ul class="dropdown-menu fs-12 shadow-sm border-0 py-1" style="min-width: 175px;">
                                                         @foreach($stages as $key => $lbl)
+                                                            @php
+                                                                $targetOrderIdx = $stageOrderMap[$key] ?? 0;
+                                                                $isPreviousStage = ($curStageNormalized !== 'rejected' && $key !== 'rejected' && $targetOrderIdx < $curOrderIdx);
+                                                                $isCurrentStage = ($key === $curStageNormalized);
+                                                            @endphp
                                                             <li>
-                                                                <form action="{{ route('hrms.recruitment.stage.update', $app->id) }}" method="POST">
-                                                                    @csrf
-                                                                    <input type="hidden" name="current_stage" value="{{ $key }}">
-                                                                    <button type="submit" class="dropdown-item {{ $key === $stageKey ? 'active' : '' }}">{{ $lbl }}</button>
-                                                                </form>
+                                                                @if($isPreviousStage)
+                                                                    <div class="dropdown-item text-muted disabled opacity-50 py-1.5 px-3 fs-11 d-flex align-items-center justify-content-between" style="cursor: not-allowed; background-color: transparent;">
+                                                                        <span><i class="feather-lock me-1.5 text-muted fs-10"></i>{{ $lbl }}</span>
+                                                                        <small class="badge bg-light text-muted border-0 fs-10">Passed</small>
+                                                                    </div>
+                                                                @elseif($isCurrentStage)
+                                                                    <div class="dropdown-item active fw-bold py-1.5 px-3 fs-11 d-flex align-items-center justify-content-between">
+                                                                        <span><i class="feather-check me-1.5 fs-10"></i>{{ $lbl }}</span>
+                                                                        <small class="badge bg-primary-subtle text-primary border border-primary-subtle fs-10">Current</small>
+                                                                    </div>
+                                                                @elseif($key === 'rejected')
+                                                                    <form action="{{ route('hrms.recruitment.stage.update', $app->id) }}" method="POST">
+                                                                        @csrf
+                                                                        <input type="hidden" name="current_stage" value="rejected">
+                                                                        <button type="submit" class="dropdown-item text-danger fw-semibold py-1.5 px-3 fs-11 d-flex align-items-center justify-content-between">
+                                                                            <span><i class="feather-x-circle me-1.5 text-danger"></i>Reject Candidate</span>
+                                                                        </button>
+                                                                    </form>
+                                                                @else
+                                                                    <form action="{{ route('hrms.recruitment.stage.update', $app->id) }}" method="POST">
+                                                                        @csrf
+                                                                        <input type="hidden" name="current_stage" value="{{ $key }}">
+                                                                        <button type="submit" class="dropdown-item text-dark fw-medium py-1.5 px-3 fs-11 d-flex align-items-center justify-content-between">
+                                                                            <span><i class="feather-arrow-right me-1.5 text-primary"></i>Advance to {{ $lbl }}</span>
+                                                                        </button>
+                                                                    </form>
+                                                                @endif
                                                             </li>
                                                         @endforeach
                                                     </ul>
@@ -578,9 +618,9 @@
 
                             <!-- Modal: Generate Job Offer -->
                             <div class="modal fade" id="offerModal{{ $app->id }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-dialog modal-lg modal-dialog-centered">
                                     <div class="modal-content border-0 shadow">
-                                        <form action="{{ route('hrms.recruitment.offer.create', $app->id) }}" method="POST">
+                                        <form action="{{ route('hrms.recruitment.offer.create', $app->id) }}" method="POST" enctype="multipart/form-data">
                                             @csrf
                                             <div class="modal-header bg-light">
                                                 <h5 class="modal-title fw-bold">Generate Job Offer: {{ $candidate->full_name }}</h5>
@@ -588,10 +628,13 @@
                                             </div>
                                             <div class="modal-body p-4 text-start">
                                                 <div class="mb-3">
-                                                    <x-ui.odoo-form-ui type="select" label="Document Master Template" name="document_template_id">
-                                                        <option value="">-- Standard Offer Letter --</option>
+                                                    <x-ui.odoo-form-ui type="select" label="Document Master Template" name="document_template_id" class="offer-tmpl-select" onchange="handleOfferTmplChange(this, '{{ $app->id }}')">
+                                                        <option value="" data-requires-signature="0" data-has-hr-sig="0">-- Standard Offer Letter --</option>
                                                         @foreach($templates as $tmpl)
-                                                            <option value="{{ $tmpl->id }}">{{ $tmpl->name }} ({{ $tmpl->code }})</option>
+                                                            @php
+                                                                $hasSigTag = (str_contains(strtolower($tmpl->body_content ?? ''), 'hr_signature') || str_contains(strtolower($tmpl->body_content ?? ''), 'hr signature') || $tmpl->requires_signature);
+                                                            @endphp
+                                                            <option value="{{ $tmpl->id }}" data-requires-signature="{{ $tmpl->requires_signature ? '1' : '0' }}" data-has-hr-sig="{{ $hasSigTag ? '1' : '0' }}">{{ $tmpl->name }} ({{ $tmpl->code }})</option>
                                                         @endforeach
                                                     </x-ui.odoo-form-ui>
                                                     <small class="text-muted fs-11 ms-1">Choose template from Document Master or use system default.</small>
@@ -618,6 +661,64 @@
                                                 </div>
                                                 <div class="mb-3">
                                                     <x-ui.odoo-form-ui type="textarea" label="Offer Letter Notes / Terms" name="offer_letter_notes" rows="2" placeholder="e.g. Probation period, signing bonus, special conditions..." />
+                                                </div>
+
+                                                <!-- HR DIGITAL SIGNATURE SECTION (SHOWN ONLY WHEN HR SIGNATURE IS REQUIRED BY TEMPLATE) -->
+                                                <div id="offer_hr_sig_section_{{ $app->id }}" class="mt-3 pt-3 border-top d-none">
+                                                    <h6 class="fw-bold text-dark fs-13 mb-2"><i class="feather-edit-3 text-warning me-1"></i> HR / Authoriser Signature Stamp</h6>
+                                                    <div class="row g-3">
+                                                        <div class="col-md-6">
+                                                            <x-ui.odoo-form-ui type="input" label="HR Signer Name" name="hr_name" value="{{ auth()->user()?->name }}" placeholder="e.g. {{ auth()->user()?->name }}" />
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <x-ui.odoo-form-ui type="input" label="HR Designation / Title" name="hr_designation" value="HR Manager" placeholder="e.g. HR Manager / Director" />
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                <label class="form-label fw-bold fs-12 text-dark mb-0">HR Signature Image (Draw or Upload)</label>
+                                                                <ul class="nav nav-pills bg-light p-1 rounded-pill border gap-1" role="tablist">
+                                                                    <li class="nav-item">
+                                                                        <button type="button" id="btn_offer_hr_sig_draw_{{ $app->id }}" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold rounded-pill active border-0 btn-primary" style="background-color: var(--bs-primary) !important; color: #ffffff !important;" onclick="switchOfferHrSigMode('{{ $app->id }}', 'draw')">
+                                                                            <i class="feather-edit-2 me-1"></i> Draw Signature
+                                                                        </button>
+                                                                    </li>
+                                                                    <li class="nav-item">
+                                                                        <button type="button" id="btn_offer_hr_sig_upload_{{ $app->id }}" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold text-secondary rounded-pill border-0" onclick="switchOfferHrSigMode('{{ $app->id }}', 'upload')">
+                                                                            <i class="feather-upload-cloud me-1"></i> Upload Image
+                                                                        </button>
+                                                                    </li>
+                                                                </ul>
+                                                            </div>
+                                                            <input type="hidden" name="hr_signature_data" id="offer_hr_sig_input_data_{{ $app->id }}">
+
+                                                            <!-- DRAW HR SIGNATURE TAB -->
+                                                            <div id="offer_hr_sig_draw_container_{{ $app->id }}">
+                                                                <div class="d-flex justify-content-end mb-1">
+                                                                    <button type="button" class="btn btn-xs btn-outline-secondary" onclick="clearOfferHrSigCanvas('{{ $app->id }}')">
+                                                                        <i class="feather-rotate-ccw me-1"></i>Clear Canvas
+                                                                    </button>
+                                                                </div>
+                                                                <div class="p-1 text-center position-relative shadow-sm" style="border: 2px dashed #94a3b8 !important; background-color: #f8fafc; border-radius: 8px;">
+                                                                    <canvas id="offerHrSignatureCanvas_{{ $app->id }}" width="400" height="100" style="touch-action: none; cursor: crosshair; background: #ffffff; width: 100%; height: 100px; border-radius: 6px;"></canvas>
+                                                                </div>
+                                                                <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> Draw HR signature using mouse or touch within the canvas box.</small>
+                                                            </div>
+
+                                                            <!-- UPLOAD HR SIGNATURE IMAGE TAB -->
+                                                            <div id="offer_hr_sig_upload_container_{{ $app->id }}" class="d-none">
+                                                                <div class="position-relative w-100">
+                                                                    <input type="file" name="hr_signature_file" accept="image/png, image/jpeg, image/jpg, image/webp" class="position-absolute opacity-0 w-100 h-100" style="left:0; top:0; cursor:pointer; z-index:5;" onchange="handleOfferHrSigUpload(this, '{{ $app->id }}')">
+                                                                    <div class="form-control d-flex flex-column align-items-center justify-content-center gap-1.5 p-3 text-center" style="border: 2px dashed rgba(var(--bs-primary-rgb, 59, 130, 246), 0.3); background-color: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.02); border-radius: 8px; min-height: 110px;">
+                                                                        <div id="offer_hr_sig_upload_preview_box_{{ $app->id }}" class="d-flex flex-column align-items-center justify-content-center">
+                                                                            <i class="feather-upload-cloud mb-1" style="font-size: 24px; color: var(--bs-primary);"></i>
+                                                                            <span class="fw-bold text-dark fs-12 file-name-label">Click to browse or drop HR signature image</span>
+                                                                            <small class="text-muted fs-10 mt-0.5">PNG or JPG transparent signature images recommended</small>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div class="modal-footer bg-light py-2">
@@ -874,10 +975,143 @@
 
 @push('scripts')
 <script>
+    var offerCanvasContexts = {};
+
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.modal').forEach(function(modalEl) {
             document.body.appendChild(modalEl);
         });
     });
+
+    function handleOfferTmplChange(selectEl, appId) {
+        var selectedOpt = selectEl.options[selectEl.selectedIndex];
+        var reqSig = selectedOpt ? selectedOpt.getAttribute('data-requires-signature') : '0';
+        var hasSigTag = selectedOpt ? selectedOpt.getAttribute('data-has-hr-sig') : '0';
+        
+        var sigSec = document.getElementById('offer_hr_sig_section_' + appId);
+        if (sigSec) {
+            if (reqSig === '1' || hasSigTag === '1') {
+                sigSec.classList.remove('d-none');
+                setTimeout(function() { initOfferSigCanvas(appId); }, 100);
+            } else {
+                sigSec.classList.add('d-none');
+            }
+        }
+    }
+
+    function initOfferSigCanvas(appId) {
+        var canvas = document.getElementById('offerHrSignatureCanvas_' + appId);
+        if (!canvas || canvas.dataset.initialized === '1') return;
+        canvas.dataset.initialized = '1';
+
+        var ctx = canvas.getContext('2d');
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#0f172a';
+        offerCanvasContexts[appId] = { canvas: canvas, ctx: ctx, isDrawing: false };
+
+        function getCanvasPos(e) {
+            var rect = canvas.getBoundingClientRect();
+            var clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+            var clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        canvas.addEventListener('mousedown', function(e) {
+            offerCanvasContexts[appId].isDrawing = true;
+            var pos = getCanvasPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            if (!offerCanvasContexts[appId].isDrawing) return;
+            var pos = getCanvasPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            var hiddenInput = document.getElementById('offer_hr_sig_input_data_' + appId);
+            if (hiddenInput) hiddenInput.value = canvas.toDataURL('image/png');
+        });
+
+        canvas.addEventListener('mouseup', function() { offerCanvasContexts[appId].isDrawing = false; });
+        canvas.addEventListener('mouseleave', function() { offerCanvasContexts[appId].isDrawing = false; });
+
+        canvas.addEventListener('touchstart', function(e) {
+            offerCanvasContexts[appId].isDrawing = true;
+            var pos = getCanvasPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+            e.preventDefault();
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', function(e) {
+            if (!offerCanvasContexts[appId].isDrawing) return;
+            var pos = getCanvasPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            var hiddenInput = document.getElementById('offer_hr_sig_input_data_' + appId);
+            if (hiddenInput) hiddenInput.value = canvas.toDataURL('image/png');
+            e.preventDefault();
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', function() { offerCanvasContexts[appId].isDrawing = false; });
+    }
+
+    function switchOfferHrSigMode(appId, mode) {
+        var drawCont = document.getElementById('offer_hr_sig_draw_container_' + appId);
+        var uploadCont = document.getElementById('offer_hr_sig_upload_container_' + appId);
+        var btnDraw = document.getElementById('btn_offer_hr_sig_draw_' + appId);
+        var btnUpload = document.getElementById('btn_offer_hr_sig_upload_' + appId);
+
+        if (mode === 'draw') {
+            if (drawCont) drawCont.classList.remove('d-none');
+            if (uploadCont) uploadCont.classList.add('d-none');
+            if (btnDraw) {
+                btnDraw.className = 'nav-link btn-xs py-1 px-3 fs-11 fw-bold rounded-pill active border-0 btn-primary';
+                btnDraw.style.cssText = 'background-color: var(--bs-primary) !important; color: #ffffff !important;';
+            }
+            if (btnUpload) {
+                btnUpload.className = 'nav-link btn-xs py-1 px-3 fs-11 fw-bold text-secondary rounded-pill border-0';
+                btnUpload.style.cssText = '';
+            }
+        } else {
+            if (drawCont) drawCont.classList.add('d-none');
+            if (uploadCont) uploadCont.classList.remove('d-none');
+            if (btnUpload) {
+                btnUpload.className = 'nav-link btn-xs py-1 px-3 fs-11 fw-bold rounded-pill active border-0 btn-primary';
+                btnUpload.style.cssText = 'background-color: var(--bs-primary) !important; color: #ffffff !important;';
+            }
+            if (btnDraw) {
+                btnDraw.className = 'nav-link btn-xs py-1 px-3 fs-11 fw-bold text-secondary rounded-pill border-0';
+                btnDraw.style.cssText = '';
+            }
+        }
+    }
+
+    function clearOfferHrSigCanvas(appId) {
+        var obj = offerCanvasContexts[appId];
+        if (obj && obj.ctx && obj.canvas) {
+            obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height);
+            var hiddenInput = document.getElementById('offer_hr_sig_input_data_' + appId);
+            if (hiddenInput) hiddenInput.value = '';
+        }
+    }
+
+    function handleOfferHrSigUpload(input, appId) {
+        var box = document.getElementById('offer_hr_sig_upload_preview_box_' + appId);
+        if (input.files && input.files[0] && box) {
+            var file = input.files[0];
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                box.innerHTML = '<img src="' + e.target.result + '" style="max-height: 60px; max-width: 200px; object-fit: contain;" class="mb-1" />' +
+                                '<span class="fw-bold text-success fs-12"><i class="feather-check-circle me-1"></i>' + file.name + '</span>' +
+                                '<small class="text-muted fs-10">Click to change signature image</small>';
+            };
+            reader.readAsDataURL(file);
+        }
+    }
 </script>
 @endpush

@@ -1,12 +1,12 @@
 @extends('layouts.duralux')
 
-@section('title', 'Lead Status Master | CRM | SaaS ERP')
-@section('page-title', 'Lead Status Master')
-@section('breadcrumb', 'CRM / Masters / Lead Status Master')
+@section('title', __('crm.lead_status_master') . ' | CRM | SaaS ERP')
+@section('page-title', __('crm.lead_status_master'))
+@section('breadcrumb', __('crm.masters') . ' / ' . __('crm.lead_status_master'))
 
 @section('page-actions')
     <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createStatusModal">
-        New Status
+        {{ __('crm.new_status') }}
     </x-ui.button>
 @endsection
 
@@ -52,11 +52,9 @@
 
 <div class="erp-single-panel">
 
-
-
     {{-- 1. Header & Actions Toolbar (Matches Customer & Lead Directory 100%) --}}
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-        <h5 class="fw-bold text-dark mb-0">Lead Status Master List</h5>
+        <h5 class="fw-bold text-dark mb-0">{{ __('crm.lead_status_master_list') }}</h5>
 
         <div class="d-flex align-items-center flex-wrap gap-2">
             <form method="GET" action="{{ route('crm.masters.lead-statuses.index') }}" class="d-flex align-items-center bg-light border rounded px-2.5 py-0.5 me-1" style="height: 34px; min-width: 240px;">
@@ -66,28 +64,28 @@
                     @endif
                 @endforeach
                 <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
-                <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="Search status..." value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('crm.search_status_placeholder') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
                 @if(request('search'))
-                    <a href="{{ route('crm.masters.lead-statuses.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search">
+                    <a href="{{ route('crm.masters.lead-statuses.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="{{ __('crm.clear_search') }}">
                         <i class="feather-x fs-12"></i>
                     </a>
                 @endif
             </form>
 
             <!-- Sort Dropdown -->
-            <x-ui.sort-dropdown label="Sort">
+            <x-ui.sort-dropdown :label="__('crm.sort')">
                 <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'sort_order', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'sort_order' && $sortOrder === 'asc' ? 'active' : '' }}">
-                    <span>Order (Ascending)</span>
+                    <span>{{ __('crm.order_ascending') }}</span>
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'sort_order', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'sort_order' && $sortOrder === 'desc' ? 'active' : '' }}">
-                    <span>Order (Descending)</span>
+                    <span>{{ __('crm.order_descending') }}</span>
                 </a>
                 <div class="dropdown-divider"></div>
                 <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'asc' ? 'active' : '' }}">
-                    <span>Status Name (A - Z)</span>
+                    <span>{{ __('crm.status_name_az') }}</span>
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'desc' ? 'active' : '' }}">
-                    <span>Status Name (Z - A)</span>
+                    <span>{{ __('crm.status_name_za') }}</span>
                 </a>
             </x-ui.sort-dropdown>
 
@@ -98,24 +96,24 @@
                         <input type="hidden" name="{{ $k }}" value="{{ $v }}">
                     @endif
                 @endforeach
-                <x-ui.filter label="Filter" offset="0, 5">
+                <x-ui.filter :label="__('crm.filter')" offset="0, 5">
                     <div class="p-3 style-filter-menu" style="min-width: 240px;">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
-                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Search status..." value="{{ request('search') }}" />
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
+                            <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_status_placeholder')" value="{{ request('search') }}" />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status Type</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.status_type') }}</label>
                             <x-ui.odoo-form-ui type="select" name="type">
-                                <option value="all" @selected(request('type', 'all') === 'all')>All Types</option>
-                                <option value="protected" @selected(request('type') === 'protected')>System Defaults</option>
-                                <option value="custom" @selected(request('type') === 'custom')>Custom Masters</option>
+                                <option value="all" @selected(request('type', 'all') === 'all')>{{ __('crm.all_types') }}</option>
+                                <option value="protected" @selected(request('type') === 'protected')>{{ __('crm.system_defaults') }}</option>
+                                <option value="custom" @selected(request('type') === 'custom')>{{ __('crm.custom_masters') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="d-flex justify-content-between pt-2 border-top">
-                            <a href="{{ route('crm.masters.lead-statuses.index') }}" class="btn btn-xs btn-light">Reset</a>
-                            <x-ui.button type="submit" variant="primary" size="xs">Apply Filter</x-ui.button>
+                            <a href="{{ route('crm.masters.lead-statuses.index') }}" class="btn btn-xs btn-light">{{ __('crm.reset') }}</a>
+                            <x-ui.button type="submit" variant="primary" size="xs">{{ __('crm.apply_filter') }}</x-ui.button>
                         </div>
                     </div>
                 </x-ui.filter>
@@ -128,11 +126,11 @@
         <x-ui.odoo-form-ui type="table" id="leadStatusMasterTable" class="mb-0">
             <thead>
                 <tr style="background-color: #e8ecf1 !important;">
-                    <th style="width: 50px; background-color: #e8ecf1 !important;" class="text-center">Drag</th>
-                    <th style="width: 70px; background-color: #e8ecf1 !important;" class="text-center">Order</th>
-                    <th style="background-color: #e8ecf1 !important;">Status</th>
-                    <th style="background-color: #e8ecf1 !important;">Type / Protection</th>
-                    <th style="width: 100px; background-color: #e8ecf1 !important;" class="text-end pe-3">Action</th>
+                    <th style="width: 50px; background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.drag') }}</th>
+                    <th style="width: 70px; background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.order') }}</th>
+                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.status') }}</th>
+                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.type_protection') }}</th>
+                    <th style="width: 100px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                 </tr>
             </thead>
             <tbody id="sortableStatusesBody" class="fs-13 text-dark">
@@ -150,10 +148,11 @@
                             default => (!empty($rawColor) && in_array($rawColor, $presetBadgeVariants, true) ? $rawColor : $presetBadgeVariants[abs($st->id ?? 0) % count($presetBadgeVariants)]),
                         };
                         $rowNum = ($statuses->currentPage() - 1) * $statuses->perPage() + $index + 1;
+                        $displayName = __('crm.statuses.' . $st->name) !== 'crm.statuses.' . $st->name ? __('crm.statuses.' . $st->name) : $st->name;
                     @endphp
                     <tr class="status-row-draggable" draggable="true" data-id="{{ $st->id }}">
                         <td class="text-center py-2.5">
-                            <div class="drag-handle text-muted" title="Drag to reorder status" data-bs-toggle="tooltip">
+                            <div class="drag-handle text-muted" title="{{ __('crm.drag_reorder_status') }}" data-bs-toggle="tooltip">
                                 <i class="feather-move fs-14 text-primary"></i>
                             </div>
                         </td>
@@ -164,17 +163,17 @@
                         </td>
                         <td>
                             <x-ui.badge :variant="$badgeColor" :soft="true" class="px-3 py-1.5 fs-12 fw-bold">
-                                {{ $st->name }}
+                                {{ $displayName }}
                             </x-ui.badge>
                         </td>
                         <td>
                             @if($isProtected)
                                 <x-ui.badge variant="warning" :soft="true" class="border border-warning-subtle px-2.5 py-1 fs-11" title="Core CRM status required for pipeline logic">
-                                    <i class="feather-lock me-1"></i> System Default (Protected)
+                                    <i class="feather-lock me-1"></i> {{ __('crm.system_default_protected') }}
                                 </x-ui.badge>
                             @else
                                 <x-ui.badge variant="success" :soft="true" class="border border-success-subtle px-2.5 py-1 fs-11">
-                                    <i class="feather-check me-1"></i> Custom Master
+                                    <i class="feather-check me-1"></i> {{ __('crm.custom_master') }}
                                 </x-ui.badge>
                             @endif
                         </td>
@@ -183,7 +182,7 @@
                                 <x-ui.action-dropdown>
                                     <x-slot:extraActions>
                                         <button type="button" class="action-dropdown-btn"
-                                                title="Edit Status"
+                                                title="{{ __('crm.edit_status') }}"
                                                 data-bs-toggle="tooltip"
                                                 onclick="openEditStatusModal({{ $st->id }}, '{{ addslashes($st->name) }}', '{{ $st->color }}', {{ $st->sort_order }})">
                                             <i class="feather feather-edit-2"></i>
@@ -191,7 +190,7 @@
                                         <form action="{{ route('crm.masters.lead-statuses.destroy', $st->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete status \'{{ addslashes($st->name) }}\'?', { title: 'Delete Lead Status', variant: 'danger', confirmButtonText: 'Delete' });">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="action-dropdown-btn text-danger" title="Delete Status" data-bs-toggle="tooltip">
+                                            <button type="submit" class="action-dropdown-btn text-danger" title="{{ __('crm.delete_status') }}" data-bs-toggle="tooltip">
                                                 <i class="feather feather-trash-2 text-danger"></i>
                                             </button>
                                         </form>
@@ -212,7 +211,7 @@
                     <tr>
                         <td colspan="5" class="text-center py-5 text-muted">
                             <i class="feather-inbox display-6 mb-2 text-muted opacity-50 d-block"></i>
-                            No lead statuses found matching your criteria.
+                            {{ __('crm.no_lead_statuses_found') }}
                         </td>
                     </tr>
                 @endforelse
@@ -236,17 +235,17 @@
 <!-- Modal: Create New Lead Status -->
 <x-ui.modal
     id="createStatusModal"
-    title='<i class="feather-plus-circle me-1.5 text-primary"></i> Add New Lead Status Master'
+    title='<i class="feather-plus-circle me-1.5 text-primary"></i> {{ __("crm.add_new_lead_status_master") }}'
     :centered="true"
     :formAction="route('crm.masters.lead-statuses.store')"
     formMethod="POST"
-    submitText="Save Status Master"
-    closeText="Cancel"
+    :submitText="__('crm.save_status_master')"
+    :closeText="__('crm.cancel')"
 >
-    <x-ui.odoo-form-ui type="input" label="Status Name" name="name" placeholder="e.g. Proposal Sent, Negotiation, Contacted" required="true" />
+    <x-ui.odoo-form-ui type="input" :label="__('crm.status_name')" name="name" :placeholder="__('crm.status_name_placeholder')" required="true" />
 
     <div class="mb-3">
-        <label class="form-label fw-bold text-dark fs-12">Badge Color / Style</label>
+        <label class="form-label fw-bold text-dark fs-12">{{ __('crm.badge_color_style') }}</label>
         <x-ui.odoo-form-ui type="select" name="color">
             <option value="bg-primary" selected>Primary (Blue)</option>
             <option value="bg-info">Info (Cyan)</option>
@@ -259,13 +258,13 @@
         </x-ui.odoo-form-ui>
     </div>
 
-    <x-ui.odoo-form-ui type="input" inputType="number" label="Sort Order Number" name="sort_order" value="{{ $statuses->max('sort_order') + 1 }}" min="1" />
+    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.sort_order_number')" name="sort_order" value="{{ $statuses->max('sort_order') + 1 }}" min="1" />
 </x-ui.modal>
 
 <!-- Modal: Edit Custom Lead Status -->
 <x-ui.modal
     id="editStatusModal"
-    title='<i class="feather-edit me-1.5 text-primary"></i> Edit Lead Status Master'
+    title='<i class="feather-edit me-1.5 text-primary"></i> {{ __("crm.edit_lead_status_master") }}'
     :centered="true"
     :showFooter="false"
 >
@@ -273,10 +272,10 @@
         @csrf
         @method('PUT')
         <div class="modal-body-content">
-            <x-ui.odoo-form-ui type="input" label="Status Name" name="name" id="edit_status_name" required="true" />
+            <x-ui.odoo-form-ui type="input" :label="__('crm.status_name')" name="name" id="edit_status_name" required="true" />
 
             <div class="mb-3">
-                <label class="form-label fw-bold text-dark fs-12">Badge Color / Style</label>
+                <label class="form-label fw-bold text-dark fs-12">{{ __('crm.badge_color_style') }}</label>
                 <x-ui.odoo-form-ui type="select" name="color" id="edit_status_color">
                     <option value="bg-primary">Primary (Blue)</option>
                     <option value="bg-info">Info (Cyan)</option>
@@ -289,12 +288,12 @@
                 </x-ui.odoo-form-ui>
             </div>
 
-            <x-ui.odoo-form-ui type="input" inputType="number" label="Sort Order Number" name="sort_order" id="edit_status_sort_order" min="1" />
+            <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.sort_order_number')" name="sort_order" id="edit_status_sort_order" min="1" />
         </div>
         <div class="modal-footer pt-3 px-0 pb-0 border-top mt-3">
-            <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('crm.cancel') }}</button>
             <x-ui.button type="submit" variant="primary" icon="feather-check">
-                Update Status
+                {{ __('crm.update_status') }}
             </x-ui.button>
         </div>
     </form>

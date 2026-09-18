@@ -4,6 +4,19 @@
 @section('page-title', __('purchase.purchase_requests'))
 @section('breadcrumb', __('ui.purchase') . ' / ' . __('purchase.purchase_requests'))
 
+@push('styles')
+    <style>
+        .erp-sort-dropdown, 
+        .erp-filter-dropdown,
+        .erp-filter-dropdown .filter-toggle-custom,
+        .erp-sort-dropdown .sort-toggle-custom {
+            vertical-align: middle !important;
+            display: inline-flex !important;
+            align-items: center !important;
+        }
+    </style>
+@endpush
+
 @section('page-actions')
     <x-ui.button href="{{ route('purchase.requisitions.create') }}" variant="primary" icon="feather-plus">
         {{ __('purchase.create_purchase_request') }}
@@ -17,10 +30,9 @@
     @endphp
 
     <div class="erp-single-panel">
-        <!-- Toast Notifications -->
-
-        <div class="d-flex align-items-center mb-3">
-            <h5 class="fw-bold text-dark mb-0">{{ __('purchase.purchase_requests_listing') }}</h5>
+        <!-- Toolbar: Search, Sort, Filters -->
+        <div class="d-flex align-items-center mb-3 flex-wrap gap-2">
+            <h5 class="fw-bold text-dark mb-0 me-3">{{ __('purchase.purchase_requests_listing') }}</h5>
 
             <div class="d-flex gap-2 ms-auto align-items-center flex-wrap">
                 <!-- Quick Search (HRMS Common Component Style) -->
@@ -54,8 +66,8 @@
                 </x-ui.sort-dropdown>
 
                 <!-- Filter -->
-                <form method="GET" action="{{ route('purchase.requisitions.index') }}" class="d-inline">
-                    <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
+                <form method="GET" action="{{ route('purchase.requisitions.index') }}" class="d-inline-flex align-items-center m-0">
+                    <x-ui.filter :label="__('ui.filter')" offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
 
                         <div class="mb-3">
@@ -88,21 +100,21 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Has Reminders</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.has_reminders') }}</label>
                             <x-ui.odoo-form-ui type="select" name="has_reminders">
-                                <option value="">All</option>
-                                <option value="1" @selected(request('has_reminders') === '1')>Yes (Reminded)</option>
-                                <option value="0" @selected(request('has_reminders') === '0')>No</option>
+                                <option value="">{{ __('purchase.all') }}</option>
+                                <option value="1" @selected(request('has_reminders') === '1')>{{ __('purchase.yes_reminded') }}</option>
+                                <option value="0" @selected(request('has_reminders') === '0')>{{ __('purchase.no') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Reminder Date From</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.reminder_date_from') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="reminder_date_from" value="{{ request('reminder_date_from') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Reminder Date To</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.reminder_date_to') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="reminder_date_to" value="{{ request('reminder_date_to') }}" />
                         </div>
 
@@ -129,7 +141,7 @@
                         <th style="width: 11%">{{ __('purchase.expected_date') }}</th>
                         <th style="width: 11%">{{ __('purchase.source_type') }}</th>
                         <th style="width: 12%">{{ __('purchase.source') }}</th>
-                        <th style="width: 13%">Last Reminder</th>
+                        <th style="width: 13%">{{ __('purchase.last_reminder') }}</th>
                         <th style="width: 8%">{{ __('purchase.status') }}</th>
                         <th style="width: 9%" class="text-end">{{ __('purchase.action') }}</th>
                     </tr>
@@ -222,7 +234,7 @@
                                             class="btn btn-xs btn-soft-danger border border-danger-subtle font-monospace px-2 py-0.5 fs-10 fw-bold d-inline-flex align-items-center gap-1 mb-1"
                                             title="Click to view all reminders"
                                             onclick="showReminderHistoryModal('{{ $req->requisition_number }}', {{ json_encode($remData) }})">
-                                        <i class="feather-bell"></i>Reminded ({{ $req->reminder_count }})
+                                        <i class="feather-bell"></i>{{ __('purchase.reminded') }} ({{ $req->reminder_count }})
                                     </button>
                                     <div class="fs-11 text-muted font-monospace">
                                         {{ $req->last_reminded_at ? $req->last_reminded_at->format('d-m-Y H:i') : '' }}

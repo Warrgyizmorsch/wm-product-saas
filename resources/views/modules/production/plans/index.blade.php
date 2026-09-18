@@ -22,48 +22,9 @@
 
 @section('content')
 <div class="erp-single-panel">
-    <!-- KPI Status Summary -->
-    <div class="row g-3 mb-4">
-        <div class="col">
-            <div class="bg-light border rounded p-3 text-center">
-                <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.draft') }}</span>
-                <h4 class="text-dark fw-bold mt-1 mb-0">{{ $statusCounts['draft'] ?? 0 }}</h4>
-            </div>
-        </div>
-        <div class="col">
-            <div class="bg-soft-warning border rounded p-3 text-center">
-                <span class="text-warning fs-11 text-uppercase fw-bold">{{ __('production.pending') }}</span>
-                <h4 class="text-warning fw-bold mt-1 mb-0">{{ $statusCounts['pending_approval'] ?? 0 }}</h4>
-            </div>
-        </div>
-        <div class="col">
-            <div class="bg-soft-success border rounded p-3 text-center">
-                <span class="text-success fs-11 text-uppercase fw-bold">{{ __('production.approved') }}</span>
-                <h4 class="text-success fw-bold mt-1 mb-0">{{ $statusCounts['approved'] ?? 0 }}</h4>
-            </div>
-        </div>
-        <div class="col">
-            <div class="bg-soft-info border rounded p-3 text-center">
-                <span class="text-info fs-11 text-uppercase fw-bold">{{ __('production.mrp_generated') }}</span>
-                <h4 class="text-info fw-bold mt-1 mb-0">{{ $statusCounts['mrp_generated'] ?? 0 }}</h4>
-            </div>
-        </div>
-        <div class="col">
-            <div class="bg-soft-primary border rounded p-3 text-center">
-                <span class="text-primary fs-11 text-uppercase fw-bold">{{ __('production.released') }}</span>
-                <h4 class="text-primary fw-bold mt-1 mb-0">{{ $statusCounts['released'] ?? 0 }}</h4>
-            </div>
-        </div>
-        <div class="col">
-            <div class="bg-light border rounded p-3 text-center">
-                <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.completed_closed') }}</span>
-                <h4 class="text-muted fw-bold mt-1 mb-0">{{ ($statusCounts['completed'] ?? 0) + ($statusCounts['closed'] ?? 0) }}</h4>
-            </div>
-        </div>
-    </div>
     {{-- Toast alerts --}}
 
-    <!-- Toolbar: Sort, Filters -->
+    <!-- Toolbar: Sort, Filters, Export -->
     <div class="d-flex align-items-center mb-3">
         <h5 class="fw-bold text-dark mb-0">{{ __('production.plans_list') }}</h5>
         <div class="d-flex gap-2 ms-auto">
@@ -74,10 +35,10 @@
             @endphp
             <x-ui.sort-dropdown :label="__('production.sort')">
                 <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'desc' ? 'active' : '' }}">
-                    <span>{{ __('production.newest_first') ?? 'Newest First' }}</span>
+                    <span>{{ __('production.newest_first') }}</span>
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'asc' ? 'active' : '' }}">
-                    <span>{{ __('production.oldest_first') ?? 'Oldest First' }}</span>
+                    <span>{{ __('production.oldest_first') }}</span>
                 </a>
                 <div class="dropdown-divider"></div>
                 <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'plan_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'plan_number' && $sortOrder === 'asc' ? 'active' : '' }}">
@@ -138,6 +99,9 @@
                     </div>
                 </x-ui.filter>
             </form>
+
+            <!-- Export Component -->
+            <x-ui.import-export-dropdown type="plans" :can-import="false" :can-download-template="false" />
         </div>
     </div>
 

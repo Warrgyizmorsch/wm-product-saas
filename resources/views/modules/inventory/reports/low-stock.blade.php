@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Low Stock Report | SaaS ERP')
-@section('page-title', 'Low Stock & Reorder Alert Report')
-@section('breadcrumb', 'Inventory / Reports / Low Stock')
+@section('title', __('inventory.low_stock_report') . ' | SaaS ERP')
+@section('page-title', __('inventory.low_stock_reorder_alert_report'))
+@section('breadcrumb', __('inventory.inventory_reports_low_stock'))
 
 @section('content')
 <div class="erp-single-panel text-dark">
@@ -12,10 +12,10 @@
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom">
             <div class="d-flex align-items-center flex-wrap gap-2">
                 <h5 class="fw-bold text-dark mb-0 me-2">
-                    <i class="feather-alert-triangle text-danger me-2"></i>Low Stock Alert Items
+                    <i class="feather-alert-triangle text-danger me-2"></i>{{ __('inventory.low_stock_alert_items') }}
                 </h5>
                 <span class="badge bg-soft-danger text-danger border border-danger-subtle font-monospace fw-bold fs-11">
-                    {{ $products instanceof \Illuminate\Pagination\LengthAwarePaginator ? $products->total() : $products->count() }} Alert Items
+                    {{ $products instanceof \Illuminate\Pagination\LengthAwarePaginator ? $products->total() : $products->count() }} {{ __('inventory.alert_items') }}
                 </span>
             </div>
 
@@ -24,7 +24,7 @@
                 <!-- Raise PR Button (Triggers Modal) -->
                 <button type="button" id="raisePrBtn" class="btn btn-sm btn-primary d-flex align-items-center gap-1 opacity-50" disabled>
                     <i class="feather-file-plus fs-14"></i>
-                    <span>Raise Purchase Requisition (PR)</span>
+                    <span>{{ __('inventory.raise_purchase_requisition_pr') }}</span>
                     <span id="selectedBadge" class="badge bg-white text-primary ms-1 d-none">0</span>
                 </button>
 
@@ -35,27 +35,27 @@
                         type="text" 
                         id="quickSearchInput"
                         class="form-control border-0 bg-transparent p-0 fs-13" 
-                        placeholder="Search product or SKU..." 
+                        placeholder="{{ __('inventory.search_product_or_sku') }}" 
                         value="{{ request('search') }}"
                         style="box-shadow: none; height: 32px; width: 200px;"
                     >
                 </div>
 
                 <!-- Filter Component -->
-                <x-ui.filter label="Filter" offset="0, 5">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Low Stock Report</h6>
+                <x-ui.filter :label="__('inventory.filter')" offset="0, 5">
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('inventory.filter_low_stock_report') }}</h6>
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Product Name or SKU</label>
-                        <x-ui.odoo-form-ui type="input" name="search" placeholder="Type product name or SKU..." value="{{ request('search') }}" />
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.search_product_name_or_sku') }}</label>
+                        <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('inventory.type_product_name_or_sku')" value="{{ request('search') }}" />
                     </div>
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('inventory.reports.low-stock') }}" class="btn btn-sm btn-light border">Reset</a>
-                        <button type="submit" form="filterForm" class="btn btn-sm btn-primary">Apply Filter</button>
+                        <a href="{{ route('inventory.reports.low-stock') }}" class="btn btn-sm btn-light border">{{ __('inventory.reset') }}</a>
+                        <button type="submit" form="filterForm" class="btn btn-sm btn-primary">{{ __('inventory.apply_filter') }}</button>
                     </div>
                 </x-ui.filter>
 
                 <x-ui.button href="javascript:window.print()" variant="light" class="border btn-sm" icon="feather-printer">
-                    Print Report
+                    {{ __('inventory.print_report') }}
                 </x-ui.button>
             </div>
         </div>
@@ -66,15 +66,15 @@
                 <thead class="table-light bg-light">
                     <tr>
                         <th style="width: 3%" class="text-center">
-                            <input type="checkbox" id="selectAllLowStock" class="form-check-input" title="Select All Items">
+                            <input type="checkbox" id="selectAllLowStock" class="form-check-input" title="{{ __('inventory.select_all_items') }}">
                         </th>
-                        <th>Product Name</th>
-                        <th>SKU Code</th>
-                        <th class="text-end">Current Total Stock</th>
-                        <th class="text-end">Reorder Point</th>
-                        <th class="text-end">Shortage Qty</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-end pe-4">Action</th>
+                        <th>{{ __('inventory.product_name') }}</th>
+                        <th>{{ __('inventory.sku_code') }}</th>
+                        <th class="text-end">{{ __('inventory.current_total_stock') }}</th>
+                        <th class="text-end">{{ __('inventory.reorder_point') }}</th>
+                        <th class="text-end">{{ __('inventory.shortage_qty') }}</th>
+                        <th class="text-center">{{ __('inventory.status') }}</th>
+                        <th class="text-end pe-4">{{ __('inventory.action') }}</th>
                     </tr>
                 </thead>
                 <tbody class="text-dark">
@@ -105,7 +105,7 @@
                                 <a href="{{ route('inventory.products.show', $product->id) }}" class="fw-bold text-primary text-decoration-none fs-13">
                                     {{ $product->name }}
                                 </a>
-                                <small class="text-muted d-block fs-11">Type: {{ ucfirst($product->type ?: 'Goods') }}</small>
+                                <small class="text-muted d-block fs-11">{{ __('inventory.type') }}: {{ ucfirst($product->type ?: 'Goods') }}</small>
 
                                 <!-- PR Tracking Badges -->
                                 @if($draftQty > 0 || $approvedQty > 0)
@@ -115,7 +115,7 @@
                                                 $draftNumbers = $draftPrs->map(fn($i) => $i->requisition?->requisition_number)->filter()->unique()->implode(', ');
                                             @endphp
                                             <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 py-1 px-2" title="Draft PR(s): {{ $draftNumbers }}">
-                                                <i class="feather-clock me-1"></i>PR Raised: {{ number_format($draftQty, 2) }} (Draft)
+                                                <i class="feather-clock me-1"></i>{{ __('inventory.pr_raised') }}: {{ number_format($draftQty, 2) }} ({{ __('inventory.draft') }})
                                             </span>
                                         @endif
                                         @if($approvedQty > 0)
@@ -123,7 +123,7 @@
                                                 $approvedNumbers = $approvedPrs->map(fn($i) => $i->requisition?->requisition_number)->filter()->unique()->implode(', ');
                                             @endphp
                                             <span class="badge bg-soft-success text-success border border-success-subtle fs-10 py-1 px-2" title="Approved PR(s): {{ $approvedNumbers }}">
-                                                <i class="feather-check-circle me-1"></i>PR Approved: {{ number_format($approvedQty, 2) }}
+                                                <i class="feather-check-circle me-1"></i>{{ __('inventory.pr_approved') }}: {{ number_format($approvedQty, 2) }}
                                             </span>
                                         @endif
                                     </div>
@@ -154,17 +154,17 @@
                                 <x-ui.action-dropdown>
                                     <li>
                                         <button type="button" class="dropdown-item text-primary fw-semibold single-pr-btn" data-product-id="{{ $product->id }}">
-                                            <i class="feather-file-plus me-2 text-primary fs-12"></i>Raise PR for Item
+                                            <i class="feather-file-plus me-2 text-primary fs-12"></i>{{ __('inventory.raise_pr_for_item') }}
                                         </button>
                                     </li>
                                     <li>
                                         <a href="{{ route('inventory.products.edit', $product->id) }}" class="dropdown-item">
-                                            <i class="feather-edit me-2 text-muted fs-12"></i>Edit Product & Reorder
+                                            <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('inventory.edit_product_and_reorder') }}
                                         </a>
                                     </li>
                                     <li>
                                         <a href="{{ route('inventory.adjustments.create') }}?product_id={{ $product->id }}" class="dropdown-item text-secondary fs-12">
-                                            <i class="feather-plus-circle me-2 text-secondary fs-12"></i>Create Stock Adjustment
+                                            <i class="feather-plus-circle me-2 text-secondary fs-12"></i>{{ __('inventory.create_stock_adjustment') }}
                                         </a>
                                     </li>
                                 </x-ui.action-dropdown>
@@ -174,7 +174,7 @@
                         <tr>
                             <td colspan="8" class="text-center py-5 text-success fw-bold">
                                 <i class="feather-check-circle fs-1 d-block mb-3 text-success opacity-75"></i>
-                                Excellent! All items are above their reorder stock levels.
+                                {{ __('inventory.all_items_above_reorder') }}
                             </td>
                         </tr>
                     @endforelse
@@ -201,13 +201,13 @@
 </div>
 
 <!-- Modal: Prefill & Edit PR Quantities Before Submit -->
-<x-ui.modal id="createPrModal" title="<i class='feather-file-plus text-primary me-2'></i>Raise Purchase Requisition (PR)" size="xl" centered="true" :showFooter="false">
+<x-ui.modal id="createPrModal" :title="'<i class=\'feather-file-plus text-primary me-2\'></i>' . __('inventory.raise_purchase_requisition_pr')" size="xl" centered="true" :showFooter="false">
     <form id="lowStockPrForm" method="POST" action="{{ route('inventory.reports.low-stock.create-pr') }}">
         @csrf
         <div class="alert alert-soft-primary border border-primary-subtle d-flex align-items-center gap-2 py-2 px-3 fs-12 rounded-3 mb-3 text-dark">
             <i class="feather-info text-primary fs-16 flex-shrink-0"></i>
             <div>
-                <strong>Review & Modify Quantities:</strong> Calculated shortage quantities have been prefilled below. You can adjust the PR quantity for each item before generating the Draft PR.
+                <strong>{{ __('inventory.review_modify_quantities') }}:</strong> {{ __('inventory.review_modify_quantities_desc') }}
             </div>
         </div>
 
@@ -215,11 +215,11 @@
             <table class="table table-hover align-middle mb-0 text-dark fs-13">
                 <thead class="table-light bg-light border-bottom">
                     <tr>
-                        <th style="width: 35%;">Product Name & SKU</th>
-                        <th class="text-end" style="width: 15%;">Current Stock</th>
-                        <th class="text-end" style="width: 15%;">Reorder Point</th>
-                        <th class="text-end" style="width: 15%;">Shortage Qty</th>
-                        <th class="text-end pe-3" style="width: 20%;">PR Request Qty *</th>
+                        <th style="width: 35%;">{{ __('inventory.product_name_sku') }}</th>
+                        <th class="text-end" style="width: 15%;">{{ __('inventory.current_stock') }}</th>
+                        <th class="text-end" style="width: 15%;">{{ __('inventory.reorder_point') }}</th>
+                        <th class="text-end" style="width: 15%;">{{ __('inventory.shortage_qty') }}</th>
+                        <th class="text-end pe-3" style="width: 20%;">{{ __('inventory.pr_request_qty') }} *</th>
                     </tr>
                 </thead>
                 <tbody id="modalPrTableBody">
@@ -229,9 +229,9 @@
         </div>
 
         <div class="d-flex justify-content-end gap-2 pt-3 border-top">
-            <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">{{ __('inventory.cancel') }}</button>
             <button type="submit" id="confirmSubmitPrBtn" class="btn btn-sm btn-primary px-3">
-                <i class="feather-check-circle me-1"></i>Confirm & Create Draft PR
+                <i class="feather-check-circle me-1"></i>{{ __('inventory.confirm_create_draft_pr') }}
             </button>
         </div>
     </form>

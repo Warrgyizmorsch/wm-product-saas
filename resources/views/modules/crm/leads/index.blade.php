@@ -67,7 +67,7 @@
                     </x-ui.sort-dropdown>
 
                     <form method="GET" action="{{ route('crm.leads.index') }}" class="d-inline">
-                        <x-ui.filter :label="__('ui.filter')" offset="0, 5">
+                        <x-ui.filter :label="__('crm.filter')" offset="0, 5">
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
@@ -310,7 +310,7 @@
                                     @endif
                                 </td>
                                 <td class="text-end pe-4">
-                                    <span class="fw-bold text-dark d-block mb-1">{{ $lead->expected_amount ? '₹' . number_format($lead->expected_amount, 2) : '—' }}</span>
+                                    <span class="fw-bold text-dark d-block mb-1">{{ $lead->expected_amount ? format_currency($lead->expected_amount) : '—' }}</span>
                                     @if($lead->expected_sale_date)
                                         <span class="text-muted fs-11"><i class="feather-calendar me-1 fs-10 text-success"></i>{{ $lead->expected_sale_date->format('d/m/Y') }}</span>
                                     @else
@@ -427,7 +427,7 @@
                                         @if ($lead->crm_deal_id)
                                             <li>
                                                 <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="dropdown-item text-success fw-semibold">
-                                                    <i class="feather-git-branch me-2 text-success fs-12"></i>View Deal
+                                                    <i class="feather-git-branch me-2 text-success fs-12"></i>{{ __('crm.view_deal') }}
                                                 </a>
                                             </li>
                                         @elseif (strtolower($lead->status ?: '') === 'qualified')
@@ -436,7 +436,7 @@
                                                     @csrf
                                                     @method('PATCH')
                                                     <button type="submit" class="dropdown-item text-warning fw-bold">
-                                                        <i class="feather-user-check me-2 text-warning fs-12"></i>Convert to Deal
+                                                        <i class="feather-user-check me-2 text-warning fs-12"></i>{{ __('crm.convert_to_deal') }}
                                                     </button>
                                                 </form>
                                             </li>
@@ -445,7 +445,7 @@
                                         @if ($lead->crm_account_id)
                                             <li>
                                                 <a href="{{ route('crm.accounts.show', $lead->crm_account_id) }}" class="dropdown-item text-primary fw-semibold">
-                                                    <i class="feather-briefcase me-2 text-primary fs-12"></i>View Account
+                                                    <i class="feather-briefcase me-2 text-primary fs-12"></i>{{ __('crm.view_account') }}
                                                 </a>
                                             </li>
                                         @endif
@@ -458,7 +458,7 @@
                                                         @csrf
                                                         @method('PATCH')
                                                         <button type="submit" class="dropdown-item text-success fw-semibold">
-                                                            <i class="feather-check-circle me-2 text-success fs-12"></i>Qualify (Genuine Lead)
+                                                            <i class="feather-check-circle me-2 text-success fs-12"></i>{{ __('crm.qualify_genuine_lead') }}
                                                         </button>
                                                     </form>
                                                 </li>
@@ -469,8 +469,8 @@
                                                 <form action="{{ route('crm.leads.destroy', $lead->id) }}" method="POST" id="deleteLeadForm_{{ $lead->id }}">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Reject & Delete Lead', message: 'Are you sure you want to reject & delete lead &quot;{{ addslashes($lead->company_name) }}&quot; ({{ $lead->lead_number ?: ('LD-' . str_pad($lead->id, 4, '0', STR_PAD_LEFT)) }}) permanently?', variant: 'danger', confirmText: 'Reject & Delete', onConfirm: function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); } })">
-                                                        <i class="feather-x-circle me-2 text-danger fs-12"></i>Reject & Delete Lead
+                                                    <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: '{{ __('crm.reject_delete_lead') }}', message: '{{ __('crm.confirm_reject_delete_lead', ['company' => addslashes($lead->company_name), 'number' => ($lead->lead_number ?: ('LD-' . str_pad($lead->id, 4, '0', STR_PAD_LEFT)))]) }}', variant: 'danger', confirmText: '{{ __('crm.reject_delete_lead') }}', onConfirm: function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); } })">
+                                                        <i class="feather-x-circle me-2 text-danger fs-12"></i>{{ __('crm.reject_delete_lead') }}
                                                     </button>
                                                 </form>
                                             </li>
@@ -481,8 +481,8 @@
                                                 <form action="{{ route('crm.leads.destroy', $lead->id) }}" method="POST" id="deleteLeadForm_{{ $lead->id }}">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Delete Lead', message: 'Are you sure you want to delete lead &quot;{{ addslashes($lead->company_name) }}&quot; ({{ $lead->lead_number ?: ('LD-' . str_pad($lead->id, 4, '0', STR_PAD_LEFT)) }}) permanently?', variant: 'danger', confirmText: 'Delete Lead', onConfirm: function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); } })">
-                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Lead
+                                                    <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: '{{ __('crm.delete_lead') }}', message: '{{ __('crm.confirm_delete_lead') }}', variant: 'danger', confirmText: '{{ __('crm.delete_lead') }}', onConfirm: function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); } })">
+                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('crm.delete_lead') }}
                                                     </button>
                                                 </form>
                                             </li>
@@ -935,7 +935,7 @@
                 var leadPriority = $(this).attr('data-lead-priority');
                 var nextFollowup = $(this).attr('data-next-followup');
 
-                $('#leadFollowupOffcanvasTitle').text('Edit Followup for ' + leadName);
+                $('#leadFollowupOffcanvasTitle').text('{{ __('crm.edit_followup_for', ['company' => '']) }}' + leadName);
                 $('#leadFollowupForm').attr('action', '/crm/leads/' + leadId + '/followups');
                 $('#offcanvasLeadStatus').val(leadStatus || 'New');
                 $('#offcanvasLeadPriority').val(leadPriority || 'Medium');
@@ -956,7 +956,7 @@
                     }
                     $('#offcanvasTagUser').select2({
                         theme: 'bootstrap-5',
-                        placeholder: 'Select persons to tag...',
+                        placeholder: '{{ __('crm.select_persons_to_tag') }}',
                         allowClear: true,
                         dropdownParent: $('#leadFollowupOffcanvas'),
                         width: '100%'
@@ -977,8 +977,8 @@
                     <i class="feather-calendar"></i>
                 </div>
                 <div>
-                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="leadFollowupOffcanvasTitle">Edit Followup</h5>
-                    <span class="text-muted fs-11">Log interaction & next followup or schedule activity</span>
+                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="leadFollowupOffcanvasTitle">{{ __('crm.edit_followup') }}</h5>
+                    <span class="text-muted fs-11">{{ __('crm.log_interaction_next_followup') }}</span>
                 </div>
             </div>
             <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -992,10 +992,10 @@
                 <!-- 2-Mode Switcher Tabs -->
                 <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
                     <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 offcanvas-mode-btn active btn-primary text-white shadow-sm" data-mode="log_note" style="font-size: 12px; padding: 8px 6px; background-color: var(--bs-primary); border-radius: 6px; transition: all 0.2s ease;">
-                        Log Discussion & Next
+                        {{ __('crm.log_discussion_next') }}
                     </button>
                     <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 offcanvas-mode-btn" data-mode="schedule" style="font-size: 12px; padding: 8px 6px; color: #64748b; background-color: transparent; border-radius: 6px; transition: all 0.2s ease;">
-                        Direct Schedule Activity
+                        {{ __('crm.direct_schedule_activity') }}
                     </button>
                 </div>
 
@@ -1003,86 +1003,86 @@
                 <div id="sectionPastInteraction">
                     <x-ui.modal-form-ui 
                         type="select" 
-                        label="Follow Up / Interaction Type" 
+                        :label="__('crm.followup_interaction_type')" 
                         name="type" 
                         id="offcanvasFollowupType" 
                     >
-                        <option value="Call">Call</option>
-                        <option value="Email">Email</option>
-                        <option value="Meeting">Meeting</option>
-                        <option value="Demo">Demo</option>
-                        <option value="WhatsApp">WhatsApp</option>
+                        <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
+                        <option value="Email">{{ __('crm.interaction_types.Email') }}</option>
+                        <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
+                        <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
+                        <option value="WhatsApp">{{ __('crm.activity_types.WhatsApp') }}</option>
                     </x-ui.modal-form-ui>
 
                     <x-ui.modal-form-ui 
                         type="select" 
-                        label="Follow Up Status / Outcome" 
+                        :label="__('crm.followup_status_outcome')" 
                         name="status" 
                         id="offcanvasFollowupStatus" 
                     >
-                        <option value="Connected">Connected</option>
-                        <option value="Not Connected">Not Connected</option>
-                        <option value="Not Answering">Not Answering</option>
+                        <option value="Connected">{{ __('crm.outcomes.Connected') }}</option>
+                        <option value="Not Connected">{{ __('crm.outcomes.Not Connected') }}</option>
+                        <option value="Not Answering">{{ __('crm.outcomes.Not Answering') }}</option>
                     </x-ui.modal-form-ui>
 
                     <x-ui.modal-form-ui 
                         type="textarea" 
-                        label="Discussion Notes / Summary" 
+                        :label="__('crm.notes_summary')" 
                         name="notes" 
                         id="offcanvasNotes" 
                         rows="3" 
-                        placeholder="Write discussion notes..." 
+                        :placeholder="__('crm.notes_summary_placeholder')" 
                     />
 
                     <!-- Next Follow-up Section inside Log Mode -->
                     <div class="border-top pt-3 mt-3">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <h6 class="fs-12 fw-bold text-dark mb-0">
-                                <i class="feather-calendar text-primary me-1"></i> NEXT ACTIVITY SCHEDULE
+                                <i class="feather-calendar text-primary me-1"></i> {{ __('crm.next_activity_schedule') }}
                             </h6>
                             <button type="button" class="btn btn-xs btn-outline-primary fw-bold px-2.5 py-1 rounded-pill d-inline-flex align-items-center gap-1" id="btnToggleNextSchedule">
                                 <i class="feather-plus fs-11" id="iconToggleNextSchedule"></i>
-                                <span id="textToggleNextSchedule">Schedule Next Activity</span>
+                                <span id="textToggleNextSchedule">{{ __('crm.schedule_next_activity_btn') }}</span>
                             </button>
                         </div>
                         
                         <div id="containerNextScheduleFields" class="mt-3 p-3 bg-light rounded-3 border" style="display: none;">
                             <x-ui.modal-form-ui 
                                 type="input" 
-                                label="Next Activity Title" 
+                                :label="__('crm.next_activity_title')" 
                                 name="next_title" 
                                 id="offcanvasNextTitle" 
-                                placeholder="e.g. Follow-up Call / Proposal Discussion" 
+                                :placeholder="__('crm.next_activity_title_placeholder')" 
                             />
 
                             <div class="row g-2">
                                 <div class="col-6">
                                     <x-ui.modal-form-ui 
                                         type="select" 
-                                        label="Next Activity Type" 
+                                        :label="__('crm.next_activity_type')" 
                                         name="next_activity_type" 
                                         id="offcanvasNextActivityType" 
                                     >
-                                        <option value="Call">Call</option>
-                                        <option value="Meeting">Meeting</option>
-                                        <option value="Demo">Demo</option>
-                                        <option value="Email">Email</option>
-                                        <option value="WhatsApp">WhatsApp</option>
+                                        <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
+                                        <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
+                                        <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
+                                        <option value="Email">{{ __('crm.interaction_types.Email') }}</option>
+                                        <option value="WhatsApp">{{ __('crm.activity_types.WhatsApp') }}</option>
                                     </x-ui.modal-form-ui>
                                 </div>
                                 <div class="col-6">
                                     <x-ui.modal-form-ui 
                                         type="select" 
-                                        label="Duration (Minutes)" 
+                                        :label="__('crm.duration_minutes')" 
                                         name="next_duration_minutes" 
                                         id="offcanvasNextDuration" 
                                     >
-                                        <option value="15">15 Mins</option>
-                                        <option value="30" selected>30 Mins</option>
-                                        <option value="45">45 Mins</option>
-                                        <option value="60">60 Mins (1 Hr)</option>
-                                        <option value="90">90 Mins</option>
-                                        <option value="120">120 Mins</option>
+                                        <option value="15">{{ __('crm.duration_options.15') }}</option>
+                                        <option value="30" selected>{{ __('crm.duration_options.30') }}</option>
+                                        <option value="45">{{ __('crm.duration_options.45') }}</option>
+                                        <option value="60">{{ __('crm.duration_options.60') }}</option>
+                                        <option value="90">{{ __('crm.duration_options.90') }}</option>
+                                        <option value="120">{{ __('crm.duration_options.120') }}</option>
                                     </x-ui.modal-form-ui>
                                 </div>
                             </div>
@@ -1090,7 +1090,7 @@
                             <x-ui.modal-form-ui 
                                 type="input" 
                                 inputType="datetime-local" 
-                                label="Next Follow-up Date & Time (Optional)" 
+                                :label="__('crm.next_followup_datetime_optional')" 
                                 name="next_followup_date" 
                                 id="offcanvasNextFollowupDate" 
                             />
@@ -1100,7 +1100,7 @@
                                     <div class="col-6">
                                         <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
                                             <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextSyncGoogle" style="cursor: pointer;">
-                                                <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                                <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
                                             </label>
                                             <input type="hidden" name="next_sync_google_calendar" value="0">
                                             <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_sync_google_calendar" value="1" id="offcanvasNextSyncGoogle" style="cursor: pointer;">
@@ -1109,7 +1109,7 @@
                                     <div class="col-6">
                                         <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
                                             <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextCreateMeet" style="cursor: pointer;">
-                                                <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                                <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
                                             </label>
                                             <input type="hidden" name="next_create_meet_link" value="0">
                                             <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_create_meet_link" value="1" id="offcanvasNextCreateMeet" style="cursor: pointer;">
@@ -1120,19 +1120,19 @@
 
                             <x-ui.modal-form-ui 
                                 type="input" 
-                                label="Guest / Attendee Emails" 
+                                :label="__('crm.guest_attendee_emails')" 
                                 name="next_guest_emails" 
                                 id="offcanvasNextGuestEmails" 
-                                placeholder="e.g. client@company.com (comma separated)" 
+                                :placeholder="__('crm.guest_emails_placeholder')" 
                             />
 
                             <x-ui.modal-form-ui 
                                 type="select" 
-                                label="Tag / Assign Persons" 
+                                :label="__('crm.tag_assign_persons')" 
                                 name="tagged_user_ids[]" 
                                 id="offcanvasTagUser" 
                                 :multiple="true"
-                                data-placeholder="Select persons to tag..."
+                                :data-placeholder="__('crm.select_persons_to_tag')"
                             >
                                 @foreach($users as $u)
                                     <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
@@ -1146,26 +1146,26 @@
                 <div id="sectionDirectSchedule" style="display: none;">
                     <x-ui.modal-form-ui 
                         type="input" 
-                        label="Event / Meeting Title" 
+                        :label="__('crm.event_meeting_title')" 
                         name="title" 
                         id="offcanvasEventTitle" 
-                        placeholder="e.g. CRM Followup Call / Client Demo" 
+                        :placeholder="__('crm.event_title_placeholder')" 
                         value="" 
                     />
 
                     <x-ui.modal-form-ui 
                         type="select" 
-                        label="Activity Type" 
+                        :label="__('crm.activity_type')" 
                         name="schedule_type" 
                         id="offcanvasScheduleType" 
                         :required="true"
                         onchange="$('#offcanvasFollowupType').val(this.value)"
                     >
-                        <option value="Call">Call</option>
-                        <option value="Meeting">Meeting</option>
-                        <option value="Demo">Demo</option>
-                        <option value="Email">Email</option>
-                        <option value="WhatsApp">WhatsApp</option>
+                        <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
+                        <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
+                        <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
+                        <option value="Email">{{ __('crm.interaction_types.Email') }}</option>
+                        <option value="WhatsApp">{{ __('crm.activity_types.WhatsApp') }}</option>
                     </x-ui.modal-form-ui>
 
                     <div class="row g-2">
@@ -1173,7 +1173,7 @@
                             <x-ui.modal-form-ui 
                                 type="input" 
                                 inputType="datetime-local" 
-                                label="Due Date & Time" 
+                                :label="__('crm.due_date_time')" 
                                 name="followup_date" 
                                 id="offcanvasFollowupDate" 
                                 :required="true"
@@ -1182,16 +1182,16 @@
                         <div class="col-6">
                             <x-ui.modal-form-ui 
                                 type="select" 
-                                label="Duration (Minutes)" 
+                                :label="__('crm.duration_minutes')" 
                                 name="duration_minutes" 
                                 id="offcanvasDuration" 
                             >
-                                <option value="15">15 Mins</option>
-                                <option value="30" selected>30 Mins</option>
-                                <option value="45">45 Mins</option>
-                                <option value="60">60 Mins (1 Hr)</option>
-                                <option value="90">90 Mins</option>
-                                <option value="120">120 Mins</option>
+                                <option value="15">{{ __('crm.duration_options.15') }}</option>
+                                <option value="30" selected>{{ __('crm.duration_options.30') }}</option>
+                                <option value="45">{{ __('crm.duration_options.45') }}</option>
+                                <option value="60">{{ __('crm.duration_options.60') }}</option>
+                                <option value="90">{{ __('crm.duration_options.90') }}</option>
+                                <option value="120">{{ __('crm.duration_options.120') }}</option>
                             </x-ui.modal-form-ui>
                         </div>
                     </div>
@@ -1201,7 +1201,7 @@
                             <div class="col-6">
                                 <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
                                     <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasSyncGoogle" style="cursor: pointer;">
-                                        <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                        <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
                                     </label>
                                     <input type="hidden" name="sync_google_calendar" value="0">
                                     <input class="form-check-input ms-0 mt-0" type="checkbox" name="sync_google_calendar" value="1" id="offcanvasSyncGoogle" style="cursor: pointer;">
@@ -1210,7 +1210,7 @@
                             <div class="col-6">
                                 <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
                                     <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasCreateMeet" style="cursor: pointer;">
-                                        <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                        <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
                                     </label>
                                     <input type="hidden" name="create_meet_link" value="0">
                                     <input class="form-check-input ms-0 mt-0" type="checkbox" name="create_meet_link" value="1" id="offcanvasCreateMeet" style="cursor: pointer;">
@@ -1221,26 +1221,26 @@
 
                     <x-ui.modal-form-ui 
                         type="input" 
-                        label="Guest / Attendee Emails" 
+                        :label="__('crm.guest_attendee_emails')" 
                         name="guest_emails" 
                         id="offcanvasGuestEmails" 
-                        placeholder="e.g. client@company.com (comma separated)" 
+                        :placeholder="__('crm.guest_emails_placeholder')" 
                     />
 
                     <x-ui.modal-form-ui 
                         type="textarea" 
-                        label="Description / Plan" 
+                        :label="__('crm.description_plan')" 
                         name="schedule_notes" 
                         id="offcanvasScheduleNotes" 
                         rows="3" 
-                        placeholder="Agenda / plan for upcoming activity..." 
+                        :placeholder="__('crm.agenda_plan_placeholder')" 
                         oninput="$('#offcanvasNotes').val(this.value)"
                     />
                 </div>
 
                 <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
-                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>
-                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">SAVE</button>
+                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">{{ __('crm.close') }}</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">{{ __('crm.save') }}</button>
                 </div>
             </form>
         </div>

@@ -1,30 +1,30 @@
 @extends('layouts.duralux')
 
-@section('title', 'Supplier Finance 360° | ' . $vendor->name)
-@section('page-title', 'Supplier Finance 360° View')
-@section('breadcrumb', 'Supply Chain / Purchase / Vendors / Profile')
+@section('title', __('purchase.supplier_finance_360') . ' | ' . $vendor->name)
+@section('page-title', __('purchase.supplier_finance_360_view'))
+@section('breadcrumb', __('purchase.supply_chain_purchase_vendors_profile'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{{ route('purchase.vendors.index') }}" class="btn btn-light border p-2 d-inline-flex align-items-center justify-content-center" title="Back to Suppliers">
+        <a href="{{ route('purchase.vendors.index') }}" class="btn btn-light border p-2 d-inline-flex align-items-center justify-content-center" title="{{ __('purchase.back_to_suppliers') }}">
             <i class="feather-arrow-left fs-16"></i>
         </a>
-        <a href="{{ route('purchase.vendors.edit', $vendor->id) }}" class="btn btn-light border" title="Edit Vendor Details">
-            <i class="feather-edit-2 me-1"></i>Edit
+        <a href="{{ route('purchase.vendors.edit', $vendor->id) }}" class="btn btn-light border" title="{{ __('purchase.edit_vendor_details') }}">
+            <i class="feather-edit-2 me-1"></i>{{ __('purchase.edit') }}
         </a>
         @if(Route::has('purchase.orders.create'))
             <x-ui.button href="{{ route('purchase.orders.create', ['vendor_id' => $vendor->id]) }}" variant="primary" icon="feather-plus">
-                Create PO
+                {{ __('purchase.create_po') }}
             </x-ui.button>
         @endif
         @if(Route::has('purchase.bills.create'))
             <x-ui.button href="{{ route('purchase.bills.create', ['vendor_id' => $vendor->id]) }}" variant="success" icon="feather-file-plus">
-                Enter Vendor Bill
+                {{ __('purchase.create_vendor_bill') }}
             </x-ui.button>
         @endif
         @if(Route::has('purchase.payments.create'))
-            <x-ui.button href="{{ route('purchase.payments.create', ['vendor_id' => $vendor->id]) }}" variant="warning" icon="feather-dollar-sign">
-                Record Payment
+            <x-ui.button href="{{ route('purchase.payments.create', ['vendor_id' => $vendor->id]) }}" variant="warning" icon="feather-credit-card">
+                {{ __('purchase.register_payment') }}
             </x-ui.button>
         @endif
     </div>
@@ -44,23 +44,23 @@
                         <div class="d-flex align-items-center gap-3 flex-wrap">
                             <h4 class="fw-bold text-dark mb-0 fs-19 me-1">{{ $vendor->name }}</h4>
                             @if(strtolower($vendor->status) === 'active')
-                                <x-ui.status-badge status="active" label="Active Supplier" dot="true" size="sm" />
+                                <x-ui.status-badge status="active" :label="__('purchase.active_supplier')" dot="true" size="sm" />
                             @else
-                                <x-ui.status-badge status="inactive" label="Inactive Supplier" dot="true" size="sm" />
+                                <x-ui.status-badge status="inactive" :label="__('purchase.inactive_supplier')" dot="true" size="sm" />
                             @endif
 
                             <span class="badge bg-soft-secondary text-dark border font-monospace fs-11 px-2.5 py-1">
-                                Code: {{ $vendor->code ?: 'N/A' }}
+                                {{ __('purchase.code_lbl') }} {{ $vendor->code ?: 'N/A' }}
                             </span>
                         </div>
 
                         <div class="d-flex align-items-center gap-3 text-muted fs-12 mt-2 flex-wrap">
                             @if($vendor->company_name)
-                                <span><i class="feather-building me-1 text-primary"></i>Company: <strong class="text-dark">{{ $vendor->company_name }}</strong></span>
+                                <span><i class="feather-building me-1 text-primary"></i>{{ __('purchase.company_lbl') }} <strong class="text-dark">{{ $vendor->company_name }}</strong></span>
                                 <span class="text-black-50">•</span>
                             @endif
                             @if($vendor->gstin)
-                                <span><strong class="text-dark">GSTIN:</strong> <span class="font-monospace text-primary fw-bold">{{ $vendor->gstin }}</span></span>
+                                <span><strong class="text-dark">{{ __('purchase.gstin_lbl') }}</strong> <span class="font-monospace text-primary fw-bold">{{ $vendor->gstin }}</span></span>
                                 <span class="text-black-50">•</span>
                             @endif
                             @if($vendor->phone)
@@ -75,10 +75,10 @@
                         @if($vendor->address || $vendor->billing_address || $vendor->shipping_address)
                             <div class="mt-2 pt-2 d-flex align-items-center gap-3 fs-11 text-muted flex-wrap">
                                 @if($vendor->address)
-                                    <span><i class="feather-map-pin me-1 text-danger"></i><strong>Primary:</strong> {{ Str::limit($vendor->address, 65) }}</span>
+                                    <span><i class="feather-map-pin me-1 text-danger"></i><strong>{{ __('purchase.primary_lbl') }}</strong> {{ Str::limit($vendor->address, 65) }}</span>
                                 @endif
                                 @if($vendor->billing_address)
-                                    <span><i class="feather-file-text me-1 text-primary"></i><strong>Billing:</strong> {{ Str::limit($vendor->billing_address, 65) }}</span>
+                                    <span><i class="feather-file-text me-1 text-primary"></i><strong>{{ __('purchase.billing_lbl') }}</strong> {{ Str::limit($vendor->billing_address, 65) }}</span>
                                 @endif
                             </div>
                         @endif
@@ -86,15 +86,15 @@
                 </div>
 
                 <div class="text-end">
-                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">Payable Health Status</span>
+                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">{{ __('purchase.payable_health_status') }}</span>
                     @if(($vendorAdvanceCredit ?? 0) > 0)
-                        <span class="badge bg-soft-info text-info fs-12 px-3 py-1.5 fw-bold border"><i class="feather-arrow-down-left me-1"></i>Advance Paid ({{ active_currency_symbol() }}{{ number_format($vendorAdvanceCredit, 2) }})</span>
+                        <span class="badge bg-soft-info text-info fs-12 px-3 py-1.5 fw-bold border"><i class="feather-arrow-down-left me-1"></i>{{ __('purchase.advance_paid_kpi') }} ({!! format_currency($vendorAdvanceCredit) !!})</span>
                     @elseif($outstandingPayable <= 0)
-                        <span class="badge bg-soft-success text-success fs-12 px-3 py-1.5 fw-bold border"><i class="feather-check-circle me-1"></i>All Settled (Zero Dues)</span>
+                        <span class="badge bg-soft-success text-success fs-12 px-3 py-1.5 fw-bold border"><i class="feather-check-circle me-1"></i>{{ __('purchase.all_settled_zero_dues') }}</span>
                     @elseif($overdueAmount > 0)
-                        <span class="badge bg-soft-danger text-danger fs-12 px-3 py-1.5 fw-bold border"><i class="feather-alert-triangle me-1"></i>Overdue Payment Dues</span>
+                        <span class="badge bg-soft-danger text-danger fs-12 px-3 py-1.5 fw-bold border"><i class="feather-alert-triangle me-1"></i>{{ __('purchase.overdue_payment_dues') }}</span>
                     @else
-                        <span class="badge bg-soft-warning text-warning fs-12 px-3 py-1.5 fw-bold border"><i class="feather-clock me-1"></i>Payment Dues Pending</span>
+                        <span class="badge bg-soft-warning text-warning fs-12 px-3 py-1.5 fw-bold border"><i class="feather-clock me-1"></i>{{ __('purchase.payment_dues_pending') }}</span>
                     @endif
                 </div>
             </div>
@@ -103,30 +103,30 @@
             <div class="row g-3 mb-4">
                 <div class="col-md-3">
                     <div class="p-3 rounded-3 border bg-light shadow-2xs">
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">Total Bills Amount</span>
-                        <h4 class="fw-bold text-dark mb-0 fs-18 font-monospace">{{ active_currency_symbol() }}{{ number_format($totalBilled, 2) }}</h4>
-                        <span class="fs-11 text-muted">{{ $bills->count() }} vendor bills</span>
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">{{ __('purchase.total_bills_amount') }}</span>
+                        <h4 class="fw-bold text-dark mb-0 fs-18 font-monospace">{!! format_currency($totalBilled) !!}</h4>
+                        <span class="fs-11 text-muted">{{ __('purchase.vendor_bills_count', ['count' => $bills->count()]) }}</span>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="p-3 rounded-3 border bg-soft-success shadow-2xs">
-                        <span class="text-success fs-11 fw-bold text-uppercase d-block mb-1">Total Paid Amount</span>
-                        <h4 class="fw-bold text-success mb-0 fs-18 font-monospace">{{ active_currency_symbol() }}{{ number_format($totalPaid, 2) }}</h4>
-                        <span class="fs-11 text-success">{{ $payments->count() }} payment records</span>
+                        <span class="text-success fs-11 fw-bold text-uppercase d-block mb-1">{{ __('purchase.total_paid_amount') }}</span>
+                        <h4 class="fw-bold text-success mb-0 fs-18 font-monospace">{!! format_currency($totalPaid) !!}</h4>
+                        <span class="fs-11 text-success">{{ __('purchase.payment_records_count', ['count' => $payments->count()]) }}</span>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="p-3 rounded-3 border bg-soft-danger shadow-2xs">
-                        <span class="text-danger fs-11 fw-bold text-uppercase d-block mb-1">Net Outstanding Dues</span>
-                        <h4 class="fw-bold text-danger mb-0 fs-18 font-monospace">{{ active_currency_symbol() }}{{ number_format($outstandingPayable, 2) }}</h4>
-                        <span class="fs-11 text-danger">Net payable balance</span>
+                        <span class="text-danger fs-11 fw-bold text-uppercase d-block mb-1">{{ __('purchase.net_outstanding_dues') }}</span>
+                        <h4 class="fw-bold text-danger mb-0 fs-18 font-monospace">{!! format_currency($outstandingPayable) !!}</h4>
+                        <span class="fs-11 text-danger">{{ __('purchase.net_payable_balance') }}</span>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="p-3 rounded-3 border bg-soft-warning shadow-2xs">
-                        <span class="text-warning fs-11 fw-bold text-uppercase d-block mb-1">Overdue Amount</span>
-                        <h4 class="fw-bold text-warning mb-0 fs-18 font-monospace">{{ active_currency_symbol() }}{{ number_format($overdueAmount, 2) }}</h4>
-                        <span class="fs-11 text-warning">Passed due date</span>
+                        <span class="text-warning fs-11 fw-bold text-uppercase d-block mb-1">{{ __('purchase.overdue_amount') }}</span>
+                        <h4 class="fw-bold text-warning mb-0 fs-18 font-monospace">{!! format_currency($overdueAmount) !!}</h4>
+                        <span class="fs-11 text-warning">{{ __('purchase.passed_due_date') }}</span>
                     </div>
                 </div>
             </div>
@@ -134,19 +134,19 @@
             {{-- 3. Interactive Tabs Navigation --}}
             <ul class="nav nav-tabs custom-tabs mb-4 border-bottom" id="vendorTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active fw-bold fs-13" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab"><i class="feather-info me-1.5"></i>Profile & Master Info</button>
+                    <button class="nav-link active fw-bold fs-13" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab"><i class="feather-info me-1.5"></i>{{ __('purchase.profile_master_info') }}</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link fw-bold fs-13" id="bills-tab" data-bs-toggle="tab" data-bs-target="#bills-pane" type="button" role="tab"><i class="feather-file-text me-1.5"></i>Vendor Bills ({{ $bills->count() }})</button>
+                    <button class="nav-link fw-bold fs-13" id="bills-tab" data-bs-toggle="tab" data-bs-target="#bills-pane" type="button" role="tab"><i class="feather-file-text me-1.5"></i>{{ __('purchase.vendor_bills_tab') }} ({{ $bills->count() }})</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link fw-bold fs-13" id="payments-tab" data-bs-toggle="tab" data-bs-target="#payments-pane" type="button" role="tab"><i class="feather-dollar-sign me-1.5"></i>Payments Paid ({{ $payments->count() }})</button>
+                    <button class="nav-link fw-bold fs-13" id="payments-tab" data-bs-toggle="tab" data-bs-target="#payments-pane" type="button" role="tab"><i class="feather-credit-card me-1.5"></i>{{ __('purchase.payments_paid_tab') }} ({{ $payments->count() }})</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link fw-bold fs-13" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-pane" type="button" role="tab"><i class="feather-truck me-1.5"></i>Purchase Orders ({{ $purchaseOrders->count() }})</button>
+                    <button class="nav-link fw-bold fs-13" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-pane" type="button" role="tab"><i class="feather-truck me-1.5"></i>{{ __('purchase.purchase_orders_tab') }} ({{ $purchaseOrders->count() }})</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link fw-bold fs-13 text-primary" id="ledger-tab" data-bs-toggle="tab" data-bs-target="#ledger-pane" type="button" role="tab"><i class="feather-book me-1.5"></i>Vendor Ledger Statement</button>
+                    <button class="nav-link fw-bold fs-13 text-primary" id="ledger-tab" data-bs-toggle="tab" data-bs-target="#ledger-pane" type="button" role="tab"><i class="feather-book me-1.5"></i>{{ __('purchase.vendor_ledger_statement') }}</button>
                 </li>
             </ul>
 
@@ -158,35 +158,35 @@
                     <div class="row g-4">
                         <div class="col-md-6">
                             <div class="p-3 border rounded-3 bg-white">
-                                <h6 class="fw-bold text-primary mb-3"><i class="feather-briefcase me-2"></i>Supplier Master Details</h6>
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-briefcase me-2"></i>{{ __('purchase.supplier_master_details') }}</h6>
                                 <table class="table table-borderless table-sm mb-0 fs-13">
                                     <tr>
-                                        <td class="text-muted" style="width: 40%;">Supplier Name:</td>
+                                        <td class="text-muted" style="width: 40%;">{{ __('purchase.supplier_name') }}:</td>
                                         <td class="fw-bold text-dark">{{ $vendor->name }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-muted">Company Trade Name:</td>
+                                        <td class="text-muted">{{ __('purchase.company_trade_name') }}:</td>
                                         <td class="fw-semibold text-dark">{{ $vendor->company_name ?: 'N/A' }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-muted">Supplier Code:</td>
+                                        <td class="text-muted">{{ __('purchase.supplier_code_id') }}:</td>
                                         <td class="font-monospace text-primary fw-bold">{{ $vendor->code ?: 'N/A' }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-muted">Email:</td>
+                                        <td class="text-muted">{{ __('purchase.email_address') }}:</td>
                                         <td>{{ $vendor->email ?: 'N/A' }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-muted">Phone:</td>
+                                        <td class="text-muted">{{ __('purchase.phone_mobile') }}:</td>
                                         <td>{{ $vendor->phone ?: 'N/A' }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-muted">Status:</td>
+                                        <td class="text-muted">{{ __('purchase.status') }}:</td>
                                         <td>
                                             @if(strtolower($vendor->status) === 'active')
-                                                <x-ui.status-badge status="active" label="Active" dot="true" size="sm" />
+                                                <x-ui.status-badge status="active" :label="__('purchase.active')" dot="true" size="sm" />
                                             @else
-                                                <x-ui.status-badge status="inactive" label="Inactive" dot="true" size="sm" />
+                                                <x-ui.status-badge status="inactive" :label="__('purchase.inactive')" dot="true" size="sm" />
                                             @endif
                                         </td>
                                     </tr>
@@ -196,31 +196,31 @@
 
                         <div class="col-md-6">
                             <div class="p-3 border rounded-3 bg-white">
-                                <h6 class="fw-bold text-primary mb-3"><i class="feather-credit-card me-2"></i>Tax & Banking Setup</h6>
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-credit-card me-2"></i>{{ __('purchase.tax_banking_setup') }}</h6>
                                 <table class="table table-borderless table-sm mb-0 fs-13">
                                     <tr>
-                                        <td class="text-muted" style="width: 40%;">GSTIN / TAX ID:</td>
+                                        <td class="text-muted" style="width: 40%;">{{ __('purchase.gstin_tax_id') }}:</td>
                                         <td class="font-monospace text-primary fw-bold">{{ $vendor->gstin ?: 'N/A' }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-muted">PAN Number:</td>
+                                        <td class="text-muted">{{ __('purchase.pan_number') }}:</td>
                                         <td class="font-monospace text-dark fw-semibold">{{ $vendor->pan ?: 'N/A' }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-muted">Bank Name:</td>
+                                        <td class="text-muted">{{ __('purchase.bank_name') }}:</td>
                                         <td class="fw-semibold text-dark">{{ $vendor->bank_name ?: 'N/A' }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-muted">Account Number:</td>
+                                        <td class="text-muted">{{ __('purchase.bank_account_number') }}:</td>
                                         <td class="font-monospace text-dark">{{ $vendor->account_number ?: 'N/A' }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-muted">IFSC / SWIFT Code:</td>
+                                        <td class="text-muted">{{ __('purchase.ifsc_swift_code') }}:</td>
                                         <td class="font-monospace text-dark">{{ $vendor->ifsc_code ?: 'N/A' }}</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-muted">Default Payment Terms:</td>
-                                        <td class="fw-bold text-success">{{ $vendor->payment_terms ?: 'Standard Net 30 Days' }}</td>
+                                        <td class="text-muted">{{ __('purchase.default_payment_terms') }}:</td>
+                                        <td class="fw-bold text-success">{{ $vendor->payment_terms ?: __('purchase.standard_net_30_days') }}</td>
                                     </tr>
                                 </table>
                             </div>
@@ -228,18 +228,18 @@
 
                         <div class="col-md-12">
                             <div class="p-3 border rounded-3 bg-white">
-                                <h6 class="fw-bold text-primary mb-3"><i class="feather-map-pin me-2"></i>Addresses & Locations</h6>
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-map-pin me-2"></i>{{ __('purchase.addresses_locations') }}</h6>
                                 <div class="row g-3">
                                     <div class="col-md-4">
-                                        <label class="fs-11 fw-bold text-muted text-uppercase d-block mb-1">Primary Office Address</label>
+                                        <label class="fs-11 fw-bold text-muted text-uppercase d-block mb-1">{{ __('purchase.primary_office_address') }}</label>
                                         <p class="fs-13 text-dark mb-0">{!! nl2br(e($vendor->address ?: 'N/A')) !!}</p>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="fs-11 fw-bold text-muted text-uppercase d-block mb-1">Billing Address</label>
+                                        <label class="fs-11 fw-bold text-muted text-uppercase d-block mb-1">{{ __('purchase.billing_address') }}</label>
                                         <p class="fs-13 text-dark mb-0">{!! nl2br(e($vendor->billing_address ?: 'N/A')) !!}</p>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="fs-11 fw-bold text-muted text-uppercase d-block mb-1">Dispatch Warehouse Address</label>
+                                        <label class="fs-11 fw-bold text-muted text-uppercase d-block mb-1">{{ __('purchase.dispatch_warehouse_address') }}</label>
                                         <p class="fs-13 text-dark mb-0">{!! nl2br(e($vendor->shipping_address ?: 'N/A')) !!}</p>
                                     </div>
                                 </div>
@@ -254,15 +254,15 @@
                         <x-ui.odoo-form-ui type="table" class="mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Bill #</th>
-                                    <th>Challan / Inv #</th>
-                                    <th>Bill Date</th>
-                                    <th>Due Date</th>
-                                    <th class="text-end">Total Amount</th>
-                                    <th class="text-end">Paid Amount</th>
-                                    <th class="text-end">Balance Due</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-end">Action</th>
+                                    <th>{{ __('purchase.bill_number') }}</th>
+                                    <th>{{ __('purchase.challan_inv_no') }}</th>
+                                    <th>{{ __('purchase.bill_date') }}</th>
+                                    <th>{{ __('purchase.due_date') }}</th>
+                                    <th class="text-end">{{ __('purchase.total_amount') }}</th>
+                                    <th class="text-end">{{ __('purchase.paid_amount') }}</th>
+                                    <th class="text-end">{{ __('purchase.balance_due') }}</th>
+                                    <th class="text-center">{{ __('purchase.status') }}</th>
+                                    <th class="text-end">{{ __('purchase.action') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -280,15 +280,15 @@
                                                 @php $isPast = \Carbon\Carbon::parse($bill->due_date)->isPast() && (float)$bill->balance_due > 0; @endphp
                                                 <span class="{{ $isPast ? 'text-danger fw-bold' : '' }}">
                                                     {{ \Carbon\Carbon::parse($bill->due_date)->format('d-M-Y') }}
-                                                    @if($isPast)<i class="feather-alert-circle ms-1" title="Overdue"></i>@endif
+                                                    @if($isPast)<i class="feather-alert-circle ms-1" title="{{ __('purchase.overdue') }}"></i>@endif
                                                 </span>
                                             @else
                                                 —
                                             @endif
                                         </td>
-                                        <td class="text-end font-monospace fw-bold text-dark">{{ active_currency_symbol() }}{{ number_format($bill->total_amount, 2) }}</td>
-                                        <td class="text-end font-monospace text-success">{{ active_currency_symbol() }}{{ number_format($bill->amount_paid, 2) }}</td>
-                                        <td class="text-end font-monospace fw-bold text-danger">{{ active_currency_symbol() }}{{ number_format($bill->balance_due, 2) }}</td>
+                                        <td class="text-end font-monospace fw-bold text-dark">{!! format_currency($bill->total_amount) !!}</td>
+                                        <td class="text-end font-monospace text-success">{!! format_currency($bill->amount_paid) !!}</td>
+                                        <td class="text-end font-monospace fw-bold text-danger">{!! format_currency($bill->balance_due) !!}</td>
                                         <td class="text-center">
                                             <x-ui.status-badge :status="$bill->status" size="sm" />
                                         </td>
@@ -298,7 +298,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="9" class="text-center py-4 text-muted">No vendor bills recorded for this supplier.</td>
+                                        <td colspan="9" class="text-center py-4 text-muted">{{ __('purchase.no_vendor_bills_for_supplier') }}</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -312,13 +312,13 @@
                         <x-ui.odoo-form-ui type="table" class="mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Payment #</th>
-                                    <th>Payment Date</th>
-                                    <th>Payment Method</th>
-                                    <th>Reference / Txn No</th>
-                                    <th class="text-end">Amount Paid</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-end pe-3">Action</th>
+                                    <th>{{ __('purchase.payment_number') }}</th>
+                                    <th>{{ __('purchase.payment_date') }}</th>
+                                    <th>{{ __('purchase.payment_method') }}</th>
+                                    <th>{{ __('purchase.ref_txn_no') }}</th>
+                                    <th class="text-end">{{ __('purchase.paid_amount') }}</th>
+                                    <th class="text-center">{{ __('purchase.status') }}</th>
+                                    <th class="text-end pe-3">{{ __('purchase.action') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -332,7 +332,7 @@
                                         <td>{{ \Carbon\Carbon::parse($pmt->payment_date)->format('d-M-Y') }}</td>
                                         <td><span class="badge bg-light text-dark border">{{ ucfirst($pmt->payment_method ?: 'Bank') }}</span></td>
                                         <td class="font-monospace text-muted">{{ $pmt->reference_number ?: 'N/A' }}</td>
-                                        <td class="text-end font-monospace fw-bold text-success">{{ active_currency_symbol() }}{{ number_format($pmt->amount, 2) }}</td>
+                                        <td class="text-end font-monospace fw-bold text-success">{!! format_currency($pmt->amount) !!}</td>
                                         <td class="text-center">
                                             <x-ui.status-badge :status="$pmt->status" size="sm" />
                                         </td>
@@ -342,7 +342,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="text-center py-4 text-muted">No payment records found for this supplier.</td>
+                                        <td colspan="7" class="text-center py-4 text-muted">{{ __('purchase.no_payments_for_supplier') }}</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -356,13 +356,13 @@
                         <x-ui.odoo-form-ui type="table" class="mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>PO #</th>
-                                    <th>Order Date</th>
-                                    <th>Expected Date</th>
-                                    <th class="text-center">Items</th>
-                                    <th class="text-end">Total Amount</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-end pe-3">Action</th>
+                                    <th>{{ __('purchase.po_number') }}</th>
+                                    <th>{{ __('purchase.order_date') }}</th>
+                                    <th>{{ __('purchase.expected_date') }}</th>
+                                    <th class="text-center">{{ __('purchase.items') }}</th>
+                                    <th class="text-end">{{ __('purchase.total_amount') }}</th>
+                                    <th class="text-center">{{ __('purchase.status') }}</th>
+                                    <th class="text-end pe-3">{{ __('purchase.action') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -375,8 +375,8 @@
                                         </td>
                                         <td>{{ \Carbon\Carbon::parse($po->order_date)->format('d-M-Y') }}</td>
                                         <td>{{ $po->expected_date ? \Carbon\Carbon::parse($po->expected_date)->format('d-M-Y') : '—' }}</td>
-                                        <td class="text-center font-monospace">{{ $po->items->count() }} items</td>
-                                        <td class="text-end font-monospace fw-bold text-dark">{{ active_currency_symbol() }}{{ number_format($po->total_amount, 2) }}</td>
+                                        <td class="text-center font-monospace">{{ __('purchase.items_count_badge', ['count' => $po->items->count()]) }}</td>
+                                        <td class="text-end font-monospace fw-bold text-dark">{!! format_currency($po->total_amount) !!}</td>
                                         <td class="text-center">
                                             <x-ui.status-badge :status="$po->status" size="sm" />
                                         </td>
@@ -386,7 +386,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="text-center py-4 text-muted">No purchase orders issued to this supplier.</td>
+                                        <td colspan="7" class="text-center py-4 text-muted">{{ __('purchase.no_pos_for_supplier') }}</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -398,12 +398,12 @@
                 <div class="tab-pane fade" id="ledger-pane" role="tabpanel">
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div>
-                            <h6 class="fw-bold text-primary mb-0"><i class="feather-book me-1"></i>Account Payable Ledger Statement</h6>
-                            <span class="fs-12 text-muted">Chronological statement of vendor bills (credit) and payments (debit).</span>
+                            <h6 class="fw-bold text-primary mb-0"><i class="feather-book me-1"></i>{{ __('purchase.account_payable_ledger_statement') }}</h6>
+                            <span class="fs-12 text-muted">{{ __('purchase.chronological_statement_help') }}</span>
                         </div>
                         <div>
                             <span class="badge bg-soft-primary text-primary px-3 py-2 fs-12 fw-bold font-monospace border">
-                                Current Running Payable: {{ active_currency_symbol() }}{{ number_format($outstandingPayable, 2) }}
+                                {{ __('purchase.current_running_payable') }} {!! format_currency($outstandingPayable) !!}
                             </span>
                         </div>
                     </div>
@@ -412,13 +412,13 @@
                         <x-ui.odoo-form-ui type="table" class="mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Voucher / Ref #</th>
-                                    <th>Entry Type</th>
-                                    <th>Description</th>
-                                    <th class="text-end">Debit (Settlement)</th>
-                                    <th class="text-end">Credit (Bill Payable)</th>
-                                    <th class="text-end">Running Payable Balance</th>
+                                    <th>{{ __('purchase.date') }}</th>
+                                    <th>{{ __('purchase.voucher_ref_no') }}</th>
+                                    <th>{{ __('purchase.entry_type') }}</th>
+                                    <th>{{ __('purchase.description') }}</th>
+                                    <th class="text-end">{{ __('purchase.debit_settlement') }}</th>
+                                    <th class="text-end">{{ __('purchase.credit_bill_payable') }}</th>
+                                    <th class="text-end">{{ __('purchase.running_payable_balance') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -426,11 +426,11 @@
                                     <tr class="table-warning">
                                         <td class="fw-bold">—</td>
                                         <td class="font-monospace fw-bold">OPENING-BAL</td>
-                                        <td><span class="badge bg-warning text-dark">Opening Balance</span></td>
-                                        <td>Initial Supplier Opening Dues</td>
+                                        <td><span class="badge bg-warning text-dark">{{ __('purchase.opening_balance') }}</span></td>
+                                        <td>{{ __('purchase.initial_supplier_opening_dues') }}</td>
                                         <td class="text-end font-monospace">0.00</td>
-                                        <td class="text-end font-monospace fw-bold text-dark">{{ active_currency_symbol() }}{{ number_format($vendor->opening_balance, 2) }}</td>
-                                        <td class="text-end font-monospace fw-bold text-primary">{{ active_currency_symbol() }}{{ number_format($vendor->opening_balance, 2) }}</td>
+                                        <td class="text-end font-monospace fw-bold text-dark">{!! format_currency($vendor->opening_balance) !!}</td>
+                                        <td class="text-end font-monospace fw-bold text-primary">{!! format_currency($vendor->opening_balance) !!}</td>
                                     </tr>
                                 @endif
 
@@ -446,26 +446,26 @@
                                         </td>
                                         <td>
                                             @if($entry['type'] === 'Vendor Bill')
-                                                <span class="badge bg-soft-danger text-danger border">Vendor Bill</span>
+                                                <span class="badge bg-soft-danger text-danger border">{{ __('purchase.vendor_bill') }}</span>
                                             @else
-                                                <span class="badge bg-soft-success text-success border">Vendor Payment</span>
+                                                <span class="badge bg-soft-success text-success border">{{ __('purchase.payment') }}</span>
                                             @endif
                                         </td>
                                         <td class="fs-12 text-muted">{{ $entry['description'] }}</td>
                                         <td class="text-end font-monospace fw-bold text-success">
-                                            {{ $entry['debit'] > 0 ? active_currency_symbol() . number_format($entry['debit'], 2) : '—' }}
+                                            {!! $entry['debit'] > 0 ? format_currency($entry['debit']) : '—' !!}
                                         </td>
                                         <td class="text-end font-monospace fw-bold text-danger">
-                                            {{ $entry['credit'] > 0 ? active_currency_symbol() . number_format($entry['credit'], 2) : '—' }}
+                                            {!! $entry['credit'] > 0 ? format_currency($entry['credit']) : '—' !!}
                                         </td>
                                         <td class="text-end font-monospace fw-bold text-primary">
-                                            {{ active_currency_symbol() }}{{ number_format($entry['running_balance'], 2) }}
+                                            {!! format_currency($entry['running_balance']) !!}
                                         </td>
                                     </tr>
                                 @empty
                                     @if(!($vendor->opening_balance > 0))
                                         <tr>
-                                            <td colspan="7" class="text-center py-4 text-muted">No ledger transactions recorded yet.</td>
+                                            <td colspan="7" class="text-center py-4 text-muted">{{ __('purchase.no_ledger_transactions') }}</td>
                                         </tr>
                                     @endif
                                 @endforelse
@@ -478,3 +478,4 @@
         </x-ui.odoo-form-ui>
     </div>
 @endsection
+

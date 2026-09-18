@@ -155,40 +155,6 @@
         <div id="bulk-action-inputs-container"></div>
     </form>
 
-    {{-- KPI Status Summary --}}
-    <div class="row g-3 mb-4">
-        <div class="col">
-            <div class="bg-light border rounded p-3 text-center">
-                <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.draft') }}</span>
-                <h4 class="text-dark fw-bold mt-1 mb-0">{{ $statusCounts['draft'] ?? 0 }}</h4>
-            </div>
-        </div>
-        <div class="col">
-            <div class="bg-soft-primary border rounded p-3 text-center">
-                <span class="text-primary fs-11 text-uppercase fw-bold">{{ __('production.released') }}</span>
-                <h4 class="text-primary fw-bold mt-1 mb-0">{{ $statusCounts['released'] ?? 0 }}</h4>
-            </div>
-        </div>
-        <div class="col">
-            <div class="bg-soft-info border rounded p-3 text-center">
-                <span class="text-info fs-11 text-uppercase fw-bold">{{ __('production.in_progress') }}</span>
-                <h4 class="text-info fw-bold mt-1 mb-0">{{ $statusCounts['in_progress'] ?? 0 }}</h4>
-            </div>
-        </div>
-        <div class="col">
-            <div class="bg-soft-success border rounded p-3 text-center">
-                <span class="text-success fs-11 text-uppercase fw-bold">{{ __('production.completed') }}</span>
-                <h4 class="text-success fw-bold mt-1 mb-0">{{ $statusCounts['completed'] ?? 0 }}</h4>
-            </div>
-        </div>
-        <div class="col">
-            <div class="bg-light border rounded p-3 text-center">
-                <span class="text-dark fs-11 text-uppercase fw-bold">{{ __('production.closed') }}</span>
-                <h4 class="text-dark fw-bold mt-1 mb-0">{{ $statusCounts['closed'] ?? 0 }}</h4>
-            </div>
-        </div>
-    </div>
-
     {{-- Toolbar: Title + Sort + Filter + Bulk Actions --}}
     @php
         $sortBy = request('sort_by', 'id');
@@ -253,9 +219,9 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.production_mode') ?? 'Production Mode' }}</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.production_mode') }}</label>
                             <x-ui.odoo-form-ui type="select" name="production_mode">
-                                <option value="">{{ __('production.all_production_modes') ?? 'All Production Modes' }}</option>
+                                <option value="">{{ __('production.all_production_modes') }}</option>
                                 <option value="standard" {{ request('production_mode') === 'standard' ? 'selected' : '' }}>{{ __('production.standard') }}</option>
                                 <option value="batch" {{ request('production_mode') === 'batch' ? 'selected' : '' }}>{{ __('production.batch') }}</option>
                                 <option value="serial" {{ request('production_mode') === 'serial' ? 'selected' : '' }}>{{ __('production.serial') }}</option>
@@ -277,6 +243,9 @@
                         </div>
                     </x-ui.filter>
                 </form>
+
+                {{-- Export Options --}}
+                <x-ui.import-export-dropdown type="orders" :can-import="false" :can-download-template="false" />
             </div>
 
             {{-- Bulk Actions Toolbar (initially hidden) --}}

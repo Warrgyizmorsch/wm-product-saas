@@ -99,4 +99,21 @@ class User extends Authenticatable
     {
         return $this->belongsTo(\App\Domains\HRMS\Models\Branch::class);
     }
+
+    protected static function booted(): void
+    {
+        static::saved(function (self $user) {
+            if ($user->isDirty('email') && !empty($user->email)) {
+                $employee = $user->employee;
+                if ($employee && $employee->office_email !== $user->email) {
+                    $emailExists = \App\Domains\HRMS\Models\Employee::where('office_email', $user->email)
+                        ->where('id', '!=', $employee->id)
+                        ->exists();
+                    if (!$emailExists) {
+                        $employee->updateQuietly(['office_email' => $user->email]);
+                    }
+                }
+            }
+        });
+    }
 }

@@ -1,50 +1,50 @@
 @extends('layouts.duralux')
 
-@section('title', 'CRM Executive Dashboard | SaaS ERP')
-@section('page-title', 'CRM Executive Dashboard')
-@section('breadcrumb', 'CRM / Dashboard')
+@section('title', __('crm.dashboard.title') . ' | SaaS ERP')
+@section('page-title', __('crm.dashboard.title'))
+@section('breadcrumb', __('crm.dashboard.breadcrumb'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2 flex-wrap">
         {{-- Export Dropdown --}}
         <div class="dropdown">
-            <button class="btn btn-sm btn-light-brand dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="feather-download me-1"></i>Export
-            </button>
+            <x-ui.button variant="light-brand" class="dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" icon="feather-download">
+                {{ __('crm.dashboard.export') }}
+            </x-ui.button>
             <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                 <li>
                     <a class="dropdown-item" href="{{ route('crm.dashboard.export', ['format' => 'pdf'] + $query) }}">
-                        <i class="feather-file-text me-2 text-danger"></i>PDF Report
+                        <i class="feather-file-text me-2 text-danger"></i>{{ __('crm.dashboard.pdf_report') }}
                     </a>
                 </li>
                 <li>
                     <a class="dropdown-item" href="{{ route('crm.dashboard.export', ['format' => 'csv'] + $query) }}">
-                        <i class="feather-grid me-2 text-success"></i>Excel / CSV
+                        <i class="feather-grid me-2 text-success"></i>{{ __('crm.dashboard.excel_csv') }}
                     </a>
                 </li>
             </ul>
         </div>
 
         {{-- Quick Action Shortcuts --}}
-        <a href="{{ route('crm.leads.create') }}" class="btn btn-sm btn-primary">
-            <i class="feather-plus me-1"></i>New Lead
-        </a>
-        <a href="{{ route('crm.deals.create') }}" class="btn btn-sm btn-soft-success">
-            <i class="feather-briefcase me-1"></i>New Deal
-        </a>
-        <a href="{{ route('crm.deals.kanban') }}" class="btn btn-sm btn-light-brand" title="Kanban Pipeline">
-            <i class="feather-columns me-1"></i>Kanban
-        </a>
-        <a href="{{ route('crm.whatsappSettings.index') }}" class="btn btn-sm btn-soft-warning" title="WhatsApp Bot Status">
-            <i class="feather-message-square me-1"></i>WhatsApp Setup
-        </a>
+        <x-ui.button href="{{ route('crm.leads.create') }}" variant="primary" icon="feather-plus">
+            {{ __('crm.dashboard.new_lead') }}
+        </x-ui.button>
+        <x-ui.button href="{{ route('crm.deals.create') }}" variant="soft-success" icon="feather-briefcase">
+            {{ __('crm.dashboard.new_deal') }}
+        </x-ui.button>
+        <x-ui.button href="{{ route('crm.deals.kanban') }}" variant="light-brand" icon="feather-columns" title="{{ __('crm.dashboard.kanban') }}">
+            {{ __('crm.dashboard.kanban') }}
+        </x-ui.button>
+        <x-ui.button href="{{ route('crm.whatsappSettings.index') }}" variant="soft-warning" icon="feather-message-square" title="{{ __('crm.dashboard.whatsapp_setup') }}">
+            {{ __('crm.dashboard.whatsapp_setup') }}
+        </x-ui.button>
     </div>
 @endsection
 
 @section('content')
 @php
     $currencySymbol = active_currency_symbol();
-    $formatCurrency = fn($amount) => active_currency_symbol() . ' ' . number_format((float) $amount, 2);
+    $formatCurrency = fn($amount) => format_currency((float) $amount);
 
     $growthBadge = function(float $change) {
         if ($change > 0) {
@@ -63,32 +63,32 @@
             <input type="hidden" name="view" value="{{ $activeView }}">
             
             <div class="col-xl-2 col-md-3 col-sm-6">
-                <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="preset"><i class="feather-calendar me-1"></i>Time Period</label>
+                <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="preset"><i class="feather-calendar me-1"></i>{{ __('crm.dashboard.time_period') }}</label>
                 <select name="preset" id="preset" class="form-select form-select-sm border-gray-300" onchange="this.form.submit()">
-                    <option value="today" @selected($preset === 'today')>Today</option>
-                    <option value="this_month" @selected($preset === 'this_month')>This Month</option>
-                    <option value="last_month" @selected($preset === 'last_month')>Last Month</option>
-                    <option value="this_quarter" @selected($preset === 'this_quarter')>This Quarter</option>
-                    <option value="this_year" @selected($preset === 'this_year')>This Year</option>
-                    <option value="all_time" @selected($preset === 'all_time')>All Time</option>
-                    <option value="custom" @selected($preset === 'custom')>Custom Range...</option>
+                    <option value="today" @selected($preset === 'today')>{{ __('crm.dashboard.today') }}</option>
+                    <option value="this_month" @selected($preset === 'this_month')>{{ __('crm.dashboard.this_month') }}</option>
+                    <option value="last_month" @selected($preset === 'last_month')>{{ __('crm.dashboard.last_month') }}</option>
+                    <option value="this_quarter" @selected($preset === 'this_quarter')>{{ __('crm.dashboard.this_quarter') }}</option>
+                    <option value="this_year" @selected($preset === 'this_year')>{{ __('crm.dashboard.this_year') }}</option>
+                    <option value="all_time" @selected($preset === 'all_time')>{{ __('crm.dashboard.all_time') }}</option>
+                    <option value="custom" @selected($preset === 'custom')>{{ __('crm.dashboard.custom_range') }}</option>
                 </select>
             </div>
 
             @if ($companies->count() > 1)
                 <div class="col-xl-2 col-md-3 col-sm-6">
-                    <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="company_scope"><i class="feather-briefcase me-1"></i>Company Scope</label>
+                    <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="company_scope"><i class="feather-briefcase me-1"></i>{{ __('crm.dashboard.company_scope') }}</label>
                     <select name="company_scope" id="company_scope" class="form-select form-select-sm border-gray-300" onchange="this.form.submit()">
-                        <option value="current" @selected($companyScope === 'current')>Selected Company</option>
-                        <option value="all" @selected($companyScope === 'all')>All Companies (Consolidated)</option>
+                        <option value="current" @selected($companyScope === 'current')>{{ __('crm.dashboard.selected_company') }}</option>
+                        <option value="all" @selected($companyScope === 'all')>{{ __('crm.dashboard.all_companies_consolidated') }}</option>
                     </select>
                 </div>
             @endif
 
             <div class="col-xl-2 col-md-3 col-sm-6">
-                <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="owner_id"><i class="feather-user me-1"></i>Sales Representative</label>
+                <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="owner_id"><i class="feather-user me-1"></i>{{ __('crm.dashboard.sales_representative') }}</label>
                 <select name="owner_id" id="owner_id" class="form-select form-select-sm border-gray-300" onchange="this.form.submit()">
-                    <option value="">All Sales Reps</option>
+                    <option value="">{{ __('crm.dashboard.all_sales_reps') }}</option>
                     @foreach ($salesOwners as $owner)
                         <option value="{{ $owner->id }}" @selected((string)$ownerId === (string)$owner->id)>{{ $owner->name }}</option>
                     @endforeach
@@ -96,21 +96,21 @@
             </div>
 
             <div class="col-xl-2 col-md-3 col-sm-6">
-                <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="lead_type"><i class="feather-tag me-1"></i>Category</label>
+                <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="lead_type"><i class="feather-tag me-1"></i>{{ __('crm.dashboard.category') }}</label>
                 <select name="lead_type" id="lead_type" class="form-select form-select-sm border-gray-300" onchange="this.form.submit()">
-                    <option value="">All Categories (B2B & B2C)</option>
-                    <option value="B2B" @selected($leadType === 'B2B')>B2B Wholesale</option>
-                    <option value="B2C" @selected($leadType === 'B2C')>B2C Retail</option>
+                    <option value="">{{ __('crm.dashboard.all_categories') }}</option>
+                    <option value="B2B" @selected($leadType === 'B2B')>{{ __('crm.dashboard.b2b_wholesale') }}</option>
+                    <option value="B2C" @selected($leadType === 'B2C')>{{ __('crm.dashboard.b2c_retail') }}</option>
                 </select>
             </div>
 
             @if ($preset === 'custom')
                 <div class="col-xl-2 col-md-3">
-                    <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="from">From Date</label>
+                    <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="from">{{ __('crm.dashboard.from_date') }}</label>
                     <input type="date" name="from" id="from" class="form-control form-control-sm" value="{{ request('from', $startDate->toDateString()) }}">
                 </div>
                 <div class="col-xl-2 col-md-3">
-                    <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="to">To Date</label>
+                    <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="to">{{ __('crm.dashboard.to_date') }}</label>
                     <input type="date" name="to" id="to" class="form-control form-control-sm" value="{{ request('to', $endDate->toDateString()) }}">
                 </div>
                 <div class="col-xl-1 col-md-2">
@@ -120,7 +120,7 @@
 
             <div class="col ms-auto text-end d-none d-xl-block">
                 <span class="fs-12 text-muted fw-semibold">
-                    Data Period: <span class="text-dark fw-bold">{{ $startDate->format('d M Y') }}</span> to <span class="text-dark fw-bold">{{ $endDate->format('d M Y') }}</span>
+                    {{ __('crm.dashboard.data_period') }}: <span class="text-dark fw-bold">{{ $startDate->format('d M Y') }}</span> {{ __('crm.dashboard.to') }} <span class="text-dark fw-bold">{{ $endDate->format('d M Y') }}</span>
                 </span>
             </div>
         </form>
@@ -129,19 +129,25 @@
 
 {{-- Navigation View Tabs (Executive Overview vs Sales Velocity & Reps) --}}
 <div class="d-flex align-items-center justify-content-between mb-4 border-bottom pb-2">
-    <ul class="nav nav-pills gap-2" id="crmDashboardTabs">
-        <li class="nav-item">
-            <a href="{{ route('crm.dashboard', array_merge($query, ['view' => 'overview'])) }}" class="nav-link px-3 py-2 fw-bold {{ $activeView === 'overview' ? 'active bg-primary text-white' : 'btn-light-brand text-muted' }}">
-                <i class="feather-pie-chart me-1"></i>Executive Overview
-            </a>
-        </li>
-        <li class="nav-item">
-            <a href="{{ route('crm.dashboard', array_merge($query, ['view' => 'operations'])) }}" class="nav-link px-3 py-2 fw-bold {{ $activeView === 'operations' ? 'active bg-primary text-white' : 'btn-light-brand text-muted' }}">
-                <i class="feather-activity me-1"></i>Sales Velocity & Reps
-            </a>
-        </li>
-    </ul>
-    <span class="fs-11 text-muted"><i class="feather-info me-1"></i>Realtime metrics synced across tenant context</span>
+    <div class="d-flex align-items-center gap-2" id="crmDashboardTabs">
+        <x-ui.button 
+            href="{{ route('crm.dashboard', array_merge($query, ['view' => 'overview'])) }}" 
+            variant="{{ $activeView === 'overview' ? 'primary' : 'light-brand' }}"
+            icon="feather-pie-chart"
+            class="fw-bold"
+        >
+            {{ __('crm.dashboard.executive_overview') }}
+        </x-ui.button>
+        <x-ui.button 
+            href="{{ route('crm.dashboard', array_merge($query, ['view' => 'operations'])) }}" 
+            variant="{{ $activeView === 'operations' ? 'primary' : 'light-brand' }}"
+            icon="feather-activity"
+            class="fw-bold"
+        >
+            {{ __('crm.dashboard.sales_velocity_reps') }}
+        </x-ui.button>
+    </div>
+    <span class="fs-11 text-muted"><i class="feather-info me-1"></i>{{ __('crm.dashboard.realtime_metrics_synced') }}</span>
 </div>
 
 @if ($activeView === 'overview')
@@ -152,7 +158,7 @@
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="fs-11 fw-bold text-uppercase text-muted">Total Leads Captured</span>
+                        <span class="fs-11 fw-bold text-uppercase text-muted">{{ __('crm.dashboard.total_leads_captured') }}</span>
                         <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-3">
                             <i class="feather-users fs-16"></i>
                         </div>
@@ -160,7 +166,7 @@
                     <h3 class="fw-bolder mb-1 text-dark">{{ number_format($currentLeadsCount) }}</h3>
                     <div class="d-flex align-items-center justify-content-between mt-2">
                         {!! $growthBadge($leadsGrowth) !!}
-                        <span class="fs-11 text-muted">vs previous period</span>
+                        <span class="fs-11 text-muted">{{ __('crm.dashboard.vs_previous_period') }}</span>
                     </div>
                 </div>
             </div>
@@ -171,15 +177,15 @@
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="fs-11 fw-bold text-uppercase text-muted">Active Revenue Pipeline</span>
+                        <span class="fs-11 fw-bold text-uppercase text-muted">{{ __('crm.dashboard.active_revenue_pipeline') }}</span>
                         <div class="avatar-text avatar-md bg-soft-warning text-warning rounded-3">
                             <i class="feather-briefcase fs-16"></i>
                         </div>
                     </div>
                     <h3 class="fw-bolder mb-1 text-dark">{{ $formatCurrency($pipelineValue) }}</h3>
                     <div class="d-flex align-items-center justify-content-between mt-2">
-                        <span class="badge bg-soft-warning text-warning fs-11 fw-semibold">{{ $openDealsCount }} Open Deals</span>
-                        <span class="fs-11 text-muted">Active Opps</span>
+                        <span class="badge bg-soft-warning text-warning fs-11 fw-semibold">{{ $openDealsCount }} {{ __('crm.dashboard.open_deals') }}</span>
+                        <span class="fs-11 text-muted">{{ __('crm.dashboard.active_opps') }}</span>
                     </div>
                 </div>
             </div>
@@ -190,15 +196,15 @@
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="fs-11 fw-bold text-uppercase text-muted">Closed Won Revenue</span>
+                        <span class="fs-11 fw-bold text-uppercase text-muted">{{ __('crm.dashboard.closed_won_revenue') }}</span>
                         <div class="avatar-text avatar-md bg-soft-success text-success rounded-3">
                             <i class="feather-trending-up fs-16"></i>
                         </div>
                     </div>
                     <h3 class="fw-bolder mb-1 text-dark">{{ $formatCurrency($wonRevenue) }}</h3>
                     <div class="d-flex align-items-center justify-content-between mt-2">
-                        <span class="badge bg-soft-success text-success fs-11 fw-semibold"><i class="feather-award me-1"></i>Win Rate {{ $winRate }}%</span>
-                        <span class="fs-11 text-muted">{{ $wonCount }} Deals Won</span>
+                        <span class="badge bg-soft-success text-success fs-11 fw-semibold"><i class="feather-award me-1"></i>{{ __('crm.dashboard.win_rate') }} {{ $winRate }}%</span>
+                        <span class="fs-11 text-muted">{{ $wonCount }} {{ __('crm.dashboard.deals_won') }}</span>
                     </div>
                 </div>
             </div>
@@ -209,15 +215,15 @@
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="fs-11 fw-bold text-uppercase text-muted">Quotations Issued</span>
+                        <span class="fs-11 fw-bold text-uppercase text-muted">{{ __('crm.dashboard.quotations_issued') }}</span>
                         <div class="avatar-text avatar-md bg-soft-info text-info rounded-3">
                             <i class="feather-file-text fs-16"></i>
                         </div>
                     </div>
                     <h3 class="fw-bolder mb-1 text-dark">{{ $formatCurrency($totalQuotationValue) }}</h3>
                     <div class="d-flex align-items-center justify-content-between mt-2">
-                        <span class="badge bg-soft-info text-info fs-11 fw-semibold">{{ $totalQuotationsCount }} Sent</span>
-                        <span class="fs-11 text-muted">{{ $pendingQuotationsCount }} Pending Approval</span>
+                        <span class="badge bg-soft-info text-info fs-11 fw-semibold">{{ $totalQuotationsCount }} {{ __('crm.dashboard.sent') }}</span>
+                        <span class="fs-11 text-muted">{{ $pendingQuotationsCount }} {{ __('crm.dashboard.pending_approval') }}</span>
                     </div>
                 </div>
             </div>
@@ -228,15 +234,15 @@
             <div class="card stretch stretch-full border-0 shadow-sm h-100 bg-soft-success">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="fs-11 fw-bold text-uppercase text-success">WhatsApp Bot Automation</span>
+                        <span class="fs-11 fw-bold text-uppercase text-success">{{ __('crm.dashboard.whatsapp_bot_automation') }}</span>
                         <div class="avatar-text avatar-md bg-success text-white rounded-3">
                             <i class="feather-message-square fs-16"></i>
                         </div>
                     </div>
-                    <h3 class="fw-bolder mb-1 text-success">{{ number_format($whatsappLeadsCount) }} <span class="fs-13 fw-normal">Bot Leads</span></h3>
+                    <h3 class="fw-bolder mb-1 text-success">{{ number_format($whatsappLeadsCount) }} <span class="fs-13 fw-normal">{{ __('crm.dashboard.bot_leads') }}</span></h3>
                     <div class="d-flex align-items-center justify-content-between mt-2">
-                        <span class="badge bg-success text-white fs-11 fw-semibold"><i class="feather-check-circle me-1"></i>{{ $whatsappQualificationRate }}% Auto-Qualified</span>
-                        <span class="fs-11 text-success font-bold">24/7 AI Engine Active</span>
+                        <span class="badge bg-success text-white fs-11 fw-semibold"><i class="feather-check-circle me-1"></i>{{ $whatsappQualificationRate }}% {{ __('crm.dashboard.auto_qualified') }}</span>
+                        <span class="fs-11 text-success font-bold">{{ __('crm.dashboard.ai_engine_active') }}</span>
                     </div>
                 </div>
             </div>
@@ -249,9 +255,9 @@
         <div class="col-xxl-4 col-xl-5">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-header border-bottom-0 pb-0">
-                    <h5 class="card-title text-dark font-bold"><i class="feather-filter text-primary me-2"></i>Sales Funnel & Stage Health</h5>
+                    <h5 class="card-title text-dark font-bold"><i class="feather-filter text-primary me-2"></i>{{ __('crm.dashboard.sales_funnel_stage_health') }}</h5>
                     <div class="card-header-action">
-                        <span class="badge bg-soft-primary text-primary">Live Conversion</span>
+                        <span class="badge bg-soft-primary text-primary">{{ __('crm.dashboard.live_conversion') }}</span>
                     </div>
                 </div>
                 <div class="card-body pt-3">
@@ -285,11 +291,11 @@
 
                     <div class="d-flex align-items-center justify-content-between pt-1">
                         <div>
-                            <span class="text-muted fs-11 text-uppercase fw-bold">Period Customers</span>
+                            <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('crm.dashboard.period_customers') }}</span>
                             <h5 class="fw-bolder mb-0 text-dark">{{ number_format($totalCustomers) }}</h5>
                         </div>
                         <div>
-                            <span class="text-muted fs-11 text-uppercase fw-bold">Period Accounts</span>
+                            <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('crm.dashboard.period_accounts') }}</span>
                             <h5 class="fw-bolder mb-0 text-dark">{{ number_format($totalAccounts) }}</h5>
                         </div>
                     </div>
@@ -303,11 +309,11 @@
                 <div class="card-header border-bottom-0 pb-0">
                     <div class="d-flex align-items-center justify-content-between w-100">
                         <div>
-                            <h5 class="card-title text-dark font-bold"><i class="feather-bar-chart-2 text-success me-2"></i>Revenue & Lead Acquisition Trend</h5>
-                            <p class="fs-11 text-muted mb-0">Performance overview for the last 6 months</p>
+                            <h5 class="card-title text-dark font-bold"><i class="feather-bar-chart-2 text-success me-2"></i>{{ __('crm.dashboard.revenue_lead_acquisition_trend') }}</h5>
+                            <p class="fs-11 text-muted mb-0">{{ __('crm.dashboard.performance_overview_6_months') }}</p>
                         </div>
                         <div class="card-header-action">
-                            <span class="badge bg-soft-success text-success"><i class="feather-trending-up me-1"></i>Realtime Sync</span>
+                            <span class="badge bg-soft-success text-success"><i class="feather-trending-up me-1"></i>{{ __('crm.dashboard.realtime_sync') }}</span>
                         </div>
                     </div>
                 </div>
@@ -326,17 +332,17 @@
         <div class="col-xxl-8 col-xl-7">
             <div class="card stretch stretch-full border-0 shadow-sm">
                 <div class="card-header">
-                    <h5 class="card-title"><i class="feather-layers text-warning me-2"></i>Deal Pipeline Stage Distribution</h5>
-                    <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-light-brand">View All Deals</a>
+                    <h5 class="card-title"><i class="feather-layers text-warning me-2"></i>{{ __('crm.dashboard.deal_pipeline_stage_distribution') }}</h5>
+                    <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-light-brand">{{ __('crm.dashboard.view_all_deals') }}</a>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
                         @php
                             $standardStages = [
-                                'qualification' => ['name' => 'Qualification', 'color' => 'info', 'icon' => 'feather-check-square'],
-                                'proposal' => ['name' => 'Proposal/Quote', 'color' => 'warning', 'icon' => 'feather-file-text'],
-                                'negotiation' => ['name' => 'Negotiation', 'color' => 'danger', 'icon' => 'feather-refresh-cw'],
-                                'won' => ['name' => 'Closed Won', 'color' => 'success', 'icon' => 'feather-award'],
+                                'qualification' => ['name' => __('crm.statuses.Qualified'), 'color' => 'info', 'icon' => 'feather-check-square'],
+                                'proposal' => ['name' => __('crm.quotation_status'), 'color' => 'warning', 'icon' => 'feather-file-text'],
+                                'negotiation' => ['name' => __('crm.dashboard.active_opps'), 'color' => 'danger', 'icon' => 'feather-refresh-cw'],
+                                'won' => ['name' => __('crm.statuses.Won'), 'color' => 'success', 'icon' => 'feather-award'],
                             ];
                         @endphp
                         @foreach ($standardStages as $key => $meta)
@@ -363,13 +369,13 @@
         <div class="col-xxl-4 col-xl-5">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-header">
-                    <h5 class="card-title"><i class="feather-pie-chart text-info me-2"></i>Lead Acquisition Channels</h5>
+                    <h5 class="card-title"><i class="feather-pie-chart text-info me-2"></i>{{ __('crm.dashboard.lead_acquisition_channels') }}</h5>
                 </div>
                 <div class="card-body">
                     @if (empty($sourceBreakdown))
                         <div class="text-center py-4 text-muted">
                             <i class="feather-inbox fs-30 mb-2"></i>
-                            <p class="fs-12 mb-0">No lead source data for this period.</p>
+                            <p class="fs-12 mb-0">{{ __('crm.dashboard.no_lead_source_data') }}</p>
                         </div>
                     @else
                         @php
@@ -406,19 +412,19 @@
         <div class="col-xxl-7 col-xl-6">
             <div class="card stretch stretch-full border-0 shadow-sm">
                 <div class="card-header">
-                    <h5 class="card-title"><i class="feather-award text-success me-2"></i>Top High-Value Open Opportunities</h5>
-                    <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-light-brand">View All</a>
+                    <h5 class="card-title"><i class="feather-award text-success me-2"></i>{{ __('crm.dashboard.top_high_value_open_opps') }}</h5>
+                    <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-light-brand">{{ __('crm.dashboard.view_all') }}</a>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light">
                                 <tr>
-                                    <th class="fs-11 text-uppercase text-muted">Deal Name & No</th>
-                                    <th class="fs-11 text-uppercase text-muted">Account / Client</th>
-                                    <th class="fs-11 text-uppercase text-muted">Value</th>
-                                    <th class="fs-11 text-uppercase text-muted">Stage</th>
-                                    <th class="fs-11 text-uppercase text-muted text-end">Action</th>
+                                    <th class="fs-11 text-uppercase text-muted">{{ __('crm.dashboard.deal_name_no') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted">{{ __('crm.dashboard.account_client') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted">{{ __('crm.dashboard.value') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted">{{ __('crm.dashboard.stage') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted text-end">{{ __('crm.dashboard.action') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -448,7 +454,7 @@
                                 @empty
                                     <tr>
                                         <td colspan="5" class="text-center py-4 text-muted fs-12">
-                                            No active open deals found in this period. <a href="{{ route('crm.deals.create') }}" class="text-primary font-bold">Create new deal</a>
+                                            {{ __('crm.dashboard.no_active_open_deals') }} <a href="{{ route('crm.deals.create') }}" class="text-primary font-bold">{{ __('crm.dashboard.create_new_deal_link') }}</a>
                                         </td>
                                     </tr>
                                 @endforelse
@@ -463,8 +469,8 @@
         <div class="col-xxl-5 col-xl-6">
             <div class="card stretch stretch-full border-0 shadow-sm">
                 <div class="card-header">
-                    <h5 class="card-title"><i class="feather-user-plus text-primary me-2"></i>Recent Inbound Leads</h5>
-                    <a href="{{ route('crm.leads.index') }}" class="btn btn-xs btn-light-brand">All Leads</a>
+                    <h5 class="card-title"><i class="feather-user-plus text-primary me-2"></i>{{ __('crm.dashboard.recent_inbound_leads') }}</h5>
+                    <a href="{{ route('crm.leads.index') }}" class="btn btn-xs btn-light-brand">{{ __('crm.dashboard.all_leads_btn') }}</a>
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush">
@@ -498,7 +504,7 @@
                             </div>
                         @empty
                             <div class="text-center py-4 text-muted fs-12">
-                                No recent leads recorded in this period.
+                                {{ __('crm.dashboard.no_recent_leads') }}
                             </div>
                         @endforelse
                     </div>
@@ -513,20 +519,20 @@
         <div class="col-xxl-8 col-xl-7">
             <div class="card stretch stretch-full border-0 shadow-sm">
                 <div class="card-header">
-                    <h5 class="card-title text-dark font-bold"><i class="feather-award text-warning me-2"></i>Sales Reps Leaderboard Performance</h5>
-                    <span class="badge bg-soft-warning text-warning fs-11">Period Rankings</span>
+                    <h5 class="card-title text-dark font-bold"><i class="feather-award text-warning me-2"></i>{{ __('crm.dashboard.sales_reps_leaderboard') }}</h5>
+                    <span class="badge bg-soft-warning text-warning fs-11">{{ __('crm.dashboard.period_rankings') }}</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light">
                                 <tr>
-                                    <th class="fs-11 text-uppercase text-muted">Rank & Sales Rep</th>
-                                    <th class="fs-11 text-uppercase text-muted text-center">Leads Assigned</th>
-                                    <th class="fs-11 text-uppercase text-muted text-center">Deals Handled</th>
-                                    <th class="fs-11 text-uppercase text-muted text-center">Won Deals</th>
-                                    <th class="fs-11 text-uppercase text-muted">Won Revenue</th>
-                                    <th class="fs-11 text-uppercase text-muted text-end">Win Rate</th>
+                                    <th class="fs-11 text-uppercase text-muted">{{ __('crm.dashboard.rank_sales_rep') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted text-center">{{ __('crm.dashboard.leads_assigned') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted text-center">{{ __('crm.dashboard.deals_handled') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted text-center">{{ __('crm.dashboard.won_deals') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted">{{ __('crm.dashboard.won_revenue') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted text-end">{{ __('crm.dashboard.win_rate') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -549,7 +555,7 @@
                                 @empty
                                     <tr>
                                         <td colspan="6" class="text-center py-4 text-muted fs-12">
-                                            No sales rep performance data for this period.
+                                            {{ __('crm.dashboard.no_sales_rep_data') }}
                                         </td>
                                     </tr>
                                 @endforelse
@@ -564,13 +570,13 @@
         <div class="col-xxl-4 col-xl-5">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-header">
-                    <h5 class="card-title text-dark font-bold"><i class="feather-pie-chart text-danger me-2"></i>Win / Loss Reason Analysis</h5>
+                    <h5 class="card-title text-dark font-bold"><i class="feather-pie-chart text-danger me-2"></i>{{ __('crm.dashboard.win_loss_reason_analysis') }}</h5>
                 </div>
                 <div class="card-body">
                     @if (empty($winLossReasons))
                         <div class="text-center py-4 text-muted">
                             <i class="feather-help-circle fs-30 mb-2 text-muted"></i>
-                            <p class="fs-12 mb-0">No closed deal reasons logged for this period.</p>
+                            <p class="fs-12 mb-0">{{ __('crm.dashboard.no_closed_deal_reasons') }}</p>
                         </div>
                     @else
                         @php
@@ -598,18 +604,18 @@
         <div class="col-xxl-6 col-xl-6">
             <div class="card stretch stretch-full border-0 shadow-sm">
                 <div class="card-header">
-                    <h5 class="card-title text-dark font-bold"><i class="feather-file-text text-info me-2"></i>Recent Issued Quotations</h5>
-                    <a href="{{ route('crm.quotations.index') }}" class="btn btn-xs btn-light-brand">View All</a>
+                    <h5 class="card-title text-dark font-bold"><i class="feather-file-text text-info me-2"></i>{{ __('crm.dashboard.recent_issued_quotations') }}</h5>
+                    <a href="{{ route('crm.quotations.index') }}" class="btn btn-xs btn-light-brand">{{ __('crm.dashboard.view_all') }}</a>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light">
                                 <tr>
-                                    <th class="fs-11 text-uppercase text-muted">Quotation No</th>
-                                    <th class="fs-11 text-uppercase text-muted">Total Amount</th>
-                                    <th class="fs-11 text-uppercase text-muted">Status</th>
-                                    <th class="fs-11 text-uppercase text-muted text-end">Action</th>
+                                    <th class="fs-11 text-uppercase text-muted">{{ __('crm.dashboard.quotation_no') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted">{{ __('crm.dashboard.total_amount') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted">{{ __('crm.dashboard.stage') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted text-end">{{ __('crm.dashboard.action') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -635,7 +641,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="text-center py-4 text-muted fs-12">No quotations created in this period.</td>
+                                        <td colspan="4" class="text-center py-4 text-muted fs-12">{{ __('crm.dashboard.no_quotations_period') }}</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -649,8 +655,8 @@
         <div class="col-xxl-6 col-xl-6">
             <div class="card stretch stretch-full border-0 shadow-sm">
                 <div class="card-header">
-                    <h5 class="card-title text-dark font-bold"><i class="feather-clock text-warning me-2"></i>Upcoming Sales Follow-ups</h5>
-                    <a href="{{ route('crm.activities.index') }}" class="btn btn-xs btn-light-brand">All Follow-ups</a>
+                    <h5 class="card-title text-dark font-bold"><i class="feather-clock text-warning me-2"></i>{{ __('crm.dashboard.upcoming_sales_followups') }}</h5>
+                    <a href="{{ route('crm.activities.index') }}" class="btn btn-xs btn-light-brand">{{ __('crm.dashboard.all_followups_btn') }}</a>
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush">
@@ -673,7 +679,7 @@
                                 </div>
                             </div>
                         @empty
-                            <div class="text-center py-4 text-muted fs-12">No pending follow-ups scheduled for this period.</div>
+                            <div class="text-center py-4 text-muted fs-12">{{ __('crm.dashboard.no_pending_followups') }}</div>
                         @endforelse
                     </div>
                 </div>
@@ -716,7 +722,7 @@
                         yAxisID: 'yLeads'
                     },
                     {
-                        label: 'Revenue Won (' + window.AppCurrency.symbol + ')',
+                        label: 'Revenue Won (' + (window.AppCurrency?.symbol || @json(active_currency_symbol())) + ')',
                         data: trendData.revenue,
                         borderColor: '#10B981',
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',

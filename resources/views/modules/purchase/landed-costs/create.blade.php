@@ -1,9 +1,9 @@
 @extends('layouts.duralux')
 
-@section('title', 'New Landed Cost Voucher | SaaS ERP')
-@section('page-title', 'Create Landed Cost Voucher')
+@section('title', __('purchase.new_landed_cost_voucher') . ' | SaaS ERP')
+@section('page-title', __('purchase.create_landed_cost_voucher'))
 @section('breadcrumb')
-    <a href="{{ route('purchase.landed-costs.index') }}">Landed Cost Vouchers</a> &gt; Create
+    <a href="{{ route('purchase.landed-costs.index') }}">{{ __('purchase.landed_cost_vouchers') }}</a> &gt; {{ __('purchase.create') }}
 @endsection
 
 @push('styles')
@@ -48,28 +48,19 @@
             <!-- Title & Header Bar -->
             <div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom flex-wrap gap-2">
                 <div>
-                    <small class="text-muted text-uppercase font-monospace fw-bold fs-11">Procurement Cost Allocation Sheet</small>
-                    <h3 class="fw-bold text-dark mb-0">New Landed Cost Voucher</h3>
-                </div>
-
-                <div class="d-flex gap-2">
-                    <x-ui.button href="{{ route('purchase.landed-costs.index') }}" variant="light" size="sm">
-                        Discard
-                    </x-ui.button>
-                    <x-ui.button type="submit" variant="primary" size="sm" icon="feather-save">
-                        Save Draft Voucher
-                    </x-ui.button>
+                    <small class="text-muted text-uppercase font-monospace fw-bold fs-11">{{ __('purchase.procurement_cost_allocation_sheet') }}</small>
+                    <h3 class="fw-bold text-dark mb-0">{{ __('purchase.new_landed_cost_voucher') }}</h3>
                 </div>
             </div>
 
             <!-- Primary 2-Column Fields Grid -->
             <div class="row g-4 mb-4 fs-13">
                 <div class="col-md-6 border-end pe-md-4">
-                    <h6 class="fw-bold text-primary mb-3"><i class="feather-calendar me-2"></i>Voucher Header Details</h6>
+                    <h6 class="fw-bold text-primary mb-3"><i class="feather-calendar me-2"></i>{{ __('purchase.voucher_header_details') }}</h6>
 
-                    <x-ui.odoo-form-ui type="input" label="Voucher Date" name="voucher_date" inputType="date" value="{{ old('voucher_date', date('Y-m-d')) }}" required="true" />
+                    <x-ui.odoo-form-ui type="input" :label="__('purchase.voucher_date')" name="voucher_date" inputType="date" value="{{ old('voucher_date', date('Y-m-d')) }}" required="true" />
 
-                    <x-ui.odoo-form-ui type="select" label="Select GRN(s)" name="grn_ids[]" id="grnSelect" multiple="true" required="true">
+                    <x-ui.odoo-form-ui type="select" :label="__('purchase.select_grns')" name="grn_ids[]" id="grnSelect" multiple="true" required="true">
                         @foreach($grns as $grn)
                             <option value="{{ $grn->id }}">
                                 {{ $grn->grn_number }} — {{ $grn->vendor->name ?? 'Vendor' }} ({{ date('d-M-Y', strtotime($grn->received_date)) }})
@@ -79,30 +70,30 @@
                 </div>
 
                 <div class="col-md-6 ps-md-4">
-                    <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-2"></i>Valuation Summary</h6>
+                    <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-2"></i>{{ __('purchase.valuation_summary') }}</h6>
 
-                    <x-ui.odoo-form-ui type="input" label="Posting Date" name="posting_date_dummy" value="[Auto-set on Post]" readonly="true" />
+                    <x-ui.odoo-form-ui type="input" :label="__('purchase.posting_date')" name="posting_date_dummy" :value="__('purchase.auto_set_on_post')" readonly="true" />
 
-                    <x-ui.odoo-form-ui type="input" label="Total Expenses" name="total_expenses_dummy" id="totalExpensesDisplay" value="₹0.00" readonly="true" class="fw-bold text-primary font-monospace fs-14" />
+                    <x-ui.odoo-form-ui type="input" :label="__('purchase.total_expenses')" name="total_expenses_dummy" id="totalExpensesDisplay" value="{{ active_currency_symbol() }}0.00" readonly="true" class="fw-bold text-primary font-monospace fs-14" />
                 </div>
             </div>
 
             <!-- Section 1: Additional Procurement Expenses Table -->
             <div class="mt-4 pt-3 border-top">
                 <div class="d-flex align-items-center justify-content-between mb-3">
-                    <h6 class="fw-bold text-primary mb-0"><i class="feather-layers me-2"></i>1. Additional Procurement Expenses</h6>
+                    <h6 class="fw-bold text-primary mb-0"><i class="feather-layers me-2"></i>1. {{ __('purchase.additional_procurement_expenses') }}</h6>
                 </div>
 
                 <div class="table-responsive">
                     <x-ui.odoo-form-ui type="table" id="expensesTable">
                         <thead>
                             <tr>
-                                <th style="width: 20%">Expense Head <span class="text-danger">*</span></th>
-                                <th style="width: 22%">Vendor / Transporter</th>
-                                <th style="width: 15%" class="text-end">Base Amount (₹) <span class="text-danger">*</span></th>
-                                <th style="width: 13%">GST Rate (%)</th>
-                                <th style="width: 15%">Tax Mechanism</th>
-                                <th style="width: 10%">Allocation Basis</th>
+                                <th style="width: 20%">{{ __('purchase.expense_head') }} <span class="text-danger">*</span></th>
+                                <th style="width: 22%">{{ __('purchase.transporter_vendor') }}</th>
+                                <th style="width: 15%" class="text-end">{{ __('purchase.base_amount') }} ({{ active_currency_symbol() }}) <span class="text-danger">*</span></th>
+                                <th style="width: 13%">{{ __('purchase.gst_rate') }}</th>
+                                <th style="width: 15%">{{ __('purchase.tax_mechanism') }}</th>
+                                <th style="width: 10%">{{ __('purchase.allocation_basis') }}</th>
                                 <th style="width: 5%" class="text-center"></th>
                             </tr>
                         </thead>
@@ -110,28 +101,28 @@
                             <tr class="expense-row">
                                 <td>
                                     <x-ui.odoo-form-ui type="select" name="expenses[0][cost_head]" required="true">
-                                        <option value="Freight & Transport" selected>Freight &amp; Transport</option>
-                                        <option value="Customs Duty">Customs Duty</option>
-                                        <option value="Loading & Unloading">Loading &amp; Unloading</option>
-                                        <option value="Insurance">Insurance</option>
-                                        <option value="Handling Charges">Handling Charges</option>
-                                        <option value="Other Costs">Other Costs</option>
+                                        <option value="Freight & Transport" selected>{{ __('purchase.freight_and_transport') }}</option>
+                                        <option value="Customs Duty">{{ __('purchase.customs_duty') }}</option>
+                                        <option value="Loading & Unloading">{{ __('purchase.loading_unloading') }}</option>
+                                        <option value="Insurance">{{ __('purchase.insurance') }}</option>
+                                        <option value="Handling Charges">{{ __('purchase.handling_charges') }}</option>
+                                        <option value="Other Costs">{{ __('purchase.other_costs') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </td>
                                 <td>
                                     <x-ui.odoo-form-ui type="select" name="expenses[0][vendor_id]">
-                                        <option value="">Select Vendor / Transporter...</option>
+                                        <option value="">{{ __('purchase.select_vendor_transporter') }}</option>
                                         @if($transportersGroup->isNotEmpty())
-                                            <optgroup label="🚛 Transporters &amp; Logistics">
+                                            <optgroup label="🚛 {{ __('purchase.transporters_logistics') }}">
                                                 @foreach($transportersGroup as $v)
-                                                    <option value="{{ $v->id }}">{{ $v->name }} (Transporter / Logistics)</option>
+                                                    <option value="{{ $v->id }}">{{ $v->name }} ({{ __('purchase.transporter_vendor') }})</option>
                                                 @endforeach
                                             </optgroup>
                                         @endif
                                         @if($suppliersGroup->isNotEmpty())
-                                            <optgroup label="🏭 Material Suppliers &amp; Vendors">
+                                            <optgroup label="🏭 {{ __('purchase.material_suppliers_vendors') }}">
                                                 @foreach($suppliersGroup as $v)
-                                                    <option value="{{ $v->id }}">{{ $v->name }} (Supplier / Vendor)</option>
+                                                    <option value="{{ $v->id }}">{{ $v->name }} ({{ __('purchase.vendor') }})</option>
                                                 @endforeach
                                             </optgroup>
                                         @endif
@@ -142,7 +133,7 @@
                                 </td>
                                 <td>
                                     <x-ui.odoo-form-ui type="select" name="expenses[0][tax_rate]" class="tax-rate-select">
-                                        <option value="0" selected>0% (No Tax)</option>
+                                        <option value="0" selected>0% ({{ __('purchase.no_tax') }})</option>
                                         <option value="5">5% GST</option>
                                         <option value="12">12% GST</option>
                                         <option value="18">18% GST</option>
@@ -159,13 +150,13 @@
                                 </td>
                                 <td>
                                     <x-ui.odoo-form-ui type="select" name="expenses[0][allocation_basis]" class="basis-select" required="true">
-                                        <option value="by_qty" selected>By Qty</option>
-                                        <option value="by_amount">By Value</option>
-                                        <option value="equal">Equal</option>
+                                        <option value="by_qty" selected>{{ __('purchase.by_qty') }}</option>
+                                        <option value="by_amount">{{ __('purchase.by_value') }}</option>
+                                        <option value="equal">{{ __('purchase.equal') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </td>
                                 <td class="text-center align-middle">
-                                    <button type="button" class="btn btn-link text-danger p-0 border-0 remove-expense-btn disabled" title="Remove Line">
+                                    <button type="button" class="btn btn-link text-danger p-0 border-0 remove-expense-btn disabled" title="{{ __('purchase.remove_line') }}">
                                         <i class="feather-trash-2"></i>
                                     </button>
                                 </td>
@@ -176,7 +167,7 @@
 
                 <div class="mt-2 mb-4">
                     <button type="button" class="btn btn-link text-primary p-0 text-decoration-none fw-semibold fs-12" id="addExpenseBtn">
-                        <i class="feather-plus me-1"></i>Add an expense line
+                        <i class="feather-plus me-1"></i>{{ __('purchase.add_expense_line') }}
                     </button>
                 </div>
             </div>
@@ -185,8 +176,8 @@
             <div class="mt-4 pt-3 border-top">
                 <div class="d-flex align-items-center justify-content-between mb-3">
                     <div>
-                        <h6 class="fw-bold text-primary mb-0"><i class="feather-box me-2"></i>2. Item Cost Allocation Live Preview</h6>
-                        <small class="text-muted fs-12">Real-time breakdown of how extra expenses will be added to each GRN item's cost price.</small>
+                        <h6 class="fw-bold text-primary mb-0"><i class="feather-box me-2"></i>2. {{ __('purchase.item_cost_allocation_live_preview') }}</h6>
+                        <small class="text-muted fs-12">{{ __('purchase.item_cost_allocation_help') }}</small>
                     </div>
                 </div>
 
@@ -194,18 +185,18 @@
                     <x-ui.odoo-form-ui type="table" id="allocationPreviewTable">
                         <thead>
                             <tr>
-                                <th style="width: 15%">GRN #</th>
-                                <th style="width: 25%">Product Name</th>
-                                <th style="width: 12%" class="text-center">Received Qty</th>
-                                <th style="width: 13%" class="text-end">Base Unit Rate</th>
-                                <th style="width: 15%" class="text-end">Allocated Extra Cost</th>
-                                <th style="width: 20%" class="text-end">New Landed Unit Cost</th>
+                                <th style="width: 15%">{{ __('purchase.grn_no') }}</th>
+                                <th style="width: 25%">{{ __('purchase.product_name') }}</th>
+                                <th style="width: 12%" class="text-center">{{ __('purchase.received_qty') }}</th>
+                                <th style="width: 13%" class="text-end">{{ __('purchase.base_unit_rate') }} ({{ active_currency_symbol() }})</th>
+                                <th style="width: 15%" class="text-end">{{ __('purchase.allocated_extra_cost') }} ({{ active_currency_symbol() }})</th>
+                                <th style="width: 20%" class="text-end">{{ __('purchase.new_landed_unit_cost') }} ({{ active_currency_symbol() }})</th>
                             </tr>
                         </thead>
                         <tbody id="previewTbody">
                             <tr>
                                 <td colspan="6" class="text-center py-4 text-muted fs-13">
-                                    <i class="feather-info me-1"></i>Select GRN(s) above to view live item cost allocations.
+                                    <i class="feather-info me-1"></i>{{ __('purchase.select_grns_to_allocate') }}
                                 </td>
                             </tr>
                         </tbody>
@@ -215,7 +206,17 @@
 
             <!-- Notes Section -->
             <div class="mt-4 pt-3 border-top">
-                <x-ui.odoo-form-ui type="textarea" label="Notes / Remarks" name="notes" placeholder="Add optional remarks or shipment details..." rows="2" />
+                <x-ui.odoo-form-ui type="textarea" :label="__('purchase.notes_remarks')" name="notes" :placeholder="__('purchase.notes_shipment_details_placeholder')" rows="2" />
+            </div>
+
+            <!-- Bottom Action Buttons (like Lead form) -->
+            <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                <x-ui.button href="{{ route('purchase.landed-costs.index') }}" variant="light" class="border px-4 py-2 fs-13">
+                    {{ __('purchase.discard') }}
+                </x-ui.button>
+                <x-ui.button type="submit" variant="primary" icon="feather-save" class="px-4 py-2 fs-13 fw-bold shadow-sm">
+                    {{ __('purchase.save_draft_voucher') }}
+                </x-ui.button>
             </div>
         </form>
     </div>
@@ -228,7 +229,7 @@
             $('#grnSelect').select2({
                 theme: 'bootstrap-5',
                 width: '100%',
-                placeholder: 'Select GRN(s)...'
+                placeholder: @json(__('purchase.select_grns_placeholder'))
             });
 
             let expenseRowIndex = 1;
@@ -238,16 +239,16 @@
             @endphp
             const vendorsOptions = `
                 @if($transportersGroup->isNotEmpty())
-                    <optgroup label="🚛 Transporters &amp; Logistics">
+                    <optgroup label="🚛 {{ __('purchase.transporters_logistics') }}">
                         @foreach($transportersGroup as $v)
-                            <option value="{{ $v->id }}">{{ addslashes($v->name) }} (Transporter / Logistics)</option>
+                            <option value="{{ $v->id }}">{{ addslashes($v->name) }} ({{ __('purchase.transporter_vendor') }})</option>
                         @endforeach
                     </optgroup>
                 @endif
                 @if($suppliersGroup->isNotEmpty())
-                    <optgroup label="🏭 Material Suppliers &amp; Vendors">
+                    <optgroup label="🏭 {{ __('purchase.material_suppliers_vendors') }}">
                         @foreach($suppliersGroup as $v)
-                            <option value="{{ $v->id }}">{{ addslashes($v->name) }} (Supplier / Vendor)</option>
+                            <option value="{{ $v->id }}">{{ addslashes($v->name) }} ({{ __('purchase.vendor') }})</option>
                         @endforeach
                     </optgroup>
                 @endif
@@ -259,17 +260,17 @@
                     <tr class="expense-row">
                         <td>
                             <x-ui.odoo-form-ui type="select" name="expenses[${expenseRowIndex}][cost_head]" required="true">
-                                <option value="Freight & Transport" selected>Freight &amp; Transport</option>
-                                <option value="Customs Duty">Customs Duty</option>
-                                <option value="Loading & Unloading">Loading &amp; Unloading</option>
-                                <option value="Insurance">Insurance</option>
-                                <option value="Handling Charges">Handling Charges</option>
-                                <option value="Other Costs">Other Costs</option>
+                                <option value="Freight & Transport" selected>{{ __('purchase.freight_and_transport') }}</option>
+                                <option value="Customs Duty">{{ __('purchase.customs_duty') }}</option>
+                                <option value="Loading & Unloading">{{ __('purchase.loading_unloading') }}</option>
+                                <option value="Insurance">{{ __('purchase.insurance') }}</option>
+                                <option value="Handling Charges">{{ __('purchase.handling_charges') }}</option>
+                                <option value="Other Costs">{{ __('purchase.other_costs') }}</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="expenses[${expenseRowIndex}][vendor_id]">
-                                <option value="">Select Vendor / Transporter...</option>
+                                <option value="">{{ __('purchase.select_vendor_transporter') }}</option>
                                 ${vendorsOptions}
                             </x-ui.odoo-form-ui>
                         </td>
@@ -278,7 +279,7 @@
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="expenses[${expenseRowIndex}][tax_rate]" class="tax-rate-select">
-                                <option value="0" selected>0% (No Tax)</option>
+                                <option value="0" selected>0% ({{ __('purchase.no_tax') }})</option>
                                 <option value="5">5% GST</option>
                                 <option value="12">12% GST</option>
                                 <option value="18">18% GST</option>
@@ -295,13 +296,13 @@
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="expenses[${expenseRowIndex}][allocation_basis]" class="basis-select" required="true">
-                                <option value="by_qty" selected>By Qty</option>
-                                <option value="by_amount">By Value</option>
-                                <option value="equal">Equal</option>
+                                <option value="by_qty" selected>{{ __('purchase.by_qty') }}</option>
+                                <option value="by_amount">{{ __('purchase.by_value') }}</option>
+                                <option value="equal">{{ __('purchase.equal') }}</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td class="text-center align-middle">
-                            <button type="button" class="btn btn-link text-danger p-0 border-0 remove-expense-btn" title="Remove Line">
+                            <button type="button" class="btn btn-link text-danger p-0 border-0 remove-expense-btn" title="{{ __('purchase.remove_line') }}">
                                 <i class="feather-trash-2"></i>
                             </button>
                         </td>
@@ -380,7 +381,8 @@
                     totalPayable += linePayable;
                 });
 
-                $('#totalExpensesDisplay').val('₹' + totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                const currSym = @json(active_currency_symbol());
+                $('#totalExpensesDisplay').val(currSym + ' ' + totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
                 renderPreviewTable(totalExpenses);
             }
@@ -400,6 +402,7 @@
                     return;
                 }
 
+                const currSym = @json(active_currency_symbol());
                 const totalQty = loadedGrnItems.reduce((acc, item) => acc + item.received_qty, 0);
                 const totalAmount = loadedGrnItems.reduce((acc, item) => acc + item.total_amount, 0);
 
@@ -438,9 +441,9 @@
                                 <small class="text-muted font-monospace">SKU: ${item.sku}</small>
                             </td>
                             <td class="text-center fw-semibold">${item.received_qty} ${item.uom}</td>
-                            <td class="text-end font-monospace">₹${item.unit_rate.toFixed(2)}</td>
-                            <td class="text-end font-monospace text-primary fw-bold">+ ₹${allocated.toFixed(2)}</td>
-                            <td class="text-end font-monospace text-success fw-bold">₹${newLandedUnitCost.toFixed(2)} / ${item.uom}</td>
+                            <td class="text-end font-monospace">${currSym} ${item.unit_rate.toFixed(2)}</td>
+                            <td class="text-end font-monospace text-primary fw-bold">+ ${currSym} ${allocated.toFixed(2)}</td>
+                            <td class="text-end font-monospace text-success fw-bold">${currSym} ${newLandedUnitCost.toFixed(2)} / ${item.uom}</td>
                         </tr>
                     `;
                     $tbody.append(rowHtml);

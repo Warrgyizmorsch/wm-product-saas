@@ -1,27 +1,27 @@
 @extends('layouts.duralux')
 
-@section('title', 'Customer Finance 360° | ' . $customer->name)
-@section('page-title', 'Customer Finance 360° View')
-@section('breadcrumb', 'Customer Profile')
+@section('title', __('crm.customer_finance_360') . ' | ' . $customer->name)
+@section('page-title', __('crm.customer_finance_360_view'))
+@section('breadcrumb', __('crm.customer_profile'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{{ route('crm.customers.index') }}" class="btn btn-light border p-2 d-inline-flex align-items-center justify-content-center" title="Back to Customers">
+        <a href="{{ route('crm.customers.index') }}" class="btn btn-light border p-2 d-inline-flex align-items-center justify-content-center" title="{{ __('crm.back_to_customers') }}">
             <i class="feather-arrow-left fs-16"></i>
         </a>
         @if(Route::has('sales.orders.create'))
             <x-ui.button href="{{ route('sales.orders.create', ['customer_id' => $customer->id]) }}" variant="primary" icon="feather-plus">
-                Sales Order
+                {{ __('crm.sales_orders') }}
             </x-ui.button>
         @endif
         @if(Route::has('sales.invoices.create'))
             <x-ui.button href="{{ route('sales.invoices.create', ['customer_id' => $customer->id]) }}" variant="success" icon="feather-file-plus">
-                Create Invoice
+                {{ __('crm.create_new_invoice') }}
             </x-ui.button>
         @endif
         @if($customer->crmAccount)
             <x-ui.button href="{{ route('crm.accounts.show', $customer->crmAccount->id) }}" variant="secondary" icon="feather-briefcase">
-                View Account
+                {{ __('crm.view_account') }}
             </x-ui.button>
         @endif
     </div>
@@ -41,21 +41,21 @@
                         <div class="d-flex align-items-center gap-3 flex-wrap">
                             <h4 class="fw-bold text-dark mb-0 fs-19 me-1">{{ $customer->name }}</h4>
                             @if(strtolower($customer->status) === 'active')
-                                <x-ui.status-badge status="active" label="Active Customer" dot="true" size="sm" />
+                                <x-ui.status-badge status="active" :label="__('crm.active_customer')" dot="true" size="sm" />
                             @else
-                                <x-ui.status-badge status="inactive" label="Inactive Customer" dot="true" size="sm" />
+                                <x-ui.status-badge status="inactive" :label="__('crm.inactive_customer')" dot="true" size="sm" />
                             @endif
 
                             @if($customer->crmAccount)
-                                <span class="badge bg-soft-info text-info border fs-11 px-2.5 py-1 ms-2" title="Linked CRM Company Account">
-                                    <i class="feather-building me-1.5"></i>Account: <strong>{{ $customer->crmAccount->name }}</strong>
+                                <span class="badge bg-soft-info text-info border fs-11 px-2.5 py-1 ms-2" title="{{ __('crm.linked_crm_account') }}">
+                                    <i class="feather-building me-1.5"></i>{{ __('crm.account_colon') }} <strong>{{ $customer->crmAccount->name }}</strong>
                                 </span>
                             @endif
                         </div>
 
                         <div class="d-flex align-items-center gap-3 text-muted fs-12 mt-2 flex-wrap">
                             @if($customer->gstin)
-                                <span><strong class="text-dark">GSTIN:</strong> <span class="font-monospace text-primary fw-bold">{{ $customer->gstin }}</span></span>
+                                <span><strong class="text-dark">{{ __('crm.gstin') }}:</strong> <span class="font-monospace text-primary fw-bold">{{ $customer->gstin }}</span></span>
                                 <span class="text-black-50">•</span>
                             @endif
                             @if($customer->phone)
@@ -67,17 +67,17 @@
                                 <span class="text-black-50">•</span>
                             @endif
                             @if($customer->crmAccount?->owner)
-                                <span><i class="feather-user me-1 text-primary"></i>Account Manager: <strong class="text-dark">{{ $customer->crmAccount->owner->name }}</strong></span>
+                                <span><i class="feather-user me-1 text-primary"></i>{{ __('crm.account_manager') }}: <strong class="text-dark">{{ $customer->crmAccount->owner->name }}</strong></span>
                             @endif
                         </div>
 
                         @if($customer->billing_address || $customer->shipping_address)
                             <div class="mt-2 pt-2 d-flex align-items-center gap-3 fs-11 text-muted flex-wrap">
                                 @if($customer->billing_address)
-                                    <span><i class="feather-map-pin me-1 text-danger"></i><strong>Billing:</strong> {{ Str::limit($customer->billing_address, 65) }}</span>
+                                    <span><i class="feather-map-pin me-1 text-danger"></i><strong>{{ __('crm.billing_colon') }}</strong> {{ Str::limit($customer->billing_address, 65) }}</span>
                                 @endif
                                 @if($customer->shipping_address)
-                                    <span><i class="feather-truck me-1 text-info"></i><strong>Shipping:</strong> {{ Str::limit($customer->shipping_address, 65) }}</span>
+                                    <span><i class="feather-truck me-1 text-info"></i><strong>{{ __('crm.shipping_colon') }}</strong> {{ Str::limit($customer->shipping_address, 65) }}</span>
                                 @endif
                             </div>
                         @endif
@@ -85,9 +85,9 @@
                 </div>
 
                 <div class="text-end">
-                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">Financial Health Status</span>
+                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">{{ __('crm.financial_health_status') }}</span>
                     @if(($customerCreditBalance ?? 0) > 0)
-                        <span class="badge bg-soft-info text-info fs-12 px-3 py-1.5 fw-bold border"><i class="feather-arrow-down-left me-1"></i>Advance Credit (-?{{ number_format($customerCreditBalance, 2) }})</span>
+                        <span class="badge bg-soft-info text-info fs-12 px-3 py-1.5 fw-bold border"><i class="feather-arrow-down-left me-1"></i>Advance Credit (-{{ format_currency($customerCreditBalance) }})</span>
                     @elseif($outstandingBalance <= 0)
                         <span class="badge bg-soft-success text-success fs-12 px-3 py-1.5 fw-bold border"><i class="feather-check-circle me-1"></i>All Clear (Zero Balance)</span>
                     @elseif($overdueAmount > 0)
@@ -102,24 +102,24 @@
             <div class="bg-light p-3 rounded-3 border mb-4">
                 <div class="row g-3 text-center text-md-start">
                     <div class="col-md-3 border-end">
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-file-text me-1 text-primary"></i>Total Lifetime Billed</span>
-                        <h4 class="fw-bold text-primary mb-0 fs-18">₹{{ number_format($totalBilled, 2) }}</h4>
-                        <span class="fs-11 text-muted">{{ $invoices->count() }} Invoices Issued</span>
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-file-text me-1 text-primary"></i>{{ __('crm.total_lifetime_billed') }}</span>
+                        <h4 class="fw-bold text-primary mb-0 fs-18">{{ format_currency($totalBilled) }}</h4>
+                        <span class="fs-11 text-muted">{{ $invoices->count() }} {{ __('crm.invoices_issued') }}</span>
                     </div>
                     <div class="col-md-3 border-end">
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-alert-circle me-1 text-warning"></i>Outstanding Receivables</span>
-                        <h4 class="fw-bold text-warning mb-0 fs-18">₹{{ number_format($outstandingBalance, 2) }}</h4>
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-alert-circle me-1 text-warning"></i>{{ __('crm.outstanding_receivables') }}</span>
+                        <h4 class="fw-bold text-warning mb-0 fs-18">{{ format_currency($outstandingBalance) }}</h4>
                         <span class="fs-11 text-muted">Total Uncollected</span>
                     </div>
                     <div class="col-md-3 border-end">
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-clock me-1 text-danger"></i>Overdue Amount</span>
-                        <h4 class="fw-bold text-danger mb-0 fs-18">₹{{ number_format($overdueAmount, 2) }}</h4>
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-clock me-1 text-danger"></i>{{ __('crm.overdue_amount') }}</span>
+                        <h4 class="fw-bold text-danger mb-0 fs-18">{{ format_currency($overdueAmount) }}</h4>
                         <span class="fs-11 text-muted">Due Date Passed</span>
                     </div>
                     <div class="col-md-3">
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-shield me-1 text-success"></i>Credit Limit / Available</span>
-                        <h4 class="fw-bold text-success mb-0 fs-18">₹{{ number_format($creditLimit, 2) }}</h4>
-                        <span class="fs-11 text-muted">Available: ₹{{ number_format($availableCredit, 2) }}</span>
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-shield me-1 text-success"></i>{{ __('crm.credit_limit') }}</span>
+                        <h4 class="fw-bold text-success mb-0 fs-18">{{ format_currency($creditLimit) }}</h4>
+                        <span class="fs-11 text-muted">{{ __('crm.available') }}: {{ format_currency($availableCredit) }}</span>
                     </div>
                 </div>
             </div>
@@ -129,25 +129,25 @@
                 <ul class="nav nav-tabs border-0 gap-1" id="customerTabs" role="tablist">
                     <li class="nav-item">
                         <a class="nav-link zoho-tab-link active fw-bold px-3 py-2" id="invoices-tab" data-bs-toggle="tab" href="#invoices-pane" role="tab">
-                            <i class="feather-file-text me-1.5 text-primary"></i>GST Invoices
+                            <i class="feather-file-text me-1.5 text-primary"></i>{{ __('crm.invoices') }}
                             <span class="badge bg-soft-primary text-primary ms-1 px-1.5 rounded-pill">{{ $invoices->count() }}</span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link zoho-tab-link fw-bold px-3 py-2" id="payments-tab" data-bs-toggle="tab" href="#payments-pane" role="tab">
-                            <i class="feather-dollar-sign me-1.5 text-success"></i>Payments & Receipts
+                            <i class="feather-dollar-sign me-1.5 text-success"></i>{{ __('crm.payments') }}
                             <span class="badge bg-soft-success text-success ms-1 px-1.5 rounded-pill">{{ $payments->count() }}</span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link zoho-tab-link fw-bold px-3 py-2" id="orders-tab" data-bs-toggle="tab" href="#orders-pane" role="tab">
-                            <i class="feather-shopping-cart me-1.5 text-info"></i>Sales Orders
+                            <i class="feather-shopping-cart me-1.5 text-info"></i>{{ __('crm.sales_orders') }}
                             <span class="badge bg-soft-info text-info ms-1 px-1.5 rounded-pill">{{ $salesOrders->count() }}</span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link zoho-tab-link fw-bold px-3 py-2" id="ledger-tab" data-bs-toggle="tab" href="#ledger-pane" role="tab">
-                            <i class="feather-book-open me-1.5 text-warning"></i>Customer Ledger Statement
+                            <i class="feather-book-open me-1.5 text-warning"></i>{{ __('crm.ledger_statement') }}
                         </a>
                     </li>
                 </ul>
@@ -160,12 +160,12 @@
                 <div class="tab-pane fade show active" id="invoices-pane" role="tabpanel">
                     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
                         <div>
-                            <h6 class="fw-bold text-dark mb-0"><i class="feather-file-text me-2 text-primary"></i>Sales Invoices & Linked CRM Deals</h6>
-                            <span class="text-muted fs-11">List of all GST Sales Invoices issued to this customer</span>
+                            <h6 class="fw-bold text-dark mb-0"><i class="feather-file-text me-2 text-primary"></i>{{ __('crm.invoices_linked_deals') }}</h6>
+                            <span class="text-muted fs-11">{{ __('crm.list_gst_invoices_issued') }}</span>
                         </div>
                         @if(Route::has('sales.invoices.create'))
                             <x-ui.button href="{{ route('sales.invoices.create', ['customer_id' => $customer->id]) }}" variant="outline-primary" size="sm" icon="feather-plus">
-                                Create New Invoice
+                                {{ __('crm.create_new_invoice') }}
                             </x-ui.button>
                         @endif
                     </div>
@@ -175,15 +175,15 @@
                             <x-ui.odoo-form-ui type="table" id="invoicesTable" class="mb-0">
                                 <thead>
                                     <tr style="background-color: #e8ecf1 !important;">
-                                        <th style="background-color: #e8ecf1 !important;">Invoice #</th>
-                                        <th style="background-color: #e8ecf1 !important;">Linked Sales Order & Deal</th>
-                                        <th style="background-color: #e8ecf1 !important;">Invoice Date</th>
-                                        <th style="background-color: #e8ecf1 !important;">Due Date</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Total Amount (₹)</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Amount Paid (₹)</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Balance Due (₹)</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-center">Status</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">Action</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.invoice_no') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.linked_so_deal') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.invoice_date') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.due_date') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.total_amount') }} ({{ active_currency_symbol() }})</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.amount_paid') }} ({{ active_currency_symbol() }})</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.balance_due') }} ({{ active_currency_symbol() }})</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.status') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -229,15 +229,15 @@
                                                             @endif
                                                         </div>
                                                     @elseif(!$dealNo)
-                                                        <span class="text-muted fs-12">— Direct Invoice —</span>
+                                                        <span class="text-muted fs-12">— {{ __('crm.direct_invoice') }} —</span>
                                                     @endif
                                                 </div>
                                             </td>
                                             <td>{{ $inv->invoice_date ? \Carbon\Carbon::parse($inv->invoice_date)->format('d/m/Y') : '—' }}</td>
                                             <td>{{ $inv->due_date ? \Carbon\Carbon::parse($inv->due_date)->format('d/m/Y') : '—' }}</td>
-                                            <td class="text-end fw-bold text-dark">₹{{ number_format($inv->total_amount, 2) }}</td>
-                                            <td class="text-end text-success fw-bold">₹{{ number_format($inv->amount_paid ?: 0, 2) }}</td>
-                                            <td class="text-end text-danger fw-bold">₹{{ number_format($inv->balance_due ?: ($inv->total_amount - ($inv->amount_paid ?: 0)), 2) }}</td>
+                                            <td class="text-end fw-bold text-dark">{{ format_currency($inv->total_amount) }}</td>
+                                            <td class="text-end text-success fw-bold">{{ format_currency($inv->amount_paid ?: 0) }}</td>
+                                            <td class="text-end text-danger fw-bold">{{ format_currency($inv->balance_due ?: ($inv->total_amount - ($inv->amount_paid ?: 0))) }}</td>
                                             <td class="text-center">
                                                 @if(strtolower($inv->status) === 'paid' || $inv->amount_paid >= $inv->total_amount)
                                                     <x-ui.status-badge status="completed" label="Paid" size="sm" />
@@ -266,7 +266,7 @@
                     @else
                         <div class="text-center py-5 text-muted border rounded">
                             <i class="feather-file-text display-6 text-muted opacity-50 mb-2 d-block"></i>
-                            <p class="mb-0 fs-13">No GST Invoices issued for this customer yet.</p>
+                            <p class="mb-0 fs-13">{{ __('crm.no_invoices_issued') }}</p>
                         </div>
                     @endif
                 </div>
@@ -275,8 +275,8 @@
                 <div class="tab-pane fade" id="payments-pane" role="tabpanel">
                     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
                         <div>
-                            <h6 class="fw-bold text-dark mb-0"><i class="feather-dollar-sign me-2 text-success"></i>Customer Payments & Receipts Traceability</h6>
-                            <span class="text-muted fs-11">List of payment receipts collected from this customer</span>
+                            <h6 class="fw-bold text-dark mb-0"><i class="feather-dollar-sign me-2 text-success"></i>{{ __('crm.customer_payments_receipts_traceability') }}</h6>
+                            <span class="text-muted fs-11">{{ __('crm.list_payment_receipts') }}</span>
                         </div>
                     </div>
                     @if($payments->isNotEmpty())
@@ -284,12 +284,12 @@
                             <x-ui.odoo-form-ui type="table" id="paymentsTable" class="mb-0">
                                 <thead>
                                     <tr style="background-color: #e8ecf1 !important;">
-                                        <th style="background-color: #e8ecf1 !important;">Receipt #</th>
-                                        <th style="background-color: #e8ecf1 !important;">Date</th>
-                                        <th style="background-color: #e8ecf1 !important;">Linked Invoice & Deal</th>
-                                        <th style="background-color: #e8ecf1 !important;">Payment Mode & Ref #</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Amount Received (₹)</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-center">Status</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.receipt_no') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.date') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.linked_invoice_deal') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.payment_mode_ref') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.amount_received') }} ({{ active_currency_symbol() }})</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.status') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -308,7 +308,7 @@
                                                 <div class="d-flex flex-column gap-2 py-1">
                                                     @if($dealNo)
                                                         <div>
-                                                            <span class="fs-10 text-muted uppercase me-1">Deal:</span>
+                                                            <span class="fs-10 text-muted uppercase me-1">{{ __('crm.deal_colon') }}</span>
                                                             @if(Route::has('crm.deals.show'))
                                                                 <a href="{{ route('crm.deals.show', $payDeal->id) }}" class="badge bg-soft-info text-info text-decoration-none fw-bold px-2.5 py-1.5 d-inline-flex align-items-center" title="Title: {{ $payDeal->title }}">
                                                                     <i class="feather-git-branch me-1"></i>{{ $dealNo }}
@@ -321,7 +321,7 @@
 
                                                     @if($payInv)
                                                         <div>
-                                                            <span class="fs-10 text-muted uppercase me-1">Invoice:</span>
+                                                            <span class="fs-10 text-muted uppercase me-1">{{ __('crm.invoice_colon') }}</span>
                                                             @if(Route::has('sales.invoices.show'))
                                                                 <a href="{{ route('sales.invoices.show', $payInv->id) }}" class="badge bg-soft-primary text-primary font-monospace text-decoration-none px-2.5 py-1.5 d-inline-flex align-items-center">
                                                                     <i class="feather-file-text me-1"></i>{{ $payInv->invoice_number }}
@@ -331,17 +331,17 @@
                                                             @endif
                                                         </div>
                                                     @elseif(!$dealNo)
-                                                        <span class="text-muted fs-12">— Advance / General Receipt —</span>
+                                                        <span class="text-muted fs-12">— {{ __('crm.advance_general_receipt') }} —</span>
                                                     @endif
                                                 </div>
                                             </td>
                                             <td>
                                                 <span class="badge bg-light text-dark border me-1">{{ ucfirst($pay->payment_method ?: 'Bank/Cash') }}</span>
                                                 @if($pay->reference_no)
-                                                    <span class="font-monospace text-muted fs-11">Ref: {{ $pay->reference_no }}</span>
+                                                    <span class="font-monospace text-muted fs-11">{{ __('crm.ref_colon') }} {{ $pay->reference_no }}</span>
                                                 @endif
                                             </td>
-                                            <td class="text-end fw-bold text-success fs-14">₹{{ number_format($pay->amount, 2) }}</td>
+                                            <td class="text-end fw-bold text-success fs-14">{{ format_currency($pay->amount) }}</td>
                                             <td class="text-center">
                                                 <x-ui.status-badge status="completed" :label="ucfirst($pay->status ?: 'Completed')" size="sm" />
                                             </td>
@@ -357,7 +357,7 @@
                     @else
                         <div class="text-center py-5 text-muted border rounded">
                             <i class="feather-dollar-sign display-6 text-muted opacity-50 mb-2 d-block"></i>
-                            <p class="mb-0 fs-13">No payment receipts recorded for this customer yet.</p>
+                            <p class="mb-0 fs-13">{{ __('crm.no_payment_receipts') }}</p>
                         </div>
                     @endif
                 </div>
@@ -366,12 +366,12 @@
                 <div class="tab-pane fade" id="orders-pane" role="tabpanel">
                     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
                         <div>
-                            <h6 class="fw-bold text-dark mb-0"><i class="feather-shopping-cart me-2 text-info"></i>Sales Orders & Linked Deals Traceability</h6>
-                            <span class="text-muted fs-11">List of Sales Orders generated for this customer</span>
+                            <h6 class="fw-bold text-dark mb-0"><i class="feather-shopping-cart me-2 text-info"></i>{{ __('crm.sales_orders_linked_deals') }}</h6>
+                            <span class="text-muted fs-11">{{ __('crm.list_sales_orders') }}</span>
                         </div>
                         @if(Route::has('sales.orders.create'))
                             <x-ui.button href="{{ route('sales.orders.create', ['customer_id' => $customer->id]) }}" variant="outline-primary" size="sm" icon="feather-plus">
-                                Create Sales Order
+                                {{ __('crm.create_sales_order') }}
                             </x-ui.button>
                         @endif
                     </div>
@@ -380,13 +380,13 @@
                             <x-ui.odoo-form-ui type="table" id="ordersTable" class="mb-0">
                                 <thead>
                                     <tr style="background-color: #e8ecf1 !important;">
-                                        <th style="background-color: #e8ecf1 !important;">Order #</th>
-                                        <th style="background-color: #e8ecf1 !important;">Linked Opportunity / Deal</th>
-                                        <th style="background-color: #e8ecf1 !important;">Order Date</th>
-                                        <th style="background-color: #e8ecf1 !important;">Items</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Total Amount (₹)</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-center">Status</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">Action</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.order_no') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.linked_opportunity_deal') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.order_date') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.items') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.total_amount') }} ({{ active_currency_symbol() }})</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.status') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -408,7 +408,7 @@
                                                 <div class="d-flex flex-column gap-2 py-1">
                                                     @if($dealNo)
                                                         <div>
-                                                            <span class="fs-10 text-muted uppercase me-1">Deal:</span>
+                                                            <span class="fs-10 text-muted uppercase me-1">{{ __('crm.deal_colon') }}</span>
                                                             @if(Route::has('crm.deals.show'))
                                                                 <a href="{{ route('crm.deals.show', $linkedDeal->id) }}" class="badge bg-soft-info text-info text-decoration-none fw-bold px-2.5 py-1.5 d-inline-flex align-items-center" title="Title: {{ $linkedDeal->title }}">
                                                                     <i class="feather-git-branch me-1"></i>{{ $dealNo }}
@@ -421,7 +421,7 @@
 
                                                     @if($so->quotation)
                                                         <div>
-                                                            <span class="fs-10 text-muted uppercase me-1">Quote:</span>
+                                                            <span class="fs-10 text-muted uppercase me-1">{{ __('crm.quote_colon') }}</span>
                                                             @if(Route::has('crm.quotations.show'))
                                                                 <a href="{{ route('crm.quotations.show', $so->quotation->id) }}" class="badge bg-soft-secondary text-secondary font-monospace text-decoration-none px-2.5 py-1.5 d-inline-flex align-items-center">
                                                                     <i class="feather-file-text me-1"></i>{{ $so->quotation->quotation_number }}
@@ -431,15 +431,15 @@
                                                             @endif
                                                         </div>
                                                     @elseif(!$dealNo)
-                                                        <span class="text-muted fs-12">— Direct Order —</span>
+                                                        <span class="text-muted fs-12">— {{ __('crm.direct_order') }} —</span>
                                                     @endif
                                                 </div>
                                             </td>
                                             <td>{{ $so->order_date ? \Carbon\Carbon::parse($so->order_date)->format('d/m/Y') : '—' }}</td>
                                             <td>
-                                                <span class="badge bg-light text-dark border">{{ $so->items->count() ?: 1 }} Item(s)</span>
+                                                <span class="badge bg-light text-dark border">{{ $so->items->count() ?: 1 }} {{ __('crm.items') }}</span>
                                             </td>
-                                            <td class="text-end fw-bold text-dark">₹{{ number_format($so->total_amount ?: ($so->grand_total ?? 0), 2) }}</td>
+                                            <td class="text-end fw-bold text-dark">{{ format_currency($so->total_amount ?: ($so->grand_total ?? 0)) }}</td>
                                             <td class="text-center">
                                                 <x-ui.status-badge status="confirmed" :label="ucfirst($so->status ?: 'Confirmed')" size="sm" />
                                             </td>
@@ -462,7 +462,7 @@
                     @else
                         <div class="text-center py-5 text-muted border rounded">
                             <i class="feather-shopping-cart display-6 text-muted opacity-50 mb-2 d-block"></i>
-                            <p class="mb-0 fs-13">No Sales Orders placed for this customer yet.</p>
+                            <p class="mb-0 fs-13">{{ __('crm.no_sales_orders') }}</p>
                         </div>
                     @endif
                 </div>
@@ -471,11 +471,11 @@
                 <div class="tab-pane fade" id="ledger-pane" role="tabpanel">
                     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
                         <div>
-                            <h6 class="fw-bold text-dark mb-0"><i class="feather-book-open me-2 text-warning"></i>Customer Account Ledger Statement</h6>
-                            <span class="text-muted fs-11">Real-time debit, credit and running balance statement with linked Deal & SO reference</span>
+                            <h6 class="fw-bold text-dark mb-0"><i class="feather-book-open me-2 text-warning"></i>{{ __('crm.customer_account_ledger_statement') }}</h6>
+                            <span class="text-muted fs-11">{{ __('crm.realtime_debit_credit_balance') }}</span>
                         </div>
                         <x-ui.button type="button" variant="light" size="sm" class="border" icon="feather-printer" onclick="window.print()">
-                            Print Statement
+                            {{ __('crm.print_statement') }}
                         </x-ui.button>
                     </div>
 
@@ -569,14 +569,14 @@
                             <x-ui.odoo-form-ui type="table" id="ledgerTable" class="mb-0">
                                 <thead>
                                     <tr style="background-color: #e8ecf1 !important;">
-                                        <th style="background-color: #e8ecf1 !important;">Date</th>
-                                        <th style="background-color: #e8ecf1 !important;">Type</th>
-                                        <th style="background-color: #e8ecf1 !important;">Reference #</th>
-                                        <th style="background-color: #e8ecf1 !important;">Particulars / Description</th>
-                                        <th style="background-color: #e8ecf1 !important;">Linked Deal & SO</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-danger">Debit (Billed) (₹)</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-success">Credit (Paid) (₹)</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-primary">Running Balance (₹)</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.date') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.type') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.reference_no') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.particulars_description') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.linked_deal_so') }}</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-danger">{{ __('crm.debit_billed') }} ({{ active_currency_symbol() }})</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-success">{{ __('crm.credit_paid') }} ({{ active_currency_symbol() }})</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-primary">{{ __('crm.running_balance') }} ({{ active_currency_symbol() }})</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -615,18 +615,18 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="text-end text-danger font-monospace">{{ $row['debit'] > 0 ? '₹' . number_format($row['debit'], 2) : '—' }}</td>
-                                            <td class="text-end text-success font-monospace">{{ $row['credit'] > 0 ? '₹' . number_format($row['credit'], 2) : '—' }}</td>
-                                            <td class="text-end font-monospace fw-bold {{ $running > 0 ? 'text-danger' : 'text-success' }}">₹{{ number_format($running, 2) }}</td>
+                                            <td class="text-end text-danger font-monospace">{{ $row['debit'] > 0 ? format_currency($row['debit']) : '—' }}</td>
+                                            <td class="text-end text-success font-monospace">{{ $row['credit'] > 0 ? format_currency($row['credit']) : '—' }}</td>
+                                            <td class="text-end font-monospace fw-bold {{ $running > 0 ? 'text-danger' : 'text-success' }}">{{ format_currency($running) }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                                 <tfoot class="table-light font-monospace fw-bold">
                                     <tr>
-                                        <td colspan="5" class="text-end text-dark">Closing Balance:</td>
-                                        <td class="text-end text-danger">₹{{ number_format($sortedLedger->sum('debit'), 2) }}</td>
-                                        <td class="text-end text-success">₹{{ number_format($sortedLedger->sum('credit'), 2) }}</td>
-                                        <td class="text-end text-primary fs-14">₹{{ number_format($running, 2) }}</td>
+                                        <td colspan="5" class="text-end text-dark">{{ __('crm.closing_balance') }}:</td>
+                                        <td class="text-end text-danger">{{ format_currency($sortedLedger->sum('debit')) }}</td>
+                                        <td class="text-end text-success">{{ format_currency($sortedLedger->sum('credit')) }}</td>
+                                        <td class="text-end text-primary fs-14">{{ format_currency($running) }}</td>
                                     </tr>
                                 </tfoot>
                             </x-ui.odoo-form-ui>
@@ -638,7 +638,7 @@
                     @else
                         <div class="text-center py-5 text-muted border rounded">
                             <i class="feather-book-open display-6 text-muted opacity-50 mb-2 d-block"></i>
-                            <p class="mb-0 fs-13">No financial ledger transactions found for this customer.</p>
+                            <p class="mb-0 fs-13">{{ __('crm.no_ledger_transactions') }}</p>
                         </div>
                     @endif
                 </div>
