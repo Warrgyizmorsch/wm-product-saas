@@ -44,10 +44,30 @@ class NotificationService
             'type' => $type,
             'title' => $title,
             'message' => $message,
-            'action_url' => $actionUrl,
+            'action_url' => self::resolveUrl($actionUrl),
             'icon_class' => $iconClass,
             'data' => $extraData,
         ]);
+    }
+
+    /**
+     * Safely resolve action URL whether passed as a route name, full URL, or relative path.
+     */
+    private static function resolveUrl(?string $url): ?string
+    {
+        if (empty($url)) {
+            return null;
+        }
+
+        if (!str_contains($url, '/') && \Illuminate\Support\Facades\Route::has($url)) {
+            try {
+                return route($url);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        return $url;
     }
 
     /**

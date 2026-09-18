@@ -154,6 +154,8 @@ class HelpdeskTicketController extends Controller
         $tenantId = tenant_id();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($id);
 
+        app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class)->authorizeTicketManagement(auth()->user(), $ticket);
+
         $this->ticketRepository->updateTicketStatus(
             $ticket,
             $request->input('status'),
