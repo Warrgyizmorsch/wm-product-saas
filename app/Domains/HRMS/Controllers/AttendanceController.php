@@ -1541,16 +1541,17 @@ class AttendanceController extends Controller
             "Expires"             => "0"
         ];
 
-        $columns = ['employee_code', 'date', 'check_in', 'check_out', 'status'];
+        $columns = ['employee_code', 'punch_datetime'];
 
         $callback = function() use($columns) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
             
-            // Add sample rows
-            fputcsv($file, ['EMP-0001', '2026-08-05', '09:00', '18:00', 'auto']);
-            fputcsv($file, ['EMP-0002', '2026-08-05', '', '', 'on_leave']);
-            fputcsv($file, ['EMP-0003', '2026-08-05', '09:30', '17:30', 'wfh']);
+            // Add sample biometric punch rows (combined date & time)
+            fputcsv($file, ['EMP-0001', '2026-09-19 09:00:00']);
+            fputcsv($file, ['EMP-0001', '2026-09-19 18:00:00']);
+            fputcsv($file, ['EMP-0002', '2026-09-19 09:30:00']);
+            fputcsv($file, ['EMP-0002', '2026-09-19 17:30:00']);
 
             fclose($file);
         };
@@ -1592,221 +1593,291 @@ class AttendanceController extends Controller
 
         // Read headers
         $header = array_shift($rows);
-        $header = array_map(function ($col) {
+        $headerNormalized = array_map(function ($col) {
             return strtolower(trim((string)$col));
         }, $header);
 
-        // Map header column indices
-        $colIndex = [
-            'employee_code' => array_search('employee_code', $header),
-            'date' => array_search('date', $header),
-            'check_in' => array_search('check_in', $header),
-            'check_out' => array_search('check_out', $header),
-            'status' => array_search('status', $header),
-        ];
+        // Map header column indices with aliases
+        $colEmpCode = false;
+        $colPunchDateTime = false;
+        $colDate = false;
+        $colCheckIn = false;
+        $colCheckOut = false;
+        $colStatus = false;
 
-        if ($colIndex['employee_code'] === false || $colIndex['date'] === false) {
-            return redirect()->back()->with('error', 'Invalid template. "employee_code" and "date" columns are required.');
+        foreach ($headerNormalized as $idx => $h) {
+            if ($colEmpCode === false && in_array($h, ['employee_code', 'employee_id', 'emp_code', 'enroll_no', 'enrollno', 'user_id', 'userid', 'badge_no', 'card_no', 'code'])) {
+                $colEmpCode = $idx;
+            }
+            if ($colPunchDateTime === false && in_array($h, ['punch_datetime', 'log_datetime', 'log_time', 'logtime', 'punch_time', 'punchtime', 'datetime', 'date_time', 'timestamp', 'logdate', 'punch'])) {
+                $colPunchDateTime = $idx;
+            }
+            if ($colDate === false && in_array($h, ['date', 'punch_date', 'log_date', 'attendance_date'])) {
+                $colDate = $idx;
+            }
+            if ($colCheckIn === false && in_array($h, ['check_in', 'checkin', 'in_time', 'intime', 'first_in', 'time_in', 'punch_in', 'in'])) {
+                $colCheckIn = $idx;
+            }
+            if ($colCheckOut === false && in_array($h, ['check_out', 'checkout', 'out_time', 'outtime', 'last_out', 'time_out', 'punch_out', 'out'])) {
+                $colCheckOut = $idx;
+            }
+            if ($colStatus === false && in_array($h, ['status', 'attendance_status', 'mode', 'type'])) {
+                $colStatus = $idx;
+            }
+        }
+
+        // Fallback for employee code if not matched by name
+        if ($colEmpCode === false && count($headerNormalized) > 0) {
+            $colEmpCode = 0;
+        }
+
+        if ($colEmpCode === false || ($colPunchDateTime === false && $colDate === false)) {
+            return redirect()->back()->with('error', 'Invalid template. "employee_code" and either "punch_datetime" or "date" column are required.');
         }
 
         $tenantId = auth()->user()?->tenant_id;
-        $successCount = 0;
         $skippedRows = [];
         $rowNum = 1;
+
+        // Group records by Employee ID + Formatted Date
+        $records = [];
+        $employeeCache = [];
 
         foreach ($rows as $row) {
             $rowNum++;
 
-            // Basic check for empty row
             if (empty($row) || !array_filter($row, fn($v) => !is_null($v) && trim((string)$v) !== '')) {
                 continue;
             }
 
-            $empCode = trim((string)($row[$colIndex['employee_code']] ?? ''));
-            $dateStr = trim((string)($row[$colIndex['date']] ?? ''));
-
-            if (!$empCode || !$dateStr) {
-                $skippedRows[] = "Row {$rowNum}: Missing employee_code or date.";
+            $empCodeStr = trim((string)($row[$colEmpCode] ?? ''));
+            if (!$empCodeStr) {
+                $skippedRows[] = "Row {$rowNum}: Missing employee_code.";
                 continue;
             }
 
-            // Find employee
-            $employee = \App\Domains\HRMS\Models\Employee::where('employee_id', $empCode)->first();
+            if (!isset($employeeCache[$empCodeStr])) {
+                $employeeCache[$empCodeStr] = \App\Domains\HRMS\Models\Employee::where('employee_id', $empCodeStr)
+                    ->orWhere('id', $empCodeStr)
+                    ->first();
+            }
+
+            $employee = $employeeCache[$empCodeStr];
             if (!$employee) {
-                $skippedRows[] = "Row {$rowNum}: Employee code '{$empCode}' not found.";
+                $skippedRows[] = "Row {$rowNum}: Employee code '{$empCodeStr}' not found.";
                 continue;
             }
 
-            // Parse Date
-            try {
-                if (is_numeric($dateStr) && (float)$dateStr > 30000 && (float)$dateStr < 100000) {
-                    $carbonDate = \Carbon\Carbon::instance(\PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$dateStr));
-                } else {
-                    $carbonDate = \Carbon\Carbon::parse($dateStr);
-                }
-                $formattedDate = $carbonDate->format('Y-m-d');
-            } catch (\Exception $e) {
-                $skippedRows[] = "Row {$rowNum}: Invalid date format '{$dateStr}'.";
-                continue;
-            }
-
-            // Extract raw values
-            $checkInRaw = $colIndex['check_in'] !== false ? trim((string)($row[$colIndex['check_in']] ?? '')) : '';
-            $checkOutRaw = $colIndex['check_out'] !== false ? trim((string)($row[$colIndex['check_out']] ?? '')) : '';
-            $statusRaw = $colIndex['status'] !== false ? strtolower(trim((string)($row[$colIndex['status']] ?? ''))) : 'auto';
-
-            if ($checkInRaw !== '' && is_numeric($checkInRaw) && (float)$checkInRaw < 1) {
-                $checkInRaw = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$checkInRaw)->format('H:i:s');
-            }
-            if ($checkOutRaw !== '' && is_numeric($checkOutRaw) && (float)$checkOutRaw < 1) {
-                $checkOutRaw = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$checkOutRaw)->format('H:i:s');
-            }
-
-            $checkInVal = $checkInRaw !== '' ? $checkInRaw : null;
-            $checkOutVal = $checkOutRaw !== '' ? $checkOutRaw : null;
-            $statusVal = $statusRaw !== '' ? $statusRaw : 'auto';
-
-            // Validate status enum
+            $statusRaw = $colStatus !== false ? strtolower(trim((string)($row[$colStatus] ?? ''))) : 'auto';
             $validStatuses = ['auto', 'present', 'absent', 'late', 'half_day', 'on_leave', 'wfh', 'weekly_off', 'week_off', 'holiday'];
-            if (!in_array($statusVal, $validStatuses)) {
-                $statusVal = 'auto';
+            if (!in_array($statusRaw, $validStatuses)) {
+                $statusRaw = 'auto';
             }
-            if ($statusVal === 'week_off') {
-                $statusVal = 'weekly_off';
-            }
-
-            // Check constraint
-            if (!$checkInVal && in_array($statusVal, ['present', 'late', 'half_day', 'wfh'])) {
-                $skippedRows[] = "Row {$rowNum}: Cannot mark employee '{$employee->display_name}' as " . ucfirst(str_replace('_', ' ', $statusVal)) . " without check_in time.";
-                continue;
+            if ($statusRaw === 'week_off') {
+                $statusRaw = 'weekly_off';
             }
 
-            // Combine date and time
-            $checkInDatetime = null;
-            if ($checkInVal) {
-                try {
-                    $checkInDatetime = \Carbon\Carbon::parse($formattedDate . ' ' . $checkInVal);
-                } catch (\Exception $e) {
-                    $skippedRows[] = "Row {$rowNum}: Invalid check_in time '{$checkInVal}'.";
+            // Case A: Combined Punch Datetime (Biometric Direct Output)
+            if ($colPunchDateTime !== false) {
+                $rawDateTimeStr = trim((string)($row[$colPunchDateTime] ?? ''));
+                if (!$rawDateTimeStr) {
+                    $skippedRows[] = "Row {$rowNum}: Missing punch_datetime.";
                     continue;
                 }
-            } elseif (in_array($statusVal, ['absent', 'on_leave', 'weekly_off', 'holiday'])) {
-                $checkInDatetime = \Carbon\Carbon::parse($formattedDate . ' 00:00:00');
-            }
 
-            $checkOutDatetime = null;
-            if ($checkOutVal) {
-                try {
-                    $checkOutDatetime = \Carbon\Carbon::parse($formattedDate . ' ' . $checkOutVal);
-                } catch (\Exception $e) {
-                    $skippedRows[] = "Row {$rowNum}: Invalid check_out time '{$checkOutVal}'.";
+                $carbonDt = $this->parseDateTimeString($rawDateTimeStr);
+                if (!$carbonDt) {
+                    $skippedRows[] = "Row {$rowNum}: Invalid punch_datetime format '{$rawDateTimeStr}'.";
                     continue;
                 }
-            }
 
-            // Calculate work hours
-            $workHours = 0.00;
-            if ($checkInDatetime && $checkOutDatetime) {
-                if ($checkOutDatetime->greaterThan($checkInDatetime)) {
-                    $workHours = round($checkInDatetime->diffInMinutes($checkOutDatetime, true) / 60.0, 2);
+                $formattedDate = $carbonDt->format('Y-m-d');
+                $empId = $employee->id;
+
+                if (!isset($records[$empId][$formattedDate])) {
+                    $records[$empId][$formattedDate] = [
+                        'employee' => $employee,
+                        'punches' => [],
+                        'status' => $statusRaw,
+                    ];
+                }
+
+                $records[$empId][$formattedDate]['punches'][] = $carbonDt;
+                if ($statusRaw !== 'auto') {
+                    $records[$empId][$formattedDate]['status'] = $statusRaw;
+                }
+            } 
+            // Case B: Separate Date and Check-In/Check-Out Columns (Summary Output)
+            else {
+                $dateStr = trim((string)($row[$colDate] ?? ''));
+                if (!$dateStr) {
+                    $skippedRows[] = "Row {$rowNum}: Missing date.";
+                    continue;
+                }
+
+                $dateDt = $this->parseDateTimeString($dateStr);
+                if (!$dateDt) {
+                    $skippedRows[] = "Row {$rowNum}: Invalid date format '{$dateStr}'.";
+                    continue;
+                }
+
+                $formattedDate = $dateDt->format('Y-m-d');
+                $checkInRaw = $colCheckIn !== false ? trim((string)($row[$colCheckIn] ?? '')) : '';
+                $checkOutRaw = $colCheckOut !== false ? trim((string)($row[$colCheckOut] ?? '')) : '';
+
+                if ($checkInRaw !== '' && is_numeric($checkInRaw) && (float)$checkInRaw < 1) {
+                    $checkInRaw = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$checkInRaw)->format('H:i:s');
+                }
+                if ($checkOutRaw !== '' && is_numeric($checkOutRaw) && (float)$checkOutRaw < 1) {
+                    $checkOutRaw = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$checkOutRaw)->format('H:i:s');
+                }
+
+                $empId = $employee->id;
+                if (!isset($records[$empId][$formattedDate])) {
+                    $records[$empId][$formattedDate] = [
+                        'employee' => $employee,
+                        'punches' => [],
+                        'status' => $statusRaw,
+                    ];
+                }
+
+                if ($checkInRaw !== '') {
+                    $inDt = $this->parseDateTimeString($formattedDate . ' ' . $checkInRaw);
+                    if ($inDt) {
+                        $records[$empId][$formattedDate]['punches'][] = $inDt;
+                    }
+                }
+                if ($checkOutRaw !== '') {
+                    $outDt = $this->parseDateTimeString($formattedDate . ' ' . $checkOutRaw);
+                    if ($outDt) {
+                        $records[$empId][$formattedDate]['punches'][] = $outDt;
+                    }
+                }
+                if ($statusRaw !== 'auto') {
+                    $records[$empId][$formattedDate]['status'] = $statusRaw;
                 }
             }
+        }
 
-            // Auto Detect Status Logic
-            $finalStatus = $statusVal;
-            if ($finalStatus === 'auto') {
-                if (!$checkInDatetime) {
-                    $hasLeave = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
-                        ->where('status', 'approved')
-                        ->whereDate('start_date', '<=', $formattedDate)
-                        ->whereDate('end_date', '>=', $formattedDate)
-                        ->exists();
+        // Process records
+        $successCount = 0;
+        foreach ($records as $empId => $dates) {
+            foreach ($dates as $formattedDate => $data) {
+                $employee = $data['employee'];
+                $statusVal = $data['status'];
+                $punches = $data['punches'];
 
-                    $finalStatus = $hasLeave ? 'on_leave' : 'absent';
-                    $checkInDatetime = \Carbon\Carbon::parse($formattedDate . ' 00:00:00');
-                } else {
-                    $hasWfh = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)
-                        ->where('status', 'approved')
-                        ->whereDate('start_date', '<=', $formattedDate)
-                        ->whereDate('end_date', '>=', $formattedDate)
-                        ->exists();
+                // Sort punches chronologically
+                usort($punches, function ($a, $b) {
+                    return $a->timestamp <=> $b->timestamp;
+                });
 
-                    $finalStatus = $hasWfh ? 'wfh' : 'present';
+                $checkInDatetime = count($punches) > 0 ? $punches[0] : null;
+                $checkOutDatetime = count($punches) > 1 ? end($punches) : null;
 
-                    $resolvedShift = $employee->resolveShiftForDate($formattedDate);
-                    if ($resolvedShift) {
-                        $shiftStart = \Carbon\Carbon::parse($formattedDate . ' ' . $resolvedShift->start_time);
-                        if ($checkInDatetime->greaterThan($shiftStart)) {
-                            $penaltyRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
+                // Calculate work hours
+                $workHours = 0.00;
+                if ($checkInDatetime && $checkOutDatetime) {
+                    if ($checkOutDatetime->greaterThan($checkInDatetime)) {
+                        $workHours = round($checkInDatetime->diffInMinutes($checkOutDatetime, true) / 60.0, 2);
+                    }
+                }
+
+                // Auto Detect Status Logic
+                $finalStatus = $statusVal;
+                if ($finalStatus === 'auto') {
+                    if (!$checkInDatetime) {
+                        $hasLeave = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
+                            ->where('status', 'approved')
+                            ->whereDate('start_date', '<=', $formattedDate)
+                            ->whereDate('end_date', '>=', $formattedDate)
+                            ->exists();
+
+                        $finalStatus = $hasLeave ? 'on_leave' : 'absent';
+                        $checkInDatetime = \Carbon\Carbon::parse($formattedDate . ' 00:00:00');
+                    } else {
+                        $hasWfh = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)
+                            ->where('status', 'approved')
+                            ->whereDate('start_date', '<=', $formattedDate)
+                            ->whereDate('end_date', '>=', $formattedDate)
+                            ->exists();
+
+                        $finalStatus = $hasWfh ? 'wfh' : 'present';
+
+                        $resolvedShift = $employee->resolveShiftForDate($formattedDate);
+                        if ($resolvedShift) {
+                            $shiftStart = \Carbon\Carbon::parse($formattedDate . ' ' . $resolvedShift->start_time);
+                            if ($checkInDatetime->greaterThan($shiftStart)) {
+                                $penaltyRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
+                                        $q->where('company_id', $employee->company_id)
+                                          ->orWhereNull('company_id');
+                                    })
+                                    ->where('rule_type', 'late_arrival')
+                                    ->where('status', true)
+                                    ->orderByRaw('company_id IS NULL ASC')
+                                    ->first();
+
+                                $graceMinutes = $penaltyRule ? (int)$penaltyRule->grace_period_minutes : 15;
+                                $diffMinutes = $checkInDatetime->diffInMinutes($shiftStart);
+
+                                if ($diffMinutes > $graceMinutes) {
+                                    $finalStatus = 'late';
+                                }
+                            }
+                        }
+
+                        if ($checkInDatetime && $checkOutDatetime && $workHours !== null) {
+                            $underHoursRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
                                     $q->where('company_id', $employee->company_id)
                                       ->orWhereNull('company_id');
                                 })
-                                ->where('rule_type', 'late_arrival')
+                                ->where('rule_type', 'under_hours')
                                 ->where('status', true)
                                 ->orderByRaw('company_id IS NULL ASC')
                                 ->first();
 
-                            $graceMinutes = $penaltyRule ? (int)$penaltyRule->grace_period_minutes : 15;
-                            $diffMinutes = $checkInDatetime->diffInMinutes($shiftStart);
-
-                            if ($diffMinutes > $graceMinutes) {
-                                $finalStatus = 'late';
-                            }
-                        }
-                    }
-
-                    if ($checkInDatetime && $checkOutDatetime && $workHours !== null) {
-                        $underHoursRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
-                                $q->where('company_id', $employee->company_id)
-                                  ->orWhereNull('company_id');
-                            })
-                            ->where('rule_type', 'under_hours')
-                            ->where('status', true)
-                            ->orderByRaw('company_id IS NULL ASC')
-                            ->first();
-
-                        if ($underHoursRule && is_array($underHoursRule->penalty_tiers)) {
-                            $sortedTiers = collect($underHoursRule->penalty_tiers)->sortBy('hours_threshold')->all();
-                            foreach ($sortedTiers as $tier) {
-                                $hoursThreshold = isset($tier['hours_threshold']) ? floatval($tier['hours_threshold']) : 0;
-                                if ($workHours < $hoursThreshold) {
-                                    $action = $tier['penalty_action'] ?? '';
-                                    $val = isset($tier['penalty_value']) ? floatval($tier['penalty_value']) : 0;
-                                    if ($action === 'working_hour_deduction' || $action === 'both_deductions') {
-                                        if ($val >= 1.0) {
-                                            $finalStatus = 'absent';
-                                        } elseif ($val > 0) {
-                                            $finalStatus = 'half_day';
+                            if ($underHoursRule && is_array($underHoursRule->penalty_tiers)) {
+                                $sortedTiers = collect($underHoursRule->penalty_tiers)->sortBy('hours_threshold')->all();
+                                foreach ($sortedTiers as $tier) {
+                                    $hoursThreshold = isset($tier['hours_threshold']) ? floatval($tier['hours_threshold']) : 0;
+                                    if ($workHours < $hoursThreshold) {
+                                        $action = $tier['penalty_action'] ?? '';
+                                        $val = isset($tier['penalty_value']) ? floatval($tier['penalty_value']) : 0;
+                                        if ($action === 'working_hour_deduction' || $action === 'both_deductions') {
+                                            if ($val >= 1.0) {
+                                                $finalStatus = 'absent';
+                                            } elseif ($val > 0) {
+                                                $finalStatus = 'half_day';
+                                            }
                                         }
+                                        break;
                                     }
-                                    break;
                                 }
                             }
                         }
                     }
                 }
+
+                if (!$checkInDatetime) {
+                    $checkInDatetime = \Carbon\Carbon::parse($formattedDate . ' 00:00:00');
+                }
+
+                $locationType = ($finalStatus === 'wfh') ? 'wfh' : 'office';
+
+                Attendance::updateOrCreate([
+                    'tenant_id' => $tenantId,
+                    'employee_id' => $employee->id,
+                    'date' => $formattedDate,
+                ], [
+                    'check_in' => $checkInDatetime,
+                    'check_out' => $checkOutDatetime,
+                    'location_type' => $locationType,
+                    'status' => $finalStatus,
+                    'total_work_hours' => $workHours,
+                ]);
+
+                $successCount++;
             }
-
-            // Fallback for check_in datetime if still null (for non-nullable DB column)
-            if (!$checkInDatetime) {
-                $checkInDatetime = \Carbon\Carbon::parse($formattedDate . ' 00:00:00');
-            }
-
-            $locationType = ($finalStatus === 'wfh') ? 'wfh' : 'office';
-
-            Attendance::updateOrCreate([
-                'tenant_id' => $tenantId,
-                'employee_id' => $employee->id,
-                'date' => $formattedDate,
-            ], [
-                'check_in' => $checkInDatetime,
-                'check_out' => $checkOutDatetime,
-                'location_type' => $locationType,
-                'status' => $finalStatus,
-                'total_work_hours' => $workHours,
-            ]);
-
-            $successCount++;
         }
 
         $msg = "Attendance logs imported successfully ({$successCount} records processed).";
@@ -1817,6 +1888,53 @@ class AttendanceController extends Controller
         }
 
         return redirect()->back()->with('success', $msg);
+    }
+
+    private function parseDateTimeString($val)
+    {
+        if ($val === null || trim((string)$val) === '') {
+            return null;
+        }
+
+        $val = trim((string)$val);
+
+        if (is_numeric($val) && (float)$val > 30000 && (float)$val < 100000) {
+            try {
+                return \Carbon\Carbon::instance(\PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$val));
+            } catch (\Throwable $e) {}
+        }
+
+        $formats = [
+            'Y-m-d H:i:s',
+            'Y-m-d H:i',
+            'd/m/Y H:i:s',
+            'd/m/Y H:i',
+            'd-m-Y H:i:s',
+            'd-m-Y H:i',
+            'Y/m/d H:i:s',
+            'Y/m/d H:i',
+            'd/m/Y h:i:s A',
+            'd/m/Y h:i A',
+            'Y-m-d h:i:s A',
+            'Y-m-d h:i A',
+            'm/d/Y H:i:s',
+            'm/d/Y h:i:s A',
+            'Y-m-d',
+            'd/m/Y',
+            'd-m-Y',
+        ];
+
+        foreach ($formats as $fmt) {
+            try {
+                return \Carbon\Carbon::createFromFormat($fmt, $val);
+            } catch (\Throwable $e) {}
+        }
+
+        try {
+            return \Carbon\Carbon::parse($val);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     public function trackLocation(Request $request)

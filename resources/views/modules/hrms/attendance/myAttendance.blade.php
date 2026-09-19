@@ -548,6 +548,150 @@
         const bootstrapDrawer = bootstrap.Offcanvas.getOrCreateInstance(drawerEl);
         bootstrapDrawer.show();
 
+        if (!window.initNominatimAutocomplete) {
+            window.initNominatimAutocomplete = function(inputEl, onSelectCallback) {
+                if (!inputEl) return;
+                inputEl.setAttribute('autocomplete', 'off');
+
+                let parent = inputEl.parentElement;
+                if (!parent) return;
+
+                if (window.getComputedStyle(parent).position === 'static') {
+                    parent.style.position = 'relative';
+                }
+
+                let dropdown = parent.querySelector('.nominatim-autocomplete-dropdown');
+                if (!dropdown) {
+                    dropdown = document.createElement('div');
+                    dropdown.className = 'nominatim-autocomplete-dropdown shadow border bg-white rounded-2 position-absolute';
+                    parent.appendChild(dropdown);
+                }
+
+                const updateDropdownPosition = () => {
+                    const topPos = (inputEl.offsetTop + inputEl.offsetHeight + 4);
+                    const leftPos = inputEl.offsetLeft;
+                    const widthPos = inputEl.offsetWidth;
+
+                    dropdown.style.cssText = `position: absolute; top: ${topPos}px; left: ${leftPos}px; width: ${widthPos}px; max-height: 160px; overflow-y: auto; z-index: 99999; display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important; background: #ffffff; border-radius: 6px;`;
+                };
+
+                let debounceTimer = null;
+                let selectedIndex = -1;
+                let currentResults = [];
+
+                const closeDropdown = () => {
+                    dropdown.style.display = 'none';
+                    dropdown.innerHTML = '';
+                    selectedIndex = -1;
+                    currentResults = [];
+                };
+
+                const escapeHtml = (str) => {
+                    if (!str) return '';
+                    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+                };
+
+                const renderResults = (results) => {
+                    currentResults = results;
+                    dropdown.innerHTML = '';
+                    selectedIndex = -1;
+                    updateDropdownPosition();
+
+                    if (!results || results.length === 0) {
+                        dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">No locations found</div>';
+                        dropdown.style.display = 'block';
+                        return;
+                    }
+
+                    results.forEach((item, index) => {
+                        const div = document.createElement('div');
+                        div.className = 'p-2 border-bottom cursor-pointer nominatim-item text-truncate d-flex align-items-center gap-2';
+                        div.style.cssText = 'cursor: pointer; transition: background 0.15s ease; border-color: #f1f5f9 !important; background: #ffffff; text-align: left;';
+                        div.innerHTML = `<i class="feather-map-pin text-primary flex-shrink-0" style="font-size: 12px;"></i>
+                                         <div class="text-truncate">
+                                             <div class="fw-semibold text-dark text-truncate" style="font-size: 11px;">${escapeHtml(item.display_name.split(',')[0])}</div>
+                                             <div class="text-muted fs-10 text-truncate">${escapeHtml(item.display_name)}</div>
+                                         </div>`;
+
+                        div.addEventListener('mouseenter', () => { highlightItem(index); });
+                        div.addEventListener('mousedown', (e) => { 
+                            e.preventDefault();
+                            selectItem(index); 
+                        });
+                        dropdown.appendChild(div);
+                    });
+
+                    dropdown.style.display = 'block';
+                };
+
+                const highlightItem = (index) => {
+                    const items = dropdown.querySelectorAll('.nominatim-item');
+                    items.forEach((el, idx) => {
+                        el.style.backgroundColor = (idx === index) ? '#f8f9fa' : '#ffffff';
+                    });
+                    selectedIndex = index;
+                };
+
+                const selectItem = (index) => {
+                    if (index >= 0 && index < currentResults.length) {
+                        const item = currentResults[index];
+                        inputEl.value = item.display_name;
+                        closeDropdown();
+                        if (typeof onSelectCallback === 'function') {
+                            onSelectCallback({
+                                lat: parseFloat(item.lat),
+                                lng: parseFloat(item.lon),
+                                formatted_address: item.display_name
+                            });
+                        }
+                    }
+                };
+
+                inputEl.addEventListener('input', function() {
+                    const query = this.value.trim();
+                    clearTimeout(debounceTimer);
+                    if (query.length < 2) {
+                        closeDropdown();
+                        return;
+                    }
+
+                    debounceTimer = setTimeout(() => {
+                        fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                            .then(res => res.json())
+                            .then(data => renderResults(data))
+                            .catch(err => {
+                                console.error('Nominatim search error:', err);
+                                closeDropdown();
+                            });
+                    }, 300);
+                });
+
+                inputEl.addEventListener('keydown', function(e) {
+                    if (dropdown.style.display === 'none' || currentResults.length === 0) return;
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        highlightItem((selectedIndex + 1) % currentResults.length);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        highlightItem((selectedIndex - 1 + currentResults.length) % currentResults.length);
+                    } else if (e.key === 'Enter') {
+                        if (selectedIndex >= 0) {
+                            e.preventDefault();
+                            selectItem(selectedIndex);
+                        }
+                    } else if (e.key === 'Escape') {
+                        closeDropdown();
+                    }
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (!inputEl.contains(e.target) && !dropdown.contains(e.target)) {
+                        closeDropdown();
+                    }
+                });
+            };
+        }
+
         // Render Google map
         setTimeout(() => {
             if (hasCheckinCoords || hasCheckoutCoords || hasLocationLogs || hasGeofenceCoords) {
@@ -573,18 +717,12 @@
                         streetViewControl: false
                     });
 
-                    // Google Places Autocomplete search logic for details drawer map
+                    // Nominatim Autocomplete search logic for details drawer map (Hybrid OpenStreetMap Search)
                     const searchInput = document.getElementById('detail_drawer_map_search');
-                    if (searchInput) {
-                        const autocomplete = new google.maps.places.Autocomplete(searchInput);
-                        autocomplete.bindTo('bounds', detailDrawerMapObj);
-
-                        autocomplete.addListener('place_changed', function() {
-                            const place = autocomplete.getPlace();
-                            if (!place.geometry || !place.geometry.location) {
-                                return;
-                            }
-                            detailDrawerMapObj.setCenter(place.geometry.location);
+                    if (searchInput && window.initNominatimAutocomplete) {
+                        window.initNominatimAutocomplete(searchInput, function(place) {
+                            const pos = { lat: place.lat, lng: place.lng };
+                            detailDrawerMapObj.setCenter(pos);
                             detailDrawerMapObj.setZoom(15);
                         });
 

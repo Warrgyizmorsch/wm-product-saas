@@ -263,7 +263,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         }
 
         if ($request->hasFile('resume')) {
-            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'public');
+            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'local');
         }
 
         $userIdInput = $validated['user_id'] ?? $request->input('user_id');
@@ -315,9 +315,14 @@ class EmployeeRepository implements EmployeeRepositoryInterface
 
         if ($request->hasFile('resume')) {
             if ($employee->resume_path) {
-                Storage::disk('public')->delete($employee->resume_path);
+                if (Storage::disk('local')->exists($employee->resume_path)) {
+                    Storage::disk('local')->delete($employee->resume_path);
+                }
+                if (Storage::disk('public')->exists($employee->resume_path)) {
+                    Storage::disk('public')->delete($employee->resume_path);
+                }
             }
-            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'public');
+            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'local');
         }
 
         $updated = $employee->update($validated);

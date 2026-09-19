@@ -1437,6 +1437,7 @@
                     'designation_id' => $convertOffer->offered_designation_id,
                     'date_of_joining' => optional($convertOffer->joining_date)->format('Y-m-d'),
                     'resume_path' => $candObj?->resume_path,
+                    'candidate_id' => $candObj?->id,
                 ] : null;
             @endphp
 
@@ -1455,7 +1456,10 @@
                 if (convertOfferData.date_of_joining && $('#create_date_of_joining').length) $('#create_date_of_joining').val(convertOfferData.date_of_joining);
                 if (convertOfferData.resume_path && $('#create_existing_resume_path').length) {
                     $('#create_existing_resume_path').val(convertOfferData.resume_path);
-                    $('#create_resume_preview_link').attr('href', '{{ asset("storage") }}/' + convertOfferData.resume_path);
+                    const resumeUrl = convertOfferData.candidate_id 
+                        ? '{{ route("hrms.recruitment.candidates.download-resume", ":candId") }}'.replace(':candId', convertOfferData.candidate_id)
+                        : '{{ asset("storage") }}/' + convertOfferData.resume_path;
+                    $('#create_resume_preview_link').attr('href', resumeUrl);
                     $('#create_resume_preview_container').removeClass('d-none');
                 }
 

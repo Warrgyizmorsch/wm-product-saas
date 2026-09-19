@@ -37,6 +37,10 @@
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addPolicyModal" class="fw-bold text-uppercase">
             New Policy
         </x-ui.button>
+    @elseif($activeTab === 'workflows')
+        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addWorkflowModal" class="fw-bold text-uppercase">
+            New Workflow
+        </x-ui.button>
     @else
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addCategoryModal" class="fw-bold text-uppercase">
             Add Category
@@ -65,6 +69,12 @@
             <a class="nav-link {{ $activeTab === 'categories' ? 'active' : 'text-muted' }}" 
                href="{{ route('hrms.expense-policy.index', ['tab' => 'categories']) }}">
                 <i class="feather-tag me-1"></i> Expense Categories
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {{ $activeTab === 'workflows' ? 'active' : 'text-muted' }}" 
+               href="{{ route('hrms.expense-policy.index', ['tab' => 'workflows']) }}">
+                <i class="feather-shield me-1"></i> Approval Workflows
             </a>
         </li>
         <li class="nav-item">
@@ -254,6 +264,10 @@
                                             data-business-unit-id="{{ $policy->business_unit_id }}"
                                             data-branch-id="{{ $policy->branch_id }}"
                                             data-status="{{ $policy->status ? 1 : 0 }}"
+                                            data-approval-type="{{ $policy->approval_type ?? '1_level' }}"
+                                            data-first-approver="{{ $policy->first_approver ?? 'reporting_manager' }}"
+                                            data-second-approver="{{ $policy->second_approver ?? 'finance_manager' }}"
+                                            data-amount-threshold="{{ $policy->amount_threshold_for_2_level ?? '' }}"
                                             data-bs-toggle="modal"
                                             data-bs-target="#editPolicyModal"
                                         />
@@ -272,7 +286,192 @@
         @endif
 
     {{-- ══════════════════════════════════════════════════════════════════════
-         TAB 2: EXPENSE CATEGORIES
+         TAB 2: APPROVAL WORKFLOWS
+         ══════════════════════════════════════════════════════════════════════ --}}
+    @elseif($activeTab === 'workflows')
+        {{-- Info banner --}}
+        <div class="alert bg-soft-info border-0 rounded-3 p-3 mb-4 fs-13 text-info">
+            <i class="feather-shield me-2"></i>
+            <strong>Approval Workflow Engine:</strong> Define approval hierarchies independently of expense policies. Set 1-Level or 2-Level approval requirements, select approver roles (Reporting Manager, Department Head, HR Admin, Finance Manager), and set optional amount thresholds for automatic 2-level escalation.
+        </div>
+
+        {{-- Toolbar --}}
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+            {{-- Heading & Active Badges --}}
+            <div class="d-flex align-items-center gap-3">
+                <h5 class="fw-bold text-dark mb-0 fs-15">Approval Workflows</h5>
+                @if($workflowFilters['search'] || $workflowFilters['status'] !== '')
+                    <div class="d-flex align-items-center gap-2">
+                        @if($workflowFilters['search'])
+                            <span class="badge bg-soft-primary text-primary px-2 py-1 fs-11 rounded-pill"><i class="feather-search me-1"></i>{{ $workflowFilters['search'] }}</span>
+                        @endif
+                        @if($workflowFilters['status'] !== '')
+                            <span class="badge bg-soft-secondary text-secondary px-2 py-1 fs-11 rounded-pill">Status: {{ $workflowFilters['status'] === '1' ? 'Active' : 'Inactive' }}</span>
+                        @endif
+                        <a href="{{ route('hrms.expense-policy.index', ['tab' => 'workflows']) }}" class="text-danger fs-12 fw-semibold"><i class="feather-x"></i> Clear</a>
+                    </div>
+                @endif
+            </div>
+
+            {{-- Actions (Search, Sort, Filter) --}}
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                {{-- Search --}}
+                <form method="GET" action="{{ route('hrms.expense-policy.index') }}" id="workflowSearchForm" 
+                      class="d-flex align-items-center border rounded px-3 py-1 m-0" 
+                      style="background-color: #f1f5f9; min-width: 220px; height: 38px;">
+                    <input type="hidden" name="tab"             value="workflows">
+                    <input type="hidden" name="wf_sort"         value="{{ $workflowFilters['sort'] }}">
+                    <input type="hidden" name="wf_status"       value="{{ $workflowFilters['status'] }}">
+                    <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                    <input type="text" name="wf_search" class="form-control border-0 bg-transparent p-0 fs-13 text-dark" placeholder="Search workflows..." value="{{ $workflowFilters['search'] }}" style="box-shadow:none; outline:none; height:32px;">
+                </form>
+
+                {{-- Sort --}}
+                <x-ui.sort-dropdown label="Sort">
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $workflowFilters['sort'] === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['wf_sort' => 'name_asc', 'tab' => 'workflows']) }}">
+                        <span>Name A → Z</span>
+                        @if($workflowFilters['sort'] === 'name_asc') <i class="feather-check ms-3"></i> @endif
+                    </a>
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $workflowFilters['sort'] === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['wf_sort' => 'name_desc', 'tab' => 'workflows']) }}">
+                        <span>Name Z → A</span>
+                        @if($workflowFilters['sort'] === 'name_desc') <i class="feather-check ms-3"></i> @endif
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $workflowFilters['sort'] === 'newest' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['wf_sort' => 'newest', 'tab' => 'workflows']) }}">
+                        <span>Newest First</span>
+                        @if($workflowFilters['sort'] === 'newest') <i class="feather-check ms-3"></i> @endif
+                    </a>
+                </x-ui.sort-dropdown>
+
+                {{-- Filter --}}
+                <x-ui.filter label="Filter">
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                    <form method="GET" action="{{ route('hrms.expense-policy.index') }}" id="workflowFilterForm">
+                        <input type="hidden" name="tab"       value="workflows">
+                        <input type="hidden" name="wf_search" value="{{ $workflowFilters['search'] }}">
+                        <input type="hidden" name="wf_sort"   value="{{ $workflowFilters['sort'] }}">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <x-ui.odoo-form-ui type="select" name="wf_status" id="wf_filter_status">
+                                <option value="">All Statuses</option>
+                                <option value="1" @selected($workflowFilters['status'] === '1')>Active</option>
+                                <option value="0" @selected($workflowFilters['status'] === '0')>Inactive</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="dropdown-divider my-3"></div>
+                        <div class="d-flex gap-2">
+                            <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply Filters</x-ui.button>
+                            <a href="{{ route('hrms.expense-policy.index', ['tab' => 'workflows']) }}" class="btn btn-sm btn-light border flex-grow-1 d-flex align-items-center justify-content-center" style="font-size: 12px; font-weight: 500;">Reset</a>
+                        </div>
+                    </form>
+                </x-ui.filter>
+            </div>
+        </div>
+
+        {{-- Workflows Cards List --}}
+        @if($workflowsList->isEmpty())
+            <div class="text-center text-muted py-5 border rounded bg-light">
+                <i class="feather-shield fs-24 d-block mb-2 text-secondary"></i>
+                <p class="mb-1 fw-medium text-dark">No approval workflows configured yet.</p>
+                <span class="fs-12">Click <strong>New Workflow</strong> to set up custom multi-level approvals for departments, designations, or company-wide.</span>
+            </div>
+        @else
+            <div class="row g-3">
+                @foreach($workflowsList as $wf)
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 border shadow-none hover-shadow transition-all">
+                            <div class="card-body p-3 d-flex flex-column justify-content-between">
+                                <div>
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="fw-bold text-dark mb-0 fs-14">
+                                            {{ $wf->name }}
+                                            @if($wf->is_default)
+                                                <span class="badge bg-soft-warning text-warning ms-1 fs-10 rounded-pill">Default</span>
+                                            @endif
+                                        </h6>
+                                        <x-ui.badge variant="{{ $wf->status ? 'success' : 'danger' }}" soft class="px-2 py-1 fs-11 rounded-pill">
+                                            {{ $wf->status ? 'Active' : 'Inactive' }}
+                                        </x-ui.badge>
+                                    </div>
+                                    <p class="text-muted fs-12 mb-3">{{ $wf->description ?: 'No description provided.' }}</p>
+
+                                    <div class="bg-light p-2 rounded mb-3 fs-12">
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span class="text-muted">Approval Hierarchy:</span>
+                                            <span class="fw-semibold text-primary">
+                                                {{ $wf->approval_type === '2_level' ? '2-Level Approval' : '1-Level Approval' }}
+                                            </span>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span class="text-muted">1st Level Approver:</span>
+                                            <span class="fw-semibold text-dark text-capitalize">
+                                                {{ str_replace('_', ' ', $wf->first_approver ?? 'reporting_manager') }}
+                                            </span>
+                                        </div>
+                                        @if($wf->approval_type === '2_level' || $wf->amount_threshold_for_2_level)
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span class="text-muted">2nd Level Approver:</span>
+                                                <span class="fw-semibold text-dark text-capitalize">
+                                                    {{ str_replace('_', ' ', $wf->second_approver ?? 'finance_manager') }}
+                                                </span>
+                                            </div>
+                                        @endif
+                                        @if($wf->amount_threshold_for_2_level)
+                                            <div class="d-flex justify-content-between">
+                                                <span class="text-muted">Auto Escalation Threshold:</span>
+                                                <span class="fw-bold text-warning">
+                                                    > ₹{{ number_format($wf->amount_threshold_for_2_level, 2) }}
+                                                </span>
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    <div class="fs-12 text-muted">
+                                        <i class="feather-tag me-1"></i>
+                                        @if($wf->designation)
+                                            Designation: <strong>{{ $wf->designation->name }}</strong>
+                                        @elseif($wf->department)
+                                            Department: <strong>{{ $wf->department->name }}</strong>
+                                        @elseif($wf->company)
+                                            Company: <strong>{{ $wf->company->company_name }}</strong>
+                                        @else
+                                            Scope: <strong>Global System Default</strong>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="border-top pt-2 mt-3 d-flex justify-content-end gap-2">
+                                    <x-ui.icon-btn type="button" variant="soft-primary" size="sm" class="btn-edit-workflow" icon="feather-edit-3"
+                                        title="Edit Workflow"
+                                        data-id="{{ $wf->id }}"
+                                        data-name="{{ $wf->name }}"
+                                        data-description="{{ $wf->description }}"
+                                        data-designation-id="{{ $wf->designation_id }}"
+                                        data-department-id="{{ $wf->department_id }}"
+                                        data-company-id="{{ $wf->company_id }}"
+                                        data-approval-type="{{ $wf->approval_type }}"
+                                        data-first-approver="{{ $wf->first_approver }}"
+                                        data-second-approver="{{ $wf->second_approver }}"
+                                        data-amount-threshold="{{ $wf->amount_threshold_for_2_level }}"
+                                        data-is-default="{{ $wf->is_default ? 1 : 0 }}"
+                                        data-status="{{ $wf->status ? 1 : 0 }}"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#editWorkflowModal"
+                                    />
+                                    <form method="POST" action="{{ route('hrms.expense-policy.workflows.destroy', $wf) }}" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this approval workflow?', { title: 'Delete Workflow', variant: 'danger', confirmButtonText: 'Delete' });" class="m-0 d-flex">
+                                        @csrf @method('DELETE')
+                                        <x-ui.icon-btn type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" title="Delete Workflow" />
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
+    {{-- ══════════════════════════════════════════════════════════════════════
+         TAB 3: EXPENSE CATEGORIES
          ══════════════════════════════════════════════════════════════════════ --}}
     @else
         {{-- Toolbar --}}
@@ -455,6 +654,27 @@
                 <option value="{{ $d->id }}">{{ $d->name }}</option>
             @endforeach
         </x-ui.odoo-form-ui>
+        <div class="p-3 bg-light rounded border my-1">
+            <h6 class="fw-bold text-dark fs-12 mb-2"><i class="feather-shield text-primary me-1"></i> Approval Workflow Configuration</h6>
+            <div class="d-flex flex-column gap-2">
+                <x-ui.odoo-form-ui type="select" label="Workflow Mode" name="approval_type" id="add_approval_type" select2-selector="default">
+                    <option value="1_level" selected>1-Level Approval (Standard)</option>
+                    <option value="2_level">2-Level Approval (Dual Level)</option>
+                    <option value="conditional_threshold">Conditional 2-Level (Amount Threshold)</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="select" label="Level 1 Approver Role" name="first_approver" id="add_first_approver" select2-selector="default">
+                    <option value="reporting_manager" selected>Reporting Manager (Direct Supervisor)</option>
+                    <option value="department_head">Department Head (HOD)</option>
+                    <option value="hr_admin">HR Admin / System Admin</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="select" label="Level 2 Approver Role" name="second_approver" id="add_second_approver" select2-selector="default">
+                    <option value="finance_manager" selected>Finance / Accounts Manager</option>
+                    <option value="hr_admin">HR Admin / System Admin</option>
+                    <option value="department_head">Department Head (HOD)</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="input" label="Threshold Amount for 2-Level (₹ / $)" name="amount_threshold_for_2_level" id="add_amount_threshold" placeholder="e.g. 15000 (Triggers 2-level if claim > threshold)" />
+            </div>
+        </div>
         <x-ui.odoo-form-ui type="select" label="Status" name="status" id="add_status" select2-selector="default">
             <option value="1" selected>Active</option>
             <option value="0">Inactive</option>
@@ -498,6 +718,27 @@
                 <option value="{{ $d->id }}">{{ $d->name }}</option>
             @endforeach
         </x-ui.odoo-form-ui>
+        <div class="p-3 bg-light rounded border my-1">
+            <h6 class="fw-bold text-dark fs-12 mb-2"><i class="feather-shield text-primary me-1"></i> Approval Workflow Configuration</h6>
+            <div class="d-flex flex-column gap-2">
+                <x-ui.odoo-form-ui type="select" label="Workflow Mode" name="approval_type" id="edit_approval_type" select2-selector="default">
+                    <option value="1_level">1-Level Approval (Standard)</option>
+                    <option value="2_level">2-Level Approval (Dual Level)</option>
+                    <option value="conditional_threshold">Conditional 2-Level (Amount Threshold)</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="select" label="Level 1 Approver Role" name="first_approver" id="edit_first_approver" select2-selector="default">
+                    <option value="reporting_manager">Reporting Manager (Direct Supervisor)</option>
+                    <option value="department_head">Department Head (HOD)</option>
+                    <option value="hr_admin">HR Admin / System Admin</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="select" label="Level 2 Approver Role" name="second_approver" id="edit_second_approver" select2-selector="default">
+                    <option value="finance_manager">Finance / Accounts Manager</option>
+                    <option value="hr_admin">HR Admin / System Admin</option>
+                    <option value="department_head">Department Head (HOD)</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="input" label="Threshold Amount for 2-Level (₹ / $)" name="amount_threshold_for_2_level" id="edit_amount_threshold" placeholder="e.g. 15000" />
+            </div>
+        </div>
         <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_status" select2-selector="default">
             <option value="1">Active</option>
             <option value="0">Inactive</option>
@@ -527,6 +768,133 @@
         <x-ui.odoo-form-ui type="input" label="Category Name" name="name" id="edit_cat_name" :required="true" />
         <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_cat_desc" rows="3" />
         <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_cat_status" select2-selector="default">
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
+        </x-ui.odoo-form-ui>
+    </div>
+</x-ui.modal>
+
+{{-- Modal 5: Add Approval Workflow --}}
+<x-ui.modal id="addWorkflowModal" title='<i class="feather-shield me-2 text-primary"></i>New Approval Workflow'
+    centered formAction="{{ route('hrms.expense-policy.workflows.store') }}" formMethod="POST"
+    submitText="Create Workflow" closeText="Cancel">
+    <div class="d-flex flex-column gap-3">
+        <x-ui.odoo-form-ui type="input" label="Workflow Name" name="name" id="wf_add_name" placeholder="e.g. Standard Travel Approval Workflow" :required="true" />
+        <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="wf_add_desc" placeholder="Brief description..." rows="2" />
+        
+        <x-ui.odoo-form-ui type="select" label="Company Scope" name="company_id" id="wf_add_company" select2-selector="default">
+            <option value="">All Companies (Global)</option>
+            @foreach($companies as $c)
+                <option value="{{ $c->id }}">{{ $c->company_name }}</option>
+            @endforeach
+        </x-ui.odoo-form-ui>
+
+        <x-ui.odoo-form-ui type="select" label="Assign to Department" name="department_id" id="wf_add_department" select2-selector="default">
+            <option value="">All Departments</option>
+            @foreach($departments as $dept)
+                <option value="{{ $dept->id }}">{{ $dept->name }}</option>
+            @endforeach
+        </x-ui.odoo-form-ui>
+
+        <x-ui.odoo-form-ui type="select" label="Assign to Designation" name="designation_id" id="wf_add_designation" select2-selector="default">
+            <option value="">All Designations</option>
+            @foreach($designations as $d)
+                <option value="{{ $d->id }}">{{ $d->name }}</option>
+            @endforeach
+        </x-ui.odoo-form-ui>
+
+        <div class="p-3 bg-light rounded border my-1">
+            <h6 class="fw-bold text-dark fs-12 mb-2"><i class="feather-layers text-primary me-1"></i> Approval Workflow Configuration</h6>
+            <div class="d-flex flex-column gap-2">
+                <x-ui.odoo-form-ui type="select" label="Workflow Mode" name="approval_type" id="wf_add_approval_type" select2-selector="default">
+                    <option value="1_level" selected>1-Level Approval (Standard)</option>
+                    <option value="2_level">2-Level Approval (Dual Level)</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="select" label="Level 1 Approver Role" name="first_approver" id="wf_add_first_approver" select2-selector="default">
+                    <option value="reporting_manager" selected>Reporting Manager (Direct Supervisor)</option>
+                    <option value="department_head">Department Head (HOD)</option>
+                    <option value="hr_admin">HR Admin / System Admin</option>
+                    <option value="finance_manager">Finance / Accounts Manager</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="select" label="Level 2 Approver Role" name="second_approver" id="wf_add_second_approver" select2-selector="default">
+                    <option value="finance_manager" selected>Finance / Accounts Manager</option>
+                    <option value="hr_admin">HR Admin / System Admin</option>
+                    <option value="department_head">Department Head (HOD)</option>
+                    <option value="reporting_manager">Reporting Manager (Direct Supervisor)</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="input" label="Threshold Amount for 2-Level (₹ / $)" name="amount_threshold_for_2_level" id="wf_add_threshold" placeholder="e.g. 5000 (Triggers 2-level if claim > threshold)" />
+            </div>
+        </div>
+
+        <x-ui.odoo-form-ui type="select" label="Set as Default Workflow" name="is_default" id="wf_add_is_default" select2-selector="default">
+            <option value="0" selected>No (Scope-specific Workflow)</option>
+            <option value="1">Yes (System-wide Default Workflow)</option>
+        </x-ui.odoo-form-ui>
+
+        <x-ui.odoo-form-ui type="select" label="Status" name="status" id="wf_add_status" select2-selector="default">
+            <option value="1" selected>Active</option>
+            <option value="0">Inactive</option>
+        </x-ui.odoo-form-ui>
+    </div>
+</x-ui.modal>
+
+{{-- Modal 6: Edit Approval Workflow --}}
+<x-ui.modal id="editWorkflowModal" title='<i class="feather-shield me-2 text-primary"></i>Edit Approval Workflow'
+    centered formAction="#" formMethod="PUT" submitText="Update Workflow" closeText="Cancel">
+    <div class="d-flex flex-column gap-3">
+        <x-ui.odoo-form-ui type="input" label="Workflow Name" name="name" id="wf_edit_name" :required="true" />
+        <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="wf_edit_desc" rows="2" />
+        
+        <x-ui.odoo-form-ui type="select" label="Company Scope" name="company_id" id="wf_edit_company" select2-selector="default">
+            <option value="">All Companies (Global)</option>
+            @foreach($companies as $c)
+                <option value="{{ $c->id }}">{{ $c->company_name }}</option>
+            @endforeach
+        </x-ui.odoo-form-ui>
+
+        <x-ui.odoo-form-ui type="select" label="Assign to Department" name="department_id" id="wf_edit_department" select2-selector="default">
+            <option value="">All Departments</option>
+            @foreach($departments as $dept)
+                <option value="{{ $dept->id }}">{{ $dept->name }}</option>
+            @endforeach
+        </x-ui.odoo-form-ui>
+
+        <x-ui.odoo-form-ui type="select" label="Assign to Designation" name="designation_id" id="wf_edit_designation" select2-selector="default">
+            <option value="">All Designations</option>
+            @foreach($designations as $d)
+                <option value="{{ $d->id }}">{{ $d->name }}</option>
+            @endforeach
+        </x-ui.odoo-form-ui>
+
+        <div class="p-3 bg-light rounded border my-1">
+            <h6 class="fw-bold text-dark fs-12 mb-2"><i class="feather-layers text-primary me-1"></i> Approval Workflow Configuration</h6>
+            <div class="d-flex flex-column gap-2">
+                <x-ui.odoo-form-ui type="select" label="Workflow Mode" name="approval_type" id="wf_edit_approval_type" select2-selector="default">
+                    <option value="1_level">1-Level Approval (Standard)</option>
+                    <option value="2_level">2-Level Approval (Dual Level)</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="select" label="Level 1 Approver Role" name="first_approver" id="wf_edit_first_approver" select2-selector="default">
+                    <option value="reporting_manager">Reporting Manager (Direct Supervisor)</option>
+                    <option value="department_head">Department Head (HOD)</option>
+                    <option value="hr_admin">HR Admin / System Admin</option>
+                    <option value="finance_manager">Finance / Accounts Manager</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="select" label="Level 2 Approver Role" name="second_approver" id="wf_edit_second_approver" select2-selector="default">
+                    <option value="finance_manager">Finance / Accounts Manager</option>
+                    <option value="hr_admin">HR Admin / System Admin</option>
+                    <option value="department_head">Department Head (HOD)</option>
+                    <option value="reporting_manager">Reporting Manager (Direct Supervisor)</option>
+                </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui type="input" label="Threshold Amount for 2-Level (₹ / $)" name="amount_threshold_for_2_level" id="wf_edit_threshold" placeholder="e.g. 5000" />
+            </div>
+        </div>
+
+        <x-ui.odoo-form-ui type="select" label="Set as Default Workflow" name="is_default" id="wf_edit_is_default" select2-selector="default">
+            <option value="0">No (Scope-specific Workflow)</option>
+            <option value="1">Yes (System-wide Default Workflow)</option>
+        </x-ui.odoo-form-ui>
+
+        <x-ui.odoo-form-ui type="select" label="Status" name="status" id="wf_edit_status" select2-selector="default">
             <option value="1">Active</option>
             <option value="0">Inactive</option>
         </x-ui.odoo-form-ui>
@@ -790,12 +1158,22 @@ document.addEventListener('DOMContentLoaded', function () {
         var buId         = this.getAttribute('data-business-unit-id');
         var branchId     = this.getAttribute('data-branch-id');
         var status       = this.getAttribute('data-status');
+        var approvalType = this.getAttribute('data-approval-type');
+        var firstAppr    = this.getAttribute('data-first-approver');
+        var secondAppr   = this.getAttribute('data-second-approver');
+        var threshold    = this.getAttribute('data-amount-threshold');
 
         var form = document.querySelector('#editPolicyModal form');
         if (form) form.action = '{{ url('hrms/expense-policy') }}/' + id;
 
         document.getElementById('edit_name').value = name || '';
         document.getElementById('edit_desc').value = description || '';
+
+        $('#edit_approval_type').val(approvalType || '1_level').trigger('change.select2');
+        $('#edit_first_approver').val(firstAppr || 'reporting_manager').trigger('change.select2');
+        $('#edit_second_approver').val(secondAppr || 'finance_manager').trigger('change.select2');
+        var thresholdInput = document.getElementById('edit_amount_threshold');
+        if (thresholdInput) thresholdInput.value = threshold || '';
 
         // Populate cascading fields sequentially to ensure correct options filtering
         $('#edit_company').val(companyId || '').trigger('change.select2');
@@ -839,6 +1217,26 @@ document.addEventListener('DOMContentLoaded', function () {
             statusSelect.value = parseInt(status) === 1 ? '1' : '0';
             if (window.$ && $(statusSelect).hasClass('select2-hidden-accessible')) $(statusSelect).trigger('change.select2');
         }
+    });
+
+    // 6. Populate Workflow Edit Modal (using delegation)
+    $(document).on('click', '.btn-edit-workflow', function() {
+        var btn = $(this);
+        var id = btn.data('id');
+        var formAction = "{{ url('hrms/expense-policy/workflows') }}/" + id;
+        
+        $('#editWorkflowModal form').attr('action', formAction);
+        $('#wf_edit_name').val(btn.data('name'));
+        $('#wf_edit_desc').val(btn.data('description'));
+        $('#wf_edit_designation').val(btn.data('designation-id')).trigger('change.select2');
+        $('#wf_edit_department').val(btn.data('department-id')).trigger('change.select2');
+        $('#wf_edit_company').val(btn.data('company-id')).trigger('change.select2');
+        $('#wf_edit_approval_type').val(btn.data('approval-type') || '1_level').trigger('change.select2');
+        $('#wf_edit_first_approver').val(btn.data('first-approver') || 'reporting_manager').trigger('change.select2');
+        $('#wf_edit_second_approver').val(btn.data('second-approver') || 'finance_manager').trigger('change.select2');
+        $('#wf_edit_threshold').val(btn.data('amount-threshold') || '');
+        $('#wf_edit_is_default').val(btn.data('is-default') == 1 ? '1' : '0').trigger('change.select2');
+        $('#wf_edit_status').val(btn.data('status') == 1 ? '1' : '0').trigger('change.select2');
     });
 });
 </script>

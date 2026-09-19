@@ -1332,10 +1332,8 @@
                     <div class="bg-light border rounded-3 p-3">
                         <h6 class="fw-bold text-dark fs-12 mb-1"><i class="feather-info text-primary me-1"></i>Import Notes:</h6>
                         <ul class="text-muted fs-11 ps-3 mb-0" style="line-height: 1.5;">
-                            <li>Columns required: <code>employee_code</code>, <code>date</code></li>
-                            <li>Columns optional: <code>check_in</code>, <code>check_out</code>, <code>status</code></li>
-                            <li>Status values: <code>auto</code>, <code>present</code>, <code>absent</code>, <code>half_day</code>, <code>on_leave</code>, <code>wfh</code>, <code>weekly_off</code>, <code>holiday</code></li>
-                            <li>Set status to <code>auto</code> to auto-calculate penalties, grace shifts, leaves, and WFH logs automatically.</li>
+                            <li>Columns required: <code>employee_code</code>, <code>punch_datetime</code> (raw biometric combined timestamp format)</li>
+                            <li>Status, shift penalties, approved leaves, WFH logs, and total work hours are auto-calculated automatically upon import.</li>
                         </ul>
                     </div>
                 </div>
