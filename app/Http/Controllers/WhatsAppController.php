@@ -27,11 +27,7 @@ class WhatsAppController extends Controller
             ->take(50)
             ->get();
 
-        if (view()->exists('modules.platform.whatsapp_settings.index')) {
-            return view('modules.platform.whatsapp_settings.index', compact('config', 'status', 'messages'));
-        }
-
-        return view('modules.crm.whatsapp_settings.index', compact('config', 'status', 'messages'));
+        return view('modules.platform.whatsapp_settings.index', compact('config', 'status', 'messages'));
     }
 
     public function messages(): JsonResponse

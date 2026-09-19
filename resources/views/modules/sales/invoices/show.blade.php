@@ -17,15 +17,15 @@
         </a>
 
         @if ($invoice->status === 'Draft')
-            <form action="{{ route('sales.invoices.send', $invoice->id) }}" method="POST" class="d-inline">
+            <form action="{{ route('sales.invoices.post', $invoice->id) }}" method="POST" class="d-inline">
                 @csrf
                 <button type="submit" class="btn btn-sm btn-primary fw-bold px-3">
-                    <i class="feather-send me-1.5"></i>{{ __('crm.mark_as_sent') }}
+                    <i class="feather-check-circle me-1.5"></i>{{ __('crm.mark_as_post') }}
                 </button>
             </form>
         @endif
 
-        @if (in_array($invoice->status, ['Sent', 'Partially Paid', 'Posted', 'Draft']))
+        @if (in_array($invoice->status, ['Posted', 'Partially Paid']) && $invoice->balance_due > 0)
             <a href="{{ route('sales.payments.create', ['invoice_id' => $invoice->id, 'customer_id' => $invoice->customer_id ?: $invoice->salesOrder?->customer_id]) }}" class="btn btn-sm btn-success fw-bold px-3">
                 <i class="feather-dollar-sign me-1.5"></i>{{ __('crm.register_payment') }}
             </a>
@@ -81,8 +81,11 @@
         .ribbon-partially-paid {
             background-color: #d97706;
         }
+        .ribbon-posted {
+            background-color: #2563eb;
+        }
         .ribbon-sent {
-            background-color: #16a34a;
+            background-color: #2563eb;
         }
         .ribbon-draft {
             background-color: #64748b;
@@ -374,7 +377,8 @@
                         $ribbonClass = match($invoice->status) {
                             'Paid' => 'ribbon-paid',
                             'Partially Paid' => 'ribbon-partially-paid',
-                            'Sent' => 'ribbon-sent',
+                            'Posted' => 'ribbon-posted',
+                            'Sent' => 'ribbon-posted',
                             'Cancelled' => 'ribbon-cancelled',
                             default => 'ribbon-draft',
                         };
@@ -382,7 +386,8 @@
                         $statusLabel = match($invoice->status) {
                             'Paid' => __('crm.status_paid'),
                             'Partially Paid' => __('crm.status_partially_paid'),
-                            'Sent' => __('crm.status_sent'),
+                            'Posted' => __('crm.status_posted'),
+                            'Sent' => __('crm.status_posted'),
                             'Cancelled' => __('crm.status_cancelled'),
                             default => __('crm.status_draft'),
                         };

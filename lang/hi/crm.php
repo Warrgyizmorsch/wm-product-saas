@@ -1861,6 +1861,10 @@ return array (
   'status_converted' => 'कन्वर्टेड (Converted)',
   'status_rejected' => 'अस्वीकृत (Rejected)',
   'status_quotation_rework' => 'कोटेशन पुनः कार्य',
+  'status_posted' => 'पोस्ट किया गया (Posted)',
+  'mark_as_post' => 'पोस्ट करें',
+  'mark_as_posted' => 'पोस्ट करें',
+  'post_invoice' => 'इनवॉइस पोस्ट करें',
 );
 
 

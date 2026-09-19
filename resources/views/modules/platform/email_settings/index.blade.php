@@ -135,7 +135,7 @@
             <x-ui.modal-form-ui type="select" label="Scope to Company" name="company_id">
                 <option value="">All Companies (Global Default)</option>
                 @foreach($companies as $comp)
-                    <option value="{{ $comp->id }}" {{ $companyId == $comp->id ? 'selected' : '' }}>{{ $comp->name }}</option>
+                    <option value="{{ $comp->id }}" {{ $companyId == $comp->id ? 'selected' : '' }}>{{ $comp->company_name ?: ($comp->name ?: $comp->legal_name) }}</option>
                 @endforeach
             </x-ui.modal-form-ui>
         </div>

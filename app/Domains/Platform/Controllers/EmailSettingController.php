@@ -35,11 +35,7 @@ class EmailSettingController extends Controller
             ? \App\Domains\HRMS\Models\Branch::where('company_id', $companyId)->get()
             : \App\Domains\HRMS\Models\Branch::where('tenant_id', $tenantId)->get();
 
-        if (view()->exists('modules.platform.email_settings.index')) {
-            return view('modules.platform.email_settings.index', compact('accounts', 'companies', 'branches', 'tenantId', 'companyId', 'branchId'));
-        }
-
-        return view('modules.crm.email_settings.index', compact('accounts', 'companies', 'branches', 'tenantId', 'companyId', 'branchId'));
+        return view('modules.platform.email_settings.index', compact('accounts', 'companies', 'branches', 'tenantId', 'companyId', 'branchId'));
     }
 
     public function store(Request $request): RedirectResponse

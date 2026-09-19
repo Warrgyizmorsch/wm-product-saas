@@ -74,7 +74,7 @@
                             <x-ui.odoo-form-ui type="select" name="status">
                                 <option value="">{{ __('crm.all_statuses') }}</option>
                                 <option value="Draft" {{ request('status') === 'Draft' ? 'selected' : '' }}>{{ __('crm.status_draft') }}</option>
-                                <option value="Sent" {{ request('status') === 'Sent' ? 'selected' : '' }}>{{ __('crm.status_sent') }}</option>
+                                <option value="Posted" {{ request('status') === 'Posted' ? 'selected' : '' }}>{{ __('crm.status_posted') }}</option>
                                 <option value="Partially Paid" {{ request('status') === 'Partially Paid' ? 'selected' : '' }}>{{ __('crm.status_partially_paid') }}</option>
                                 <option value="Paid" {{ request('status') === 'Paid' ? 'selected' : '' }}>{{ __('crm.status_paid') }}</option>
                                 <option value="Cancelled" {{ request('status') === 'Cancelled' ? 'selected' : '' }}>{{ __('crm.status_cancelled') }}</option>
@@ -127,7 +127,7 @@
                             $badgeClass = 'bg-soft-secondary text-secondary';
                             if ($inv->status == 'Paid') $badgeClass = 'bg-soft-success text-success';
                             elseif ($inv->status == 'Partially Paid') $badgeClass = 'bg-soft-warning text-warning';
-                            elseif ($inv->status == 'Sent') $badgeClass = 'bg-soft-info text-info';
+                            elseif ($inv->status == 'Posted' || $inv->status == 'Sent') $badgeClass = 'bg-soft-primary text-primary';
                             elseif ($inv->status == 'Cancelled') $badgeClass = 'bg-soft-danger text-danger';
 
                             $custName = $inv->customer?->name ?? $inv->salesOrder?->customer?->name ?? '—';
@@ -135,7 +135,8 @@
 
                             $statusLabel = match($inv->status) {
                                 'Draft' => __('crm.status_draft'),
-                                'Sent' => __('crm.status_sent'),
+                                'Posted' => __('crm.status_posted'),
+                                'Sent' => __('crm.status_posted'),
                                 'Partially Paid' => __('crm.status_partially_paid'),
                                 'Paid' => __('crm.status_paid'),
                                 'Cancelled' => __('crm.status_cancelled'),
@@ -198,10 +199,10 @@
                             <td class="text-end pe-4">
                                 <div class="hstack gap-2 justify-content-end">
                                     @if ($inv->status === 'Draft')
-                                        <form action="{{ route('sales.invoices.send', $inv->id) }}" method="POST" class="d-inline">
+                                        <form action="{{ route('sales.invoices.post', $inv->id) }}" method="POST" class="d-inline">
                                             @csrf
-                                            <button type="submit" class="action-dropdown-btn" title="{{ __('crm.mark_as_sent') }}" data-bs-toggle="tooltip">
-                                                <i class="feather-send fs-13"></i>
+                                            <button type="submit" class="action-dropdown-btn" title="{{ __('crm.mark_as_post') }}" data-bs-toggle="tooltip">
+                                                <i class="feather-check-circle fs-13 text-primary"></i>
                                             </button>
                                         </form>
                                     @endif
@@ -209,15 +210,15 @@
                                     <x-ui.action-dropdown :viewUrl="route('sales.invoices.show', $inv->id)">
                                         @if ($inv->status === 'Draft')
                                             <li>
-                                                <form action="{{ route('sales.invoices.send', $inv->id) }}" method="POST" class="d-inline">
+                                                <form action="{{ route('sales.invoices.post', $inv->id) }}" method="POST" class="d-inline">
                                                     @csrf
-                                                    <button type="submit" class="dropdown-item fw-semibold border-0 bg-transparent w-100 text-start">
-                                                        <i class="feather-send me-2 text-muted fs-12"></i>{{ __('crm.mark_as_sent') }}
+                                                    <button type="submit" class="dropdown-item fw-semibold border-0 bg-transparent w-100 text-start text-primary">
+                                                        <i class="feather-check-circle me-2 text-primary fs-12"></i>{{ __('crm.mark_as_post') }}
                                                     </button>
                                                 </form>
                                             </li>
                                         @endif
-                                        @if ($inv->status !== 'Paid' && $inv->status !== 'Cancelled')
+                                        @if (in_array($inv->status, ['Posted', 'Partially Paid']) && $inv->balance_due > 0)
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
                                                 <a href="{{ route('sales.payments.create', ['invoice_id' => $inv->id, 'customer_id' => $inv->customer_id ?: $inv->salesOrder?->customer_id]) }}" class="dropdown-item text-success fw-semibold">

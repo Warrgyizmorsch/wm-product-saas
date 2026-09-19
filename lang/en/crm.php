@@ -1864,6 +1864,10 @@ return array (
   'status_converted' => 'Converted',
   'status_rejected' => 'Rejected',
   'status_quotation_rework' => 'Quotation Rework',
+  'status_posted' => 'Posted',
+  'mark_as_post' => 'Mark as Post',
+  'mark_as_posted' => 'Mark as Post',
+  'post_invoice' => 'Post Invoice',
 );
 
 
