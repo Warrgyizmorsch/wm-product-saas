@@ -269,7 +269,7 @@
                             <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">{{ __('crm.order_schedule') }}</span>
                             <p class="text-dark mb-1 fs-12"><strong>{{ __('crm.order_date') }}:</strong> <span class="text-muted ms-1">{{ $order->order_date ? $order->order_date->format('d/m/Y') : '—' }}</span></p>
                             <p class="text-dark mb-1 fs-12"><strong>{{ __('crm.est_shipment') }}</strong> <span class="text-muted ms-1">{{ $order->shipment_date ? $order->shipment_date->format('d/m/Y') : __('crm.not_scheduled') }}</span></p>
-                            <p class="text-dark mb-0 fs-12"><strong>{{ __('crm.payment_terms') }}</strong> <span class="text-muted ms-1">{{ $order->payment_terms ?: __('crm.due_on_receipt') }}</span></p>
+                            <p class="text-dark mb-0 fs-12"><strong>{{ __('crm.payment_terms') }}</strong> <span class="text-muted ms-1">{{ \App\Domains\Platform\Models\PaymentTerm::getLabel($order->payment_terms) }}</span></p>
                         </div>
                         <div class="col-sm-4 text-sm-end text-start">
                             <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">{{ __('crm.reference_details') }}</span>

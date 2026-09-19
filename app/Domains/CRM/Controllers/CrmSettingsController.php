@@ -3,6 +3,7 @@
 namespace App\Domains\CRM\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Domains\CRM\Models\Lead;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -11,6 +12,8 @@ class CrmSettingsController extends Controller
 {
     public function index(): View
     {
+        $this->authorize('viewAny', Lead::class);
+
         $tenant = tenant();
         $settings = is_array($tenant?->settings) ? $tenant->settings : [];
 
@@ -27,6 +30,8 @@ class CrmSettingsController extends Controller
 
     public function updateInvoicingPolicy(Request $request): RedirectResponse
     {
+        $this->authorize('create', Lead::class);
+
         $validated = $request->validate([
             'invoicing_policy' => ['required', 'string', 'in:sales_order,dispatch_order,both'],
         ]);
@@ -47,6 +52,8 @@ class CrmSettingsController extends Controller
 
     public function updateQuotationApprovalPolicy(Request $request): RedirectResponse
     {
+        $this->authorize('create', Lead::class);
+
         $validated = $request->validate([
             'quotation_approval_policy' => ['required', 'string', 'in:approval_required,auto_approve'],
         ]);

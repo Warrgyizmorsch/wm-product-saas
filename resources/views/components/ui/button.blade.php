@@ -148,11 +148,11 @@
 @if($href)
     <a href="{{ $href }}" {{ $attributes->class([$classes]) }}>
         @if($icon && $iconPosition === 'left')
-            <i class="{{ $icon }} me-2"></i>
+            <i class="{{ $icon }}{{ trim((string)$slot) ? ' me-2' : '' }}"></i>
         @endif
         {{ $slot }}
         @if($icon && $iconPosition === 'right')
-            <i class="{{ $icon }} ms-2"></i>
+            <i class="{{ $icon }}{{ trim((string)$slot) ? ' ms-2' : '' }}"></i>
         @endif
         @if($badge !== null && $badge !== '')
             <span class="btn-badge-count {{ $badgeClass }}">{{ $badge }}</span>
@@ -161,11 +161,11 @@
 @else
     <button type="{{ $type }}" {{ $attributes->class([$classes]) }}>
         @if($icon && $iconPosition === 'left')
-            <i class="{{ $icon }} me-2"></i>
+            <i class="{{ $icon }}{{ trim((string)$slot) ? ' me-2' : '' }}"></i>
         @endif
         {{ $slot }}
         @if($icon && $iconPosition === 'right')
-            <i class="{{ $icon }} ms-2"></i>
+            <i class="{{ $icon }}{{ trim((string)$slot) ? ' ms-2' : '' }}"></i>
         @endif
         @if($badge !== null && $badge !== '')
             <span class="btn-badge-count {{ $badgeClass }}">{{ $badge }}</span>

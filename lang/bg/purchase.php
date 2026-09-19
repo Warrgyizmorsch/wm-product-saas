@@ -4,6 +4,7 @@ return [
     'savings_dashboard' => 'Спестявания Табло',
     'purchase_requests' => 'Заявки за покупка',
     'pending_pr_items' => 'Изчакващи PR артикули',
+    'rfq' => 'RFQ',
     'rfqs' => 'Заявки за оферти (RFQs)',
     'purchase_orders' => 'Поръчки за покупка',
     'goods_receipts' => 'GRN (Стокови разписки)',
@@ -1237,6 +1238,7 @@ return [
     'tax_rate'                              => 'Данъчна ставка',
     'terms_and_notes'                       => 'Условия и бележки',
     'no_additional_terms_specified'         => 'Няма посочени допълнителни условия или бележки за тази поръчка.',
+    'js_assign_supplier_to_all_items'       => 'Моля, задайте поне един доставчик за всеки артикул.',
 ];
 
 

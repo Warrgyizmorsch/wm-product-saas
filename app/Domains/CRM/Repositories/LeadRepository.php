@@ -123,7 +123,7 @@ class LeadRepository
 
         $quotations = Quotation::where('lead_id', $lead->id)->latest()->get();
         if ($activeQuotationId) {
-            $activeQuotation = Quotation::find($activeQuotationId);
+            $activeQuotation = Quotation::where('lead_id', $lead->id)->find($activeQuotationId);
         } else {
             $activeQuotation = $quotations->where('is_current', true)->first() ?: $quotations->first();
         }

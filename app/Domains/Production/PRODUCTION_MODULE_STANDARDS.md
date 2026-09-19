@@ -184,7 +184,7 @@ The primary theme color is controlled by the CSS variable defined in `public/ass
 
 ```css
 :root {
-    --bs-primary: #0000FF;
+    --bs-primary: #6337fa;
 }
 ```
 

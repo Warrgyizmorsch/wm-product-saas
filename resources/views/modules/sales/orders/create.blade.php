@@ -68,6 +68,15 @@
                     <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.order_date')" name="order_date" :value="old('order_date', date('Y-m-d'))" :required="true" />
 
                     <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.shipment_date')" name="shipment_date" :value="old('shipment_date')" />
+
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="paymentTermsSelect">
+                        <option value="">{{ __('crm.choose_payment_terms') }}</option>
+                        @foreach ($paymentTerms as $pt)
+                            <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected(old('payment_terms', $prefillQuotation?->crmDeal?->payment_terms ?? $prefillQuotation?->payment_terms) == $pt->name)>
+                                {{ $pt->display_name }}
+                            </option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
                 </div>
 
                 <!-- Column 2: Commercial, Tax & Delivery Options -->
@@ -98,7 +107,9 @@
                         <option value="Customer Pickup" @selected(old('freight_terms') == 'Customer Pickup')>{{ __('crm.freight_customer_pickup') }}</option>
                     </x-ui.odoo-form-ui>
 
-                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.freight_amount')" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', 0)" min="0" step="0.01" />
+                    <div id="soFreightAmountContainer" class="{{ old('freight_terms') === 'To Be Billed' ? '' : 'd-none' }}">
+                        <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.freight_amount')" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', 0)" min="0" step="0.01" />
+                    </div>
             </div>
 
             <!-- Address fields -->
@@ -430,10 +441,23 @@
                     $('#gstTypeContainer').addClass('d-none').hide();
                 }
 
+                toggleFreightDisplay();
                 calculateTotals();
             }
 
-            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect').on('change', toggleTaxAndDiscountOptions);
+            function toggleFreightDisplay() {
+                const freightTerms = $('#freightTermsSelect').val() || 'To Pay';
+                if (freightTerms === 'To Be Billed') {
+                    $('#soFreightAmountContainer').removeClass('d-none').show();
+                    $('#summaryFreightRow').removeClass('d-none').show();
+                } else {
+                    $('#soFreightAmountContainer').addClass('d-none').hide();
+                    $('#summaryFreightRow').addClass('d-none').hide();
+                    $('#freightAmountInput').val('0');
+                }
+            }
+
+            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #freightTermsSelect').on('change', toggleTaxAndDiscountOptions);
 
             // Input listeners for calculations
             $(document).on('input change', '.qty-input, .price-input, .tax-input, .line-discount-input, #discountInput, #orderTaxInput, #freightTermsSelect, #freightAmountInput, #adjustmentInput', function() {

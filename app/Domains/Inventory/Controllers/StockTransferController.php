@@ -5,17 +5,21 @@ namespace App\Domains\Inventory\Controllers;
 use App\Http\Controllers\Controller;
 use App\Domains\Inventory\Models\StockTransfer;
 use App\Domains\Inventory\Models\StockTransferItem;
+use App\Domains\Inventory\Models\StockTransaction;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class StockTransferController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', StockTransfer::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
         $query = StockTransfer::query()
@@ -56,6 +60,8 @@ class StockTransferController extends Controller
 
     public function create()
     {
+        $this->authorize('create', StockTransfer::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
         $products = Product::where('tenant_id', $tenantId)->sellable()->get();
@@ -65,15 +71,27 @@ class StockTransferController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', StockTransfer::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
         $validated = $request->validate([
-            'from_warehouse_id' => 'required|exists:warehouses,id|different:to_warehouse_id',
-            'to_warehouse_id' => 'required|exists:warehouses,id',
+            'from_warehouse_id' => [
+                'required',
+                Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId),
+                'different:to_warehouse_id',
+            ],
+            'to_warehouse_id' => [
+                'required',
+                Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId),
+            ],
             'transfer_date' => 'required|date',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_id' => [
+                'required',
+                Rule::exists('products', 'id')->where('tenant_id', $tenantId),
+            ],
             'items.*.quantity' => 'required|numeric|gt:0',
         ]);
 
@@ -96,7 +114,7 @@ class StockTransferController extends Controller
                     $availableQty = max(0, $physicalQty - (float)$reserved);
 
                     if ((float)$item['quantity'] > $availableQty) {
-                        $prod = \App\Domains\Inventory\Models\Product::find($item['product_id']);
+                        $prod = Product::where('tenant_id', $tenantId)->find($item['product_id']);
                         $name = $prod?->name ?? 'Item';
                         throw new \Exception("Insufficient available stock for '{$name}'. Net Available: {$availableQty}, Requested: {$item['quantity']}.");
                     }
@@ -135,12 +153,16 @@ class StockTransferController extends Controller
 
     public function show(StockTransfer $transfer)
     {
+        $this->authorize('view', $transfer);
+
         $transfer->load(['fromWarehouse', 'toWarehouse', 'creator', 'approver', 'receiver', 'items.product', 'items.batch']);
         return view('modules.inventory.transfers.show', compact('transfer'));
     }
 
     public function dispatch(StockTransfer $transfer)
     {
+        $this->authorize('dispatch', $transfer);
+
         if ($transfer->status !== 'Draft' && $transfer->status !== 'Pending') {
             return back()->with('error', 'Only Draft or Pending transfers can be dispatched.');
         }
@@ -172,6 +194,8 @@ class StockTransferController extends Controller
 
     public function receive(StockTransfer $transfer)
     {
+        $this->authorize('receive', $transfer);
+
         if ($transfer->status !== 'In-Transit') {
             return back()->with('error', 'Only In-Transit transfers can be received.');
         }
@@ -180,10 +204,17 @@ class StockTransferController extends Controller
 
         DB::transaction(function () use ($transfer, $tenantId) {
             foreach ($transfer->items as $item) {
-                $product = Product::find($item->product_id);
-                $unitCost = (float)($product ? $product->cost_price : 0);
+                $outTx = StockTransaction::where('tenant_id', $tenantId)
+                    ->where('reference_type', 'StockTransfer')
+                    ->where('reference_id', $transfer->id)
+                    ->where('product_id', $item->product_id)
+                    ->where('type', 'OUT')
+                    ->first();
 
-                // Record stock inflow into destination warehouse
+                $product = Product::where('tenant_id', $tenantId)->find($item->product_id);
+                $unitCost = $outTx ? (float)$outTx->unit_cost : (float)($product ? $product->cost_price : 0);
+
+                // Record stock inflow into destination warehouse with cost from dispatch
                 StockService::recordInflow(
                     tenantId: $tenantId,
                     productId: $item->product_id,
@@ -209,6 +240,8 @@ class StockTransferController extends Controller
 
     public function cancel(StockTransfer $transfer)
     {
+        $this->authorize('cancel', $transfer);
+
         if ($transfer->status === 'Completed' || $transfer->status === 'In-Transit') {
             return back()->with('error', 'Cannot cancel an In-Transit or Completed transfer.');
         }

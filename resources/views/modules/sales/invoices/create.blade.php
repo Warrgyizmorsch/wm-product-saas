@@ -53,12 +53,6 @@
                                 <i class="feather-truck me-1 text-info"></i>{{ __('crm.against_dispatch_order') }}
                             </label>
                         </div>
-                        <div class="form-check">
-                            <input class="form-check-input mode-radio" type="radio" name="mode_option" id="modeDirect" value="direct" {{ $mode === 'direct' ? 'checked' : '' }}>
-                            <label class="form-check-label fw-bold text-dark fs-13" for="modeDirect">
-                                <i class="feather-user me-1 text-success"></i>{{ __('crm.direct_invoice_standalone') }}
-                            </label>
-                        </div>
                     </div>
                 </div>
 
@@ -71,6 +65,9 @@
                             <!-- Mode 1: Sales Order Dropdown -->
                             <x-ui.odoo-form-ui type="select" :label="__('crm.sales_order_reference')" name="sales_order_id" id="salesOrderSelect" class="odoo-select2" :required="true">
                                 <option value="">{{ __('crm.select_sales_order_ph') }}</option>
+                                @if ($salesOrders->isEmpty())
+                                    <option value="" disabled>{{ __('crm.no_unbilled_sales_orders') }}</option>
+                                @endif
                                 @foreach ($salesOrders as $so)
                                     <option value="{{ $so->id }}" @selected($salesOrder?->id == $so->id)>
                                         {{ $so->sales_order_number }} (Customer: {{ $so->customer?->name }})
@@ -80,7 +77,14 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.customer')" name="_customer_display" :value="$salesOrder?->customer?->name ?: '—'" readonly="true" style="font-weight: bold; background-color: transparent;" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.payment_terms')" name="_terms_display" :value="$salesOrder?->payment_terms ?: __('crm.immediate_payment')" readonly="true" style="background-color: transparent;" />
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="salesOrderPaymentTermsSelect">
+                                <option value="">{{ __('crm.choose_payment_terms') }}</option>
+                                @foreach ($paymentTerms as $pt)
+                                    <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected(old('payment_terms', $salesOrder?->payment_terms) == $pt->name)>
+                                        {{ $pt->display_name }}
+                                    </option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
 
                         @elseif ($mode === 'dispatch_order')
                             <!-- Mode 2: Dispatch Order Dropdown -->
@@ -98,7 +102,14 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.customer')" name="_customer_display" :value="$salesOrder?->customer?->name ?: ($dispatchOrder?->salesOrder?->customer?->name ?: '—')" readonly="true" style="font-weight: bold; background-color: transparent;" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.payment_terms')" name="_terms_display" :value="$salesOrder?->payment_terms ?: __('crm.immediate_payment')" readonly="true" style="background-color: transparent;" />
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="dispatchOrderPaymentTermsSelect">
+                                <option value="">{{ __('crm.choose_payment_terms') }}</option>
+                                @foreach ($paymentTerms as $pt)
+                                    <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected(old('payment_terms', $salesOrder?->payment_terms ?: $dispatchOrder?->salesOrder?->payment_terms) == $pt->name)>
+                                        {{ $pt->display_name }}
+                                    </option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
 
                         @else
                             <!-- Mode 3: Direct Customer Dropdown -->
@@ -111,12 +122,13 @@
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms">
-                                <option value="Immediate Payment">{{ __('crm.immediate_payment') }}</option>
-                                <option value="15 Days">15 Days</option>
-                                <option value="30 Days">30 Days</option>
-                                <option value="45 Days">45 Days</option>
-                                <option value="60 Days">60 Days</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="directPaymentTermsSelect">
+                                <option value="">{{ __('crm.choose_payment_terms') }}</option>
+                                @foreach ($paymentTerms as $pt)
+                                    <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected(old('payment_terms') == $pt->name)>
+                                        {{ $pt->display_name }}
+                                    </option>
+                                @endforeach
                             </x-ui.odoo-form-ui>
                         @endif
 
@@ -165,7 +177,7 @@
                             <option value="Customer Pickup" @selected(old('freight_terms', $dispatchOrder?->freight_terms ?? $salesOrder?->freight_terms ?? '') == 'Customer Pickup')>{{ __('crm.freight_customer_pickup') }}</option>
                         </x-ui.odoo-form-ui>
 
-                        <div class="row g-2">
+                        <div id="freightBillingOptionsContainer" class="row g-2 {{ old('freight_terms', $dispatchOrder?->freight_terms ?? $salesOrder?->freight_terms ?? 'To Pay') === 'To Be Billed' ? '' : 'd-none' }}">
                             <div class="col-md-6">
                                 <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.freight_amount') . ' (' . active_currency_symbol() . ')'" name="freight_amount" id="invFreightAmountInput" :value="old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
                             </div>
@@ -355,12 +367,11 @@
                                 </div>
 
                                 <!-- FREIGHT BREAKDOWN SECTION -->
-                                <div id="summaryFreightSectionContainer">
+                                <div id="summaryFreightSectionContainer" class="{{ old('freight_terms', $dispatchOrder?->freight_terms ?? $salesOrder?->freight_terms ?? 'To Pay') === 'To Be Billed' ? '' : 'd-none' }}">
                                     <hr class="my-2 border-slate">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <span class="text-muted fs-13 fw-semibold">{{ __('crm.freight_charges') }}</span>
-                                        <input type="number" id="summaryFreightText" class="form-control form-control-sm text-end fw-bold text-primary" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" min="0" step="0.01" value="{{ old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0) }}">
-                                        <input type="hidden" name="freight_amount" id="invFreightAmountInput" value="{{ old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0) }}">
+                                        <input type="text" id="summaryFreightText" class="form-control form-control-sm text-end fw-bold text-primary" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="0.00">
                                     </div>
 
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryFreightTaxRow">
@@ -489,10 +500,23 @@
                     $('#calcTaxableRow').addClass('d-none').hide();
                 }
 
+                toggleFreightDisplay();
                 recalculateInvoiceTotals();
             }
 
-            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #orderTaxPercent').on('change input', function() {
+            function toggleFreightDisplay() {
+                const freightTerms = $('#invFreightTermsSelect').val() || 'To Pay';
+                if (freightTerms === 'To Be Billed') {
+                    $('#freightBillingOptionsContainer').removeClass('d-none').show();
+                    $('#summaryFreightSectionContainer').removeClass('d-none').show();
+                } else {
+                    $('#freightBillingOptionsContainer').addClass('d-none').hide();
+                    $('#summaryFreightSectionContainer').addClass('d-none').hide();
+                    $('#invFreightAmountInput').val('0');
+                }
+            }
+
+            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #orderTaxPercent, #invFreightTermsSelect').on('change input', function() {
                 toggleTaxAndDiscountDisplay();
             });
 
@@ -634,7 +658,7 @@
                 validateAllInvoiceRows();
             });
 
-            $(document).on('input change', '.qty-input, .rate-input, .disc-input, .tax-input, #summaryDiscount, #orderTaxPercent, #invFreightTermsSelect, #invFreightTaxRateSelect, #summaryFreightText, #adjustmentInput', function() {
+            $(document).on('input change', '.qty-input, .rate-input, .disc-input, .tax-input, #summaryDiscount, #orderTaxPercent, #invFreightTermsSelect, #invFreightTaxRateSelect, #invFreightAmountInput, #adjustmentInput, #discountTypeSelect, #taxTypeSelect, #gstTypeSelect', function() {
                 recalculateInvoiceTotals();
             });
 
@@ -702,9 +726,8 @@
                 const itemsTaxTotal = totalTax;
 
                 const freightTerms = $('#invFreightTermsSelect').val() || 'To Pay';
-                const summaryFreight = parseFloat($('#summaryFreightText').val()) || 0;
-                const effectiveFreight = (freightTerms === 'To Be Billed') ? summaryFreight : 0;
-                $('#invFreightAmountInput').val(effectiveFreight);
+                const rawFreight = parseFloat($('#invFreightAmountInput').val()) || 0;
+                const effectiveFreight = (freightTerms === 'To Be Billed') ? rawFreight : 0;
 
                 const freightTaxRateOption = $('#invFreightTaxRateSelect').val() || 'highest';
                 let freightTaxRate = 18;
@@ -722,9 +745,20 @@
                 const totalFreightInclGst = effectiveFreight + freightTax;
                 const grandTotalTax = itemsTaxTotal + freightTax;
 
-                $('#summaryItemsTaxText').val('+' + currencySymbol + itemsTaxTotal.toFixed(2));
-                $('#summaryFreightTaxText').val('+' + currencySymbol + freightTax.toFixed(2));
-                $('#summaryFreightTotalText').val(currencySymbol + totalFreightInclGst.toFixed(2));
+                if (freightTerms === 'To Be Billed') {
+                    $('#summaryFreightText').val(currencySymbol + rawFreight.toFixed(2));
+                    $('#summaryFreightTaxText').val('+' + currencySymbol + freightTax.toFixed(2));
+                    $('#summaryFreightTotalText').val(currencySymbol + totalFreightInclGst.toFixed(2));
+                    $('#summaryFreightTaxLabel').text("{{ __('crm.add_freight_gst_tax') }} (" + freightTaxRate + "%)");
+                    $('#summaryFreightSectionContainer').removeClass('opacity-50');
+                } else {
+                    const statusNote = (freightTerms === 'To Pay') ? ' (To Pay)' : (freightTerms === 'Prepaid' ? ' (Prepaid)' : ' (Pickup)');
+                    $('#summaryFreightText').val(currencySymbol + rawFreight.toFixed(2) + statusNote);
+                    $('#summaryFreightTaxText').val('+' + currencySymbol + '0.00');
+                    $('#summaryFreightTotalText').val(currencySymbol + '0.00');
+                    $('#summaryFreightTaxLabel').text("{{ __('crm.add_freight_gst_tax') }} (Not Billed)");
+                    $('#summaryFreightSectionContainer').addClass('opacity-50');
+                }
 
                 if (taxType !== 'without_tax' && grandTotalTax > 0) {
                     if (gstType === 'igst') {
@@ -972,6 +1006,31 @@
                 e.preventDefault();
                 handleBarcodeScan();
             });
+
+            // Auto-calculate Due Date based on Payment Terms master due_days
+            function updateDueDateFromTerms() {
+                const termsSelect = document.querySelector('select[name="payment_terms"]');
+                const invoiceDateInput = document.querySelector('input[name="invoice_date"]');
+                const dueDateInput = document.querySelector('input[name="due_date"]');
+
+                if (termsSelect && invoiceDateInput && dueDateInput) {
+                    const selectedOpt = termsSelect.options[termsSelect.selectedIndex];
+                    const dueDays = selectedOpt ? selectedOpt.getAttribute('data-due-days') : null;
+                    if (dueDays !== null && dueDays !== '' && invoiceDateInput.value) {
+                        const invDate = new Date(invoiceDateInput.value);
+                        if (!isNaN(invDate.getTime())) {
+                            invDate.setDate(invDate.getDate() + parseInt(dueDays, 10));
+                            const yyyy = invDate.getFullYear();
+                            const mm = String(invDate.getMonth() + 1).padStart(2, '0');
+                            const dd = String(invDate.getDate()).padStart(2, '0');
+                            dueDateInput.value = `${yyyy}-${mm}-${dd}`;
+                        }
+                    }
+                }
+            }
+
+            $(document).on('change', 'select[name="payment_terms"]', updateDueDateFromTerms);
+            $(document).on('change', 'input[name="invoice_date"]', updateDueDateFromTerms);
         });
     </script>
 @endpush

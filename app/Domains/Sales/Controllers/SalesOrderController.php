@@ -10,6 +10,7 @@ use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Platform\Models\PaymentTerm;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -59,6 +60,7 @@ class SalesOrderController extends Controller
             ->get();
 
         $warehouses = Warehouse::query()->orderBy('name')->get();
+        $paymentTerms = PaymentTerm::query()->where('is_active', true)->orderBy('due_days')->get();
 
         return view('modules.sales.orders.create', [
             'customers' => $customers,
@@ -66,6 +68,7 @@ class SalesOrderController extends Controller
             'warehouses' => $warehouses,
             'salesReps' => $salesReps,
             'quotations' => $quotations,
+            'paymentTerms' => $paymentTerms,
             'prefillQuotation' => $prefillQuotation,
             'nextOrderNumber' => $this->salesOrders->getNextSalesOrderNumber(),
         ]);
@@ -144,8 +147,9 @@ class SalesOrderController extends Controller
         $salesReps = User::query()->orderBy('name')->get();
         $quotations = Quotation::query()->where('is_current', true)->whereIn('status', ['Approved', 'Accepted'])->latest()->get();
         $warehouses = Warehouse::query()->orderBy('name')->get();
+        $paymentTerms = PaymentTerm::query()->where('is_active', true)->orderBy('due_days')->get();
 
-        return view('modules.sales.orders.edit', compact('order', 'customers', 'products', 'warehouses', 'salesReps', 'quotations'));
+        return view('modules.sales.orders.edit', compact('order', 'customers', 'products', 'warehouses', 'salesReps', 'quotations', 'paymentTerms'));
     }
 
     public function update(Request $request, int $id): RedirectResponse

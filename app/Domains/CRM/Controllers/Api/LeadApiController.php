@@ -155,6 +155,8 @@ class LeadApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Lead::class);
+
         $payload = $request->all();
 
         // 1) Direct JSON array: [ {...}, {...} ]
