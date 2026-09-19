@@ -48,4 +48,25 @@ class AccountingMasterSeederTest extends TestCase
         $this->assertSame(0, DB::table('chart_of_accounts')->where('tenant_id', $crm->id)->count());
         $this->assertGreaterThan(0, DB::table('chart_of_accounts')->where('tenant_id', $full->id)->count());
     }
+
+    public function test_seed_only_limits_the_seeder_and_never_overwrites_an_existing_chart(): void
+    {
+        $old = Tenant::create(['name' => 'Old', 'slug' => 'old', 'status' => 'active', 'plan' => 'enterprise']);
+        $new = Tenant::create(['name' => 'New', 'slug' => 'new', 'status' => 'active', 'plan' => 'enterprise']);
+
+        config(['tenancy.seed_only' => ['old']]);
+        $this->seed(AccountingChartOfAccountsSeeder::class);
+        DB::table('chart_of_accounts')->where('tenant_id', $old->id)->where('code', '1020')->update(['name' => 'SBI Current A/c']);
+
+        config(['tenancy.seed_only' => []]);
+        $this->seed(AccountingChartOfAccountsSeeder::class);
+
+        $this->assertSame('SBI Current A/c', DB::table('chart_of_accounts')->where('tenant_id', $old->id)->where('code', '1020')->value('name'));
+        $this->assertGreaterThan(0, DB::table('chart_of_accounts')->where('tenant_id', $new->id)->count());
+
+        DB::table('chart_of_accounts')->where('tenant_id', $new->id)->delete();
+        config(['tenancy.seed_only' => ['old']]);
+        $this->seed(AccountingChartOfAccountsSeeder::class);
+        $this->assertSame(0, DB::table('chart_of_accounts')->where('tenant_id', $new->id)->count());
+    }
 }

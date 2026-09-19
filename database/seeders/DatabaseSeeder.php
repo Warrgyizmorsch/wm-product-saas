@@ -63,7 +63,7 @@ class DatabaseSeeder extends Seeder
 
         // Same default masters a tenant created from Tenant Console gets, for every
         // tenant. Runs last so it reuses the demo company/branch instead of adding its own.
-        foreach (Tenant::query()->orderBy('id')->get() as $each) {
+        foreach (Tenant::query()->when(config('tenancy.seed_only'), fn ($q, $slugs) => $q->whereIn('slug', $slugs))->orderBy('id')->get() as $each) {
             app(\App\Core\Tenant\TenantProvisioner::class)->provision($each);
         }
 

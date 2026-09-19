@@ -15,7 +15,7 @@ class PaymentTermSeeder extends Seeder
     public function run(): void
     {
         // Payment terms belong to Sales/Purchase: only tenants whose plan includes either get them.
-        $tenants = Tenant::query()->get()->filter(fn (Tenant $tenant) => $tenant->hasModule('sales', 'purchase'));
+        $tenants = Tenant::query()->when(config('tenancy.seed_only'), fn ($q, $slugs) => $q->whereIn('slug', $slugs))->get()->filter(fn (Tenant $tenant) => $tenant->hasModule('sales', 'purchase'));
 
         $defaultTerms = [
             [
