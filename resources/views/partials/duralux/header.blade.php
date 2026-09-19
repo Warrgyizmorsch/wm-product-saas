@@ -47,7 +47,7 @@
             ->whereIn('status', \App\Models\Tenant::accessibleStatuses())
             ->orderBy('name')
             ->get()
-            ->map(fn ($tenant) => [
+            ->map(fn($tenant) => [
                 'name' => $tenant->name,
                 'code' => strtoupper($tenant->slug),
                 'slug' => $tenant->slug,
@@ -60,7 +60,7 @@
             ->where('tenant_id', $resolvedTenant->id)
             ->orderBy('company_name')
             ->get()
-            ->map(fn ($company) => [
+            ->map(fn($company) => [
                 'id' => $company->id,
                 'name' => $company->company_name,
                 'active' => $resolvedCompany?->is($company) ?? false,
@@ -72,7 +72,7 @@
             ->where('company_id', $resolvedCompany->id)
             ->orderBy('name')
             ->get()
-            ->map(fn ($branch) => [
+            ->map(fn($branch) => [
                 'id' => $branch->id,
                 'name' => $branch->name,
                 'active' => $resolvedBranch?->is($branch) ?? false,
@@ -189,7 +189,8 @@
 
                 <div class="nxl-lavel-mega-menu-wrapper d-flex gap-3">
                     <div class="dropdown nxl-h-item nxl-lavel-menu">
-                        <a href="javascript:void(0);" class="avatar-text avatar-md bg-primary text-white" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                        <a href="javascript:void(0);" class="avatar-text avatar-md bg-primary text-white"
+                            data-bs-toggle="dropdown" data-bs-auto-close="outside">
                             <i class="feather-plus"></i>
                         </a>
                         <div class="dropdown-menu nxl-h-dropdown">
@@ -207,73 +208,86 @@
                         </div>
                     </div>
 
-                    <x-ui.dropdown class="nxl-h-item nxl-mega-menu" menu-class="nxl-h-dropdown erp-module-launcher" menu-id="mega-menu-dropdown">
+                    <x-ui.dropdown class="nxl-h-item nxl-mega-menu" menu-class="nxl-h-dropdown erp-module-launcher"
+                        menu-id="mega-menu-dropdown">
                         <x-slot name="trigger">
-                            <x-ui.button href="javascript:void(0);" variant="light-brand" icon="feather-grid" class="dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+                            <x-ui.button href="javascript:void(0);" variant="light-brand" icon="feather-grid"
+                                class="dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                                role="button" aria-expanded="false">
                                 {{ __('ui.modules') }}
                             </x-ui.button>
                         </x-slot>
 
-                            <div class="d-lg-flex align-items-start">
-                                <div class="nav flex-column nxl-mega-menu-tabs" role="tablist" aria-orientation="vertical">
-                                    @foreach ($moduleTabs as $index => $tab)
-                                        <button class="nav-link {{ $index === 0 ? 'active' : '' }} nxl-mega-menu-{{ $tab['size'] }}" data-bs-toggle="pill" data-bs-target="#{{ $tab['target'] }}" type="button" role="tab">
-                                            <span class="menu-icon">
-                                                <i class="{{ $tab['icon'] }}"></i>
-                                            </span>
-                                            <span class="menu-title">{{ $tab['title'] }}</span>
-                                            <span class="menu-arrow">
-                                                <i class="feather-chevron-right"></i>
-                                            </span>
-                                        </button>
-                                    @endforeach
-                                </div>
-
-                                <div class="tab-content nxl-mega-menu-tabs-content">
-                                    @foreach ($moduleTabs as $index => $tab)
-                                        <div class="tab-pane fade {{ $index === 0 ? 'show active' : '' }}" id="{{ $tab['target'] }}" role="tabpanel">
-                                            <div class="d-lg-flex align-items-start justify-content-between mb-4">
-                                                <div>
-                                                    <h6 class="fw-bolder text-dark">{{ $tab['title'] }}</h6>
-                                                    <p class="fs-12 text-muted mb-0 text-truncate-2-line">{{ $tab['description'] }}</p>
-                                                </div>
-                                                <a href="javascript:void(0);" class="fs-13 text-primary mt-2 mt-lg-0">Open Module &rarr;</a>
-                                            </div>
-
-                                            <div class="row g-3 erp-mega-module-grid">
-                                                @foreach ($tab['modules'] as $module)
-                                                    <div class="col-lg-4">
-                                                        <x-ui.dropdown-item class="erp-module-link">
-                                                            <span class="avatar-text avatar-md bg-soft-primary text-primary">
-                                                                <i class="{{ $module['icon'] }}"></i>
-                                                            </span>
-                                                            <span class="erp-module-link-copy">
-                                                                <span>{{ $module['label'] }}</span>
-                                                                <small>{{ $module['meta'] }}</small>
-                                                            </span>
-                                                            <i class="feather-arrow-right ms-auto me-0"></i>
-                                                        </x-ui.dropdown-item>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-
-                                            <hr class="border-top-dashed">
-                                            <div class="erp-module-footer">
-                                                <x-ui.badge variant="success" soft>Enterprise</x-ui.badge>
-                                                <span class="fs-11 text-muted">Tenant scoped</span>
-                                                <span class="fs-11 text-muted">Role aware</span>
-                                                <a href="javascript:void(0);" class="fs-12 fw-bold text-primary ms-auto">Access Control &rarr;</a>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
+                        <div class="d-lg-flex align-items-start">
+                            <div class="nav flex-column nxl-mega-menu-tabs" role="tablist" aria-orientation="vertical">
+                                @foreach ($moduleTabs as $index => $tab)
+                                    <button
+                                        class="nav-link {{ $index === 0 ? 'active' : '' }} nxl-mega-menu-{{ $tab['size'] }}"
+                                        data-bs-toggle="pill" data-bs-target="#{{ $tab['target'] }}" type="button"
+                                        role="tab">
+                                        <span class="menu-icon">
+                                            <i class="{{ $tab['icon'] }}"></i>
+                                        </span>
+                                        <span class="menu-title">{{ $tab['title'] }}</span>
+                                        <span class="menu-arrow">
+                                            <i class="feather-chevron-right"></i>
+                                        </span>
+                                    </button>
+                                @endforeach
                             </div>
+
+                            <div class="tab-content nxl-mega-menu-tabs-content">
+                                @foreach ($moduleTabs as $index => $tab)
+                                    <div class="tab-pane fade {{ $index === 0 ? 'show active' : '' }}"
+                                        id="{{ $tab['target'] }}" role="tabpanel">
+                                        <div class="d-lg-flex align-items-start justify-content-between mb-4">
+                                            <div>
+                                                <h6 class="fw-bolder text-dark">{{ $tab['title'] }}</h6>
+                                                <p class="fs-12 text-muted mb-0 text-truncate-2-line">
+                                                    {{ $tab['description'] }}</p>
+                                            </div>
+                                            <a href="javascript:void(0);" class="fs-13 text-primary mt-2 mt-lg-0">Open
+                                                Module &rarr;</a>
+                                        </div>
+
+                                        <div class="row g-3 erp-mega-module-grid">
+                                            @foreach ($tab['modules'] as $module)
+                                                <div class="col-lg-4">
+                                                    <x-ui.dropdown-item class="erp-module-link">
+                                                        <span class="avatar-text avatar-md bg-soft-primary text-primary">
+                                                            <i class="{{ $module['icon'] }}"></i>
+                                                        </span>
+                                                        <span class="erp-module-link-copy">
+                                                            <span>{{ $module['label'] }}</span>
+                                                            <small>{{ $module['meta'] }}</small>
+                                                        </span>
+                                                        <i class="feather-arrow-right ms-auto me-0"></i>
+                                                    </x-ui.dropdown-item>
+                                                </div>
+                                            @endforeach
+                                        </div>
+
+                                        <hr class="border-top-dashed">
+                                        <div class="erp-module-footer">
+                                            <x-ui.badge variant="success" soft>Enterprise</x-ui.badge>
+                                            <span class="fs-11 text-muted">Tenant scoped</span>
+                                            <span class="fs-11 text-muted">Role aware</span>
+                                            <a href="javascript:void(0);" class="fs-12 fw-bold text-primary ms-auto">Access
+                                                Control &rarr;</a>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
                     </x-ui.dropdown>
 
                     @if ($isPlatformAdmin)
-                        <x-ui.dropdown class="nxl-h-item erp-tenant-switcher d-none d-xl-flex" menu-class="nxl-h-dropdown erp-tenant-dropdown">
+                        <x-ui.dropdown class="nxl-h-item erp-tenant-switcher d-none d-xl-flex"
+                            menu-class="nxl-h-dropdown erp-tenant-dropdown">
                             <x-slot name="trigger">
-                                <x-ui.button href="javascript:void(0);" variant="light-brand" class="erp-tenant-button dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+                                <x-ui.button href="javascript:void(0);" variant="light-brand"
+                                    class="erp-tenant-button dropdown-toggle" data-bs-toggle="dropdown"
+                                    data-bs-auto-close="outside" role="button" aria-expanded="false">
                                     <span class="avatar-text avatar-sm bg-soft-success text-success">
                                         <i class="feather-briefcase"></i>
                                     </span>
@@ -285,32 +299,35 @@
                                 </x-ui.button>
                             </x-slot>
 
-                                <div class="px-4 py-3 border-bottom">
-                                    <h6 class="mb-1">{{ __('ui.switch_tenant') }}</h6>
-                                    <p class="fs-11 text-muted mb-0">{{ $currentTenant['currency'] }} - {{ $currentTenant['plan'] }} Plan</p>
-                                </div>
-                                @foreach ($tenants as $tenant)
-                                    <x-ui.dropdown-item href="{{ route('tenant.switch', $tenant['slug']) }}" :active="!empty($tenant['active'])">
-                                        <span class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($tenant['name'], 0, 1) }}</span>
-                                        <span>
-                                            <span class="d-block fw-semibold">{{ $tenant['name'] }}</span>
-                                            <span class="fs-11 text-muted">{{ $tenant['code'] }}</span>
-                                        </span>
-                                        @if (!empty($tenant['active']))
-                                            <i class="feather-check ms-auto me-0 text-success"></i>
-                                        @endif
-                                    </x-ui.dropdown-item>
-                                @endforeach
-                                <div class="dropdown-divider"></div>
-                                <x-ui.dropdown-item href="{{ route('platform.tenants.create') }}" icon="feather-plus">
-                                    <span>{{ __('ui.add_tenant') }}</span>
+                            <div class="px-4 py-3 border-bottom">
+                                <h6 class="mb-1">{{ __('ui.switch_tenant') }}</h6>
+                                <p class="fs-11 text-muted mb-0">{{ $currentTenant['currency'] }} -
+                                    {{ $currentTenant['plan'] }} Plan</p>
+                            </div>
+                            @foreach ($tenants as $tenant)
+                                <x-ui.dropdown-item href="{{ route('tenant.switch', $tenant['slug']) }}"
+                                    :active="!empty($tenant['active'])">
+                                    <span
+                                        class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($tenant['name'], 0, 1) }}</span>
+                                    <span>
+                                        <span class="d-block fw-semibold">{{ $tenant['name'] }}</span>
+                                        <span class="fs-11 text-muted">{{ $tenant['code'] }}</span>
+                                    </span>
+                                    @if (!empty($tenant['active']))
+                                        <i class="feather-check ms-auto me-0 text-success"></i>
+                                    @endif
                                 </x-ui.dropdown-item>
+                            @endforeach
+                            <div class="dropdown-divider"></div>
+                            <x-ui.dropdown-item href="{{ route('platform.tenants.create') }}" icon="feather-plus">
+                                <span>{{ __('ui.add_tenant') }}</span>
+                            </x-ui.dropdown-item>
                         </x-ui.dropdown>
                     @else
                         {{-- Non-platform-admin users (tenant owners, staff) get the same info display
-                             but no switcher — switching tenants is a platform-admin-only capability,
-                             enforced server-side by TenantSwitchController; hiding the list here too
-                             avoids exposing every other tenant's name to a plain tenant owner. --}}
+                        but no switcher — switching tenants is a platform-admin-only capability,
+                        enforced server-side by TenantSwitchController; hiding the list here too
+                        avoids exposing every other tenant's name to a plain tenant owner. --}}
                         <div class="nxl-h-item erp-tenant-switcher d-none d-xl-flex erp-tenant-button">
                             <span class="avatar-text avatar-sm bg-soft-success text-success">
                                 <i class="feather-briefcase"></i>
@@ -323,9 +340,12 @@
                     @endif
 
                     @if ($companies->count() > 1)
-                        <x-ui.dropdown class="nxl-h-item erp-company-switcher d-none d-xl-flex" menu-class="nxl-h-dropdown erp-company-dropdown">
+                        <x-ui.dropdown class="nxl-h-item erp-company-switcher d-none d-xl-flex"
+                            menu-class="nxl-h-dropdown erp-company-dropdown">
                             <x-slot name="trigger">
-                                <x-ui.button href="javascript:void(0);" variant="light-brand" class="erp-company-button dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+                                <x-ui.button href="javascript:void(0);" variant="light-brand"
+                                    class="erp-company-button dropdown-toggle" data-bs-toggle="dropdown"
+                                    data-bs-auto-close="outside" role="button" aria-expanded="false">
                                     <span class="avatar-text avatar-sm bg-soft-info text-info">
                                         <i class="feather-home"></i>
                                     </span>
@@ -337,25 +357,30 @@
                                 </x-ui.button>
                             </x-slot>
 
-                                <div class="px-4 py-3 border-bottom">
-                                    <h6 class="mb-1">{{ __('ui.switch_company') }}</h6>
-                                </div>
-                                @foreach ($companies as $companyOption)
-                                    <x-ui.dropdown-item href="{{ route('company.switch', $companyOption['id']) }}" :active="!empty($companyOption['active'])">
-                                        <span class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($companyOption['name'], 0, 1) }}</span>
-                                        <span class="d-block fw-semibold">{{ $companyOption['name'] }}</span>
-                                        @if (!empty($companyOption['active']))
-                                            <i class="feather-check ms-auto me-0 text-success"></i>
-                                        @endif
-                                    </x-ui.dropdown-item>
-                                @endforeach
+                            <div class="px-4 py-3 border-bottom">
+                                <h6 class="mb-1">{{ __('ui.switch_company') }}</h6>
+                            </div>
+                            @foreach ($companies as $companyOption)
+                                <x-ui.dropdown-item href="{{ route('company.switch', $companyOption['id']) }}"
+                                    :active="!empty($companyOption['active'])">
+                                    <span
+                                        class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($companyOption['name'], 0, 1) }}</span>
+                                    <span class="d-block fw-semibold">{{ $companyOption['name'] }}</span>
+                                    @if (!empty($companyOption['active']))
+                                        <i class="feather-check ms-auto me-0 text-success"></i>
+                                    @endif
+                                </x-ui.dropdown-item>
+                            @endforeach
                         </x-ui.dropdown>
                     @endif
 
                     @if ($branches->count() > 1)
-                        <x-ui.dropdown class="nxl-h-item erp-branch-switcher d-none d-xl-flex" menu-class="nxl-h-dropdown erp-branch-dropdown">
+                        <x-ui.dropdown class="nxl-h-item erp-branch-switcher d-none d-xl-flex"
+                            menu-class="nxl-h-dropdown erp-branch-dropdown">
                             <x-slot name="trigger">
-                                <x-ui.button href="javascript:void(0);" variant="light-brand" class="erp-branch-button dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+                                <x-ui.button href="javascript:void(0);" variant="light-brand"
+                                    class="erp-branch-button dropdown-toggle" data-bs-toggle="dropdown"
+                                    data-bs-auto-close="outside" role="button" aria-expanded="false">
                                     <span class="avatar-text avatar-sm bg-soft-warning text-warning">
                                         <i class="feather-map-pin"></i>
                                     </span>
@@ -367,18 +392,20 @@
                                 </x-ui.button>
                             </x-slot>
 
-                                <div class="px-4 py-3 border-bottom">
-                                    <h6 class="mb-1">{{ __('ui.switch_branch') }}</h6>
-                                </div>
-                                @foreach ($branches as $branchOption)
-                                    <x-ui.dropdown-item href="{{ route('branch.switch', $branchOption['id']) }}" :active="!empty($branchOption['active'])">
-                                        <span class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($branchOption['name'], 0, 1) }}</span>
-                                        <span class="d-block fw-semibold">{{ $branchOption['name'] }}</span>
-                                        @if (!empty($branchOption['active']))
-                                            <i class="feather-check ms-auto me-0 text-success"></i>
-                                        @endif
-                                    </x-ui.dropdown-item>
-                                @endforeach
+                            <div class="px-4 py-3 border-bottom">
+                                <h6 class="mb-1">{{ __('ui.switch_branch') }}</h6>
+                            </div>
+                            @foreach ($branches as $branchOption)
+                                <x-ui.dropdown-item href="{{ route('branch.switch', $branchOption['id']) }}"
+                                    :active="!empty($branchOption['active'])">
+                                    <span
+                                        class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($branchOption['name'], 0, 1) }}</span>
+                                    <span class="d-block fw-semibold">{{ $branchOption['name'] }}</span>
+                                    @if (!empty($branchOption['active']))
+                                        <i class="feather-check ms-auto me-0 text-success"></i>
+                                    @endif
+                                </x-ui.dropdown-item>
+                            @endforeach
                         </x-ui.dropdown>
                     @endif
                 </div>
@@ -387,26 +414,34 @@
 
         <div class="header-right ms-auto">
             <div class="d-flex align-items-center">
-                <div class="dropdown nxl-h-item nxl-header-search" id="global-search-container" data-search-url="{{ route('global-search') }}">
-                    <a href="javascript:void(0);" class="nxl-head-link me-0" data-bs-toggle="dropdown" data-bs-auto-close="outside" id="global-search-toggle">
+                <div class="dropdown nxl-h-item nxl-header-search" id="global-search-container"
+                    data-search-url="{{ route('global-search') }}">
+                    <a href="javascript:void(0);" class="nxl-head-link me-0" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside" id="global-search-toggle">
                         <i class="feather-search"></i>
                     </a>
-                    <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-search-dropdown shadow-lg border-0" id="global-search-dropdown" style="min-width: 420px; max-width: 520px;">
+                    <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-search-dropdown shadow-lg border-0"
+                        id="global-search-dropdown" style="min-width: 420px; max-width: 520px;">
                         <div class="input-group search-form border-bottom">
                             <span class="input-group-text bg-transparent border-0 pe-1">
                                 <i class="feather-search fs-6 text-muted" id="search-spinner-icon"></i>
                             </span>
-                            <input type="text" class="form-control search-input-field border-0 ps-1" id="global-search-input" placeholder="{{ __('ui.search_placeholder') }}" autocomplete="off">
+                            <input type="text" class="form-control search-input-field border-0 ps-1"
+                                id="global-search-input" placeholder="{{ __('ui.search_placeholder') }}"
+                                autocomplete="off">
                             <span class="input-group-text bg-transparent border-0">
-                                <button type="button" class="btn-close fs-11" id="global-search-clear" style="display: none;"></button>
+                                <button type="button" class="btn-close fs-11" id="global-search-clear"
+                                    style="display: none;"></button>
                             </span>
                         </div>
-                        
+
                         {{-- Scope Selector Pills --}}
                         <div class="search-scope-bar px-3 py-2 bg-light-subtle border-bottom">
                             <div class="d-flex align-items-center justify-content-between mb-1">
-                                <span class="fs-11 fw-semibold text-muted text-uppercase tracking-wider">Search in</span>
-                                <span class="badge bg-secondary-subtle text-secondary fs-11" id="global-search-active-scope">All</span>
+                                <span class="fs-11 fw-semibold text-muted text-uppercase tracking-wider">Search
+                                    in</span>
+                                <span class="badge bg-secondary-subtle text-secondary fs-11"
+                                    id="global-search-active-scope">All</span>
                             </div>
                             <div class="d-flex flex-wrap gap-1" id="search-scope-pills">
                                 @php
@@ -424,7 +459,9 @@
                                     ];
                                 @endphp
                                 @foreach ($searchScopes as $scope)
-                                    <button type="button" class="btn btn-xs py-1 px-2 fs-11 fw-medium search-scope-pill {{ $loop->first ? 'btn-primary' : 'btn-outline-secondary' }}" data-scope="{{ $scope['id'] }}">
+                                    <button type="button"
+                                        class="btn btn-xs py-1 px-2 fs-11 fw-medium search-scope-pill {{ $loop->first ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                        data-scope="{{ $scope['id'] }}">
                                         {{ $scope['label'] }}
                                     </button>
                                 @endforeach
@@ -432,13 +469,17 @@
                         </div>
 
                         {{-- Dynamic Search & Recent Results Container --}}
-                        <div class="search-items-wrapper" id="global-search-results-wrapper" style="max-height: 380px; overflow-y: auto;">
+                        <div class="search-items-wrapper" id="global-search-results-wrapper"
+                            style="max-height: 380px; overflow-y: auto;">
                             {{-- Default view: Recent Searches & Tips --}}
                             <div id="global-search-default-view">
-                                <div class="recent-result px-3 py-2" id="global-search-recent-section" style="display: none;">
+                                <div class="recent-result px-3 py-2" id="global-search-recent-section"
+                                    style="display: none;">
                                     <div class="d-flex align-items-center justify-content-between mb-2">
                                         <span class="fs-12 fw-semibold text-muted text-uppercase">Recent Searches</span>
-                                        <button type="button" class="btn btn-link btn-xs text-muted p-0 text-decoration-none fs-11" id="clear-recent-searches">Clear History</button>
+                                        <button type="button"
+                                            class="btn btn-link btn-xs text-muted p-0 text-decoration-none fs-11"
+                                            id="clear-recent-searches">Clear History</button>
                                     </div>
                                     <div id="recent-searches-list"></div>
                                     <div class="dropdown-divider my-2"></div>
@@ -446,7 +487,9 @@
                                 <div class="px-3 py-2">
                                     <p class="fs-11 fw-medium text-muted mb-0 d-flex align-items-center gap-1">
                                         <i class="feather-info text-primary fs-13 me-0.5"></i>
-                                        <span>Type at least 2 characters to search. Use <span class="search-kbd-key">↑</span> <span class="search-kbd-key">↓</span> to navigate, <span class="search-kbd-key">Enter</span> to open.</span>
+                                        <span>Type at least 2 characters to search. Use <span
+                                                class="search-kbd-key">↑</span> <span class="search-kbd-key">↓</span> to
+                                            navigate, <span class="search-kbd-key">Enter</span> to open.</span>
                                     </p>
                                 </div>
                             </div>
@@ -458,12 +501,16 @@
 
                             {{-- Empty State View --}}
                             <div id="global-search-empty-view" class="text-center py-4 px-3" style="display: none;">
-                                <div class="avatar-text avatar-md bg-light-subtle rounded-circle mx-auto mb-2 text-muted">
+                                <div
+                                    class="avatar-text avatar-md bg-light-subtle rounded-circle mx-auto mb-2 text-muted">
                                     <i class="feather-search fs-4"></i>
                                 </div>
-                                <p class="fs-13 fw-medium text-dark mb-1">No results found for "<span id="empty-query-text"></span>"</p>
-                                <p class="fs-11 text-muted mb-2">Try searching with another keyword or reset filter to <strong>All</strong>.</p>
-                                <button type="button" class="btn btn-sm btn-outline-primary fs-11 py-1 px-2" id="reset-scope-btn">Switch to All Modules</button>
+                                <p class="fs-13 fw-medium text-dark mb-1">No results found for "<span
+                                        id="empty-query-text"></span>"</p>
+                                <p class="fs-11 text-muted mb-2">Try searching with another keyword or reset filter to
+                                    <strong>All</strong>.</p>
+                                <button type="button" class="btn btn-sm btn-outline-primary fs-11 py-1 px-2"
+                                    id="reset-scope-btn">Switch to All Modules</button>
                             </div>
                         </div>
                     </div>
@@ -477,7 +524,8 @@
 
                 <div class="nxl-h-item d-none d-sm-flex">
                     <div class="full-screen-switcher">
-                        <a href="javascript:void(0);" class="nxl-head-link me-0" onclick="$('body').fullScreenHelper('toggle');">
+                        <a href="javascript:void(0);" class="nxl-head-link me-0"
+                            onclick="$('body').fullScreenHelper('toggle');">
                             <i class="feather-maximize maximize"></i>
                             <i class="feather-minimize minimize"></i>
                         </a>
@@ -486,39 +534,52 @@
 
                 <!-- Primary Color Picker -->
                 <div class="nxl-h-item d-flex align-items-center justify-content-center me-3">
-                    <div class="d-flex align-items-center gap-2 border rounded-pill px-2 py-1 bg-light" style="height: 38px;">
+                    <div class="d-flex align-items-center gap-2 border rounded-pill px-2 py-1 bg-light header-color-picker-wrapper"
+                        style="height: 38px;">
                         <i class="feather-aperture text-muted fs-14"></i>
-                        <input type="color" id="primaryColorPicker" class="form-control form-control-color border-0 bg-transparent p-0" style="width: 22px; height: 22px; cursor: pointer; border-radius: 50% !important;" value="#0000FF" title="Choose Primary Color">
+                        <label for="primaryColorPicker" class="header-color-picker-label" title="Choose Primary Color">
+                            <span id="primaryColorPreview" class="header-color-preview-circle"></span>
+                            <input type="color" id="primaryColorPicker" class="header-color-picker-input"
+                                value="#6337fa" title="Choose Primary Color">
+                        </label>
                     </div>
                 </div>
 
                 <div class="nxl-h-item dark-light-theme">
-                    <a href="javascript:void(0);" class="nxl-head-link me-0 dark-button" id="header-dark-mode-btn" title="Dark Mode" aria-label="Switch to dark mode">
+                    <a href="javascript:void(0);" class="nxl-head-link me-0 dark-button" id="header-dark-mode-btn"
+                        title="Dark Mode" aria-label="Switch to dark mode">
                         <i class="feather-moon"></i>
                     </a>
-                    <a href="javascript:void(0);" class="nxl-head-link me-0 light-button" id="header-light-mode-btn" style="display: none" title="Light Mode" aria-label="Switch to light mode">
+                    <a href="javascript:void(0);" class="nxl-head-link me-0 light-button" id="header-light-mode-btn"
+                        style="display: none" title="Light Mode" aria-label="Switch to light mode">
                         <i class="feather-sun"></i>
                     </a>
                 </div>
 
                 <div class="dropdown nxl-h-item" id="header-approvals-dropdown">
-                    <a href="javascript:void(0);" class="nxl-head-link me-0" data-bs-toggle="dropdown" role="button" data-bs-auto-close="outside" id="header-approvals-trigger" title="{{ __('ui.approvals') }}">
+                    <a href="javascript:void(0);" class="nxl-head-link me-0" data-bs-toggle="dropdown" role="button"
+                        data-bs-auto-close="outside" id="header-approvals-trigger" title="{{ __('ui.approvals') }}">
                         <i class="feather-check-square"></i>
                         <span class="badge bg-success nxl-h-badge d-none" id="header-approvals-badge">0</span>
                     </a>
-                    <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-timesheets-menu" style="min-width: 330px;">
-                        <div class="d-flex justify-content-between align-items-center timesheets-head px-3 py-2 border-bottom">
+                    <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-timesheets-menu"
+                        style="min-width: 330px;">
+                        <div
+                            class="d-flex justify-content-between align-items-center timesheets-head px-3 py-2 border-bottom">
                             <h6 class="fw-bold text-dark mb-0">{{ __('ui.approvals') }}</h6>
                             <span class="fs-11 text-muted text-end ms-auto" id="header-approvals-status-text"></span>
                         </div>
-                        <div class="timesheets-body erp-approval-list p-0" id="header-approvals-list" style="max-height: 350px; overflow-y: auto;">
+                        <div class="timesheets-body erp-approval-list p-0" id="header-approvals-list"
+                            style="max-height: 350px; overflow-y: auto;">
                             <div class="text-center py-4 text-muted" id="header-approvals-loading">
-                                <span class="spinner-border spinner-border-sm text-primary me-1" role="status" aria-hidden="true"></span>
+                                <span class="spinner-border spinner-border-sm text-primary me-1" role="status"
+                                    aria-hidden="true"></span>
                                 <span class="fs-12">Loading approvals...</span>
                             </div>
                         </div>
                         <div class="text-center timesheets-footer py-2 border-top" id="header-approvals-footer">
-                            <span class="fs-12 text-muted fw-semibold" id="header-approvals-footer-text">{{ __('ui.approvals') }}</span>
+                            <span class="fs-12 text-muted fw-semibold"
+                                id="header-approvals-footer-text">{{ __('ui.approvals') }}</span>
                         </div>
                     </div>
                 </div>
@@ -536,21 +597,29 @@
                 <div class="dropdown nxl-h-item">
                     <a href="javascript:void(0);" data-bs-toggle="dropdown" role="button" data-bs-auto-close="outside">
                         @if($headerEmployee && !empty($headerEmployee->photo))
-                            <img src="{{ asset('storage/' . $headerEmployee->photo) }}" alt="user-image" class="img-fluid user-avtar me-0 object-fit-cover" style="width: 38px; height: 38px; border-radius: 50%;">
+                            <img src="{{ asset('storage/' . $headerEmployee->photo) }}" alt="user-image"
+                                class="img-fluid user-avtar me-0 object-fit-cover"
+                                style="width: 38px; height: 38px; border-radius: 50%;">
                         @else
-                            <img src="{{ asset('assets/images/avatar/1.png') }}" alt="user-image" class="img-fluid user-avtar me-0">
+                            <img src="{{ asset('assets/images/avatar/1.png') }}" alt="user-image"
+                                class="img-fluid user-avtar me-0">
                         @endif
                     </a>
                     <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-user-dropdown">
                         <div class="dropdown-header">
                             <a href="{{ $headerProfileUrl }}" class="d-flex align-items-center text-decoration-none">
                                 @if($headerEmployee && !empty($headerEmployee->photo))
-                                    <img src="{{ asset('storage/' . $headerEmployee->photo) }}" alt="user-image" class="img-fluid user-avtar object-fit-cover" style="width: 38px; height: 38px; border-radius: 50%;">
+                                    <img src="{{ asset('storage/' . $headerEmployee->photo) }}" alt="user-image"
+                                        class="img-fluid user-avtar object-fit-cover"
+                                        style="width: 38px; height: 38px; border-radius: 50%;">
                                 @else
-                                    <img src="{{ asset('assets/images/avatar/1.png') }}" alt="user-image" class="img-fluid user-avtar">
+                                    <img src="{{ asset('assets/images/avatar/1.png') }}" alt="user-image"
+                                        class="img-fluid user-avtar">
                                 @endif
                                 <div>
-                                    <h6 class="text-dark mb-0">{{ auth()->user()->name ?? __('ui.erp_admin') }} <span class="badge bg-soft-success text-success ms-1">{{ $currentTenant['plan'] }}</span></h6>
+                                    <h6 class="text-dark mb-0">{{ auth()->user()->name ?? __('ui.erp_admin') }} <span
+                                            class="badge bg-soft-success text-success ms-1">{{ $currentTenant['plan'] }}</span>
+                                    </h6>
                                     <span class="fs-12 fw-medium text-muted">{{ auth()->user()->email ?? '' }}</span>
                                 </div>
                             </a>

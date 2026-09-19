@@ -539,8 +539,7 @@
                 <div class="d-block d-md-none mb-3 mobile-tabs-wrapper p-2 rounded border">
                     <x-ui.horizontal-tabs id="mobileProductionOrderTabs" :tabs="$verticalTabs" />
                 </div>
-                <div class="tab-content production-order-tab-content p-2"
-                    id="productionOrderVerticalTabsContent">
+                <div class="tab-content production-order-tab-content p-2" id="productionOrderVerticalTabsContent">
 
                     {{-- Tab 1: Overview --}}
                     <div class="tab-pane fade {{ $activeTab === 'vtab-overview' ? 'show active' : '' }}" id="vtab-overview"
@@ -616,7 +615,8 @@
                                     </x-ui.table>
                                 @else
                                     <div class="alert alert-warning py-2 px-3 fs-12 mb-0">
-                                        <i class="feather-alert-triangle me-1"></i> No schedule has been generated for this production order yet.
+                                        <i class="feather-alert-triangle me-1"></i> No schedule has been generated for this
+                                        production order yet.
                                     </div>
                                 @endif
                             </div>
@@ -686,28 +686,32 @@
                                 <div class="card border border-success-subtle bg-soft-success p-3 text-center">
                                     <span class="text-success text-uppercase fs-11 fw-bold">Ready Operations</span>
                                     <h3 class="fw-bold text-success mb-0 mt-1">
-                                        {{ $readiness['ready_operations_count'] ?? 0 }}</h3>
+                                        {{ $readiness['ready_operations_count'] ?? 0 }}
+                                    </h3>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="card border border-info-subtle bg-soft-info p-3 text-center">
                                     <span class="text-info text-uppercase fs-11 fw-bold">Sequential Waiting</span>
                                     <h3 class="fw-bold text-info mb-0 mt-1">
-                                        {{ $readiness['waiting_operations_count'] ?? 0 }}</h3>
+                                        {{ $readiness['waiting_operations_count'] ?? 0 }}
+                                    </h3>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="card border border-warning-subtle bg-soft-warning p-3 text-center">
                                     <span class="text-warning-emphasis text-uppercase fs-11 fw-bold">Partially Ready</span>
                                     <h3 class="fw-bold text-warning-emphasis mb-0 mt-1">
-                                        {{ $readiness['partial_operations_count'] ?? 0 }}</h3>
+                                        {{ $readiness['partial_operations_count'] ?? 0 }}
+                                    </h3>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="card border border-danger-subtle bg-soft-danger p-3 text-center">
                                     <span class="text-danger text-uppercase fs-11 fw-bold">Actionable Blockers</span>
                                     <h3 class="fw-bold text-danger mb-0 mt-1">
-                                        {{ $readiness['actionable_blockers_count'] ?? 0 }}</h3>
+                                        {{ $readiness['actionable_blockers_count'] ?? 0 }}
+                                    </h3>
                                 </div>
                             </div>
                         </div>
@@ -892,7 +896,8 @@
                                     <div class="card shadow-sm border p-3 bg-soft-primary h-100">
                                         <span class="fs-11 text-uppercase text-primary fw-bold">Authoritative Cost</span>
                                         <div class="fs-18 fw-bold text-primary mt-1">
-                                            {{ format_currency($subcost['authoritative'] ?? 0) }}</div>
+                                            {{ format_currency($subcost['authoritative'] ?? 0) }}
+                                        </div>
                                         <small class="text-muted fs-11 mt-1">Lifecycle:
                                             {{ ($subcost['actual'] ?? 0) > 0 ? 'Actual Vendor Bill' : (($subcost['committed'] ?? 0) > 0 ? 'PO Committed' : 'Routing Estimate') }}</small>
                                     </div>
@@ -1091,13 +1096,15 @@
                                                             <div class="text-danger fs-10 fw-bold mt-1">Accepted:
                                                                 {{ number_format($receivedQty - $rejectedQty, 2) }} | Rej:
                                                                 {{ number_format($rejectedQty, 2) }} | Scrap:
-                                                                {{ number_format($scrappedQty, 2) }}</div>
+                                                                {{ number_format($scrappedQty, 2) }}
+                                                            </div>
                                                         @endif
                                                     </td>
                                                     <td class="align-top font-monospace fw-bold text-end">
                                                         {{ format_currency($extOp->subcontract_cost_per_unit * $order->quantity_ordered) }}
                                                         <div class="fs-10 text-muted">@
-                                                            {{ format_currency($extOp->subcontract_cost_per_unit) }}/unit</div>
+                                                            {{ format_currency($extOp->subcontract_cost_per_unit) }}/unit
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             @empty
@@ -1121,7 +1128,8 @@
                             @if($hasCompanyMaterialOps || $order->production_model === 'subcontract_company_material' || $order->production_model === 'hybrid')
                                 <div class="card border shadow-sm mb-4">
                                     <div class="card-header bg-light py-2">
-                                        <h6 class="fw-bold text-dark mb-0"><i class="feather-box me-1 text-warning"></i>Company Material Balance at Subcontractor</h6>
+                                        <h6 class="fw-bold text-dark mb-0"><i class="feather-box me-1 text-warning"></i>Company
+                                            Material Balance at Subcontractor</h6>
                                     </div>
                                     <div class="table-responsive">
                                         <table class="table table-sm align-middle mb-0 fs-12">
@@ -1143,17 +1151,22 @@
                                                     @endphp
                                                     <tr>
                                                         <td class="fw-bold text-dark">{{ $extOp->operation_number }} —
-                                                            {{ $extOp->name }}</td>
+                                                            {{ $extOp->name }}
+                                                        </td>
                                                         <td>{{ $order->product->name }} (Component/Raw)</td>
                                                         <td class="text-end font-monospace">{{ number_format($bal['sent'], 2) }}</td>
                                                         <td class="text-end font-monospace text-success">
-                                                            {{ number_format($bal['consumed'], 2) }}</td>
+                                                            {{ number_format($bal['consumed'], 2) }}
+                                                        </td>
                                                         <td class="text-end font-monospace text-info">
-                                                            {{ number_format($bal['returned'], 2) }}</td>
+                                                            {{ number_format($bal['returned'], 2) }}
+                                                        </td>
                                                         <td class="text-end font-monospace text-danger">
-                                                            {{ number_format($bal['scrapped'], 2) }}</td>
+                                                            {{ number_format($bal['scrapped'], 2) }}
+                                                        </td>
                                                         <td class="text-end font-monospace fw-bold text-warning">
-                                                            {{ number_format($bal['remaining'], 2) }}</td>
+                                                            {{ number_format($bal['remaining'], 2) }}
+                                                        </td>
                                                     </tr>
                                                 @empty
                                                     <tr>
@@ -1870,7 +1883,7 @@
                             }
 
                             #componentPlanSubTabs .nav-link.active {
-                                background-color: var(--bs-primary, #0000FF) !important;
+                                background-color: var(--bs-primary, #6337fa) !important;
                                 color: #ffffff !important;
                                 box-shadow: 0 2px 6px rgba(0, 0, 255, 0.25) !important;
                             }
@@ -2284,7 +2297,8 @@
                                                     </td>
                                                     <td class="text-end font-monospace fw-bold">
                                                         {{ number_format($targetQty, 2) }}
-                                                        {{ $opProduct?->uom?->code ?? 'Pcs' }}</td>
+                                                        {{ $opProduct?->uom?->code ?? 'Pcs' }}
+                                                    </td>
                                                     <td class="text-center">
                                                         @if($treeOp->status === 'completed')
                                                             <span
@@ -2327,7 +2341,8 @@
                                                             @endif
                                                         </td>
                                                         <td class="text-end font-monospace fs-11">{{ number_format($reqQty, 2) }}
-                                                            {{ $matProd?->uom?->code ?? 'units' }}</td>
+                                                            {{ $matProd?->uom?->code ?? 'units' }}
+                                                        </td>
                                                         <td class="text-center fs-11">
                                                             @if(($treeOp->quantity_scrapped + $treeOp->quantity_rejected) > 0)
                                                                 <span
@@ -2366,7 +2381,8 @@
                                                 </td>
                                                 <td class="text-end font-monospace text-dark fw-bold">
                                                     {{ number_format($order->quantity_ordered, 2) }}
-                                                    {{ $order->product?->uom?->code ?? 'Pcs' }}</td>
+                                                    {{ $order->product?->uom?->code ?? 'Pcs' }}
+                                                </td>
                                                 <td class="text-center">
                                                     <span
                                                         class="badge bg-soft-success text-success border border-success-subtle px-2 py-1 fs-11">
@@ -2802,14 +2818,18 @@
                                                         {{ \Carbon\Carbon::parse($insp->inspected_at ?? $insp->created_at)->format('Y-m-d H:i') }}
                                                     </td>
                                                     <td class="fw-bold font-monospace text-primary">
-                                                        {{ $insp->inspection_number }}</td>
+                                                        {{ $insp->inspection_number }}
+                                                    </td>
                                                     <td>{{ $insp->operation ? $insp->operation->name : 'Order Header' }}</td>
                                                     <td class="text-center fw-bold">
-                                                        {{ number_format($insp->inspected_quantity, 0) }}</td>
+                                                        {{ number_format($insp->inspected_quantity, 0) }}
+                                                    </td>
                                                     <td class="text-center text-success fw-bold">
-                                                        {{ number_format($insp->passed_qty, 0) }}</td>
+                                                        {{ number_format($insp->passed_qty, 0) }}
+                                                    </td>
                                                     <td class="text-center text-danger fw-bold">
-                                                        {{ number_format($insp->failed_qty, 0) }}</td>
+                                                        {{ number_format($insp->failed_qty, 0) }}
+                                                    </td>
                                                     <td>
                                                         @if($insp->result === 'passed')
                                                             <span class="badge bg-success text-white">Passed</span>
@@ -3048,7 +3068,8 @@
                                         <tr>
                                             <td class="fw-bold">{{ $opVar['sequence'] ?? '—' }}</td>
                                             <td class="fw-semibold text-dark">
-                                                {{ $opVar['operation_name'] ?? $opVar['name'] ?? 'Operation' }}</td>
+                                                {{ $opVar['operation_name'] ?? $opVar['name'] ?? 'Operation' }}
+                                            </td>
                                             <td class="text-end">
                                                 {{ number_format($opVar['planned_time_minutes'] ?? $opVar['planned_total_time'] ?? 0, 1) }}m
                                             </td>
@@ -3631,7 +3652,8 @@
                                                 @endif
                                             </td>
                                             <td class="text-center fw-semibold">
-                                                {{ $slip->items->pluck('product_id')->unique()->count() }}</td>
+                                                {{ $slip->items->pluck('product_id')->unique()->count() }}
+                                            </td>
                                             <td>
                                                 @if($slip->purchaseRequisitions->isNotEmpty())
                                                     @foreach($slip->purchaseRequisitions as $pr)
@@ -3760,7 +3782,8 @@
                     @foreach($order->operations as $op)
                         @if($op->status !== 'completed')
                             <option value="{{ $op->id }}">{{ $op->operation_number }} —
-                                {{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}</option>
+                                {{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}
+                            </option>
                         @endif
                     @endforeach
                 </x-ui.odoo-form-ui>

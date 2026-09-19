@@ -10,12 +10,12 @@
 ])
 
 @php
-    $trendClass = match($trendDirection) {
+    $trendClass = match ($trendDirection) {
         'up' => 'text-success',
         'down' => 'text-danger',
         default => 'text-muted',
     };
-    $trendIcon = match($trendDirection) {
+    $trendIcon = match ($trendDirection) {
         'up' => 'feather-arrow-up-right',
         'down' => 'feather-arrow-down-right',
         default => 'feather-minus',
@@ -26,7 +26,8 @@
     <div class="card-body {{ $variant === 'compact' ? 'p-3' : 'p-4' }}">
         <div class="d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center gap-3">
-                <div class="avatar-text avatar-lg bg-soft-{{ $color }} text-{{ $color }} rounded-3 d-flex align-items-center justify-content-center">
+                <div
+                    class="avatar-text avatar-lg bg-soft-{{ $color }} text-{{ $color }} rounded-3 d-flex align-items-center justify-content-center">
                     <i class="{{ $icon }} fs-4"></i>
                 </div>
                 <div>
@@ -40,7 +41,8 @@
 
             @if ($trend)
                 <div class="text-end">
-                    <span class="badge bg-soft-{{ $trendDirection === 'up' ? 'success' : ($trendDirection === 'down' ? 'danger' : 'secondary') }} {{ $trendClass }} fw-bold px-2 py-1 fs-12">
+                    <span
+                        class="badge bg-soft-{{ $trendDirection === 'up' ? 'success' : ($trendDirection === 'down' ? 'danger' : 'secondary') }} {{ $trendClass }} fw-bold px-2 py-1 fs-12">
                         <i class="{{ $trendIcon }} me-1"></i>{{ $trend }}
                     </span>
                 </div>

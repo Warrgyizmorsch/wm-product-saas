@@ -100,6 +100,7 @@ class SchedulingCalendarService
         // All order ops for sequence/dependency violations
         $orderIds = $operations->pluck('production_order_id')->unique()->toArray();
         $allOrderOps = ProductionScheduleOperation::whereIn('production_order_id', $orderIds)
+            ->with(['orderOperation.predecessorDependencies', 'orderOperation.routingOperation', 'order'])
             ->orderBy('sequence')
             ->get()
             ->groupBy('production_order_id');
@@ -165,14 +166,11 @@ class SchedulingCalendarService
                     return $overlapStart->lt($overlapFinish);
                 });
 
-                $activeMachineCount = $wc->machines->where('status', Machine::STATUS_ACTIVE)->count() ?: 1;
-                $perMachineShiftCap = $availMinutes > 0 ? ($availMinutes / $activeMachineCount) : 450.0;
-
-                $allocatedMinutes = $dayOps->sum(function($op) use ($date, $perMachineShiftCap) {
-                    $overlapStart = $op->planned_start->max($date->copy()->startOfDay());
-                    $overlapFinish = $op->planned_finish->min($date->copy()->endOfDay());
-                    $rawMinutes = max(0, $overlapStart->diffInMinutes($overlapFinish));
-                    return min($perMachineShiftCap, $rawMinutes);
+                $allocatedMinutes = $dayOps->sum(function($op) use ($date) {
+                    if ($op->orderOperation && (bool) $op->orderOperation->is_external) {
+                        return 0.0;
+                    }
+                    return $this->schedulingService->calculateOperationScheduledMinutesOnDate($op, $date);
                 });
 
                 $isOverCapacity = $allocatedMinutes > $availMinutes;
@@ -548,8 +546,60 @@ class SchedulingCalendarService
 
         // 5. Dependency / Sequence Violation
         $orderOps = $allOrderOps->get($op->production_order_id, collect());
-        foreach ($orderOps as $otherOp) {
-            if ($otherOp->sequence < $op->sequence) {
+        $orderOp = $op->orderOperation;
+
+        if ($orderOp && $orderOps->count() > 1) {
+            $predecessorOrderOpIds = [];
+
+            if ($orderOp->previous_operation_id) {
+                $predecessorOrderOpIds[] = $orderOp->previous_operation_id;
+            }
+
+            if ($orderOp->relationLoaded('predecessorDependencies')) {
+                foreach ($orderOp->predecessorDependencies as $pred) {
+                    $predecessorOrderOpIds[] = $pred->id;
+                }
+            } else {
+                $predIds = \App\Domains\Production\Models\ProductionOrderOperationDependency::where('tenant_id', $op->tenant_id ?? 1)
+                    ->where('operation_id', $orderOp->id)
+                    ->pluck('predecessor_operation_id')
+                    ->toArray();
+                $predecessorOrderOpIds = array_merge($predecessorOrderOpIds, $predIds);
+            }
+
+            $predecessorOrderOpIds = array_unique(array_filter($predecessorOrderOpIds));
+
+            // Fallback for single-routing / linear orders where previous_operation_id is not set
+            if (empty($predecessorOrderOpIds)) {
+                $sameRoutingPrev = $orderOps->filter(function ($prevSchedOp) use ($op, $orderOp) {
+                    $prevOrderOp = $prevSchedOp->orderOperation;
+                    if (!$prevOrderOp) return false;
+
+                    $sameSource = ($orderOp->source_routing_id && $prevOrderOp->source_routing_id)
+                        ? ($orderOp->source_routing_id === $prevOrderOp->source_routing_id)
+                        : ($orderOp->production_order_id === $prevOrderOp->production_order_id);
+
+                    return $sameSource && $prevSchedOp->sequence < $op->sequence;
+                })->sortByDesc('sequence')->first();
+
+                if ($sameRoutingPrev && $sameRoutingPrev->production_order_operation_id) {
+                    $predecessorOrderOpIds[] = $sameRoutingPrev->production_order_operation_id;
+                }
+            }
+
+            $opByOrderOpId = [];
+            foreach ($orderOps as $o) {
+                if ($o->production_order_operation_id) {
+                    $opByOrderOpId[$o->production_order_operation_id] = $o;
+                }
+            }
+
+            foreach ($predecessorOrderOpIds as $predOrderOpId) {
+                $otherOp = $opByOrderOpId[$predOrderOpId] ?? null;
+                if (!$otherOp) {
+                    continue;
+                }
+
                 $predOrderOp = $otherOp->orderOperation;
                 if ($predOrderOp && (bool) ($predOrderOp->queue_threshold_enabled ?? $predOrderOp->overlap_enabled)) {
                     $batchQty = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
@@ -614,14 +664,14 @@ class SchedulingCalendarService
      */
     public function getOperationConflicts(int $schedOpId): array
     {
-        $op = ProductionScheduleOperation::with(['orderOperation', 'workCenter', 'machine', 'order'])->find($schedOpId);
+        $op = ProductionScheduleOperation::with(['orderOperation.predecessorDependencies', 'orderOperation.routingOperation', 'workCenter', 'machine', 'order'])->find($schedOpId);
         if (!$op) {
             return ['has_conflict' => false, 'conflicts' => []];
         }
 
         $allOrderOps = collect([
             $op->production_order_id => ProductionScheduleOperation::where('production_order_id', $op->production_order_id)
-                ->with(['orderOperation', 'order'])
+                ->with(['orderOperation.predecessorDependencies', 'orderOperation.routingOperation', 'order'])
                 ->get()
         ]);
 
