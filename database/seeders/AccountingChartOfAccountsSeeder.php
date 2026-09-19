@@ -16,7 +16,7 @@ class AccountingChartOfAccountsSeeder extends Seeder
     {
         // Common masters: every tenant whose plan includes Accounting gets the same defaults, each on its own default
         // company/branch so they show up in the company-scoped UI.
-        foreach (Tenant::query()->orderBy('id')->get() as $tenant) {
+        foreach (Tenant::query()->when(config('tenancy.seed_only'), fn ($q, $slugs) => $q->whereIn('slug', $slugs))->orderBy('id')->get() as $tenant) {
             if (! $tenant->hasModule('accounting')) {
                 continue;
             }
@@ -25,7 +25,8 @@ class AccountingChartOfAccountsSeeder extends Seeder
             app(TenantRunner::class)->run($tenant, function () use ($tenant): void {
                 [$company, $branch] = app(DefaultOrganization::class)->ensure($tenant);
 
-                app(ChartOfAccountsService::class)->provisionDefaults($tenant->id, $company->id, $branch->id);
+                // IfMissing: never re-apply the template over a chart the tenant already has/renamed.
+                app(ChartOfAccountsService::class)->provisionDefaultsIfMissing($tenant->id, $company->id, $branch->id);
                 app(TaxRateService::class)->provisionDefaultsIfMissing($tenant->id, $company->id, $branch->id);
                 app(FiscalPeriodService::class)->provisionCurrentFiscalYearIfMissing($tenant->id, $company->id, $branch->id);
             });
