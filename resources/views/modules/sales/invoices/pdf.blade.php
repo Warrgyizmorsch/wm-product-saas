@@ -306,7 +306,7 @@
                         </tr>
                         <tr>
                             <td class="meta-label">Terms:</td>
-                            <td class="meta-value">{{ $invoice->salesOrder?->payment_terms ?: 'Immediate Payment' }}</td>
+                            <td class="meta-value">{{ \App\Domains\Platform\Models\PaymentTerm::getLabel($invoice->payment_terms ?: $invoice->salesOrder?->payment_terms) }}</td>
                         </tr>
                     </table>
                 </div>

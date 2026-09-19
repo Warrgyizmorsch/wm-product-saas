@@ -494,24 +494,32 @@
         }
 
         // Toast helper for AJAX flows, mirroring the config used by the x-ui.toast component
-        // (which only fires from server-rendered session flash on full page loads).
+        window.showAppToast = function (type, message) {
+            if (!message) return;
+            var iconType = (type === 'danger' || type === 'error') ? 'error' : (type === 'warning' ? 'warning' : 'success');
+            if (typeof Swal !== 'undefined') {
+                Swal.mixin({
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 4000,
+                    timerProgressBar: true,
+                    didOpen: function (toast) {
+                        toast.addEventListener('mouseenter', Swal.stopTimer);
+                        toast.addEventListener('mouseleave', Swal.resumeTimer);
+                    }
+                }).fire({
+                    icon: iconType,
+                    title: message
+                });
+            } else if (typeof toastr !== 'undefined') {
+                if (iconType === 'error') toastr.error(message);
+                else if (iconType === 'warning') toastr.warning(message);
+                else toastr.success(message);
+            }
+        };
         function showAppToast(type, message) {
-            if (typeof Swal === 'undefined' || !message) return;
-
-            Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                showConfirmButton: false,
-                timer: 5000,
-                timerProgressBar: true,
-                didOpen: function (toast) {
-                    toast.addEventListener('mouseenter', Swal.stopTimer);
-                    toast.addEventListener('mouseleave', Swal.resumeTimer);
-                }
-            }).fire({
-                icon: type,
-                title: message
-            });
+            window.showAppToast(type, message);
         }
     </script>
 

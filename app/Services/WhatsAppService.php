@@ -258,8 +258,29 @@ class WhatsAppService
         $pdfBinary = $pdf->output();
         $filename = "Quotation_{$quotation->quotation_number}.pdf";
 
-        $defaultCaption = "Dear Valued Client,\n\nPlease find attached Quotation *{$quotation->quotation_number}* for your review.\n\nThank you,\nSales Team";
+        $dealTitle = $quotation->crmDeal?->title ?: ($quotation->lead?->title ?: 'your enquiry');
+        $totalFormatted = format_currency($quotation->total_amount);
+
+        $defaultCaption = "Dear Valued Client,\n\n"
+            . "Please find attached Quotation *{$quotation->quotation_number}* for *{$dealTitle}* (Total: *{$totalFormatted}*).\n\n"
+            . "👉 *Please respond with one of the options below:*\n"
+            . "1️⃣ Reply *1* or *ACCEPT* to Accept Quotation\n"
+            . "2️⃣ Reply *2* or *REJECT [reason]* to Reject Quotation\n\n"
+            . "Thank you,\nSales Team";
+
         $caption = $customCaption ?: $defaultCaption;
+
+        $updateData = ['phone' => $mobile];
+        if (in_array($quotation->status, ['Draft', 'Approved', 'Pending Approval'])) {
+            $updateData['status'] = 'Quotation Sent';
+        }
+        $quotation->update($updateData);
+
+        if (isset($updateData['status'])) {
+            try {
+                app(\App\Domains\CRM\Services\QuotationService::class)->handleQuotationStatusChange($quotation, 'Quotation Sent');
+            } catch (\Throwable $e) {}
+        }
 
         return $this->sendDocument(
             mobile: $mobile,
@@ -269,3 +290,4 @@ class WhatsAppService
         );
     }
 }
+

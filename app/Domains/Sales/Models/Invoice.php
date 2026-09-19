@@ -23,6 +23,7 @@ class Invoice extends BaseModel
         'invoice_number',
         'invoice_date',
         'due_date',
+        'payment_terms',
         'status',
         'subtotal',
         'tax_amount',

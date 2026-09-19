@@ -4,6 +4,7 @@ return [
     'savings_dashboard' => 'बचत डैशबोर्ड',
     'purchase_requests' => 'खरीद अनुरोध',
     'pending_pr_items' => 'लंबित पीआर आइटम',
+    'rfq' => 'RFQ',
     'rfqs' => 'कोटेशन अनुरोध (RFQs)',
     'purchase_orders' => 'खरीद आदेश',
     'goods_receipts' => 'GRN (माल रसीदें)',
@@ -1238,5 +1239,6 @@ return [
     'tax_rate'                              => 'कर की दर',
     'terms_and_notes'                       => 'शर्तें और नोट्स',
     'no_additional_terms_specified'         => 'इस खरीद आदेश के लिए कोई अतिरिक्त शर्तें या नोट निर्दिष्ट नहीं हैं।',
+    'js_assign_supplier_to_all_items'       => 'कृपया प्रत्येक आइटम के लिए कम से कम एक सप्लायर चुनें।',
 ];
 

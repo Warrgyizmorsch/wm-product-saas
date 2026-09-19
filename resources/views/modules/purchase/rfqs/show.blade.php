@@ -14,14 +14,8 @@
 
         @if($rfq->status === 'Draft')
             <a href="{{ route('purchase.rfqs.edit', $rfq->id) }}" class="btn btn-warning">
-                <i class="feather-edit me-2"></i>{{ __('purchase.edit_draft') }}
+                <i class="feather-edit me-2"></i>{{ __('purchase.edit_rfq') }}
             </a>
-            <form action="{{ route('purchase.rfqs.send', $rfq->id) }}" method="POST" class="d-inline">
-                @csrf
-                <button type="submit" class="btn btn-info text-white">
-                    <i class="feather-mail me-2"></i>{{ __('purchase.send_rfq_vendors') }}
-                </button>
-            </form>
         @endif
 
         @if($rfq->status === 'Received')
@@ -308,6 +302,10 @@
                     </div>
                 @endif
 
+                <form id="sendRfqActionForm" action="{{ route('purchase.rfqs.send', $rfq->id) }}" method="POST" class="d-none">
+                    @csrf
+                </form>
+
                 <!-- Absolute ERP Vendor Quotations Update Form -->
                 <form action="{{ route('purchase.rfqs.save-comparison', $rfq->id) }}" method="POST" enctype="multipart/form-data">
                     @csrf
@@ -317,8 +315,11 @@
                             <div>
                                 <h5 class="fw-bold text-dark mb-0"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.update_rate_supplier') }}</h5>
                             </div>
-                            <div>
-                                <button type="submit" class="btn btn-primary px-4 py-2 fw-semibold" style="background-color: #714B67; border-color: #714B67;">
+                            <div class="d-flex align-items-center gap-2">
+                                <button type="button" class="btn btn-success text-white px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm" onclick="$('#sendRfqActionForm').submit();">
+                                    <i class="feather-message-circle"></i> {{ __('purchase.send_rfq_vendors') }}
+                                </button>
+                                <button type="submit" class="btn btn-primary px-4 py-2 fw-semibold shadow-sm" style="background-color: #714B67; border-color: #714B67;">
                                     <i class="feather-save me-2"></i>{{ __('purchase.save_quotation_matrix') }}
                                 </button>
                             </div>
@@ -382,7 +383,10 @@
                                                 </div>
                                             </div>
                                             <div class="card-body p-3">
-                                                <div class="d-flex gap-2 mb-3">
+                                                <div class="d-flex align-items-center gap-1.5 mb-3">
+                                                    <button type="button" class="btn btn-xs btn-outline-success send-whatsapp-vendor-btn d-inline-flex align-items-center justify-content-center p-1.5" style="border-radius: 6px; width: 32px; height: 32px;" data-vendor-rfq-id="{{ $rv->id }}" data-vendor-name="{{ $rv->vendor?->name }}" data-vendor-phone="{{ $rv->vendor?->phone }}" title="Send WhatsApp">
+                                                        <i class="feather-message-circle fs-14"></i>
+                                                    </button>
                                                     <button type="button" class="btn btn-xs btn-outline-primary copy-portal-btn flex-fill fw-semibold py-1.5" data-link="{{ route('purchase.rfqs.portal', $rv->token) }}">
                                                         <i class="feather-copy me-1"></i>{{ __('purchase.copy_portal_link') }}
                                                     </button>
@@ -448,9 +452,15 @@
                                                                     <input type="date" class="odoo-table-input matrix-sync-input" data-sync="#dt_deliv_{{ $rv->id }}_{{ $item->product_id }}" value="{{ $quotedDeliv }}">
                                                                 </div>
                                                                 <div class="col-6">
-                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-trending-up me-0.5"></i>{{ __('purchase.total') }} ({{ $currency }})</label>
-                                                                    <div class="odoo-table-input bg-soft-success fw-bold text-success text-end font-monospace mob-total-val" id="mob_total_{{ $rv->id }}_{{ $item->product_id }}">
-                                                                        {{ number_format($totalCost, 2, '.', '') }}
+                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-shield me-0.5"></i>{{ __('purchase.validity_date') }}</label>
+                                                                    <input type="date" class="odoo-table-input matrix-sync-input" data-sync="#dt_valid_{{ $rv->id }}_{{ $item->product_id }}" value="{{ $quotedValid }}">
+                                                                </div>
+                                                                <div class="col-12 mt-1">
+                                                                    <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light border">
+                                                                        <span class="fs-11 fw-semibold text-muted">{{ __('purchase.item_total') }}:</span>
+                                                                        <span class="font-monospace fw-bold text-dark fs-12 mob-item-total" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}">
+                                                                            {{ $totalCost > 0 ? format_currency($totalCost) : '—' }}
+                                                                        </span>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -458,8 +468,9 @@
                                                     @endif
                                                 @endforeach
                                                 @if($mappedCount === 0)
-                                                    <div class="text-center py-3 text-muted">
-                                                        <i class="feather-info mb-1"></i> {{ __('purchase.no_items_assigned_vendor') }}
+                                                    <div class="text-center py-4 text-muted fs-12">
+                                                        <i class="feather-alert-circle d-block fs-18 mb-1"></i>
+                                                        {{ __('purchase.no_items_inquired_vendor') }}
                                                     </div>
                                                 @endif
                                             </div>
@@ -469,33 +480,33 @@
                             </div>
                         </div>
 
-                        <!-- DESKTOP COMPARISON MATRIX TABLE -->
-                        <div class="d-none d-md-block table-responsive rounded">
-                            <table class="odoo-table rfq-matrix-table align-middle fs-12 text-dark mb-0" style="min-width: 1000px; width: 100%;">
-                                <thead class="table-light">
+                        <!-- ===================== DESKTOP COMPARISON MATRIX TABLE ===================== -->
+                        <div class="table-responsive d-none d-md-block shadow-xs border rounded bg-white" style="overflow-x: auto; max-width: 100%;">
+                            <table class="table table-bordered table-sm align-middle fs-12 mb-0 rfq-matrix-table" id="rfqMatrixTable" style="min-width: {{ 450 + (count($rfq->rfqVendors) * 220) }}px;">
+                                <thead class="table-light align-middle">
                                     <tr>
-                                        <th style="width: 3%;" class="text-center align-middle">
-                                            <input type="checkbox" id="select-all-items" class="form-check-input" title="{{ __('purchase.select_all_items') }}">
+                                        <th style="width: 40px;" class="text-center bg-light">
+                                            <input type="checkbox" class="form-check-input select-all-items" id="selectAllItems" title="Select / Deselect All Items">
                                         </th>
-                                        <th style="width: 4%;" class="text-center">{{ __('purchase.s_no') }}</th>
-                                        <th style="width: 23%;">{{ __('purchase.product_description') }}</th>
-                                        <th style="width: 8%;" class="text-center">{{ __('purchase.qty_uom') }}</th>
-                                        <th style="width: 10%;" class="text-muted fw-bold text-end pe-2">{{ __('purchase.vendor_details') }}</th>
+                                        <th style="width: 40px;" class="text-center bg-light">#</th>
+                                        <th style="min-width: 220px;" class="bg-light">{{ __('purchase.product_description') }}</th>
+                                        <th style="width: 100px;" class="text-center bg-light">{{ __('purchase.qty_uom') }}</th>
+                                        <th style="width: 130px;" class="text-end bg-light">{{ __('purchase.vendor_details') }}</th>
                                         
                                         <!-- Loop each Vendor column -->
                                         @foreach($rfq->rfqVendors as $rv)
-                                            <th class="text-center bg-soft-primary border-start font-weight-bold" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                @php
-                                                    $rvDelivDate = $rv->delivery_date
-                                                        ? $rv->delivery_date->format('Y-m-d')
-                                                        : ($rv->rates->whereNotNull('delivery_date')->first()?->delivery_date
-                                                            ? \Carbon\Carbon::parse($rv->rates->whereNotNull('delivery_date')->first()->delivery_date)->format('Y-m-d')
-                                                            : '');
-                                                @endphp
-                                                <div class="form-check d-flex align-items-center justify-content-center gap-1 mb-1">
+                                            @php
+                                                $rvDelivDate = $rv->delivery_date
+                                                    ? $rv->delivery_date->format('Y-m-d')
+                                                    : ($rv->rates->whereNotNull('delivery_date')->first()?->delivery_date
+                                                        ? \Carbon\Carbon::parse($rv->rates->whereNotNull('delivery_date')->first()->delivery_date)->format('Y-m-d')
+                                                        : '');
+                                            @endphp
+                                            <th class="text-center p-2 vendor-col-header" style="min-width: 200px; background-color: #f8fafc;" data-vendor-id="{{ $rv->id }}">
+                                                <div class="form-check d-flex align-items-center justify-content-center gap-1.5 mb-1.5">
                                                     <input type="radio"
-                                                        class="form-check-input supplier-select-radio flex-shrink-0"
-                                                        name="po_vendor"
+                                                        class="form-check-input supplier-po-radio"
+                                                        name="selected_po_vendor"
                                                         id="vendor_radio_{{ $rv->id }}"
                                                         value="{{ $rv->id }}"
                                                         data-vendor-id="{{ $rv->id }}"
@@ -511,11 +522,14 @@
                                                 </div>
                                                 
                                                 <!-- Copy Link & Open Portal Buttons -->
-                                                <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
-                                                    <button type="button" class="btn btn-xs btn-outline-primary copy-portal-btn d-inline-flex align-items-center gap-0.5 py-2 px-2 fs-10" style="border-radius: 12px; font-weight: 500;" data-link="{{ route('purchase.rfqs.portal', $rv->token) }}">
+                                                <div class="d-flex align-items-center justify-content-center gap-1 mb-2">
+                                                    <button type="button" class="btn btn-xs btn-outline-success send-whatsapp-vendor-btn d-inline-flex align-items-center justify-content-center p-1" style="border-radius: 6px; width: 26px; height: 26px;" data-vendor-rfq-id="{{ $rv->id }}" data-vendor-name="{{ $rv->vendor?->name }}" data-vendor-phone="{{ $rv->vendor?->phone }}" title="Send WhatsApp Link">
+                                                        <i class="feather-message-circle" style="font-size: 13px;"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-xs btn-outline-primary copy-portal-btn d-inline-flex align-items-center gap-0.5 py-1 px-1.5 fs-10" style="border-radius: 6px; font-weight: 500;" data-link="{{ route('purchase.rfqs.portal', $rv->token) }}" title="{{ __('purchase.copy') }}">
                                                         <i class="feather-copy" style="font-size: 10px;"></i> {{ __('purchase.copy') }}
                                                     </button>
-                                                    <a href="{{ route('purchase.rfqs.portal', $rv->token) }}" target="_blank" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-0.5 py-2 px-2 fs-10" style="border-radius: 12px; font-weight: 500;">
+                                                    <a href="{{ route('purchase.rfqs.portal', $rv->token) }}" target="_blank" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-0.5 py-1 px-1.5 fs-10" style="border-radius: 6px; font-weight: 500;" title="{{ __('purchase.portal') }}">
                                                         <i class="feather-external-link" style="font-size: 10px;"></i> {{ __('purchase.portal') }}
                                                     </a>
                                                 </div>
@@ -936,10 +950,56 @@
         </x-slot>
     </x-ui.modal>
 
+    <!-- RFQ SEND WHATSAPP STATUS MODAL -->
+    <x-ui.modal id="rfqSendStatusModal" title="<i class='feather-message-circle me-1.5 text-success'></i>WhatsApp Dispatch Status" size="md" :centered="true" :showFooter="false">
+        <div class="py-4 px-3 text-center">
+            <div id="rfqSendStatusIcon" class="mb-3 d-flex justify-content-center"></div>
+            <h4 id="rfqSendStatusTitle" class="fw-bold text-dark mb-2 fs-17"></h4>
+            <div id="rfqSendStatusMessage" class="alert alert-light border text-center fs-13 mb-4 p-3 text-break shadow-2xs rounded-3 mx-auto" style="max-width: 480px; background-color: #f8fafc; border-color: #e2e8f0 !important; color: #334155; line-height: 1.6; white-space: pre-line;"></div>
+            <div class="d-flex justify-content-center mt-2">
+                <button type="button" class="btn btn-primary fw-bold px-5 py-2 fs-13 shadow-2xs rounded-3" data-bs-dismiss="modal" style="min-width: 130px;">OK</button>
+            </div>
+        </div>
+    </x-ui.modal>
+
 @endsection
 
 @push('scripts')
     <script>
+        function showRfqSendModal(status, title, message) {
+            let iconHtml = '';
+            let titleClass = 'fw-bold mb-2 fs-17 ';
+
+            if (status === 'success') {
+                iconHtml = '<div class="avatar avatar-xl bg-soft-success text-success rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 62px; height: 62px; border: 2px solid rgba(34, 197, 94, 0.2);"><i class="feather-check-circle fs-32"></i></div>';
+                titleClass += 'text-success';
+            } else {
+                iconHtml = '<div class="avatar avatar-xl bg-soft-warning text-warning rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 62px; height: 62px; border: 2px solid rgba(234, 179, 8, 0.2);"><i class="feather-alert-triangle fs-32"></i></div>';
+                titleClass += 'text-warning';
+            }
+
+            $('#rfqSendStatusIcon').html(iconHtml);
+            $('#rfqSendStatusTitle').text(title).attr('class', titleClass);
+            $('#rfqSendStatusMessage').text(message);
+
+            const modalEl = document.getElementById('rfqSendStatusModal');
+            if (modalEl) {
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            }
+        }
+
+        // Automatic trigger if redirected from Send RFQ Action
+        @if(session('rfq_dispatch_message'))
+            $(document).ready(function() {
+                showRfqSendModal(
+                    @json(session('rfq_dispatch_status', 'warning')),
+                    @json(session('rfq_dispatch_status') === 'success' ? 'WhatsApp Sent Successfully' : 'WhatsApp Delivery Warning'),
+                    @json(session('rfq_dispatch_message'))
+                );
+            });
+        @endif
+
         $(document).ready(function() {
             // Copy portal link to clipboard helper
             $('.copy-portal-btn').on('click', function() {
@@ -956,6 +1016,44 @@
                     }, 2000);
                 }).catch(err => {
                     console.error('Could not copy portal link:', err);
+                });
+            });
+
+            // Send WhatsApp to individual vendor
+            $(document).on('click', '.send-whatsapp-vendor-btn', function() {
+                const $btn = $(this);
+                const rfqVendorId = $btn.data('vendor-rfq-id');
+                const vendorName = $btn.data('vendor-name');
+                const vendorPhone = $btn.data('vendor-phone');
+
+                if (!vendorPhone) {
+                    showRfqSendModal('warning', 'Missing Contact Number', `Phone number is not configured for supplier: ${vendorName}`);
+                    return;
+                }
+
+                const origHtml = $btn.html();
+                $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1" role="status" style="width:10px;height:10px;"></span>Sending...');
+
+                $.ajax({
+                    url: `/purchase/rfqs/vendors/${rfqVendorId}/send-whatsapp`,
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        phone: vendorPhone
+                    },
+                    success: function(res) {
+                        $btn.prop('disabled', false).html(origHtml);
+                        if (res.success) {
+                            showRfqSendModal('success', 'WhatsApp Delivered', res.message || `WhatsApp link sent to ${vendorName}!`);
+                        } else {
+                            showRfqSendModal('warning', 'Delivery Alert', res.message || 'Failed to send WhatsApp message.');
+                        }
+                    },
+                    error: function(xhr) {
+                        $btn.prop('disabled', false).html(origHtml);
+                        const msg = xhr.responseJSON?.message || 'Error occurred while sending WhatsApp.';
+                        showRfqSendModal('warning', 'WhatsApp Warning', msg);
+                    }
                 });
             });
 

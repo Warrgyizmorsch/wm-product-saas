@@ -1403,6 +1403,22 @@
 
                         @elseif($activeQuotation)
                             <!-- ACTIVE QUOTATION DETAILS CARD VIEW -->
+                            @if (in_array($activeQuotation->status, ['Rejected', 'Declined']))
+                                <div class="alert alert-danger border-danger border-start border-4 shadow-sm mb-3 d-print-none" role="alert" style="background-color: #fff5f5;">
+                                    <div class="d-flex align-items-start">
+                                        <div class="avatar-text avatar-md bg-danger text-white me-3 mt-0.5 rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                                            <i class="feather-x-circle fs-18"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h6 class="alert-heading fw-bold text-danger mb-1"><i class="feather-alert-triangle me-1"></i> Quotation Rejected by Client</h6>
+                                            <p class="fs-13 text-dark mb-0">
+                                                <strong>Rejection Reason / Client Feedback:</strong> 
+                                                <span class="text-danger fw-semibold">{{ $activeQuotation->rejection_reason ?: 'No specific reason provided.' }}</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
                             <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionQuotations">
                                 <div class="card-body p-4">
                                     <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4 flex-wrap gap-2">
@@ -1574,6 +1590,12 @@
                                                 <span class="badge bg-soft-{{ $qBadgeColor }} text-{{ $qBadgeColor }} border border-{{ $qBadgeColor }}-subtle px-2.5 py-1 fw-bold fs-12">
                                                     {{ $activeQuotation->status }}
                                                 </span>
+                                                @if ($activeQuotation->status === 'Rejected' && $activeQuotation->rejection_reason)
+                                                    <div class="mt-1.5 fs-12 text-danger fw-semibold d-flex align-items-center">
+                                                        <i class="feather-alert-triangle me-1 fs-13"></i>
+                                                        <span><strong>Reason:</strong> {{ $activeQuotation->rejection_reason }}</span>
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -1686,7 +1708,19 @@
                                                         <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'quotation_id' => $rev->id]) }}" class="fw-bold text-dark text-decoration-none">
                                                             {{ $rev->quotation_number }}
                                                         </a>
-                                                        <span class="text-muted mt-0.5" style="font-size: 9px;">{{ format_currency($rev->total_amount) }}</span>
+                                                        <div class="d-flex align-items-center gap-1 mt-0.5">
+                                                            <span class="text-muted" style="font-size: 9px;">{{ format_currency($rev->total_amount) }}</span>
+                                                            @if($rev->status === 'Rejected')
+                                                                <span class="badge bg-soft-danger text-danger px-1 py-0" style="font-size: 8px;">Rejected</span>
+                                                            @elseif($rev->status === 'Accepted')
+                                                                <span class="badge bg-soft-success text-success px-1 py-0" style="font-size: 8px;">Accepted</span>
+                                                            @endif
+                                                        </div>
+                                                        @if($rev->status === 'Rejected' && $rev->rejection_reason)
+                                                            <span class="text-danger mt-0.5 text-truncate" style="font-size: 9px; max-width: 140px;" title="{{ $rev->rejection_reason }}">
+                                                                <i class="feather-info me-0.5"></i>{{ $rev->rejection_reason }}
+                                                            </span>
+                                                        @endif
                                                     </div>
                                                 </div>
                                             @endforeach
@@ -3256,7 +3290,7 @@
             $('#sendWaPhone').val(cPhone);
             $('#sendWaPdfBadge').text('Quotation_' + qNum + '.pdf');
 
-            const defaultCaption = "Dear Valued Client,\n\nPlease find attached Quotation *" + qNum + "* for your review regarding " + dTitle + ".\n\nThank you,\nSales Team";
+            const defaultCaption = "Dear Valued Client,\n\nPlease find attached Quotation *" + qNum + "* for your review regarding " + dTitle + ".\n\n👉 *Please respond with one of the options below:*\n1️⃣ Reply *1* or *ACCEPT* to Accept Quotation\n2️⃣ Reply *2* or *REJECT [reason]* to Reject Quotation\n\nThank you,\nSales Team";
             $('#sendWaCaption').val(defaultCaption);
 
             const sendWaModal = new bootstrap.Modal(document.getElementById('sendQuotationWhatsAppModal'));

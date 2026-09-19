@@ -18,6 +18,7 @@ Route::get('/locale/{locale}', LocaleController::class)
 // Authenticity is verified inside the controller via the webhook signature,
 // not by tenant resolution. Excluded from CSRF in bootstrap/app.php.
 Route::post('/webhooks/razorpay', [RazorpayWebhookController::class, 'handle'])
+    ->middleware('throttle:60,1')
     ->name('webhooks.razorpay');
 
 Route::middleware(['tenant'])->group(function (): void {
@@ -33,8 +34,10 @@ Route::middleware(['tenant'])->group(function (): void {
     });
 
     // Public WhatsApp Webhook Route for Node.js Bridge
-    Route::post('/platform/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'handleWebhook'])->name('platform.whatsapp.webhook');
-    Route::post('/crm/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'handleWebhook'])->name('crm.whatsapp.webhook');
+    Route::middleware(['throttle:60,1'])->group(function (): void {
+        Route::post('/platform/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'handleWebhook'])->name('platform.whatsapp.webhook');
+        Route::post('/crm/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'handleWebhook'])->name('crm.whatsapp.webhook');
+    });
 
     Route::middleware(['auth', 'company', 'branch'])->group(function (): void {
         Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');

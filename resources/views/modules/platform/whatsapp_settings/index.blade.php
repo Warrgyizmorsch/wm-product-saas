@@ -6,19 +6,24 @@
 
 @section('content')
 <div class="container-fluid p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <div>
-            <h4 class="fw-bold text-dark mb-1">
-                <i class="feather-message-circle text-success me-2"></i>WhatsApp Web Linked Device Setup
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 pb-3 border-bottom">
+        <div class="me-auto">
+            <h4 class="fw-bold text-dark mb-1 d-flex align-items-center">
+                <span class="d-inline-flex align-items-center justify-content-center bg-soft-success text-success rounded-circle me-2" style="width: 36px; height: 36px;">
+                    <i class="feather-message-circle fs-18"></i>
+                </span>
+                WhatsApp Web Linked Device Setup
             </h4>
             <p class="text-muted fs-12 mb-0">Connect your corporate WhatsApp account via Linked Devices QR scan to send instant Quotations, Invoices, and Client Documents.</p>
         </div>
-        <div>
-            <button type="button" id="btnRefreshWA" class="btn btn-outline-secondary fw-bold px-3 py-2 fs-12">
-                <i class="feather-refresh-cw me-1.5"></i>Refresh Status
+        <div class="d-inline-flex align-items-center gap-2 flex-shrink-0 text-nowrap">
+            <button type="button" id="btnRefreshWA" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1.5 px-3 py-2 fs-12 fw-bold shadow-sm" style="white-space: nowrap; border-radius: 6px;">
+                <i class="feather-refresh-cw fs-13"></i>
+                <span>Refresh Status</span>
             </button>
-            <button type="button" id="btnConnectWA" class="btn btn-success fw-bold px-3 py-2 fs-12 ms-2">
-                <i class="feather-smartphone me-1.5"></i>Generate QR Code
+            <button type="button" id="btnConnectWA" class="btn btn-success text-white d-inline-flex align-items-center gap-1.5 px-3 py-2 fs-12 fw-bold shadow-sm" style="background-color: #25D366; border-color: #25D366; white-space: nowrap; border-radius: 6px;">
+                <i class="feather-smartphone fs-13"></i>
+                <span>Generate QR Code</span>
             </button>
         </div>
     </div>

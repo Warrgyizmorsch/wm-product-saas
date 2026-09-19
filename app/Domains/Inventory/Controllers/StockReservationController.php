@@ -11,6 +11,8 @@ class StockReservationController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', StockReservation::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
         $query = StockReservation::query()
@@ -40,6 +42,8 @@ class StockReservationController extends Controller
 
     public function release(StockReservation $reservation)
     {
+        $this->authorize('update', $reservation);
+
         if ($reservation->status !== 'Active') {
             return back()->with('error', 'Only Active reservations can be released.');
         }

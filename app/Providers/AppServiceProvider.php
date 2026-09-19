@@ -528,6 +528,11 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\CRM\Models\CrmAccount::class,
+            \App\Domains\CRM\Policies\CrmAccountPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\CRM\Models\Customer::class,
             \App\Domains\CRM\Policies\CustomerPolicy::class
         );
@@ -535,6 +540,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\CRM\Models\Quotation::class,
             \App\Domains\CRM\Policies\QuotationPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\CRM\Models\DealStatus::class,
+            \App\Domains\CRM\Policies\DealStatusPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(
@@ -561,6 +571,36 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Inventory\Models\Uom::class,
             \App\Domains\Inventory\Policies\UomPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Inventory\Models\StockAdjustment::class,
+            \App\Domains\Inventory\Policies\StockAdjustmentPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Inventory\Models\StockTransfer::class,
+            \App\Domains\Inventory\Policies\StockTransferPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Inventory\Models\StockReservation::class,
+            \App\Domains\Inventory\Policies\StockReservationPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Inventory\Models\StockTransaction::class,
+            \App\Domains\Inventory\Policies\StockTransactionPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Inventory\Models\Batch::class,
+            \App\Domains\Inventory\Policies\BatchPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Inventory\Models\SerialNumber::class,
+            \App\Domains\Inventory\Policies\SerialNumberPolicy::class
         );
 
         // ── Purchase Policies ─────────────────────────────────────────────────

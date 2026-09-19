@@ -17,6 +17,8 @@ class CrmAccountController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', CrmAccount::class);
+
         $tenantId = tenant_id() ?? 1;
         $search = $request->input('search');
 
@@ -40,12 +42,16 @@ class CrmAccountController extends Controller
 
     public function create(): View
     {
+        $this->authorize('create', CrmAccount::class);
+
         $users = \App\Models\User::orderBy('name')->get();
         return view('modules.crm.accounts.create', compact('users'));
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', CrmAccount::class);
+
         $tenantId = tenant_id() ?? 1;
 
         $validated = $request->validate([
@@ -152,6 +158,8 @@ class CrmAccountController extends Controller
 
     public function show(CrmAccount $account): View
     {
+        $this->authorize('view', $account);
+
         $account->load(['contacts', 'deals.quotations', 'quotations', 'customer', 'owner']);
 
         // Deal metrics
@@ -223,6 +231,8 @@ class CrmAccountController extends Controller
 
     public function edit(CrmAccount $account): View
     {
+        $this->authorize('update', $account);
+
         $account->load('primaryContact');
         $users = \App\Models\User::orderBy('name')->get();
         return view('modules.crm.accounts.edit', compact('account', 'users'));
@@ -230,6 +240,8 @@ class CrmAccountController extends Controller
 
     public function update(Request $request, CrmAccount $account): RedirectResponse
     {
+        $this->authorize('update', $account);
+
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
             'gstin'         => 'nullable|string|max:50',
@@ -262,6 +274,8 @@ class CrmAccountController extends Controller
 
     public function storeContact(Request $request, CrmAccount $account): RedirectResponse
     {
+        $this->authorize('update', $account);
+
         $tenantId = tenant_id() ?? 1;
 
         $validated = $request->validate([
@@ -296,6 +310,8 @@ class CrmAccountController extends Controller
 
     public function getContactsList(CrmAccount $account): \Illuminate\Http\JsonResponse
     {
+        $this->authorize('view', $account);
+
         $contacts = CrmContact::where('crm_account_id', $account->id)
             ->orderBy('name')
             ->get(['id', 'name', 'designation', 'role', 'email', 'phone']);
@@ -311,7 +327,10 @@ class CrmAccountController extends Controller
         $tenantId = tenant_id() ?? 1;
 
         $validated = $request->validate([
-            'crm_account_id' => 'required|exists:crm_accounts,id',
+            'crm_account_id' => [
+                'required',
+                Rule::exists('crm_accounts', 'id')->where('tenant_id', $tenantId),
+            ],
             'name'           => 'required|string|max:255',
             'designation'    => 'nullable|string|max:255',
             'role'           => 'nullable|string|max:100',
@@ -320,7 +339,8 @@ class CrmAccountController extends Controller
             'mobile'         => 'nullable|string|max:50',
         ]);
 
-        $account = CrmAccount::findOrFail($validated['crm_account_id']);
+        $account = CrmAccount::where('tenant_id', $tenantId)->findOrFail($validated['crm_account_id']);
+        $this->authorize('update', $account);
 
         $contact = CrmContact::create([
             'tenant_id'      => $tenantId,
@@ -367,6 +387,8 @@ class CrmAccountController extends Controller
 
     public function destroy(CrmAccount $account): RedirectResponse
     {
+        $this->authorize('delete', $account);
+
         $account->delete();
         return redirect()->route('crm.accounts.index')->with('success', 'Account deleted successfully.');
     }

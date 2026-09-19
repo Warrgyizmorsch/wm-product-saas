@@ -28,6 +28,7 @@ Route::prefix('purchase')
         Route::get('rfqs/{rfq}/enter-quotes', [PurchaseRfqController::class, 'enterQuotes'])->name('rfqs.enter-quotes');
         Route::post('rfqs/{rfq}/store-quotes', [PurchaseRfqController::class, 'storeQuotes'])->name('rfqs.store-quotes');
         Route::post('rfqs/{rfq}/send', [PurchaseRfqController::class, 'sendRfq'])->name('rfqs.send');
+        Route::post('rfqs/vendors/{rfqVendor}/send-whatsapp', [PurchaseRfqController::class, 'sendVendorWhatsapp'])->name('rfqs.send-vendor-whatsapp');
         Route::post('rfqs/{rfq}/confirm', [PurchaseRfqController::class, 'confirmRfq'])->name('rfqs.confirm');
         Route::post('rfqs/{rfq}/create-po', [PurchaseRfqController::class, 'createPo'])->name('rfqs.create-po');
         Route::post('rfqs/{rfq}/save-comparison', [PurchaseRfqController::class, 'saveComparison'])->name('rfqs.save-comparison');

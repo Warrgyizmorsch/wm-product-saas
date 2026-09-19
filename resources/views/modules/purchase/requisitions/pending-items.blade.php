@@ -461,7 +461,7 @@
                 const checkedCount = $('.row-checkbox:checked').length;
                 
                 if (checkedCount === 0) {
-                    alert('{{ __('purchase.js_select_at_least_one_item') }}');
+                    showAppToast('warning', '{{ __('purchase.js_select_at_least_one_item') }}');
                     return;
                 }
 
@@ -521,9 +521,7 @@
                     const url = new URL(redirectUrl);
                     selectedIds.forEach(id => url.searchParams.append('requisition_item_ids[]', id));
                     
-                    if (confirm('{{ __('purchase.js_confirm_rfq_redirect') }} ' + checkedCount + ' {{ __('purchase.js_selected_items') }}')) {
-                        window.location.href = url.toString();
-                    }
+                    window.location.href = url.toString();
                 }
             });
 
@@ -552,13 +550,13 @@
             $('#btnConfirmModalPo').on('click', function() {
                 const vendorId = $('#modalSupplierSelect').val();
                 if (!vendorId) {
-                    alert('{{ __('purchase.js_select_supplier') }}');
+                    showAppToast('warning', '{{ __('purchase.js_select_supplier') }}');
                     return;
                 }
 
                 const selectedIds = $(this).data('selected-ids');
                 if (!selectedIds || selectedIds.length === 0) {
-                    alert('{{ __('purchase.js_no_items_selected') }}');
+                    showAppToast('warning', '{{ __('purchase.js_no_items_selected') }}');
                     return;
                 }
 

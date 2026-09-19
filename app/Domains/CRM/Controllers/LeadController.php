@@ -395,7 +395,9 @@ class LeadController extends Controller
                 'failed_rows' => $import->failedRows,
             ];
 
-            return redirect()->route('crm.leads.index')->with('import_summary', $summary);
+            return redirect()->route('crm.leads.index')
+                ->with('import_summary', $summary)
+                ->with('success', 'Leads imported successfully!');
         } catch (\Exception $e) {
             return redirect()->route('crm.leads.index')->withErrors(['file' => 'Failed to import file: ' . $e->getMessage()]);
         }
@@ -560,6 +562,7 @@ class LeadController extends Controller
         if (!$document->lead || !Storage::disk('public')->exists($document->file_path)) {
             abort(404);
         }
+        $this->authorize('view', $document->lead);
         return response()->file(Storage::disk('public')->path($document->file_path));
     }
 
@@ -568,6 +571,7 @@ class LeadController extends Controller
         if (!$document->lead || !Storage::disk('public')->exists($document->file_path)) {
             abort(404);
         }
+        $this->authorize('view', $document->lead);
         return response()->download(Storage::disk('public')->path($document->file_path), $document->file_name);
     }
 
