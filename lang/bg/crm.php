@@ -1854,6 +1854,10 @@ return array (
   'record' => 'Записване',
   'quick_add_transporter' => 'Бързо добавяне на превозвач',
   'taxation_contact_details' => '2. Данъчни и данни за контакт',
+  'status_posted' => 'Публикувана',
+  'mark_as_post' => 'Публикувай',
+  'mark_as_posted' => 'Публикувай',
+  'post_invoice' => 'Публикувай фактура',
 );
 
 

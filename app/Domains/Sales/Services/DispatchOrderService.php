@@ -72,7 +72,7 @@ class DispatchOrderService
     {
         $invoices = \App\Domains\Sales\Models\Invoice::with(['items.product', 'items.warehouse'])
             ->where('sales_order_id', $salesOrderId)
-            ->whereNotIn('status', ['Cancelled'])
+            ->whereIn('status', ['Posted', 'Partially Paid', 'Paid'])
             ->get();
 
         return $invoices->map(function ($invoice) {

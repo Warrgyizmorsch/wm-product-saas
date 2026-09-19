@@ -34,7 +34,7 @@ class CustomerPaymentController extends Controller
         $this->authorize('create', CustomerPayment::class);
 
         $customers = Customer::query()->orderBy('name')->get();
-        $invoices = Invoice::whereIn('status', ['Draft', 'Sent', 'Posted', 'Partially Paid', 'Overdue'])->latest()->get();
+        $invoices = Invoice::whereIn('status', ['Posted', 'Partially Paid', 'Overdue'])->where('balance_due', '>', 0)->latest()->get();
         $salesOrders = SalesOrder::whereIn('status', ['Confirmed', 'Partially Shipped'])->latest()->get();
 
         $latest = CustomerPayment::latest('id')->first();
@@ -48,9 +48,11 @@ class CustomerPaymentController extends Controller
 
         if ($prefillInvoiceId) {
             $prefillInvoice = Invoice::find($prefillInvoiceId);
-            if ($prefillInvoice) {
+            if ($prefillInvoice && in_array($prefillInvoice->status, ['Posted', 'Partially Paid', 'Overdue'])) {
                 $prefillAmount      = $prefillInvoice->balance_due;
                 $prefillCustomerId  = $prefillCustomerId ?: $prefillInvoice->customer_id;
+            } else {
+                $prefillInvoiceId = null;
             }
         }
 

@@ -142,9 +142,9 @@ async function initSession(key, force = false) {
       sockOptions.version = version;
     }
 
-    console.log(`[Baileys ${key}] Starting WASocket instance...`);
     const sock = makeWASocket(sockOptions);
     sessionObj.sock = sock;
+    sessionObj.connectedAt = Math.floor(Date.now() / 1000);
 
     sock.ev.on('creds.update', saveCreds);
 
@@ -181,6 +181,19 @@ async function initSession(key, force = false) {
           if (msg.key && msg.key.id) {
             messageStore.set(msg.key.id, msg);
           }
+
+          // 1. STRICT FILTER: Ignore self messages (fromMe) - PREVENTS SELF-REPLY INFINITE LOOP!
+          if (msg.key && msg.key.fromMe) {
+            continue;
+          }
+
+          // 2. STRICT FILTER: Ignore historical messages synced on startup
+          const sessionStart = sessionObj.connectedAt || Math.floor(Date.now() / 1000);
+          const msgTimestamp = msg.messageTimestamp ? (typeof msg.messageTimestamp === 'number' ? msg.messageTimestamp : (msg.messageTimestamp.low || 0)) : 0;
+          if (msgTimestamp && msgTimestamp < (sessionStart - 5)) {
+            continue;
+          }
+
           const jid = msg.key.remoteJid || '';
 
           // STRICT FILTER: Ignore Groups, Newsletters, Channels, Status Broadcasts
@@ -263,7 +276,7 @@ async function initSession(key, force = false) {
           console.log(`[Baileys ${key}] Human message (${payload.direction}) from ${senderNumber}: "${bodyText || payload.message_body}"`);
 
           try {
-            const resp = await fetch('http://127.0.0.1:8000/crm/whatsapp/webhook', {
+            const resp = await fetch('http://127.0.0.1:8000/platform/whatsapp/webhook', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)

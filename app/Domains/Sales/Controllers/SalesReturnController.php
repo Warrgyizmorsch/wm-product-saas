@@ -42,13 +42,13 @@ class SalesReturnController extends Controller
         $tenantId = require_tenant_id();
         $customers = Customer::query()->orderBy('name')->get();
         $salesOrders = SalesOrder::with(['invoices' => function($q) {
-            $q->where('status', '!=', 'Cancelled')->with('items.product', 'items.warehouse');
+            $q->whereIn('status', ['Posted', 'Partially Paid', 'Paid'])->with('items.product', 'items.warehouse');
         }, 'customer', 'items.product', 'items.warehouse'])
         ->whereIn('status', ['Confirmed', 'Partially Shipped', 'Shipped', 'Invoiced'])
         ->latest()->get();
 
         $invoices = Invoice::with(['customer', 'items.product', 'items.warehouse', 'salesOrder'])
-            ->where('status', '!=', 'Cancelled')
+            ->whereIn('status', ['Posted', 'Partially Paid', 'Paid'])
             ->latest()->get();
 
         $warehouses = Warehouse::where('status', 'active')->orderBy('name')->get();

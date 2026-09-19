@@ -568,7 +568,7 @@ class QuotationController extends Controller
         if ($matchedCustomers->isEmpty()) {
             $quotation->update(['status' => 'Accepted']);
             $this->quotationService->handleQuotationStatusChange($quotation, 'Accepted', $quotation->lead_id);
-            return redirect()->route('crm.quotations.show', $quotation->id)
+            return redirect()->back()
                 ->with('success', "Quotation #{$quotation->quotation_number} accepted and converted to Customer automatically!");
         }
 
@@ -613,12 +613,12 @@ class QuotationController extends Controller
 
             $this->quotationService->handleQuotationStatusChange($quotation, 'Accepted', $quotation->lead_id);
 
-            return redirect()->route('crm.quotations.show', $quotation->id)
+            return redirect()->back()
                 ->with('success', "Quotation #{$quotation->quotation_number} accepted and attached to existing customer '{$customer->name}'!");
         } else {
             $quotation->update(['status' => 'Accepted']);
             $this->quotationService->handleQuotationStatusChange($quotation, 'Accepted', $quotation->lead_id);
-            return redirect()->route('crm.quotations.show', $quotation->id)
+            return redirect()->back()
                 ->with('success', "Quotation #{$quotation->quotation_number} accepted and converted to new Customer!");
         }
     }

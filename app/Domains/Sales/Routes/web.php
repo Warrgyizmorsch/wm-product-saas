@@ -68,6 +68,7 @@ Route::prefix('sales')
         Route::get('invoices/create', [\App\Domains\Sales\Controllers\InvoiceController::class, 'create'])->name('invoices.create');
         Route::post('invoices', [\App\Domains\Sales\Controllers\InvoiceController::class, 'store'])->name('invoices.store');
         Route::get('invoices/{invoice}', [\App\Domains\Sales\Controllers\InvoiceController::class, 'show'])->name('invoices.show');
+        Route::post('invoices/{invoice}/post', [\App\Domains\Sales\Controllers\InvoiceController::class, 'post'])->name('invoices.post');
         Route::post('invoices/{invoice}/send', [\App\Domains\Sales\Controllers\InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/pay', [\App\Domains\Sales\Controllers\InvoiceController::class, 'pay'])->name('invoices.pay');
 
