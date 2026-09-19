@@ -4,6 +4,7 @@ return [
     'savings_dashboard' => 'Savings Dashboard',
     'purchase_requests' => 'Purchase Requests',
     'pending_pr_items' => 'Pending PR Items',
+    'rfq' => 'RFQ',
     'rfqs' => 'RFQs',
     'purchase_orders' => 'Purchase Orders',
     'goods_receipts' => 'GRN (Goods Receipts)',
@@ -1239,5 +1240,6 @@ return [
     'tax_rate'                              => 'Tax Rate',
     'terms_and_notes'                       => 'Terms & Notes',
     'no_additional_terms_specified'         => 'No additional terms or notes specified for this purchase order.',
+    'js_assign_supplier_to_all_items'       => 'Please assign at least one supplier to every item.',
 ];
 

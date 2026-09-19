@@ -21,12 +21,6 @@
                         <div class="d-flex align-items-center">
                             <h5 class="fw-bold text-dark mb-0 me-3"><i class="feather-user-plus text-primary me-2"></i>{{ __('purchase.new_supplier_master_sheet') }}</h5>
                         </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <a href="{{ route('purchase.vendors.index') }}" class="btn btn-light border fw-semibold">{{ __('purchase.cancel') }}</a>
-                            <button type="submit" class="btn btn-primary fw-bold px-4 py-2">
-                                <i class="feather-save me-1"></i>{{ __('purchase.save_supplier_master') }}
-                            </button>
-                        </div>
                     </div>
 
                     <div class="p-4 p-md-5">
@@ -123,6 +117,16 @@
                             <div class="col-md-6">
                                 <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="{{ __('purchase.opening_balance') }} ({{ active_currency_symbol() }})" name="opening_balance" id="opening_balance" value="{{ old('opening_balance', '0.00') }}" placeholder="0.00" :error-text="$errors->first('opening_balance')" />
                             </div>
+                        </div>
+
+                        <!-- Bottom Action Buttons -->
+                        <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                            <a href="{{ route('purchase.vendors.index') }}" class="btn btn-light border px-4 py-2 fs-13 fw-semibold">
+                                {{ __('purchase.cancel') }}
+                            </a>
+                            <button type="submit" class="btn btn-primary fw-bold px-4 py-2 fs-13 shadow-sm">
+                                <i class="feather-save me-1"></i>{{ __('purchase.save_supplier_master') }}
+                            </button>
                         </div>
 
                     </div>

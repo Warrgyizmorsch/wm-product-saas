@@ -40,6 +40,8 @@ class PurchaseOrderController extends Controller
 
     public function poDetailPartial(PurchaseOrder $order)
     {
+        $this->authorize('view', $order);
+
         $order->load(['vendor', 'requisition', 'items.product']);
         return view('modules.purchase.approvals.po-detail-partial', compact('order'));
     }

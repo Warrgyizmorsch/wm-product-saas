@@ -1243,7 +1243,7 @@ return array (
   'eway_bill_status' => 'Статус на E-Way Bill',
   'no_invoices_generated_yet' => 'Все още няма генерирани фактури. Създайте фактури от потвърдени поръчки за продажба.',
   'generate_customer_invoice' => 'Генериране на фактура за клиент',
-  'generate_invoice_subtitle' => 'Създаване на фактура въз основа на поръчка за продажба, експедиционна бележка или директно за клиент.',
+  'generate_invoice_subtitle' => 'Създаване на фактура въз основа на поръчка за продажба или експедиционна бележка.',
   'create_invoice_based_on' => 'Създаване на фактура въз основа на:',
   'against_sales_order' => 'Въз основа на поръчка за продажба',
   'against_dispatch_order' => 'Въз основа на експедиционна бележка',
@@ -1858,6 +1858,15 @@ return array (
   'mark_as_post' => 'Публикувай',
   'mark_as_posted' => 'Публикувай',
   'post_invoice' => 'Публикувай фактура',
+  'choose_payment_terms' => '-- Изберете условия на плащане --',
+  'payment_term_due_receipt' => 'Незабавно / При получаване',
+  'payment_term_immediate_payment' => 'Незабавно плащане',
+  'payment_term_net15' => 'Нето 15 дни',
+  'payment_term_net30' => 'Нето 30 дни',
+  'payment_term_net45' => 'Нето 45 дни',
+  'payment_term_net60' => 'Нето 60 дни',
+  'payment_term_adv50_del50' => '50% аванс, 50% при доставка',
+  'no_unbilled_sales_orders' => 'Няма налични нефактурирани поръчки за продажба',
 );
 
 

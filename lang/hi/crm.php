@@ -1241,7 +1241,7 @@ return array (
   'eway_bill_status' => 'ई-वे बिल स्थिति',
   'no_invoices_generated_yet' => 'अभी तक कोई चालान जनरेट नहीं हुआ है। पुष्ट बिक्री आदेशों से चालान बनाएं।',
   'generate_customer_invoice' => 'ग्राहक चालान जनरेट करें',
-  'generate_invoice_subtitle' => 'बिक्री आदेश, डिलीवरी आदेश, या सीधे ग्राहक के लिए बिलिंग चालान बनाएं।',
+  'generate_invoice_subtitle' => 'बिक्री आदेश (Sales Order) या डिलीवरी आदेश (Dispatch Order) के आधार पर बिलिंग चालान बनाएं।',
   'create_invoice_based_on' => 'चालान इस आधार पर बनाएं:',
   'against_sales_order' => 'बिक्री आदेश के विरुद्ध',
   'against_dispatch_order' => 'डिलीवरी आदेश के विरुद्ध',
@@ -1865,6 +1865,15 @@ return array (
   'mark_as_post' => 'पोस्ट करें',
   'mark_as_posted' => 'पोस्ट करें',
   'post_invoice' => 'इनवॉइस पोस्ट करें',
+  'choose_payment_terms' => '-- भुगतान की शर्तें चुनें --',
+  'payment_term_due_receipt' => 'तत्काल / रसीद पर देय',
+  'payment_term_immediate_payment' => 'तत्काल भुगतान',
+  'payment_term_net15' => 'नेट 15 दिन',
+  'payment_term_net30' => 'नेट 30 दिन',
+  'payment_term_net45' => 'नेट 45 दिन',
+  'payment_term_net60' => 'नेट 60 दिन',
+  'payment_term_adv50_del50' => '50% अग्रिम, 50% डिलीवरी पर',
+  'no_unbilled_sales_orders' => 'कोई बिना बिल वाला बिक्री आदेश उपलब्ध नहीं है',
 );
 
 

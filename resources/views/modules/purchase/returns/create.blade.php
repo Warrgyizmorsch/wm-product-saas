@@ -228,7 +228,7 @@
                 if (rowsCount > 1) {
                     $(this).closest('tr').remove();
                 } else {
-                    alert('{{ __("purchase.js_select_checkboxes") }}');
+                    showAppToast('warning', 'At least one item row is required.');
                 }
             });
 

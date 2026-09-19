@@ -288,6 +288,11 @@ class VendorBillController extends Controller
     public function detailPartial(int $id)
     {
         $bill = $this->billRepo->findWithDetails($id);
+        if (!$bill) {
+            abort(404);
+        }
+        $this->authorize('view', $bill);
+
         return view('modules.purchase.bills.detail-partial', compact('bill'));
     }
 

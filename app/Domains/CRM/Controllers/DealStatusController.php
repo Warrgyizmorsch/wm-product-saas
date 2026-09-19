@@ -18,6 +18,8 @@ class DealStatusController extends Controller
 
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', DealStatus::class);
+
         $tenantId = tenant_id() ?? 1;
 
         if (DealStatus::where('tenant_id', $tenantId)->count() === 0) {
@@ -52,6 +54,8 @@ class DealStatusController extends Controller
 
     public function store(Request $request): RedirectResponse|JsonResponse
     {
+        $this->authorize('create', DealStatus::class);
+
         $tenantId = tenant_id() ?? 1;
 
         $validated = $request->validate([
@@ -86,6 +90,8 @@ class DealStatusController extends Controller
 
     public function update(Request $request, DealStatus $dealStatus): RedirectResponse|JsonResponse
     {
+        $this->authorize('update', $dealStatus);
+
         $tenantId = tenant_id() ?? 1;
 
         $validated = $request->validate([
@@ -118,6 +124,8 @@ class DealStatusController extends Controller
 
     public function destroy(Request $request, DealStatus $dealStatus): RedirectResponse|JsonResponse
     {
+        $this->authorize('delete', $dealStatus);
+
         $res = $this->service->deleteStatus($dealStatus);
 
         if (!$res['success']) {
@@ -136,6 +144,8 @@ class DealStatusController extends Controller
 
     public function reorder(Request $request): RedirectResponse|JsonResponse
     {
+        $this->authorize('update', DealStatus::class);
+
         $validated = $request->validate([
             'order' => 'required|array',
             'order.*' => 'integer',
@@ -152,6 +162,8 @@ class DealStatusController extends Controller
 
     public function move(Request $request, DealStatus $dealStatus, string $direction): RedirectResponse
     {
+        $this->authorize('update', $dealStatus);
+
         $tenantId = tenant_id() ?? 1;
         $statuses = $this->service->getAllStatuses($tenantId)->values();
 
@@ -164,7 +176,7 @@ class DealStatusController extends Controller
                 $targetStatus = $statuses[$targetIndex];
 
                 // Swap sort orders
-                $currentOrder = $leadStatus->sort_order ?: ($currentIndex + 1);
+                $currentOrder = $dealStatus->sort_order ?: ($currentIndex + 1);
                 $targetOrder  = $targetStatus->sort_order ?: ($targetIndex + 1);
 
                 if ($currentOrder === $targetOrder) {

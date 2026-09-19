@@ -431,7 +431,7 @@
                             </div>
                             <div class="d-flex justify-content-end gap-2">
                                 <span class="text-muted">{{ __('crm.payment_terms') }}:</span>
-                                <strong class="text-dark">{{ $invoice->salesOrder?->payment_terms ?: __('crm.immediate_payment') }}</strong>
+                                <strong class="text-dark">{{ \App\Domains\Platform\Models\PaymentTerm::getLabel($invoice->payment_terms ?: $invoice->salesOrder?->payment_terms) }}</strong>
                             </div>
                         </div>
                     </div>

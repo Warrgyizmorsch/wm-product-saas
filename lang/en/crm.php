@@ -1241,7 +1241,7 @@ return array (
   'eway_bill_status' => 'E-Way Bill Status',
   'no_invoices_generated_yet' => 'No invoices generated yet. Create invoices from confirmed Sales Orders.',
   'generate_customer_invoice' => 'Generate Customer Invoice',
-  'generate_invoice_subtitle' => 'Create billing invoice against Sales Order, Dispatch Order, or directly for Customer.',
+  'generate_invoice_subtitle' => 'Create billing invoice against Sales Order or Dispatch Order.',
   'create_invoice_based_on' => 'Create Invoice Based On:',
   'against_sales_order' => 'Against Sales Order',
   'against_dispatch_order' => 'Against Dispatch Order / Delivery',
@@ -1868,6 +1868,15 @@ return array (
   'mark_as_post' => 'Mark as Post',
   'mark_as_posted' => 'Mark as Post',
   'post_invoice' => 'Post Invoice',
+  'choose_payment_terms' => '-- Select Payment Terms --',
+  'payment_term_due_receipt' => 'Immediate / Due on Receipt',
+  'payment_term_immediate_payment' => 'Immediate Payment',
+  'payment_term_net15' => 'Net 15 Days',
+  'payment_term_net30' => 'Net 30 Days',
+  'payment_term_net45' => 'Net 45 Days',
+  'payment_term_net60' => 'Net 60 Days',
+  'payment_term_adv50_del50' => '50% Advance, 50% Delivery',
+  'no_unbilled_sales_orders' => 'No unbilled Sales Orders available',
 );
 
 
