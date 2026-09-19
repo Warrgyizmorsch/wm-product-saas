@@ -1,4 +1,4 @@
-<!-- Dynamic Header Notifications Dropdown -->
+<!-- Dynamic System-Wide Header Notifications Dropdown -->
 <div class="dropdown nxl-h-item">
     <a class="nxl-head-link me-3" data-bs-toggle="dropdown" href="#" role="button" data-bs-auto-close="outside" id="notificationBellDropdown" aria-expanded="false" title="Notifications">
         <i class="feather-bell"></i>
@@ -22,16 +22,16 @@
         </div>
 
         <div class="text-center notifications-footer">
-            <a href="{{ route('hrms.notifications.index') }}" class="fs-13 fw-semibold text-dark">{{ __('ui.all_notifications') }}</a>
+            <a href="{{ route('notifications.index') }}" class="fs-13 fw-semibold text-dark">{{ __('ui.all_notifications') }}</a>
         </div>
     </div>
 </div>
 
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        function fetchHrmsNotifications() {
+        function fetchSystemNotifications() {
             $.ajax({
-                url: "{{ route('hrms.notifications.unread') }}",
+                url: "{{ route('notifications.unread') }}",
                 type: "GET",
                 dataType: "json",
                 success: function (res) {
@@ -61,6 +61,8 @@
                     res.notifications.forEach(function (n) {
                         let isUnreadBg = !n.is_read ? 'bg-soft-primary' : '';
                         let typeIcon = n.icon_class || 'feather-bell';
+                        let moduleBadgeClass = n.module_badge_class || 'bg-soft-primary text-primary';
+                        let moduleLabel = n.module_label || 'SYSTEM';
 
                         html += `
                             <div class="notifications-item ${isUnreadBg}" data-id="${n.id}">
@@ -68,13 +70,16 @@
                                     <i class="${typeIcon}"></i>
                                 </div>
                                 <div class="notifications-desc flex-grow-1" style="min-width: 0;">
-                                    <a href="${n.action_url}" onclick="markHrmsNotificationRead(${n.id})" class="font-body text-truncate-2-line text-decoration-none" title="${n.title}">
-                                        <span class="fw-semibold text-dark d-block mb-0.5">${n.title}</span>
+                                    <a href="${n.action_url}" onclick="markNotificationRead(${n.id})" class="font-body text-truncate-2-line text-decoration-none" title="${n.title}">
+                                        <div class="d-flex align-items-center gap-1.5 mb-0.5">
+                                            <span class="badge ${moduleBadgeClass} fs-10 px-1.5 py-0.5 rounded fw-semibold">${moduleLabel}</span>
+                                            <span class="fw-semibold text-dark d-inline-block text-truncate" style="max-width: 180px;">${n.title}</span>
+                                        </div>
                                         <span class="text-muted fs-12">${n.message}</span>
                                     </a>
                                     <div class="d-flex justify-content-between align-items-center mt-1">
                                         <div class="notifications-date text-muted border-bottom border-bottom-dashed fs-11">${n.time_ago}</div>
-                                        <a href="javascript:void(0);" onclick="deleteHrmsNotification(${n.id}, event)" class="text-danger ms-2" title="Dismiss">
+                                        <a href="javascript:void(0);" onclick="deleteNotificationItem(${n.id}, event)" class="text-danger ms-2" title="Dismiss">
                                             <i class="feather-x fs-12"></i>
                                         </a>
                                     </div>
@@ -88,42 +93,46 @@
             });
         }
 
-        window.markHrmsNotificationRead = function(id) {
+        window.markNotificationRead = function(id) {
             $.ajax({
-                url: "/hrms/notifications/" + id + "/read",
+                url: "/notifications/" + id + "/read",
                 type: "POST",
                 data: { _token: "{{ csrf_token() }}" },
                 success: function() {
-                    fetchHrmsNotifications();
+                    fetchSystemNotifications();
                 }
             });
         };
 
-        window.deleteHrmsNotification = function(id, event) {
+        window.markHrmsNotificationRead = window.markNotificationRead;
+
+        window.deleteNotificationItem = function(id, event) {
             if (event) event.stopPropagation();
             $.ajax({
-                url: "/hrms/notifications/" + id,
+                url: "/notifications/" + id,
                 type: "DELETE",
                 data: { _token: "{{ csrf_token() }}" },
                 success: function() {
-                    fetchHrmsNotifications();
+                    fetchSystemNotifications();
                 }
             });
         };
+
+        window.deleteHrmsNotification = window.deleteNotificationItem;
 
         $('#markAllNotificationsReadBtn').on('click', function(e) {
             e.preventDefault();
             $.ajax({
-                url: "{{ route('hrms.notifications.read-all') }}",
+                url: "{{ route('notifications.read-all') }}",
                 type: "POST",
                 data: { _token: "{{ csrf_token() }}" },
                 success: function() {
-                    fetchHrmsNotifications();
+                    fetchSystemNotifications();
                 }
             });
         });
 
-        fetchHrmsNotifications();
-        setInterval(fetchHrmsNotifications, 45000);
+        fetchSystemNotifications();
+        setInterval(fetchSystemNotifications, 45000);
     });
 </script>

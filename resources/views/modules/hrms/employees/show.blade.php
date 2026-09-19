@@ -12,8 +12,9 @@
         @php
             $authUser = auth()->user();
             $isHrOrAdmin = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
-            $isOwnProfile = $authUser?->employee?->id == $employee->id;
+            $isOwnProfile = $authUser && (($authUser->employee?->id == $employee->id) || (\App\Domains\HRMS\Models\Employee::resolveForUser($authUser)?->id == $employee->id));
             $canEditProfile = $isHrOrAdmin || $isOwnProfile;
+            $showOfficeSection = $isHrOrAdmin && !$isOwnProfile;
         @endphp
         @if($canEditProfile)
             <x-ui.button type="button" variant="primary" icon="feather-edit-3" data-bs-toggle="modal" data-bs-target="#editEmployeeModal">
@@ -1065,7 +1066,7 @@
                     <input type="hidden" name="form_mode" value="edit">
                     <input type="hidden" name="editing_employee_id" id="editing_employee_id" value="{{ $employee->id }}">
                     <div class="modal-body p-4" style="overflow-y: auto; max-height: calc(85vh - 120px);">
-                        @include('modules.hrms.employees.form-fields', ['mode' => 'edit', 'employee' => $employee, 'isHrOrAdmin' => $isHrOrAdmin])
+                        @include('modules.hrms.employees.form-fields', ['mode' => 'edit', 'employee' => $employee, 'isHrOrAdmin' => $showOfficeSection])
                     </div>
                     <div class="modal-footer bg-light py-2">
                         <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>

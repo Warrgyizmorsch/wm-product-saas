@@ -137,7 +137,7 @@ class PipController extends Controller
         $pip = $this->pipService->createPip($validated);
 
         if (!empty($validated['employee_id'])) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: (int) $validated['employee_id'],
                 title: 'PIP Initiated',
                 message: 'A Performance Improvement Plan (PIP) has been initiated for you.',

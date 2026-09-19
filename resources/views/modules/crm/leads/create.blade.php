@@ -169,17 +169,9 @@
 
                             <x-ui.odoo-form-ui type="select" :label="__('crm.source')" name="source">
                                 <option value="">{{ __('crm.select_option') }}</option>
-                                <option value="Direct Inquiry" @selected(old('source', $lead->source) === 'Direct Inquiry')>{{ __('crm.sources.Direct Inquiry') }}</option>
-                                <option value="Website Form" @selected(old('source', $lead->source) === 'Website Form')>{{ __('crm.sources.Website Form') }}</option>
-                                <option value="Web Search" @selected(old('source', $lead->source) === 'Web Search')>{{ __('crm.sources.Web Search') }}</option>
-                                <option value="Meta Ads" @selected(old('source', $lead->source) === 'Meta Ads')>{{ __('crm.sources.Meta Ads') }}</option>
-                                <option value="IndiaMART" @selected(old('source', $lead->source) === 'IndiaMART')>{{ __('crm.sources.IndiaMART') }}</option>
-                                <option value="Cold Call" @selected(old('source', $lead->source) === 'Cold Call')>{{ __('crm.sources.Cold Call') }}</option>
-                                <option value="Referral" @selected(old('source', $lead->source) === 'Referral')>{{ __('crm.sources.Referral') }}</option>
-                                <option value="Employee Referral" @selected(old('source', $lead->source) === 'Employee Referral')>{{ __('crm.sources.Employee Referral') }}</option>
-                                <option value="Partner" @selected(old('source', $lead->source) === 'Partner')>{{ __('crm.sources.Partner') }}</option>
-                                <option value="Advertisement" @selected(old('source', $lead->source) === 'Advertisement')>{{ __('crm.sources.Advertisement') }}</option>
-                                <option value="Trade Show" @selected(old('source', $lead->source) === 'Trade Show')>{{ __('crm.sources.Trade Show') }}</option>
+                                @foreach (['Direct Inquiry', 'Website Form', 'Web Search', 'Meta Ads', 'IndiaMART', 'TradeIndia', 'Justdial', 'Cold Call', 'Referral', 'Employee Referral', 'Partner', 'Advertisement', 'Trade Show', 'WhatsApp Bot', 'WhatsApp', 'Email', 'Phone Call', 'Walk In', 'LinkedIn', 'Google Ads', 'Other'] as $srcOption)
+                                    <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ \Illuminate\Support\Facades\Lang::has('crm.sources.' . $srcOption) ? __('crm.sources.' . $srcOption) : $srcOption }}</option>
+                                @endforeach
                             </x-ui.odoo-form-ui>
 
                             <x-ui.odoo-form-ui type="select" :label="__('crm.priority')" name="priority">

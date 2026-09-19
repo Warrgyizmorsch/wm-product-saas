@@ -177,7 +177,7 @@ class CrmDashboardController extends Controller
             'Contacted'     => $leadStatusCounts->get('Contacted', 0),
             'Qualified'     => $leadStatusCounts->get('Qualified', 0),
             'Quotation'     => (clone $periodQuotationsQuery)->count(),
-            'Converted/Won' => $leadStatusCounts->get('Converted', 0) + $leadStatusCounts->get('Won', 0),
+            'Dealing/Won'   => $leadStatusCounts->get('Dealing', 0) + $leadStatusCounts->get('Won', 0),
         ];
 
         // 3. Deal Pipeline Stage Breakdown

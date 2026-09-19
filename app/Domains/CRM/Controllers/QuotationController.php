@@ -137,8 +137,8 @@ class QuotationController extends Controller
             'items.*.item_name'   => ['nullable', 'string', 'max:255'],
             'items.*.product_id'  => ['required', 'integer', 'exists:products,id'],
             'items.*.description' => ['nullable', 'string'],
-            'items.*.quantity'    => ['required', 'integer', 'min:1'],
-            'items.*.unit_price'  => ['required', 'numeric', 'min:0.01'],
+            'items.*.quantity'    => ['required', 'numeric', 'min:0.01'],
+            'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
@@ -336,8 +336,8 @@ class QuotationController extends Controller
             'items.*.item_name'   => ['nullable', 'string', 'max:255'],
             'items.*.product_id'  => ['required', 'integer', 'exists:products,id'],
             'items.*.description' => ['nullable', 'string'],
-            'items.*.quantity'    => ['required', 'integer', 'min:1'],
-            'items.*.unit_price'  => ['required', 'numeric', 'min:0.01'],
+            'items.*.quantity'    => ['required', 'numeric', 'min:0.01'],
+            'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
@@ -441,7 +441,7 @@ class QuotationController extends Controller
         }
 
         $this->quotationService->handleQuotationStatusChange($quotation, $newStatus, $quotation->lead_id);
-        return back()->with('success', 'Quotation status updated successfully!');
+        return back()->with('success', 'Quotation status updated to ' . $newStatus . ' successfully!');
     }
 
     public function approve(int $id): RedirectResponse
@@ -568,7 +568,7 @@ class QuotationController extends Controller
         if ($matchedCustomers->isEmpty()) {
             $quotation->update(['status' => 'Accepted']);
             $this->quotationService->handleQuotationStatusChange($quotation, 'Accepted', $quotation->lead_id);
-            return redirect()->route('crm.quotations.show', $quotation->id)
+            return redirect()->back()
                 ->with('success', "Quotation #{$quotation->quotation_number} accepted and converted to Customer automatically!");
         }
 
@@ -613,12 +613,12 @@ class QuotationController extends Controller
 
             $this->quotationService->handleQuotationStatusChange($quotation, 'Accepted', $quotation->lead_id);
 
-            return redirect()->route('crm.quotations.show', $quotation->id)
+            return redirect()->back()
                 ->with('success', "Quotation #{$quotation->quotation_number} accepted and attached to existing customer '{$customer->name}'!");
         } else {
             $quotation->update(['status' => 'Accepted']);
             $this->quotationService->handleQuotationStatusChange($quotation, 'Accepted', $quotation->lead_id);
-            return redirect()->route('crm.quotations.show', $quotation->id)
+            return redirect()->back()
                 ->with('success', "Quotation #{$quotation->quotation_number} accepted and converted to new Customer!");
         }
     }

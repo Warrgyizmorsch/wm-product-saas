@@ -662,7 +662,7 @@
 
     function checkWhatsAppStatus() {
         $.ajax({
-            url: "/crm/whatsapp/status",
+            url: "{{ route('platform.whatsapp.status') }}",
             method: "GET",
             success: function(res) {
                 if (res.status === 'connected') {
@@ -705,7 +705,7 @@
         $('#waStatusBadge').attr('class', 'badge bg-info text-dark').text('Connecting...');
         $('#waStatusText').text('Requesting QR code connection...');
         $.ajax({
-            url: "/crm/whatsapp/connect",
+            url: "{{ route('platform.whatsapp.connect') }}",
             method: "POST",
             data: { _token: "{{ csrf_token() }}" },
             success: function() {

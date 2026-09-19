@@ -142,7 +142,7 @@
                         $badgeColor = match(strtolower($st->name)) {
                             'new' => 'primary',
                             'qualified' => 'teal',
-                            'converted' => 'info',
+                            'dealing' => 'info',
                             'won' => 'success',
                             'lost' => 'danger',
                             default => (!empty($rawColor) && in_array($rawColor, $presetBadgeVariants, true) ? $rawColor : $presetBadgeVariants[abs($st->id ?? 0) % count($presetBadgeVariants)]),

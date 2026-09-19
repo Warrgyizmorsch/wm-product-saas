@@ -211,7 +211,7 @@
 
 @section('content')
     @php
-        $currency = tenant()?->settings['currency'] ?? 'INR';
+        $currency = tenant()?->settings['currency'] ?? active_currency_symbol();
     @endphp
     <div class="row text-dark">
         <div class="col-12">
@@ -374,7 +374,7 @@
                                                     </label>
                                                 </div>
                                                 <div>
-                                                    @if($rv->status === 'Received')
+                                                    @if(in_array($rv->status, ['Received', 'Submitted']))
                                                         <span class="badge bg-soft-success text-success fs-10 fw-bold"><i class="feather-check-circle me-1"></i>{{ __('purchase.submitted') }}</span>
                                                     @else
                                                         <span class="badge bg-soft-secondary text-secondary fs-10 fw-bold"><i class="feather-clock me-1"></i>{{ __('purchase.pending') }}</span>
@@ -520,7 +520,7 @@
                                                     </a>
                                                 </div>
                                                 
-                                                @if($rv->status === 'Received')
+                                                @if(in_array($rv->status, ['Received', 'Submitted']))
                                                     <span class="badge bg-soft-success text-success fs-9 fw-bold">{{ __('purchase.submitted') }}</span>
                                                 @else
                                                     <span class="badge bg-soft-secondary text-secondary fs-9 fw-bold">{{ __('purchase.pending') }}</span>

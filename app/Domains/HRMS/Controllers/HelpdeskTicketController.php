@@ -49,7 +49,7 @@ class HelpdeskTicketController extends Controller
         $ticket = $this->ticketRepository->createTicket($request->all(), $files);
 
         // Send Notification to HR / Support Admins
-        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+        \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: "New Ticket #{$ticket->ticket_number}",
             message: "Ticket created: {$ticket->subject}",
             actionUrl: route('hrms.helpdesk.tickets.show', $ticket->id),
@@ -119,7 +119,7 @@ class HelpdeskTicketController extends Controller
         // Trigger Notification on Reply
         if (!$request->boolean('is_internal_note')) {
             if ($canManage && $ticket->employee) {
-                \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                \App\Services\Notification\NotificationService::sendToEmployee(
                     employee: $ticket->employee,
                     title: "Reply on Ticket #{$ticket->ticket_number}",
                     message: "Support staff replied to your ticket: {$ticket->subject}",
@@ -128,7 +128,7 @@ class HelpdeskTicketController extends Controller
                     iconClass: 'feather-message-square'
                 );
             } elseif ($ticket->assignedAgent) {
-                \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                \App\Services\Notification\NotificationService::sendToEmployee(
                     employee: $ticket->assignedAgent,
                     title: "User replied on Ticket #{$ticket->ticket_number}",
                     message: "New message on ticket {$ticket->ticket_number}",
@@ -154,6 +154,8 @@ class HelpdeskTicketController extends Controller
         $tenantId = tenant_id();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($id);
 
+        app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class)->authorizeTicketManagement(auth()->user(), $ticket);
+
         $this->ticketRepository->updateTicketStatus(
             $ticket,
             $request->input('status'),
@@ -164,7 +166,7 @@ class HelpdeskTicketController extends Controller
         // Notify employee on status change
         if ($ticket->employee) {
             $statusLabel = ucfirst(str_replace('_', ' ', $request->input('status')));
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employee: $ticket->employee,
                 title: "Ticket #{$ticket->ticket_number} Updated",
                 message: "Your ticket status has been updated to {$statusLabel}.",

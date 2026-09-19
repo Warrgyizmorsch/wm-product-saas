@@ -219,8 +219,8 @@
             var productsData = {
                 @foreach ($products as $p)
                     "{{ $p->id }}": {
-                        price: {{ (float) ($p->price ?: 0) }},
-                        tax_rate: {{ (float) ($p->tax_rate ?: 18) }}
+                        price: {{ (float) ($p->selling_price ?: $p->unit_cost ?: 0) }},
+                        tax_rate: {{ (float) ($p->gst_rate ?: 18) }}
                     },
                 @endforeach
             };

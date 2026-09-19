@@ -249,6 +249,11 @@ class ProductionOrderController extends Controller
                 $validated['notes'] ?? null
             );
 
+            $totalQty = (float) collect($validated['items'])->sum('quantity');
+            $reqReason = $validated['notes'] ?? 'Ad-hoc additional material request';
+            app(\App\Domains\Production\Services\ProductionNotificationService::class)
+                ->notifyAdditionalMaterialRequested($order, $totalQty, $reqReason, (int) (auth()->id() ?? 1));
+
             return redirect()->route('production.orders.show', ['order' => $order->id, 'tab' => 'vtab-reservations'])
                 ->with('success', "Request sent to store for additional materials. (Requisition #{$slip->requisition_number})");
         } catch (\Exception $e) {

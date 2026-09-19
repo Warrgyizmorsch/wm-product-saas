@@ -413,6 +413,7 @@ class QualityInspectionService
             }
 
             // Auto-create NCR for rejected quantity
+            $ncr = null;
             if ($rejectedQty > 0) {
                 $ncr = \App\Domains\Production\Models\ProductionNcr::create([
                     'tenant_id' => $tenantId,
@@ -427,6 +428,13 @@ class QualityInspectionService
                     'operator_id' => $userId ?? auth()->id() ?? 1,
                     'description' => "Shopfloor Quality Inspection failed for {$rejectedQty} units on operation #{$orderOp->operation_number}.",
                 ]);
+
+                app(ProductionNotificationService::class)->notifyNcrCreated($ncr);
+            }
+
+            if ($result === 'failed' || $rejectedQty > 0) {
+                $holdReason = $data['remarks'] ?? "Shopfloor inspection failed with {$rejectedQty} rejected units.";
+                app(ProductionNotificationService::class)->notifyQualityHold($orderOp, $holdReason, $ncr?->id);
             }
 
             $this->eventService->writeEvent($tenantId, [

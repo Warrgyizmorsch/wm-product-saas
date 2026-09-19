@@ -15,6 +15,10 @@ class ProvisionProductionDefaults
 
     public function handle(TenantProvisioning $event): void
     {
+        if (! $event->includes('production')) {
+            return;
+        }
+
         foreach (self::SHIFTS as $code => [$name, $start, $end]) {
             ProductionShift::query()->firstOrCreate(
                 ['tenant_id' => $event->tenantId, 'code' => $code],

@@ -17,6 +17,7 @@ class TenantProvisioningTest extends TestCase
     private const TABLES = [
         'companies', 'branches', 'lead_statuses', 'deal_statuses', 'uoms',
         'warehouses', 'payment_terms', 'production_shifts', 'chart_of_accounts',
+        'cost_centers', 'asset_categories',
     ];
 
     private function makeTenant(string $slug): Tenant
@@ -48,6 +49,8 @@ class TenantProvisioningTest extends TestCase
         $this->assertSame(6, $counts['payment_terms']);
         $this->assertSame(2, $counts['production_shifts']);
         $this->assertGreaterThan(0, $counts['chart_of_accounts']);
+        $this->assertSame(4, $counts['cost_centers']);
+        $this->assertGreaterThanOrEqual(5, $counts['asset_categories']);
 
         $companyId = DB::table('companies')->where('tenant_id', $tenant->id)->value('id');
         $this->assertSame(0, DB::table('lead_statuses')->where('tenant_id', $tenant->id)->where('company_id', '!=', $companyId)->count());
@@ -65,6 +68,84 @@ class TenantProvisioningTest extends TestCase
 
         $this->assertSame($before, $this->counts($tenant));
         $this->assertSame('SBI Current A/c', DB::table('chart_of_accounts')->where('tenant_id', $tenant->id)->where('code', '1020')->value('name'));
+    }
+
+    public function test_accounting_masters_are_attached_to_the_default_company(): void
+    {
+        $tenant = $this->makeTenant('acme');
+        app(TenantProvisioner::class)->provision($tenant);
+        $companyId = DB::table('companies')->where('tenant_id', $tenant->id)->value('id');
+
+        foreach (['accounting_tax_rates', 'accounting_fiscal_years', 'cost_centers', 'asset_categories'] as $table) {
+            $this->assertGreaterThan(0, DB::table($table)->where('tenant_id', $tenant->id)->count(), $table);
+            $this->assertSame(0, DB::table($table)->where('tenant_id', $tenant->id)->where(fn ($q) => $q->whereNull('company_id')->orWhere('company_id', '!=', $companyId))->count(), "{$table} not on default company");
+        }
+    }
+
+    public function test_reprovisioning_attaches_masters_that_were_seeded_without_a_company(): void
+    {
+        $tenant = $this->makeTenant('acme');
+        app(TenantProvisioner::class)->provision($tenant);
+        $companyId = DB::table('companies')->where('tenant_id', $tenant->id)->value('id');
+
+        DB::table('accounting_tax_rates')->where('tenant_id', $tenant->id)->update(['company_id' => null, 'branch_id' => null]);
+        DB::table('accounting_fiscal_years')->where('tenant_id', $tenant->id)->update(['company_id' => null, 'branch_id' => null]);
+        $rates = DB::table('accounting_tax_rates')->where('tenant_id', $tenant->id)->count();
+
+        app(TenantProvisioner::class)->provision($tenant);
+
+        $this->assertSame($rates, DB::table('accounting_tax_rates')->where('tenant_id', $tenant->id)->count());
+        $this->assertSame($rates, DB::table('accounting_tax_rates')->where('tenant_id', $tenant->id)->where('company_id', $companyId)->count());
+        $this->assertSame(1, DB::table('accounting_fiscal_years')->where('tenant_id', $tenant->id)->where('company_id', $companyId)->count());
+    }
+
+    private function tenantOnPlan(string $slug, array $modules): Tenant
+    {
+        $plan = \App\Domains\Platform\Models\Plan::create([
+            'name' => ucfirst($slug).' plan', 'slug' => $slug.'-plan', 'price' => 0, 'currency' => 'INR',
+            'billing_cycle' => 'monthly', 'features' => $modules, 'is_active' => true,
+        ]);
+
+        return Tenant::create(['name' => ucfirst($slug), 'slug' => $slug, 'status' => 'active', 'plan' => 'starter', 'plan_id' => $plan->id]);
+    }
+
+    public function test_only_the_modules_in_the_plan_get_their_masters(): void
+    {
+        $tenant = $this->tenantOnPlan('crm-only', ['crm', 'inventory', 'hrms']);
+
+        app(TenantProvisioner::class)->provision($tenant);
+
+        $counts = $this->counts($tenant);
+        $this->assertSame(1, $counts['companies']);
+        $this->assertSame(5, $counts['lead_statuses']);
+        $this->assertSame(12, $counts['uoms']);
+        $this->assertSame(0, $counts['chart_of_accounts']);
+        $this->assertSame(0, $counts['cost_centers']);
+        $this->assertSame(0, $counts['asset_categories']);
+        $this->assertSame(0, $counts['production_shifts']);
+        $this->assertSame(0, $counts['payment_terms']);
+        $this->assertSame(0, DB::table('accounting_tax_rates')->where('tenant_id', $tenant->id)->count());
+        $this->assertGreaterThan(0, DB::table('departments')->where('tenant_id', $tenant->id)->count());
+    }
+
+    public function test_switching_to_a_bigger_plan_fills_the_new_modules(): void
+    {
+        $tenant = $this->tenantOnPlan('grow', ['crm']);
+        app(TenantProvisioner::class)->provision($tenant);
+        $this->assertSame(0, $this->counts($tenant)['chart_of_accounts']);
+
+        $bigger = \App\Domains\Platform\Models\Plan::create([
+            'name' => 'Big', 'slug' => 'big', 'price' => 0, 'currency' => 'INR',
+            'billing_cycle' => 'monthly', 'features' => ['crm', 'accounting'], 'is_active' => true,
+        ]);
+
+        app(\App\Domains\Platform\Services\TenantService::class)->switchOwnPlan($tenant, $bigger->id);
+
+        $counts = $this->counts($tenant);
+        $this->assertGreaterThan(0, $counts['chart_of_accounts']);
+        $this->assertSame(4, $counts['cost_centers']);
+        $this->assertSame(5, DB::table('accounting_tax_rates')->where('tenant_id', $tenant->id)->count());
+        $this->assertSame(0, $counts['uoms']);
     }
 
     public function test_setting_up_a_tenant_from_inside_another_tenant_writes_only_to_the_new_one(): void

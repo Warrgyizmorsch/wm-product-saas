@@ -334,28 +334,32 @@ class EmployeeController extends Controller
         $isHrOrAdmin = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', [
             'tenant_id' => $authUser->tenant_id,
         ]);
-        $isOwnProfile = $authUser?->employee?->id == $employee->id;
+        $isOwnProfile = $authUser && (($authUser->employee?->id == $employee->id) || (\App\Domains\HRMS\Models\Employee::resolveForUser($authUser)?->id == $employee->id));
 
         if (!$isHrOrAdmin && !$isOwnProfile) {
             $this->authorizeHrms('hrms.employees.update');
         }
 
-        if (!$isHrOrAdmin) {
-            // Self-service edits must never change the account's system role.
+        if (!$isHrOrAdmin || $isOwnProfile) {
+            // Self-profile edits must never change official company fields (role, department, designation, salary, manager, etc.)
             $request->offsetUnset('role_id');
             $request->query->remove('role_id');
 
             $request->merge([
-                'employee_id' => $request->input('employee_id', $employee->employee_id),
-                'user_id' => $request->input('user_id', $employee->user_id),
-                'company_id' => $request->input('company_id', $employee->company_id),
-                'department_id' => $request->input('department_id', $employee->department_id),
-                'designation_id' => $request->input('designation_id', $employee->designation_id),
-                'date_of_joining' => $request->input('date_of_joining', $employee->date_of_joining ? $employee->date_of_joining->format('Y-m-d') : null),
-                'gender' => $request->input('gender', $employee->gender),
-                'full_name' => $request->input('full_name', $employee->full_name),
-                'job_title' => $request->input('job_title', $employee->job_title),
-                'status' => $request->input('status', $employee->status),
+                'employee_id'          => $employee->employee_id,
+                'user_id'              => $employee->user_id,
+                'company_id'           => $employee->company_id,
+                'department_id'        => $employee->department_id,
+                'designation_id'       => $employee->designation_id,
+                'reporting_manager_id' => $employee->reporting_manager_id,
+                'pay_group_id'         => $employee->pay_group_id,
+                'salary_structure_id'  => $employee->salary_structure_id,
+                'office_email'         => $employee->office_email,
+                'date_of_joining'      => $employee->date_of_joining ? $employee->date_of_joining->format('Y-m-d') : null,
+                'gender'               => $employee->gender,
+                'full_name'            => $employee->full_name,
+                'job_title'            => $employee->job_title,
+                'status'               => $employee->status,
             ]);
         }
 

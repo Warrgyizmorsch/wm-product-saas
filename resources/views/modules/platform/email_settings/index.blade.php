@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'SMTP Email Configurations | CRM Settings')
+@section('title', 'SMTP Email Configurations | Platform Settings')
 @section('page-title', 'Email Accounts & Database SMTP Setup')
-@section('breadcrumb', 'CRM / Settings / Email Accounts')
+@section('breadcrumb', 'Platform / Settings / Email Accounts')
 
 @section('page-actions')
     <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addAccountModal">
@@ -99,7 +99,7 @@
                                 <button type="button" class="btn btn-xs btn-outline-success fw-bold btn-open-test-mail-modal px-2.5 py-1" data-account-id="{{ $acc->id }}" data-account-name="{{ $acc->name }}" data-email-address="{{ $acc->email_address }}">
                                     <i class="feather-send me-1"></i>Send Test Email
                                 </button>
-                                <form action="{{ route('crm.emailSettings.destroy', $acc->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete SMTP account \'{{ $acc->name }}\' ({{ $acc->email_address }})?');">
+                                <form action="{{ route('platform.emailSettings.destroy', $acc->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete SMTP account \'{{ $acc->name }}\' ({{ $acc->email_address }})?');">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-xs btn-outline-danger fw-bold px-2.5 py-1">
@@ -123,7 +123,7 @@
 </div>
 
 <!-- ADD ACCOUNT MODAL -->
-<x-ui.modal id="addAccountModal" title="<i class='feather-mail text-primary me-1.5'></i>Add SMTP Email Account" size="lg" :centered="true" :formAction="route('crm.emailSettings.store')" formMethod="POST" submitText="Save SMTP Account" closeText="Cancel">
+<x-ui.modal id="addAccountModal" title="<i class='feather-mail text-primary me-1.5'></i>Add SMTP Email Account" size="lg" :centered="true" :formAction="route('platform.emailSettings.store')" formMethod="POST" submitText="Save SMTP Account" closeText="Cancel">
     <div class="row g-3">
         <div class="col-md-6">
             <x-ui.modal-form-ui type="input" label="Display Account Name" name="name" placeholder="e.g. Sales Desk" :required="true" />
@@ -135,7 +135,7 @@
             <x-ui.modal-form-ui type="select" label="Scope to Company" name="company_id">
                 <option value="">All Companies (Global Default)</option>
                 @foreach($companies as $comp)
-                    <option value="{{ $comp->id }}" {{ $companyId == $comp->id ? 'selected' : '' }}>{{ $comp->name }}</option>
+                    <option value="{{ $comp->id }}" {{ $companyId == $comp->id ? 'selected' : '' }}>{{ $comp->company_name ?: ($comp->name ?: $comp->legal_name) }}</option>
                 @endforeach
             </x-ui.modal-form-ui>
         </div>
@@ -198,10 +198,10 @@
             <x-ui.modal-form-ui type="input" inputType="email" label="Recipient Email Address (To)" name="to_email" id="testMailToEmail" placeholder="recipient@example.com" :required="true" />
         </div>
         <div class="mb-3">
-            <x-ui.modal-form-ui type="input" label="Subject" name="subject" id="testMailSubject" value="Test Email from CRM System" :required="true" />
+            <x-ui.modal-form-ui type="input" label="Subject" name="subject" id="testMailSubject" value="Test Email from Platform System" :required="true" />
         </div>
         <div class="mb-3">
-            <x-ui.modal-form-ui type="textarea" label="Message Body" name="body_html" id="testMailBody" rows="4" :required="true">Hello! This is a test email sent from your CRM System to verify SMTP settings are working correctly.</x-ui.modal-form-ui>
+            <x-ui.modal-form-ui type="textarea" label="Message Body" name="body_html" id="testMailBody" rows="4" :required="true">Hello! This is a test email sent from your Platform System to verify SMTP settings are working correctly.</x-ui.modal-form-ui>
         </div>
         <div class="d-flex justify-content-end gap-2 pt-2 border-top">
             <button type="button" class="btn btn-sm btn-light border fw-bold" data-bs-dismiss="modal">Cancel</button>
@@ -239,7 +239,7 @@
             btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Testing...');
 
             $.ajax({
-                url: "/crm/email-settings/" + accId + "/test",
+                url: "/platform/email-settings/" + accId + "/test",
                 method: "POST",
                 data: {
                     _token: "{{ csrf_token() }}"
@@ -262,7 +262,7 @@
             const accName = $(this).attr('data-account-name');
             const accEmail = $(this).attr('data-email-address');
 
-            $('#sendTestMailForm').attr('action', '/crm/email-settings/' + accId + '/send-test-email');
+            $('#sendTestMailForm').attr('action', '/platform/email-settings/' + accId + '/send-test-email');
             $('#testMailFromAccount').val(accName + ' (' + accEmail + ')');
             if(!$('#testMailToEmail').val()) {
                 $('#testMailToEmail').val(accEmail);

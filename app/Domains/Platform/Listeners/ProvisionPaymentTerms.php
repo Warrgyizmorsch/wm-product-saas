@@ -19,6 +19,10 @@ class ProvisionPaymentTerms
 
     public function handle(TenantProvisioning $event): void
     {
+        if (! $event->includes('sales', 'purchase')) {
+            return;
+        }
+
         foreach (self::TERMS as $code => [$name, $dueDays, $description]) {
             PaymentTerm::query()->firstOrCreate(
                 ['tenant_id' => $event->tenantId, 'code' => $code],

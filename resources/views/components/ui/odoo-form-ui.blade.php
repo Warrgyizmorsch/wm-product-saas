@@ -677,6 +677,19 @@
                     requiredFields.forEach(field => {
                         if (field.disabled || field.readOnly || field.type === 'hidden') return;
 
+                        // Skip elements hidden inside closed/hidden panels, tabs, or containers
+                        let isSelect2 = field.tagName === 'SELECT' && $(field).data('select2');
+                        if (isSelect2) {
+                            let s2Container = field.nextElementSibling;
+                            if (!s2Container || s2Container.offsetParent === null || $(s2Container).is(':hidden')) {
+                                return;
+                            }
+                        } else {
+                            if (field.offsetParent === null || field.closest('.d-none') || $(field).is(':hidden')) {
+                                return;
+                            }
+                        }
+
                         let val = field.value;
                         let isInvalid = false;
                         let customErrorMsg = '';

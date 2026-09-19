@@ -22,7 +22,11 @@ class ProvisionAccountingMasters
 
     public function handle(TenantProvisioning $event): void
     {
-        $this->taxRates->provisionDefaultsIfMissing($event->tenantId);
-        $this->fiscalPeriods->provisionCurrentFiscalYearIfMissing($event->tenantId);
+        if (! $event->includes('accounting')) {
+            return;
+        }
+
+        $this->taxRates->provisionDefaultsIfMissing($event->tenantId, $event->companyId, $event->branchId);
+        $this->fiscalPeriods->provisionCurrentFiscalYearIfMissing($event->tenantId, $event->companyId, $event->branchId);
     }
 }

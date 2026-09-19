@@ -547,13 +547,4 @@ Route::prefix('hrms')
             Route::post('/offer/{offer}/send-email', [RecruitmentController::class, 'sendOfferEmail'])->name('offer.send-email');
             Route::post('/offer/{offer}/convert-to-employee', [RecruitmentController::class, 'convertToEmployee'])->name('offer.convert');
         });
-
-        // Notifications Center
-        Route::prefix('notifications')->name('notifications.')->group(function (): void {
-            Route::get('/', [\App\Domains\HRMS\Controllers\HrmsNotificationController::class, 'index'])->name('index');
-            Route::get('/unread', [\App\Domains\HRMS\Controllers\HrmsNotificationController::class, 'unread'])->name('unread');
-            Route::post('/{id}/read', [\App\Domains\HRMS\Controllers\HrmsNotificationController::class, 'markAsRead'])->name('read');
-            Route::post('/read-all', [\App\Domains\HRMS\Controllers\HrmsNotificationController::class, 'markAllRead'])->name('read-all');
-            Route::delete('/{id}', [\App\Domains\HRMS\Controllers\HrmsNotificationController::class, 'destroy'])->name('destroy');
-        });
     });

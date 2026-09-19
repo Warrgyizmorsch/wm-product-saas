@@ -81,7 +81,7 @@
                             $statusClass = match(strtolower($statusKey)) {
                                 'new' => 'bg-soft-primary text-primary',
                                 'qualified' => 'bg-soft-teal text-teal',
-                                'converted' => 'bg-soft-info text-info',
+                                'dealing' => 'bg-soft-info text-info',
                                 'won' => 'bg-soft-success text-success',
                                 'lost' => 'bg-soft-danger text-danger',
                                 default => $presetSoftClasses[abs(crc32($statusKey)) % count($presetSoftClasses)],
@@ -400,8 +400,8 @@
 
                                                 <x-ui.odoo-form-ui type="select" :label="__('crm.lead_source')" name="source" :errorText="$errors->first('source')">
                                                     <option value="">{{ __('crm.select_an_option') }}</option>
-                                                    @foreach (['Cold Call', 'Employee Referral', 'Partner', 'Web Search', 'Advertisement', 'Trade Show'] as $srcOption)
-                                                        <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ __('crm.sources.' . $srcOption) ?? $srcOption }}</option>
+                                                    @foreach (['Direct Inquiry', 'Website Form', 'Web Search', 'Meta Ads', 'IndiaMART', 'TradeIndia', 'Justdial', 'Cold Call', 'Referral', 'Employee Referral', 'Partner', 'Advertisement', 'Trade Show', 'WhatsApp Bot', 'WhatsApp', 'Email', 'Phone Call', 'Walk In', 'LinkedIn', 'Google Ads', 'Other'] as $srcOption)
+                                                        <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ \Illuminate\Support\Facades\Lang::has('crm.sources.' . $srcOption) ? __('crm.sources.' . $srcOption) : $srcOption }}</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
 
@@ -781,7 +781,7 @@
                                                  <div class="zoho-field-row">
                                                      <div class="zoho-field-label">{{ __('crm.lead_source') }}</div>
                                                      <div class="zoho-field-value">
-                                                         <span class="badge bg-light text-dark border px-2 py-0.5" style="font-size: 11px;">{{ ($lead->source && $lead->source !== 'Select an Option') ? __('crm.sources.' . $lead->source) : '—' }}</span>
+                                                         <span class="badge bg-light text-dark border px-2 py-0.5" style="font-size: 11px;">{{ ($lead->source && !in_array($lead->source, ['Select an Option', 'Select an option', 'Select Option'], true)) ? (\Illuminate\Support\Facades\Lang::has('crm.sources.' . $lead->source) ? __('crm.sources.' . $lead->source) : $lead->source) : '—' }}</span>
                                                      </div>
                                                  </div>
                                              </div>
@@ -1866,9 +1866,12 @@
                                                          <button type="submit" class="btn btn-sm btn-success">{{ __('crm.accept_quotation') }}</button>
                                                      </form>
                                                  @elseif ($activeQuotation->status === 'Accepted')
-                                                     <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-success">
-                                                         <i class="feather-shopping-cart me-1"></i>{{ __('crm.convert_to_sales_order') }}
-                                                     </a>
+                                                      <a href="{{ $activeQuotation->crm_deal_id ? route('crm.deals.showConvertForm', $activeQuotation->crm_deal_id) : route('crm.quotations.showConvertForm', $activeQuotation->id) }}" class="btn btn-sm btn-warning text-dark fw-bold px-2.5 py-1.5">
+                                                          <i class="feather-user-check me-1"></i>{{ __('crm.convert_to_customer') }}
+                                                      </a>
+                                                      <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-success">
+                                                          <i class="feather-shopping-cart me-1"></i>{{ __('crm.convert_to_sales_order') }}
+                                                      </a>
                                                  @endif
                                             </div>
                                         </div>

@@ -40,7 +40,7 @@ class TenantService
     {
         return DB::transaction(function () use ($data): Tenant {
             $tenant = $this->tenants->create($this->payload($data));
-            // Default masters for every module; the plan only decides which modules open.
+            // Default masters for the modules the plan includes.
             $this->provisioner->provision($tenant);
             $owner = $this->createOwnerUser($tenant, $data);
 
@@ -61,7 +61,12 @@ class TenantService
 
     public function update(Tenant $tenant, array $data): bool
     {
-        return $this->tenants->update($tenant, $this->payload($data, $tenant));
+        $updated = $this->tenants->update($tenant, $this->payload($data, $tenant));
+
+        // A plan change can add modules: fill their masters (only missing rows are added).
+        $this->provisioner->provision($tenant->fresh());
+
+        return $updated;
     }
 
     /**
@@ -73,12 +78,17 @@ class TenantService
     {
         $plan = Plan::query()->where('id', $planId)->where('is_active', true)->firstOrFail();
 
-        return $this->tenants->update($tenant, [
+        $updated = $this->tenants->update($tenant, [
             'plan' => $plan->slug,
             'plan_id' => $plan->id,
             'subscription_status' => Tenant::STATUS_ACTIVE,
             'plan_started_at' => now(),
         ]);
+
+        // The new plan may include modules the tenant did not have: fill their masters.
+        $this->provisioner->provision($tenant->fresh());
+
+        return $updated;
     }
 
     public function updateStatus(Tenant $tenant, string $status): bool

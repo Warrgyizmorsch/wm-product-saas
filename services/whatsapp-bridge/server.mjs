@@ -142,9 +142,9 @@ async function initSession(key, force = false) {
       sockOptions.version = version;
     }
 
-    console.log(`[Baileys ${key}] Starting WASocket instance...`);
     const sock = makeWASocket(sockOptions);
     sessionObj.sock = sock;
+    sessionObj.connectedAt = Math.floor(Date.now() / 1000);
 
     sock.ev.on('creds.update', saveCreds);
 
@@ -181,6 +181,19 @@ async function initSession(key, force = false) {
           if (msg.key && msg.key.id) {
             messageStore.set(msg.key.id, msg);
           }
+
+          // 1. STRICT FILTER: Ignore self messages (fromMe) - PREVENTS SELF-REPLY INFINITE LOOP!
+          if (msg.key && msg.key.fromMe) {
+            continue;
+          }
+
+          // 2. STRICT FILTER: Ignore historical messages synced on startup
+          const sessionStart = sessionObj.connectedAt || Math.floor(Date.now() / 1000);
+          const msgTimestamp = msg.messageTimestamp ? (typeof msg.messageTimestamp === 'number' ? msg.messageTimestamp : (msg.messageTimestamp.low || 0)) : 0;
+          if (msgTimestamp && msgTimestamp < (sessionStart - 5)) {
+            continue;
+          }
+
           const jid = msg.key.remoteJid || '';
 
           // STRICT FILTER: Ignore Groups, Newsletters, Channels, Status Broadcasts
@@ -263,7 +276,7 @@ async function initSession(key, force = false) {
           console.log(`[Baileys ${key}] Human message (${payload.direction}) from ${senderNumber}: "${bodyText || payload.message_body}"`);
 
           try {
-            const resp = await fetch('http://127.0.0.1:8000/crm/whatsapp/webhook', {
+            const resp = await fetch('http://127.0.0.1:8000/platform/whatsapp/webhook', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
@@ -553,6 +566,32 @@ app.post('/sessions/:key/send-document', async (req, res) => {
   }
 });
 
-app.listen(PORT, '127.0.0.1', () => {
+app.listen(PORT, '127.0.0.1', async () => {
   console.log(`[WhatsApp Bridge] Running on http://127.0.0.1:${PORT}`);
+
+  // Automatically restore and connect all existing saved WhatsApp sessions on startup
+  try {
+    if (fs.existsSync(SESSION_BASE_PATH)) {
+      const entries = fs.readdirSync(SESSION_BASE_PATH, { withFileTypes: true });
+      let restoredCount = 0;
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const sessionKey = entry.name;
+          const credsPath = path.join(SESSION_BASE_PATH, sessionKey, 'creds.json');
+          if (fs.existsSync(credsPath)) {
+            console.log(`[WhatsApp Bridge] Auto-initializing saved session: "${sessionKey}" in background...`);
+            initSession(sessionKey).catch(err => {
+              console.error(`[WhatsApp Bridge] Background init error for ${sessionKey}:`, err.message);
+            });
+            restoredCount++;
+          }
+        }
+      }
+      if (restoredCount === 0) {
+        console.log('[WhatsApp Bridge] No existing saved session found. Ready for QR linking.');
+      }
+    }
+  } catch (err) {
+    console.error('[WhatsApp Bridge] Error scanning session directory on startup:', err.message);
+  }
 });

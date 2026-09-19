@@ -528,22 +528,22 @@ class InvoiceController extends Controller
     }
 
 
-    public function post(int $id): RedirectResponse
+    public function post(int $invoice): RedirectResponse
     {
-        $invoice = $this->invoiceRepo->find($id);
-        if (!$invoice) abort(404);
-        $this->authorize('update', $invoice);
+        $inv = $this->invoiceRepo->find($invoice);
+        if (!$inv) abort(404);
+        $this->authorize('update', $inv);
 
-        if ($invoice->status !== 'Draft') {
+        if ($inv->status !== 'Draft') {
             return back()->withErrors(['status' => 'Only Draft invoices can be posted.']);
         }
 
-        $invoice->status = 'Posted';
-        $invoice->save();
+        $inv->status = 'Posted';
+        $inv->save();
 
-        event(new InvoicePosted($invoice));
+        event(new InvoicePosted($inv));
 
-        return redirect()->route('sales.invoices.show', $invoice->id)->with('success', "Invoice {$invoice->invoice_number} posted successfully.");
+        return redirect()->route('sales.invoices.show', $inv->id)->with('success', "Invoice {$inv->invoice_number} posted successfully.");
     }
 
     public function send(int $invoice): RedirectResponse

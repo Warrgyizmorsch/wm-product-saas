@@ -252,20 +252,36 @@ class LeadService
                 }
             }
             $message = 'Lead status updated to Lost.';
-        } elseif ($newStatus === 'Converted') {
+        } elseif ($newStatus === 'Dealing') {
             if (!$lead->crm_deal_id) {
                 app(\App\Domains\CRM\Repositories\LeadRepository::class)->qualifyLead($lead);
-                return ['success' => true, 'message' => 'Lead converted to Deal successfully!'];
             }
-            $message = 'Lead status updated to Converted.';
+            $message = 'Lead status updated to Dealing.';
         } elseif ($newStatus === 'Won') {
             if (!$lead->crm_account_id) {
-                return [
-                    'success' => false,
-                    'message' => 'Cannot mark as Won. Account & Deal conversion required first!'
-                ];
+                $acc = \App\Domains\CRM\Models\CrmAccount::where('tenant_id', $lead->tenant_id ?? 1)
+                    ->where(function($q) use ($lead) {
+                        if (!empty($lead->email)) $q->where('email', $lead->email);
+                        if (!empty($lead->company_name)) $q->orWhere('name', $lead->company_name);
+                    })->first();
+                if (!$acc) {
+                    $acc = \App\Domains\CRM\Models\CrmAccount::create([
+                        'tenant_id' => $lead->tenant_id ?? 1,
+                        'name'      => $lead->company_name ?: ($lead->contact_person ?: 'Customer Account'),
+                        'email'     => $lead->email,
+                        'phone'     => $lead->phone,
+                        'status'    => 'active',
+                        'owner_id'  => $lead->lead_owner_id ?: 1,
+                    ]);
+                }
+                $updateData['crm_account_id'] = $acc->id;
+                $lead->crm_account_id = $acc->id;
             }
             $updateData['is_customer'] = true;
+            $customer = $lead->getCustomer();
+            if ($customer) {
+                $customer->update(['status' => 'active']);
+            }
             $message = 'Lead marked as Won.';
         }
 

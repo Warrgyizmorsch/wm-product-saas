@@ -440,7 +440,8 @@
 
                 @php
                     $hasAcceptedQuotation = $deal->quotations->contains(fn($q) => in_array($q->status, ['Accepted', 'Converted', 'Won']));
-                    $hasCustomer = !empty($deal->account?->customer_id);
+                    $isDealWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+                    $hasCustomer = !empty($deal->account?->customer_id) && $isDealWon;
                     $acceptedQuote = $deal->quotations->firstWhere('status', 'Accepted') ?: ($deal->quotations->firstWhere('status', 'Converted') ?: $activeQuotation);
                 @endphp
 
@@ -873,7 +874,7 @@
 
                                         <div class="zoho-field-row">
                                             <div class="zoho-field-label">{{ __('crm.lead_source') }}</div>
-                                            <div class="zoho-field-value text-dark">{{ ($deal->lead_source && !in_array($deal->lead_source, ['Select an Option', 'Select an option', 'Select Option'], true)) ? $deal->lead_source : '—' }}</div>
+                                            <div class="zoho-field-value text-dark">{{ ($deal->lead_source && !in_array($deal->lead_source, ['Select an Option', 'Select an option', 'Select Option'], true)) ? (\Illuminate\Support\Facades\Lang::has('crm.sources.' . $deal->lead_source) ? __('crm.sources.' . $deal->lead_source) : $deal->lead_source) : '—' }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
@@ -1190,7 +1191,9 @@
                                     <form action="{{ route('crm.quotations.store') }}" method="POST" id="quotationForm" novalidate>
                                         @csrf
                                         <input type="hidden" name="crm_deal_id" value="{{ $deal->id }}">
-                                        <input type="hidden" name="form_type" value="quotat                                        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+                                        <input type="hidden" name="form_type" value="quotation_create">
+
+                                        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
                                             <h5 class="fw-bold text-dark mb-0 fs-16"><i class="feather-file-plus text-primary me-2"></i>{{ __('crm.new_quotation_title') }}</h5>
                                             <a href="{{ route('crm.deals.show', $deal->id) }}" class="btn btn-sm btn-light border">{{ __('crm.cancel') }}</a>
                                         </div>
@@ -1224,7 +1227,9 @@
                                                      </x-ui.odoo-form-ui>
                                                 @endif
                                             </div>
-                                                                           <!-- Order Lines Table -->
+                                        </div>
+
+                                        <!-- Order Lines Table -->
                                         <div class="border-top pt-4">
                                             <h5 class="fw-bold text-dark mb-3 fs-14">{{ __('crm.order_lines') }}</h5>
                                             <div class="table-responsive">
@@ -1234,7 +1239,7 @@
                                                             <th style="width: 38%;">{{ __('crm.product_description') }}</th>
                                                             <th class="text-end" style="width: 10%;">{{ __('crm.qty') }}</th>
                                                             <th class="text-end" style="width: 18%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
-                                                            <th class="text-end" style="width: 12%;">{{ __('crm.taxes') }}</th>
+                                                            <th class="text-end" style="width: 12%;">{{ __('crm.taxes') }} (%)</th>
                                                             <th class="text-end pe-3" style="width: 17%;">{{ __('crm.amount') }}</th>
                                                             <th class="text-center" style="width: 5%;"></th>
                                                         </tr>
@@ -1283,7 +1288,6 @@
                                             <a href="{{ route('crm.deals.show', $deal->id) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">{{ __('crm.discard') }}</a>
                                             <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12">{{ __('crm.save_quotation') }}</button>
                                         </div>
-               </div>
                                     </form>
                                 </div>
                             </div>
@@ -2375,7 +2379,9 @@
                 let opts = '<option value="">Select Product...</option>';
                 crmProductsList.forEach(function(p) {
                     const sel = (p.id == selectedId) ? ' selected' : '';
-                    opts += `<option value="${p.id}" data-selling-price="${p.selling_price || 0}"${sel}>${p.name} ${p.sku ? '('+p.sku+')' : ''}</option>`;
+                    const price = parseFloat(p.selling_price || p.unit_cost || 0);
+                    const taxRate = (p.gst_rate !== null && p.gst_rate !== undefined) ? parseFloat(p.gst_rate) : 18;
+                    opts += `<option value="${p.id}" data-selling-price="${price}" data-tax-rate="${taxRate}"${sel}>${p.name} ${p.sku ? '('+p.sku+')' : ''}</option>`;
                 });
                 return opts;
             }
@@ -2395,10 +2401,10 @@
                             </a>
                         </td>
                         <td>
-                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
+                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="0.01" step="any" required style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
-                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0.01" step="0.01" required style="width: 100%; max-width: 140px; margin-left: auto; text-align: right;">
+                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="width: 100%; max-width: 140px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
                             <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
@@ -2456,24 +2462,28 @@
                         $('#desc-container-' + rowIndex).show();
                         newRow.find('.toggle-desc-btn').html('<i class="feather-minus me-1"></i>Remove Description');
                     }
-                    newRow.find('.qty-input').val(item.quantity);
+                    newRow.find('.qty-input').val(item.quantity || 1);
                     let finalUnitPrice = parseFloat(item.unit_price);
                     if (isNaN(finalUnitPrice) || finalUnitPrice === 0) {
                         const foundProd = crmProductsList.find(p => p.id == item.product_id);
-                        if (foundProd && parseFloat(foundProd.selling_price) > 0) {
-                            finalUnitPrice = parseFloat(foundProd.selling_price);
+                        if (foundProd && parseFloat(foundProd.selling_price || foundProd.unit_cost || 0) > 0) {
+                            finalUnitPrice = parseFloat(foundProd.selling_price || foundProd.unit_cost || 0);
                         } else {
                             finalUnitPrice = 0.00;
                         }
                     }
                     newRow.find('.price-input').val(finalUnitPrice.toFixed(2));
-                    newRow.find('.tax-input').val(item.tax_rate);
+                    newRow.find('.tax-input').val(item.tax_rate !== undefined && item.tax_rate !== null ? parseFloat(item.tax_rate).toFixed(2) : '18.00');
                 }
 
                 newRow.find('.item-name-input').on('change', function() {
                     const selectedOption = $(this).find('option:selected');
                     const sellingPrice = parseFloat(selectedOption.attr('data-selling-price')) || 0;
+                    const taxRate = parseFloat(selectedOption.attr('data-tax-rate'));
                     $(this).closest('tr').find('.price-input').val(sellingPrice.toFixed(2));
+                    if (!isNaN(taxRate)) {
+                        $(this).closest('tr').find('.tax-input').val(taxRate.toFixed(2));
+                    }
                     calculateTotals();
                 });
 
@@ -2486,7 +2496,7 @@
                 let taxTotal = 0;
 
                 $('.item-row').each(function() {
-                    const qty = parseInt($(this).find('.qty-input').val()) || 0;
+                    const qty = parseFloat($(this).find('.qty-input').val()) || 0;
                     const price = parseFloat($(this).find('.price-input').val()) || 0;
                     const taxRate = parseFloat($(this).find('.tax-input').val()) || 0;
 
@@ -3184,7 +3194,7 @@
 
         function checkWhatsAppStatus() {
             $.ajax({
-                url: "/crm/whatsapp/status",
+                url: "{{ route('platform.whatsapp.status') }}",
                 method: "GET",
                 success: function(res) {
                     if (res.status === 'connected') {
@@ -3227,7 +3237,7 @@
             $('#waStatusBadge').attr('class', 'badge bg-info text-dark').text('Connecting...');
             $('#waStatusText').text('Requesting QR code connection...');
             $.ajax({
-                url: "/crm/whatsapp/connect",
+                url: "{{ route('platform.whatsapp.connect') }}",
                 method: "POST",
                 data: { _token: "{{ csrf_token() }}" },
                 success: function() {

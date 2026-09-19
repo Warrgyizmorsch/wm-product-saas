@@ -463,7 +463,7 @@ class LeadController extends Controller
     {
         $this->authorize('update', $lead);
         $dbStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses()->pluck('name')->toArray();
-        $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Converted', 'Won', 'Lost'], $dbStatuses)));
+        $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost'], $dbStatuses)));
         $validated = $request->validate(['status' => 'required|string|in:' . $allowedStatuses]);
 
         $res = $this->leadService->updateLeadStatus($lead, $validated['status']);

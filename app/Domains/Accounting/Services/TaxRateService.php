@@ -62,9 +62,18 @@ class TaxRateService
      * can be calculated correctly end to end. Flagging this as a model-level
      * change, not something provisioning can paper over.
      */
-    public function provisionDefaultsIfMissing(int $tenantId): bool
+    public function provisionDefaultsIfMissing(int $tenantId, ?int $companyId = null, ?int $branchId = null): bool
     {
         if (TaxRate::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)->exists()) {
+            // Rows seeded before a company existed are invisible in the UI (company-scoped);
+            // attach them to the tenant's default organization instead of duplicating them.
+            if ($companyId !== null) {
+                TaxRate::query()->withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('company_id')
+                    ->update(['company_id' => $companyId, 'branch_id' => $branchId]);
+            }
+
             return false;
         }
 
@@ -82,6 +91,8 @@ class TaxRateService
             TaxRate::query()->withoutGlobalScopes()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'name' => "GST {$rate}%"],
                 [
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                     'type' => 'gst',
                     'rate' => (float) $rate,
                     'is_compound' => false,

@@ -1,19 +1,25 @@
 <?php
 
-namespace App\Domains\HRMS\Controllers;
+namespace App\Http\Controllers;
 
-use App\Domains\HRMS\Models\HrmsNotification;
-use App\Http\Controllers\Controller;
+use App\Models\Notification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
-class HrmsNotificationController extends Controller
+class NotificationController extends Controller
 {
+    /**
+     * Display the System Notification Center view.
+     */
     public function index(Request $request): View
     {
         $user = $request->user();
-        $query = HrmsNotification::forUser($user->id)->orderBy('created_at', 'desc');
+        $query = Notification::forUser($user->id)->orderBy('created_at', 'desc');
+
+        if ($request->filled('module') && $request->input('module') !== 'all') {
+            $query->forModule($request->input('module'));
+        }
 
         if ($request->filled('status')) {
             if ($request->input('status') === 'unread') {
@@ -25,9 +31,12 @@ class HrmsNotificationController extends Controller
 
         $notifications = $query->paginate(20)->withQueryString();
 
-        return view('modules.hrms.notifications.index', compact('notifications'));
+        return view('notifications.index', compact('notifications'));
     }
 
+    /**
+     * Get unread notification badge count and top recent items for header dropdown.
+     */
     public function unread(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -35,16 +44,32 @@ class HrmsNotificationController extends Controller
             return response()->json(['unread_count' => 0, 'notifications' => []]);
         }
 
-        $unreadCount = HrmsNotification::forUser($user->id)->unread()->count();
+        $unreadCount = Notification::forUser($user->id)->unread()->count();
 
-        $notifications = HrmsNotification::forUser($user->id)
+        $notifications = Notification::forUser($user->id)
             ->orderByRaw('read_at IS NULL DESC')
             ->orderBy('created_at', 'desc')
-            ->take(5)
+            ->take(6)
             ->get()
             ->map(function ($n) {
+                $module = strtolower($n->module ?? 'system');
+                $badgeClass = match ($module) {
+                    'hrms' => 'bg-soft-primary text-primary',
+                    'purchase' => 'bg-soft-info text-info',
+                    'production' => 'bg-soft-warning text-warning',
+                    'sales' => 'bg-soft-success text-success',
+                    'crm' => 'bg-soft-danger text-danger',
+                    'inventory' => 'bg-soft-purple text-purple',
+                    'accounting' => 'bg-soft-dark text-dark',
+                    'projects' => 'bg-soft-secondary text-secondary',
+                    default => 'bg-soft-secondary text-dark',
+                };
+
                 return [
                     'id' => $n->id,
+                    'module' => $module,
+                    'module_label' => strtoupper($module),
+                    'module_badge_class' => $badgeClass,
                     'title' => $n->title,
                     'message' => $n->message,
                     'type' => $n->type,
@@ -61,10 +86,13 @@ class HrmsNotificationController extends Controller
         ]);
     }
 
+    /**
+     * Mark a single notification as read.
+     */
     public function markAsRead(Request $request, $id): JsonResponse
     {
         $user = $request->user();
-        $notification = HrmsNotification::where('user_id', $user->id)->findOrFail($id);
+        $notification = Notification::where('user_id', $user->id)->findOrFail($id);
         $notification->update(['read_at' => now()]);
 
         return response()->json([
@@ -73,10 +101,13 @@ class HrmsNotificationController extends Controller
         ]);
     }
 
+    /**
+     * Mark all notifications as read for current user.
+     */
     public function markAllRead(Request $request): JsonResponse
     {
         $user = $request->user();
-        HrmsNotification::forUser($user->id)->unread()->update(['read_at' => now()]);
+        Notification::forUser($user->id)->unread()->update(['read_at' => now()]);
 
         return response()->json([
             'success' => true,
@@ -84,10 +115,13 @@ class HrmsNotificationController extends Controller
         ]);
     }
 
+    /**
+     * Delete a notification.
+     */
     public function destroy(Request $request, $id): JsonResponse
     {
         $user = $request->user();
-        $notification = HrmsNotification::where('user_id', $user->id)->findOrFail($id);
+        $notification = Notification::where('user_id', $user->id)->findOrFail($id);
         $notification->delete();
 
         return response()->json([

@@ -170,9 +170,14 @@ class SalesAccountingService
             ];
         }
 
+        $companyId = $invoice->company_id ?? (company_id() ?? \App\Domains\HRMS\Models\Company::where('tenant_id', $tenantId)->value('id'));
+        $branchId  = $invoice->branch_id ?? (branch_id() ?? \App\Domains\HRMS\Models\Branch::where('tenant_id', $tenantId)->value('id'));
+
         try {
             $meta = [
                 'tenant_id'             => $tenantId,
+                'company_id'            => $companyId,
+                'branch_id'             => $branchId,
                 'journal_date'          => $invoice->invoice_date ?? now(),
                 'source'                => Journal::SOURCE_SALES,
                 'reference_type'        => 'Invoice',
@@ -260,9 +265,14 @@ class SalesAccountingService
             ]
         ];
 
+        $companyId = $dispatch->company_id ?? (company_id() ?? \App\Domains\HRMS\Models\Company::where('tenant_id', $tenantId)->value('id'));
+        $branchId  = $dispatch->branch_id ?? (branch_id() ?? \App\Domains\HRMS\Models\Branch::where('tenant_id', $tenantId)->value('id'));
+
         try {
             $meta = [
                 'tenant_id'             => $tenantId,
+                'company_id'            => $companyId,
+                'branch_id'             => $branchId,
                 'journal_date'          => $dispatch->dispatch_date ?? now(),
                 'source'                => Journal::SOURCE_INVENTORY,
                 'reference_type'        => 'DispatchOrder',

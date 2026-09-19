@@ -426,6 +426,14 @@ class AssetController extends Controller
             ]);
         }
 
+        \App\Services\Notification\NotificationService::sendToHrAdmins(
+            title: 'New Asset Request',
+            message: "{$employee->full_name} submitted an asset request.",
+            actionUrl: 'hrms.assets-module.index',
+            type: 'asset_request',
+            iconClass: 'feather-box'
+        );
+
         return redirect()->back()->with('success', 'Asset request(s) submitted successfully.');
     }
 
@@ -442,6 +450,16 @@ class AssetController extends Controller
             'status'      => 'rejected',
             'admin_notes' => $validated['admin_notes'] ?? 'Withdrawn by employee.',
         ]);
+
+        \App\Services\Notification\NotificationService::sendToEmployee(
+            employee: $assetRequest->employee_id,
+            title: 'Asset Request Rejected',
+            message: 'Your asset request has been rejected.',
+            actionUrl: 'hrms.assets-module.my-assets',
+            module: 'hrms',
+            type: 'asset_request',
+            iconClass: 'feather-x-circle'
+        );
 
         return redirect()->back()->with('success', 'Asset request rejected successfully.');
     }
@@ -491,6 +509,16 @@ class AssetController extends Controller
             'allocated_asset_id' => $asset->id,
             'admin_notes'        => "Allocated asset {$asset->asset_code} ({$asset->name}) directly on " . date('d M, Y'),
         ]);
+
+        \App\Services\Notification\NotificationService::sendToEmployee(
+            employee: $assetRequest->employee_id,
+            title: 'Asset Allocated',
+            message: "Asset {$asset->asset_code} ({$asset->name}) has been allocated to you.",
+            actionUrl: 'hrms.assets-module.my-assets',
+            module: 'hrms',
+            type: 'asset_allocation',
+            iconClass: 'feather-box'
+        );
 
         return redirect()->back()->with('success', 'Asset allocated directly for request.');
     }
@@ -547,6 +575,16 @@ class AssetController extends Controller
                 'admin_notes'        => "Allocated asset(s): " . implode(', ', $assetCodes) . " on " . date('d M, Y'),
             ]);
         });
+
+        \App\Services\Notification\NotificationService::sendToEmployee(
+            employee: $assetRequest->employee_id,
+            title: 'Asset Allocated',
+            message: 'An asset has been allocated for your request.',
+            actionUrl: 'hrms.assets-module.my-assets',
+            module: 'hrms',
+            type: 'asset_allocation',
+            iconClass: 'feather-box'
+        );
 
         return redirect()->back()->with('success', 'Asset request allocated successfully.');
     }

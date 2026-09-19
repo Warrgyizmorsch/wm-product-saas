@@ -35,7 +35,7 @@
         <x-ui.button href="{{ route('crm.deals.kanban') }}" variant="light-brand" icon="feather-columns" title="{{ __('crm.dashboard.kanban') }}">
             {{ __('crm.dashboard.kanban') }}
         </x-ui.button>
-        <x-ui.button href="{{ route('crm.whatsappSettings.index') }}" variant="soft-warning" icon="feather-message-square" title="{{ __('crm.dashboard.whatsapp_setup') }}">
+        <x-ui.button href="{{ route('platform.whatsappSettings.index') }}" variant="soft-warning" icon="feather-message-square" title="{{ __('crm.dashboard.whatsapp_setup') }}">
             {{ __('crm.dashboard.whatsapp_setup') }}
         </x-ui.button>
     </div>
@@ -392,7 +392,7 @@
                                     <span class="avatar-text avatar-xs bg-soft-{{ $clr }} text-{{ $clr }} rounded-circle">
                                         <i class="feather-hash"></i>
                                     </span>
-                                    <span class="fs-12 fw-semibold text-dark">{{ $sourceName ?: 'Direct / Manual' }}</span>
+                                    <span class="fs-12 fw-semibold text-dark">{{ ($sourceName && \Illuminate\Support\Facades\Lang::has('crm.sources.' . $sourceName)) ? __('crm.sources.' . $sourceName) : ($sourceName ?: __('crm.sources.Direct Inquiry')) }}</span>
                                 </div>
                                 <div class="text-end">
                                     <span class="fs-12 fw-bold text-dark me-2">{{ number_format($count) }}</span>

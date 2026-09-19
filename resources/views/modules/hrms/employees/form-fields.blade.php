@@ -423,7 +423,7 @@
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_mobile') }}" name="personal_mobile_number" id="{{ $prefix }}_personal_mobile_number" :value="$fieldValue('personal_mobile_number')" placeholder="{{ __('hrms.employees.frm_mobile_placeholder') }}" :errorText="$errors->first('personal_mobile_number')" data-field-group="employee" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :value="$fieldValue('personal_email', $isEdit ? ($employee->personal_email ?? '') : '')" placeholder="{{ __('hrms.employees.frm_email_placeholder') }}" :errorText="$errors->first('personal_email')" data-field-group="employee" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :required="true" :value="$fieldValue('personal_email', $isEdit ? ($employee->personal_email ?? '') : '')" placeholder="{{ __('hrms.employees.frm_email_placeholder') }}" :errorText="$errors->first('personal_email')" data-field-group="employee" />
                         </div>
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_home_phone') }}" name="home_phone" id="{{ $prefix }}_home_phone" :value="$fieldValue('home_phone')" placeholder="{{ __('hrms.employees.frm_home_phone_placeholder') }}" :errorText="$errors->first('home_phone')" data-field-group="employee" />

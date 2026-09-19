@@ -12,7 +12,7 @@ class ProvisionCrmDefaults
     private const LEAD_STATUSES = [
         'New' => ['bg-primary', true],
         'Qualified' => ['bg-teal', true],
-        'Converted' => ['bg-info', true],
+        'Dealing' => ['bg-info', true],
         'Won' => ['bg-success', true],
         'Lost' => ['bg-danger', true],
     ];
@@ -29,6 +29,10 @@ class ProvisionCrmDefaults
 
     public function handle(TenantProvisioning $event): void
     {
+        if (! $event->includes('crm')) {
+            return;
+        }
+
         $order = 0;
         foreach (self::LEAD_STATUSES as $name => [$color, $protected]) {
             LeadStatus::query()->firstOrCreate(

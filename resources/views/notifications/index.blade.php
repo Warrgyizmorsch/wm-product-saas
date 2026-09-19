@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Notifications Center | HRMS')
+@section('title', 'Notifications Center | Enterprise ERP')
 @section('page-title', 'Notifications Center')
-@section('breadcrumb', 'HRMS / Notifications')
+@section('breadcrumb', 'System / Notifications')
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
@@ -14,35 +14,25 @@
 
 @push('styles')
 <style>
-    #notificationSubTabs .nav-link {
+    #notificationSubTabs .nav-link, #notificationModuleTabs .nav-link {
         border: none !important;
         background-color: transparent !important;
         color: #64748b;
         font-weight: 500;
-        padding: 10px 16px;
+        padding: 8px 14px;
         border-bottom: 2px solid transparent !important;
         transition: all 0.2s ease-in-out;
     }
-    #notificationSubTabs .nav-link:hover {
+    #notificationSubTabs .nav-link:hover, #notificationModuleTabs .nav-link:hover {
         color: var(--bs-primary);
     }
-    #notificationSubTabs .nav-link.active {
+    #notificationSubTabs .nav-link.active, #notificationModuleTabs .nav-link.active {
         color: var(--bs-primary) !important;
         border-bottom: 2px solid var(--bs-primary) !important;
         font-weight: 600;
     }
-    .notification-panel-item {
-        transition: background 0.15s ease-in-out;
-        border-bottom: 1px solid #f1f5f9;
-    }
-    .notification-panel-item:last-child {
-        border-bottom: none;
-    }
-    .notification-panel-item:hover {
-        background-color: #f8fafc;
-    }
-    .notification-unread-bg {
-        background-color: rgba(var(--bs-primary-rgb), 0.04);
+    .hover-primary:hover {
+        color: var(--bs-primary) !important;
     }
 </style>
 @endpush
@@ -51,21 +41,49 @@
 <div class="container-fluid">
     <!-- ERP Single Panel Container -->
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
-        <!-- Panel Header: Navigation Sub-Tabs & Actions -->
+
+        <!-- Module Filter Tabs -->
+        <div class="border-bottom pb-2 mb-3">
+            <ul class="nav nav-tabs border-0 flex-nowrap overflow-auto" id="notificationModuleTabs">
+                @php
+                    $currentModule = request('module', 'all');
+                    $modules = [
+                        'all' => ['label' => 'All Modules', 'icon' => 'feather-grid'],
+                        'hrms' => ['label' => 'HRMS', 'icon' => 'feather-users'],
+                        'purchase' => ['label' => 'Purchase', 'icon' => 'feather-shopping-bag'],
+                        'production' => ['label' => 'Production', 'icon' => 'feather-layers'],
+                        'sales' => ['label' => 'Sales', 'icon' => 'feather-trending-up'],
+                        'crm' => ['label' => 'CRM', 'icon' => 'feather-target'],
+                        'inventory' => ['label' => 'Inventory', 'icon' => 'feather-package'],
+                        'accounting' => ['label' => 'Accounting', 'icon' => 'feather-dollar-sign'],
+                        'system' => ['label' => 'System', 'icon' => 'feather-sliders'],
+                    ];
+                @endphp
+                @foreach($modules as $modKey => $modInfo)
+                    <li class="nav-item">
+                        <a class="nav-link {{ $currentModule === $modKey ? 'active' : '' }}" href="{{ route('notifications.index', array_merge(request()->query(), ['module' => $modKey])) }}">
+                            <i class="{{ $modInfo['icon'] }} me-1 fs-12"></i> {{ $modInfo['label'] }}
+                        </a>
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+
+        <!-- Status Filter Sub-Tabs & Info -->
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 border-bottom pb-2 mb-3">
             <ul class="nav nav-tabs border-0" id="notificationSubTabs">
                 <li class="nav-item">
-                    <a class="nav-link {{ !request('status') ? 'active' : '' }}" href="{{ route('hrms.notifications.index') }}">
-                        <i class="feather-bell me-1"></i> All Notifications
+                    <a class="nav-link {{ !request('status') ? 'active' : '' }}" href="{{ route('notifications.index', array_merge(request()->query(), ['status' => null])) }}">
+                        <i class="feather-bell me-1"></i> All Status
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {{ request('status') === 'unread' ? 'active' : '' }}" href="{{ route('hrms.notifications.index', ['status' => 'unread']) }}">
+                    <a class="nav-link {{ request('status') === 'unread' ? 'active' : '' }}" href="{{ route('notifications.index', array_merge(request()->query(), ['status' => 'unread'])) }}">
                         <i class="feather-mail me-1"></i> Unread Only
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {{ request('status') === 'read' ? 'active' : '' }}" href="{{ route('hrms.notifications.index', ['status' => 'read']) }}">
+                    <a class="nav-link {{ request('status') === 'read' ? 'active' : '' }}" href="{{ route('notifications.index', array_merge(request()->query(), ['status' => 'read'])) }}">
                         <i class="feather-check-circle me-1"></i> Read Only
                     </a>
                 </li>
@@ -76,12 +94,12 @@
             </div>
         </div>
 
-        <!-- Notifications Items Table List -->
+        <!-- Notifications Table -->
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0" style="table-layout: fixed; width: 100%;">
                 <thead class="table-light">
                     <tr>
-                        <th style="width: 50px;" class="text-center">Type</th>
+                        <th style="width: 100px;" class="text-center">Module</th>
                         <th style="width: 55%;">Notification Details</th>
                         <th style="width: 150px;">Time</th>
                         <th style="width: 120px;" class="text-end">Actions</th>
@@ -89,11 +107,25 @@
                 </thead>
                 <tbody>
                     @forelse($notifications as $n)
+                        @php
+                            $mod = strtolower($n->module ?? 'system');
+                            $badgeClass = match ($mod) {
+                                'hrms' => 'bg-soft-primary text-primary',
+                                'purchase' => 'bg-soft-info text-info',
+                                'production' => 'bg-soft-warning text-warning',
+                                'sales' => 'bg-soft-success text-success',
+                                'crm' => 'bg-soft-danger text-danger',
+                                'inventory' => 'bg-soft-purple text-purple',
+                                'accounting' => 'bg-soft-dark text-dark',
+                                'projects' => 'bg-soft-secondary text-secondary',
+                                default => 'bg-soft-secondary text-dark',
+                            };
+                        @endphp
                         <tr id="notification-row-{{ $n->id }}" class="{{ !$n->read_at ? 'table-primary-subtle' : '' }}">
                             <td class="text-center align-middle">
-                                <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle mx-auto d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
-                                    <i class="{{ $n->icon_class ?? 'feather-bell' }} fs-15"></i>
-                                </div>
+                                <span class="badge {{ $badgeClass }} fs-11 px-2 py-1 rounded fw-bold d-inline-block text-uppercase">
+                                    {{ $mod }}
+                                </span>
                             </td>
                             <td>
                                 <div class="py-1">
@@ -127,7 +159,7 @@
                             <td colspan="4" class="text-center py-5">
                                 <i class="feather-bell-off text-muted fs-36 d-block mb-2"></i>
                                 <h6 class="fw-bold text-dark mb-1">No Notifications Found</h6>
-                                <p class="text-muted fs-12 mb-0">You're all caught up! There are no notifications to display.</p>
+                                <p class="text-muted fs-12 mb-0">You're all caught up! There are no notifications to display in this view.</p>
                             </td>
                         </tr>
                     @endforelse
@@ -146,7 +178,7 @@
 <script>
     function markSingleReadPage(id) {
         $.ajax({
-            url: "/hrms/notifications/" + id + "/read",
+            url: "/notifications/" + id + "/read",
             type: "POST",
             data: { _token: "{{ csrf_token() }}" },
             success: function() {
@@ -157,7 +189,7 @@
 
     function markAllNotificationsReadPage() {
         $.ajax({
-            url: "{{ route('hrms.notifications.read-all') }}",
+            url: "{{ route('notifications.read-all') }}",
             type: "POST",
             data: { _token: "{{ csrf_token() }}" },
             success: function() {
@@ -169,11 +201,11 @@
     function deleteNotificationPage(id) {
         if (!confirm('Are you sure you want to delete this notification?')) return;
         $.ajax({
-            url: "/hrms/notifications/" + id,
+            url: "/notifications/" + id,
             type: "DELETE",
             data: { _token: "{{ csrf_token() }}" },
             success: function() {
-                $('#notification-row-' + id).fadeOut(300, function() { $(this).remove(); });
+                $('#notification-row-' + id).fadeOut(200, function() { $(this).remove(); });
             }
         });
     }

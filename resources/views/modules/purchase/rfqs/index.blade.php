@@ -175,7 +175,7 @@
                                         @foreach($rfq->rfqVendors as $rv)
                                             <div class="fw-semibold text-dark fs-12 d-flex align-items-center">
                                                 <i class="feather-truck text-muted me-1 fs-11"></i>{{ $rv->vendor?->name ?? '—' }}
-                                                @if($rv->status === 'Received')
+                                                @if(in_array($rv->status, ['Received', 'Submitted']))
                                                     <span class="badge bg-soft-success text-success fw-bold ms-2 px-1.5 py-0.5 rounded" style="font-size: 9px; letter-spacing: 0.3px; text-transform: uppercase;">
                                                         <i class="feather-check me-0.5" style="font-size: 8px;"></i>{{ __('purchase.status_quoted') }}
                                                     </span>

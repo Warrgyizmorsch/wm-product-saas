@@ -7,6 +7,7 @@ use App\Domains\Sales\Repositories\SalesOrderRepository;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\CrmDeal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -138,6 +139,25 @@ class SalesOrderService
                 $quotation = Quotation::find($data['quotation_id']);
                 if ($quotation) {
                     $quotation->update(['status' => 'Converted']);
+                    if ($quotation->lead_id) {
+                        $lead = Lead::find($quotation->lead_id);
+                        if ($lead) {
+                            $lead->update([
+                                'status' => 'Converted',
+                                'is_customer' => true,
+                                'converted_at' => now(),
+                            ]);
+                        }
+                    }
+                    if ($quotation->crm_deal_id) {
+                        $deal = CrmDeal::find($quotation->crm_deal_id);
+                        if ($deal) {
+                            $deal->update([
+                                'stage' => 'Won',
+                                'probability' => 100,
+                            ]);
+                        }
+                    }
                 }
             }
 

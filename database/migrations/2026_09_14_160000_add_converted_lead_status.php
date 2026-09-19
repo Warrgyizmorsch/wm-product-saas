@@ -17,7 +17,7 @@ return new class extends Migration
             $defaultCompanyId = DB::table('companies')->where('is_default', true)->value('id') ?? DB::table('companies')->value('id');
             $defaultBranchId  = DB::table('branches')->where('is_default', true)->value('id') ?? DB::table('branches')->value('id');
 
-            // 1. Update any existing 'Converted' record where company_id or branch_id is NULL
+            // 1. Update any existing 'Dealing' record where company_id or branch_id is NULL
             if ($defaultCompanyId !== null || $defaultBranchId !== null) {
                 $updateData = [];
                 if ($defaultCompanyId !== null) {
@@ -28,14 +28,14 @@ return new class extends Migration
                 }
 
                 DB::table('lead_statuses')
-                    ->where('name', 'Converted')
+                    ->where('name', 'Dealing')
                     ->where(function ($q) {
                         $q->whereNull('company_id')->orWhereNull('branch_id');
                     })
                     ->update($updateData);
             }
 
-            // 1. Update any existing 'Converted' record where company_id or branch_id is NULL
+            // 1. Update any existing 'Dealing' record where company_id or branch_id is NULL
             $defaults = array_filter([
                 'company_id' => $defaultCompanyId,
                 'branch_id'  => $defaultBranchId,
@@ -43,7 +43,7 @@ return new class extends Migration
 
             if ($defaults !== []) {
                 DB::table('lead_statuses')
-                    ->where('name', 'Converted')
+                    ->where('name', 'Dealing')
                     ->where(function ($q) {
                         $q->whereNull('company_id')->orWhereNull('branch_id');
                     })
@@ -72,7 +72,7 @@ return new class extends Migration
 
                 $existsQuery = DB::table('lead_statuses')
                     ->where('tenant_id', $tenantId)
-                    ->where('name', 'Converted');
+                    ->where('name', 'Dealing');
 
                 if ($companyId !== null) {
                     $existsQuery->where('company_id', $companyId);
@@ -85,7 +85,7 @@ return new class extends Migration
                         'tenant_id'    => $tenantId,
                         'company_id'   => $companyId,
                         'branch_id'    => $branchId,
-                        'name'         => 'Converted',
+                        'name'         => 'Dealing',
                         'sort_order'   => 3,
                         'color'        => 'bg-info',
                         'is_protected' => true,
@@ -95,7 +95,7 @@ return new class extends Migration
                     ]);
                 }
             }
-            // Adjust sort order for Won and Lost so Converted stays at position #3
+            // Adjust sort order for Won and Lost so Dealing stays at position #3
             DB::table('lead_statuses')->where('name', 'Won')->where('sort_order', '<', 4)->update(['sort_order' => 4]);
             DB::table('lead_statuses')->where('name', 'Lost')->where('sort_order', '<', 5)->update(['sort_order' => 5]);
         }
@@ -107,7 +107,7 @@ return new class extends Migration
     public function down(): void
     {
         if (Schema::hasTable('lead_statuses')) {
-            DB::table('lead_statuses')->where('name', 'Converted')->delete();
+            DB::table('lead_statuses')->where('name', 'Dealing')->delete();
         }
     }
 };

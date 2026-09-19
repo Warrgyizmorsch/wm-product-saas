@@ -239,6 +239,8 @@ class ProductionScheduleController extends Controller
                 'released_by' => auth()->id(),
             ]);
 
+            app(\App\Domains\Production\Services\ProductionNotificationService::class)->notifyScheduleReleased($schedule);
+
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => true,

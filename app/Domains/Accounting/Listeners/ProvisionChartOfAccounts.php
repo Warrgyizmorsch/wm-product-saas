@@ -14,6 +14,10 @@ class ProvisionChartOfAccounts
 
     public function handle(TenantProvisioning $event): void
     {
+        if (! $event->includes('accounting')) {
+            return;
+        }
+
         $this->accounts->provisionDefaultsIfMissing($event->tenantId, $event->companyId, $event->branchId);
     }
 }

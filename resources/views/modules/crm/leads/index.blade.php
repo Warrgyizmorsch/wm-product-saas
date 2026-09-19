@@ -319,8 +319,8 @@
                                 </td>
                                 <td>
                                     <div class="d-flex flex-column gap-1 fs-11">
-                                        @if($lead->source && $lead->source !== 'Select an Option')
-                                            <div><span class="text-muted">{{ __('crm.source') }}:</span> <span class="fw-semibold text-dark">{{ __('crm.sources.' . $lead->source) ?? $lead->source }}</span></div>
+                                        @if($lead->source && !in_array($lead->source, ['Select an Option', 'Select an option', 'Select Option'], true))
+                                            <div><span class="text-muted">{{ __('crm.source') }}:</span> <span class="fw-semibold text-dark">{{ \Illuminate\Support\Facades\Lang::has('crm.sources.' . $lead->source) ? __('crm.sources.' . $lead->source) : $lead->source }}</span></div>
                                         @endif
                                         @php
                                             $currentPriority = ($lead->priority && $lead->priority !== 'Select an Option') ? $lead->priority : '';
@@ -384,7 +384,7 @@
                                                             $bgClass = match(strtolower($statusOption)) {
                                                                 'new' => 'bg-primary',
                                                                 'qualified' => 'bg-teal',
-                                                                'converted' => 'bg-info',
+                                                                'dealing' => 'bg-info',
                                                                 'won' => 'bg-success',
                                                                 'lost' => 'bg-danger',
                                                                 default => (!empty($ls->color) && str_starts_with($ls->color, 'bg-') ? $ls->color : $presetBgColors[abs($ls->id ?? 0) % count($presetBgColors)]),

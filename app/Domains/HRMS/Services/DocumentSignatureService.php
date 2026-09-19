@@ -143,6 +143,28 @@ class DocumentSignatureService
             'requested_by_id'    => $user?->id,
         ]);
 
+        if ($template->requires_signature) {
+            \App\Services\Notification\NotificationService::sendToEmployee(
+                employeeId: $employee->id,
+                title: 'Action Required: Digital Signature Needed',
+                message: "Document '{$document->name}' requires your digital signature.",
+                actionUrl: route('hrms.documents.index'),
+                module: 'hrms',
+                type: 'signature_required',
+                iconClass: 'feather-pen-tool'
+            );
+        } else {
+            \App\Services\Notification\NotificationService::sendToEmployee(
+                employeeId: $employee->id,
+                title: 'New Signed Document Issued',
+                message: "A new signed document '{$document->name}' has been issued to your document vault.",
+                actionUrl: route('hrms.documents.index'),
+                module: 'hrms',
+                type: 'document_issued',
+                iconClass: 'feather-file-text'
+            );
+        }
+
         return [
             'document'       => $document,
             'pdf_path'       => $pdfStoragePath,
@@ -304,6 +326,29 @@ class DocumentSignatureService
                 'ip_address'     => $ipAddress,
             ]),
         ]);
+
+        // Send notifications upon successful signature completion
+        \App\Services\Notification\NotificationService::sendToHrAdmins(
+            title: 'Document Digitally Signed',
+            message: "{$signerName} has digitally signed the document '{$document->name}'.",
+            actionUrl: route('hrms.documents.index'),
+            module: 'hrms',
+            type: 'signature_completed',
+            iconClass: 'feather-check-square'
+        );
+
+        $targetUserId = $user?->id ?? ($document->documentable_type === Employee::class ? $document->documentable?->user_id : null);
+        if ($targetUserId) {
+            \App\Services\Notification\NotificationService::send(
+                user: $targetUserId,
+                title: 'Document Signed Successfully',
+                message: "You have successfully digitally signed '{$document->name}'.",
+                actionUrl: route('hrms.documents.index'),
+                module: 'hrms',
+                type: 'signature_completed',
+                iconClass: 'feather-check-circle'
+            );
+        }
 
         return $document->fresh(['signedBy', 'documentable']);
     }

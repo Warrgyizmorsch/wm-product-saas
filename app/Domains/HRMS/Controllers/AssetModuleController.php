@@ -186,6 +186,16 @@ class AssetModuleController extends Controller
             }
         });
 
+        \App\Services\Notification\NotificationService::sendToEmployee(
+            employee: $validated['employee_id'],
+            title: 'Asset Allocated',
+            message: 'An asset has been allocated to you.',
+            actionUrl: 'hrms.assets-module.my-assets',
+            module: 'hrms',
+            type: 'asset_allocation',
+            iconClass: 'feather-box'
+        );
+
         return redirect()->route('hrms.assets-module.index')->with('success', 'Asset(s) allocated directly successfully.');
     }
 
