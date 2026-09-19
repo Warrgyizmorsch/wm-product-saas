@@ -12,7 +12,7 @@ class AccountingMasterSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_the_seeder_gives_every_tenant_its_own_masters_on_its_own_company(): void
+    public function test_the_seeder_gives_every_tenant_its_own_common_masters(): void
     {
         $a = Tenant::create(['name' => 'A', 'slug' => 'a', 'status' => 'active', 'plan' => 'enterprise']);
         $b = Tenant::create(['name' => 'B', 'slug' => 'b', 'status' => 'active', 'plan' => 'enterprise']);
@@ -21,13 +21,10 @@ class AccountingMasterSeederTest extends TestCase
         $this->seed(AccountingChartOfAccountsSeeder::class);
 
         foreach ([$a, $b] as $tenant) {
-            $companyId = DB::table('companies')->where('tenant_id', $tenant->id)->value('id');
-            $this->assertNotNull($companyId, "{$tenant->slug} has no company");
-
             foreach (['chart_of_accounts', 'accounting_tax_rates', 'accounting_fiscal_years'] as $table) {
                 $rows = DB::table($table)->where('tenant_id', $tenant->id);
                 $this->assertGreaterThan(0, (clone $rows)->count(), "{$tenant->slug}: {$table} empty");
-                $this->assertSame(0, (clone $rows)->where(fn ($q) => $q->whereNull('company_id')->orWhere('company_id', '!=', $companyId))->count(), "{$tenant->slug}: {$table} not on its own company");
+                $this->assertSame(0, (clone $rows)->whereNotNull('company_id')->count(), "{$tenant->slug}: {$table} should not be company specific");
             }
 
             $this->assertSame(5, DB::table('accounting_tax_rates')->where('tenant_id', $tenant->id)->count());

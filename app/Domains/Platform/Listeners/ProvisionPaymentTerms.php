@@ -27,8 +27,6 @@ class ProvisionPaymentTerms
             PaymentTerm::query()->firstOrCreate(
                 ['tenant_id' => $event->tenantId, 'code' => $code],
                 [
-                    'company_id' => $event->companyId,
-                    'branch_id' => $event->branchId,
                     'name' => $name,
                     'due_days' => $dueDays,
                     'discount_days' => 0,

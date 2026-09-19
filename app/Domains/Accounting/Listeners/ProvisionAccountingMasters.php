@@ -26,7 +26,7 @@ class ProvisionAccountingMasters
             return;
         }
 
-        $this->taxRates->provisionDefaultsIfMissing($event->tenantId, $event->companyId, $event->branchId);
-        $this->fiscalPeriods->provisionCurrentFiscalYearIfMissing($event->tenantId, $event->companyId, $event->branchId);
+        $this->taxRates->provisionDefaultsIfMissing($event->tenantId);
+        $this->fiscalPeriods->provisionCurrentFiscalYearIfMissing($event->tenantId);
     }
 }

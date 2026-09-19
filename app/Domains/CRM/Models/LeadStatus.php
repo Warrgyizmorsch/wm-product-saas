@@ -15,6 +15,9 @@ class LeadStatus extends Model
 
     protected $table = 'lead_statuses';
 
+    /** Default masters are seeded without a company/branch and shown in every one. */
+    public bool $sharedAcrossCompanies = true;
+
     protected $fillable = [
         'tenant_id',
         'company_id',

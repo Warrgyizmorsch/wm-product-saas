@@ -70,33 +70,31 @@ class TenantProvisioningTest extends TestCase
         $this->assertSame('SBI Current A/c', DB::table('chart_of_accounts')->where('tenant_id', $tenant->id)->where('code', '1020')->value('name'));
     }
 
-    public function test_accounting_masters_are_attached_to_the_default_company(): void
+    public function test_lookup_masters_are_common_and_show_in_the_default_company(): void
     {
         $tenant = $this->makeTenant('acme');
         app(TenantProvisioner::class)->provision($tenant);
         $companyId = DB::table('companies')->where('tenant_id', $tenant->id)->value('id');
 
-        foreach (['accounting_tax_rates', 'accounting_fiscal_years', 'cost_centers', 'asset_categories'] as $table) {
+        // Common masters carry no company/branch ...
+        foreach (['chart_of_accounts', 'accounting_tax_rates', 'accounting_fiscal_years', 'cost_centers', 'lead_statuses', 'deal_statuses', 'uoms', 'payment_terms', 'production_shifts'] as $table) {
             $this->assertGreaterThan(0, DB::table($table)->where('tenant_id', $tenant->id)->count(), $table);
-            $this->assertSame(0, DB::table($table)->where('tenant_id', $tenant->id)->where(fn ($q) => $q->whereNull('company_id')->orWhere('company_id', '!=', $companyId))->count(), "{$table} not on default company");
+            $this->assertSame(0, DB::table($table)->where('tenant_id', $tenant->id)->whereNotNull('company_id')->count(), "{$table} should not be company specific");
         }
-    }
 
-    public function test_reprovisioning_attaches_masters_that_were_seeded_without_a_company(): void
-    {
-        $tenant = $this->makeTenant('acme');
-        app(TenantProvisioner::class)->provision($tenant);
-        $companyId = DB::table('companies')->where('tenant_id', $tenant->id)->value('id');
+        // ... and are still listed while a company is selected.
+        app(TenantContext::class)->set($tenant);
+        app(\App\Core\Company\CompanyContext::class)->set(\App\Domains\HRMS\Models\Company::query()->find($companyId));
 
-        DB::table('accounting_tax_rates')->where('tenant_id', $tenant->id)->update(['company_id' => null, 'branch_id' => null]);
-        DB::table('accounting_fiscal_years')->where('tenant_id', $tenant->id)->update(['company_id' => null, 'branch_id' => null]);
-        $rates = DB::table('accounting_tax_rates')->where('tenant_id', $tenant->id)->count();
-
-        app(TenantProvisioner::class)->provision($tenant);
-
-        $this->assertSame($rates, DB::table('accounting_tax_rates')->where('tenant_id', $tenant->id)->count());
-        $this->assertSame($rates, DB::table('accounting_tax_rates')->where('tenant_id', $tenant->id)->where('company_id', $companyId)->count());
-        $this->assertSame(1, DB::table('accounting_fiscal_years')->where('tenant_id', $tenant->id)->where('company_id', $companyId)->count());
+        $this->assertSame(5, \App\Domains\Accounting\Models\TaxRate::query()->count());
+        $this->assertSame(4, \App\Domains\Accounting\Models\CostCenter::query()->count());
+        $this->assertGreaterThan(0, \App\Domains\Accounting\Models\ChartOfAccount::query()->count());
+        $this->assertSame(1, \App\Domains\Accounting\Models\FiscalYear::query()->count());
+        $this->assertSame(5, \App\Domains\CRM\Models\LeadStatus::query()->count());
+        $this->assertSame(6, \App\Domains\CRM\Models\DealStatus::query()->count());
+        $this->assertSame(12, \App\Domains\Inventory\Models\Uom::query()->count());
+        $this->assertSame(6, \App\Domains\Platform\Models\PaymentTerm::query()->count());
+        $this->assertSame(0, DB::table('asset_categories')->where('tenant_id', $tenant->id)->where('company_id', '!=', $companyId)->count());
     }
 
     private function tenantOnPlan(string $slug, array $modules): Tenant

@@ -23,7 +23,6 @@ class ProvisionProductionDefaults
             ProductionShift::query()->firstOrCreate(
                 ['tenant_id' => $event->tenantId, 'code' => $code],
                 [
-                    'company_id' => $event->companyId,
                     'name' => $name,
                     'start_time' => $start,
                     'end_time' => $end,

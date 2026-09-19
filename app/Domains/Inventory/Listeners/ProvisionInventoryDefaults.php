@@ -33,7 +33,7 @@ class ProvisionInventoryDefaults
         foreach (self::UOMS as $code => [$name, $category]) {
             Uom::query()->firstOrCreate(
                 ['tenant_id' => $event->tenantId, 'code' => $code],
-                ['company_id' => $event->companyId, 'branch_id' => $event->branchId, 'name' => $name, 'category' => $category],
+                ['name' => $name, 'category' => $category],
             );
         }
 

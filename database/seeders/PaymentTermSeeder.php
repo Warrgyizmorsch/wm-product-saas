@@ -67,8 +67,6 @@ class PaymentTermSeeder extends Seeder
                         'code' => $term['code'],
                     ],
                     [
-                        'company_id' => 1,
-                        'branch_id' => 1,
                         'name' => $term['name'],
                         'due_days' => $term['due_days'],
                         'discount_days' => 0,
