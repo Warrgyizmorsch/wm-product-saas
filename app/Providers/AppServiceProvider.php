@@ -411,6 +411,7 @@ class AppServiceProvider extends ServiceProvider
         foreach ([
             \App\Domains\Accounting\Listeners\ProvisionChartOfAccounts::class,
             \App\Domains\Accounting\Listeners\ProvisionAccountingMasters::class,
+            \App\Domains\Accounting\Listeners\ProvisionCostCentersAndAssetCategories::class,
             \App\Domains\Platform\Listeners\ProvisionPaymentTerms::class,
             \App\Domains\CRM\Listeners\ProvisionCrmDefaults::class,
             \App\Domains\Inventory\Listeners\ProvisionInventoryDefaults::class,

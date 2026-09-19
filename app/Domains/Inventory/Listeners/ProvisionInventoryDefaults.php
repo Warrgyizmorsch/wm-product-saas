@@ -26,6 +26,10 @@ class ProvisionInventoryDefaults
 
     public function handle(TenantProvisioning $event): void
     {
+        if (! $event->includes('inventory')) {
+            return;
+        }
+
         foreach (self::UOMS as $code => [$name, $category]) {
             Uom::query()->firstOrCreate(
                 ['tenant_id' => $event->tenantId, 'code' => $code],

@@ -29,6 +29,10 @@ class ProvisionCrmDefaults
 
     public function handle(TenantProvisioning $event): void
     {
+        if (! $event->includes('crm')) {
+            return;
+        }
+
         $order = 0;
         foreach (self::LEAD_STATUSES as $name => [$color, $protected]) {
             LeadStatus::query()->firstOrCreate(

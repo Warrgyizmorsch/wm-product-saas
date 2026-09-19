@@ -67,6 +67,10 @@ class ProvisionHrmsDefaults
 
     public function handle(TenantProvisioning $event): void
     {
+        if (! $event->includes('hrms')) {
+            return;
+        }
+
         $departments = $this->provisionDepartments($event);
         $this->provisionDesignations($event, $departments);
         $this->provisionLeaveTypes($event);

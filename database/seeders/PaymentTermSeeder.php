@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Domains\Platform\Models\PaymentTerm;
+use App\Models\Tenant;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -13,7 +14,8 @@ class PaymentTermSeeder extends Seeder
      */
     public function run(): void
     {
-        $tenants = DB::table('tenants')->get();
+        // Payment terms belong to Sales/Purchase: only tenants whose plan includes either get them.
+        $tenants = Tenant::query()->get()->filter(fn (Tenant $tenant) => $tenant->hasModule('sales', 'purchase'));
 
         $defaultTerms = [
             [
@@ -55,7 +57,7 @@ class PaymentTermSeeder extends Seeder
         ];
 
         // If no tenants in table yet, run for default tenant_id = 1
-        $tenantIds = $tenants->isNotEmpty() ? $tenants->pluck('id')->toArray() : [1];
+        $tenantIds = Tenant::query()->exists() ? $tenants->pluck('id')->all() : [1];
 
         foreach ($tenantIds as $tenantId) {
             foreach ($defaultTerms as $term) {

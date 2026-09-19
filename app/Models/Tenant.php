@@ -120,6 +120,25 @@ class Tenant extends Model
         return $this->belongsTo(Plan::class, 'plan_id');
     }
 
+    /**
+     * Modules the tenant's plan includes, or null when there is no plan/feature
+     * list (everything is allowed, same rule as tenant_allowed_modules()).
+     *
+     * @return array<int, string>|null
+     */
+    public function planModules(): ?array
+    {
+        return $this->planCatalog?->features;
+    }
+
+    /** True when the plan includes ANY of the given modules (or has no module limit). */
+    public function hasModule(string ...$modules): bool
+    {
+        $allowed = $this->planModules();
+
+        return $allowed === null || array_intersect($modules, $allowed) !== [];
+    }
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
