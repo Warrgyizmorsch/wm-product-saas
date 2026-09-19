@@ -8,16 +8,16 @@
         <style>
             .erp-horizontal-tabs {
                 border-bottom: 2px solid #e2e8f0;
-                gap: 6px;
+                gap: 8px;
                 overflow-x: auto;
-                overflow-y: hidden;
+                overflow-y: visible;
                 flex-wrap: nowrap;
                 white-space: nowrap;
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: none; /* Firefox */
                 -ms-overflow-style: none; /* IE and Edge */
                 padding-bottom: 4px;
-                padding-top: 2px;
+                padding-top: 8px;
             }
             .erp-horizontal-tabs::-webkit-scrollbar {
                 display: none; /* Chrome, Safari, Opera */
@@ -27,6 +27,7 @@
             .erp-horizontal-tabs .nav-item {
                 margin-bottom: 0;
                 flex-shrink: 0;
+                position: relative;
             }
             .erp-horizontal-tabs .nav-link {
                 border: 1px solid transparent !important;
@@ -41,6 +42,17 @@
                 border-radius: 6px !important;
                 white-space: nowrap;
                 flex-shrink: 0;
+                position: relative !important;
+                overflow: visible !important;
+            }
+            .erp-horizontal-tabs .nav-link .btn-badge-count {
+                top: -8px;
+                right: -6px;
+                font-size: 10px;
+                min-width: 19px;
+                height: 19px;
+                padding: 0 4px;
+                border: 2px solid #ffffff;
             }
             .erp-horizontal-tabs .nav-link i {
                 font-size: 14px;
@@ -98,6 +110,9 @@
                 color: #cbd5e1 !important;
                 border-color: #283c50 !important;
             }
+            html.app-skin-dark .erp-horizontal-tabs .nav-link .btn-badge-count {
+                border-color: #0f172a !important;
+            }
         </style>
     @endpush
 @endonce
@@ -111,7 +126,7 @@
             </li>
         @else
             <li class="nav-item" role="presentation">
-                <button class="nav-link {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
+                <button class="nav-link btn-badge-container {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
                         id="{{ $tab['id'] }}-tab" 
                         data-bs-toggle="tab" 
                         data-bs-target="#{{ $tab['id'] }}" 
@@ -123,6 +138,9 @@
                         <i class="{{ $tab['icon'] }} me-2"></i>
                     @endif
                     {{ $tab['label'] }}
+                    @if(isset($tab['badge']) && (int)$tab['badge'] > 0)
+                        <span class="btn-badge-count {{ $tab['badgeClass'] ?? '' }}">{{ $tab['badge'] }}</span>
+                    @endif
                 </button>
             </li>
         @endif

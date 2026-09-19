@@ -6,17 +6,146 @@
     <x-ui.icon-btn href="{{ route('production.schedules.index') }}" icon="feather-arrow-left" variant="transparent-dark" title="Back to Schedules" />
 @endsection
 
-@section('page-actions')
-    <x-ui.button :href="route('production.schedules.dispatch-board')" variant="primary" icon="feather-grid" class="me-2">
-        Dispatch Board
-    </x-ui.button>
-    <x-ui.button :href="route('production.schedules.index')" variant="outline-secondary" icon="feather-list" class="me-2">
-        {{ __('production.plans_list') ?? 'List View' }}
-    </x-ui.button>
-    <x-ui.button :href="route('production.schedules.work-center-view')" variant="outline-secondary" icon="feather-layers">
-        {{ __('production.work_center_view') }}
-    </x-ui.button>
-@endsection
+@push('styles')
+<style>
+    .gantt-legend-strip {
+        background-color: #f8fafc;
+        border-color: #e2e8f0 !important;
+        color: #475569;
+    }
+    .gantt-legend-strip .text-dark {
+        color: #1e293b !important;
+    }
+    .gantt-legend-strip .text-muted {
+        color: #64748b !important;
+    }
+    html.app-skin-dark .gantt-legend-strip,
+    body.app-skin-dark .gantt-legend-strip,
+    [data-bs-theme="dark"] .gantt-legend-strip,
+    [data-theme="dark"] .gantt-legend-strip {
+        background-color: #162038 !important;
+        border-color: #283c50 !important;
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .gantt-legend-strip .text-dark,
+    body.app-skin-dark .gantt-legend-strip .text-dark,
+    [data-bs-theme="dark"] .gantt-legend-strip .text-dark,
+    [data-theme="dark"] .gantt-legend-strip .text-dark {
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .gantt-legend-strip .text-muted,
+    body.app-skin-dark .gantt-legend-strip .text-muted,
+    [data-bs-theme="dark"] .gantt-legend-strip .text-muted,
+    [data-theme="dark"] .gantt-legend-strip .text-muted {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .gantt-legend-strip .badge.bg-soft-danger,
+    body.app-skin-dark .gantt-legend-strip .badge.bg-soft-danger,
+    [data-bs-theme="dark"] .gantt-legend-strip .badge.bg-soft-danger,
+    [data-theme="dark"] .gantt-legend-strip .badge.bg-soft-danger {
+        background-color: rgba(239, 68, 68, 0.2) !important;
+        color: #fca5a5 !important;
+        border-color: rgba(239, 68, 68, 0.4) !important;
+    }
+    .gantt-board-inner {
+        min-width: 1050px;
+        background-color: #fafafa;
+    }
+    html.app-skin-dark .gantt-board-inner,
+    body.app-skin-dark .gantt-board-inner,
+    [data-bs-theme="dark"] .gantt-board-inner {
+        background-color: #0f172a !important;
+    }
+    html.app-skin-dark .gantt-board-wrapper,
+    body.app-skin-dark .gantt-board-wrapper,
+    [data-bs-theme="dark"] .gantt-board-wrapper {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .gantt-header,
+    body.app-skin-dark .gantt-header,
+    [data-bs-theme="dark"] .gantt-header {
+        background-color: #162038 !important;
+        border-color: #283c50 !important;
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .gantt-header .gantt-resource-col,
+    body.app-skin-dark .gantt-header .gantt-resource-col,
+    [data-bs-theme="dark"] .gantt-header .gantt-resource-col {
+        background-color: #162038 !important;
+        border-color: #283c50 !important;
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .gantt-header-tick,
+    body.app-skin-dark .gantt-header-tick,
+    [data-bs-theme="dark"] .gantt-header-tick {
+        background-color: #162038 !important;
+        border-color: #283c50 !important;
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .gantt-header-tick .text-dark,
+    body.app-skin-dark .gantt-header-tick .text-dark,
+    [data-bs-theme="dark"] .gantt-header-tick .text-dark {
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .gantt-header-tick .text-muted,
+    body.app-skin-dark .gantt-header-tick .text-muted,
+    [data-bs-theme="dark"] .gantt-header-tick .text-muted {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .gantt-row-wc,
+    body.app-skin-dark .gantt-row-wc,
+    [data-bs-theme="dark"] .gantt-row-wc {
+        background-color: #162038 !important;
+        border-color: #283c50 !important;
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .gantt-row-wc .text-dark,
+    body.app-skin-dark .gantt-row-wc .text-dark,
+    [data-bs-theme="dark"] .gantt-row-wc .text-dark {
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .gantt-row-wc .text-muted,
+    body.app-skin-dark .gantt-row-wc .text-muted,
+    [data-bs-theme="dark"] .gantt-row-wc .text-muted {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .gantt-row-machine,
+    body.app-skin-dark .gantt-row-machine,
+    [data-bs-theme="dark"] .gantt-row-machine {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .gantt-row-machine .gantt-resource-col,
+    body.app-skin-dark .gantt-row-machine .gantt-resource-col,
+    [data-bs-theme="dark"] .gantt-row-machine .gantt-resource-col {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .gantt-row-machine .gantt-resource-col .text-dark,
+    body.app-skin-dark .gantt-row-machine .gantt-resource-col .text-dark,
+    [data-bs-theme="dark"] .gantt-row-machine .gantt-resource-col .text-dark {
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .gantt-row-machine .gantt-resource-col .text-muted,
+    body.app-skin-dark .gantt-row-machine .gantt-resource-col .text-muted,
+    [data-bs-theme="dark"] .gantt-row-machine .gantt-resource-col .text-muted {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .gantt-timeline-lane,
+    body.app-skin-dark .gantt-timeline-lane,
+    [data-bs-theme="dark"] .gantt-timeline-lane {
+        background-color: #0b1120 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .gantt-timeline-lane .border-light,
+    body.app-skin-dark .gantt-timeline-lane .border-light,
+    [data-bs-theme="dark"] .gantt-timeline-lane .border-light {
+        border-color: #1e293b !important;
+    }
+</style>
+@endpush
 
 @section('content')
     {{-- Workflow Guide Component --}}
@@ -42,8 +171,8 @@
                 };
             @endphp
 
-            {{-- Board Header & Toolbar matching Dispatch Board Structure --}}
-            <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom gap-3">
+            {{-- Board Header & Action Toolbar --}}
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                 <div>
                     <h4 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
                         <i class="feather-calendar text-primary"></i> Production Scheduling Calendar
@@ -51,27 +180,42 @@
                     <p class="text-muted fs-13 mb-0">Interactive Shop Floor Timeline & Machine Workload Horizon</p>
                 </div>
 
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                    {{-- Date Navigation --}}
-                    <div class="d-flex align-items-center gap-1 me-2">
-                        <a href="{{ request()->fullUrlWithQuery(['start' => $prevStart->toDateString()]) }}" class="btn btn-sm btn-outline-secondary px-2 py-1" title="Previous Period">
-                            <i class="feather-chevron-left"></i>
-                        </a>
-                        <span class="fw-bold text-dark px-2 fs-13 font-monospace">
-                            @if($view === 'day')
-                                {{ $startDate->format('D, d M Y') }}
-                            @elseif($view === 'month')
-                                {{ $startDate->format('F Y') }}
-                            @else
-                                {{ $startDate->format('d M') }} – {{ $endDate->format('d M Y') }}
-                            @endif
-                        </span>
-                        <a href="{{ request()->fullUrlWithQuery(['start' => $nextStart->toDateString()]) }}" class="btn btn-sm btn-outline-secondary px-2 py-1" title="Next Period">
-                            <i class="feather-chevron-right"></i>
-                        </a>
-                        <a href="{{ request()->fullUrlWithQuery(['start' => now()->toDateString()]) }}" class="btn btn-sm btn-outline-secondary px-3 py-1 fw-semibold ms-1">{{ __('production.today') }}</a>
-                    </div>
+                <div class="d-flex align-items-center gap-2">
+                    <x-ui.button :href="route('production.schedules.dispatch-board')" variant="primary" icon="feather-grid">
+                        Dispatch Board
+                    </x-ui.button>
+                    <x-ui.button :href="route('production.schedules.index')" variant="outline-secondary" icon="feather-list">
+                        {{ __('production.plans_list') ?? 'List View' }}
+                    </x-ui.button>
+                    <x-ui.button :href="route('production.schedules.work-center-view')" variant="outline-secondary" icon="feather-layers">
+                        {{ __('production.work_center_view') }}
+                    </x-ui.button>
+                </div>
+            </div>
 
+            {{-- Timeline Controls & Filter Toolbar --}}
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom gap-3">
+                {{-- Date Navigation --}}
+                <div class="d-flex align-items-center gap-1">
+                    <a href="{{ request()->fullUrlWithQuery(['start' => $prevStart->toDateString()]) }}" class="btn btn-sm btn-outline-secondary px-2 py-1" title="Previous Period">
+                        <i class="feather-chevron-left"></i>
+                    </a>
+                    <span class="fw-bold text-dark px-2 fs-13 font-monospace">
+                        @if($view === 'day')
+                            {{ $startDate->format('D, d M Y') }}
+                        @elseif($view === 'month')
+                            {{ $startDate->format('F Y') }}
+                        @else
+                            {{ $startDate->format('d M') }} – {{ $endDate->format('d M Y') }}
+                        @endif
+                    </span>
+                    <a href="{{ request()->fullUrlWithQuery(['start' => $nextStart->toDateString()]) }}" class="btn btn-sm btn-outline-secondary px-2 py-1" title="Next Period">
+                        <i class="feather-chevron-right"></i>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['start' => now()->toDateString()]) }}" class="btn btn-sm btn-outline-secondary px-3 py-1 fw-semibold ms-1">{{ __('production.today') }}</a>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center gap-2">
                     {{-- Layout Selection (Gantt vs Table) --}}
                     <div class="d-flex align-items-center gap-1 me-2">
                         <a href="{{ request()->fullUrlWithQuery(['layout' => 'gantt']) }}" class="btn btn-sm {{ $layout === 'gantt' ? 'btn-primary active' : 'btn-outline-secondary' }} px-3 py-1 fs-12 fw-semibold">
@@ -136,16 +280,16 @@
                 @endphp
 
                 @if($operations->count() > 0)
-                    <div class="gantt-chart-container border rounded overflow-hidden shadow-sm mb-4" style="overflow-x: auto;">
-                        <div style="min-width: 1050px; background-color: #fafafa;">
+                    <div class="gantt-board-wrapper border rounded overflow-hidden shadow-sm mb-4" style="overflow-x: auto;">
+                        <div class="gantt-board-inner" style="min-width: 1050px;">
                             <!-- Header Row -->
-                            <div class="gantt-header-row d-flex border-bottom bg-light">
-                                <div class="gantt-label-col border-end p-3 d-flex align-items-center" style="width: 250px; flex-shrink: 0; background-color: #f8f9fa; z-index: 10;">
+                            <div class="gantt-header d-flex border-bottom bg-light fs-12 fw-bold text-dark sticky-top" style="z-index: 10;">
+                                <div class="gantt-resource-col border-end p-3 d-flex align-items-center bg-light" style="width: 250px; min-width: 250px; flex-shrink: 0; z-index: 10;">
                                     <span class="fw-bold text-uppercase text-muted fs-11">{{ __('production.work_centers') }}</span>
                                 </div>
-                                <div class="gantt-timeline-col flex-grow-1 d-flex">
+                                <div class="gantt-timeline-lane flex-grow-1 d-flex overflow-hidden">
                                     @foreach($columns as $col)
-                                        <div class="flex-grow-1 text-center py-2 border-end d-flex flex-column justify-content-center" style="min-width: 40px; background-color: #f8f9fa;">
+                                        <div class="gantt-header-tick flex-grow-1 text-center py-2 border-end d-flex flex-column justify-content-center" style="min-width: 40px;">
                                             <span class="fw-bold fs-11 text-dark">{{ $col['label'] }}</span>
                                             @if(isset($col['sublabel']))
                                                 <span class="text-muted fs-9" style="font-size: 9px; line-height: 1;">{{ $col['sublabel'] }}</span>
@@ -158,7 +302,7 @@
                             <!-- Rows -->
                             @foreach($workCentersData as $wc)
                                 <!-- Work Center Header Line -->
-                                <div class="gantt-wc-group border-bottom bg-light px-3 py-2 fw-bold text-dark d-flex justify-content-between align-items-center" style="font-size: 13px;">
+                                <div class="gantt-row-wc border-bottom bg-light px-3 py-2 fw-bold text-dark d-flex justify-content-between align-items-center" style="font-size: 13px;">
                                     <span>
                                         <i class="feather-settings text-primary me-1"></i> {{ $wc['name'] }}
                                         @if(!empty($wc['code']))
@@ -176,8 +320,8 @@
                                         $laneCount = max(1, count($machine['lanes']));
                                         $rowHeight = 20 + ($laneCount * 46);
                                     @endphp
-                                    <div class="gantt-row d-flex align-items-stretch border-bottom bg-white" style="min-height: {{ $rowHeight }}px;">
-                                        <div class="gantt-label-col border-end d-flex flex-column justify-content-center px-3 py-2" style="width: 250px; flex-shrink: 0; background-color: #fafafa; z-index: 10;">
+                                    <div class="gantt-row-machine d-flex align-items-stretch border-bottom bg-white position-relative" style="min-height: {{ $rowHeight }}px;">
+                                        <div class="gantt-resource-col border-end d-flex flex-column justify-content-center px-3 py-2 bg-white" style="width: 250px; min-width: 250px; flex-shrink: 0; z-index: 10;">
                                             <span class="fw-semibold text-dark fs-12">
                                                 {{ $machine['name'] }}
                                                 @if(!empty($machine['code']))
@@ -188,7 +332,7 @@
                                                 <span class="badge {{ !$machine['is_active'] ? 'bg-soft-danger text-danger' : 'bg-soft-warning text-warning' }} mt-1 align-self-start fs-9" style="font-size: 9px;">{{ $machine['badge'] }}</span>
                                             @endif
                                         </div>
-                                        <div class="gantt-timeline-col position-relative flex-grow-1 py-2" style="min-height: {{ $rowHeight }}px;">
+                                        <div class="gantt-timeline-lane position-relative flex-grow-1 py-2" style="min-height: {{ $rowHeight }}px;">
                                             <!-- Grid lines background -->
                                             <div class="position-absolute w-100 h-100 d-flex top-0 left-0" style="pointer-events: none; z-index: 1;">
                                                 @foreach($columns as $col)
@@ -258,7 +402,7 @@
                      </div>
 
                      {{-- Styled Legend Bar matching Dispatch Board --}}
-                     <div class="d-flex flex-wrap align-items-center justify-content-between p-3 bg-light rounded border fs-12 mt-4">
+                     <div class="gantt-legend-strip d-flex flex-wrap align-items-center justify-content-between p-3 rounded border fs-12 mt-4">
                          <div class="d-flex flex-wrap align-items-center gap-3">
                              <span class="fw-semibold text-dark"><i class="feather-info me-1"></i> Legend:</span>
                              <span class="d-flex align-items-center gap-1"><span class="d-inline-block rounded-circle bg-primary" style="width: 10px; height: 10px;"></span> Scheduled</span>

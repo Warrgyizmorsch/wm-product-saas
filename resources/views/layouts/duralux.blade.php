@@ -66,8 +66,78 @@
         .nxl-container .nxl-content .main-content {
             padding: 10px !important;
         }
+
         .dark-light-theme .light-button {
             display: none;
+        }
+
+        .header-color-picker-label {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            margin: 0;
+            padding: 0;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .header-color-preview-circle {
+            display: block;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background-color: var(--bs-primary, #6337fa);
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15) inset, 0 1px 2px rgba(0, 0, 0, 0.08);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .header-color-picker-label:hover .header-color-preview-circle {
+            transform: scale(1.08);
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2) inset, 0 2px 4px rgba(0, 0, 0, 0.12);
+        }
+
+        .header-color-picker-input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+            opacity: 0 !important;
+            cursor: pointer !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+
+        .header-color-picker-input::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        .header-color-picker-input::-webkit-color-swatch {
+            border: none;
+            border-radius: 50%;
+        }
+
+        .header-color-picker-input::-moz-color-swatch {
+            border: none;
+            border-radius: 50%;
+        }
+
+        html.app-skin-dark .header-color-picker-wrapper {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
+        }
+
+        html.app-skin-dark .header-color-preview-circle {
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25) inset, 0 1px 2px rgba(0, 0, 0, 0.3);
         }
     </style>
     @stack('styles')
@@ -94,11 +164,12 @@
                         <h5 class="m-b-10">
                             @yield('page-title', __('ui.dashboard'))
                             {{-- Ledger amounts carry no symbol of their own; say once, per page, what they are in. --}}
-                            @if (request()->routeIs('accounting.*') && ! request()->routeIs('accounting.exchange-rates.*') && company())
-                                @php($reportingCurrency = company_currency())
-                                <span class="badge bg-soft-primary text-primary fs-11 fw-semibold ms-2 align-middle" title="{{ $reportingCurrency['name'] }} — the company's base currency">
-                                    Amounts in {{ $reportingCurrency['code'] }} ({{ $reportingCurrency['symbol'] }})
-                                </span>
+                            @if (request()->routeIs('accounting.*') && !request()->routeIs('accounting.exchange-rates.*') && company())
+                            @php($reportingCurrency = company_currency())
+                            <span class="badge bg-soft-primary text-primary fs-11 fw-semibold ms-2 align-middle"
+                                title="{{ $reportingCurrency['name'] }} — the company's base currency">
+                                Amounts in {{ $reportingCurrency['code'] }} ({{ $reportingCurrency['symbol'] }})
+                            </span>
                             @endif
                         </h5>
                     </div>
@@ -218,14 +289,21 @@
         });
         // Initialize and bind primary color picker
         $(document).ready(function () {
-            var savedColor = localStorage.getItem('erp_primary_color') || '#0000FF';
+            var savedColor = localStorage.getItem('erp_primary_color') || '#6337fa';
             var picker = $('#primaryColorPicker');
+            var preview = $('#primaryColorPreview');
             if (picker.length) {
                 picker.val(savedColor);
+                if (preview.length) {
+                    preview.css('background-color', savedColor);
+                }
                 picker.on('input change', function () {
                     var color = $(this).val();
                     document.documentElement.style.setProperty('--bs-primary', color);
                     localStorage.setItem('erp_primary_color', color);
+                    if (preview.length) {
+                        preview.css('background-color', color);
+                    }
                 });
             }
         });
