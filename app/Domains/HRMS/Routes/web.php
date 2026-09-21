@@ -129,6 +129,7 @@ Route::prefix('hrms')
             Route::post('/{employee}/update-status', [EmployeeController::class, 'updateStatus'])->name('employees.update-status');
             Route::post('/{employee}/update-stage', [EmployeeController::class, 'updateStage'])->name('employees.update-stage');
             Route::get('/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
+            Route::get('/{employee}/download-resume', [EmployeeController::class, 'downloadResume'])->name('employees.download-resume');
             Route::delete('/delete/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
             
             Route::post('/{employee}/documents/upload', [EmployeeController::class, 'uploadDocument'])->name('employees.documents.upload');
@@ -361,12 +362,17 @@ Route::prefix('hrms')
             Route::delete('/{category}', [ExpenseCategoryController::class, 'destroy'])->name('expense-categories.destroy');
         });
 
-        // Expense Policy Master (2-layer: named policy → category limits)
+        // Expense Policy Master (3-tab: Categories → Workflows → Policies)
         Route::prefix('expense-policy')->group(function (): void {
             Route::get('/', [ExpensePolicyController::class, 'index'])->name('expense-policy.index');
             Route::post('/', [ExpensePolicyController::class, 'store'])->name('expense-policy.store');
             Route::put('/{policy}', [ExpensePolicyController::class, 'update'])->name('expense-policy.update');
             Route::delete('/{policy}', [ExpensePolicyController::class, 'destroy'])->name('expense-policy.destroy');
+
+            // Dedicated Approval Workflows
+            Route::post('/workflows', [ExpensePolicyController::class, 'storeWorkflow'])->name('expense-policy.workflows.store');
+            Route::put('/workflows/{workflow}', [ExpensePolicyController::class, 'updateWorkflow'])->name('expense-policy.workflows.update');
+            Route::delete('/workflows/{workflow}', [ExpensePolicyController::class, 'destroyWorkflow'])->name('expense-policy.workflows.destroy');
 
             // Category-level rules within a policy
             Route::get('/{policy}/rules', [ExpensePolicyController::class, 'showRules'])->name('expense-policy.rules');
@@ -533,6 +539,7 @@ Route::prefix('hrms')
             // Candidates
             Route::get('/candidates', [RecruitmentController::class, 'candidates'])->name('candidates.index');
             Route::post('/candidates/store', [RecruitmentController::class, 'storeCandidate'])->name('candidates.store');
+            Route::get('/candidates/{candidate}/download-resume', [RecruitmentController::class, 'downloadResume'])->name('candidates.download-resume');
 
             // Pipeline & Kanban
             Route::get('/pipeline/{requisition}', [RecruitmentController::class, 'pipeline'])->name('pipeline');

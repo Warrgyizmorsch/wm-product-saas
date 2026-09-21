@@ -23,7 +23,7 @@ class TravelExpenseController extends Controller
 {
     public function index(Request $request): View
     {
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $tenantId = current_tenant_id() ?? require_tenant_id();
         $user = auth()->user();
 
         // 1. Resolve employee context
@@ -223,26 +223,35 @@ class TravelExpenseController extends Controller
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
 
-        DB::transaction(function () use ($validated, $request) {
+        $emp = Employee::find($validated['employee_id']);
+        $appRes = $this->resolveApprovalLevels($emp, floatval($validated['estimated_budget']), $tenantId);
+
+        DB::transaction(function () use ($validated, $request, $appRes, $emp, $tenantId) {
             $travelRequest = TravelRequest::create([
-                'tenant_id'        => $validated['tenant_id'],
-                'employee_id'      => $validated['employee_id'],
-                'purpose'          => $validated['purpose'],
-                'destination'      => $validated['destination'],
-                'start_date'       => $validated['start_date'],
-                'end_date'         => $validated['end_date'],
-                'estimated_budget' => $validated['estimated_budget'],
-                'status'           => $validated['status'],
+                'tenant_id'              => $validated['tenant_id'],
+                'employee_id'            => $validated['employee_id'],
+                'purpose'                => $validated['purpose'],
+                'destination'            => $validated['destination'],
+                'start_date'             => $validated['start_date'],
+                'end_date'               => $validated['end_date'],
+                'estimated_budget'       => $validated['estimated_budget'],
+                'status'                 => $validated['status'],
+                'approval_levels'        => $appRes['approval_levels'],
+                'current_approval_level' => 1,
             ]);
 
             if ($request->boolean('request_advance')) {
+                $advAmt = floatval($validated['advance_amount']);
+                $advRes = $this->resolveApprovalLevels($emp, $advAmt, $tenantId);
                 CashAdvance::create([
-                    'tenant_id'         => $validated['tenant_id'],
-                    'employee_id'       => $validated['employee_id'],
-                    'travel_request_id' => $travelRequest->id,
-                    'amount'            => $validated['advance_amount'],
-                    'purpose'           => $validated['purpose'],
-                    'status'            => 'pending',
+                    'tenant_id'              => $validated['tenant_id'],
+                    'employee_id'            => $validated['employee_id'],
+                    'travel_request_id'      => $travelRequest->id,
+                    'amount'                 => $advAmt,
+                    'purpose'                => $validated['purpose'],
+                    'status'                 => 'pending',
+                    'approval_levels'        => $advRes['approval_levels'],
+                    'current_approval_level' => 1,
                 ]);
             }
         });
@@ -271,19 +280,50 @@ class TravelExpenseController extends Controller
 
         $approvedBudget = $request->input('approved_budget', $travelRequest->estimated_budget);
         
+        $levels = $travelRequest->approval_levels ?: 1;
+        $currentLevel = $travelRequest->current_approval_level ?: 1;
+        $isFirstStage = ($levels == 2 && ($travelRequest->status === 'pending' || $currentLevel == 1));
+
+        if ($isFirstStage) {
+            $travelRequest->update([
+                'status'                 => 'l1_approved',
+                'current_approval_level' => 2,
+                'l1_approved_by'         => auth()->id(),
+                'l1_approved_at'         => now(),
+                'approved_budget'        => $approvedBudget,
+            ]);
+
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'Travel Request Level 1 Approved',
+                message: "Travel request to {$travelRequest->destination} passed Level 1 approval. Level 2 (Final) approval required.",
+                actionUrl: route('hrms.travel-expense.index', ['tab' => 'travel']),
+                type: 'travel_l1_approved',
+                iconClass: 'feather-check-circle'
+            );
+
+            return redirect()->back()->with('success', 'Travel request approved at Level 1. Moved to Level 2 (Final) approval.');
+        }
+
+        // Level 2 (Final) Approval
         $travelRequest->update([
-            'status' => 'approved',
-            'approved_budget' => $approvedBudget
+            'status'                 => 'approved',
+            'current_approval_level' => 2,
+            'l2_approved_by'         => auth()->id(),
+            'l2_approved_at'         => now(),
+            'approved_budget'        => $approvedBudget
         ]);
 
         $advanceMsg = '';
         if ($request->boolean('approve_cash_advance')) {
-            $linkedAdvance = $travelRequest->cashAdvances()->where('status', 'pending')->first();
+            $linkedAdvance = $travelRequest->cashAdvances()->whereIn('status', ['pending', 'l1_approved'])->first();
             if ($linkedAdvance) {
                 $approvedAdvanceAmt = $request->input('approved_advance_amount', $linkedAdvance->amount);
                 $linkedAdvance->update([
-                    'status' => 'approved',
-                    'approved_amount' => $approvedAdvanceAmt,
+                    'status'                 => 'approved',
+                    'current_approval_level' => 2,
+                    'l2_approved_by'         => auth()->id(),
+                    'l2_approved_at'         => now(),
+                    'approved_amount'        => $approvedAdvanceAmt,
                 ]);
                 $advanceMsg = ' and linked cash advance';
             }
@@ -293,7 +333,7 @@ class TravelExpenseController extends Controller
             \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $travelRequest->employee_id,
                 title: 'Travel Request Approved',
-                message: "Your travel request to {$travelRequest->destination} has been approved.",
+                message: "Your travel request to {$travelRequest->destination} has received final approval.",
                 actionUrl: route('hrms.travel-expense.index', ['tab' => 'travel']),
                 type: 'travel_approved',
                 iconClass: 'feather-check-circle'
@@ -349,9 +389,13 @@ class TravelExpenseController extends Controller
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
 
+        $emp = Employee::find($validated['employee_id']);
+        $advRes = $this->resolveApprovalLevels($emp, floatval($validated['amount']), $tenantId);
+        $validated['approval_levels']        = $advRes['approval_levels'];
+        $validated['current_approval_level'] = 1;
+
         $cashAdvance = CashAdvance::create($validated);
 
-        $emp = Employee::find($validated['employee_id']);
         \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'New Cash Advance Request',
             message: ($emp ? $emp->full_name : 'Employee') . " requested a cash advance of $" . number_format($validated['amount'], 2) . ".",
@@ -369,17 +413,45 @@ class TravelExpenseController extends Controller
         $this->authorizeHrms('hrms.travel_expenses.approve');
 
         $approvedAmount = $request->input('approved_amount', $cashAdvance->amount);
-        
+
+        $levels = $cashAdvance->approval_levels ?: 1;
+        $currentLevel = $cashAdvance->current_approval_level ?: 1;
+        $isFirstStage = ($levels == 2 && ($cashAdvance->status === 'pending' || $currentLevel == 1));
+
+        if ($isFirstStage) {
+            $cashAdvance->update([
+                'status'                 => 'l1_approved',
+                'current_approval_level' => 2,
+                'l1_approved_by'         => auth()->id(),
+                'l1_approved_at'         => now(),
+                'approved_amount'        => $approvedAmount,
+            ]);
+
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'Cash Advance Level 1 Approved',
+                message: "Cash advance request for {$cashAdvance->purpose} passed Level 1 approval. Level 2 (Final) approval required.",
+                actionUrl: route('hrms.travel-expense.index', ['tab' => 'advance']),
+                type: 'cash_advance_l1_approved',
+                iconClass: 'feather-check-circle'
+            );
+
+            return redirect()->back()->with('success', 'Cash advance approved at Level 1. Moved to Level 2 (Final) approval.');
+        }
+
+        // Level 2 (Final) Approval
         $cashAdvance->update([
-            'status' => 'approved',
-            'approved_amount' => $approvedAmount
+            'status'                 => 'approved',
+            'current_approval_level' => 2,
+            'l2_approved_by'         => auth()->id(),
+            'l2_approved_at'         => now(),
+            'approved_amount'        => $approvedAmount
         ]);
 
         if ($cashAdvance->employee_id) {
             \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $cashAdvance->employee_id,
                 title: 'Cash Advance Approved',
-                message: "Your cash advance request of $" . number_format($approvedAmount, 2) . " has been approved.",
+                message: "Your cash advance request of $" . number_format($approvedAmount, 2) . " has received final approval.",
                 actionUrl: route('hrms.travel-expense.index', ['tab' => 'advance']),
                 type: 'cash_advance_approved',
                 iconClass: 'feather-check-circle'
@@ -396,40 +468,11 @@ class TravelExpenseController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $cashAdvance->update(['status' => 'disbursed']);
 
-        $amount = floatval($cashAdvance->approved_amount ?? $cashAdvance->amount);
-        if ($amount > 0) {
-            $advancesAccount = $this->getOrCreateAccount($tenantId, '1400', 'Loans & Advances', 'asset', 'debit', 'loans_advances');
-            $bankAccount = $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', 'asset', 'debit', 'current_asset');
-
-            $lines = [
-                [
-                    'chart_of_account_id' => $advancesAccount->id,
-                    'debit' => $amount,
-                    'credit' => 0.00,
-                    'description' => "Disbursement of Advance: " . $cashAdvance->purpose
-                ],
-                [
-                    'chart_of_account_id' => $bankAccount->id,
-                    'debit' => 0.00,
-                    'credit' => $amount,
-                    'description' => "Disbursement of Advance: " . $cashAdvance->purpose
-                ]
-            ];
-
-            try {
-                $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
-                $journalService->post($lines, [
-                    'tenant_id' => $tenantId,
-                    'journal_date' => now(),
-                    'source' => 'expense',
-                    'reference_type' => 'CashAdvance',
-                    'reference_id' => $cashAdvance->id,
-                    'memo' => "Disbursed Cash Advance: " . $cashAdvance->purpose,
-                    'posted_by' => auth()->id(),
-                ]);
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error("Disbursement Journal Posting Failed: " . $e->getMessage());
-            }
+        try {
+            $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
+            $travelAccountingService->postCashAdvanceDisbursementJournal($cashAdvance);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Disbursement Journal Posting Failed: " . $e->getMessage());
         }
 
         return redirect()->back()->with('success', 'Cash advance disbursed successfully.');
@@ -563,16 +606,21 @@ class TravelExpenseController extends Controller
 
             $advance = !empty($validated['cash_advance_id']) ? CashAdvance::find($validated['cash_advance_id']) : null;
 
+            $emp = Employee::find($validated['employee_id']);
+            $appRes = $this->resolveApprovalLevels($emp, $totalAmount, $tenantId);
+
             // 2. Create report record
             $report = ExpenseReport::create([
-                'tenant_id'         => $tenantId,
-                'employee_id'       => $validated['employee_id'],
-                'travel_request_id' => $validated['travel_request_id'] ?: null,
-                'title'             => $validated['title'],
-                'total_amount'      => $totalAmount,
-                'advance_adjusted'  => $advanceAdjusted,
-                'net_reimbursement' => $netReimbursement,
-                'status'            => 'draft',
+                'tenant_id'              => $tenantId,
+                'employee_id'            => $validated['employee_id'],
+                'travel_request_id'      => $validated['travel_request_id'] ?: null,
+                'title'                  => $validated['title'],
+                'total_amount'           => $totalAmount,
+                'advance_adjusted'       => $advanceAdjusted,
+                'net_reimbursement'      => $netReimbursement,
+                'status'                 => 'draft',
+                'approval_levels'        => $appRes['approval_levels'],
+                'current_approval_level' => 1,
             ]);
 
             // 3. Link cash advance to this report if applicable
@@ -843,10 +891,16 @@ class TravelExpenseController extends Controller
             }
         }
 
-        $expenseReport->update(['status' => 'submitted']);
+        $emp = Employee::find($expenseReport->employee_id);
+        $appRes = $this->resolveApprovalLevels($emp, floatval($expenseReport->total_amount), $expenseReport->tenant_id);
+
+        $expenseReport->update([
+            'status'                 => 'submitted',
+            'approval_levels'        => $appRes['approval_levels'],
+            'current_approval_level' => 1,
+        ]);
         $expenseReport->claims()->update(['status' => 'submitted']);
 
-        $emp = Employee::find($expenseReport->employee_id);
         \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'Expense Report Submitted',
             message: ($emp ? $emp->full_name : 'Employee') . " submitted expense report '{$expenseReport->title}' for approval.",
@@ -863,6 +917,31 @@ class TravelExpenseController extends Controller
         $this->authorizeHrms('hrms.travel_expenses.approve');
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        $levels = $expenseReport->approval_levels ?: 1;
+        $currentLevel = $expenseReport->current_approval_level ?: 1;
+        $isFirstStage = ($levels == 2 && ($expenseReport->status === 'pending' || $expenseReport->status === 'submitted' || $currentLevel == 1));
+
+        if ($isFirstStage) {
+            $approvedAmount = floatval($request->input('approved_amount', $expenseReport->total_amount));
+            $expenseReport->update([
+                'status'                 => 'l1_approved',
+                'current_approval_level' => 2,
+                'l1_approved_by'         => auth()->id(),
+                'l1_approved_at'         => now(),
+                'approved_amount'        => $approvedAmount,
+            ]);
+
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'Expense Report Level 1 Approved',
+                message: "Expense report '{$expenseReport->title}' passed Level 1 approval. Level 2 (Final) approval required.",
+                actionUrl: route('hrms.travel-expense.index', ['tab' => 'report']),
+                type: 'expense_report_l1_approved',
+                iconClass: 'feather-check-circle'
+            );
+
+            return redirect()->back()->with('success', 'Expense report approved at Level 1. Moved to Level 2 (Final) approval.');
+        }
 
         // Check for itemized claim line decisions
         $itemDecisions = $request->input('items', []);
@@ -941,6 +1020,9 @@ class TravelExpenseController extends Controller
             'approved_net_reimbursement' => $approvedNet,
             'advance_adjusted'          => $adjusted,
             'payout_channel'             => $payoutChannel,
+            'current_approval_level'     => 2,
+            'l2_approved_by'             => auth()->id(),
+            'l2_approved_at'             => now(),
         ]);
 
         if ($payoutChannel === 'accounting') {
@@ -1155,65 +1237,11 @@ class TravelExpenseController extends Controller
                     'approved_net_reimbursement' => $approvedNet,
                 ]);
 
-                $lines = [];
-
-                // 1. Debit Other Expense (Code 5900)
-                $expenseAccount = $this->getOrCreateAccount($tenantId, '5900', 'Other Expense', 'expense', 'debit', 'operating_expense');
-                $lines[] = [
-                    'chart_of_account_id' => $expenseAccount->id,
-                    'debit' => $unpaidApprovedAmount,
-                    'credit' => 0.00,
-                    'description' => "Expense Claim Payout: " . $expenseReport->title
-                ];
-
-                // 2. Credit Advances (Code 1400)
-                if ($offsetAmount > 0) {
-                    $advancesAccount = $this->getOrCreateAccount($tenantId, '1400', 'Loans & Advances', 'asset', 'debit', 'loans_advances');
-                    $lines[] = [
-                        'chart_of_account_id' => $advancesAccount->id,
-                        'debit' => 0.00,
-                        'credit' => $offsetAmount,
-                        'description' => "Clear Advance for Claim: " . $expenseReport->title
-                    ];
-                }
-
-                // 3. Bank Account transaction (Code 1020)
-                if ($surplus > 0 || $approvedNet > 0) {
-                    $bankAccount = $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', 'asset', 'debit', 'current_asset');
-                    if ($surplus > 0) {
-                        // Recovery (Debit Bank)
-                        $lines[] = [
-                            'chart_of_account_id' => $bankAccount->id,
-                            'debit' => $surplus,
-                            'credit' => 0.00,
-                            'description' => "Advance surplus recovered for Claim: " . $expenseReport->title
-                        ];
-                    } elseif ($approvedNet > 0) {
-                        // Payout (Credit Bank)
-                        $lines[] = [
-                            'chart_of_account_id' => $bankAccount->id,
-                            'debit' => 0.00,
-                            'credit' => $approvedNet,
-                            'description' => "Payout for Claim: " . $expenseReport->title
-                        ];
-                    }
-                }
-
-                if (count($lines) > 0) {
-                    try {
-                        $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
-                        $journalService->post($lines, [
-                            'tenant_id' => $tenantId,
-                            'journal_date' => now(),
-                            'source' => 'expense',
-                            'reference_type' => 'ExpenseReport',
-                            'reference_id' => $expenseReport->id,
-                            'memo' => "Paid Expense Claim Portion: " . $expenseReport->title,
-                            'posted_by' => auth()->id(),
-                        ]);
-                    } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error("Payout Journal Posting Failed: " . $e->getMessage());
-                    }
+                try {
+                    $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
+                    $travelAccountingService->postExpenseReportPayoutJournal($expenseReport);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error("Payout Journal Posting Failed: " . $e->getMessage());
                 }
             }
 
@@ -1551,6 +1579,90 @@ class TravelExpenseController extends Controller
             'advance_adjusted'          => $adjusted,
             'net_reimbursement'         => $netReimbursement,
         ];
+    }
+
+    /**
+     * Helper to resolve active approval workflow (or policy fallback) and calculate required approval levels for an employee.
+     */
+    private function resolveApprovalLevels(?Employee $employee, float $amount = 0.00, ?int $tenantId = null): array
+    {
+        if (!$employee) {
+            return ['approval_levels' => 1, 'workflow' => null, 'policy' => null];
+        }
+        $tenantId = $tenantId ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        // 1. Check Dedicated Approval Workflows first
+        $workflow = \App\Domains\HRMS\Models\ExpenseApprovalWorkflow::where('tenant_id', $tenantId)
+            ->where('status', true)
+            ->where(function($q) use ($employee) {
+                $q->where('designation_id', $employee->designation_id)
+                  ->orWhere('department_id', $employee->department_id)
+                  ->orWhere('company_id', $employee->company_id)
+                  ->orWhere('is_default', true)
+                  ->orWhere(function($sub) {
+                      $sub->whereNull('designation_id')
+                          ->whereNull('department_id')
+                          ->whereNull('company_id');
+                  });
+            })
+            ->orderByRaw('CASE 
+                WHEN designation_id IS NOT NULL THEN 1 
+                WHEN department_id IS NOT NULL THEN 2 
+                WHEN company_id IS NOT NULL THEN 3 
+                WHEN is_default = 1 THEN 4
+                ELSE 5 
+            END')
+            ->first();
+
+        if ($workflow) {
+            $type = $workflow->approval_type ?? '1_level';
+            if ($type === '2_level') {
+                return ['approval_levels' => 2, 'workflow' => $workflow, 'policy' => null];
+            } elseif ($type === 'conditional_threshold') {
+                $threshold = floatval($workflow->amount_threshold_for_2_level ?? 0);
+                if ($threshold > 0 && $amount > $threshold) {
+                    return ['approval_levels' => 2, 'workflow' => $workflow, 'policy' => null];
+                }
+            }
+            return ['approval_levels' => 1, 'workflow' => $workflow, 'policy' => null];
+        }
+
+        // 2. Secondary fallback to Expense Policy
+        $policy = ExpensePolicy::where('tenant_id', $tenantId)
+            ->where('status', true)
+            ->where(function($q) use ($employee) {
+                $q->where('designation_id', $employee->designation_id)
+                  ->orWhere('department_id', $employee->department_id)
+                  ->orWhere('company_id', $employee->company_id)
+                  ->orWhere(function($sub) {
+                      $sub->whereNull('designation_id')
+                          ->whereNull('department_id')
+                          ->whereNull('company_id');
+                  });
+            })
+            ->orderByRaw('CASE 
+                WHEN designation_id IS NOT NULL THEN 1 
+                WHEN department_id IS NOT NULL THEN 2 
+                WHEN company_id IS NOT NULL THEN 3 
+                ELSE 4 
+            END')
+            ->first();
+
+        if ($policy) {
+            $type = $policy->approval_type ?? '1_level';
+            if ($type === '2_level') {
+                return ['approval_levels' => 2, 'workflow' => null, 'policy' => $policy];
+            } elseif ($type === 'conditional_threshold') {
+                $threshold = floatval($policy->amount_threshold_for_2_level ?? 0);
+                if ($threshold > 0 && $amount > $threshold) {
+                    return ['approval_levels' => 2, 'workflow' => null, 'policy' => $policy];
+                }
+            }
+            return ['approval_levels' => 1, 'workflow' => null, 'policy' => $policy];
+        }
+
+        // 3. System Fallback: 1-Level Approval
+        return ['approval_levels' => 1, 'workflow' => null, 'policy' => null];
     }
 
     private function authorizeHrms(string $permission): void

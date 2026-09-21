@@ -52,9 +52,17 @@
                     
                     @php
                         $existingResume = $fieldValue('resume_path', $convertOfferPayload['resume_path'] ?? '');
+                        $resumeDownloadUrl = '#';
+                        if (!empty($employee->id) && !empty($existingResume)) {
+                            $resumeDownloadUrl = route('hrms.employees.download-resume', $employee);
+                        } elseif (!empty($existingResume) && !empty($convertOfferPayload['candidate_id'])) {
+                            $resumeDownloadUrl = route('hrms.recruitment.candidates.download-resume', $convertOfferPayload['candidate_id']);
+                        } elseif (!empty($existingResume)) {
+                            $resumeDownloadUrl = asset('storage/' . $existingResume);
+                        }
                     @endphp
                     <div id="{{ $prefix }}_resume_preview_container" class="mt-1 fs-11 text-muted {{ !empty($existingResume) ? '' : 'd-none' }}">
-                        Attached Resume: <a href="{{ !empty($existingResume) ? asset('storage/' . $existingResume) : '#' }}" id="{{ $prefix }}_resume_preview_link" target="_blank" class="text-primary fw-semibold"><i class="feather-paperclip me-1"></i>View Candidate Resume</a>
+                        Attached Resume: <a href="{{ $resumeDownloadUrl }}" id="{{ $prefix }}_resume_preview_link" target="_blank" class="text-primary fw-semibold"><i class="feather-paperclip me-1"></i>View Resume</a>
                     </div>
                 </div>
             </div>
@@ -423,7 +431,7 @@
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_mobile') }}" name="personal_mobile_number" id="{{ $prefix }}_personal_mobile_number" :value="$fieldValue('personal_mobile_number')" placeholder="{{ __('hrms.employees.frm_mobile_placeholder') }}" :errorText="$errors->first('personal_mobile_number')" data-field-group="employee" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :required="true" :value="$fieldValue('personal_email', $isEdit ? ($employee->personal_email ?? '') : '')" placeholder="{{ __('hrms.employees.frm_email_placeholder') }}" :errorText="$errors->first('personal_email')" data-field-group="employee" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :required="false" :value="$fieldValue('personal_email', $isEdit ? ($employee->personal_email ?? '') : '')" placeholder="{{ __('hrms.employees.frm_email_placeholder') }}" :errorText="$errors->first('personal_email')" data-field-group="employee" />
                         </div>
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_home_phone') }}" name="home_phone" id="{{ $prefix }}_home_phone" :value="$fieldValue('home_phone')" placeholder="{{ __('hrms.employees.frm_home_phone_placeholder') }}" :errorText="$errors->first('home_phone')" data-field-group="employee" />
@@ -577,6 +585,150 @@ const runEmployeeFormSetup = () => {
             coordSection.hide();
         }
 
+        if (!window.initNominatimAutocomplete) {
+            window.initNominatimAutocomplete = function(inputEl, onSelectCallback) {
+                if (!inputEl) return;
+                inputEl.setAttribute('autocomplete', 'off');
+
+                let parent = inputEl.parentElement;
+                if (!parent) return;
+
+                if (window.getComputedStyle(parent).position === 'static') {
+                    parent.style.position = 'relative';
+                }
+
+                let dropdown = parent.querySelector('.nominatim-autocomplete-dropdown');
+                if (!dropdown) {
+                    dropdown = document.createElement('div');
+                    dropdown.className = 'nominatim-autocomplete-dropdown shadow border bg-white rounded-2 position-absolute';
+                    parent.appendChild(dropdown);
+                }
+
+                const updateDropdownPosition = () => {
+                    const topPos = (inputEl.offsetTop + inputEl.offsetHeight + 4);
+                    const leftPos = inputEl.offsetLeft;
+                    const widthPos = inputEl.offsetWidth;
+
+                    dropdown.style.cssText = `position: absolute; top: ${topPos}px; left: ${leftPos}px; width: ${widthPos}px; max-height: 160px; overflow-y: auto; z-index: 99999; display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important; background: #ffffff; border-radius: 6px;`;
+                };
+
+                let debounceTimer = null;
+                let selectedIndex = -1;
+                let currentResults = [];
+
+                const closeDropdown = () => {
+                    dropdown.style.display = 'none';
+                    dropdown.innerHTML = '';
+                    selectedIndex = -1;
+                    currentResults = [];
+                };
+
+                const escapeHtml = (str) => {
+                    if (!str) return '';
+                    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+                };
+
+                const renderResults = (results) => {
+                    currentResults = results;
+                    dropdown.innerHTML = '';
+                    selectedIndex = -1;
+                    updateDropdownPosition();
+
+                    if (!results || results.length === 0) {
+                        dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">No locations found</div>';
+                        dropdown.style.display = 'block';
+                        return;
+                    }
+
+                    results.forEach((item, index) => {
+                        const div = document.createElement('div');
+                        div.className = 'p-2 border-bottom cursor-pointer nominatim-item text-truncate d-flex align-items-center gap-2';
+                        div.style.cssText = 'cursor: pointer; transition: background 0.15s ease; border-color: #f1f5f9 !important; background: #ffffff; text-align: left;';
+                        div.innerHTML = `<i class="feather-map-pin text-primary flex-shrink-0" style="font-size: 12px;"></i>
+                                         <div class="text-truncate">
+                                             <div class="fw-semibold text-dark text-truncate" style="font-size: 11px;">${escapeHtml(item.display_name.split(',')[0])}</div>
+                                             <div class="text-muted fs-10 text-truncate">${escapeHtml(item.display_name)}</div>
+                                         </div>`;
+
+                        div.addEventListener('mouseenter', () => { highlightItem(index); });
+                        div.addEventListener('mousedown', (e) => { 
+                            e.preventDefault();
+                            selectItem(index); 
+                        });
+                        dropdown.appendChild(div);
+                    });
+
+                    dropdown.style.display = 'block';
+                };
+
+                const highlightItem = (index) => {
+                    const items = dropdown.querySelectorAll('.nominatim-item');
+                    items.forEach((el, idx) => {
+                        el.style.backgroundColor = (idx === index) ? '#f8f9fa' : '#ffffff';
+                    });
+                    selectedIndex = index;
+                };
+
+                const selectItem = (index) => {
+                    if (index >= 0 && index < currentResults.length) {
+                        const item = currentResults[index];
+                        inputEl.value = item.display_name;
+                        closeDropdown();
+                        if (typeof onSelectCallback === 'function') {
+                            onSelectCallback({
+                                lat: parseFloat(item.lat),
+                                lng: parseFloat(item.lon),
+                                formatted_address: item.display_name
+                            });
+                        }
+                    }
+                };
+
+                inputEl.addEventListener('input', function() {
+                    const query = this.value.trim();
+                    clearTimeout(debounceTimer);
+                    if (query.length < 2) {
+                        closeDropdown();
+                        return;
+                    }
+
+                    debounceTimer = setTimeout(() => {
+                        fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                            .then(res => res.json())
+                            .then(data => renderResults(data))
+                            .catch(err => {
+                                console.error('Nominatim search error:', err);
+                                closeDropdown();
+                            });
+                    }, 300);
+                });
+
+                inputEl.addEventListener('keydown', function(e) {
+                    if (dropdown.style.display === 'none' || currentResults.length === 0) return;
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        highlightItem((selectedIndex + 1) % currentResults.length);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        highlightItem((selectedIndex - 1 + currentResults.length) % currentResults.length);
+                    } else if (e.key === 'Enter') {
+                        if (selectedIndex >= 0) {
+                            e.preventDefault();
+                            selectItem(selectedIndex);
+                        }
+                    } else if (e.key === 'Escape') {
+                        closeDropdown();
+                    }
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (!inputEl.contains(e.target) && !dropdown.contains(e.target)) {
+                        closeDropdown();
+                    }
+                });
+            };
+        }
+
         // Location Detection handler
         let wfhMap = null;
         let wfhMarker = null;
@@ -645,24 +797,17 @@ const runEmployeeFormSetup = () => {
             latInput.on('input', updateMapFromInputs);
             lngInput.on('input', updateMapFromInputs);
 
-            // Bind Google Places Autocomplete search input
+            // Bind Nominatim Autocomplete search input (Hybrid OpenStreetMap Search)
             const searchInputEl = document.getElementById(prefix + '_wfh_map_search');
-            if (searchInputEl) {
-                const autocomplete = new google.maps.places.Autocomplete(searchInputEl);
-                autocomplete.bindTo('bounds', wfhMap);
-
-                autocomplete.addListener('place_changed', function() {
-                    const place = autocomplete.getPlace();
-                    if (!place.geometry || !place.geometry.location) {
-                        return;
-                    }
-
-                    wfhMap.setCenter(place.geometry.location);
+            if (searchInputEl && window.initNominatimAutocomplete) {
+                window.initNominatimAutocomplete(searchInputEl, function(place) {
+                    const pos = { lat: place.lat, lng: place.lng };
+                    wfhMap.setCenter(pos);
                     wfhMap.setZoom(15);
-                    wfhMarker.setPosition(place.geometry.location);
+                    wfhMarker.setPosition(pos);
 
-                    latInput.val(place.geometry.location.lat().toFixed(8));
-                    lngInput.val(place.geometry.location.lng().toFixed(8));
+                    latInput.val(place.lat.toFixed(8));
+                    lngInput.val(place.lng.toFixed(8));
                 });
 
                 // Prevent form submission when pressing enter on search box

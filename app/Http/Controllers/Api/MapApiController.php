@@ -32,7 +32,7 @@ class MapApiController extends Controller
 
     /**
      * GET /api/maps/geocode
-     * Proxies geocoding requests to Google Geocoding API.
+     * Proxies geocoding requests to Google Geocoding API with Nominatim fallback.
      */
     public function geocode(Request $request): JsonResponse
     {
@@ -40,49 +40,59 @@ class MapApiController extends Controller
             'address' => 'required|string',
         ]);
 
+        $address = $request->input('address');
         $key = config('services.google_maps.key');
-        if (empty($key)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Google Maps API key is not configured.'
-            ], 500);
+        
+        if (!empty($key)) {
+            $response = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
+                'address' => $address,
+                'key'     => $key
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (($data['status'] ?? '') === 'OK' && !empty($data['results'])) {
+                    $result = $data['results'][0];
+                    $location = $result['geometry']['location'];
+
+                    return response()->json([
+                        'latitude'          => $location['lat'],
+                        'longitude'         => $location['lng'],
+                        'formatted_address' => $result['formatted_address'],
+                        'place_id'          => $result['place_id']
+                    ]);
+                }
+            }
         }
 
-        $response = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
-            'address' => $request->input('address'),
-            'key'     => $key
+        // Nominatim Fallback
+        $nomResponse = Http::withHeaders([
+            'User-Agent' => 'WM-Product-SaaS/1.0'
+        ])->get('https://nominatim.openstreetmap.org/search', [
+            'q'      => $address,
+            'format' => 'json',
+            'limit'  => 1
         ]);
 
-        if ($response->failed()) {
+        if ($nomResponse->successful() && !empty($nomResponse->json())) {
+            $first = $nomResponse->json()[0];
             return response()->json([
-                'success' => false,
-                'message' => 'Failed to connect to Google Geocoding API.'
-            ], 502);
+                'latitude'          => (float)$first['lat'],
+                'longitude'         => (float)$first['lon'],
+                'formatted_address' => $first['display_name'],
+                'place_id'          => (string)($first['place_id'] ?? '')
+            ]);
         }
-
-        $data = $response->json();
-
-        if (($data['status'] ?? '') !== 'OK' || empty($data['results'])) {
-            return response()->json([
-                'success' => false,
-                'message' => $data['error_message'] ?? 'No geocoding results found.'
-            ], 422);
-        }
-
-        $result = $data['results'][0];
-        $location = $result['geometry']['location'];
 
         return response()->json([
-            'latitude'          => $location['lat'],
-            'longitude'         => $location['lng'],
-            'formatted_address' => $result['formatted_address'],
-            'place_id'          => $result['place_id']
-        ]);
+            'success' => false,
+            'message' => 'Geocoding failed.'
+        ], 422);
     }
 
     /**
      * GET /api/maps/autocomplete
-     * Proxies autocomplete requests to Google Places Autocomplete API.
+     * Proxies autocomplete requests to Google Places Autocomplete API with Nominatim fallback.
      */
     public function autocomplete(Request $request): JsonResponse
     {
@@ -91,50 +101,64 @@ class MapApiController extends Controller
             'country' => 'nullable|string|max:10',
         ]);
 
+        $query = $request->input('query');
         $key = config('services.google_maps.key');
-        if (empty($key)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Google Maps API key is not configured.'
-            ], 500);
-        }
 
-        $params = [
-            'input' => $request->input('query'),
-            'key'   => $key
-        ];
-
-        if ($request->filled('country')) {
-            $params['components'] = 'country:' . $request->input('country');
-        }
-
-        $response = Http::get('https://maps.googleapis.com/maps/api/place/autocomplete/json', $params);
-
-        if ($response->failed()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to connect to Google Places API.'
-            ], 502);
-        }
-
-        $data = $response->json();
-
-        if (($data['status'] ?? '') !== 'OK') {
-            return response()->json([
-                'success' => false,
-                'message' => $data['error_message'] ?? 'Places autocomplete failed.'
-            ], 422);
-        }
-
-        $predictions = collect($data['predictions'] ?? [])->map(function ($p) {
-            return [
-                'description' => $p['description'],
-                'place_id'    => $p['place_id']
+        if (!empty($key)) {
+            $params = [
+                'input' => $query,
+                'key'   => $key
             ];
-        });
+
+            if ($request->filled('country')) {
+                $params['components'] = 'country:' . $request->input('country');
+            }
+
+            $response = Http::get('https://maps.googleapis.com/maps/api/place/autocomplete/json', $params);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (($data['status'] ?? '') === 'OK' && !empty($data['predictions'])) {
+                    $predictions = collect($data['predictions'])->map(function ($p) {
+                        return [
+                            'description' => $p['description'],
+                            'place_id'    => $p['place_id']
+                        ];
+                    });
+
+                    return response()->json([
+                        'predictions' => $predictions
+                    ]);
+                }
+            }
+        }
+
+        // Nominatim Fallback
+        $nomResponse = Http::withHeaders([
+            'User-Agent' => 'WM-Product-SaaS/1.0'
+        ])->get('https://nominatim.openstreetmap.org/search', [
+            'q'      => $query,
+            'format' => 'json',
+            'limit'  => 5
+        ]);
+
+        if ($nomResponse->successful()) {
+            $predictions = collect($nomResponse->json())->map(function ($item) {
+                return [
+                    'description' => $item['display_name'],
+                    'place_id'    => (string)($item['place_id'] ?? ''),
+                    'lat'         => (float)$item['lat'],
+                    'lon'         => (float)$item['lon']
+                ];
+            });
+
+            return response()->json([
+                'predictions' => $predictions
+            ]);
+        }
 
         return response()->json([
-            'predictions' => $predictions
+            'predictions' => []
         ]);
     }
 }

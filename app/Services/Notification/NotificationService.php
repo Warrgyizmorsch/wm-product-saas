@@ -165,6 +165,11 @@ class NotificationService
     ): void {
         $query = User::query();
 
+        $tenantId = $extraData['tenant_id'] ?? (function_exists('tenant_id') ? tenant_id() : null) ?? auth()->user()?->tenant_id;
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
+        }
+
         $query->where(function ($q) use ($roles) {
             foreach ($roles as $role) {
                 $q->orWhere('role', 'like', "%{$role}%")
@@ -178,9 +183,6 @@ class NotificationService
         });
 
         $users = $query->get();
-        if ($users->isEmpty()) {
-            $users = User::limit(5)->get();
-        }
 
         foreach ($users as $u) {
             self::send($u, $title, $message, $actionUrl, $module, $type, $iconClass, $extraData);
@@ -222,7 +224,12 @@ class NotificationService
         string $iconClass = 'feather-volume-2',
         ?array $extraData = null
     ): void {
-        $employees = Employee::where('status', true)->whereNotNull('user_id')->get();
+        $tenantId = $extraData['tenant_id'] ?? (function_exists('tenant_id') ? tenant_id() : null) ?? auth()->user()?->tenant_id;
+        $query = Employee::where('status', true)->whereNotNull('user_id');
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
+        }
+        $employees = $query->get();
         foreach ($employees as $employee) {
             self::sendToEmployee($employee, $title, $message, $actionUrl, $module, $type, $iconClass, $extraData);
         }

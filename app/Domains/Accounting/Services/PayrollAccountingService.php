@@ -32,7 +32,7 @@ class PayrollAccountingService
         // Fail closed rather than silently posting into tenant 1's ledger if
         // both the run's own tenant_id and the bound request context are
         // somehow unresolvable.
-        $tenantId = $run->tenant_id ?? require_tenant_id();
+        $tenantId = $run->tenant_id ?? current_tenant_id() ?? require_tenant_id();
 
         // Check if journal already posted for this payroll run to prevent duplicate entries
         $existingJournal = Journal::where('tenant_id', $tenantId)
@@ -262,7 +262,7 @@ class PayrollAccountingService
         // Fail closed rather than silently posting into tenant 1's ledger if
         // both the run's own tenant_id and the bound request context are
         // somehow unresolvable.
-        $tenantId = $run->tenant_id ?? require_tenant_id();
+        $tenantId = $run->tenant_id ?? current_tenant_id() ?? require_tenant_id();
 
         $existingJournal = Journal::where('tenant_id', $tenantId)
             ->where('reference_type', 'PayrollRunPayout')
