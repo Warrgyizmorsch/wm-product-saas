@@ -6,6 +6,7 @@
         'production-orders'    => 'Production Order Summary & Output Report',
         'material-consumption' => 'Material Consumption & Variance Report',
         'cost-variance'        => 'Production Cost & Variance Report',
+        'order-detail'         => 'Production Order Detail Report',
     ];
     $displayTitle = $reportTitles[$type] ?? (ucwords(str_replace('-', ' ', $type)) . ' Report');
 @endphp
@@ -103,12 +104,12 @@
         @media print {
             @page {
                 size: landscape;
-                margin: 10mm 8mm;
+                margin: 8mm 6mm;
             }
             body {
                 background-color: #ffffff !important;
                 color: #000000 !important;
-                font-size: 9pt !important;
+                font-size: 8pt !important;
                 padding: 0 !important;
             }
             .no-print {
@@ -123,41 +124,65 @@
             .report-card {
                 border: none !important;
                 box-shadow: none !important;
-                padding: 0 !important;
+                padding: 4px 0 !important;
                 margin: 0 !important;
+            }
+            /* Scale oversized tables to fit page width */
+            .table-responsive {
+                overflow: visible !important;
             }
             .report-table {
                 width: 100% !important;
-                border: 1px solid #000000 !important;
-                border-collapse: collapse !important;
-            }
-            .report-table thead th, .report-table tbody td {
                 border: 1px solid #475569 !important;
-                padding: 5px 8px !important;
-                font-size: 8.5pt !important;
-                color: #000000 !important;
+                border-collapse: collapse !important;
+                table-layout: fixed;
+                word-wrap: break-word;
+                font-size: 7.5pt !important;
             }
             .report-table thead th {
-                background-color: #f1f5f9 !important;
+                background-color: #1e293b !important;
+                color: #ffffff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                border: 1px solid #334155 !important;
+                padding: 4px 5px !important;
+                font-size: 7.5pt !important;
+                white-space: normal !important;
+                word-wrap: break-word;
+            }
+            .report-table tbody td {
+                border: 1px solid #cbd5e1 !important;
+                padding: 3px 5px !important;
+                font-size: 7.5pt !important;
+                color: #000000 !important;
+                vertical-align: middle !important;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }
+            .report-table tbody tr:nth-child(even) td {
+                background-color: #f8fafc !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
             .kpi-box {
                 border: 1px solid #64748b !important;
-                padding: 6px 10px !important;
-                background: #ffffff !important;
+                padding: 5px 8px !important;
+                background: #f8fafc !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
             .badge {
                 border: 1px solid #475569 !important;
-                color: #000000 !important;
-                background: transparent !important;
+                font-size: 7pt !important;
+                padding: 1px 4px !important;
             }
             a {
                 text-decoration: none !important;
                 color: #000000 !important;
             }
+            /* Prevent sections from orphaning across pages */
+            h5 { page-break-after: avoid; }
+            .table-responsive { page-break-inside: auto; }
         }
     </style>
     @stack('styles')
@@ -177,50 +202,95 @@
                     <x-ui.filter :label="__('ui.filter')"  offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('production.filter_options') }}</h6>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_start') }}</label>
-                            <x-ui.odoo-form-ui type="input" inputType="date" name="date_start" :value="request('date_start', $reportData['period_start'])" />
-                        </div>
+                        @if($type === 'order-detail')
+                            {{-- Order-detail is filtered by order_id only, no date range --}}
+                            @if(request('order_id'))
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Active Order</label>
+                                    <div class="badge bg-soft-primary text-primary border border-primary-subtle fs-12 px-2 py-1 w-100 text-start">
+                                        <i class="feather-file-text me-1"></i>
+                                        Order #{{ request('order_id') }}
+                                    </div>
+                                    <input type="hidden" name="order_id" value="{{ request('order_id') }}">
+                                </div>
+                            @endif
+                            <p class="text-muted fs-12 mb-0">To view a different order, go back to the Reports page and select another order.</p>
+                        @else
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_start') }}</label>
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="date_start" :value="request('date_start', $reportData['period_start'])" />
+                            </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_end') }}</label>
-                            <x-ui.odoo-form-ui type="input" inputType="date" name="date_end" :value="request('date_end', $reportData['period_end'])" />
-                        </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_end') }}</label>
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="date_end" :value="request('date_end', $reportData['period_end'])" />
+                            </div>
 
-                        {{-- Preserve existing active filters --}}
-                        @if(request('order_id'))
-                            <input type="hidden" name="order_id" value="{{ request('order_id') }}">
-                        @endif
-                        @if(request('product_id'))
-                            <input type="hidden" name="product_id" value="{{ request('product_id') }}">
-                        @endif
-                        @if(request('material_id'))
-                            <input type="hidden" name="material_id" value="{{ request('material_id') }}">
-                        @endif
-                        @if(request('machine_id'))
-                            <input type="hidden" name="machine_id" value="{{ request('machine_id') }}">
-                        @endif
-                        @if(request('work_center_id'))
-                            <input type="hidden" name="work_center_id" value="{{ request('work_center_id') }}">
-                        @endif
-                        @if(request('status'))
-                            <input type="hidden" name="status" value="{{ request('status') }}">
-                        @endif
+                            {{-- Preserve existing active filters --}}
+                            @if(request('order_id'))
+                                <input type="hidden" name="order_id" value="{{ request('order_id') }}">
+                            @endif
+                            @if(request('product_id'))
+                                <input type="hidden" name="product_id" value="{{ request('product_id') }}">
+                            @endif
+                            @if(request('material_id'))
+                                <input type="hidden" name="material_id" value="{{ request('material_id') }}">
+                            @endif
+                            @if(request('machine_id'))
+                                <input type="hidden" name="machine_id" value="{{ request('machine_id') }}">
+                            @endif
+                            @if(request('work_center_id'))
+                                <input type="hidden" name="work_center_id" value="{{ request('work_center_id') }}">
+                            @endif
+                            @if(request('status'))
+                                <input type="hidden" name="status" value="{{ request('status') }}">
+                            @endif
+                            @if(request('customer_id'))
+                                <input type="hidden" name="customer_id" value="{{ request('customer_id') }}">
+                            @endif
 
-                        <div class="d-flex gap-2 justify-content-end mt-4">
-                            <x-ui.button href="{{ route('production.intelligence.reports.show', $type) }}" variant="light"  class="border">
-                                {{ __('production.reset') }}
-                            </x-ui.button>
-                            <x-ui.button type="submit" variant="primary" >
-                                {{ __('production.apply_filters') }}
-                            </x-ui.button>
-                        </div>
+                            <div class="d-flex gap-2 justify-content-end mt-4">
+                                <x-ui.button href="{{ route('production.intelligence.reports.show', $type) }}" variant="light"  class="border">
+                                    {{ __('production.reset') }}
+                                </x-ui.button>
+                                <x-ui.button type="submit" variant="primary" >
+                                    {{ __('production.apply_filters') }}
+                                </x-ui.button>
+                            </div>
+                        @endif
                     </x-ui.filter>
                 </form>
 
-                <x-ui.button href="{{ route('production.intelligence.reports.export', array_merge(['type' => $type], request()->all())) }}" variant="light"  icon="feather-download" class="border shadow-sm">
-                    {{ __('production.export_csv') ?? 'Export CSV' }}
-                </x-ui.button>
+                {{-- Export Dropdown: CSV / Excel / PDF --}}
+                <div class="dropdown">
+                    <button class="btn btn-light border shadow-sm dropdown-toggle d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="feather-download"></i> Export
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:170px">
+                        <li><span class="dropdown-header fs-11 text-uppercase text-muted fw-bold px-3 py-1">Export Format</span></li>
+                        <li>
+                            <a class="dropdown-item fs-13 d-flex align-items-center gap-2"
+                               href="{{ route('production.intelligence.reports.export', array_merge(['type' => $type], request()->all())) }}">
+                                <i class="feather-file-text text-muted"></i> CSV
+                                <small class="text-muted ms-auto">Basic</small>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item fs-13 d-flex align-items-center gap-2"
+                               href="{{ route('production.intelligence.reports.export-excel', array_merge(['type' => $type], request()->all())) }}">
+                                <i class="feather-grid text-success"></i> Excel
+                                <small class="text-muted ms-auto">.xlsx</small>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item fs-13 d-flex align-items-center gap-2"
+                               href="{{ route('production.intelligence.reports.export-pdf', array_merge(['type' => $type], request()->all())) }}">
+                                <i class="feather-file text-danger"></i> PDF
+                                <small class="text-muted ms-auto">.pdf</small>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
 
                 <x-ui.button onclick="window.print();" variant="primary"  icon="feather-printer" class="shadow-sm">
                     {{ __('production.print_report') ?? 'Print Report' }}
@@ -488,31 +558,35 @@
             @elseif($type === 'material-consumption')
                 {{-- Summary KPI Cards --}}
                 <div class="row g-3 mb-4">
-                    <div class="col-md-3 col-6">
-                        <div class="kpi-box text-center">
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center h-100">
                             <div class="text-muted fs-11 text-uppercase fw-semibold">Total Line Items</div>
                             <div class="fs-18 fw-bold text-dark mt-1">{{ number_format($reportData['summary']['total_items'] ?? 0) }}</div>
                         </div>
                     </div>
-                    <div class="col-md-3 col-6">
-                        <div class="kpi-box text-center">
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center h-100">
                             <div class="text-muted fs-11 text-uppercase fw-semibold">Total Planned Cost</div>
                             <div class="fs-18 fw-bold text-primary mt-1">{{ number_format($reportData['summary']['total_planned_cost'] ?? 0, 2) }}</div>
                         </div>
                     </div>
-                    <div class="col-md-3 col-6">
-                        <div class="kpi-box text-center">
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center h-100">
                             <div class="text-muted fs-11 text-uppercase fw-semibold">Total Issued Cost</div>
-                            <div class="fs-18 fw-bold text-success mt-1">{{ number_format($reportData['summary']['total_issued_cost'] ?? 0, 2) }}</div>
+                            <div class="fs-18 fw-bold text-dark mt-1">{{ number_format($reportData['summary']['total_issued_cost'] ?? 0, 2) }}</div>
                         </div>
                     </div>
                     <div class="col-md-3 col-6">
-                        <div class="kpi-box text-center">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Total Cost Variance</div>
-                            @php $totVar = $reportData['summary']['total_variance_cost'] ?? 0; @endphp
-                            <div class="fs-18 fw-bold {{ $totVar > 0 ? 'text-danger' : ($totVar < 0 ? 'text-success' : 'text-dark') }} mt-1">
-                                {{ $totVar > 0 ? '+' : '' }}{{ number_format($totVar, 2) }}
-                            </div>
+                        <div class="kpi-box text-center h-100">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Actually Consumed Cost</div>
+                            <div class="fs-18 fw-bold text-success mt-1">{{ number_format($reportData['summary']['total_consumed_cost'] ?? 0, 2) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-12">
+                        <div class="kpi-box text-center h-100">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Floor Stock / WIP Balance</div>
+                            <div class="fs-18 fw-bold text-warning mt-1">{{ number_format($reportData['summary']['total_floor_balance_cost'] ?? 0, 2) }}</div>
+                            <small class="text-muted fs-11">Issued to floor but not yet consumed</small>
                         </div>
                     </div>
                 </div>
@@ -522,10 +596,7 @@
                         <span class="text-muted fs-12 fw-semibold"><i class="feather-box me-1"></i> UOM Totals:</span>
                         @foreach($reportData['summary']['uom_groups'] as $uom => $uomData)
                             <span class="badge bg-white border text-dark fs-12 px-2 py-1 shadow-sm">
-                                <strong>{{ $uom }}:</strong> Planned {{ number_format($uomData['planned'], 2) }} | Issued {{ number_format($uomData['issued'], 2) }} 
-                                <span class="{{ $uomData['variance'] > 0 ? 'text-danger fw-bold' : ($uomData['variance'] < 0 ? 'text-success fw-bold' : 'text-muted') }}">
-                                    ({{ $uomData['variance'] > 0 ? '+' : '' }}{{ number_format($uomData['variance'], 2) }})
-                                </span>
+                                <strong>{{ $uom }}:</strong> Planned {{ number_format($uomData['planned'], 2) }} | Issued {{ number_format($uomData['issued'], 2) }} | Consumed {{ number_format($uomData['consumed'] ?? 0, 2) }} | Floor {{ number_format($uomData['floor_balance'] ?? 0, 2) }}
                             </span>
                         @endforeach
                     </div>
@@ -535,30 +606,38 @@
                 <div class="table-responsive">
                     <table class="report-table align-middle">
                         <thead>
-                            <tr>
+                            <tr class="text-nowrap">
                                 <th>Order Number</th>
                                 <th>Finished Good</th>
+                                <th>Consuming Operation</th>
                                 <th>Material / Component</th>
                                 <th>UOM</th>
                                 <th class="text-end">Planned Qty</th>
                                 <th class="text-end">Issued Qty</th>
-                                <th class="text-end">Variance Qty</th>
-                                <th class="text-end">Variance %</th>
+                                <th class="text-end">Consumed Qty</th>
+                                <th class="text-end">Floor Balance</th>
+                                <th class="text-center" style="min-width: 110px;">Consumption %</th>
                                 <th class="text-end">Unit Cost</th>
                                 <th class="text-end">Planned Cost</th>
                                 <th class="text-end">Issued Cost</th>
-                                <th class="text-end">Variance Cost</th>
+                                <th class="text-end">Consumed Cost</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse($reportData['data'] as $row)
                                 <tr>
-                                    <td class="fw-bold">
-                                        <a href="{{ route('production.orders.show', $row['order_id']) }}" class="text-primary text-decoration-none" target="_blank">
+                                    <td class="fw-bold font-monospace">
+                                        <a href="{{ route('production.intelligence.reports.show', ['type' => 'order-detail', 'order_id' => $row['order_id']]) }}" class="text-primary text-decoration-none" target="_blank" title="View Order Job Card">
                                             {{ $row['order_number'] }}
                                         </a>
                                     </td>
                                     <td class="fw-semibold text-dark">{{ $row['finished_good'] }}</td>
+                                    <td>
+                                        <span class="fw-semibold text-dark">{{ $row['operation_name'] }}</span>
+                                        @if($row['work_center'] !== '—')
+                                            <div class="text-muted fs-11"><i class="feather-map-pin me-1"></i>{{ $row['work_center'] }}</div>
+                                        @endif
+                                    </td>
                                     <td>
                                         <div class="fw-semibold text-dark">{{ $row['material_name'] }}</div>
                                         <small class="text-muted font-monospace">{{ $row['material_sku'] }}</small>
@@ -566,22 +645,26 @@
                                     <td><span class="badge bg-light text-dark border">{{ $row['uom'] }}</span></td>
                                     <td class="text-end fw-semibold">{{ number_format($row['planned_qty'], 2) }}</td>
                                     <td class="text-end text-primary fw-bold">{{ number_format($row['issued_qty'], 2) }}</td>
-                                    <td class="text-end {{ $row['variance_qty'] > 0 ? 'text-danger fw-bold' : ($row['variance_qty'] < 0 ? 'text-success fw-bold' : 'text-muted') }}">
-                                        {{ $row['variance_qty'] > 0 ? '+' : '' }}{{ number_format($row['variance_qty'], 2) }}
+                                    <td class="text-end text-success fw-bold">{{ number_format($row['consumed_qty'], 2) }}</td>
+                                    <td class="text-end fw-semibold {{ $row['floor_balance'] > 0 ? 'text-warning' : 'text-muted' }}">
+                                        {{ number_format($row['floor_balance'], 2) }}
                                     </td>
-                                    <td class="text-end {{ $row['variance_pct'] > 0 ? 'text-danger' : ($row['variance_pct'] < 0 ? 'text-success' : 'text-muted') }}">
-                                        {{ $row['variance_pct'] > 0 ? '+' : '' }}{{ $row['variance_pct'] }}%
+                                    <td>
+                                        <div class="d-flex align-items-center gap-1 justify-content-center">
+                                            <div class="progress flex-grow-1" style="height: 5px; min-width: 50px;">
+                                                <div class="progress-bar bg-success" style="width: {{ min(100, $row['consumption_pct']) }}%;"></div>
+                                            </div>
+                                            <span class="fs-11 fw-semibold text-muted">{{ $row['consumption_pct'] }}%</span>
+                                        </div>
                                     </td>
-                                    <td class="text-end">{{ number_format($row['unit_cost'], 2) }}</td>
+                                    <td class="text-end text-muted">{{ number_format($row['unit_cost'], 2) }}</td>
                                     <td class="text-end">{{ number_format($row['planned_cost'], 2) }}</td>
                                     <td class="text-end">{{ number_format($row['issued_cost'], 2) }}</td>
-                                    <td class="text-end {{ $row['variance_cost'] > 0 ? 'text-danger fw-bold' : ($row['variance_cost'] < 0 ? 'text-success fw-bold' : 'text-muted') }}">
-                                        {{ $row['variance_cost'] > 0 ? '+' : '' }}{{ number_format($row['variance_cost'], 2) }}
-                                    </td>
+                                    <td class="text-end text-success fw-semibold">{{ number_format($row['consumed_cost'], 2) }}</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="12" class="text-center text-muted py-4">No material reservations or consumption records found.</td>
+                                    <td colspan="14" class="text-center text-muted py-4">No material reservations or consumption records found.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -705,11 +788,604 @@
                         </tbody>
                     </table>
                 </div>
+            @elseif($type === 'order-detail')
+                @php
+                    $order = $reportData['order'];
+                    $statusBadge = match($order['status']) {
+                        'completed'   => 'bg-soft-success text-success border border-success-subtle',
+                        'in_progress' => 'bg-soft-primary text-primary border border-primary-subtle',
+                        'released'    => 'bg-soft-info text-info border border-info-subtle',
+                        'draft'       => 'bg-soft-secondary text-secondary border border-secondary-subtle',
+                        'closed'      => 'bg-soft-dark text-dark border',
+                        'cancelled'   => 'bg-soft-danger text-danger border border-danger-subtle',
+                        default       => 'bg-soft-dark text-dark border',
+                    };
+                @endphp
+
+                {{-- ── ORDER HEADER IDENTITY BLOCK ──────────────────────────────── --}}
+                <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4 pb-3 border-bottom">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="fs-20 fw-bold text-dark font-monospace">{{ $order['order_number'] }}</span>
+                            <span class="badge {{ $statusBadge }}">{{ ucfirst(str_replace('_', ' ', $order['status'])) }}</span>
+                            @if($order['is_external'] ?? false)
+                                <span class="badge bg-soft-warning text-warning border border-warning-subtle">Subcontract</span>
+                            @endif
+                        </div>
+                        <div class="text-muted fs-13">{{ $order['product_name'] }} &nbsp;<span class="font-monospace text-muted">{{ $order['product_sku'] }}</span></div>
+                        <div class="text-muted fs-12 mt-1">Created by <strong>{{ $order['created_by'] }}</strong> &nbsp;·&nbsp; Planned: <strong>{{ $order['start_date'] }}</strong> → <strong>{{ $order['end_date'] }}</strong></div>
+                    </div>
+                    <div class="text-sm-end text-start">
+                        <div class="text-muted fs-12">Generated: <strong class="text-dark">{{ $reportData['generated_at'] }}</strong></div>
+                        @if($order['actual_start'])
+                            <div class="text-muted fs-12 mt-1">Actual Start: <strong class="text-dark">{{ $order['actual_start'] }}</strong></div>
+                        @endif
+                        @if($order['actual_end'])
+                            <div class="text-muted fs-12">Actual End: <strong class="text-dark">{{ $order['actual_end'] }}</strong></div>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- ── SECTION 1: ORDER KPI STRIP ──────────────────────────────── --}}
+                <div class="row g-3 mb-4">
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Planned Qty</div>
+                            <div class="fs-18 fw-bold text-dark mt-1">{{ number_format($order['planned_qty'], 2) }}</div>
+                            <div class="text-muted fs-11">{{ $order['uom'] }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Produced</div>
+                            <div class="fs-18 fw-bold text-success mt-1">{{ number_format($order['produced_qty'], 2) }}</div>
+                            <div class="text-muted fs-11">{{ $order['uom'] }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Scrapped</div>
+                            <div class="fs-18 fw-bold {{ $order['scrapped_qty'] > 0 ? 'text-danger' : 'text-muted' }} mt-1">{{ number_format($order['scrapped_qty'], 2) }}</div>
+                            <div class="text-muted fs-11">{{ $order['uom'] }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Rejected</div>
+                            <div class="fs-18 fw-bold {{ $order['rejected_qty'] > 0 ? 'text-warning' : 'text-muted' }} mt-1">{{ number_format($order['rejected_qty'], 2) }}</div>
+                            <div class="text-muted fs-11">{{ $order['uom'] }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Completion</div>
+                            <div class="fs-18 fw-bold text-primary mt-1">{{ $order['completion_pct'] }}%</div>
+                            <div class="progress mt-1" style="height:4px">
+                                <div class="progress-bar bg-primary" style="width:{{ $order['completion_pct'] }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Yield</div>
+                            <div class="fs-18 fw-bold {{ $order['yield_pct'] >= 95 ? 'text-success' : ($order['yield_pct'] >= 80 ? 'text-warning' : 'text-danger') }} mt-1">{{ $order['yield_pct'] }}%</div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ── SECTION 1B: ESTIMATED COST VS ACTUAL COST BREAKDOWN ───────── --}}
+                @if(!empty($reportData['cost_estimation']))
+                    @php
+                        $costEst = $reportData['cost_estimation'];
+                        $totVariance = $costEst['total']['variance'] ?? 0;
+                        $totVarPct = $costEst['total']['variance_pct'] ?? 0;
+                    @endphp
+                    <div class="card border border-light shadow-sm mb-4">
+                        <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
+                            <h6 class="fw-bold text-dark mb-0 fs-13">
+                                <i class="feather-dollar-sign me-1 text-success"></i>Production Order Cost Estimation vs. Actual Incurred
+                            </h6>
+                            <span class="badge {{ $totVariance > 0 ? 'bg-soft-danger text-danger border border-danger-subtle' : ($totVariance < 0 ? 'bg-soft-success text-success border border-success-subtle' : 'bg-soft-secondary text-secondary border') }} fs-11">
+                                Net Variance: {{ $totVariance > 0 ? '+' : '' }}{{ number_format($totVariance, 2) }} ({{ $totVariance > 0 ? '+' : '' }}{{ $totVarPct }}%)
+                            </span>
+                        </div>
+                        <div class="card-body p-3">
+                            <div class="row g-3">
+                                {{-- Material Pillar --}}
+                                <div class="col-md-3 col-6">
+                                    <div class="p-2 border rounded bg-white text-center">
+                                        <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Material Cost</span>
+                                        <div class="fs-15 fw-bold text-primary">{{ number_format($costEst['material']['planned'] ?? 0, 2) }}</div>
+                                        <small class="text-muted fs-11 d-block">Act: {{ number_format($costEst['material']['actual'] ?? 0, 2) }}</small>
+                                        <div class="fs-11 {{ ($costEst['material']['variance'] ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-success fw-semibold' }}">
+                                            Var: {{ ($costEst['material']['variance'] ?? 0) > 0 ? '+' : '' }}{{ number_format($costEst['material']['variance'] ?? 0, 2) }}
+                                        </div>
+                                    </div>
+                                </div>
+                                {{-- Labor Pillar --}}
+                                <div class="col-md-3 col-6">
+                                    <div class="p-2 border rounded bg-white text-center">
+                                        <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Labor Cost</span>
+                                        <div class="fs-15 fw-bold text-primary">{{ number_format($costEst['labor']['planned'] ?? 0, 2) }}</div>
+                                        <small class="text-muted fs-11 d-block">Act: {{ number_format($costEst['labor']['actual'] ?? 0, 2) }}</small>
+                                        <div class="fs-11 {{ ($costEst['labor']['variance'] ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-success fw-semibold' }}">
+                                            Var: {{ ($costEst['labor']['variance'] ?? 0) > 0 ? '+' : '' }}{{ number_format($costEst['labor']['variance'] ?? 0, 2) }}
+                                        </div>
+                                    </div>
+                                </div>
+                                {{-- Machine Pillar --}}
+                                <div class="col-md-3 col-6">
+                                    <div class="p-2 border rounded bg-white text-center">
+                                        <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Machine Cost</span>
+                                        <div class="fs-15 fw-bold text-primary">{{ number_format($costEst['machine']['planned'] ?? 0, 2) }}</div>
+                                        <small class="text-muted fs-11 d-block">Act: {{ number_format($costEst['machine']['actual'] ?? 0, 2) }}</small>
+                                        <div class="fs-11 {{ ($costEst['machine']['variance'] ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-success fw-semibold' }}">
+                                            Var: {{ ($costEst['machine']['variance'] ?? 0) > 0 ? '+' : '' }}{{ number_format($costEst['machine']['variance'] ?? 0, 2) }}
+                                        </div>
+                                    </div>
+                                </div>
+                                {{-- Overhead Pillar --}}
+                                <div class="col-md-3 col-6">
+                                    <div class="p-2 border rounded bg-white text-center">
+                                        <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Overhead Cost</span>
+                                        <div class="fs-15 fw-bold text-primary">{{ number_format($costEst['overhead']['planned'] ?? 0, 2) }}</div>
+                                        <small class="text-muted fs-11 d-block">Act: {{ number_format($costEst['overhead']['actual'] ?? 0, 2) }}</small>
+                                        <div class="fs-11 {{ ($costEst['overhead']['variance'] ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-success fw-semibold' }}">
+                                            Var: {{ ($costEst['overhead']['variance'] ?? 0) > 0 ? '+' : '' }}{{ number_format($costEst['overhead']['variance'] ?? 0, 2) }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap justify-content-between align-items-center mt-3 pt-2 border-top fs-12">
+                                <div>
+                                    <span class="text-muted">Total Estimated (Planned):</span>
+                                    <strong class="text-dark ms-1 fs-13">{{ number_format($costEst['total']['planned'] ?? 0, 2) }}</strong>
+                                </div>
+                                <div>
+                                    <span class="text-muted">Total Actual Incurred:</span>
+                                    <strong class="text-dark ms-1 fs-13">{{ number_format($costEst['total']['actual'] ?? 0, 2) }}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- ── SECTION 2: CURRENT WIP LOCATION ─────────────────────────── --}}
+                @if(!empty($reportData['wip_locations']))
+                    <div class="alert border border-primary-subtle bg-soft-primary mb-4 py-2 px-3" role="alert">
+                        <div class="d-flex flex-wrap gap-3 align-items-center">
+                            <span class="fw-bold text-primary fs-13"><i class="feather-map-pin me-1"></i>Current WIP Location</span>
+                            @foreach($reportData['wip_locations'] as $wip)
+                                <span class="badge bg-white border text-dark fs-12 px-2 py-1 shadow-sm">
+                                    <strong>{{ $wip['operation'] }}</strong>
+                                    @if($wip['work_center'] !== '—') <span class="text-muted"> @ {{ $wip['work_center'] }}</span> @endif
+                                    &nbsp;·&nbsp; <span class="text-primary fw-bold">{{ number_format($wip['available'], 2) }} units</span>
+                                    @if($wip['batch'] !== '—') <span class="text-muted fs-11"> ({{ $wip['batch'] }})</span> @endif
+                                </span>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                {{-- ── SECTION 3: OPERATION STAGES ──────────────────────────────── --}}
+                <h5 class="fw-bold text-dark mb-3 mt-2"><i class="feather-git-merge me-2 text-primary"></i>Operation Stages</h5>
+                <div class="table-responsive mb-4">
+                    <table class="report-table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Seq</th>
+                                <th>Operation</th>
+                                <th>Work Center</th>
+                                <th>Machine</th>
+                                <th>Status</th>
+                                <th class="text-end">Produced</th>
+                                <th class="text-end">Rejected</th>
+                                <th class="text-end">Scrapped</th>
+                                <th class="text-end">Setup (min)<br><small class="fw-normal text-muted">Plan / Act</small></th>
+                                <th class="text-end">Process (min)<br><small class="fw-normal text-muted">Plan / Act</small></th>
+                                <th>Started At</th>
+                                <th>Ended At</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($reportData['operations'] as $op)
+                                @php
+                                    $opBadge = match($op['status']) {
+                                        'completed' => 'bg-soft-success text-success border border-success-subtle',
+                                        'running','in_progress' => 'bg-soft-primary text-primary border border-primary-subtle',
+                                        'paused'    => 'bg-soft-warning text-warning border border-warning-subtle',
+                                        'ready'     => 'bg-soft-info text-info border border-info-subtle',
+                                        'waiting'   => 'bg-soft-secondary text-secondary border border-secondary-subtle',
+                                        default     => 'bg-soft-dark text-dark border',
+                                    };
+                                @endphp
+                                <tr>
+                                    <td class="fw-bold text-muted font-monospace">{{ $op['sequence'] }}</td>
+                                    <td>
+                                        <div class="fw-semibold text-dark">{{ $op['name'] }}</div>
+                                        <div class="d-flex gap-1 mt-1">
+                                            @if($op['is_external'])
+                                                <span class="badge bg-soft-warning text-warning border border-warning-subtle" style="font-size:10px">External</span>
+                                            @endif
+                                            @if($op['quality_required'])
+                                                <span class="badge bg-soft-info text-info border border-info-subtle" style="font-size:10px">QC Gate</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td class="fw-semibold text-dark">{{ $op['work_center'] }}</td>
+                                    <td class="text-muted">{{ $op['machine'] }}</td>
+                                    <td><span class="badge {{ $opBadge }}">{{ ucfirst(str_replace('_', ' ', $op['status'])) }}</span></td>
+                                    <td class="text-end text-success fw-bold">{{ number_format($op['qty_produced'], 2) }}</td>
+                                    <td class="text-end {{ $op['qty_rejected'] > 0 ? 'text-warning fw-bold' : 'text-muted' }}">{{ number_format($op['qty_rejected'], 2) }}</td>
+                                    <td class="text-end {{ $op['qty_scrapped'] > 0 ? 'text-danger fw-bold' : 'text-muted' }}">{{ number_format($op['qty_scrapped'], 2) }}</td>
+                                    <td class="text-end">
+                                        <span class="text-muted">{{ number_format($op['setup_planned'], 0) }}</span>
+                                        <span class="text-muted"> / </span>
+                                        <span class="{{ $op['setup_actual'] > $op['setup_planned'] && $op['setup_planned'] > 0 ? 'text-danger fw-bold' : 'text-dark fw-semibold' }}">{{ number_format($op['setup_actual'], 0) }}</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="text-muted">{{ number_format($op['process_planned'], 0) }}</span>
+                                        <span class="text-muted"> / </span>
+                                        <span class="{{ $op['process_actual'] > $op['process_planned'] && $op['process_planned'] > 0 ? 'text-danger fw-bold' : 'text-dark fw-semibold' }}">{{ number_format($op['process_actual'], 0) }}</span>
+                                    </td>
+                                    <td class="text-muted fs-12">{{ $op['actual_start'] ?? '—' }}</td>
+                                    <td class="text-muted fs-12">{{ $op['actual_end'] ?? '—' }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="12" class="text-center text-muted py-4">No routing operations found for this order.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                {{-- ── SECTION 4: MATERIAL CONSUMPTION ─────────────────────────── --}}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0"><i class="feather-layers me-2 text-warning"></i>Material Consumption & Operation Allocation</h5>
+                    <span class="badge bg-soft-info text-info border border-info-subtle fs-11">
+                        <i class="feather-info me-1"></i>Consumed based on Operation Progress
+                    </span>
+                </div>
+
+                {{-- Material Cost Summary strip --}}
+                @php
+                    $matSummary = $reportData['material_summary'] ?? [];
+                    $matVar = $matSummary['variance_cost'] ?? 0;
+                @endphp
+                <div class="row g-3 mb-3">
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center p-2">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Planned Cost</div>
+                            <div class="fs-15 fw-bold text-primary mt-1">{{ number_format($matSummary['total_planned_cost'] ?? 0, 2) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center p-2">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Issued (Store)</div>
+                            <div class="fs-15 fw-bold text-dark mt-1">{{ number_format($matSummary['total_issued_cost'] ?? 0, 2) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="kpi-box text-center p-2">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Actually Consumed</div>
+                            <div class="fs-15 fw-bold text-success mt-1">{{ number_format($matSummary['total_consumed_cost'] ?? 0, 2) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="kpi-box text-center p-2">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Floor Stock / WIP</div>
+                            <div class="fs-15 fw-bold text-warning mt-1">{{ number_format($matSummary['total_floor_stock_cost'] ?? 0, 2) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-12">
+                        <div class="kpi-box text-center p-2">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">Cost Variance</div>
+                            <div class="fs-15 fw-bold {{ $matVar > 0 ? 'text-danger' : ($matVar < 0 ? 'text-success' : 'text-muted') }} mt-1">
+                                {{ $matVar > 0 ? '+' : '' }}{{ number_format($matVar, 2) }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive mb-4">
+                    <table class="report-table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Material / Component</th>
+                                <th>Consuming Operation</th>
+                                <th>UOM</th>
+                                <th class="text-end">Planned Qty</th>
+                                <th class="text-end">Issued Qty</th>
+                                <th class="text-end text-success">Consumed Qty</th>
+                                <th class="text-end text-warning">Floor WIP Stock</th>
+                                <th class="text-end">Progress %</th>
+                                <th class="text-end">Unit Cost</th>
+                                <th class="text-end">Planned Cost</th>
+                                <th class="text-end">Consumed Cost</th>
+                                <th class="text-end">Cost Variance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($reportData['materials'] as $mat)
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold text-dark">{{ $mat['material_name'] }}</div>
+                                        <div class="font-monospace text-muted fs-11">{{ $mat['material_sku'] }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold text-dark fs-12">{{ $mat['operation_name'] ?? 'Stage Intake' }}</div>
+                                        @if(!empty($mat['work_center']))
+                                            <div class="text-muted fs-11"><i class="feather-cpu me-1"></i>{{ $mat['work_center'] }}</div>
+                                        @endif
+                                    </td>
+                                    <td><span class="badge bg-light text-dark border">{{ $mat['uom'] }}</span></td>
+                                    <td class="text-end fw-semibold">{{ number_format($mat['planned_qty'], 2) }}</td>
+                                    <td class="text-end text-primary fw-bold">{{ number_format($mat['issued_qty'], 2) }}</td>
+                                    <td class="text-end text-success fw-bold">{{ number_format($mat['consumed_qty'] ?? 0, 2) }}</td>
+                                    <td class="text-end {{ ($mat['floor_balance'] ?? 0) > 0 ? 'text-warning fw-bold' : 'text-muted' }}">
+                                        {{ number_format($mat['floor_balance'] ?? 0, 2) }}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-flex align-items-center justify-content-end gap-1">
+                                            <span class="fw-semibold fs-12">{{ $mat['consumption_pct'] ?? 0 }}%</span>
+                                            <div class="progress" style="width: 45px; height: 5px;">
+                                                <div class="progress-bar bg-success" role="progressbar" style="width: {{ min(100, $mat['consumption_pct'] ?? 0) }}%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-end text-muted">{{ number_format($mat['unit_cost'], 2) }}</td>
+                                    <td class="text-end">{{ number_format($mat['planned_cost'], 2) }}</td>
+                                    <td class="text-end text-success fw-semibold">{{ number_format($mat['consumed_cost'] ?? 0, 2) }}</td>
+                                    <td class="text-end {{ $mat['variance_cost'] > 0 ? 'text-danger fw-bold' : ($mat['variance_cost'] < 0 ? 'text-success fw-bold' : 'text-muted') }}">
+                                        {{ $mat['variance_cost'] > 0 ? '+' : '' }}{{ number_format($mat['variance_cost'], 2) }}
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="12" class="text-center text-muted py-4">No material reservations found for this order.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                {{-- ── SECTION 5: SCRAP EVENTS ──────────────────────────────────── --}}
+                <h5 class="fw-bold text-dark mb-3"><i class="feather-trash-2 me-2 text-danger"></i>Scrap Events
+                    @if(count($reportData['scrap_events']) > 0)
+                        <span class="badge bg-soft-danger text-danger border border-danger-subtle ms-1">{{ count($reportData['scrap_events']) }}</span>
+                    @endif
+                </h5>
+                @if(empty($reportData['scrap_events']))
+                    <div class="text-muted fs-13 mb-4 py-3 px-3 border rounded bg-light text-center">
+                        <i class="feather-check-circle text-success me-1"></i> No scrap events recorded for this order.
+                    </div>
+                @else
+                    <div class="table-responsive mb-2">
+                        <table class="report-table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Scrapped Item</th>
+                                    <th>SKU</th>
+                                    <th>Operation</th>
+                                    <th class="text-end">Quantity</th>
+                                    <th>Reason</th>
+                                    <th>Recorded At</th>
+                                    <th>Stock Posted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($reportData['scrap_events'] as $scrap)
+                                    <tr>
+                                        <td class="fw-semibold text-dark">{{ $scrap['product'] }}</td>
+                                        <td class="font-monospace text-muted fs-12">{{ $scrap['product_sku'] }}</td>
+                                        <td class="text-muted">{{ $scrap['operation'] }}</td>
+                                        <td class="text-end text-danger fw-bold">{{ number_format($scrap['quantity'], 2) }}</td>
+                                        <td>{{ $scrap['reason'] }}</td>
+                                        <td class="text-muted fs-12">{{ $scrap['recorded_at'] }}</td>
+                                        <td>
+                                            @if($scrap['stock_posted'])
+                                                <span class="badge bg-soft-success text-success border border-success-subtle"><i class="feather-check me-1"></i>Posted</span>
+                                            @else
+                                                <span class="badge bg-soft-warning text-warning border border-warning-subtle">Pending</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
+            @elseif($type === 'sales-order-tracking')
+                {{-- KPI Metric Summary Strip --}}
+                <div class="row g-3 mb-4">
+                    <div class="col-sm-6 col-md-2">
+                        <div class="p-3 bg-light rounded border text-center h-100">
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Total Sales Orders</span>
+                            <h4 class="fw-bold text-dark mb-0">{{ number_format($reportData['total_orders'] ?? 0) }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-2">
+                        <div class="p-3 bg-light rounded border text-center h-100">
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Total Ordered Qty</span>
+                            <h4 class="fw-bold text-primary mb-0">{{ number_format($reportData['total_ordered_qty'] ?? 0, 1) }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-2">
+                        <div class="p-3 bg-light rounded border text-center h-100">
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">MO Produced Qty</span>
+                            <h4 class="fw-bold text-success mb-0">{{ number_format($reportData['total_produced_qty'] ?? 0, 1) }}</h4>
+                            <small class="text-muted fs-11">{{ $reportData['production_pct'] ?? 0 }}% of ordered</small>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-2">
+                        <div class="p-3 bg-light rounded border text-center h-100">
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Delivered Qty</span>
+                            <h4 class="fw-bold mb-0" style="color: #0d9488;">{{ number_format($reportData['total_delivered_qty'] ?? 0, 1) }}</h4>
+                            <small class="text-muted fs-11">{{ $reportData['fulfillment_pct'] ?? 0 }}% fulfilled</small>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-2">
+                        <div class="p-3 bg-light rounded border text-center h-100">
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Pending Delivery</span>
+                            <h4 class="fw-bold text-danger mb-0">{{ number_format($reportData['total_pending_qty'] ?? 0, 1) }}</h4>
+                            <small class="text-muted fs-11">awaiting dispatch</small>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-2">
+                        <div class="p-3 bg-light rounded border text-center h-100">
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Fulfillment Rate</span>
+                            <h4 class="fw-bold mb-0" style="color: #7c3aed;">{{ $reportData['fulfillment_pct'] ?? 0 }}%</h4>
+                            <div class="progress mt-2" style="height: 4px;">
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(100, $reportData['fulfillment_pct'] ?? 0) }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Table Representation --}}
+                <div class="table-responsive">
+                    <table class="report-table align-middle">
+                        <thead>
+                            <tr class="text-nowrap">
+                                <th style="width: 35px;">SR</th>
+                                <th>Sales Person</th>
+                                <th>Sale Order No</th>
+                                <th>Order Date</th>
+                                <th>Customer Name</th>
+                                <th>Product Description</th>
+                                <th class="text-end">SO Qty</th>
+                                <th>Delivery Date</th>
+                                <th>Status</th>
+                                <th>MO No</th>
+                                <th>MO Date</th>
+                                <th>Requisition No</th>
+                                <th>Indent No</th>
+                                <th>PO No</th>
+                                <th>Supplier Name</th>
+                                <th class="text-end">MO Done</th>
+                                <th class="text-end">MO Done Date</th>
+                                <th class="text-end">MO Pending</th>
+                                <th class="text-end">Delivered Qty</th>
+                                <th>Delivered Date</th>
+                                <th class="text-end">Pending Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($reportData['data'] as $row)
+                                @php
+                                    $moBadgeClass = match($row['mo_color']) {
+                                        'success' => 'bg-soft-success text-success border border-success-subtle',
+                                        'warning' => 'bg-soft-warning text-warning border border-warning-subtle',
+                                        default   => 'bg-soft-danger text-danger border border-danger-subtle',
+                                    };
+                                    $delBadgeClass = match($row['delivery_color']) {
+                                        'success' => 'bg-soft-success text-success border border-success-subtle',
+                                        'warning' => 'bg-soft-warning text-warning border border-warning-subtle',
+                                        default   => 'bg-soft-danger text-danger border border-danger-subtle',
+                                    };
+                                    $reqBadgeClass = match($row['req_color']) {
+                                        'success' => 'bg-soft-success text-success border border-success-subtle',
+                                        'warning' => 'bg-soft-warning text-warning border border-warning-subtle',
+                                        default   => 'bg-soft-secondary text-secondary border border-secondary-subtle',
+                                    };
+                                    $poBadgeClass = match($row['po_color']) {
+                                        'success' => 'bg-soft-success text-success border border-success-subtle',
+                                        'warning' => 'bg-soft-warning text-warning border border-warning-subtle',
+                                        default   => 'bg-soft-secondary text-secondary border border-secondary-subtle',
+                                    };
+                                @endphp
+                                <tr>
+                                    <td class="text-muted fs-12 text-center">{{ $row['sr_no'] }}</td>
+                                    <td class="fs-12 text-muted">{{ $row['sales_person'] }}</td>
+                                    <td>
+                                        <span class="fw-bold font-monospace text-primary">{{ $row['sales_order_no'] }}</span>
+                                    </td>
+                                    <td class="text-muted fs-12 text-nowrap">{{ $row['sales_order_date'] }}</td>
+                                    <td class="fw-semibold text-dark">{{ $row['customer_name'] }}</td>
+                                    <td>
+                                        <div class="fw-medium text-dark">{{ $row['product_name'] }}</div>
+                                        <small class="text-muted font-monospace fs-11">{{ $row['product_sku'] }}</small>
+                                    </td>
+                                    <td class="text-end fw-bold text-dark">{{ number_format($row['so_qty'], 1) }}</td>
+                                    <td class="text-muted fs-12 text-nowrap">{{ $row['customer_delivery_date'] }}</td>
+                                    <td>
+                                        <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-11">{{ $row['status'] }}</span>
+                                    </td>
+                                    {{-- MO Stage --}}
+                                    <td>
+                                        @if($row['mo_no'] !== '—')
+                                            @if(!empty($row['mo_id']))
+                                                <a href="{{ route('production.intelligence.reports.show', ['type' => 'order-detail', 'order_id' => $row['mo_id']]) }}" target="_blank" class="fw-bold font-monospace text-decoration-none" title="View MO detail">
+                                                    {{ $row['mo_no'] }}
+                                                </a>
+                                            @else
+                                                <span class="fw-bold font-monospace">{{ $row['mo_no'] }}</span>
+                                            @endif
+                                            <div><span class="badge {{ $moBadgeClass }} fs-10">{{ $row['mo_status'] }}</span></div>
+                                        @else
+                                            <span class="badge bg-soft-danger text-danger border border-danger-subtle fs-10">Not Created</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-muted fs-12 text-nowrap">{{ $row['mo_date'] }}</td>
+                                    {{-- Requisition & Indent Stage --}}
+                                    <td>
+                                        @if($row['requisition_no'] !== '—')
+                                            <span class="font-monospace fs-12 text-dark">{{ $row['requisition_no'] }}</span>
+                                        @else
+                                            <span class="text-muted fs-12">—</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($row['indent_no'] !== '—')
+                                            <span class="badge {{ $reqBadgeClass }} fs-11 font-monospace">{{ $row['indent_no'] }}</span>
+                                            <div class="fs-10 text-muted">{{ $row['indent_date'] }}</div>
+                                        @else
+                                            <span class="text-muted fs-12">—</span>
+                                        @endif
+                                    </td>
+                                    {{-- Purchase Order Stage --}}
+                                    <td>
+                                        @if($row['po_no'] !== '—')
+                                            <span class="badge {{ $poBadgeClass }} fs-11 font-monospace">{{ $row['po_no'] }}</span>
+                                        @else
+                                            <span class="text-muted fs-12">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="fs-12 text-muted">{{ $row['supplier_name'] }}</td>
+                                    {{-- MO Quantities --}}
+                                    <td class="text-end fw-bold text-success">{{ number_format($row['mo_done_qty'], 1) }}</td>
+                                    <td class="text-end text-muted fs-12 text-nowrap">{{ $row['mo_done_date'] }}</td>
+                                    <td class="text-end fw-bold {{ $row['mo_pending_qty'] > 0 ? 'text-danger' : 'text-muted' }}">
+                                        {{ number_format($row['mo_pending_qty'], 1) }}
+                                    </td>
+                                    {{-- Dispatch & Delivery Stage --}}
+                                    <td class="text-end fw-bold" style="color: #0d9488;">{{ number_format($row['delivered_qty'], 1) }}</td>
+                                    <td class="text-muted fs-12 text-nowrap">{{ $row['delivered_date'] }}</td>
+                                    <td class="text-end">
+                                        <span class="badge {{ $delBadgeClass }} fs-11 fw-bold">
+                                            {{ number_format($row['pending_qty'], 1) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="21" class="text-center text-muted py-4">
+                                        <i class="feather-info fs-24 d-block mb-2 text-muted"></i>
+                                        No sales orders found for the selected filter period.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
             @endif
         </div>
     </div>
 
-    @if($print)
+    @if(!empty($print))
         <script>
             window.onload = function() {
                 window.print();
