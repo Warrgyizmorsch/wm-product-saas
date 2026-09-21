@@ -45,6 +45,7 @@ class StockService
                 ->where('tenant_id', $tenantId)
                 ->where('product_id', $productId)
                 ->where('warehouse_id', $warehouseId)
+                ->lockForUpdate()
                 ->first();
 
             $availableToReserve = 0.0;
@@ -182,6 +183,7 @@ class StockService
                 ->where('tenant_id', $tenantId)
                 ->where('product_id', $productId)
                 ->where('warehouse_id', $warehouseId)
+                ->lockForUpdate()
                 ->first();
 
             if ($stock) {
@@ -365,6 +367,7 @@ class StockService
                 ->where('tenant_id', $tenantId)
                 ->where('product_id', $productId)
                 ->where('warehouse_id', $warehouseId)
+                ->lockForUpdate()
                 ->first();
 
             if ($stock) {
@@ -372,10 +375,14 @@ class StockService
                 $currentCost = (float)$stock->unit_cost;
                 $newQty = $currentQty + $quantity;
 
-                // Weighted Average cost recalculation
-                $newCost = $newQty > 0 
-                    ? (($currentQty * $currentCost) + ($quantity * $unitCost)) / $newQty 
-                    : $unitCost;
+                // Weighted Average cost recalculation only for non-FIFO products
+                if ($product->inventory_valuation_method === 'FIFO') {
+                    $newCost = $currentCost > 0 ? $currentCost : $unitCost;
+                } else {
+                    $newCost = $newQty > 0 
+                        ? (($currentQty * $currentCost) + ($quantity * $unitCost)) / $newQty 
+                        : $unitCost;
+                }
 
                 $stock->update([
                     'quantity' => $newQty,
@@ -496,9 +503,16 @@ class StockService
                 ->where('tenant_id', $tenantId)
                 ->where('product_id', $productId)
                 ->where('warehouse_id', $warehouseId)
+                ->lockForUpdate()
                 ->first();
 
             $currentQty = $stock ? (float)$stock->quantity : 0.0;
+            if ($quantity > $currentQty + 0.0001) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'quantity' => "Insufficient stock on hand for product '{$product->name}'. Requested: {$quantity}, Available on hand: {$currentQty}."
+                ]);
+            }
+
             $currentCost = $stock ? (float)$stock->unit_cost : (float)$product->cost_price;
 
             $calculatedUnitCost = $currentCost;

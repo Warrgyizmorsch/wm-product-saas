@@ -121,9 +121,9 @@ class EmployeeController extends Controller
         }
 
         $header = array_map('strtolower', array_map('trim', $header));
-        $required = ['full_name', 'personal_email', 'company_id', 'department_id', 'designation_id', 'date_of_joining', 'gender'];
+        $required = ['full_name', 'company_id', 'department_id', 'designation_id', 'date_of_joining', 'gender'];
         $colIndex = [];
-        foreach (array_merge($required, ['employee_id']) as $col) {
+        foreach (array_merge($required, ['employee_id', 'personal_email']) as $col) {
             $colIndex[$col] = array_search($col, $header, true);
         }
 
@@ -148,7 +148,7 @@ class EmployeeController extends Controller
             $rowData = [
                 'tenant_id'        => $tenantId,
                 'full_name'        => trim($row[$colIndex['full_name']] ?? ''),
-                'personal_email'   => trim($row[$colIndex['personal_email']] ?? ''),
+                'personal_email'   => $colIndex['personal_email'] !== false ? trim($row[$colIndex['personal_email']] ?? '') : null,
                 'employee_id'      => $colIndex['employee_id'] !== false ? trim($row[$colIndex['employee_id']] ?? '') : null,
                 'company_id'       => trim($row[$colIndex['company_id']] ?? ''),
                 'department_id'    => trim($row[$colIndex['department_id']] ?? ''),
@@ -161,7 +161,7 @@ class EmployeeController extends Controller
             $validator = \Illuminate\Support\Facades\Validator::make($rowData, [
                 'full_name' => 'required|string|max:255',
                 'personal_email' => [
-                    'required', 'email', 'max:255',
+                    'nullable', 'email', 'max:255',
                     Rule::unique('employees', 'personal_email')->where('tenant_id', $tenantId)->whereNull('deleted_at'),
                 ],
                 'company_id' => 'required|exists:companies,id',
@@ -246,12 +246,11 @@ class EmployeeController extends Controller
                             $employee->update(['resume_path' => $candidateObj->resume_path]);
                         }
                     }
-                    $oldStage = $application->current_stage;
-                    $application->update([
-                        'current_stage' => 'hired',
-                        'stage_updated_at' => now(),
-                    ]);
-                    if ($oldStage !== 'hired') {
+                    if ($application->fresh()->current_stage !== 'hired') {
+                        $application->update([
+                            'current_stage' => 'hired',
+                            'stage_updated_at' => now(),
+                        ]);
                         $req = $application->requisition;
                         if ($req && $req->vacancies > 0) {
                             $req->decrement('vacancies');
@@ -436,7 +435,7 @@ class EmployeeController extends Controller
             'first_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['nullable', 'string', 'max:255'],
             'personal_email' => [
-                'required', 'email', 'max:255',
+                'nullable', 'email', 'max:255',
                 Rule::unique('employees', 'personal_email')
                     ->where('tenant_id', $tenantId)
                     ->whereNull('deleted_at')
@@ -784,6 +783,27 @@ class EmployeeController extends Controller
         }
 
         return redirect()->back()->with('success', 'Employee stage updated successfully.');
+    }
+
+    public function downloadResume(Employee $employee)
+    {
+        if ($employee->user_id !== auth()->id()) {
+            $this->authorizeHrms('hrms.employees.view');
+        }
+
+        if (!$employee->resume_path) {
+            abort(404, 'Employee resume not found.');
+        }
+
+        if (\Illuminate\Support\Facades\Storage::disk('local')->exists($employee->resume_path)) {
+            return \Illuminate\Support\Facades\Storage::disk('local')->response($employee->resume_path);
+        }
+
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($employee->resume_path)) {
+            return \Illuminate\Support\Facades\Storage::disk('public')->response($employee->resume_path);
+        }
+
+        abort(404, 'Resume file missing.');
     }
 
     private function authorizeHrms(string $permission): void

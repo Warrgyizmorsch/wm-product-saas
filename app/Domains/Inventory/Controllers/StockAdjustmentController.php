@@ -11,11 +11,14 @@ use App\Domains\Inventory\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class StockAdjustmentController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', StockAdjustment::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
         $query = StockAdjustment::query()
@@ -56,6 +59,8 @@ class StockAdjustmentController extends Controller
 
     public function create()
     {
+        $this->authorize('create', StockAdjustment::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
         $products = Product::where('tenant_id', $tenantId)->sellable()->get();
@@ -65,15 +70,23 @@ class StockAdjustmentController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', StockAdjustment::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
         $validated = $request->validate([
-            'warehouse_id' => 'required|exists:warehouses,id',
+            'warehouse_id' => [
+                'required',
+                Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId),
+            ],
             'adjustment_date' => 'required|date',
             'reason' => 'required|in:Damaged,Expired,Stock Count Variance,Theft/Loss,Scrap,Sample,Other',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_id' => [
+                'required',
+                Rule::exists('products', 'id')->where('tenant_id', $tenantId),
+            ],
             'items.*.type' => 'required|in:Addition,Deduction',
             'items.*.quantity' => 'required|numeric|gt:0',
             'items.*.unit_cost' => 'nullable|numeric|min:0',
@@ -94,10 +107,10 @@ class StockAdjustmentController extends Controller
             ]);
 
             foreach ($validated['items'] as $item) {
-                $product = Product::find($item['product_id']);
+                $product = Product::where('tenant_id', $tenantId)->find($item['product_id']);
                 $unitCost = isset($item['unit_cost']) && $item['unit_cost'] > 0 
                     ? (float)$item['unit_cost'] 
-                    : (float)($product->cost_price ?? 0);
+                    : (float)($product?->cost_price ?? 0);
                 $total = (float)$item['quantity'] * $unitCost;
 
                 StockAdjustmentItem::create([
@@ -118,12 +131,16 @@ class StockAdjustmentController extends Controller
 
     public function show(StockAdjustment $adjustment)
     {
+        $this->authorize('view', $adjustment);
+
         $adjustment->load(['warehouse', 'creator', 'approver', 'items.product', 'items.batch']);
         return view('modules.inventory.adjustments.show', compact('adjustment'));
     }
 
     public function approve(StockAdjustment $adjustment)
     {
+        $this->authorize('approve', $adjustment);
+
         if ($adjustment->status !== 'Draft') {
             return back()->with('error', 'Only Draft adjustments can be approved.');
         }
@@ -167,6 +184,8 @@ class StockAdjustmentController extends Controller
 
     public function cancel(StockAdjustment $adjustment)
     {
+        $this->authorize('delete', $adjustment);
+
         if ($adjustment->status === 'Approved') {
             return back()->with('error', 'Cannot cancel an approved adjustment.');
         }

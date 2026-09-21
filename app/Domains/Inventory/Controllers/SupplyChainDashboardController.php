@@ -4,6 +4,7 @@ namespace App\Domains\Inventory\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\ProductWarehouseStock;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
@@ -24,7 +25,9 @@ class SupplyChainDashboardController extends Controller
 {
     public function index(Request $request): View
     {
-        $tenantId = tenant_id() ?? (auth()->user()?->tenant_id ?? 1);
+        $this->authorize('viewAny', Product::class);
+
+        $tenantId = current_tenant_id() ?? tenant_id() ?? (auth()->user()?->tenant_id ?? 1);
         $preset = $request->get('preset', 'this_month');
         $fromDate = $request->get('from');
         $toDate = $request->get('to');
@@ -47,19 +50,20 @@ class SupplyChainDashboardController extends Controller
         $paymentsTotalValue = (float) (clone $paymentsQuery)->sum('amount');
         $paymentsCount = (clone $paymentsQuery)->count();
 
-        // 2. Inventory & Stock Valuation Metrics
-        $products = Product::where('tenant_id', $tenantId)->sellable()->get();
-        $totalProductsCount = $products->count();
-        $totalInventoryValuation = $products->sum(function ($p) {
-            $stock = $p->total_stock;
-            $price = $p->cost_price ?: ($p->unit_cost ?: ($p->selling_price ?: 0));
-            return $stock * $price;
-        });
+        // 2. Inventory & Stock Valuation Metrics (optimized direct DB aggregate)
+        $totalProductsCount = Product::where('tenant_id', $tenantId)->sellable()->count();
+        $totalInventoryValuation = (float) ProductWarehouseStock::where('tenant_id', $tenantId)
+            ->selectRaw('SUM(quantity * unit_cost) as total_val')
+            ->value('total_val') ?: 0.0;
 
-        $lowStockProductsList = $products->filter(function ($p) {
-            $reorder = (float) ($p->reorder_point ?: 10);
-            return $p->total_stock <= $reorder;
-        })->take(10);
+        $lowStockProductsList = Product::where('tenant_id', $tenantId)
+            ->sellable()
+            ->with('warehouseStocks')
+            ->get()
+            ->filter(function ($p) {
+                $reorder = (float) ($p->reorder_point ?: 10);
+                return $p->total_stock <= $reorder;
+            })->take(10);
 
         $lowStockCount = $lowStockProductsList->count();
 

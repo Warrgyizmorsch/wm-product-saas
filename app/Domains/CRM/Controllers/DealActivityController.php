@@ -12,6 +12,8 @@ class DealActivityController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', CrmDeal::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $view = $request->input('view', 'month'); // month, week, day

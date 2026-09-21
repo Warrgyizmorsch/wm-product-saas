@@ -15,7 +15,7 @@ use App\Domains\CRM\Controllers\Api\LeadApiController;
 */
 
 Route::prefix('api/crm/leads')
-    ->middleware(['auth:sanctum'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.crm.leads.')
     ->group(function () {
         Route::post('/', [LeadApiController::class, 'store'])->name('store');

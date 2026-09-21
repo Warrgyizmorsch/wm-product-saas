@@ -15,7 +15,15 @@ trait BelongsToCompany
             $companyId = company_id() ?? app(CompanyContext::class)->id();
 
             if ($companyId !== null) {
-                $builder->where($builder->getModel()->getTable().'.company_id', $companyId);
+                $model = $builder->getModel();
+                $column = $model->getTable().'.company_id';
+
+                // Shared masters (no company) stay visible in every company.
+                if (property_exists($model, 'sharedAcrossCompanies') && $model->sharedAcrossCompanies) {
+                    $builder->where(fn (Builder $q) => $q->where($column, $companyId)->orWhereNull($column));
+                } else {
+                    $builder->where($column, $companyId);
+                }
             }
         });
 

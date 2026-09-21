@@ -43,6 +43,8 @@ class QuotationController extends Controller
 
     public function detailPartial(Quotation $quotation)
     {
+        $this->authorize('view', $quotation);
+
         $quotation->load(['lead', 'salesPerson', 'items.product']);
         return view('modules.crm.quotations.detail-partial', compact('quotation'));
     }
@@ -252,12 +254,17 @@ class QuotationController extends Controller
             'caption' => 'nullable|string',
         ]);
 
+        $phone = $request->input('phone');
+        if (!empty($phone)) {
+            $quotation->update(['phone' => $phone]);
+        }
+
         try {
             /** @var \App\Services\WhatsAppService $waService */
             $waService = app(\App\Services\WhatsAppService::class);
             $result = $waService->sendQuotation(
                 quotation: $quotation,
-                mobile: $request->input('phone'),
+                mobile: $phone,
                 customCaption: $request->input('caption')
             );
 
@@ -414,7 +421,8 @@ class QuotationController extends Controller
         $this->authorize('update', $quotation);
 
         $validated = $request->validate([
-            'status' => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework,Converted,Won'],
+            'status'           => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework,Converted,Won'],
+            'rejection_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
@@ -431,12 +439,21 @@ class QuotationController extends Controller
         }
 
         $oldStatus = $quotation->status;
-        $this->quotationRepo->update($quotation, ['status' => $newStatus]);
+        $updateFields = ['status' => $newStatus];
+        if ($request->filled('rejection_reason')) {
+            $updateFields['rejection_reason'] = $request->input('rejection_reason');
+        }
+
+        $this->quotationRepo->update($quotation, $updateFields);
 
         if ($quotation->lead_id && $oldStatus !== $newStatus && ($lead = Lead::find($quotation->lead_id))) {
+            $logMsg = "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to '{$newStatus}'";
+            if (!empty($updateFields['rejection_reason'])) {
+                $logMsg .= " (Reason: {$updateFields['rejection_reason']})";
+            }
             \App\Domains\CRM\Models\LeadHistory::logEvent(
                 $lead, 'quotation_status_changed', $oldStatus, $newStatus,
-                "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to '{$newStatus}'"
+                $logMsg
             );
         }
 

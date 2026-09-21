@@ -10,6 +10,7 @@ use App\Domains\Sales\Models\InvoiceItem;
 use App\Domains\Sales\Models\PaymentAllocation;
 use App\Domains\Sales\Events\InvoicePosted;
 use App\Domains\Sales\Repositories\InvoiceRepository;
+use App\Domains\Platform\Models\PaymentTerm;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,7 +48,7 @@ class InvoiceController extends Controller
         } elseif ($invoicingPolicy === 'dispatch_order') {
             $mode = 'dispatch_order';
         } else {
-            $mode = $requestedMode ?: ($customerId ? 'direct' : 'sales_order');
+            $mode = ($requestedMode === 'dispatch_order') ? 'dispatch_order' : 'sales_order';
         }
 
         // Fetch Sales Orders that have unbilled quantities remaining
@@ -61,7 +62,7 @@ class InvoiceController extends Controller
             $totalOrdered = $so->items->sum('quantity');
             $totalInvoiced = $so->invoices->flatMap->items->where('sales_order_item_id', '!=', null)->sum('quantity');
             return ($totalOrdered - $totalInvoiced) > 0.0001;
-        });
+        })->values();
 
         // Fetch Dispatch Orders that have status Confirmed, Shipped, Dispatched, or Delivered and have unbilled quantities remaining
         $allDispatchOrders = \App\Domains\Sales\Models\DispatchOrder::with(['salesOrder.customer', 'items.product', 'items.warehouse', 'materialRequirement'])
@@ -103,38 +104,43 @@ class InvoiceController extends Controller
         $dispatchOrder = null;
         $materialRequirement = null;
 
-        if ($dispatchOrderId) {
-            $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])->find($dispatchOrderId);
-            if (!$dispatchOrder) {
-                $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])
-                    ->where('material_requirement_id', $dispatchOrderId)
-                    ->latest()
-                    ->first();
-            }
-            if ($dispatchOrder) {
-                $salesOrderId = $dispatchOrder->sales_order_id;
-                $materialRequirementId = $dispatchOrder->material_requirement_id;
-                if (!$requestedMode) {
-                    $mode = 'dispatch_order';
-                }
-
-                if (!$dispatchOrders->contains('id', $dispatchOrder->id)) {
-                    $dispatchOrders->push($dispatchOrder);
-                }
-            }
-        }
-
         if ($requestedMode === 'dispatch' || $requestedMode === 'dispatch_order') {
             $mode = 'dispatch_order';
         } elseif ($requestedMode === 'sales_order' || $requestedMode === 'so') {
             $mode = 'sales_order';
         }
 
-        $salesOrder = $salesOrderId ? SalesOrder::with('items.product', 'items.warehouse', 'customer')->find($salesOrderId) : null;
-        if ($salesOrder && !$dispatchOrderId && $mode !== 'dispatch_order') {
-            $mode = 'sales_order';
-            if (!$salesOrders->contains('id', $salesOrder->id)) {
-                $salesOrders->push($salesOrder);
+        if ($dispatchOrderId) {
+            $matchingDO = $dispatchOrders->firstWhere('id', (int)$dispatchOrderId) 
+                ?: $dispatchOrders->firstWhere('material_requirement_id', (int)$dispatchOrderId);
+            if ($matchingDO) {
+                $dispatchOrder = $matchingDO;
+                $salesOrderId = $dispatchOrder->sales_order_id;
+                $salesOrder = SalesOrder::with('items.product', 'items.warehouse', 'customer')->find($salesOrderId);
+                if (!$requestedMode) {
+                    $mode = 'dispatch_order';
+                }
+            } else {
+                $dispatchOrder = $dispatchOrders->first() ?: null;
+                if ($dispatchOrder) {
+                    $salesOrderId = $dispatchOrder->sales_order_id;
+                    $salesOrder = SalesOrder::with('items.product', 'items.warehouse', 'customer')->find($salesOrderId);
+                }
+            }
+        }
+
+        if (!$dispatchOrderId && $mode !== 'dispatch_order') {
+            if ($salesOrderId) {
+                $matchingSO = $salesOrders->firstWhere('id', (int)$salesOrderId);
+                if ($matchingSO) {
+                    $salesOrder = $matchingSO;
+                } else {
+                    $salesOrder = $salesOrders->first() ?: null;
+                    $salesOrderId = $salesOrder?->id;
+                }
+            } elseif ($salesOrders->isNotEmpty()) {
+                $salesOrder = $salesOrders->first();
+                $salesOrderId = $salesOrder?->id;
             }
         }
 
@@ -257,8 +263,10 @@ class InvoiceController extends Controller
             }
         }
 
+        $paymentTerms = PaymentTerm::query()->where('is_active', true)->orderBy('due_days')->get();
+
         return view('modules.sales.invoices.create', compact(
-            'mode', 'salesOrders', 'dispatchOrders', 'customers', 'products', 'warehouses',
+            'mode', 'salesOrders', 'dispatchOrders', 'customers', 'products', 'warehouses', 'paymentTerms',
             'salesOrder', 'dispatchOrder', 'nextInvoiceNumber', 'advanceAllocations', 'invoiceItems', 'customerId', 'invoicingPolicy'
         ));
     }
@@ -274,6 +282,7 @@ class InvoiceController extends Controller
             'invoice_number'          => ['required', 'string', 'max:255', 'unique:invoices,invoice_number'],
             'invoice_date'            => ['required', 'date'],
             'due_date'                => ['required', 'date', 'after_or_equal:invoice_date'],
+            'payment_terms'           => ['nullable', 'string', 'max:255'],
             'gst_type'                => ['nullable', 'string', 'in:cgst_sgst,igst'],
             'freight_terms'           => ['nullable', 'string', 'in:To Pay,To Be Billed,Prepaid,Customer Pickup'],
             'freight_amount'          => ['nullable', 'numeric', 'min:0'],
@@ -414,6 +423,7 @@ class InvoiceController extends Controller
                 'invoice_number'          => $validated['invoice_number'],
                 'invoice_date'            => $validated['invoice_date'],
                 'due_date'                => $validated['due_date'],
+                'payment_terms'           => $validated['payment_terms'] ?? ($salesOrder?->payment_terms ?? null),
                 'status'                  => 'Draft',
                 'discount_type'           => $discountType,
                 'tax_type'                => $taxType,

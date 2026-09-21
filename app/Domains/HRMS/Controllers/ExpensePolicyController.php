@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Domains\HRMS\Models\ExpensePolicy;
 use App\Domains\HRMS\Models\ExpensePolicyRule;
 use App\Domains\HRMS\Models\ExpenseCategory;
+use App\Domains\HRMS\Models\ExpenseApprovalWorkflow;
 use App\Domains\HRMS\Models\Designation;
 use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Company;
@@ -18,21 +19,19 @@ use Illuminate\View\View;
 /**
  * ExpensePolicyController
  *
- * Manages the 2-layer Expense Policy structure:
- *   Layer 1 → Named Policy (e.g. "Manager Travel Policy")
- *   Layer 2 → Category-wise limits within that policy
- *
- * The policy is then assigned to designations/departments for
- * automatic validation during expense claim submission.
+ * Manages the 3-tab Expense Master structure:
+ *   Tab 1 → Expense Categories
+ *   Tab 2 → Approval Workflows (1-Level, 2-Level, Amount Threshold rules)
+ *   Tab 3 → Expense Policies (Category-wise limits & receipt rules)
  */
 class ExpensePolicyController extends Controller
 {
     // ─────────────────────────────────────────────────────────────────
-    // Policy Header CRUD
+    // Policy & Master CRUD
     // ─────────────────────────────────────────────────────────────────
 
     /**
-     * List all expense policies for the current tenant.
+     * List all expense categories, workflows, and policies for current tenant.
      */
     public function index(Request $request): View
     {
@@ -53,6 +52,13 @@ class ExpensePolicyController extends Controller
             'search' => $request->query('cat_search', ''),
             'status' => $request->query('cat_status', ''),
             'sort'   => $request->query('cat_sort', 'name_asc'),
+        ];
+
+        // Workflow tab filters
+        $workflowFilters = [
+            'search' => $request->query('wf_search', ''),
+            'status' => $request->query('wf_status', ''),
+            'sort'   => $request->query('wf_sort', 'name_asc'),
         ];
 
         // 1. Query Policies
@@ -105,6 +111,32 @@ class ExpensePolicyController extends Controller
         }
         $categoriesList = $catQuery->get();
 
+        // 3. Query Approval Workflows
+        $wfQuery = ExpenseApprovalWorkflow::where('tenant_id', $tenantId)
+            ->with(['designation', 'department', 'company', 'businessUnit', 'branch']);
+
+        if ($activeTab === 'workflows') {
+            if ($workflowFilters['search'] !== '') {
+                $search = $workflowFilters['search'];
+                $wfQuery->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%");
+                });
+            }
+            if ($workflowFilters['status'] !== '') {
+                $wfQuery->where('status', (bool) $workflowFilters['status']);
+            }
+            match ($workflowFilters['sort']) {
+                'name_desc' => $wfQuery->orderBy('name', 'desc'),
+                'newest'    => $wfQuery->orderBy('created_at', 'desc'),
+                'oldest'    => $wfQuery->orderBy('created_at', 'asc'),
+                default     => $wfQuery->orderBy('name', 'asc'),
+            };
+        } else {
+            $wfQuery->orderBy('is_default', 'desc')->orderBy('name', 'asc');
+        }
+        $workflowsList = $wfQuery->get();
+
         // Constants/scope helpers
         $categories    = ExpenseCategory::where('tenant_id', $tenantId)->where('status', true)->orderBy('name')->get();
         $designations  = Designation::where('status', true)->orderBy('name')->get();
@@ -114,8 +146,8 @@ class ExpensePolicyController extends Controller
         $branches      = Branch::orderBy('name')->get();
 
         return view('modules.hrms.expense-policy.index', compact(
-            'policies', 'categoriesList', 'categories', 'designations', 'departments',
-            'companies', 'businessUnits', 'branches', 'filters', 'catFilters', 'activeTab'
+            'policies', 'categoriesList', 'workflowsList', 'categories', 'designations', 'departments',
+            'companies', 'businessUnits', 'branches', 'filters', 'catFilters', 'workflowFilters', 'activeTab'
         ));
     }
 
@@ -129,14 +161,18 @@ class ExpensePolicyController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
-            'name'             => 'required|string|max:255',
-            'description'      => 'nullable|string|max:1000',
-            'designation_id'   => 'nullable|exists:designations,id',
-            'department_id'    => 'nullable|exists:departments,id',
-            'company_id'       => 'nullable|exists:companies,id',
-            'business_unit_id' => 'nullable|exists:business_units,id',
-            'branch_id'        => 'nullable|exists:branches,id',
-            'status'           => 'nullable|boolean',
+            'name'                        => 'required|string|max:255',
+            'description'                 => 'nullable|string|max:1000',
+            'designation_id'              => 'nullable|exists:designations,id',
+            'department_id'               => 'nullable|exists:departments,id',
+            'company_id'                  => 'nullable|exists:companies,id',
+            'business_unit_id'            => 'nullable|exists:business_units,id',
+            'branch_id'                   => 'nullable|exists:branches,id',
+            'status'                      => 'nullable|boolean',
+            'approval_type'               => 'required|string|in:1_level,2_level,conditional_threshold',
+            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin',
+            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head',
+            'amount_threshold_for_2_level'=> 'nullable|numeric|min:0',
         ]);
 
         $validated['tenant_id'] = $tenantId;
@@ -149,20 +185,24 @@ class ExpensePolicyController extends Controller
     }
 
     /**
-     * Update the policy header (name, description, assignment, status).
+     * Update the policy header (name, description, assignment, status, approval rules).
      */
     public function update(Request $request, ExpensePolicy $policy): RedirectResponse
     {
         $this->authorize('update', $policy);
         $validated = $request->validate([
-            'name'             => 'required|string|max:255',
-            'description'      => 'nullable|string|max:1000',
-            'designation_id'   => 'nullable|exists:designations,id',
-            'department_id'    => 'nullable|exists:departments,id',
-            'company_id'       => 'nullable|exists:companies,id',
-            'business_unit_id' => 'nullable|exists:business_units,id',
-            'branch_id'        => 'nullable|exists:branches,id',
-            'status'           => 'nullable|boolean',
+            'name'                        => 'required|string|max:255',
+            'description'                 => 'nullable|string|max:1000',
+            'designation_id'              => 'nullable|exists:designations,id',
+            'department_id'               => 'nullable|exists:departments,id',
+            'company_id'                  => 'nullable|exists:companies,id',
+            'business_unit_id'            => 'nullable|exists:business_units,id',
+            'branch_id'                   => 'nullable|exists:branches,id',
+            'status'                      => 'nullable|boolean',
+            'approval_type'               => 'required|string|in:1_level,2_level,conditional_threshold',
+            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin',
+            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head',
+            'amount_threshold_for_2_level'=> 'nullable|numeric|min:0',
         ]);
 
         $validated['status'] = (bool) ($request->input('status', 1));
@@ -305,5 +345,90 @@ class ExpensePolicyController extends Controller
 
         return redirect()->route('hrms.expense-policy.rules', $policy)
             ->with('success', 'Category rule removed.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Approval Workflow CRUD
+    // ─────────────────────────────────────────────────────────────────
+
+    public function storeWorkflow(Request $request): RedirectResponse
+    {
+        $this->authorize('create', ExpensePolicy::class);
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        $validated = $request->validate([
+            'name'                        => 'required|string|max:255',
+            'description'                 => 'nullable|string|max:1000',
+            'designation_id'              => 'nullable|exists:designations,id',
+            'department_id'               => 'nullable|exists:departments,id',
+            'company_id'                  => 'nullable|exists:companies,id',
+            'business_unit_id'            => 'nullable|exists:business_units,id',
+            'branch_id'                   => 'nullable|exists:branches,id',
+            'approval_type'               => 'required|string|in:1_level,2_level,conditional_threshold',
+            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin',
+            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head',
+            'amount_threshold_for_2_level'=> 'nullable|numeric|min:0',
+            'is_default'                  => 'nullable|boolean',
+            'status'                      => 'nullable|boolean',
+        ]);
+
+        $validated['tenant_id']  = $tenantId;
+        $validated['status']     = (bool) ($request->input('status', 1));
+        $validated['is_default'] = (bool) ($request->input('is_default', 0));
+
+        if ($validated['is_default']) {
+            ExpenseApprovalWorkflow::where('tenant_id', $tenantId)->update(['is_default' => false]);
+        }
+
+        ExpenseApprovalWorkflow::create($validated);
+
+        return redirect()->route('hrms.expense-policy.index', ['tab' => 'workflows'])
+            ->with('success', 'Approval workflow created successfully.');
+    }
+
+    public function updateWorkflow(Request $request, ExpenseApprovalWorkflow $workflow): RedirectResponse
+    {
+        $this->authorize('update', ExpensePolicy::class);
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        $validated = $request->validate([
+            'name'                        => 'required|string|max:255',
+            'description'                 => 'nullable|string|max:1000',
+            'designation_id'              => 'nullable|exists:designations,id',
+            'department_id'               => 'nullable|exists:departments,id',
+            'company_id'                  => 'nullable|exists:companies,id',
+            'business_unit_id'            => 'nullable|exists:business_units,id',
+            'branch_id'                   => 'nullable|exists:branches,id',
+            'approval_type'               => 'required|string|in:1_level,2_level,conditional_threshold',
+            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin',
+            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head',
+            'amount_threshold_for_2_level'=> 'nullable|numeric|min:0',
+            'is_default'                  => 'nullable|boolean',
+            'status'                      => 'nullable|boolean',
+        ]);
+
+        $validated['status']     = (bool) ($request->input('status', 1));
+        $validated['is_default'] = (bool) ($request->input('is_default', 0));
+
+        if ($validated['is_default']) {
+            ExpenseApprovalWorkflow::where('tenant_id', $tenantId)->where('id', '!=', $workflow->id)->update(['is_default' => false]);
+        }
+
+        $workflow->update($validated);
+
+        return redirect()->route('hrms.expense-policy.index', ['tab' => 'workflows'])
+            ->with('success', 'Approval workflow updated successfully.');
+    }
+
+    public function destroyWorkflow(ExpenseApprovalWorkflow $workflow): RedirectResponse
+    {
+        $this->authorize('delete', ExpensePolicy::class);
+
+        $workflow->delete();
+
+        return redirect()->route('hrms.expense-policy.index', ['tab' => 'workflows'])
+            ->with('success', 'Approval workflow deleted successfully.');
     }
 }

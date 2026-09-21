@@ -263,10 +263,12 @@
                                     <td>
                                         @if($req->status === 'approved')
                                             <span class="badge bg-soft-success text-success px-2 py-1 fs-11 rounded-pill">Approved</span>
+                                        @elseif($req->status === 'l1_approved')
+                                            <span class="badge bg-soft-info text-info px-2 py-1 fs-11 rounded-pill" title="Level 1 Passed - Pending Level 2 Final Approval"><i class="feather-clock me-1"></i>Pending L2</span>
                                         @elseif($req->status === 'rejected')
                                             <span class="badge bg-soft-danger text-danger px-2 py-1 fs-11 rounded-pill">Rejected</span>
                                         @else
-                                            <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill">Pending</span>
+                                            <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill">{{ ($req->approval_levels ?? 1) == 2 ? 'Pending L1' : 'Pending' }}</span>
                                         @endif
 
                                         @php
@@ -276,6 +278,8 @@
                                             <div class="mt-1">
                                                 @if($linkedAdv->status === 'pending')
                                                     <span class="badge bg-soft-warning text-dark px-1.5 py-0.5 fs-10" title="Cash Advance Requested"><i class="feather-dollar-sign me-0.5"></i>Advance: {{ $currencySymbol }}{{ number_format($linkedAdv->amount, 2) }}</span>
+                                                @elseif($linkedAdv->status === 'l1_approved')
+                                                    <span class="badge bg-soft-info text-info px-1.5 py-0.5 fs-10" title="Cash Advance L1 Approved"><i class="feather-clock me-0.5"></i>Advance: Pending L2</span>
                                                 @elseif($linkedAdv->status === 'approved' || $linkedAdv->status === 'disbursed')
                                                     <span class="badge bg-soft-info text-info px-1.5 py-0.5 fs-10" title="Cash Advance Approved"><i class="feather-check-circle me-0.5"></i>Advance Approved</span>
                                                 @elseif($linkedAdv->status === 'rejected')
@@ -285,10 +289,12 @@
                                         @endif
                                     </td>
                                     <td class="text-end">
-                                        @if($req->status === 'pending')
+                                        @if(in_array($req->status, ['pending', 'l1_approved']))
                                             @if($isAdmin)
                                                 <div class="d-flex justify-content-end gap-1">
-                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11" data-bs-toggle="modal" data-bs-target="#approveTravelModal_{{ $req->id }}">Approve</button>
+                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11" data-bs-toggle="modal" data-bs-target="#approveTravelModal_{{ $req->id }}">
+                                                        {{ $req->status === 'l1_approved' ? 'Final Approve (L2)' : (($req->approval_levels ?? 1) == 2 ? 'Approve (L1)' : 'Approve') }}
+                                                    </button>
                                                     <form method="POST" action="{{ route('hrms.travel-expense.travel.reject', $req) }}" class="m-0">
                                                         @csrf
                                                         <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11">Reject</button>
@@ -513,6 +519,8 @@
                                     <td>
                                         @if($adv->status === 'disbursed')
                                             <span class="badge bg-soft-info text-info px-2 py-1 fs-11 rounded-pill">Disbursed</span>
+                                        @elseif($adv->status === 'l1_approved')
+                                            <span class="badge bg-soft-info text-info px-2 py-1 fs-11 rounded-pill" title="Level 1 Passed - Pending Level 2 Final Approval"><i class="feather-clock me-1"></i>Pending L2</span>
                                         @elseif($adv->status === 'approved')
                                             <span class="badge bg-soft-success text-success px-2 py-1 fs-11 rounded-pill">Approved</span>
                                         @elseif($adv->status === 'settled')
@@ -520,14 +528,16 @@
                                         @elseif($adv->status === 'rejected')
                                             <span class="badge bg-soft-danger text-danger px-2 py-1 fs-11 rounded-pill">Rejected</span>
                                         @else
-                                            <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill">Pending</span>
+                                            <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill">{{ ($adv->approval_levels ?? 1) == 2 ? 'Pending L1' : 'Pending' }}</span>
                                         @endif
                                     </td>
                                     <td class="text-end text-nowrap">
-                                        @if($adv->status === 'pending')
+                                        @if(in_array($adv->status, ['pending', 'l1_approved']))
                                             @if($isAdmin)
                                                 <div class="d-flex justify-content-end gap-1">
-                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11" data-bs-toggle="modal" data-bs-target="#approveAdvanceModal_{{ $adv->id }}">Approve</button>
+                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11" data-bs-toggle="modal" data-bs-target="#approveAdvanceModal_{{ $adv->id }}">
+                                                        {{ $adv->status === 'l1_approved' ? 'Final Approve (L2)' : (($adv->approval_levels ?? 1) == 2 ? 'Approve (L1)' : 'Approve') }}
+                                                    </button>
                                                     <form method="POST" action="{{ route('hrms.travel-expense.advance.reject', $adv) }}" class="m-0">
                                                         @csrf
                                                         <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11">Reject</button>
@@ -760,8 +770,10 @@
                                     <td>
                                         @if($rep->status === 'draft')
                                             <span class="badge bg-secondary text-white px-2 py-1 fs-11 rounded-pill">Draft</span>
-                                        @elseif($rep->status === 'submitted')
-                                            <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill">Submitted</span>
+                                        @elseif($rep->status === 'submitted' || $rep->status === 'pending')
+                                            <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill">{{ ($rep->approval_levels ?? 1) == 2 ? 'Pending L1' : 'Submitted' }}</span>
+                                        @elseif($rep->status === 'l1_approved')
+                                            <span class="badge bg-soft-info text-info px-2 py-1 fs-11 rounded-pill" title="Level 1 Passed - Pending Level 2 Final Approval"><i class="feather-clock me-1"></i>Pending L2</span>
                                         @elseif($rep->status === 'partially_approved')
                                             <span class="badge bg-soft-warning text-dark px-2 py-1 fs-11 rounded-pill"><i class="feather-alert-circle me-1"></i>Partially Approved</span>
                                         @elseif($rep->status === 'approved')
@@ -864,8 +876,10 @@
 
                                             {{-- ADMIN ACTIONS --}}
                                             @if($isAdmin)
-                                                @if($rep->status === 'submitted')
-                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11 text-uppercase" data-bs-toggle="modal" data-bs-target="#approveReportModal_{{ $rep->id }}">Review & Approve</button>
+                                                @if(in_array($rep->status, ['submitted', 'pending', 'l1_approved']))
+                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11 text-uppercase" data-bs-toggle="modal" data-bs-target="#approveReportModal_{{ $rep->id }}">
+                                                        {{ $rep->status === 'l1_approved' ? 'Final Approve (L2)' : (($rep->approval_levels ?? 1) == 2 ? 'Approve (L1)' : 'Review & Approve') }}
+                                                    </button>
 
                                                     <form method="POST" action="{{ route('hrms.travel-expense.report.reject', $rep) }}" class="m-0">
                                                         @csrf

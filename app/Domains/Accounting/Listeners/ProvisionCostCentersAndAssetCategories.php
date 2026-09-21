@@ -51,8 +51,6 @@ class ProvisionCostCentersAndAssetCategories
             CostCenter::query()->withoutGlobalScopes()->firstOrCreate(
                 ['tenant_id' => $event->tenantId, 'code' => $code],
                 [
-                    'company_id' => $event->companyId,
-                    'branch_id' => $event->branchId,
                     'name' => $name,
                     'is_active' => true,
                 ],

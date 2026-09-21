@@ -5,13 +5,13 @@ namespace App\Domains\HRMS\Models;
 use App\Core\Database\BaseModel;
 
 /**
- * ExpensePolicy — Layer 1 (Policy Header).
- * A named policy (e.g. "Manager Travel Policy") that is assigned
- * to a Designation or Department and contains category-wise rules.
+ * ExpenseApprovalWorkflow — Standalone approval routing rule.
+ * Configures 1-Level, 2-Level, or Amount-Threshold approval workflows
+ * globally or assigned to a Designation / Department / Scope.
  */
-class ExpensePolicy extends BaseModel
+class ExpenseApprovalWorkflow extends BaseModel
 {
-    protected $table = 'expense_policies';
+    protected $table = 'expense_approval_workflows';
 
     protected $fillable = [
         'tenant_id',
@@ -22,49 +22,45 @@ class ExpensePolicy extends BaseModel
         'company_id',
         'business_unit_id',
         'branch_id',
-        'status',
         'approval_type',
         'first_approver',
         'second_approver',
         'amount_threshold_for_2_level',
+        'is_default',
+        'status',
     ];
 
     protected $casts = [
         'status'                       => 'boolean',
+        'is_default'                   => 'boolean',
         'amount_threshold_for_2_level' => 'decimal:2',
     ];
 
-    /** Policy has many category-level rules. */
-    public function rules()
-    {
-        return $this->hasMany(ExpensePolicyRule::class, 'expense_policy_id');
-    }
-
-    /** Policy is assigned to a Designation (optional). */
+    /** Workflow is assigned to a Designation (optional). */
     public function designation()
     {
         return $this->belongsTo(Designation::class, 'designation_id');
     }
 
-    /** Policy is assigned to a Department (optional). */
+    /** Workflow is assigned to a Department (optional). */
     public function department()
     {
         return $this->belongsTo(Department::class, 'department_id');
     }
 
-    /** Policy belongs to a Company (optional scope). */
+    /** Workflow belongs to a Company (optional scope). */
     public function company()
     {
         return $this->belongsTo(Company::class, 'company_id');
     }
 
-    /** Policy belongs to a Business Unit (optional scope). */
+    /** Workflow belongs to a Business Unit (optional scope). */
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class, 'business_unit_id');
     }
 
-    /** Policy belongs to a Branch (optional scope). */
+    /** Workflow belongs to a Branch (optional scope). */
     public function branch()
     {
         return $this->belongsTo(Branch::class, 'branch_id');

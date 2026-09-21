@@ -18,6 +18,6 @@ class ProvisionChartOfAccounts
             return;
         }
 
-        $this->accounts->provisionDefaultsIfMissing($event->tenantId, $event->companyId, $event->branchId);
+        $this->accounts->provisionDefaultsIfMissing($event->tenantId);
     }
 }

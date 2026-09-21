@@ -15,7 +15,15 @@ trait BelongsToBranch
             $branchId = branch_id() ?? app(BranchContext::class)->id();
 
             if ($branchId !== null) {
-                $builder->where($builder->getModel()->getTable().'.branch_id', $branchId);
+                $model = $builder->getModel();
+                $column = $model->getTable().'.branch_id';
+
+                // Shared masters (no branch) stay visible in every branch.
+                if (property_exists($model, 'sharedAcrossCompanies') && $model->sharedAcrossCompanies) {
+                    $builder->where(fn (Builder $q) => $q->where($column, $branchId)->orWhereNull($column));
+                } else {
+                    $builder->where($column, $branchId);
+                }
             }
         });
 

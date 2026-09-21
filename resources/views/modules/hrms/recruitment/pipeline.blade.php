@@ -222,7 +222,7 @@
                                         </x-ui.badge>
                                         @if($candidate->resume_path)
                                             <x-ui.button 
-                                                :href="asset('storage/' . $candidate->resume_path)" 
+                                                :href="route('hrms.recruitment.candidates.download-resume', $candidate)" 
                                                 target="_blank" 
                                                 variant="outline-primary" 
                                                 size="sm" 
@@ -390,7 +390,7 @@
                                                     @endif
                                                     @if($candidate->resume_path)
                                                         <x-ui.button 
-                                                            :href="asset('storage/' . $candidate->resume_path)" 
+                                                            :href="route('hrms.recruitment.candidates.download-resume', $candidate)" 
                                                             target="_blank" 
                                                             variant="outline-primary" 
                                                             size="sm" 

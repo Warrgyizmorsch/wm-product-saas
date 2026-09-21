@@ -28,8 +28,6 @@ class FiscalPeriodService
         return DB::transaction(function () use ($data) {
             $fiscalYear = $this->fiscalYears->create([
                 'tenant_id' => $data['tenant_id'] ?? tenant_id(),
-                'company_id' => $data['company_id'] ?? null,
-                'branch_id' => $data['branch_id'] ?? null,
                 'name' => $data['name'],
                 'start_date' => $data['start_date'],
                 'end_date' => $data['end_date'],
@@ -46,7 +44,6 @@ class FiscalPeriodService
 
                 $this->periods->create([
                     'tenant_id' => $fiscalYear->tenant_id,
-                    'company_id' => $data['company_id'] ?? null,
                     'fiscal_year_id' => $fiscalYear->id,
                     'name' => $cursor->format('F Y'),
                     'start_date' => $periodStart,
@@ -72,7 +69,7 @@ class FiscalPeriodService
      * now()->startOfYear()/endOfYear() default to Jan-Dec and will silently
      * produce the wrong FY for every Indian tenant.
      */
-    public function provisionCurrentFiscalYearIfMissing(int $tenantId, ?int $companyId = null, ?int $branchId = null): ?FiscalYear
+    public function provisionCurrentFiscalYearIfMissing(int $tenantId): ?FiscalYear
     {
         $today = now();
         $fyStartYear = $today->month >= 4 ? $today->year : $today->year - 1;
@@ -83,18 +80,10 @@ class FiscalPeriodService
         $existing = FiscalYear::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->whereDate('start_date', $startDate->toDateString());
+            ->whereDate('start_date', $startDate->toDateString())
+            ->exists();
 
-        if ($existing->exists()) {
-            // Attach rows seeded before a company existed (company-scoped UI hides them).
-            if ($companyId !== null) {
-                $ids = (clone $existing)->whereNull('company_id')->pluck('id');
-                FiscalYear::query()->withoutGlobalScopes()->whereIn('id', $ids)
-                    ->update(['company_id' => $companyId, 'branch_id' => $branchId]);
-                AccountingPeriod::query()->withoutGlobalScopes()->whereIn('fiscal_year_id', $ids)
-                    ->whereNull('company_id')->update(['company_id' => $companyId]);
-            }
-
+        if ($existing) {
             return null;
         }
 
@@ -103,8 +92,6 @@ class FiscalPeriodService
             'name' => 'FY ' . $fyStartYear . '-' . ($fyStartYear + 1),
             'start_date' => $startDate->toDateString(),
             'end_date' => $endDate->toDateString(),
-            'company_id' => $companyId,
-            'branch_id' => $branchId,
         ]);
     }
 

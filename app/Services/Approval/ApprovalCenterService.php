@@ -373,7 +373,7 @@ class ApprovalCenterService
 
             // Expense Reports
             if ($canApproveExpense) {
-                $expQuery = ExpenseReport::query()->where('status', 'pending');
+                $expQuery = ExpenseReport::query()->whereIn('status', ['pending', 'submitted', 'l1_approved']);
                 $expCount = (clone $expQuery)->count();
                 $totalActionableCount += $expCount;
                 if ($expCount > 0) {
@@ -384,10 +384,11 @@ class ApprovalCenterService
                     foreach ($exps as $exp) {
                         $empName = $exp->employee?->full_name ?: 'Employee';
                         $amount = number_format((float) $exp->total_amount, 2);
+                        $stageLabel = $exp->status === 'l1_approved' ? ' (Level 2)' : '';
                         $candidateItems[] = [
                             'module' => 'HRMS',
                             'type' => 'Expense Report',
-                            'title' => (string) ($exp->title ?: "Expense #{$exp->id}"),
+                            'title' => (string) ($exp->title ?: "Expense #{$exp->id}") . $stageLabel,
                             'subtitle' => "{$empName} • Total: \${$amount}",
                             'url' => Route::has('hrms.travel-expense.index') ? route('hrms.travel-expense.index') : url('/hrms/travel-expense'),
                             'icon' => 'feather-dollar-sign',
@@ -398,7 +399,7 @@ class ApprovalCenterService
                 }
 
                 // Travel Requests
-                $travelQuery = TravelRequest::query()->where('status', 'pending');
+                $travelQuery = TravelRequest::query()->whereIn('status', ['pending', 'l1_approved']);
                 $travelCount = (clone $travelQuery)->count();
                 $totalActionableCount += $travelCount;
                 if ($travelCount > 0) {
@@ -408,10 +409,11 @@ class ApprovalCenterService
                         ->get();
                     foreach ($travels as $travel) {
                         $empName = $travel->employee?->full_name ?: 'Employee';
+                        $stageLabel = $travel->status === 'l1_approved' ? ' (Level 2)' : '';
                         $candidateItems[] = [
                             'module' => 'HRMS',
                             'type' => 'Travel Request',
-                            'title' => "{$empName} - Travel",
+                            'title' => "{$empName} - Travel{$stageLabel}",
                             'subtitle' => "Destination: {$travel->destination}",
                             'url' => Route::has('hrms.travel-expense.index') ? route('hrms.travel-expense.index') : url('/hrms/travel-expense'),
                             'icon' => 'feather-briefcase',
@@ -422,7 +424,7 @@ class ApprovalCenterService
                 }
 
                 // Cash Advances
-                $advQuery = CashAdvance::query()->where('status', 'pending');
+                $advQuery = CashAdvance::query()->whereIn('status', ['pending', 'l1_approved']);
                 $advCount = (clone $advQuery)->count();
                 $totalActionableCount += $advCount;
                 if ($advCount > 0) {
@@ -433,10 +435,11 @@ class ApprovalCenterService
                     foreach ($advs as $adv) {
                         $empName = $adv->employee?->full_name ?: 'Employee';
                         $amount = number_format((float) $adv->amount, 2);
+                        $stageLabel = $adv->status === 'l1_approved' ? ' (Level 2)' : '';
                         $candidateItems[] = [
                             'module' => 'HRMS',
                             'type' => 'Cash Advance',
-                            'title' => "{$empName} - Cash Advance",
+                            'title' => "{$empName} - Cash Advance{$stageLabel}",
                             'subtitle' => "Amount: \${$amount}",
                             'url' => Route::has('hrms.travel-expense.index') ? route('hrms.travel-expense.index') : url('/hrms/travel-expense'),
                             'icon' => 'feather-credit-card',

@@ -101,7 +101,7 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $tenantId = current_tenant_id() ?? require_tenant_id();
         [$employee, $isAdmin] = $this->resolveEmployeeContext();
 
         $travelQuery = TravelRequest::where('tenant_id', $tenantId);
@@ -797,40 +797,11 @@ class TravelExpenseApiController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $cashAdvance->update(['status' => 'disbursed']);
 
-        $amount = floatval($cashAdvance->approved_amount ?? $cashAdvance->amount);
-        if ($amount > 0) {
-            $advancesAccount = $this->getOrCreateAccount($tenantId, '1400', 'Loans & Advances', 'asset', 'debit', 'loans_advances');
-            $bankAccount = $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', 'asset', 'debit', 'current_asset');
-
-            $lines = [
-                [
-                    'chart_of_account_id' => $advancesAccount->id,
-                    'debit' => $amount,
-                    'credit' => 0.00,
-                    'description' => "Disbursement of Advance: " . $cashAdvance->purpose
-                ],
-                [
-                    'chart_of_account_id' => $bankAccount->id,
-                    'debit' => 0.00,
-                    'credit' => $amount,
-                    'description' => "Disbursement of Advance: " . $cashAdvance->purpose
-                ]
-            ];
-
-            try {
-                $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
-                $journalService->post($lines, [
-                    'tenant_id' => $tenantId,
-                    'journal_date' => now(),
-                    'source' => 'expense',
-                    'reference_type' => 'CashAdvance',
-                    'reference_id' => $cashAdvance->id,
-                    'memo' => "Disbursed Cash Advance: " . $cashAdvance->purpose,
-                    'posted_by' => auth()->id(),
-                ]);
-            } catch (\Exception $e) {
-                Log::error("Disbursement Journal Posting Failed: " . $e->getMessage());
-            }
+        try {
+            $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
+            $travelAccountingService->postCashAdvanceDisbursementJournal($cashAdvance);
+        } catch (\Throwable $e) {
+            Log::error("Disbursement Journal Posting Failed: " . $e->getMessage());
         }
 
         return $this->sendSuccess($this->transformCashAdvance($cashAdvance->fresh(), true), 'Cash advance disbursed successfully.');
@@ -1298,72 +1269,11 @@ class TravelExpenseApiController extends Controller
             $isAccountingChannel = ($expenseReport->payout_channel ?? 'accounting') === 'accounting';
 
             if ($isAccountingChannel) {
-                $totalAdvance = $advance ? floatval($advance->approved_amount ?? $advance->amount) : 0.00;
-                $approvedAmount = floatval($expenseReport->approved_amount ?? $expenseReport->total_amount);
-                $surplus = max($totalAdvance - $approvedAmount, 0.00);
-                $approvedNet = max($approvedAmount - $totalAdvance, 0.00);
-
-                $lines = [];
-
-                // 1. Debit Other Expense (Code 5900)
-                if ($approvedAmount > 0) {
-                    $expenseAccount = $this->getOrCreateAccount($tenantId, '5900', 'Other Expense', 'expense', 'debit', 'operating_expense');
-                    $lines[] = [
-                        'chart_of_account_id' => $expenseAccount->id,
-                        'debit' => $approvedAmount,
-                        'credit' => 0.00,
-                        'description' => "Expense Claim: " . $expenseReport->title
-                    ];
-                }
-
-                // 2. Credit Advances (Code 1400)
-                if ($totalAdvance > 0) {
-                    $advancesAccount = $this->getOrCreateAccount($tenantId, '1400', 'Loans & Advances', 'asset', 'debit', 'loans_advances');
-                    $lines[] = [
-                        'chart_of_account_id' => $advancesAccount->id,
-                        'debit' => 0.00,
-                        'credit' => $totalAdvance,
-                        'description' => "Clear Advance for Claim: " . $expenseReport->title
-                    ];
-                }
-
-                // 3. Bank Account transaction (Code 1020)
-                if ($surplus > 0 || $approvedNet > 0) {
-                    $bankAccount = $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', 'asset', 'debit', 'current_asset');
-                    if ($surplus > 0) {
-                        // Recovery (Debit Bank)
-                        $lines[] = [
-                            'chart_of_account_id' => $bankAccount->id,
-                            'debit' => $surplus,
-                            'credit' => 0.00,
-                            'description' => "Advance surplus recovered for Claim: " . $expenseReport->title
-                        ];
-                    } elseif ($approvedNet > 0) {
-                        // Payout (Credit Bank)
-                        $lines[] = [
-                            'chart_of_account_id' => $bankAccount->id,
-                            'debit' => 0.00,
-                            'credit' => $approvedNet,
-                            'description' => "Payout for Claim: " . $expenseReport->title
-                        ];
-                    }
-                }
-
-                if (count($lines) > 0) {
-                    try {
-                        $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
-                        $journalService->post($lines, [
-                            'tenant_id' => $tenantId,
-                            'journal_date' => now(),
-                            'source' => 'expense',
-                            'reference_type' => 'ExpenseReport',
-                            'reference_id' => $expenseReport->id,
-                            'memo' => "Paid Expense Claim: " . $expenseReport->title,
-                            'posted_by' => auth()->id(),
-                        ]);
-                    } catch (\Exception $e) {
-                        Log::error("Payout Journal Posting Failed: " . $e->getMessage());
-                    }
+                try {
+                    $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
+                    $travelAccountingService->postExpenseReportPayoutJournal($expenseReport);
+                } catch (\Throwable $e) {
+                    Log::error("Payout Journal Posting Failed: " . $e->getMessage());
                 }
             }
 

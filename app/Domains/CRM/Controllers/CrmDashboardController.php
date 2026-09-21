@@ -27,6 +27,8 @@ class CrmDashboardController extends Controller
 
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', Lead::class);
+
         $tenantId = current_tenant_id() ?? (auth()->user()?->tenant_id ?? 1);
         $data = $this->buildDashboardData($request, $tenantId);
 
@@ -35,6 +37,8 @@ class CrmDashboardController extends Controller
 
     public function export(Request $request, string $format): Response
     {
+        $this->authorize('viewAny', Lead::class);
+
         $tenantId = current_tenant_id() ?? (auth()->user()?->tenant_id ?? 1);
         $data = $this->buildDashboardData($request, $tenantId);
         $filename = sprintf('CRM_Dashboard_%s_%s', $data['startDate']->format('Ymd'), $data['endDate']->format('Ymd'));
@@ -83,11 +87,21 @@ class CrmDashboardController extends Controller
 
     private function buildDashboardData(Request $request, int $tenantId): array
     {
+        $user = auth()->user();
+        $access = app(\App\Services\Access\AccessService::class);
+        $canViewTenantLeads = $user ? $access->allows($user, 'crm.leads.view', ['tenant_id' => $tenantId]) : false;
+
         $preset = $request->get('preset', 'this_month');
         $fromDate = $request->get('from');
         $toDate = $request->get('to');
         $companyScope = $request->get('company_scope', 'current');
         $ownerId = $request->get('owner_id');
+
+        // If user does not have tenant-wide view, force their own owner_id
+        if (!$canViewTenantLeads && $user) {
+            $ownerId = $user->id;
+        }
+
         $leadType = $request->get('lead_type');
         $activeView = $request->get('view', 'overview');
 

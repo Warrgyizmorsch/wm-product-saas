@@ -20,6 +20,9 @@ class AccountingPeriod extends BaseModel
 
     protected $table = 'accounting_periods';
 
+    /** Default masters are seeded without a company/branch and shown in every one. */
+    public bool $sharedAcrossCompanies = true;
+
     protected $fillable = [
         'tenant_id',
         'company_id',

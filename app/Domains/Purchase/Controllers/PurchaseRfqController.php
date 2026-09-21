@@ -194,8 +194,11 @@ class PurchaseRfqController extends Controller
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.estimated_cost' => 'nullable|numeric|min:0',
-            'items.*.vendor_ids' => 'nullable|array',
+            'items.*.vendor_ids' => 'required|array|min:1',
             'items.*.vendor_ids.*' => 'integer|exists:vendors,id',
+        ], [
+            'items.*.vendor_ids.required' => __('purchase.js_assign_supplier_to_all_items'),
+            'items.*.vendor_ids.min' => __('purchase.js_assign_supplier_to_all_items'),
         ]);
 
         $rfq = $this->rfqService->storeRfq($validated, $tenantId);
@@ -252,8 +255,11 @@ class PurchaseRfqController extends Controller
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.estimated_cost' => 'nullable|numeric|min:0',
-            'items.*.vendor_ids' => 'nullable|array',
+            'items.*.vendor_ids' => 'required|array|min:1',
             'items.*.vendor_ids.*' => 'integer|exists:vendors,id',
+        ], [
+            'items.*.vendor_ids.required' => __('purchase.js_assign_supplier_to_all_items'),
+            'items.*.vendor_ids.min' => __('purchase.js_assign_supplier_to_all_items'),
         ]);
 
         $this->rfqService->updateRfq($rfq, $validated, $tenantId);
@@ -319,14 +325,138 @@ class PurchaseRfqController extends Controller
 
     public function sendRfq(Request $request, int $id)
     {
-        $rfq = $this->rfqRepo->find($id);
+        $tenantId = require_tenant_id();
+        $rfq = $this->rfqRepo->findWithDetails($id);
         if (!$rfq) abort(404);
         $this->authorize('update', $rfq);
 
-        $this->rfqRepo->update($rfq, ['status' => 'Sent']);
+        $sentCount = 0;
+        $noPhoneVendors = [];
+        $failedVendors = [];
+
+        /** @var \App\Services\WhatsAppService $waService */
+        $waService = app(\App\Services\WhatsAppService::class);
+        $companyName = company()?->name ?? config('app.name', 'SaaS ERP');
+
+        foreach ($rfq->rfqVendors as $rv) {
+            $vendorName = $rv->vendor?->name ?? 'Valued Supplier';
+            $phone = $rv->vendor?->phone;
+
+            if (empty($phone)) {
+                $noPhoneVendors[] = $vendorName;
+                continue;
+            }
+
+            $portalUrl = route('purchase.rfqs.portal', $rv->token);
+            $message = "📋 *Request For Quotation (RFQ)*\n\n"
+                . "Dear *{$vendorName}*,\n\n"
+                . "We have generated a Request For Quotation *#{$rfq->rfq_number}* for your company.\n\n"
+                . "👉 Please click the link below to view inquiry items and submit your prices & terms:\n"
+                . "🔗 {$portalUrl}\n\n"
+                . "Thank you,\n"
+                . "*{$companyName}*";
+
+            try {
+                $res = $waService->sendMessage($phone, $message);
+                if ($res['success'] ?? false) {
+                    $sentCount++;
+                    if ($rv->status === 'Draft') {
+                        $rv->update(['status' => 'Sent']);
+                    }
+                } else {
+                    $failedVendors[] = "{$vendorName} (" . ($res['message'] ?? 'Bridge error') . ")";
+                }
+            } catch (\Throwable $e) {
+                $failedVendors[] = "{$vendorName} ({$e->getMessage()})";
+            }
+        }
+
+        // If at least one WhatsApp was sent successfully
+        if ($sentCount > 0) {
+            $this->rfqRepo->update($rfq, ['status' => 'Sent']);
+
+            if (empty($failedVendors) && empty($noPhoneVendors)) {
+                return redirect()->route('purchase.rfqs.show', $id)
+                    ->with('rfq_dispatch_status', 'success')
+                    ->with('rfq_dispatch_message', "RFQ {$rfq->rfq_number} status updated to Sent.\n\nWhatsApp portal links have been successfully delivered to all {$sentCount} supplier(s).");
+            } else {
+                $msg = "RFQ {$rfq->rfq_number} updated to Sent. WhatsApp link sent to {$sentCount} supplier(s).";
+                if (!empty($failedVendors)) {
+                    $msg .= "\n\n• Failed for: " . implode("\n• ", $failedVendors);
+                }
+                if (!empty($noPhoneVendors)) {
+                    $msg .= "\n\n• Missing contact number for: " . implode(', ', $noPhoneVendors);
+                }
+                return redirect()->route('purchase.rfqs.show', $id)
+                    ->with('rfq_dispatch_status', 'warning')
+                    ->with('rfq_dispatch_message', $msg);
+            }
+        }
+
+        // If NO messages could be sent, keep status as Draft / previous status
+        $alertMsg = "WhatsApp messages could not be sent to suppliers. RFQ status remains unchanged (" . ($rfq->status ?? 'Draft') . ").";
+        if (!empty($failedVendors)) {
+            $alertMsg .= "\n\n• Failed for: " . implode("\n• ", $failedVendors);
+        }
+        if (!empty($noPhoneVendors)) {
+            $alertMsg .= "\n\n• Missing contact number for: " . implode(', ', $noPhoneVendors);
+        }
 
         return redirect()->route('purchase.rfqs.show', $id)
-            ->with('success', "RFQ {$rfq->rfq_number} sent to vendors.");
+            ->with('rfq_dispatch_status', 'warning')
+            ->with('rfq_dispatch_message', $alertMsg);
+    }
+
+    public function sendVendorWhatsapp(Request $request, int $rfqVendorId)
+    {
+        $tenantId = require_tenant_id();
+        $rv = PurchaseRfqVendor::with(['vendor', 'rfq'])->where('tenant_id', $tenantId)->find($rfqVendorId);
+        if (!$rv) {
+            return response()->json(['success' => false, 'message' => 'Vendor record not found.'], 404);
+        }
+
+        $vendorName = $rv->vendor?->name ?? 'Valued Supplier';
+        $phone = $request->input('phone', $rv->vendor?->phone);
+
+        if (empty($phone)) {
+            return response()->json(['success' => false, 'message' => "Supplier '{$vendorName}' does not have a contact number configured."], 422);
+        }
+
+        /** @var \App\Services\WhatsAppService $waService */
+        $waService = app(\App\Services\WhatsAppService::class);
+        $companyName = company()?->name ?? config('app.name', 'SaaS ERP');
+        $portalUrl = route('purchase.rfqs.portal', $rv->token);
+
+        $message = "📋 *Request For Quotation (RFQ)*\n\n"
+            . "Dear *{$vendorName}*,\n\n"
+            . "We have generated a Request For Quotation *#{$rv->rfq?->rfq_number}* for your company.\n\n"
+            . "👉 Please click the link below to view inquiry items and submit your prices & terms:\n"
+            . "🔗 {$portalUrl}\n\n"
+            . "Thank you,\n"
+            . "*{$companyName}*";
+
+        try {
+            $res = $waService->sendMessage($phone, $message);
+            if ($res['success'] ?? false) {
+                if ($rv->status === 'Draft') {
+                    $rv->update(['status' => 'Sent']);
+                }
+                return response()->json([
+                    'success' => true,
+                    'message' => "WhatsApp link sent successfully to {$vendorName} ({$phone})!",
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => $res['message'] ?? 'Failed to send WhatsApp message.',
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error sending WhatsApp: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function confirmRfq(Request $request, int $id)

@@ -38,8 +38,6 @@ class ProvisionCrmDefaults
             LeadStatus::query()->firstOrCreate(
                 ['tenant_id' => $event->tenantId, 'name' => $name],
                 [
-                    'company_id' => $event->companyId,
-                    'branch_id' => $event->branchId,
                     'sort_order' => ++$order,
                     'color' => $color,
                     'is_protected' => $protected,
@@ -53,8 +51,6 @@ class ProvisionCrmDefaults
             DealStatus::query()->firstOrCreate(
                 ['tenant_id' => $event->tenantId, 'name' => $name],
                 [
-                    'company_id' => $event->companyId,
-                    'branch_id' => $event->branchId,
                     'sort_order' => ++$order,
                     'color' => $color,
                     'probability' => $probability,

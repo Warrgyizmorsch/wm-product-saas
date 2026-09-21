@@ -250,7 +250,7 @@
                 <span class="section-label" style="text-align: center;">Order Schedule</span>
                 <div class="client-info" style="text-align: center;"><strong>Order Date:</strong> {{ $order->order_date ? $order->order_date->format('d/m/Y') : '—' }}</div>
                 <div class="client-info" style="text-align: center;"><strong>Est. Shipment:</strong> {{ $order->shipment_date ? $order->shipment_date->format('d/m/Y') : 'Not Scheduled' }}</div>
-                <div class="client-info" style="text-align: center;"><strong>Payment Terms:</strong> {{ $order->payment_terms ?: 'Due on Receipt' }}</div>
+                <div class="client-info" style="text-align: center;"><strong>Payment Terms:</strong> {{ \App\Domains\Platform\Models\PaymentTerm::getLabel($order->payment_terms) }}</div>
             </div>
             <div class="reference">
                 <span class="section-label">Reference Details</span>

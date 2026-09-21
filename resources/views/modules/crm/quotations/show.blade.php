@@ -724,7 +724,7 @@
         $('#sendWaPhone').val(cPhone);
         $('#sendWaPdfBadge').text('Quotation_' + qNum + '.pdf');
 
-        const defaultCaption = "Dear Valued Client,\n\nPlease find attached Quotation *" + qNum + "* for your review regarding " + dTitle + ".\n\nThank you,\nSales Team";
+        const defaultCaption = "Dear Valued Client,\n\nPlease find attached Quotation *" + qNum + "* for your review regarding " + dTitle + ".\n\n👉 *Please respond with one of the options below:*\n1️⃣ Reply *1* or *ACCEPT* to Accept Quotation\n2️⃣ Reply *2* or *REJECT [reason]* to Reject Quotation\n\nThank you,\nSales Team";
         $('#sendWaCaption').val(defaultCaption);
 
         const sendWaModal = new bootstrap.Modal(document.getElementById('sendQuotationWhatsAppModal'));

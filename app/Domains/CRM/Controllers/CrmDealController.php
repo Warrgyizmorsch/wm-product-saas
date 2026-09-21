@@ -14,6 +14,8 @@ use App\Domains\CRM\Services\DealHealthService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class CrmDealController extends Controller
@@ -271,6 +273,8 @@ class CrmDealController extends Controller
 
     public function show(Request $request, CrmDeal $deal): View
     {
+        $this->authorize('view', $deal);
+
         $tenantId = tenant_id() ?? 1;
         $deal->load(['account.contacts', 'account.owner', 'contact', 'quotations.items.product', 'salesOrders', 'owner']);
         $nextQuotationNumber = app(\App\Domains\CRM\Services\QuotationService::class)->getNextQuotationNumber();
@@ -347,6 +351,8 @@ class CrmDealController extends Controller
 
     public function edit(CrmDeal $deal): View
     {
+        $this->authorize('update', $deal);
+
         $tenantId = tenant_id() ?? 1;
         $accounts = CrmAccount::where('tenant_id', $tenantId)->orderBy('name')->get();
         $contacts = $deal->crm_account_id 
@@ -361,6 +367,8 @@ class CrmDealController extends Controller
 
     public function update(Request $request, CrmDeal $deal): RedirectResponse
     {
+        $this->authorize('update', $deal);
+
         $tenantId = tenant_id() ?? 1;
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
@@ -435,6 +443,8 @@ class CrmDealController extends Controller
 
     public function updateStage(Request $request, CrmDeal $deal)
     {
+        $this->authorize('update', $deal);
+
         $tenantId = tenant_id() ?? 1;
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
@@ -504,12 +514,16 @@ class CrmDealController extends Controller
 
     public function destroy(CrmDeal $deal): RedirectResponse
     {
+        $this->authorize('delete', $deal);
+
         $deal->delete();
         return redirect()->route('crm.deals.index')->with('success', 'Deal deleted successfully.');
     }
 
     public function uploadDocuments(Request $request, CrmDeal $deal): RedirectResponse
     {
+        $this->authorize('update', $deal);
+
         $request->validate([
             'documents' => 'required',
             'documents.*' => 'file|max:10240'
@@ -546,6 +560,8 @@ class CrmDealController extends Controller
 
     public function updateRequirement(Request $request, CrmDeal $deal)
     {
+        $this->authorize('update', $deal);
+
         $validated = $request->validate([
             'notes'       => 'nullable|string',
             'requirement' => 'nullable|string',
@@ -576,6 +592,8 @@ class CrmDealController extends Controller
 
     public function showConvertForm(CrmDeal $deal)
     {
+        $this->authorize('update', $deal);
+
         $tenantId = $deal->tenant_id ?? (tenant_id() ?? 1);
         $deal->load(['account.contacts', 'contact', 'lead']);
 
@@ -653,9 +671,18 @@ class CrmDealController extends Controller
 
     public function processConvert(Request $request, CrmDeal $deal): RedirectResponse|View
     {
+        $this->authorize('update', $deal);
+
+        $tenantId = $deal->tenant_id ?? (tenant_id() ?? 1);
+
         $request->validate([
             'conversion_mode'      => 'required|string|in:existing,create_new',
-            'existing_customer_id' => 'required_if:conversion_mode,existing|nullable|integer|exists:customers,id',
+            'existing_customer_id' => [
+                'required_if:conversion_mode,existing',
+                'nullable',
+                'integer',
+                Rule::exists('customers', 'id')->where('tenant_id', $tenantId),
+            ],
         ]);
 
         $mode = $request->input('conversion_mode');
@@ -900,6 +927,8 @@ class CrmDealController extends Controller
      */
     public function syncHealth(CrmDeal $deal, DealHealthService $service): JsonResponse
     {
+        $this->authorize('update', $deal);
+
         $result = $service->syncDealHealth($deal);
         return response()->json($result);
     }
@@ -909,6 +938,8 @@ class CrmDealController extends Controller
      */
     public function generateDraftReply(CrmDeal $deal, DealHealthService $service): JsonResponse
     {
+        $this->authorize('view', $deal);
+
         $result = $service->generateDraftReply($deal);
         return response()->json($result);
     }

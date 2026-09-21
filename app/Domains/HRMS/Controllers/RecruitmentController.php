@@ -268,7 +268,7 @@ class RecruitmentController extends Controller
 
         $resumePath = null;
         if ($request->hasFile('resume')) {
-            $resumePath = $request->file('resume')->store('recruitment/resumes', 'public');
+            $resumePath = $request->file('resume')->store('recruitment/resumes', 'local');
         }
 
         $candidate = Candidate::create([
@@ -811,20 +811,17 @@ class RecruitmentController extends Controller
 
         // 1. Immediately update Candidate status and Application stage to 'hired'
         $candidate->update(['status' => 'hired']);
-        if ($application) {
-            $oldStage = $application->current_stage;
+        if ($application && $application->current_stage !== 'hired') {
             $application->update([
                 'current_stage'    => 'hired',
                 'stage_updated_at' => now(),
             ]);
 
-            if ($oldStage !== 'hired') {
-                $req = $application->requisition;
-                if ($req && $req->vacancies > 0) {
-                    $req->decrement('vacancies');
-                    if ($req->fresh()->vacancies === 0) {
-                        $req->update(['status' => 'closed']);
-                    }
+            $req = $application->requisition;
+            if ($req && $req->vacancies > 0) {
+                $req->decrement('vacancies');
+                if ($req->fresh()->vacancies === 0) {
+                    $req->update(['status' => 'closed']);
                 }
             }
         }
@@ -835,5 +832,24 @@ class RecruitmentController extends Controller
             'user_id'          => $user->id,
             'account_id'       => $request->account_id,
         ]))->with('success', "🎉 User account created for {$candidate->full_name}! Candidate moved to Hired stage. Please complete the Employee Profile below.");
+    }
+
+    public function downloadResume(Candidate $candidate)
+    {
+        $this->authorizeHrms('hrms.recruitment.view');
+
+        if (!$candidate->resume_path) {
+            abort(404, 'Candidate resume not found.');
+        }
+
+        if (\Illuminate\Support\Facades\Storage::disk('local')->exists($candidate->resume_path)) {
+            return \Illuminate\Support\Facades\Storage::disk('local')->response($candidate->resume_path);
+        }
+
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($candidate->resume_path)) {
+            return \Illuminate\Support\Facades\Storage::disk('public')->response($candidate->resume_path);
+        }
+
+        abort(404, 'Resume file missing.');
     }
 }

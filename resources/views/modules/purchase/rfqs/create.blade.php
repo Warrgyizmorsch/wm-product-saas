@@ -276,6 +276,7 @@
                 if (selectedOptions.length === 0) {
                     $badgeContainer.html('<span class="text-muted fs-11 italic me-2">{{ __('purchase.no_supplier') }}</span>');
                 } else {
+                    $badgeContainer.removeClass('p-1 rounded border border-danger bg-soft-danger');
                     selectedOptions.each(function() {
                         const id = $(this).val();
                         const name = $(this).text();
@@ -485,13 +486,13 @@
             $('#bulkAddSupplierBtn').on('click', function() {
                 const selectedVendorId = $('#bulkSupplierSelect').val();
                 if (!selectedVendorId) {
-                    alert('{{ __('purchase.js_select_supplier_first') }}');
+                    showAppToast('warning', '{{ __('purchase.js_select_supplier_first') }}');
                     return;
                 }
 
                 const checkedRows = $('.row-item-checkbox:checked');
                 if (checkedRows.length === 0) {
-                    alert('{{ __('purchase.js_select_checkboxes') }}');
+                    showAppToast('warning', '{{ __('purchase.js_select_checkboxes') }}');
                     return;
                 }
 
@@ -512,13 +513,13 @@
             $('#bulkRemoveSupplierBtn').on('click', function() {
                 const selectedVendorId = $('#bulkSupplierSelect').val();
                 if (!selectedVendorId) {
-                    alert('{{ __('purchase.js_select_supplier_first') }}');
+                    showAppToast('warning', '{{ __('purchase.js_select_supplier_first') }}');
                     return;
                 }
 
                 const checkedRows = $('.row-item-checkbox:checked');
                 if (checkedRows.length === 0) {
-                    alert('{{ __('purchase.js_select_checkboxes') }}');
+                    showAppToast('warning', '{{ __('purchase.js_select_checkboxes') }}');
                     return;
                 }
 
@@ -534,6 +535,43 @@
                         updateBadgeDisplay($row);
                     }
                 });
+            });
+
+            // Form Submit Validation: Every item must have at least 1 supplier assigned
+            $('#createRfqForm').on('submit', function(e) {
+                let hasItems = false;
+                let missingSupplier = false;
+                let firstMissingRow = null;
+
+                $('#rfqItemsTable tbody tr.item-row').each(function() {
+                    hasItems = true;
+                    const $row = $(this);
+                    const selectedVendors = $row.find('.vendor-hidden-select').val() || [];
+                    if (selectedVendors.length === 0) {
+                        missingSupplier = true;
+                        if (!firstMissingRow) {
+                            firstMissingRow = $row;
+                        }
+                        $row.find('.selected-vendors-badges').addClass('p-1 rounded border border-danger bg-soft-danger');
+                    } else {
+                        $row.find('.selected-vendors-badges').removeClass('p-1 rounded border border-danger bg-soft-danger');
+                    }
+                });
+
+                if (!hasItems) {
+                    e.preventDefault();
+                    showAppToast('warning', '{{ __('purchase.alert_no_items_found') }}');
+                    return false;
+                }
+
+                if (missingSupplier) {
+                    e.preventDefault();
+                    showAppToast('warning', '{{ __('purchase.js_assign_supplier_to_all_items') }}');
+                    if (firstMissingRow) {
+                        firstMissingRow[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    return false;
+                }
             });
         });
     </script>
