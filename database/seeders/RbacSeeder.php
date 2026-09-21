@@ -417,6 +417,7 @@ class RbacSeeder extends Seeder
             ['name' => 'platform.currencies.manage', 'module' => 'platform', 'entity' => 'currencies', 'action' => 'manage'],
             ['name' => 'platform.usage.view', 'module' => 'platform', 'entity' => 'usage', 'action' => 'view'],
             ['name' => 'platform.payment_gateway.manage', 'module' => 'platform', 'entity' => 'payment_gateway', 'action' => 'manage'],
+            ['name' => 'dashboard.tenant.manage', 'module' => 'dashboard', 'entity' => 'tenant', 'action' => 'manage'],
             ['name' => 'access.roles.manage', 'module' => 'access', 'entity' => 'roles', 'action' => 'manage'],
             ['name' => 'access.permissions.manage', 'module' => 'access', 'entity' => 'permissions', 'action' => 'manage'],
             ['name' => 'access.users.manage', 'module' => 'access', 'entity' => 'users', 'action' => 'manage'],

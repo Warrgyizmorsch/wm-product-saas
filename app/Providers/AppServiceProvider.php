@@ -38,6 +38,9 @@ class AppServiceProvider extends ServiceProvider
         // Loads every module's Routes/menu.php once per request.
         $this->app->singleton(\App\Core\Navigation\MenuRegistry::class);
 
+        // Loads every module's Dashboard/widgets.php once per request.
+        $this->app->singleton(\App\Core\Dashboard\WidgetRegistry::class);
+
         // Payment gateways: register every known PaymentGateway implementation
         // here. Which one is actually used is a stored setting resolved at
         // call time (PaymentGatewayManager::active()), not this list — adding
@@ -413,6 +416,7 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Listeners\ProvisionAccountingMasters::class,
             \App\Domains\Accounting\Listeners\ProvisionCostCentersAndAssetCategories::class,
             \App\Domains\Platform\Listeners\ProvisionPaymentTerms::class,
+            \App\Domains\Platform\Listeners\ProvisionDashboardLayout::class,
             \App\Domains\CRM\Listeners\ProvisionCrmDefaults::class,
             \App\Domains\Inventory\Listeners\ProvisionInventoryDefaults::class,
             \App\Domains\Production\Listeners\ProvisionProductionDefaults::class,

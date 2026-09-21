@@ -7,6 +7,7 @@ use App\Domains\Accounting\Services\AccountingDashboardService;
 use App\Domains\Accounting\Support\DashboardPeriod;
 use App\Domains\Accounting\Support\DashboardReport;
 use App\Domains\HRMS\Models\Company;
+use App\Domains\Platform\Services\DashboardService;
 use App\Exports\AccountingDashboardExport;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -36,6 +37,7 @@ class AccountingDashboardController extends Controller
     public function __construct(
         private readonly AccountingDashboardService $dashboard,
         private readonly AccessService $access,
+        private readonly DashboardService $layouts,
     ) {
     }
 
@@ -50,11 +52,24 @@ class AccountingDashboardController extends Controller
         }
 
         $user = $request->user();
+        $activeView = $filters['view'] ?? $this->defaultView($user);
 
-        return view('modules.accounting.dashboard', $this->build($tenantId, $filters) + [
+        // Every block on the page is a widget the user can rearrange; the page's own filters apply to all of them.
+        $widgetQuery = array_filter([
+            'preset' => $filters['preset'] ?? 'this_month',
+            'from' => $filters['from'] ?? null,
+            'to' => $filters['to'] ?? null,
+            'scope' => ($filters['company_scope'] ?? 'current') === 'all' ? 'all' : null,
+            'cost_center_id' => $filters['cost_center_id'] ?? null,
+        ], fn ($value) => $value !== null && $value !== '');
+        $state = $this->layouts->pageState($user, $tenantId, 'accounting', $activeView);
+
+        return view('modules.accounting.dashboard', $this->build($tenantId, $filters) + $state + [
+            'initial' => $this->layouts->preload($state['layout'], $user, $tenantId, $widgetQuery),
+            'widgetQuery' => (object) $widgetQuery,
             'presets' => DashboardPeriod::PRESETS,
             'views' => self::VIEWS,
-            'activeView' => $filters['view'] ?? $this->defaultView($user),
+            'activeView' => $activeView,
             'costCenters' => CostCenter::query()->active()->orderBy('code')->get(['id', 'code', 'name']),
             'companyCount' => Company::query()->count(),
             'canPostJournals' => $this->access->allows($user, 'accounting.journals.post', ['tenant_id' => $user->tenant_id]),

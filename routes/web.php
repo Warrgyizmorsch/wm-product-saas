@@ -1,5 +1,6 @@
 <?php
 
+use App\Domains\Platform\Controllers\DashboardController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BranchSwitchController;
@@ -51,17 +52,17 @@ Route::middleware(['tenant'])->group(function (): void {
         Route::get('/branch-switch/{branch}', BranchSwitchController::class)
             ->name('branch.switch');
 
-        Route::get('/', function () {
-            return view('dashboard');
-        })->name('home');
+        Route::get('/', [DashboardController::class, 'index'])->name('home');
 
         Route::get('/ui-elements', function () {
             return view('ui-elements');
         })->name('ui-elements');
 
-        Route::get('/dashboard', function () {
-            return view('dashboard');
-        })->name('dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard/widgets/{key}', [DashboardController::class, 'widget'])
+            ->middleware('throttle:240,1')->name('dashboard.widget');
+        Route::put('/dashboard/layout', [DashboardController::class, 'save'])->name('dashboard.layout.save');
+        Route::delete('/dashboard/layout', [DashboardController::class, 'reset'])->name('dashboard.layout.reset');
 
         Route::get('/global-search', [GlobalSearchController::class, 'search'])
             ->name('global-search');
