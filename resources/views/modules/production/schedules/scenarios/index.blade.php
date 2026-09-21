@@ -34,12 +34,12 @@
             <thead class="bg-light text-muted small text-uppercase">
                 <tr>
                     <th class="ps-4">Scenario Name</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Created By</th>
-                    <th>Created At</th>
+                    <th>{{ __('production.routing_type') }}</th>
+                    <th>{{ __('production.status') }}</th>
+                    <th>{{ __('production.created_by') }}</th>
+                    <th>{{ __('production.created_at') }}</th>
                     <th>Summary KPIs</th>
-                    <th class="text-end pe-4">Actions</th>
+                    <th class="text-end pe-4">{{ __('production.actions') }}</th>
                 </tr>
             </thead>
             <tbody>

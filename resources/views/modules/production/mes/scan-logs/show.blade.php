@@ -6,8 +6,7 @@
 
 @section('page-actions')
     <a href="{{ route('production.scan-logs.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-arrow-left me-2"></i>Back to List
-    </a>
+        <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}</a>
 @endsection
 
 @section('content')

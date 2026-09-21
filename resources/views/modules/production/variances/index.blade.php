@@ -27,7 +27,7 @@
                 <th style="width: 20%">Evidence</th>
                 <th style="width: 12%">Sample Size</th>
                 <th style="width: 10%">Avg Variance</th>
-                <th style="width: 13%" class="text-end">Action</th>
+                <th style="width: 13%" class="text-end">{{ __('production.action') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -73,11 +73,11 @@
     <x-ui.odoo-form-ui type="table">
         <thead>
             <tr>
-                <th>Product</th>
-                <th>Operation</th>
+                <th>{{ __('production.product') }}</th>
+                <th>{{ __('production.operation') }}</th>
                 <th>Planned Avg</th>
                 <th>Actual Avg</th>
-                <th>Variance</th>
+                <th>{{ __('production.variance') }}</th>
                 <th>Scrap Count</th>
                 <th>Alt Machine Count</th>
             </tr>

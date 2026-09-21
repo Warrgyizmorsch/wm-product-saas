@@ -141,9 +141,9 @@
                                                     @elseif($assign->status === 'accepted')
                                                         <span class="badge bg-soft-success text-success fs-9">Accepted</span>
                                                     @elseif($assign->status === 'rejected')
-                                                        <span class="badge bg-soft-danger text-danger fs-9">Rejected</span>
+                                                        <span class="badge bg-soft-danger text-danger fs-9">{{ __('production.rejected') }}</span>
                                                     @else
-                                                        <span class="badge bg-soft-secondary text-secondary fs-9">Completed</span>
+                                                        <span class="badge bg-soft-secondary text-secondary fs-9">{{ __('production.completed_schedules') }}</span>
                                                     @endif
                                                 </div>
                                                 <h6 class="fw-bold text-dark mb-1">{{ $assign->operation->name ?? '—' }}</h6>
@@ -167,13 +167,11 @@
                                                     </form>
                                                     <form method="POST" action="{{ route('production.mes.assignments.reject', $assign->id) }}" class="flex-fill">
                                                         @csrf
-                                                        <x-ui.button type="submit" variant="outline-danger" icon="feather-x" class="w-100 btn-touch">Reject</x-ui.button>
+                                                        <x-ui.button type="submit" variant="outline-danger" icon="feather-x" class="w-100 btn-touch">{{ __('production.reject') }}</x-ui.button>
                                                     </form>
                                                 @elseif($assign->status === 'accepted')
                                                     @if($assign->operation && $assign->operation->status === 'completed')
-                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="secondary" icon="feather-eye" class="">
-                                                            View
-                                                        </x-ui.button>
+                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="secondary" icon="feather-eye" class="">{{ __('production.view') }}</x-ui.button>
                                                     @else
                                                         <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="primary" icon="feather-play" class="">
                                                             Go to Execution

@@ -36,7 +36,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Quantity</label>
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.quantity') }}</label>
                         <input type="number" step="0.01" name="quantity" class="form-control" placeholder="Quantity" required>
                     </div>
 
@@ -60,13 +60,13 @@
                     <thead>
                         <tr>
                             <th style="width: 8%">ID</th>
-                            <th style="width: 15%">Category</th>
+                            <th style="width: 15%">{{ __('production.category') }}</th>
                             <th style="width: 22%">Production Order &amp; Product</th>
-                            <th style="width: 15%">Reason</th>
+                            <th style="width: 15%">{{ __('production.reason') }}</th>
                             <th style="width: 12%" class="text-end">Qty</th>
                             <th style="width: 13%" class="text-end">Value</th>
-                            <th style="width: 10%">Status</th>
-                            <th class="text-end" style="width: 5%">Action</th>
+                            <th style="width: 10%">{{ __('production.status') }}</th>
+                            <th class="text-end" style="width: 5%">{{ __('production.action') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -96,9 +96,9 @@
 
                                 <td>
                                     @if($sc->status === 'approved')
-                                        <span class="erp-badge-active">Approved</span>
+                                        <span class="erp-badge-active">{{ __('production.approved') }}</span>
                                     @elseif($sc->status === 'pending_approval')
-                                        <span class="erp-badge-pending">Pending</span>
+                                        <span class="erp-badge-pending">{{ __('production.pending') }}</span>
                                     @else
                                         <span class="erp-badge-draft text-uppercase">{{ $sc->status }}</span>
                                     @endif

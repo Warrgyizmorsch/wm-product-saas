@@ -51,10 +51,10 @@
 
                         <x-ui.odoo-form-ui type="select" label="Priority" name="priority" :required="true"
                             :error-text="$errors->first('priority')">
-                            <option value="medium" @selected(old('priority', 'medium') == 'medium')>Medium</option>
-                            <option value="low" @selected(old('priority') == 'low')>Low</option>
-                            <option value="high" @selected(old('priority') == 'high')>High</option>
-                            <option value="critical" @selected(old('priority') == 'critical')>Critical</option>
+                            <option value="medium" @selected(old('priority', 'medium') == 'medium')>{{ __('production.priority_medium') }}</option>
+                            <option value="low" @selected(old('priority') == 'low')>{{ __('production.priority_low') }}</option>
+                            <option value="high" @selected(old('priority') == 'high')>{{ __('production.priority_high') }}</option>
+                            <option value="critical" @selected(old('priority') == 'critical')>{{ __('production.critical') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
 
@@ -91,7 +91,7 @@
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                    <a href="{{ route('production.maintenance.schedules.index') }}" class="btn btn-light border px-4">Cancel</a>
+                    <a href="{{ route('production.maintenance.schedules.index') }}" class="btn btn-light border px-4">{{ __('production.cancel') }}</a>
                     <button type="submit" class="btn btn-primary px-4"><i class="feather-check me-1"></i> Save PM Schedule</button>
                 </div>
             </x-ui.odoo-form-ui>

@@ -31,13 +31,13 @@
         <td class="text-end text-primary fw-bold">{{ format_currency($sw->total_value) }}</td>
         <td>
             @if($sw->currentRoutingOperation && $sw->currentRoutingOperation->is_external)
-                <span class="badge bg-soft-warning text-dark text-uppercase fs-10"><i class="feather-external-link me-1"></i>At Vendor</span>
+                <span class="badge bg-soft-warning text-dark text-uppercase fs-10"><i class="feather-external-link me-1"></i>{{ __('production.at_vendor') }}</span>
             @elseif($sw->status === 'transferred')
                 <span class="badge bg-soft-info text-info text-uppercase fs-10">Transferred</span>
             @elseif($sw->status === 'active')
                 <span class="badge bg-soft-success text-success text-uppercase fs-10">Active</span>
             @elseif($sw->status === 'quality_hold')
-                <span class="badge bg-soft-warning text-warning text-uppercase fs-10">QC Pending</span>
+                <span class="badge bg-soft-warning text-warning text-uppercase fs-10">{{ __('production.qc_pending') }}</span>
             @elseif($sw->status === 'rework')
                 <span class="badge bg-soft-danger text-danger text-uppercase fs-10">Rework</span>
             @else
@@ -53,7 +53,7 @@
 @empty
     <tr>
         <td colspan="8" class="text-center py-3 text-muted fs-12">
-            No WIP batches matching selected criteria.
+            {{ __('production.no_wip_batches_found') }}
         </td>
     </tr>
 @endforelse

@@ -94,7 +94,7 @@
                         <th style="width: 35%">Material Description</th>
                         <th style="width: 25%">Source Warehouse</th>
                         <th style="width: 15%" class="text-end">Dispatched Quantity</th>
-                        <th style="width: 10%">UOM</th>
+                        <th style="width: 10%">{{ __('production.uom') }}</th>
                         <th style="width: 10%">Batch / Serial</th>
                     </tr>
                 </thead>

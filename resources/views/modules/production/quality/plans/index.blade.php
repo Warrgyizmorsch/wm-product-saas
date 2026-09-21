@@ -19,17 +19,17 @@
             <div class="d-flex gap-2 ms-auto">
                 <form method="GET" action="{{ route('production.quality-plans.index') }}" class="d-inline">
                     <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i>{{ __('production.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.search_keywords') }}</label>
                             <x-ui.input name="search" placeholder="Search by plan name..." value="{{ request('search') }}" />
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Plan Scope Type</label>
                             <x-ui.odoo-form-ui type="select" name="type">
-                                <option value="">All Types</option>
+                                <option value="">{{ __('production.all_types') }}</option>
                                 <option value="product" @selected(request('type') === 'product')>Product Specific</option>
                                 <option value="product_category" @selected(request('type') === 'product_category')>Category Specific</option>
                                 <option value="process" @selected(request('type') === 'process')>Process General</option>
@@ -40,17 +40,17 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status State</label>
                             <x-ui.odoo-form-ui type="select" name="status">
-                                <option value="">All Statuses</option>
-                                <option value="draft" @selected(request('status') === 'draft')>Draft</option>
-                                <option value="submitted" @selected(request('status') === 'submitted')>Submitted</option>
-                                <option value="approved" @selected(request('status') === 'approved')>Approved</option>
+                                <option value="">{{ __('production.all_statuses') }}</option>
+                                <option value="draft" @selected(request('status') === 'draft')>{{ __('production.draft_schedules') }}</option>
+                                <option value="submitted" @selected(request('status') === 'submitted')>{{ __('production.submitted') }}</option>
+                                <option value="approved" @selected(request('status') === 'approved')>{{ __('production.approved') }}</option>
                                 <option value="archived" @selected(request('status') === 'archived')>Archived</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('production.quality-plans.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('production.quality-plans.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -61,12 +61,12 @@
         <x-ui.odoo-form-ui type="table">
             <thead>
                 <tr>
-                    <th style="width: 25%">Plan Name</th>
-                    <th style="width: 10%">Version</th>
+                    <th style="width: 25%">{{ __('production.plan_name') }}</th>
+                    <th style="width: 10%">{{ __('production.version') }}</th>
                     <th style="width: 15%">Scope Type</th>
                     <th style="width: 25%">Assigned Target</th>
-                    <th style="width: 10%">Status</th>
-                    <th class="text-end" style="width: 15%">Actions</th>
+                    <th style="width: 10%">{{ __('production.status') }}</th>
+                    <th class="text-end" style="width: 15%">{{ __('production.actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -94,9 +94,9 @@
                         </td>
                         <td>
                             @if($plan->status === 'approved')
-                                <span class="erp-badge-active">Approved</span>
+                                <span class="erp-badge-active">{{ __('production.approved') }}</span>
                             @elseif($plan->status === 'draft')
-                                <span class="erp-badge-draft">Draft</span>
+                                <span class="erp-badge-draft">{{ __('production.draft_schedules') }}</span>
                             @else
                                 <span class="badge bg-soft-warning text-warning text-capitalize">{{ $plan->status }}</span>
                             @endif
@@ -105,8 +105,7 @@
                             <x-ui.action-dropdown>
                                 <li>
                                     <a href="{{ route('production.quality-plans.edit', $plan->id) }}" class="dropdown-item">
-                                        <i class="feather-edit me-2 text-muted fs-12"></i>Edit Plan
-                                    </a>
+                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('production.edit_plan') }}</a>
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
@@ -115,8 +114,7 @@
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="dropdown-item text-danger">
-                                            <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Permanent
-                                        </button>
+                                            <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('production.delete_permanent') }}</button>
                                     </form>
                                 </li>
                             </x-ui.action-dropdown>

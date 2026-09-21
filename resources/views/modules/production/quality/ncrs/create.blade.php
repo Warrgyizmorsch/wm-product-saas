@@ -64,7 +64,7 @@
                     <button type="submit" class="btn btn-danger px-4">
                         <i class="feather-alert-triangle me-2"></i>Record Defect Report (NCR)
                     </button>
-                    <a href="{{ route('production.ncrs.index') }}" class="btn btn-secondary px-4">Cancel</a>
+                    <a href="{{ route('production.ncrs.index') }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

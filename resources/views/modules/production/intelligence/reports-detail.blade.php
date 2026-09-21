@@ -1,14 +1,15 @@
 @php
     $reportTitles = [
         'machine'              => __('production.machine_performance_report') ?? 'Machine Performance & OEE Report',
-        'work-center'          => __('production.work_center_report') ?? 'Work Center Performance & OEE Report',
+        'work-center'          => __('production.work_center_report') ?? (__('production.work_center') . ' Performance & OEE Report'),
         'downtime'             => __('production.downtime_breakdown_report') ?? 'Downtime Breakdown & Events Report',
-        'production-orders'    => 'Production Order Summary & Output Report',
+        'production-orders'    => 'Production ' . __('production.order_summary') . ' & Output Report',
         'material-consumption' => 'Material Consumption & Variance Report',
         'cost-variance'        => 'Production Cost & Variance Report',
         'order-detail'         => 'Production Order Detail Report',
+        'sales-order-tracking' => 'Sales Order Tracking Report (Order-to-Delivery Pipeline)',
     ];
-    $displayTitle = $reportTitles[$type] ?? (ucwords(str_replace('-', ' ', $type)) . ' Report');
+    $displayTitle = $reportTitles[$type] ?? ($displayTitle ?? (ucwords(str_replace('-', ' ', $type)) . ' Report'));
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -267,7 +268,7 @@
                         <i class="feather-download"></i> Export
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:170px">
-                        <li><span class="dropdown-header fs-11 text-uppercase text-muted fw-bold px-3 py-1">Export Format</span></li>
+                        <li><span class="dropdown-header fs-11 text-uppercase text-muted fw-bold px-3 py-1">{{ __('production.export_format') }}</span></li>
                         <li>
                             <a class="dropdown-item fs-13 d-flex align-items-center gap-2"
                                href="{{ route('production.intelligence.reports.export', array_merge(['type' => $type], request()->all())) }}">
@@ -349,7 +350,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">No machine performance records found for the selected period.</td>
+                                    <td colspan="8" class="text-center text-muted py-4">{{ __('production.no_machine_records_found') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -361,8 +362,8 @@
                     <table class="report-table align-middle">
                         <thead>
                             <tr>
-                                <th>Work Center Code</th>
-                                <th>Work Center Name</th>
+                                <th>{{ __('production.work_center') }} Code</th>
+                                <th>{{ __('production.work_center') }} Name</th>
                                 <th>OEE %</th>
                                 <th>Availability %</th>
                                 <th>Performance %</th>
@@ -381,7 +382,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">No work center performance records found for the selected period.</td>
+                                    <td colspan="6" class="text-center text-muted py-4">{{ __('production.no_work_center_records_found') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -397,9 +398,9 @@
                                 <th>Machine</th>
                                 <th>Downtime Category</th>
                                 <th>{{ __('production.reason') }}</th>
-                                <th>Started At</th>
-                                <th>Resolved At</th>
-                                <th class="text-end">Duration (min)</th>
+                                <th>{{ __('production.started_at') }}</th>
+                                <th>{{ __('production.resolved_at') }}</th>
+                                <th class="text-end">{{ __('production.duration_min') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -414,7 +415,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">No downtime events found for the period.</td>
+                                    <td colspan="6" class="text-center text-muted py-4">{{ __('production.no_downtime_events_found') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -427,8 +428,8 @@
                         <thead>
                             <tr>
                                 <th>Downtime Category</th>
-                                <th class="text-end">Total Events Count</th>
-                                <th class="text-end">Total Accumulated Duration (min)</th>
+                                <th class="text-end">{{ __('production.total_events_count') }}</th>
+                                <th class="text-end">Total Accumulated {{ __('production.duration_min') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -458,31 +459,31 @@
                     </div>
                     <div class="col-md-2 col-6">
                         <div class="kpi-box text-center">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Planned Volume</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.planned_volume') }}</div>
                             <div class="fs-18 fw-bold text-primary mt-1">{{ number_format($reportData['summary']['total_planned_qty'] ?? 0, 2) }}</div>
                         </div>
                     </div>
                     <div class="col-md-2 col-6">
                         <div class="kpi-box text-center">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Produced Volume</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.produced_volume') }}</div>
                             <div class="fs-18 fw-bold text-success mt-1">{{ number_format($reportData['summary']['total_produced_qty'] ?? 0, 2) }}</div>
                         </div>
                     </div>
                     <div class="col-md-2 col-6">
                         <div class="kpi-box text-center">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Scrapped Volume</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.scrapped_volume') }}</div>
                             <div class="fs-18 fw-bold text-danger mt-1">{{ number_format($reportData['summary']['total_scrapped_qty'] ?? 0, 2) }}</div>
                         </div>
                     </div>
                     <div class="col-md-2 col-6">
                         <div class="kpi-box text-center">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Overall Completion</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.overall_completion') }}</div>
                             <div class="fs-18 fw-bold text-info mt-1">{{ number_format($reportData['summary']['overall_completion_pct'] ?? 0, 1) }}%</div>
                         </div>
                     </div>
                     <div class="col-md-2 col-6">
                         <div class="kpi-box text-center">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Overall Yield</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.overall_yield') }}</div>
                             <div class="fs-18 fw-bold text-dark mt-1">{{ number_format($reportData['summary']['overall_yield_pct'] ?? 0, 1) }}%</div>
                         </div>
                     </div>
@@ -497,10 +498,10 @@
                                 <th>Product / SKU</th>
                                 <th>Status</th>
                                 <th class="text-end">Planned Qty</th>
-                                <th class="text-end">Produced Qty</th>
+                                <th class="text-end">{{ __('production.produced_qty') }}</th>
                                 <th class="text-end">Scrapped Qty</th>
-                                <th>Completion %</th>
-                                <th>Yield %</th>
+                                <th>{{ __('production.completion_pct') }}</th>
+                                <th>{{ __('production.yield_pct') }}</th>
                                 <th>Start Date</th>
                                 <th>End Date</th>
                             </tr>
@@ -548,7 +549,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="text-center text-muted py-4">No production orders found for the selected criteria.</td>
+                                    <td colspan="10" class="text-center text-muted py-4">{{ __('production.no_production_orders_found') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -560,7 +561,7 @@
                 <div class="row g-3 mb-4">
                     <div class="col-md-2 col-6">
                         <div class="kpi-box text-center h-100">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Total Line Items</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.total_line_items') }}</div>
                             <div class="fs-18 fw-bold text-dark mt-1">{{ number_format($reportData['summary']['total_items'] ?? 0) }}</div>
                         </div>
                     </div>
@@ -572,28 +573,28 @@
                     </div>
                     <div class="col-md-2 col-6">
                         <div class="kpi-box text-center h-100">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Total Issued Cost</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.total_issued_cost') }}</div>
                             <div class="fs-18 fw-bold text-dark mt-1">{{ number_format($reportData['summary']['total_issued_cost'] ?? 0, 2) }}</div>
                         </div>
                     </div>
                     <div class="col-md-3 col-6">
                         <div class="kpi-box text-center h-100">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Actually Consumed Cost</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.actually_consumed') }} Cost</div>
                             <div class="fs-18 fw-bold text-success mt-1">{{ number_format($reportData['summary']['total_consumed_cost'] ?? 0, 2) }}</div>
                         </div>
                     </div>
                     <div class="col-md-3 col-12">
                         <div class="kpi-box text-center h-100">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Floor Stock / WIP Balance</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.floor_stock_wip') }} Balance</div>
                             <div class="fs-18 fw-bold text-warning mt-1">{{ number_format($reportData['summary']['total_floor_balance_cost'] ?? 0, 2) }}</div>
-                            <small class="text-muted fs-11">Issued to floor but not yet consumed</small>
+                            <small class="text-muted fs-11">{{ __('production.issued_floor_not_consumed') }}</small>
                         </div>
                     </div>
                 </div>
 
                 @if(!empty($reportData['summary']['uom_groups']))
                     <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
-                        <span class="text-muted fs-12 fw-semibold"><i class="feather-box me-1"></i> UOM Totals:</span>
+                        <span class="text-muted fs-12 fw-semibold"><i class="feather-box me-1"></i> {{ __('production.uom_totals') }}:</span>
                         @foreach($reportData['summary']['uom_groups'] as $uom => $uomData)
                             <span class="badge bg-white border text-dark fs-12 px-2 py-1 shadow-sm">
                                 <strong>{{ $uom }}:</strong> Planned {{ number_format($uomData['planned'], 2) }} | Issued {{ number_format($uomData['issued'], 2) }} | Consumed {{ number_format($uomData['consumed'] ?? 0, 2) }} | Floor {{ number_format($uomData['floor_balance'] ?? 0, 2) }}
@@ -608,19 +609,19 @@
                         <thead>
                             <tr class="text-nowrap">
                                 <th>Order Number</th>
-                                <th>Finished Good</th>
-                                <th>Consuming Operation</th>
-                                <th>Material / Component</th>
+                                <th>{{ __('production.finished_good') }}</th>
+                                <th>{{ __('production.consuming_operation') }}</th>
+                                <th>{{ __('production.material_component') }}</th>
                                 <th>UOM</th>
                                 <th class="text-end">Planned Qty</th>
                                 <th class="text-end">Issued Qty</th>
-                                <th class="text-end">Consumed Qty</th>
-                                <th class="text-end">Floor Balance</th>
-                                <th class="text-center" style="min-width: 110px;">Consumption %</th>
+                                <th class="text-end">{{ __('production.consumed_qty') }}</th>
+                                <th class="text-end">{{ __('production.floor_balance') }}</th>
+                                <th class="text-center" style="min-width: 110px;">{{ __('production.consumption_pct') }}</th>
                                 <th class="text-end">Unit Cost</th>
                                 <th class="text-end">Planned Cost</th>
-                                <th class="text-end">Issued Cost</th>
-                                <th class="text-end">Consumed Cost</th>
+                                <th class="text-end">{{ __('production.issued_cost') }}</th>
+                                <th class="text-end">{{ __('production.consumed_cost') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -664,7 +665,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="14" class="text-center text-muted py-4">No material reservations or consumption records found.</td>
+                                    <td colspan="14" class="text-center text-muted py-4">{{ __('production.no_material_records_found') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -694,7 +695,7 @@
                     </div>
                     <div class="col-md-3 col-6">
                         <div class="kpi-box text-center">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Total Cost Variance</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.total_cost_variance') }}</div>
                             @php $costVar = $reportData['summary']['total_variance'] ?? 0; @endphp
                             <div class="fs-18 fw-bold {{ $costVar > 0 ? 'text-danger' : ($costVar < 0 ? 'text-success' : 'text-dark') }} mt-1">
                                 {{ $costVar > 0 ? '+' : '' }}{{ number_format($costVar, 2) }}
@@ -723,7 +724,7 @@
                             <strong class="text-primary">{{ number_format($reportData['summary']['machine_actual'] ?? 0, 2) }}</strong>
                         </div>
                         <div class="col-md-3 col-6">
-                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold">Overhead / Adjustments</span>
+                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold">Overhead / {{ __('production.adjustments') }}</span>
                             <strong>{{ number_format($reportData['summary']['overhead_actual'] ?? 0, 2) }}</strong> / 
                             <span class="text-muted">Adj: {{ number_format($reportData['summary']['total_adjustments'] ?? 0, 2) }}</span>
                         </div>
@@ -739,14 +740,14 @@
                                 <th>Product / SKU</th>
                                 <th>Status</th>
                                 <th class="text-end">Planned Cost</th>
-                                <th class="text-end">Actual Material</th>
-                                <th class="text-end">Actual Labor</th>
+                                <th class="text-end">{{ __('production.actual_material') }}</th>
+                                <th class="text-end">{{ __('production.actual_labor') }}</th>
                                 <th class="text-end">Actual Machine</th>
-                                <th class="text-end">Actual Overhead</th>
-                                <th class="text-end">Adjustments</th>
-                                <th class="text-end">Actual Total</th>
-                                <th class="text-end">Variance Amount</th>
-                                <th class="text-end">Variance %</th>
+                                <th class="text-end">{{ __('production.actual_overhead') }}</th>
+                                <th class="text-end">{{ __('production.adjustments') }}</th>
+                                <th class="text-end">{{ __('production.actual_total') }}</th>
+                                <th class="text-end">{{ __('production.variance_amount') }}</th>
+                                <th class="text-end">{{ __('production.variance_pct') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -782,7 +783,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="12" class="text-center text-muted py-4">No production cost records found for the selected criteria.</td>
+                                    <td colspan="12" class="text-center text-muted py-4">{{ __('production.no_production_cost_records_found') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -883,10 +884,10 @@
                     <div class="card border border-light shadow-sm mb-4">
                         <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
                             <h6 class="fw-bold text-dark mb-0 fs-13">
-                                <i class="feather-dollar-sign me-1 text-success"></i>Production Order Cost Estimation vs. Actual Incurred
+                                <i class="feather-dollar-sign me-1 text-success"></i>Production Order Cost Estimation vs. {{ __('production.actual_incurred') }}
                             </h6>
                             <span class="badge {{ $totVariance > 0 ? 'bg-soft-danger text-danger border border-danger-subtle' : ($totVariance < 0 ? 'bg-soft-success text-success border border-success-subtle' : 'bg-soft-secondary text-secondary border') }} fs-11">
-                                Net Variance: {{ $totVariance > 0 ? '+' : '' }}{{ number_format($totVariance, 2) }} ({{ $totVariance > 0 ? '+' : '' }}{{ $totVarPct }}%)
+                                {{ __('production.net_variance') }}: {{ $totVariance > 0 ? '+' : '' }}{{ number_format($totVariance, 2) }} ({{ $totVariance > 0 ? '+' : '' }}{{ $totVarPct }}%)
                             </span>
                         </div>
                         <div class="card-body p-3">
@@ -938,11 +939,11 @@
                             </div>
                             <div class="d-flex flex-wrap justify-content-between align-items-center mt-3 pt-2 border-top fs-12">
                                 <div>
-                                    <span class="text-muted">Total Estimated (Planned):</span>
+                                    <span class="text-muted">Total {{ __('production.estimated_planned') }}:</span>
                                     <strong class="text-dark ms-1 fs-13">{{ number_format($costEst['total']['planned'] ?? 0, 2) }}</strong>
                                 </div>
                                 <div>
-                                    <span class="text-muted">Total Actual Incurred:</span>
+                                    <span class="text-muted">Total {{ __('production.actual_incurred') }}:</span>
                                     <strong class="text-dark ms-1 fs-13">{{ number_format($costEst['total']['actual'] ?? 0, 2) }}</strong>
                                 </div>
                             </div>
@@ -954,7 +955,7 @@
                 @if(!empty($reportData['wip_locations']))
                     <div class="alert border border-primary-subtle bg-soft-primary mb-4 py-2 px-3" role="alert">
                         <div class="d-flex flex-wrap gap-3 align-items-center">
-                            <span class="fw-bold text-primary fs-13"><i class="feather-map-pin me-1"></i>Current WIP Location</span>
+                            <span class="fw-bold text-primary fs-13"><i class="feather-map-pin me-1"></i>{{ __('production.current_wip_location') }}</span>
                             @foreach($reportData['wip_locations'] as $wip)
                                 <span class="badge bg-white border text-dark fs-12 px-2 py-1 shadow-sm">
                                     <strong>{{ $wip['operation'] }}</strong>
@@ -968,14 +969,14 @@
                 @endif
 
                 {{-- ── SECTION 3: OPERATION STAGES ──────────────────────────────── --}}
-                <h5 class="fw-bold text-dark mb-3 mt-2"><i class="feather-git-merge me-2 text-primary"></i>Operation Stages</h5>
+                <h5 class="fw-bold text-dark mb-3 mt-2"><i class="feather-git-merge me-2 text-primary"></i>{{ __('production.operation_stages') }}</h5>
                 <div class="table-responsive mb-4">
                     <table class="report-table align-middle">
                         <thead>
                             <tr>
                                 <th>Seq</th>
                                 <th>Operation</th>
-                                <th>Work Center</th>
+                                <th>{{ __('production.work_center') }}</th>
                                 <th>Machine</th>
                                 <th>Status</th>
                                 <th class="text-end">Produced</th>
@@ -983,8 +984,8 @@
                                 <th class="text-end">Scrapped</th>
                                 <th class="text-end">Setup (min)<br><small class="fw-normal text-muted">Plan / Act</small></th>
                                 <th class="text-end">Process (min)<br><small class="fw-normal text-muted">Plan / Act</small></th>
-                                <th>Started At</th>
-                                <th>Ended At</th>
+                                <th>{{ __('production.started_at') }}</th>
+                                <th>{{ __('production.ended_at') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1005,10 +1006,10 @@
                                         <div class="fw-semibold text-dark">{{ $op['name'] }}</div>
                                         <div class="d-flex gap-1 mt-1">
                                             @if($op['is_external'])
-                                                <span class="badge bg-soft-warning text-warning border border-warning-subtle" style="font-size:10px">External</span>
+                                                <span class="badge bg-soft-warning text-warning border border-warning-subtle" style="font-size:10px">{{ __('production.external') }}</span>
                                             @endif
                                             @if($op['quality_required'])
-                                                <span class="badge bg-soft-info text-info border border-info-subtle" style="font-size:10px">QC Gate</span>
+                                                <span class="badge bg-soft-info text-info border border-info-subtle" style="font-size:10px">{{ __('production.qc_gate') }}</span>
                                             @endif
                                         </div>
                                     </td>
@@ -1033,7 +1034,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="12" class="text-center text-muted py-4">No routing operations found for this order.</td>
+                                    <td colspan="12" class="text-center text-muted py-4">{{ __('production.no_routing_operations_found') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -1042,7 +1043,7 @@
 
                 {{-- ── SECTION 4: MATERIAL CONSUMPTION ─────────────────────────── --}}
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold text-dark mb-0"><i class="feather-layers me-2 text-warning"></i>Material Consumption & Operation Allocation</h5>
+                    <h5 class="fw-bold text-dark mb-0"><i class="feather-layers me-2 text-warning"></i>{{ __('production.material_consumption_operation_allocation') }}</h5>
                     <span class="badge bg-soft-info text-info border border-info-subtle fs-11">
                         <i class="feather-info me-1"></i>Consumed based on Operation Progress
                     </span>
@@ -1068,13 +1069,13 @@
                     </div>
                     <div class="col-md-3 col-6">
                         <div class="kpi-box text-center p-2">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Actually Consumed</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.actually_consumed') }}</div>
                             <div class="fs-15 fw-bold text-success mt-1">{{ number_format($matSummary['total_consumed_cost'] ?? 0, 2) }}</div>
                         </div>
                     </div>
                     <div class="col-md-3 col-6">
                         <div class="kpi-box text-center p-2">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold">Floor Stock / WIP</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.floor_stock_wip') }}</div>
                             <div class="fs-15 fw-bold text-warning mt-1">{{ number_format($matSummary['total_floor_stock_cost'] ?? 0, 2) }}</div>
                         </div>
                     </div>
@@ -1092,17 +1093,17 @@
                     <table class="report-table align-middle">
                         <thead>
                             <tr>
-                                <th>Material / Component</th>
-                                <th>Consuming Operation</th>
+                                <th>{{ __('production.material_component') }}</th>
+                                <th>{{ __('production.consuming_operation') }}</th>
                                 <th>UOM</th>
                                 <th class="text-end">Planned Qty</th>
                                 <th class="text-end">Issued Qty</th>
-                                <th class="text-end text-success">Consumed Qty</th>
-                                <th class="text-end text-warning">Floor WIP Stock</th>
+                                <th class="text-end text-success">{{ __('production.consumed_qty') }}</th>
+                                <th class="text-end text-warning">{{ __('production.floor_wip_stock') }}</th>
                                 <th class="text-end">Progress %</th>
                                 <th class="text-end">Unit Cost</th>
                                 <th class="text-end">Planned Cost</th>
-                                <th class="text-end">Consumed Cost</th>
+                                <th class="text-end">{{ __('production.consumed_cost') }}</th>
                                 <th class="text-end">Cost Variance</th>
                             </tr>
                         </thead>
@@ -1165,13 +1166,13 @@
                         <table class="report-table align-middle">
                             <thead>
                                 <tr>
-                                    <th>Scrapped Item</th>
+                                    <th>{{ __('production.scrapped_item') }}</th>
                                     <th>SKU</th>
                                     <th>Operation</th>
                                     <th class="text-end">Quantity</th>
                                     <th>Reason</th>
-                                    <th>Recorded At</th>
-                                    <th>Stock Posted</th>
+                                    <th>{{ __('production.recorded_at') }}</th>
+                                    <th>{{ __('production.stock_posted') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1185,7 +1186,7 @@
                                         <td class="text-muted fs-12">{{ $scrap['recorded_at'] }}</td>
                                         <td>
                                             @if($scrap['stock_posted'])
-                                                <span class="badge bg-soft-success text-success border border-success-subtle"><i class="feather-check me-1"></i>Posted</span>
+                                                <span class="badge bg-soft-success text-success border border-success-subtle"><i class="feather-check me-1"></i>{{ __('production.posted') }}</span>
                                             @else
                                                 <span class="badge bg-soft-warning text-warning border border-warning-subtle">Pending</span>
                                             @endif
@@ -1202,40 +1203,40 @@
                 <div class="row g-3 mb-4">
                     <div class="col-sm-6 col-md-2">
                         <div class="p-3 bg-light rounded border text-center h-100">
-                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Total Sales Orders</span>
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">{{ __('production.total_sales_orders') }}</span>
                             <h4 class="fw-bold text-dark mb-0">{{ number_format($reportData['total_orders'] ?? 0) }}</h4>
                         </div>
                     </div>
                     <div class="col-sm-6 col-md-2">
                         <div class="p-3 bg-light rounded border text-center h-100">
-                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Total Ordered Qty</span>
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">{{ __('production.total_ordered_qty') }}</span>
                             <h4 class="fw-bold text-primary mb-0">{{ number_format($reportData['total_ordered_qty'] ?? 0, 1) }}</h4>
                         </div>
                     </div>
                     <div class="col-sm-6 col-md-2">
                         <div class="p-3 bg-light rounded border text-center h-100">
-                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">MO Produced Qty</span>
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">MO {{ __('production.produced_qty') }}</span>
                             <h4 class="fw-bold text-success mb-0">{{ number_format($reportData['total_produced_qty'] ?? 0, 1) }}</h4>
                             <small class="text-muted fs-11">{{ $reportData['production_pct'] ?? 0 }}% of ordered</small>
                         </div>
                     </div>
                     <div class="col-sm-6 col-md-2">
                         <div class="p-3 bg-light rounded border text-center h-100">
-                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Delivered Qty</span>
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">{{ __('production.delivered_qty') }}</span>
                             <h4 class="fw-bold mb-0" style="color: #0d9488;">{{ number_format($reportData['total_delivered_qty'] ?? 0, 1) }}</h4>
                             <small class="text-muted fs-11">{{ $reportData['fulfillment_pct'] ?? 0 }}% fulfilled</small>
                         </div>
                     </div>
                     <div class="col-sm-6 col-md-2">
                         <div class="p-3 bg-light rounded border text-center h-100">
-                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Pending Delivery</span>
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">{{ __('production.pending_delivery') }}</span>
                             <h4 class="fw-bold text-danger mb-0">{{ number_format($reportData['total_pending_qty'] ?? 0, 1) }}</h4>
-                            <small class="text-muted fs-11">awaiting dispatch</small>
+                            <small class="text-muted fs-11">{{ __('production.awaiting_dispatch') }}</small>
                         </div>
                     </div>
                     <div class="col-sm-6 col-md-2">
                         <div class="p-3 bg-light rounded border text-center h-100">
-                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Fulfillment Rate</span>
+                            <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">{{ __('production.fulfillment_rate') }}</span>
                             <h4 class="fw-bold mb-0" style="color: #7c3aed;">{{ $reportData['fulfillment_pct'] ?? 0 }}%</h4>
                             <div class="progress mt-2" style="height: 4px;">
                                 <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(100, $reportData['fulfillment_pct'] ?? 0) }}%"></div>
@@ -1250,26 +1251,26 @@
                         <thead>
                             <tr class="text-nowrap">
                                 <th style="width: 35px;">SR</th>
-                                <th>Sales Person</th>
-                                <th>Sale Order No</th>
-                                <th>Order Date</th>
-                                <th>Customer Name</th>
-                                <th>Product Description</th>
-                                <th class="text-end">SO Qty</th>
-                                <th>Delivery Date</th>
+                                <th>{{ __('production.sales_person') }}</th>
+                                <th>{{ __('production.sale_order_no') }}</th>
+                                <th>{{ __('production.order_date') }}</th>
+                                <th>{{ __('production.customer_name') }}</th>
+                                <th>{{ __('production.product_description') }}</th>
+                                <th class="text-end">{{ __('production.so_qty') }}</th>
+                                <th>{{ __('production.delivery_date') }}</th>
                                 <th>Status</th>
-                                <th>MO No</th>
-                                <th>MO Date</th>
-                                <th>Requisition No</th>
-                                <th>Indent No</th>
-                                <th>PO No</th>
-                                <th>Supplier Name</th>
-                                <th class="text-end">MO Done</th>
-                                <th class="text-end">MO Done Date</th>
-                                <th class="text-end">MO Pending</th>
-                                <th class="text-end">Delivered Qty</th>
-                                <th>Delivered Date</th>
-                                <th class="text-end">Pending Qty</th>
+                                <th>{{ __('production.mo_no') }}</th>
+                                <th>{{ __('production.mo_date') }}</th>
+                                <th>{{ __('production.requisition_no') }}</th>
+                                <th>{{ __('production.indent_no') }}</th>
+                                <th>{{ __('production.po_no') }}</th>
+                                <th>{{ __('production.supplier_name') }}</th>
+                                <th class="text-end">{{ __('production.mo_done') }}</th>
+                                <th class="text-end">{{ __('production.mo_done') }} Date</th>
+                                <th class="text-end">{{ __('production.mo_pending') }}</th>
+                                <th class="text-end">{{ __('production.delivered_qty') }}</th>
+                                <th>{{ __('production.delivered_date') }}</th>
+                                <th class="text-end">{{ __('production.pending_qty') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1325,7 +1326,7 @@
                                             @endif
                                             <div><span class="badge {{ $moBadgeClass }} fs-10">{{ $row['mo_status'] }}</span></div>
                                         @else
-                                            <span class="badge bg-soft-danger text-danger border border-danger-subtle fs-10">Not Created</span>
+                                            <span class="badge bg-soft-danger text-danger border border-danger-subtle fs-10">{{ __('production.not_created') }}</span>
                                         @endif
                                     </td>
                                     <td class="text-muted fs-12 text-nowrap">{{ $row['mo_date'] }}</td>

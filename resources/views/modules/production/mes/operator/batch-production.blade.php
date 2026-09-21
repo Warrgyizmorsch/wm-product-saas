@@ -39,7 +39,7 @@
             <x-ui.odoo-form-ui type="table" class="align-middle mb-0 w-100">
                 <thead>
                     <tr>
-                        <th style="width: 22%">Batch Number</th>
+                        <th style="width: 22%">{{ __('production.batch_number') }}</th>
                         @if($batchQueue['meta']['is_first_op'])
                             <th style="width: 13%" class="text-end">Planned / Rem</th>
                         @else
@@ -47,8 +47,8 @@
                         @endif
                         <th style="width: 26%" class="text-center">Output Metrics</th>
                         <th style="width: 9%" class="text-end">Out</th>
-                        <th style="width: 13%" class="text-center">Status</th>
-                        <th style="width: 17%" class="text-center">Actions</th>
+                        <th style="width: 13%" class="text-center">{{ __('production.status') }}</th>
+                        <th style="width: 17%" class="text-center">{{ __('production.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -122,8 +122,7 @@
                                         <x-ui.button variant="info" class="text-white py-1 px-2 fs-11"
                                             onclick="openLogProgressForBatch({{ $item['batch']->id }}, '{{ $item['batch']->batch_number }}', {{ $item['remaining_to_process'] }})"
                                             title="Log Progress">
-                                            <i class="feather-edit-3 me-1"></i> Log
-                                        </x-ui.button>
+                                            <i class="feather-edit-3 me-1"></i>{{ __('production.log') }}</x-ui.button>
                                     @endif
 
                                     @if($item['can_transfer'])
@@ -137,8 +136,7 @@
                                             <x-ui.button variant="success" class="py-1 px-2 fs-11"
                                                 onclick="openTransferModal({{ $wipId }}, '{{ $item['batch']->batch_number }}', {{ $op->routing_operation_id }}, {{ $item['next_operation']->routing_operation_id }}, '{{ $item['next_operation']->name }}', {{ $item['ready_to_transfer'] }})"
                                                 title="Transfer WIP">
-                                                <i class="feather-send me-1"></i> Transfer
-                                            </x-ui.button>
+                                                <i class="feather-send me-1"></i>{{ __('production.transfer') }}</x-ui.button>
                                         @endif
                                     @endif
 
@@ -175,12 +173,12 @@
                 <x-ui.odoo-form-ui type="table" class="align-middle mb-0 w-100">
                     <thead>
                         <tr>
-                            <th>Batch Number</th>
+                            <th>{{ __('production.batch_number') }}</th>
                             <th class="text-end">Good Qty</th>
                             <th class="text-end">Transferred</th>
-                            <th class="text-end">Ready</th>
+                            <th class="text-end">{{ __('production.ready') }}</th>
                             <th>Destination</th>
-                            <th class="text-center">Action</th>
+                            <th class="text-center">{{ __('production.action') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -205,8 +203,7 @@
                                     @if($wipId && $item['next_operation'])
                                         <x-ui.button variant="warning" class="py-1 px-3 fs-11"
                                             onclick="openTransferModal({{ $wipId }}, {{ $item['batch']->id }}, '{{ $item['batch']->batch_number }}', {{ $op->routing_operation_id }}, {{ $item['next_operation']->routing_operation_id }}, '{{ $item['next_operation']->name }}', {{ $item['ready_to_transfer'] }})">
-                                            <i class="feather-send me-1"></i> Transfer WIP
-                                        </x-ui.button>
+                                            <i class="feather-send me-1"></i>{{ __('production.transfer_wip') }}</x-ui.button>
                                     @endif
                                 </td>
                             </tr>
@@ -222,7 +219,7 @@
                 <x-ui.odoo-form-ui type="table" class="align-middle mb-0 w-100">
                     <thead>
                         <tr>
-                            <th>Batch Number</th>
+                            <th>{{ __('production.batch_number') }}</th>
                             <th class="text-end">Scrap</th>
                             <th class="text-end">Rework</th>
                             <th>Status / Reason</th>
@@ -272,12 +269,12 @@
                             <x-ui.odoo-form-ui type="table" class="mb-0 align-middle w-100">
                                 <thead>
                                     <tr>
-                                        <th style="width: 22%">Batch Number</th>
+                                        <th style="width: 22%">{{ __('production.batch_number') }}</th>
                                         <th style="width: 15%" class="text-end">Good Qty</th>
                                         <th style="width: 26%" class="text-center">Defects & Scrap</th>
                                         <th style="width: 12%" class="text-end">Out</th>
                                         <th style="width: 15%">Destination</th>
-                                        <th style="width: 10%" class="text-center">Status</th>
+                                        <th style="width: 10%" class="text-center">{{ __('production.status') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>

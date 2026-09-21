@@ -222,26 +222,26 @@
         </div>
     @endif
 
-    {{-- Cost Estimation vs Actual Breakdown --}}
+    {{-- {{ __('production.cost_estimation_vs_actual') }} --}}
     @if(!empty($reportData['cost_estimation']))
         @php
             $est = $reportData['cost_estimation'];
             $var = $est['net_variance'] ?? 0;
         @endphp
-        <div class="section-title">Cost Estimation vs Actual Breakdown</div>
+        <div class="section-title">{{ __('production.cost_estimation_vs_actual') }}</div>
         <table class="data-table" style="margin-bottom: 10px;">
             <thead>
                 <tr>
                     <th>Cost Element</th>
-                    <th class="text-right">Estimated (Planned)</th>
-                    <th class="text-right">Actual Incurred</th>
+                    <th class="text-right">{{ __('production.estimated_planned') }}</th>
+                    <th class="text-right">{{ __('production.actual_incurred') }}</th>
                     <th class="text-right">Variance</th>
-                    <th class="text-right">Variance Status</th>
+                    <th class="text-right">{{ __('production.variance_status') }}</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td style="font-weight:600;">Material Cost (Direct)</td>
+                    <td style="font-weight:600;">{{ __('production.direct_material_cost') }}</td>
                     <td class="text-right">{{ number_format($est['estimated']['material_cost'] ?? 0, 2) }}</td>
                     <td class="text-right">{{ number_format($est['actual']['material_cost'] ?? 0, 2) }}</td>
                     <td class="text-right" style="{{ ($est['variance']['material'] ?? 0) > 0 ? 'color:#dc2626;font-weight:bold' : 'color:#16a34a' }}">
@@ -250,7 +250,7 @@
                     <td class="text-right">{{ ($est['variance']['material'] ?? 0) > 0 ? 'Unfavorable' : 'Favorable' }}</td>
                 </tr>
                 <tr>
-                    <td style="font-weight:600;">Direct Labor Cost</td>
+                    <td style="font-weight:600;">{{ __('production.direct_labor_cost') }}</td>
                     <td class="text-right">{{ number_format($est['estimated']['labor_cost'] ?? 0, 2) }}</td>
                     <td class="text-right">{{ number_format($est['actual']['labor_cost'] ?? 0, 2) }}</td>
                     <td class="text-right" style="{{ ($est['variance']['labor'] ?? 0) > 0 ? 'color:#dc2626;font-weight:bold' : 'color:#16a34a' }}">
@@ -259,7 +259,7 @@
                     <td class="text-right">{{ ($est['variance']['labor'] ?? 0) > 0 ? 'Unfavorable' : 'Favorable' }}</td>
                 </tr>
                 <tr>
-                    <td style="font-weight:600;">Machine / Equipment Cost</td>
+                    <td style="font-weight:600;">{{ __('production.machine_equipment_cost') }}</td>
                     <td class="text-right">{{ number_format($est['estimated']['machine_cost'] ?? 0, 2) }}</td>
                     <td class="text-right">{{ number_format($est['actual']['machine_cost'] ?? 0, 2) }}</td>
                     <td class="text-right" style="{{ ($est['variance']['machine'] ?? 0) > 0 ? 'color:#dc2626;font-weight:bold' : 'color:#16a34a' }}">
@@ -268,7 +268,7 @@
                     <td class="text-right">{{ ($est['variance']['machine'] ?? 0) > 0 ? 'Unfavorable' : 'Favorable' }}</td>
                 </tr>
                 <tr>
-                    <td style="font-weight:600;">Factory Overhead</td>
+                    <td style="font-weight:600;">{{ __('production.factory_overhead') }}</td>
                     <td class="text-right">{{ number_format($est['estimated']['overhead_cost'] ?? 0, 2) }}</td>
                     <td class="text-right">{{ number_format($est['actual']['overhead_cost'] ?? 0, 2) }}</td>
                     <td class="text-right" style="{{ ($est['variance']['overhead'] ?? 0) > 0 ? 'color:#dc2626;font-weight:bold' : 'color:#16a34a' }}">
@@ -279,7 +279,7 @@
             </tbody>
             <tfoot>
                 <tr style="background:#f1f5f9; font-weight:bold;">
-                    <td>Total Production Cost:</td>
+                    <td>{{ __('production.total_production_cost') }}:</td>
                     <td class="text-right">{{ number_format($est['estimated']['total_cost'] ?? 0, 2) }}</td>
                     <td class="text-right" style="color:#2563eb;">{{ number_format($est['actual']['total_cost'] ?? 0, 2) }}</td>
                     <td class="text-right" style="{{ $var > 0 ? 'color:#dc2626' : ($var < 0 ? 'color:#16a34a' : '') }}">
@@ -294,7 +294,7 @@
     @endif
 
     {{-- Operations --}}
-    <div class="section-title">Operation Stages</div>
+    <div class="section-title">{{ __('production.operation_stages') }}</div>
     <table class="data-table">
         <thead>
             <tr>
@@ -340,13 +340,13 @@
                     <td style="font-size:7.5pt; color:#64748b;">{{ $op['actual_end'] ?? '—' }}</td>
                 </tr>
             @empty
-                <tr><td colspan="12" class="text-center" style="color:#94a3b8; padding:8px;">No operations found.</td></tr>
+                <tr><td colspan="12" class="text-center" style="color:#94a3b8; padding:8px;">{{ __('production.no_routing_operations_found') }}</td></tr>
             @endforelse
         </tbody>
     </table>
 
     {{-- Materials --}}
-    <div class="section-title">Material Consumption & Operation Allocation</div>
+    <div class="section-title">{{ __('production.material_consumption_operation_allocation') }}</div>
     <table class="data-table">
         <thead>
             <tr>
@@ -386,7 +386,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="12" class="text-center" style="color:#94a3b8; padding:8px;">No material records found.</td></tr>
+                <tr><td colspan="12" class="text-center" style="color:#94a3b8; padding:8px;">{{ __('production.no_material_records_found') }}</td></tr>
             @endforelse
         </tbody>
         @if(!empty($reportData['materials']))
@@ -411,7 +411,7 @@
     @else
         <table class="data-table">
             <thead>
-                <tr><th>Scrapped Item</th><th>SKU</th><th>Operation</th><th class="text-right">Quantity</th><th>Reason</th><th>Recorded At</th><th>Stock Posted</th></tr>
+                <tr><th>{{ __('production.scrapped_item') }}</th><th>SKU</th><th>Operation</th><th class="text-right">Quantity</th><th>Reason</th><th>{{ __('production.recorded_at') }}</th><th>{{ __('production.stock_posted') }}</th></tr>
             </thead>
             <tbody>
                 @foreach($reportData['scrap_events'] as $s)
@@ -424,7 +424,7 @@
                         <td style="color:#64748b; font-size:7.5pt;">{{ $s['recorded_at'] }}</td>
                         <td class="text-center">
                             @if($s['stock_posted'])
-                                <span class="badge badge-success">Posted</span>
+                                <span class="badge badge-success">{{ __('production.posted') }}</span>
                             @else
                                 <span class="badge badge-warning">Pending</span>
                             @endif
@@ -453,7 +453,7 @@
                     <td class="text-right" style="{{ $r['downtime_minutes'] > 0 ? 'color:#dc2626;font-weight:bold' : 'color:#94a3b8' }}">{{ number_format($r['downtime_minutes'], 0) }}</td>
                 </tr>
             @empty
-                <tr><td colspan="8" class="text-center" style="color:#94a3b8; padding:8px;">No records for this period.</td></tr>
+                <tr><td colspan="8" class="text-center" style="color:#94a3b8; padding:8px;">{{ __('production.no_production_orders_found') }}</td></tr>
             @endforelse
         </tbody>
     </table>
@@ -471,14 +471,14 @@
                     <td class="text-right" style="color:#16a34a;">{{ number_format($r['quality'], 2) }}%</td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="text-center" style="color:#94a3b8; padding:8px;">No records for this period.</td></tr>
+                <tr><td colspan="6" class="text-center" style="color:#94a3b8; padding:8px;">{{ __('production.no_production_orders_found') }}</td></tr>
             @endforelse
         </tbody>
     </table>
 
 @elseif($type === 'downtime')
     <table class="data-table">
-        <thead><tr><th>Machine</th><th>Category</th><th>Reason</th><th>Started At</th><th>Resolved At</th><th class="text-right">Duration (min)</th></tr></thead>
+        <thead><tr><th>Machine</th><th>Category</th><th>Reason</th><th>{{ __('production.started_at') }}</th><th>{{ __('production.resolved_at') }}</th><th class="text-right">{{ __('production.duration_min') }}</th></tr></thead>
         <tbody>
             @forelse($reportData['downtimes'] as $d)
                 <tr>
@@ -490,14 +490,14 @@
                     <td class="text-right" style="color:#dc2626; font-weight:bold;">{{ number_format($d->duration_minutes ?? 0, 0) }}</td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="text-center" style="color:#94a3b8; padding:8px;">No downtime events.</td></tr>
+                <tr><td colspan="6" class="text-center" style="color:#94a3b8; padding:8px;">{{ __('production.no_downtime_events_found') }}</td></tr>
             @endforelse
         </tbody>
     </table>
 
 @elseif($type === 'production-orders')
     <table class="data-table">
-        <thead><tr><th>Order Number</th><th>Product / SKU</th><th>Status</th><th class="text-right">Planned</th><th class="text-right">Produced</th><th class="text-right">Scrapped</th><th class="text-right">Completion%</th><th class="text-right">Yield%</th><th>Start</th><th>End</th></tr></thead>
+        <thead><tr><th>Order Number</th><th>Product / SKU</th><th>Status</th><th class="text-right">Planned</th><th class="text-right">Produced</th><th class="text-right">Scrapped</th><th class="text-right">{{ __('production.completion_pct') }}</th><th class="text-right">{{ __('production.yield_pct') }}</th><th>Start</th><th>End</th></tr></thead>
         <tbody>
             @forelse($reportData['data'] as $r)
                 @php
@@ -529,12 +529,12 @@
         @endphp
         <table class="kpi-strip" style="margin-bottom: 8px;">
             <tr>
-                <td><div class="kpi-label">Total Items</div><div class="kpi-value">{{ $sum['items_count'] ?? count($reportData['data']) }}</div></td>
+                <td><div class="kpi-label">{{ __('production.total_line_items') }}</div><div class="kpi-value">{{ $sum['items_count'] ?? count($reportData['data']) }}</div></td>
                 <td><div class="kpi-label">Planned Cost</div><div class="kpi-value primary">{{ number_format($sum['total_planned_cost'] ?? 0, 2) }}</div></td>
-                <td><div class="kpi-label">Issued Store</div><div class="kpi-value">{{ number_format($sum['total_issued_cost'] ?? 0, 2) }}</div></td>
-                <td><div class="kpi-label">Actually Consumed</div><div class="kpi-value success">{{ number_format($sum['total_consumed_cost'] ?? 0, 2) }}</div></td>
-                <td><div class="kpi-label">Floor WIP Stock</div><div class="kpi-value warning">{{ number_format($sum['total_floor_stock_cost'] ?? 0, 2) }}</div></td>
-                <td><div class="kpi-label">Cost Variance</div><div class="kpi-value {{ $varCost > 0 ? 'danger' : ($varCost < 0 ? 'success' : '') }}">{{ $varCost > 0 ? '+' : '' }}{{ number_format($varCost, 2) }}</div></td>
+                <td><div class="kpi-label">{{ __('production.store_issued_qty') }}</div><div class="kpi-value">{{ number_format($sum['total_issued_cost'] ?? 0, 2) }}</div></td>
+                <td><div class="kpi-label">{{ __('production.actually_consumed') }}</div><div class="kpi-value success">{{ number_format($sum['total_consumed_cost'] ?? 0, 2) }}</div></td>
+                <td><div class="kpi-label">{{ __('production.floor_wip_stock') }}</div><div class="kpi-value warning">{{ number_format($sum['total_floor_stock_cost'] ?? 0, 2) }}</div></td>
+                <td><div class="kpi-label">{{ __('production.variance_cost') }}</div><div class="kpi-value {{ $varCost > 0 ? 'danger' : ($varCost < 0 ? 'success' : '') }}">{{ $varCost > 0 ? '+' : '' }}{{ number_format($varCost, 2) }}</div></td>
             </tr>
         </table>
     @endif
@@ -543,9 +543,9 @@
         <thead>
             <tr>
                 <th>Order</th>
-                <th>Finished Good</th>
-                <th>Consuming Operation</th>
-                <th>Material / SKU</th>
+                <th>{{ __('production.finished_good') }}</th>
+                <th>{{ __('production.consuming_operation') }}</th>
+                <th>{{ __('production.material_sku') }}</th>
                 <th>UOM</th>
                 <th class="text-right">Planned</th>
                 <th class="text-right">Issued</th>
@@ -584,7 +584,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="13" class="text-center" style="color:#94a3b8; padding:8px;">No material records found.</td></tr>
+                <tr><td colspan="13" class="text-center" style="color:#94a3b8; padding:8px;">{{ __('production.no_material_records_found') }}</td></tr>
             @endforelse
         </tbody>
         @if(!empty($reportData['summary']))
@@ -604,7 +604,7 @@
 
 @elseif($type === 'cost-variance')
     <table class="data-table">
-        <thead><tr><th>Order</th><th>Product / SKU</th><th>Status</th><th class="text-right">Planned</th><th class="text-right">Mat</th><th class="text-right">Labor</th><th class="text-right">Machine</th><th class="text-right">OH</th><th class="text-right">Adj</th><th class="text-right">Actual Total</th><th class="text-right">Variance</th><th class="text-right">Var%</th></tr></thead>
+        <thead><tr><th>Order</th><th>Product / SKU</th><th>Status</th><th class="text-right">Planned</th><th class="text-right">Mat</th><th class="text-right">Labor</th><th class="text-right">Machine</th><th class="text-right">OH</th><th class="text-right">Adj</th><th class="text-right">{{ __('production.actual_total') }}</th><th class="text-right">Variance</th><th class="text-right">Var%</th></tr></thead>
         <tbody>
             @forelse($reportData['data'] as $r)
                 <tr>
@@ -622,7 +622,7 @@
                     <td class="text-right" style="{{ $r['variance_pct'] > 0 ? 'color:#dc2626;font-weight:bold' : ($r['variance_pct'] < 0 ? 'color:#16a34a;font-weight:bold' : 'color:#94a3b8') }}">{{ $r['variance_pct'] > 0 ? '+' : '' }}{{ $r['variance_pct'] }}%</td>
                 </tr>
             @empty
-                <tr><td colspan="12" class="text-center" style="color:#94a3b8; padding:8px;">No cost records found.</td></tr>
+                <tr><td colspan="12" class="text-center" style="color:#94a3b8; padding:8px;">{{ __('production.no_production_cost_records_found') }}</td></tr>
             @endforelse
         </tbody>
     </table>
@@ -636,7 +636,7 @@
                 <strong style="font-size:11pt; color:#0f172a;">{{ number_format($reportData['total_orders'] ?? 0) }}</strong>
             </td>
             <td style="width:16.6%; background:#f8fafc; border:1px solid #cbd5e1; padding:6px; text-align:center;">
-                <span style="font-size:7pt; text-transform:uppercase; color:#64748b; display:block;">Total Ordered Qty</span>
+                <span style="font-size:7pt; text-transform:uppercase; color:#64748b; display:block;">{{ __('production.total_ordered_qty') }}</span>
                 <strong style="font-size:11pt; color:#2563eb;">{{ number_format($reportData['total_ordered_qty'] ?? 0, 1) }}</strong>
             </td>
             <td style="width:16.6%; background:#f8fafc; border:1px solid #cbd5e1; padding:6px; text-align:center;">
@@ -644,15 +644,15 @@
                 <strong style="font-size:11pt; color:#16a34a;">{{ number_format($reportData['total_produced_qty'] ?? 0, 1) }}</strong>
             </td>
             <td style="width:16.6%; background:#f8fafc; border:1px solid #cbd5e1; padding:6px; text-align:center;">
-                <span style="font-size:7pt; text-transform:uppercase; color:#64748b; display:block;">Delivered Qty</span>
+                <span style="font-size:7pt; text-transform:uppercase; color:#64748b; display:block;">{{ __('production.delivered_qty') }}</span>
                 <strong style="font-size:11pt; color:#0d9488;">{{ number_format($reportData['total_delivered_qty'] ?? 0, 1) }}</strong>
             </td>
             <td style="width:16.6%; background:#f8fafc; border:1px solid #cbd5e1; padding:6px; text-align:center;">
-                <span style="font-size:7pt; text-transform:uppercase; color:#64748b; display:block;">Pending Delivery</span>
+                <span style="font-size:7pt; text-transform:uppercase; color:#64748b; display:block;">{{ __('production.pending_delivery') }}</span>
                 <strong style="font-size:11pt; color:#dc2626;">{{ number_format($reportData['total_pending_qty'] ?? 0, 1) }}</strong>
             </td>
             <td style="width:16.6%; background:#f8fafc; border:1px solid #cbd5e1; padding:6px; text-align:center;">
-                <span style="font-size:7pt; text-transform:uppercase; color:#64748b; display:block;">Fulfillment Rate</span>
+                <span style="font-size:7pt; text-transform:uppercase; color:#64748b; display:block;">{{ __('production.fulfillment_rate') }}</span>
                 <strong style="font-size:11pt; color:#7c3aed;">{{ $reportData['fulfillment_pct'] ?? 0 }}%</strong>
             </td>
         </tr>
@@ -662,19 +662,19 @@
         <thead>
             <tr>
                 <th style="width:20px;">SR</th>
-                <th>Sales Person</th>
+                <th>{{ __('production.sales_person') }}</th>
                 <th>SO No / Date</th>
                 <th>Customer</th>
-                <th>Product Description</th>
-                <th class="text-right">SO Qty</th>
-                <th>Due Date</th>
-                <th>SO Status</th>
+                <th>{{ __('production.product_description') }}</th>
+                <th class="text-right">{{ __('production.so_qty') }}</th>
+                <th>{{ __('production.target_date') }}</th>
+                <th>{{ __('production.status') }}</th>
                 <th>MO No / Date</th>
                 <th>Requisition / Indent</th>
                 <th>PO / Vendor</th>
-                <th class="text-right">MO Done</th>
+                <th class="text-right">{{ __('production.mo_done') }}</th>
                 <th class="text-right">MO Pend</th>
-                <th class="text-right">Delivered</th>
+                <th class="text-right">{{ __('production.delivered_qty') }}</th>
                 <th class="text-right">Pending</th>
             </tr>
         </thead>
@@ -704,7 +704,7 @@
                             <strong style="font-family:monospace;">{{ $r['mo_no'] }}</strong><br>
                             <span class="badge {{ $moBadge }}">{{ $r['mo_status'] }}</span>
                         @else
-                            <span class="badge badge-danger">Not Started</span>
+                            <span class="badge badge-danger">{{ __('production.not_started') }}</span>
                         @endif
                     </td>
                     <td style="font-size:6pt;">
@@ -723,7 +723,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="15" class="text-center" style="color:#94a3b8; padding:8px;">No sales orders found for this period.</td></tr>
+                <tr><td colspan="15" class="text-center" style="color:#94a3b8; padding:8px;">{{ __('production.no_sales_orders_found') }}</td></tr>
             @endforelse
         </tbody>
     </table>

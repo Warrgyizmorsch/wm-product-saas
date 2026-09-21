@@ -6,8 +6,7 @@
 
 @section('page-actions')
     <a href="{{ route('production.ncrs.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-arrow-left me-2"></i>Back to List
-    </a>
+        <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}</a>
 @endsection
 
 @section('content')
@@ -159,9 +158,9 @@
                                     </div>
                                     <div class="row g-2 mb-3">
                                         <div class="col-6">
-                                            <label class="form-label text-muted fw-semibold fs-12">Category</label>
+                                            <label class="form-label text-muted fw-semibold fs-12">{{ __('production.category') }}</label>
                                             <select name="category" class="form-select form-select-sm">
-                                                <option value="finished_good" selected>Finished Good</option>
+                                                <option value="finished_good" selected>{{ __('production.finished_good') }}</option>
                                                 <option value="wip_part">WIP Part</option>
                                                 <option value="raw_material">Raw Material</option>
                                             </select>

@@ -170,7 +170,7 @@
                     <div class="row g-2 text-center">
                         <div class="col-6 col-sm-4 col-md">
                             <div class="bg-white border rounded p-2.5 h-100 shadow-2xs">
-                                <span class="fs-10 text-muted text-uppercase fw-bold d-block mb-1">Target Quantity</span>
+                                <span class="fs-10 text-muted text-uppercase fw-bold d-block mb-1">{{ __('production.target_quantity') }}</span>
                                 <span class="fs-18 fw-extrabold text-dark font-monospace">{{ number_format($opTargetQty, 2) }}</span>
                                 <small class="text-muted d-block fs-10">{{ $itemUom }}</small>
                             </div>
@@ -197,8 +197,7 @@
                             <div class="col-6 col-sm-4 col-md">
                                 <div class="bg-white border border-warning-subtle rounded p-2.5 h-100 shadow-2xs">
                                     <span class="fs-10 text-warning text-uppercase fw-bold d-block mb-1">
-                                        <i class="feather-shield text-warning me-0.5"></i>Pending QC
-                                    </span>
+                                        <i class="feather-shield text-warning me-0.5"></i>{{ __('production.pending_qc') }}</span>
                                     <span class="fs-18 fw-extrabold text-warning font-monospace">{{ number_format($opPendingQcQty, 2) }}</span>
                                     <small class="text-muted d-block fs-10">{{ $itemUom }}</small>
                                 </div>
@@ -216,7 +215,7 @@
                         @if($opRejectedQty > 0)
                             <div class="col-6 col-sm-4 col-md">
                                 <div class="bg-white border border-danger-subtle rounded p-2.5 h-100 shadow-2xs">
-                                    <span class="fs-10 text-danger text-uppercase fw-bold d-block mb-1">Rejected</span>
+                                    <span class="fs-10 text-danger text-uppercase fw-bold d-block mb-1">{{ __('production.rejected') }}</span>
                                     <span class="fs-18 fw-extrabold text-danger font-monospace">{{ number_format($opRejectedQty, 2) }}</span>
                                     <small class="text-muted d-block fs-10">{{ $itemUom }}</small>
                                 </div>
@@ -233,7 +232,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="fw-bold text-dark mb-0"><i class="feather-shield text-primary me-2"></i>Multi-Level Component Execution Readiness</h6>
                             @if($op->status === 'completed')
-                                <span class="badge bg-soft-success text-success fw-bold px-2 py-1"><i class="feather-check-circle me-1"></i>Completed</span>
+                                <span class="badge bg-soft-success text-success fw-bold px-2 py-1"><i class="feather-check-circle me-1"></i>{{ __('production.completed_schedules') }}</span>
                             @elseif($readiness['is_ready'])
                                 <span class="badge bg-soft-success text-success fw-bold px-2 py-1"><i class="feather-check-circle me-1"></i>Executable</span>
                             @else
@@ -636,7 +635,7 @@
                     <div class="alert alert-soft-warning py-2 fs-11 mb-3 border border-warning-subtle">
                         <i class="feather-shield text-warning me-1"></i>
                         <strong>Quality Check Required:</strong>
-                        <div>Output logged here enters <strong>Pending QC</strong> status until inspected. Rejections must be recorded through <strong>QC Check</strong>, and scrap through <strong>Log Scrap</strong>.</div>
+                        <div>Output logged here enters <strong>{{ __('production.pending_qc') }}</strong> status until inspected. Rejections must be recorded through <strong>QC Check</strong>, and scrap through <strong>{{ __('production.log_scrap_tab') }}</strong>.</div>
                     </div>
                 @endif
 
@@ -694,7 +693,7 @@
         closeText="Cancel">
         <div class="bg-soft-warning p-3 rounded mb-3 border border-warning-subtle d-flex justify-content-between align-items-center">
             <div>
-                <h6 class="fw-bold text-dark mb-1"><i class="feather-shield-check text-warning me-2"></i>In-Process Quality Inspection</h6>
+                <h6 class="fw-bold text-dark mb-1"><i class="feather-shield-check text-warning me-2"></i>{{ __('production.in_process_qc_inspection') }}</h6>
                 <span class="fs-11 text-muted">Order: <strong>{{ $order->order_number }}</strong> | Item: <strong>{{ $op->sourceProduct->name ?? $order->product->name }}</strong></span>
             </div>
             <span class="badge bg-warning text-dark fs-12 px-3 py-2 font-monospace">Pending QC: {{ number_format($touchPendingQcQty, 0) }}</span>
@@ -813,8 +812,7 @@
                                 @endif
                             @empty
                                 <div class="text-muted fs-12 py-1">
-                                    <i class="feather-info text-primary me-1"></i> Quality Plan <strong>{{ $qp->name }}</strong> has no custom checklist parameters configured.
-                                </div>
+                                    <i class="feather-info text-primary me-1"></i>{{ __('production.quality_plan') }}<strong>{{ $qp->name }}</strong>{{ __('production.no_checklist_parameters') }}</div>
                             @endforelse
                         </div>
                     @endforeach
@@ -830,10 +828,10 @@
             <div class="col-md-4">
                 <x-ui.odoo-form-ui type="select" label="Defect Reason (If Rejected)" name="defect_reason">
                     <option value="">-- None / Meets Quality Standard --</option>
-                    <option value="Surface Scratch / Coating Damage">Surface Scratch / Coating Damage</option>
-                    <option value="Out of Dimension / Thickness Error">Out of Dimension / Thickness Error</option>
-                    <option value="Chipped Edge / Structural Defect">Chipped Edge / Structural Defect</option>
-                    <option value="Raw Material Defect">Raw Material Defect</option>
+                    <option value="Surface Scratch / Coating Damage">{{ __('production.surface_scratch_defect') }}</option>
+                    <option value="Out of Dimension / Thickness Error">{{ __('production.dimension_thickness_error') }}</option>
+                    <option value="Chipped Edge / Structural Defect">{{ __('production.chipped_edge_defect') }}</option>
+                    <option value="Raw Material Defect">{{ __('production.raw_material_defect') }}</option>
                     <option value="Machine Calibration Error">Machine Calibration Error</option>
                     <option value="Operator Assembly Error">Operator Assembly Error</option>
                 </x-ui.odoo-form-ui>

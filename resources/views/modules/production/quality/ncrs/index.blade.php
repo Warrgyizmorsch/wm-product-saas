@@ -25,10 +25,10 @@
                 @endphp
                 <x-ui.sort-dropdown label="Sort">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Newest First</span>
+                        <span>{{ __('production.sort_newest_first') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Oldest First</span>
+                        <span>{{ __('production.sort_oldest_first') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'ncr_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'ncr_number' && $sortOrder === 'asc' ? 'active' : '' }}">
@@ -42,15 +42,15 @@
                 <!-- Custom Filter Component -->
                 <form method="GET" action="{{ route('production.ncrs.index') }}" class="d-inline">
                     <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i>{{ __('production.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.search_keywords') }}</label>
                             <x-ui.input name="search" placeholder="Search NCR number or description..." value="{{ request('search') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Category</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.category') }}</label>
                             <x-ui.select name="category" :options="[
                                 '' => 'All Categories',
                                 'material' => 'Material Defect',
@@ -61,7 +61,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.status') }}</label>
                             <x-ui.select name="status" :options="[
                                 '' => 'All Statuses',
                                 'open' => 'Open',
@@ -72,8 +72,8 @@
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('production.ncrs.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('production.ncrs.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -85,13 +85,13 @@
             <thead>
                 <tr>
                     <th style="width: 15%">NCR Number</th>
-                    <th style="width: 12%">Category</th>
+                    <th style="width: 12%">{{ __('production.category') }}</th>
                     <th style="width: 12%">Disposition</th>
-                    <th style="width: 10%">Status</th>
+                    <th style="width: 10%">{{ __('production.status') }}</th>
                     <th style="width: 18%">Linked Inspection</th>
                     <th style="width: 25%">Production Order &amp; Product</th>
-                    <th style="width: 15%">Created At</th>
-                    <th class="text-end" style="width: 5%">Actions</th>
+                    <th style="width: 15%">{{ __('production.created_at') }}</th>
+                    <th class="text-end" style="width: 5%">{{ __('production.actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -111,12 +111,12 @@
                             @elseif($ncr->disposition_type === 'use_as_is')
                                 <span class="badge bg-light text-success border border-success px-2.5 py-1 text-uppercase">Use As-Is</span>
                             @else
-                                <span class="badge bg-light text-secondary border border-secondary px-2.5 py-1 text-uppercase">Pending</span>
+                                <span class="badge bg-light text-secondary border border-secondary px-2.5 py-1 text-uppercase">{{ __('production.pending') }}</span>
                             @endif
                         </td>
                         <td>
                             @if($ncr->status === 'closed')
-                                <span class="erp-badge-active">Closed</span>
+                                <span class="erp-badge-active">{{ __('production.closed') }}</span>
                             @elseif($ncr->status === 'open')
                                 <span class="erp-badge-draft text-danger">Open</span>
                             @elseif($ncr->status === 'under_review')

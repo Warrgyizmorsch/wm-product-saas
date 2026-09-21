@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Production Dashboard')
-@section('page-title', 'Production Dashboard')
-@section('breadcrumb', 'Production / Dashboard')
+@section('title', __('production.production_dashboard'))
+@section('page-title', __('production.production_dashboard'))
+@section('breadcrumb', __('production.production_dashboard'))
 
 @php
     $rawRole = auth()->user()?->role;
@@ -15,25 +15,25 @@
     $worklistTabs = [
         [
             'id' => 'content-demand',
-            'label' => 'Pending Demand (' . $pendingSalesOrderCount . ')',
+            'label' => __('production.pending_demand') . ' (' . $pendingSalesOrderCount . ')',
             'active' => true,
             'icon' => 'feather-shopping-cart'
         ],
         [
             'id' => 'content-ready',
-            'label' => 'Ready To Start (' . $readyToStartCount . ')',
+            'label' => __('production.ready_to_start') . ' (' . $readyToStartCount . ')',
             'active' => false,
             'icon' => 'feather-check-circle'
         ],
         [
             'id' => 'content-inprogress',
-            'label' => 'Active In-Progress (' . $inProgressOrders->count() . ')',
+            'label' => __('production.active_in_progress') . ' (' . $inProgressOrders->count() . ')',
             'active' => false,
             'icon' => 'feather-activity'
         ],
         [
             'id' => 'content-overdue',
-            'label' => 'At-Risk / Overdue (' . $overdueOrdersCount . ')',
+            'label' => __('production.at_risk_overdue') . ' (' . $overdueOrdersCount . ')',
             'active' => false,
             'icon' => 'feather-alert-triangle'
         ],
@@ -662,15 +662,9 @@
 @endpush
 
 @section('page-actions')
-    <x-ui.button variant="primary" icon="feather-plus-circle" href="{{ route('production.orders.create') }}">
-        Create Production Order
-    </x-ui.button>
-    <x-ui.button variant="light" icon="feather-monitor" href="{{ route('production.mes.dashboard') }}">
-        Shop Floor
-    </x-ui.button>
-    <x-ui.button variant="light" icon="feather-bar-chart-2" href="{{ route('production.intelligence.reports.index') }}">
-        Reports
-    </x-ui.button>
+    <x-ui.button variant="primary" icon="feather-plus-circle" href="{{ route('production.orders.create') }}">{{ __('production.create_production_order') }}</x-ui.button>
+    <x-ui.button variant="light" icon="feather-monitor" href="{{ route('production.mes.dashboard') }}">{{ __('production.shop_floor') }}</x-ui.button>
+    <x-ui.button variant="light" icon="feather-bar-chart-2" href="{{ route('production.intelligence.reports.index') }}">{{ __('production.reports') }}</x-ui.button>
 @endsection
 
 @section('content')
@@ -681,10 +675,10 @@
         <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
             <div class="d-flex align-items-center gap-2">
                 <span class="fs-12 fw-bold text-dark text-uppercase tracking-wider">
-                    <i class="feather-activity text-primary me-1"></i> Operational Overview
+                    <i class="feather-activity text-primary me-1"></i> {{ __('production.operational_overview') }}
                 </span>
-                <span class="text-muted fs-12">&bull; Horizon: <span
-                        class="badge bg-soft-primary text-primary fw-semibold">{{ ($timeframe ?? 'today') === 'week' ? 'This Week' : (($timeframe ?? 'today') === 'month' ? 'This Month' : 'Today') }}</span></span>
+                <span class="text-muted fs-12">&bull; {{ __('production.horizon') }} <span
+                        class="badge bg-soft-primary text-primary fw-semibold">{{ ($timeframe ?? 'today') === 'week' ? __('production.this_week') : (($timeframe ?? 'today') === 'month' ? __('production.this_month') : __('production.today')) }}</span></span>
             </div>
             <div class="timeframe-pill-group d-inline-flex p-1 rounded-pill shadow-sm">
                 <a href="{{ route('production.dashboard', ['timeframe' => 'today']) }}"
@@ -705,10 +699,10 @@
         <div class="row g-3">
             {{-- Card 1: Active Production Orders --}}
             <div class="col-xl-2 col-md-4 col-sm-6">
-                <x-ui.stat-widget title="Active Orders" :value="number_format($totalActiveOrders)"
-                    subtitle="Orders in progress" icon="feather-play-circle" color="primary" variant="compact">
+                <x-ui.stat-widget title="{{ __('production.active_orders') }}" :value="number_format($totalActiveOrders)"
+                    subtitle="{{ __('production.orders_in_progress') }}" icon="feather-play-circle" color="primary" variant="compact">
                     <x-slot name="footer">
-                        <span class="fw-semibold">{{ number_format($orderStatusCounts['total']) }}</span> Total Orders
+                        <span class="fw-semibold">{{ number_format($orderStatusCounts['total']) }}</span> {{ __('production.total_orders') }}
                     </x-slot>
                 </x-ui.stat-widget>
             </div>
@@ -716,7 +710,7 @@
             {{-- Card 2: Planned Today / Period --}}
             <div class="col-xl-2 col-md-4 col-sm-6">
                 <x-ui.stat-widget
-                    title="Planned {{ ($timeframe ?? 'today') === 'week' ? 'This Week' : (($timeframe ?? 'today') === 'month' ? 'This Month' : 'Today') }}"
+                    title="{{ __('production.planned') }} {{ ($timeframe ?? 'today') === 'week' ? __('production.this_week') : (($timeframe ?? 'today') === 'month' ? __('production.this_month') : __('production.today')) }}"
                     :value="number_format($productionSummary['planned_quantity'] ?? 0)" subtitle="Scheduled units"
                     icon="feather-calendar" color="primary" variant="compact">
                     <x-slot name="footer">
@@ -728,7 +722,7 @@
 
             {{-- Card 3: In Progress --}}
             <div class="col-xl-2 col-md-4 col-sm-6">
-                <x-ui.stat-widget title="In Progress" :value="number_format($orderStatusCounts['in_progress'] ?? 0)"
+                <x-ui.stat-widget title="{{ __('production.in_progress') }}" :value="number_format($orderStatusCounts['in_progress'] ?? 0)"
                     subtitle="On shop floor" icon="feather-activity" color="info" variant="compact">
                     <x-slot name="footer">
                         <span class="fw-semibold">{{ $orderStatusCounts['released'] ?? 0 }}</span> Released in queue
@@ -739,7 +733,7 @@
             {{-- Card 4: Completed Today / Period --}}
             <div class="col-xl-2 col-md-4 col-sm-6">
                 <x-ui.stat-widget
-                    title="Completed {{ ($timeframe ?? 'today') === 'week' ? 'This Week' : (($timeframe ?? 'today') === 'month' ? 'This Month' : 'Today') }}"
+                    title="{{ __('production.completed') }} {{ ($timeframe ?? 'today') === 'week' ? __('production.this_week') : (($timeframe ?? 'today') === 'month' ? __('production.this_month') : __('production.today')) }}"
                     :value="number_format($mesCompletedTodayCount ?? 0)" subtitle="Operations finished"
                     icon="feather-check-circle" color="success" variant="compact">
                     <x-slot name="footer">
@@ -750,20 +744,20 @@
 
             {{-- Card 5: Pending QC --}}
             <div class="col-xl-2 col-md-4 col-sm-6">
-                <x-ui.stat-widget title="Pending QC" :value="number_format($pendingQcCount ?? 0)"
+                <x-ui.stat-widget title="{{ __('production.pending_qc') }}" :value="number_format($pendingQcCount ?? 0)"
                     subtitle="Waiting for quality check" icon="feather-shield" :color="($pendingQcCount ?? 0) > 0 ? 'warning' : 'primary'" variant="compact">
                     <x-slot name="footer">
-                        <span class="fw-semibold">{{ $openNcrCount ?? 0 }}</span> Open NCRs
+                        <span class="fw-semibold">{{ $openNcrCount ?? 0 }}</span> {{ __('production.open_ncrs') }}
                     </x-slot>
                 </x-ui.stat-widget>
             </div>
 
             {{-- Card 6: Material Blocked --}}
             <div class="col-xl-2 col-md-4 col-sm-6">
-                <x-ui.stat-widget title="Material Blocked" :value="number_format($materialBlockersCount ?? 0)"
+                <x-ui.stat-widget title="{{ __('production.material_blocked') }}" :value="number_format($materialBlockersCount ?? 0)"
                     subtitle="Blocked by material issue" icon="feather-package" :color="($materialBlockersCount ?? 0) > 0 ? 'danger' : 'primary'" variant="compact">
                     <x-slot name="footer">
-                        Pending Store Release
+                        {{ __('production.pending_store_release') }}
                     </x-slot>
                 </x-ui.stat-widget>
             </div>
@@ -779,27 +773,24 @@
                     </div>
                     <div>
                         <div class="d-flex align-items-center gap-2">
-                            <h6 class="card-title fw-bold text-dark mb-0 fs-14">Action Center</h6>
+                            <h6 class="card-title fw-bold text-dark mb-0 fs-14">{{ __('production.action_center') }}</h6>
                             @if($totalActionExceptions > 0)
                                 <span
                                     class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-0.5 fs-11 fw-bold border border-primary border-opacity-10">
-                                    {{ $totalActionExceptions }} Item(s) Need Attention
+                                    {{ $totalActionExceptions }} {{ __('production.items_need_attention_short') }}
                                 </span>
                             @else
                                 <span
                                     class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-0.5 fs-11 fw-bold border border-primary border-opacity-10">
-                                    Everything is on track
+                                    {{ __('production.everything_on_track') }}
                                 </span>
                             @endif
                         </div>
-                        <span class="fs-11 text-muted">Items that need your attention &bull; Critical Action Center</span>
+                        <span class="fs-11 text-muted">{{ __('production.items_need_attention') }}</span>
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <x-ui.button variant="primary" icon="feather-alert-octagon"
-                        href="{{ route('production.planning-exceptions.index') }}">
-                        Exception Engine
-                    </x-ui.button>
+                    <x-ui.button variant="primary" icon="feather-alert-octagon" href="{{ route('production.planning-exceptions.index') }}">{{ __('production.exception_engine') }}</x-ui.button>
                 </div>
             </div>
 
@@ -809,11 +800,11 @@
                         <table class="table table-hover align-middle mb-0 fs-13">
                             <thead class="dash-table-head fs-11 text-uppercase text-muted border-bottom">
                                 <tr>
-                                    <th class="ps-4" style="width: 220px;">Item</th>
-                                    <th>Details</th>
-                                    <th class="text-center" style="width: 110px;">Priority</th>
-                                    <th class="text-center" style="width: 160px;">Status</th>
-                                    <th class="text-center pe-4" style="width: 110px;">Action</th>
+                                    <th class="ps-4" style="width: 220px;">{{ __('production.item') }}</th>
+                                    <th>{{ __('production.details') }}</th>
+                                    <th class="text-center" style="width: 110px;">{{ __('production.priority') }}</th>
+                                    <th class="text-center" style="width: 160px;">{{ __('production.status') }}</th>
+                                    <th class="text-center pe-4" style="width: 110px;">{{ __('production.action') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -823,7 +814,7 @@
                                         <td class="ps-4">
                                             <div class="d-flex align-items-center gap-2">
                                                 <i class="feather-clock text-primary fs-15"></i>
-                                                <span class="fw-semibold text-dark">Overdue Orders</span>
+                                                <span class="fw-semibold text-dark">{{ __('production.overdue_orders') }}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -835,7 +826,7 @@
                                             @endif
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-soft-primary text-primary fs-11 rounded-pill">High</span>
+                                            <span class="badge bg-soft-primary text-primary fs-11 rounded-pill">{{ __('production.priority_high') }}</span>
                                         </td>
                                         <td class="text-center">
                                             <span
@@ -843,9 +834,7 @@
                                         </td>
                                         <td class="text-center pe-4">
                                             <x-ui.button variant="primary" icon="feather-arrow-right" iconPosition="right"
-                                                href="#worklist-tabs-section" onclick="activateTab('content-overdue-tab')">
-                                                View
-                                            </x-ui.button>
+                                                href="#worklist-tabs-section" onclick="activateTab('content-overdue-tab')">{{ __('production.view') }}</x-ui.button>
                                         </td>
                                     </tr>
                                 @endif
@@ -856,7 +845,7 @@
                                         <td class="ps-4">
                                             <div class="d-flex align-items-center gap-2">
                                                 <i class="feather-alert-octagon text-primary fs-15"></i>
-                                                <span class="fw-semibold text-dark">Machine Breakdown</span>
+                                                <span class="fw-semibold text-dark">{{ __('production.machine_breakdown') }}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -885,7 +874,7 @@
                                         <td class="ps-4">
                                             <div class="d-flex align-items-center gap-2">
                                                 <i class="feather-package text-primary fs-15"></i>
-                                                <span class="fw-semibold text-dark">Material Blockers</span>
+                                                <span class="fw-semibold text-dark">{{ __('production.material_blockers') }}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -893,7 +882,7 @@
                                                 waiting for store release / raw materials.</span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-soft-primary text-primary fs-11 rounded-pill">High</span>
+                                            <span class="badge bg-soft-primary text-primary fs-11 rounded-pill">{{ __('production.priority_high') }}</span>
                                         </td>
                                         <td class="text-center">
                                             <span
@@ -902,9 +891,7 @@
                                         </td>
                                         <td class="text-center pe-4">
                                             <x-ui.button variant="primary" icon="feather-arrow-right" iconPosition="right"
-                                                href="{{ route('sales.material-requests.index') }}">
-                                                View
-                                            </x-ui.button>
+                                                href="{{ route('sales.material-requests.index') }}">{{ __('production.view') }}</x-ui.button>
                                         </td>
                                     </tr>
                                 @endif
@@ -915,7 +902,7 @@
                                         <td class="ps-4">
                                             <div class="d-flex align-items-center gap-2">
                                                 <i class="feather-shield text-primary fs-15"></i>
-                                                <span class="fw-semibold text-dark">Pending QC &amp; NCR</span>
+                                                <span class="fw-semibold text-dark">{{ __('production.pending_qc_ncr') }}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -923,7 +910,7 @@
                                                 &bull; {{ number_format($openNcrCount) }} active non-conformance(s).</span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-soft-primary text-primary fs-11 rounded-pill">Medium</span>
+                                            <span class="badge bg-soft-primary text-primary fs-11 rounded-pill">{{ __('production.priority_medium') }}</span>
                                         </td>
                                         <td class="text-center">
                                             <span
@@ -932,9 +919,7 @@
                                         </td>
                                         <td class="text-center pe-4">
                                             <x-ui.button variant="primary" icon="feather-arrow-right" iconPosition="right"
-                                                href="{{ route('production.inspections.index') }}">
-                                                View
-                                            </x-ui.button>
+                                                href="{{ route('production.inspections.index') }}">{{ __('production.view') }}</x-ui.button>
                                         </td>
                                     </tr>
                                 @endif
@@ -945,7 +930,7 @@
                                         <td class="ps-4">
                                             <div class="d-flex align-items-center gap-2">
                                                 <i class="feather-truck text-primary fs-15"></i>
-                                                <span class="fw-semibold text-dark">Vendor Delays</span>
+                                                <span class="fw-semibold text-dark">{{ __('production.vendor_delays') }}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -953,7 +938,7 @@
                                                 operation(s) overdue beyond expected delivery.</span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-soft-primary text-primary fs-11 rounded-pill">High</span>
+                                            <span class="badge bg-soft-primary text-primary fs-11 rounded-pill">{{ __('production.priority_high') }}</span>
                                         </td>
                                         <td class="text-center">
                                             <span
@@ -961,9 +946,7 @@
                                         </td>
                                         <td class="text-center pe-4">
                                             <x-ui.button variant="primary" icon="feather-arrow-right" iconPosition="right"
-                                                href="{{ route('production.subcontract.analytics') }}">
-                                                View
-                                            </x-ui.button>
+                                                href="{{ route('production.subcontract.analytics') }}">{{ __('production.view') }}</x-ui.button>
                                         </td>
                                     </tr>
                                 @endif
@@ -974,7 +957,7 @@
                                         <td class="ps-4">
                                             <div class="d-flex align-items-center gap-2">
                                                 <i class="feather-shopping-cart text-primary fs-15"></i>
-                                                <span class="fw-semibold text-dark">Pending Demand</span>
+                                                <span class="fw-semibold text-dark">{{ __('production.pending_demand') }}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -982,7 +965,7 @@
                                                 awaiting production order creation.</span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-soft-primary text-primary fs-11 rounded-pill">Medium</span>
+                                            <span class="badge bg-soft-primary text-primary fs-11 rounded-pill">{{ __('production.priority_medium') }}</span>
                                         </td>
                                         <td class="text-center">
                                             <span
@@ -990,9 +973,7 @@
                                         </td>
                                         <td class="text-center pe-4">
                                             <x-ui.button variant="primary" icon="feather-arrow-right" iconPosition="right"
-                                                href="#worklist-tabs-section" onclick="activateTab('content-demand-tab')">
-                                                View
-                                            </x-ui.button>
+                                                href="#worklist-tabs-section" onclick="activateTab('content-demand-tab')">{{ __('production.view') }}</x-ui.button>
                                         </td>
                                     </tr>
                                 @endif
@@ -1018,9 +999,9 @@
             <div class="card-header py-2.5 px-4 border-bottom d-flex align-items-center justify-content-between">
                 <div>
                     <h6 class="card-title fw-bold text-dark mb-0 fs-13">Production Flow</h6>
-                    <span class="fs-11 text-muted">End-to-end manufacturing lifecycle pipeline</span>
+                    <span class="fs-11 text-muted">{{ __('production.mfg_lifecycle_pipeline') }}</span>
                 </div>
-                <span class="fs-11 text-muted">Click any stage to drill down</span>
+                <span class="fs-11 text-muted">{{ __('production.click_stage_drilldown') }}</span>
             </div>
             <div class="card-body p-3">
                 <div class="production-flow-container">
@@ -1028,12 +1009,12 @@
                     <a href="#worklist-tabs-section" onclick="activateTab('content-demand-tab')"
                         class="production-flow-step">
                         <div>
-                            <span class="step-number">Stage 1</span>
-                            <div class="step-title">Demand</div>
+                            <span class="step-number">{{ __('production.stage_1') }}</span>
+                            <div class="step-title">{{ __('production.demand') }}</div>
                         </div>
                         <div>
                             <div class="step-count">{{ number_format($pendingSalesOrderCount) }}</div>
-                            <div class="step-desc">Pending demands</div>
+                            <div class="step-desc">{{ __('production.pending_demands') }}</div>
                         </div>
                     </a>
 
@@ -1042,12 +1023,12 @@
                     {{-- Stage 2: Planning --}}
                     <a href="{{ route('production.plans.index') }}" class="production-flow-step">
                         <div>
-                            <span class="step-number">Stage 2</span>
-                            <div class="step-title">Planning</div>
+                            <span class="step-number">{{ __('production.stage_2') }}</span>
+                            <div class="step-title">{{ __('production.planning') }}</div>
                         </div>
                         <div>
                             <div class="step-count">{{ number_format(array_sum($planStatusCounts)) }}</div>
-                            <div class="step-desc">Production plans</div>
+                            <div class="step-desc">{{ __('production.production_plans') }}</div>
                         </div>
                     </a>
 
@@ -1056,12 +1037,12 @@
                     {{-- Stage 3: Production Orders --}}
                     <a href="{{ route('production.orders.index') }}" class="production-flow-step">
                         <div>
-                            <span class="step-number">Stage 3</span>
-                            <div class="step-title">Production Orders</div>
+                            <span class="step-number">{{ __('production.stage_3') }}</span>
+                            <div class="step-title">{{ __('production.step_production_orders') }}</div>
                         </div>
                         <div>
                             <div class="step-count">{{ number_format($totalActiveOrders) }}</div>
-                            <div class="step-desc">Active orders</div>
+                            <div class="step-desc">{{ __('production.active_orders') }}</div>
                         </div>
                     </a>
 
@@ -1070,12 +1051,12 @@
                     {{-- Stage 4: Shop Floor --}}
                     <a href="{{ route('production.mes.dashboard') }}" class="production-flow-step">
                         <div>
-                            <span class="step-number">Stage 4</span>
-                            <div class="step-title">Shop Floor</div>
+                            <span class="step-number">{{ __('production.stage_4') }}</span>
+                            <div class="step-title">{{ __('production.shop_floor') }}</div>
                         </div>
                         <div>
                             <div class="step-count">{{ number_format($orderStatusCounts['in_progress'] ?? 0) }}</div>
-                            <div class="step-desc">In progress</div>
+                            <div class="step-desc">{{ __('production.in_progress') }}</div>
                         </div>
                     </a>
 
@@ -1084,12 +1065,12 @@
                     {{-- Stage 5: Quality & Completion --}}
                     <a href="{{ route('production.quality.dashboard') }}" class="production-flow-step">
                         <div>
-                            <span class="step-number">Stage 5</span>
-                            <div class="step-title">Quality &amp; Completion</div>
+                            <span class="step-number">{{ __('production.stage_5') }}</span>
+                            <div class="step-title">{{ __('production.quality_and_completion') }}</div>
                         </div>
                         <div>
                             <div class="step-count">{{ number_format($orderStatusCounts['completed'] ?? 0) }}</div>
-                            <div class="step-desc">Completed orders</div>
+                            <div class="step-desc">{{ __('production.completed_orders') }}</div>
                         </div>
                     </a>
                 </div>
@@ -1099,8 +1080,8 @@
         {{-- ── SECTION 5: PRODUCTION AREAS (6 Expandable Module Cards) ─────────── --}}
         <div class="mb-3">
             <div class="d-flex align-items-center justify-content-between mb-2 px-1">
-                <h6 class="fw-bold text-dark mb-0 fs-14">Production Areas</h6>
-                <span class="fs-11 text-muted">Click any area to expand detailed analytics</span>
+                <h6 class="fw-bold text-dark mb-0 fs-14">{{ __('production.production_areas') }}</h6>
+                <span class="fs-11 text-muted">{{ __('production.click_area_expand') }}</span>
             </div>
 
             {{-- ── 5.1 Production & Capacity ── --}}
@@ -1113,7 +1094,7 @@
                                 <i class="feather-bar-chart-2"></i>
                             </div>
                             <div>
-                                <div class="fw-bold text-dark fs-14">Production &amp; Capacity</div>
+                                <div class="fw-bold text-dark fs-14">{{ __('production.production_and_capacity') }}</div>
                                 @php
                                     $avgUtil = !empty($workCenterLoads) ? round(collect($workCenterLoads)->avg('utilization'), 1) : 0;
                                 @endphp
@@ -1138,20 +1119,20 @@
                     <div class="production-area-body">
                         {{-- Work-Center Capacity, Load & Bottleneck Pulse --}}
                         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                            <h6 class="fw-bold text-dark mb-0 fs-13">Work-Center Capacity &amp; Bottleneck Pulse</h6>
+                            <h6 class="fw-bold text-dark mb-0 fs-13">{{ __('production.wc_capacity_bottleneck_pulse') }}</h6>
                             <div class="d-flex align-items-center gap-2">
                                 <span
                                     class="badge bg-soft-primary text-primary fs-11 font-monospace rounded-pill px-2.5 py-1">
-                                    Active Orders Pipeline: {{ $totalActiveOrders }} Active
+                                    {{ __('production.active_orders_pipeline') }}: {{ $totalActiveOrders }} {{ __('production.active') }}
                                 </span>
                                 <span
                                     class="badge bg-soft-primary text-primary fs-11 font-monospace rounded-pill px-2.5 py-1">
-                                    Volume &amp; Adherence:
+                                    {{ __('production.volume_and_adherence') }}:
                                     {{ number_format($productionSummary['schedule_adherence'] ?? 100, 1) }}%
                                 </span>
                                 <span
                                     class="badge bg-soft-primary text-primary fs-11 font-monospace rounded-pill px-2.5 py-1">
-                                    Plant OEE Score: {{ number_format($oeeKpi['current_value'] ?? 0, 1) }}%
+                                    {{ __('production.plant_oee_score') }}: {{ number_format($oeeKpi['current_value'] ?? 0, 1) }}%
                                 </span>
                                 <x-ui.button variant="light" icon="feather-layers"
                                     href="{{ route('production.mes.work-centers.index') }}">
@@ -1169,7 +1150,7 @@
                                         Bottleneck Spotlight: {{ $bottleneckWorkCenters->count() }} Work Center(s) Near or Above
                                         Target Capacity
                                     </h6>
-                                    <small class="text-muted fs-11">Thresholds: Warning &ge;85%, Critical &gt;100%</small>
+                                    <small class="text-muted fs-11">{{ __('production.capacity_thresholds_note') }}</small>
                                 </div>
                                 <div class="d-flex flex-wrap gap-2">
                                     @foreach($bottleneckWorkCenters as $bwc)
@@ -1185,13 +1166,7 @@
                         @else
                             <div
                                 class="dash-panel-subtle py-2.5 px-3 rounded-3 border mb-3 d-flex align-items-center justify-content-between">
-                                <div class="d-flex align-items-center gap-2 fs-12 text-muted">
-                                    <i class="feather-check-circle fs-15 text-primary"></i>
-                                    <span class="text-dark"><strong>Zero Bottlenecks Active!</strong> All work centers are
-                                        operating within standard capacity limits (&lt;85% utilization).</span>
-                                </div>
-                                <span class="badge bg-soft-primary text-primary fs-10 font-monospace rounded-pill">Capacity
-                                    Balanced</span>
+                                <div class="d-flex align-items-center gap-2 fs-12 text-muted"><i class="feather-check-circle fs-15 text-primary"></i><span class="text-dark"><strong>{{ __('production.zero_bottlenecks_active') }}</strong> {{ __('production.all_work_centers_standard_limits') }}</span></div><span class="badge bg-soft-primary text-primary fs-10 font-monospace rounded-pill">{{ __('production.capacity_balanced') }}</span>
                             </div>
                         @endif
 
@@ -1269,7 +1244,7 @@
                         @else
                             <div class="text-center py-3 text-muted">
                                 <i class="feather-inbox fs-24 d-block mb-1 opacity-50"></i>
-                                <span>No active work centers configured for this tenant.</span>
+                                <span>{{ __('production.no_active_work_centers_configured') }}</span>
                             </div>
                         @endif
                     </div>
@@ -1286,7 +1261,7 @@
                                 <i class="feather-package"></i>
                             </div>
                             <div>
-                                <div class="fw-bold text-dark fs-14">Materials &amp; Inventory</div>
+                                <div class="fw-bold text-dark fs-14">{{ __('production.materials_and_inventory') }}</div>
                                 <span class="fs-11 text-muted">
                                     {{ $fullyIssuedCount }} ready to start &bull;
                                     {{ $materialBlockersCount }} material blocked &bull;
@@ -1394,7 +1369,7 @@
                                 <i class="feather-cpu"></i>
                             </div>
                             <div>
-                                <div class="fw-bold text-dark fs-14">Shop Floor</div>
+                                <div class="fw-bold text-dark fs-14">{{ __('production.shop_floor') }}</div>
                                 <span class="fs-11 text-muted">
                                     {{ $machineStateCounts['running'] ?? 0 }} running &bull;
                                     {{ $machineStateCounts['idle'] ?? 0 }} idle &bull;
@@ -1597,9 +1572,7 @@
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <x-ui.button variant="primary" icon="feather-monitor"
-                                    href="{{ route('production.mes.dashboard') }}">
-                                    Open Shop Floor / MES
-                                </x-ui.button>
+                                    href="{{ route('production.mes.dashboard') }}">{{ __('production.open_shop_floor_mes') }}</x-ui.button>
                             </div>
                         </div>
                     </div>
@@ -1644,9 +1617,7 @@
                             </h6>
                             <div class="d-flex align-items-center gap-2">
                                 <x-ui.button variant="light" icon="feather-clipboard"
-                                    href="{{ route('production.inspections.index') }}">
-                                    All Inspections
-                                </x-ui.button>
+                                    href="{{ route('production.inspections.index') }}">{{ __('production.all_inspections') }}</x-ui.button>
                                 <x-ui.button variant="primary" icon="feather-award"
                                     href="{{ route('production.quality.dashboard') }}">
                                     Quality Dashboard
@@ -1720,7 +1691,7 @@
                                         <div>
                                             <span
                                                 class="fs-18 fw-bold text-dark font-monospace">{{ number_format($qualityKpis['ncrOpen'] ?? 0) }}</span>
-                                            <small class="text-muted d-block fs-10">Open NCRs
+                                            <small class="text-muted d-block fs-10">{{ __('production.open_ncrs') }}
                                                 ({{ $qualityKpis['ncrClosed'] ?? 0 }} Closed)</small>
                                         </div>
                                         <div class="border-start ps-3">
@@ -1823,21 +1794,14 @@
                     <div class="production-area-body">
                         {{-- Plant Maintenance & Subcontracting SLA --}}
                         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                            <h6 class="card-title fw-bold text-dark mb-0 fs-13">Plant Maintenance &amp; Subcontracting SLA
-                            </h6>
+                            <h6 class="card-title fw-bold text-dark mb-0 fs-13">{{ __('production.plant_maintenance_subcontract_sla') }}</h6>
                             <div class="d-flex align-items-center gap-2">
                                 <x-ui.button variant="light" icon="feather-file-text"
-                                    href="{{ route('production.maintenance.work-orders.index') }}">
-                                    Work Orders
-                                </x-ui.button>
+                                    href="{{ route('production.maintenance.work-orders.index') }}">{{ __('production.work_orders') }}</x-ui.button>
                                 <x-ui.button variant="light" icon="feather-tool"
-                                    href="{{ route('production.maintenance.dashboard') }}">
-                                    Maintenance Hub
-                                </x-ui.button>
+                                    href="{{ route('production.maintenance.dashboard') }}">{{ __('production.maintenance_hub') }}</x-ui.button>
                                 <x-ui.button variant="primary" icon="feather-truck"
-                                    href="{{ route('production.subcontract.analytics') }}">
-                                    Vendor Analytics
-                                </x-ui.button>
+                                    href="{{ route('production.subcontract.analytics') }}">{{ __('production.vendor_analytics') }} </x-ui.button>
                             </div>
                         </div>
 
@@ -1874,8 +1838,7 @@
                                     class="text-decoration-none">
                                     <div
                                         class="dash-tile dash-tile-default maintenance-tile-box border {{ $openBreakdownWosCount > 0 ? 'border-primary' : '' }} hover-shadow">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">Breakdown
-                                            WOs</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">{{ __('production.breakdown_wos') }}</span>
                                         <h3 class="fw-bold text-dark my-1 font-monospace fs-22">
                                             {{ number_format($openBreakdownWosCount) }}
                                         </h3>
@@ -1905,8 +1868,7 @@
                                     <div class="d-flex align-items-center gap-2">
                                         <span
                                             class="fs-11 fw-bold text-uppercase text-muted d-inline-flex align-items-center gap-1">
-                                            <i class="feather-truck text-primary"></i> Vendor SLA &amp; External Operations:
-                                        </span>
+                                            <i class="feather-truck text-primary"></i> {{ __('production.vendor_sla_external_ops') }}</span>
                                         <span
                                             class="badge bg-soft-primary text-primary fs-11 font-monospace rounded-pill px-2.5 py-1">
                                             OTD: {{ number_format($subcontractDelivery['on_time_delivery_pct'] ?? 100, 1) }}%
@@ -2053,37 +2015,30 @@
                     <div class="production-area-body">
                         {{-- Execution Variance, Order Risk & Planning Pulse --}}
                         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                            <h6 class="card-title fw-bold text-dark mb-0 fs-13">Execution Variance, Order Risk &amp;
-                                Planning Pulse</h6>
+                            <h6 class="card-title fw-bold text-dark mb-0 fs-13">{{ __('production.execution_variance_order_risk_pulse') }}</h6>
                             <div class="d-flex align-items-center gap-2">
                                 <x-ui.button variant="light" icon="feather-activity"
-                                    href="{{ route('production.variances.index') }}">
-                                    Routing Variances
-                                </x-ui.button>
+                                    href="{{ route('production.variances.index') }}">{{ __('production.routing_variances') }}</x-ui.button>
                                 <x-ui.button variant="light" icon="feather-calendar"
                                     href="{{ route('production.plans.index') }}">
-                                    Master Plans
+                                    {{ __('production.master_plans') }}
                                 </x-ui.button>
                                 <x-ui.button variant="primary" icon="feather-git-pull-request"
-                                    href="{{ route('production.ecos.index') }}">
-                                    ECO Hub
-                                </x-ui.button>
+                                    href="{{ route('production.ecos.index') }}">{{ __('production.eco_hub') }}</x-ui.button>
                             </div>
                         </div>
 
                         {{-- Six Big Losses & Cycle Time Intelligence --}}
                         <div class="mb-3 p-3 rounded-3 dash-panel-subtle border">
                             <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="fs-11 fw-bold text-uppercase text-muted">TPM Six Big Losses
-                                    Classification</span>
+                                <span class="fs-11 fw-bold text-uppercase text-muted">{{ __('production.tpm_six_big_losses') }}</span>
                                 <small class="text-muted fs-11">Overall Downtime Rate: <strong
                                         class="text-dark font-monospace">{{ number_format($downtimeRate, 1) }}%</strong></small>
                             </div>
                             <div class="row g-2">
                                 <div class="col-md-2 col-sm-4 col-6">
                                     <div class="dash-tile dash-tile-default loss-tile-box border hover-shadow">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">Equipment
-                                            Failure</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">{{ __('production.equipment_failure') }}</span>
                                         <h4 class="fw-bold text-dark my-1 font-monospace fs-16">
                                             {{ number_format($sixBigLosses['equipment_failure_minutes'] ?? 0, 1) }}m
                                         </h4>
@@ -2092,8 +2047,7 @@
                                 </div>
                                 <div class="col-md-2 col-sm-4 col-6">
                                     <div class="dash-tile dash-tile-default loss-tile-box border hover-shadow">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">Setup &amp;
-                                            Adjust</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">{{ __('production.setup_and_adjust') }}</span>
                                         <h4 class="fw-bold text-dark my-1 font-monospace fs-16">
                                             {{ number_format($sixBigLosses['setup_adjustment_minutes'] ?? 0, 1) }}m
                                         </h4>
@@ -2102,8 +2056,7 @@
                                 </div>
                                 <div class="col-md-2 col-sm-4 col-6">
                                     <div class="dash-tile dash-tile-default loss-tile-box border hover-shadow">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">Minor
-                                            Stops</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">{{ __('production.minor_stops') }}</span>
                                         <h4 class="fw-bold text-dark my-1 font-monospace fs-16">
                                             {{ number_format($sixBigLosses['minor_stops_minutes'] ?? 0, 1) }}m
                                         </h4>
@@ -2112,8 +2065,7 @@
                                 </div>
                                 <div class="col-md-2 col-sm-4 col-6">
                                     <div class="dash-tile dash-tile-default loss-tile-box border hover-shadow">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">Reduced
-                                            Speed</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">{{ __('production.reduced_speed') }}</span>
                                         <h4 class="fw-bold text-dark my-1 font-monospace fs-16">
                                             {{ number_format($sixBigLosses['reduced_speed_minutes'] ?? 0, 1) }}m
                                         </h4>
@@ -2122,8 +2074,7 @@
                                 </div>
                                 <div class="col-md-2 col-sm-4 col-6">
                                     <div class="dash-tile dash-tile-default loss-tile-box border hover-shadow">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">Startup
-                                            Rejects</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">{{ __('production.startup_rejects') }}</span>
                                         <h4 class="fw-bold text-dark my-1 font-monospace fs-16">
                                             {{ number_format($sixBigLosses['startup_rejects_count'] ?? 0) }}
                                         </h4>
@@ -2132,8 +2083,7 @@
                                 </div>
                                 <div class="col-md-2 col-sm-4 col-6">
                                     <div class="dash-tile dash-tile-default loss-tile-box border hover-shadow">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">Production
-                                            Scrap</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1">{{ __('production.production_scrap') }}</span>
                                         <h4 class="fw-bold text-dark my-1 font-monospace fs-16">
                                             {{ number_format($sixBigLosses['production_rejects_count'] ?? 0) }}
                                         </h4>
@@ -2148,9 +2098,7 @@
                                     <div
                                         class="p-3 rounded-3 dash-card-inner border h-100 d-flex flex-column justify-content-between">
                                         <span class="fs-11 fw-bold text-uppercase text-muted d-block mb-3">
-                                            <i class="feather-clock me-1 text-primary"></i>Cycle Times &amp; Waiting
-                                            Averages
-                                        </span>
+                                            <i class="feather-clock me-1 text-primary"></i>{{ __('production.cycle_times_waiting_averages') }}</span>
                                         <div class="row g-2 text-center">
                                             <div class="col-3 py-2">
                                                 <small class="text-muted fs-11 d-block mb-1">Setup</small>
@@ -2179,8 +2127,7 @@
                                     <div
                                         class="p-3 rounded-3 dash-card-inner border h-100 d-flex flex-column justify-content-between">
                                         <span class="fs-11 fw-bold text-uppercase text-muted d-block mb-3">
-                                            <i class="feather-cpu me-1 text-primary"></i>Resource Utilizations
-                                        </span>
+                                            <i class="feather-cpu me-1 text-primary"></i>{{ __('production.resource_utilizations') }}</span>
                                         <div class="row g-2 text-center">
                                             <div class="col-4 py-2">
                                                 <small class="text-muted fs-11 d-block mb-1">Machines</small>
@@ -2212,8 +2159,7 @@
                                         <div class="d-flex align-items-center justify-content-between mb-2">
                                             <span
                                                 class="fs-11 fw-bold text-uppercase text-muted d-inline-flex align-items-center gap-1">
-                                                <i class="feather-percent text-primary"></i> Execution Variance
-                                                ({{ ucfirst($timeframe) }})
+                                                <i class="feather-percent text-primary"></i> {{ __('production.execution_variance') }} ({{ ($timeframe ?? 'today') === 'week' ? __('production.this_week') : (($timeframe ?? 'today') === 'month' ? __('production.this_month') : __('production.today')) }})
                                             </span>
                                             <span
                                                 class="badge bg-soft-primary text-primary fs-10 font-monospace rounded-pill px-2 py-0.5">
@@ -2225,7 +2171,7 @@
                                         {{-- Output Metrics --}}
                                         <div class="p-2.5 rounded-3 dash-card-inner border mb-2">
                                             <div class="d-flex align-items-center justify-content-between mb-1">
-                                                <span class="fs-11 text-muted">Output Units (Planned vs Actual)</span>
+                                                <span class="fs-11 text-muted">{{ __('production.output_units_planned_vs_actual') }}</span>
                                                 <span class="fs-11 fw-bold font-monospace text-dark">
                                                     {{ $outputVariance >= 0 ? '+' . number_format($outputVariance) : number_format($outputVariance) }}
                                                     net
@@ -2245,7 +2191,7 @@
                                         {{-- Duration Metrics --}}
                                         <div class="p-2.5 rounded-3 dash-card-inner border">
                                             <div class="d-flex align-items-center justify-content-between mb-1">
-                                                <span class="fs-11 text-muted">Operation Hours (Actual vs Plan)</span>
+                                                <span class="fs-11 text-muted">{{ __('production.operation_hours_actual_vs_plan') }}</span>
                                                 <span class="fs-11 fw-bold font-monospace text-dark">
                                                     {{ $durationVarianceHours > 0 ? '+' . $durationVarianceHours : $durationVarianceHours }}h
                                                     delta
@@ -2265,7 +2211,7 @@
                                     <div class="pt-2 mt-2 border-top text-end">
                                         <a href="{{ route('production.variances.index') }}"
                                             class="fs-11 text-primary text-decoration-none fw-semibold">
-                                            Full Variance Analysis <i class="feather-arrow-right ms-1"></i>
+                                            {{ __('production.full_variance_analysis') }} <i class="feather-arrow-right ms-1"></i>
                                         </a>
                                     </div>
                                 </div>
@@ -2280,9 +2226,7 @@
                                             <div class="d-flex align-items-center gap-2">
                                                 <span
                                                     class="fs-11 fw-bold text-uppercase text-muted d-inline-flex align-items-center gap-1">
-                                                    <i class="feather-clock text-primary"></i> Near-Term Completion Risk
-                                                    (&lt;72h)
-                                                </span>
+                                                    <i class="feather-clock text-primary"></i> {{ __('production.near_term_completion_risk') }}</span>
                                                 <span
                                                     class="badge bg-soft-primary text-primary fs-10 font-monospace rounded-pill px-2 py-0.5">
                                                     {{ $atRiskOrders->count() }} At Risk
@@ -2291,8 +2235,7 @@
                                             @if($qualityConstrainedOrdersCount > 0)
                                                 <span
                                                     class="badge bg-soft-primary text-primary fs-10 font-monospace rounded-pill px-2 py-0.5">
-                                                    <i class="feather-shield me-1"></i>{{ $qualityConstrainedOrdersCount }}
-                                                    Quality Hold
+                                                    <i class="feather-shield me-1"></i>{{ $qualityConstrainedOrdersCount }} {{ __('production.quality_hold') }}
                                                 </span>
                                             @endif
                                         </div>
@@ -2376,7 +2319,7 @@
                                             <div class="text-center py-4 px-2 text-muted dash-card-inner rounded-3 border d-flex flex-column align-items-center justify-content-center"
                                                 style="min-height: 140px;">
                                                 <i class="feather-check-circle fs-20 text-primary mb-1"></i>
-                                                <span class="fs-12 fw-semibold text-dark">No Near-Term Completion Risk</span>
+                                                <span class="fs-12 fw-semibold text-dark">{{ __('production.no_near_term_completion_risk') }}</span>
                                                 <div class="fs-11 text-muted">All active orders due within 72 hours have
                                                     achieved &ge; 50% target progress.</div>
                                             </div>
@@ -2397,14 +2340,12 @@
                                     class="p-3 rounded-3 border dash-panel-subtle h-100 d-flex flex-column justify-content-between">
                                     <div>
                                         <span class="fs-11 fw-bold text-uppercase text-muted d-block mb-2">
-                                            <i class="feather-layers me-1 text-primary"></i>Planning &amp; ECO Pulse
-                                        </span>
+                                            <i class="feather-layers me-1 text-primary"></i>{{ __('production.planning_and_eco_pulse') }}</span>
 
                                         {{-- Master Plans Strip --}}
                                         <div class="p-2 rounded-3 dash-card-inner border mb-2">
                                             <div class="d-flex align-items-center justify-content-between mb-1.5">
-                                                <span class="fs-11 fw-bold text-dark"><i
-                                                        class="feather-calendar me-1 text-primary"></i>Master Plans</span>
+                                                <span class="fs-11 fw-bold text-dark"><i class="feather-calendar me-1 text-primary"></i>{{ __('production.master_plans') }}</span>
                                                 <a href="{{ route('production.plans.index') }}"
                                                     class="fs-10 text-primary text-decoration-none font-monospace">View
                                                     All</a>
@@ -2436,9 +2377,7 @@
                                         {{-- ECO Pipeline Strip --}}
                                         <div class="p-2 rounded-3 dash-card-inner border">
                                             <div class="d-flex align-items-center justify-content-between mb-1.5">
-                                                <span class="fs-11 fw-bold text-dark"><i
-                                                        class="feather-git-pull-request me-1 text-primary"></i>ECO
-                                                    Pipeline</span>
+                                                <span class="fs-11 fw-bold text-dark"><i class="feather-git-pull-request me-1 text-primary"></i>{{ __('production.eco_pipeline') }}</span>
                                                 <a href="{{ route('production.ecos.index') }}"
                                                     class="fs-10 text-primary text-decoration-none font-monospace">View
                                                     All</a>
@@ -2516,8 +2455,8 @@
             <div
                 class="card-header pt-3 pb-0 px-4 border-bottom-0 d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div>
-                    <h6 class="card-title fw-bold text-dark mb-0 fs-14">Operational Worklists</h6>
-                    <span class="fs-11 text-muted">Detailed task lists, orders in execution and pending demands</span>
+                    <h6 class="card-title fw-bold text-dark mb-0 fs-14">{{ __('production.operational_worklists') }}</h6>
+                    <span class="fs-11 text-muted">{{ __('production.operational_worklists_desc') }}</span>
                 </div>
                 <div>
                     <x-ui.horizontal-tabs id="operationalTabs" :tabs="$worklistTabs" />
@@ -2533,9 +2472,8 @@
                         <div
                             class="px-4 py-2 dash-panel-subtle border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2 flex-shrink-0">
                             <div>
-                                <h6 class="fw-bold text-dark mb-0 fs-13">Pending Sales Orders to Manufacture</h6>
-                                <small class="text-muted d-block fs-11">Sales Orders / Material Requisitions awaiting
-                                    Production Order conversion.</small>
+                                <h6 class="fw-bold text-dark mb-0 fs-13">{{ __('production.pending_sales_orders_to_manufacture') }}</h6>
+                                <small class="text-muted d-block fs-11">{{ __('production.sales_orders_awaiting_conversion') }}</small>
                             </div>
                             <span class="badge bg-soft-primary text-primary fs-11 px-2.5 py-1 rounded-pill font-monospace">
                                 {{ $pendingSalesOrderCount }} Pending Demand(s)
@@ -2545,12 +2483,12 @@
                             <table class="table table-hover align-middle mb-0 fs-13">
                                 <thead class="dash-table-head text-muted border-bottom fs-11 text-uppercase">
                                     <tr>
-                                        <th class="ps-4">Request # / SO Reference</th>
-                                        <th>Product / SKU</th>
-                                        <th class="text-end">Requested Qty</th>
-                                        <th class="text-center">Required Date</th>
-                                        <th class="text-center">Status</th>
-                                        <th class="text-center pe-4">Action</th>
+                                        <th class="ps-4">{{ __('production.request_so_reference') }}</th>
+                                        <th>{{ __('production.product_sku') }}</th>
+                                        <th class="text-end">{{ __('production.requested_qty') }}</th>
+                                        <th class="text-center">{{ __('production.required_date') }}</th>
+                                        <th class="text-center">{{ __('production.status') }}</th>
+                                        <th class="text-center pe-4">{{ __('production.action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2605,10 +2543,8 @@
                                                         style="width: 48px; height: 48px;">
                                                         <i class="feather-check-circle fs-24"></i>
                                                     </div>
-                                                    <h6 class="fw-semibold text-dark mb-1 fs-14">Pending Sales Orders to
-                                                        Manufacture</h6>
-                                                    <p class="text-muted fs-12 mb-0">All sales order demands have active
-                                                        Production Orders created.</p>
+                                                    <h6 class="fw-semibold text-dark mb-1 fs-14">{{ __('production.pending_sales_orders_to_manufacture') }}</h6>
+                                                    <p class="text-muted fs-12 mb-0">{{ __('production.all_sales_demands_active') }}</p>
                                                 </div>
                                             </td>
                                         </tr>
@@ -2625,13 +2561,13 @@
                             <table class="table table-hover align-middle mb-0 fs-13">
                                 <thead class="dash-table-head text-muted border-bottom fs-11 text-uppercase">
                                     <tr>
-                                        <th class="ps-4">Order # / Mode</th>
-                                        <th>Product / SKU</th>
-                                        <th class="text-end">Target Qty</th>
-                                        <th class="text-center">Status</th>
-                                        <th class="text-center">Requisition Status</th>
-                                        <th class="text-center">Target Date</th>
-                                        <th class="text-center pe-4">Action</th>
+                                        <th class="ps-4">{{ __('production.order_mode') }}</th>
+                                        <th>{{ __('production.product_sku') }}</th>
+                                        <th class="text-end">{{ __('production.target_qty') }}</th>
+                                        <th class="text-center">{{ __('production.status') }}</th>
+                                        <th class="text-center">{{ __('production.requisition_status') }}</th>
+                                        <th class="text-center">{{ __('production.target_date') }}</th>
+                                        <th class="text-center pe-4">{{ __('production.action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2699,9 +2635,8 @@
                                                         style="width: 48px; height: 48px;">
                                                         <i class="feather-inbox fs-24"></i>
                                                     </div>
-                                                    <h6 class="fw-semibold text-dark mb-1 fs-14">No Orders Ready to Start</h6>
-                                                    <p class="text-muted fs-12 mb-0">No orders currently waiting in
-                                                        Ready-to-Start status.</p>
+                                                    <h6 class="fw-semibold text-dark mb-1 fs-14">{{ __('production.no_orders_ready_to_start') }}</h6>
+                                                    <p class="text-muted fs-12 mb-0">{{ __('production.no_orders_waiting_ready_to_start') }}</p>
                                                 </div>
                                             </td>
                                         </tr>
@@ -2718,12 +2653,12 @@
                             <table class="table table-hover align-middle mb-0 fs-13">
                                 <thead class="dash-table-head text-muted border-bottom fs-11 text-uppercase">
                                     <tr>
-                                        <th class="ps-4">Order # / Mode</th>
-                                        <th>Product / SKU</th>
-                                        <th class="text-end">Produced / Target</th>
-                                        <th style="min-width: 130px;">Progress</th>
-                                        <th>Active Operations</th>
-                                        <th class="text-center pe-4">Action</th>
+                                        <th class="ps-4">{{ __('production.order_mode') }}</th>
+                                        <th>{{ __('production.product_sku') }}</th>
+                                        <th class="text-end">{{ __('production.produced_target') }}</th>
+                                        <th style="min-width: 130px;">{{ __('production.progress') }}</th>
+                                        <th>{{ __('production.active_operations') }}</th>
+                                        <th class="text-center pe-4">{{ __('production.action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2820,13 +2755,13 @@
                             <table class="table table-hover align-middle mb-0 fs-13">
                                 <thead class="dash-table-head text-muted border-bottom fs-11 text-uppercase">
                                     <tr>
-                                        <th class="ps-4">Order # / Mode</th>
-                                        <th>Product / SKU</th>
-                                        <th class="text-end">Target Qty</th>
-                                        <th class="text-center">Status</th>
-                                        <th class="text-center">Planned End Date</th>
-                                        <th class="text-center">Overdue Days</th>
-                                        <th class="text-center pe-4">Action</th>
+                                        <th class="ps-4">{{ __('production.order_mode') }}</th>
+                                        <th>{{ __('production.product_sku') }}</th>
+                                        <th class="text-end">{{ __('production.target_qty') }}</th>
+                                        <th class="text-center">{{ __('production.status') }}</th>
+                                        <th class="text-center">{{ __('production.planned_end_date') }}</th>
+                                        <th class="text-center">{{ __('production.overdue_days') }}</th>
+                                        <th class="text-center pe-4">{{ __('production.action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2863,7 +2798,7 @@
                                             <td class="text-center">
                                                 <span
                                                     class="badge bg-soft-primary text-primary fs-11 px-2.5 py-1 rounded-pill font-monospace">
-                                                    {{ $daysOverdue }} Day(s) Overdue
+                                                    {{ $daysOverdue }} {{ __('production.days_overdue') }}
                                                 </span>
                                             </td>
                                             <td class="text-center pe-4">
@@ -2882,10 +2817,8 @@
                                                         style="width: 48px; height: 48px;">
                                                         <i class="feather-check-circle fs-24"></i>
                                                     </div>
-                                                    <h6 class="fw-semibold text-dark mb-1 fs-14">Zero Overdue Orders! All
-                                                        production schedules are within target delivery dates.</h6>
-                                                    <p class="text-muted fs-12 mb-0">Manufacturing throughput is adhering to
-                                                        customer commitments.</p>
+                                                    <h6 class="fw-semibold text-dark mb-1 fs-14">{{ __('production.zero_overdue_orders') }}</h6>
+                                                    <p class="text-muted fs-12 mb-0">{{ __('production.mfg_throughput_adhering') }}</p>
                                                 </div>
                                             </td>
                                         </tr>
@@ -2903,10 +2836,10 @@
         <div class="card dash-card border-0 shadow-sm rounded-3 mb-4">
             <div class="card-header py-3 px-4 border-bottom d-flex align-items-center justify-content-between">
                 <div>
-                    <h6 class="card-title fw-bold text-dark mb-0 fs-14">Recent Activity</h6>
-                    <span class="fs-11 text-muted">Latest manufacturing and operational events</span>
+                    <h6 class="card-title fw-bold text-dark mb-0 fs-14">{{ __('production.recent_activity') }}</h6>
+                    <span class="fs-11 text-muted">{{ __('production.latest_mfg_operational_events') }}</span>
                 </div>
-                <span class="fs-11 text-muted">Real-time event trail</span>
+                <span class="fs-11 text-muted">{{ __('production.realtime_event_trail') }}</span>
             </div>
             <div class="card-body p-0">
                 @if(isset($recentOrders) && $recentOrders->isNotEmpty())
@@ -2914,11 +2847,11 @@
                         <table class="table table-hover align-middle mb-0 fs-13">
                             <thead class="dash-table-head text-muted border-bottom fs-11 text-uppercase">
                                 <tr>
-                                    <th class="ps-4" style="width: 140px;">Time</th>
-                                    <th style="width: 130px;">Type</th>
-                                    <th>Description</th>
-                                    <th style="width: 180px;">Reference</th>
-                                    <th class="text-center pe-4" style="width: 130px;">Status</th>
+                                    <th class="ps-4" style="width: 140px;">{{ __('production.time') }}</th>
+                                    <th style="width: 130px;">{{ __('production.type') }}</th>
+                                    <th>{{ __('production.description') }}</th>
+                                    <th style="width: 180px;">{{ __('production.reference') }}</th>
+                                    <th class="text-center pe-4" style="width: 130px;">{{ __('production.status') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -2957,7 +2890,7 @@
                 @else
                     <div class="text-center py-4 px-3 text-muted">
                         <i class="feather-clock fs-22 d-block mb-1 opacity-50"></i>
-                        <span class="fs-12">No recent production events recorded.</span>
+                        <span class="fs-12">{{ __('production.no_recent_production_events') }}</span>
                     </div>
                 @endif
             </div>

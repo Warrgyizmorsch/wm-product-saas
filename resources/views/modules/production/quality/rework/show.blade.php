@@ -6,8 +6,7 @@
 
 @section('page-actions')
     <a href="{{ route('production.rework.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-arrow-left me-2"></i>Back to List
-    </a>
+        <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}</a>
 @endsection
 
 @section('content')
@@ -101,10 +100,10 @@
                 <x-ui.odoo-form-ui type="table">
                     <thead>
                         <tr>
-                            <th style="width: 10%">Sequence</th>
+                            <th style="width: 10%">{{ __('production.js_sequence_label') }}</th>
                             <th style="width: 30%">Operation Stage Detail</th>
                             <th style="width: 25%">Work Center Location</th>
-                            <th style="width: 15%">Status</th>
+                            <th style="width: 15%">{{ __('production.status') }}</th>
                             <th style="width: 20%" class="text-end">Execution Actions</th>
                         </tr>
                     </thead>
@@ -139,12 +138,11 @@
                                             <div class="d-flex align-items-center gap-1 justify-content-end">
                                                 <input type="number" step="0.1" name="setup_time_actual" class="form-control form-control-sm font-monospace" placeholder="Setup mins" style="width: 95px; height: 26px; padding: 2px 6px;" required>
                                                 <button type="submit" class="btn btn-xs btn-success" style="height: 26px;">
-                                                    <i class="feather-check me-1"></i>Complete
-                                                </button>
+                                                    <i class="feather-check me-1"></i>{{ __('production.complete') }}</button>
                                             </div>
                                         </form>
                                     @else
-                                        <span class="text-success fw-bold fs-12"><i class="feather-check-circle me-1"></i>Completed</span>
+                                        <span class="text-success fw-bold fs-12"><i class="feather-check-circle me-1"></i>{{ __('production.completed_schedules') }}</span>
                                     @endif
                                 </td>
                             </tr>

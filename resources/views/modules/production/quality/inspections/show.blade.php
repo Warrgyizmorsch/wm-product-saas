@@ -6,8 +6,7 @@
 
 @section('page-actions')
     <a href="{{ route('production.inspections.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-arrow-left me-2"></i>Back to List
-    </a>
+        <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}</a>
 @endsection
 
 @section('content')
@@ -103,7 +102,7 @@
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
-                    <a href="{{ route('production.inspections.index') }}" class="btn btn-secondary px-4">Cancel</a>
+                    <a href="{{ route('production.inspections.index') }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
                     <button type="submit" class="btn btn-warning px-4">
                         <i class="feather-check-square me-2"></i>Submit Measurements Checklist
                     </button>
@@ -145,9 +144,9 @@
                                 </td>
                                 <td class="align-middle">
                                     @if($res->result === 'passed')
-                                        <span class="text-success fw-bold fs-12 text-uppercase"><i class="feather-check-circle me-1"></i>Passed</span>
+                                        <span class="text-success fw-bold fs-12 text-uppercase"><i class="feather-check-circle me-1"></i>{{ __('production.passed') }}</span>
                                     @else
-                                        <span class="text-danger fw-bold fs-12 text-uppercase"><i class="feather-x-circle me-1"></i>Failed</span>
+                                        <span class="text-danger fw-bold fs-12 text-uppercase"><i class="feather-x-circle me-1"></i>{{ __('production.failed') }}</span>
                                     @endif
                                 </td>
                             </tr>
