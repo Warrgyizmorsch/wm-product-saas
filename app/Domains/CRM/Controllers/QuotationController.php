@@ -17,6 +17,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\QuotationExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class QuotationController extends Controller
 {
@@ -31,6 +33,20 @@ class QuotationController extends Controller
         $quotations = $this->quotationRepo->getPaginatedQuotations($request->all(), 10);
 
         return view('modules.crm.quotations.index', compact('quotations'));
+    }
+
+    /**
+     * Export Quotations to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', Quotation::class);
+        $tenantId = tenant_id() ?? auth()->user()->tenant_id ?? 1;
+
+        return Excel::download(
+            new QuotationExport($tenantId, $request->all()),
+            'quotations_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function approvalsIndex(Request $request): View

@@ -9,6 +9,8 @@ use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Repositories\SalesReturnRepository;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Exports\SalesReturnExport;
+use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,26 +31,46 @@ class SalesReturnController extends Controller
         return view('modules.sales.returns.index', compact('returns'));
     }
 
+    /**
+     * Export Sales Returns to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', SalesReturn::class);
+        $tenantId = tenant_id() ?? auth()->user()->tenant_id ?? 1;
+
+        return Excel::download(
+            new SalesReturnExport($tenantId, $request->all()),
+            'sales_returns_export_' . date('Y-m-d_His') . '.xlsx'
+        );
+    }
+
     public function create(Request $request): View
     {
         $this->authorize('create', SalesReturn::class);
 
-        $salesOrderId = $request->input('sales_order_id');
+        $salesOrderId = $request->input('sales_order_id') ?: $request->query('sales_order_id');
         $salesOrder = null;
         if ($salesOrderId) {
-            $salesOrder = SalesOrder::with('items.product', 'items.warehouse', 'customer')->find($salesOrderId);
+            $salesOrder = SalesOrder::with(['invoices' => function($q) {
+                $q->where('status', '!=', 'Cancelled')->with('items.product', 'items.warehouse');
+            }, 'items.product', 'items.warehouse', 'customer'])->find($salesOrderId);
         }
 
         $tenantId = require_tenant_id();
         $customers = Customer::query()->orderBy('name')->get();
         $salesOrders = SalesOrder::with(['invoices' => function($q) {
-            $q->whereIn('status', ['Posted', 'Partially Paid', 'Paid'])->with('items.product', 'items.warehouse');
+            $q->where('status', '!=', 'Cancelled')->with('items.product', 'items.warehouse');
         }, 'customer', 'items.product', 'items.warehouse'])
         ->whereIn('status', ['Confirmed', 'Partially Shipped', 'Shipped', 'Invoiced'])
         ->latest()->get();
 
+        if ($salesOrder && !$salesOrders->contains('id', $salesOrder->id)) {
+            $salesOrders->prepend($salesOrder);
+        }
+
         $invoices = Invoice::with(['customer', 'items.product', 'items.warehouse', 'salesOrder'])
-            ->whereIn('status', ['Posted', 'Partially Paid', 'Paid'])
+            ->where('status', '!=', 'Cancelled')
             ->latest()->get();
 
         $warehouses = Warehouse::where('status', 'active')->orderBy('name')->get();

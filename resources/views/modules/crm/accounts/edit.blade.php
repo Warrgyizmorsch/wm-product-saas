@@ -26,7 +26,7 @@
                     <x-ui.odoo-form-ui type="input" :label="__('crm.gstin')" name="gstin" :value="old('gstin', $account->gstin)" />
                 </div>
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.contact_email')" name="email" :value="old('email', $account->email)" />
+                    <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.contact_email')" name="email" :value="old('email', $account->email)" :required="true" />
                 </div>
                 <div class="col-md-4">
                     <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $account->phone)" />

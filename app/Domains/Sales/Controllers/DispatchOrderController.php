@@ -16,6 +16,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use App\Exports\DispatchOrderExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class DispatchOrderController extends Controller
 {
@@ -31,6 +33,20 @@ class DispatchOrderController extends Controller
         $dispatches = $this->dispatchRepo->getPaginated($request->all(), 15);
 
         return view('modules.sales.dispatches.index', compact('dispatches'));
+    }
+
+    /**
+     * Export Dispatch Orders to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', DispatchOrder::class);
+        $tenantId = tenant_id() ?? auth()->user()->tenant_id ?? 1;
+
+        return Excel::download(
+            new DispatchOrderExport($tenantId, $request->all()),
+            'dispatch_orders_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function create(Request $request): View

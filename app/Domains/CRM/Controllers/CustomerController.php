@@ -5,6 +5,8 @@ namespace App\Domains\CRM\Controllers;
 use App\Core\Tenant\TenantContext;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Services\CustomerService;
+use App\Exports\CustomerExport;
+use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -252,5 +254,19 @@ class CustomerController extends Controller
         return redirect()
             ->back()
             ->with('success', "Customer '{$customer->name}' marked as {$statusLabel} successfully.");
+    }
+
+    /**
+     * Export Customers to Excel with customizable columns and applied filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', Customer::class);
+        $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? auth()->user()->tenant_id ?? 1;
+
+        return Excel::download(
+            new CustomerExport($tenantId, $request->all()),
+            'customers_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 }

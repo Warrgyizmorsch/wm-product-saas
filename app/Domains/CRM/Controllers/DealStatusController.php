@@ -20,14 +20,7 @@ class DealStatusController extends Controller
     {
         $this->authorize('viewAny', DealStatus::class);
 
-        $tenantId = tenant_id() ?? 1;
-
-        if (DealStatus::where('tenant_id', $tenantId)->count() === 0) {
-            DealStatus::seedDefaultsForTenant($tenantId);
-        }
-
         $query = DealStatus::query()
-            ->where('tenant_id', $tenantId)
             ->where('is_active', true);
 
         if ($request->filled('search')) {
@@ -37,9 +30,9 @@ class DealStatusController extends Controller
 
         if ($request->filled('type') && $request->type !== 'all') {
             if ($request->type === 'protected') {
-                $query->where('is_protected', true);
+                $query->where(fn ($q) => $q->where('is_protected', true)->orWhereNull('tenant_id'));
             } elseif ($request->type === 'custom') {
-                $query->where('is_protected', false);
+                $query->where('is_protected', false)->whereNotNull('tenant_id');
             }
         }
 
@@ -59,7 +52,12 @@ class DealStatusController extends Controller
         $tenantId = tenant_id() ?? 1;
 
         $validated = $request->validate([
-            'name'        => 'required|string|max:100|unique:deal_statuses,name,NULL,id,tenant_id,' . $tenantId,
+            'name'        => [
+                'required', 'string', 'max:100',
+                \Illuminate\Validation\Rule::unique('deal_statuses', 'name')->where(function ($query) use ($tenantId) {
+                    return $query->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'));
+                }),
+            ],
             'color'       => 'nullable|string|max:50',
             'sort_order'  => 'nullable|integer|min:0',
             'probability' => 'nullable|integer|min:0|max:100',
@@ -95,7 +93,14 @@ class DealStatusController extends Controller
         $tenantId = tenant_id() ?? 1;
 
         $validated = $request->validate([
-            'name'        => 'required|string|max:100|unique:deal_statuses,name,' . $dealStatus->id . ',id,tenant_id,' . $tenantId,
+            'name'        => [
+                'required', 'string', 'max:100',
+                \Illuminate\Validation\Rule::unique('deal_statuses', 'name')
+                    ->ignore($dealStatus->id)
+                    ->where(function ($query) use ($tenantId) {
+                        return $query->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'));
+                    }),
+            ],
             'color'       => 'nullable|string|max:50',
             'sort_order'  => 'nullable|integer|min:0',
             'probability' => 'nullable|integer|min:0|max:100',

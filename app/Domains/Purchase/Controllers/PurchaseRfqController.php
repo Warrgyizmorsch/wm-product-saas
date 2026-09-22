@@ -17,6 +17,8 @@ use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Exports\PurchaseRfqExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PurchaseRfqController extends Controller
 {
@@ -31,6 +33,20 @@ class PurchaseRfqController extends Controller
 
         $data = $this->rfqRepo->getPaginatedRfqsData($request->all(), 10);
         return view('modules.purchase.rfqs.index', $data);
+    }
+
+    /**
+     * Export RFQs to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', PurchaseRfq::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new PurchaseRfqExport($tenantId, $request->all()),
+            'rfqs_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function savingsDashboard(Request $request)

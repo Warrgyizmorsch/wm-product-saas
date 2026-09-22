@@ -15,7 +15,7 @@ class TenantProvisioningTest extends TestCase
     use RefreshDatabase;
 
     private const TABLES = [
-        'companies', 'branches', 'lead_statuses', 'deal_statuses', 'uoms',
+        'companies', 'branches', 'uoms',
         'warehouses', 'payment_terms', 'production_shifts', 'chart_of_accounts',
         'cost_centers', 'asset_categories',
     ];
@@ -42,8 +42,6 @@ class TenantProvisioningTest extends TestCase
         $counts = $this->counts($tenant);
         $this->assertSame(1, $counts['companies']);
         $this->assertSame(1, $counts['branches']);
-        $this->assertSame(5, $counts['lead_statuses']);
-        $this->assertSame(6, $counts['deal_statuses']);
         $this->assertSame(12, $counts['uoms']);
         $this->assertSame(1, $counts['warehouses']);
         $this->assertSame(6, $counts['payment_terms']);
@@ -52,8 +50,9 @@ class TenantProvisioningTest extends TestCase
         $this->assertSame(4, $counts['cost_centers']);
         $this->assertGreaterThanOrEqual(5, $counts['asset_categories']);
 
-        $companyId = DB::table('companies')->where('tenant_id', $tenant->id)->value('id');
-        $this->assertSame(0, DB::table('lead_statuses')->where('tenant_id', $tenant->id)->where('company_id', '!=', $companyId)->count());
+        // CRM statuses are global system defaults
+        $this->assertSame(5, DB::table('lead_statuses')->whereNull('tenant_id')->count());
+        $this->assertSame(6, DB::table('deal_statuses')->whereNull('tenant_id')->count());
     }
 
     public function test_running_it_again_adds_nothing_and_keeps_renamed_accounts(): void
@@ -77,7 +76,7 @@ class TenantProvisioningTest extends TestCase
         $companyId = DB::table('companies')->where('tenant_id', $tenant->id)->value('id');
 
         // Common masters carry no company/branch ...
-        foreach (['chart_of_accounts', 'accounting_tax_rates', 'accounting_fiscal_years', 'cost_centers', 'lead_statuses', 'deal_statuses', 'uoms', 'payment_terms', 'production_shifts'] as $table) {
+        foreach (['chart_of_accounts', 'accounting_tax_rates', 'accounting_fiscal_years', 'cost_centers', 'uoms', 'payment_terms', 'production_shifts'] as $table) {
             $this->assertGreaterThan(0, DB::table($table)->where('tenant_id', $tenant->id)->count(), $table);
             $this->assertSame(0, DB::table($table)->where('tenant_id', $tenant->id)->whereNotNull('company_id')->count(), "{$table} should not be company specific");
         }
@@ -115,7 +114,6 @@ class TenantProvisioningTest extends TestCase
 
         $counts = $this->counts($tenant);
         $this->assertSame(1, $counts['companies']);
-        $this->assertSame(5, $counts['lead_statuses']);
         $this->assertSame(12, $counts['uoms']);
         $this->assertSame(0, $counts['chart_of_accounts']);
         $this->assertSame(0, $counts['cost_centers']);
@@ -156,7 +154,7 @@ class TenantProvisioningTest extends TestCase
 
         app(TenantProvisioner::class)->provision($newTenant);
 
-        $this->assertSame(5, $this->counts($newTenant)['lead_statuses']);
+        $this->assertSame(5, \App\Domains\CRM\Models\LeadStatus::query()->count());
         $this->assertSame($adminBefore, $this->counts($adminTenant));
         $this->assertSame($adminTenant->id, app(TenantContext::class)->id());
     }
@@ -184,7 +182,7 @@ class TenantProvisioningTest extends TestCase
 
         $this->artisan('tenant:provision', ['--all' => true])->assertSuccessful();
 
-        $this->assertSame(6, $this->counts($tenant)['deal_statuses']);
+        $this->assertSame(6, \App\Domains\CRM\Models\DealStatus::query()->count());
     }
 
     public function test_the_command_rejects_an_unknown_slug(): void

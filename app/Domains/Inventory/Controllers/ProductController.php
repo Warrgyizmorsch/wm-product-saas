@@ -59,10 +59,14 @@ class ProductController extends Controller
         }
     }
 
-    public function export()
+    public function export(Request $request)
     {
         $this->authorize('viewAny', Product::class);
-        return Excel::download(new ProductExport, 'products_export.xlsx');
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        return Excel::download(
+            new ProductExport($tenantId, $request->all()),
+            'products_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function index(Request $request): View

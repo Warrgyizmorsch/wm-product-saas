@@ -5,9 +5,16 @@
 @section('breadcrumb', __('crm.accounts_sidebar'))
 
 @section('page-actions')
-    <x-ui.button href="{{ route('crm.accounts.create') }}" variant="primary" icon="feather-plus">
-        {{ __('crm.add_new_account') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="accounts" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('crm.accounts.export') }}" />
+        <x-ui.button href="{{ route('crm.accounts.create') }}" variant="primary" icon="feather-plus">
+            {{ __('crm.add_new_account') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')

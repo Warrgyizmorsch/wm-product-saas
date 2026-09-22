@@ -17,6 +17,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\SalesOrderExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class SalesOrderController extends Controller
 {
@@ -32,6 +34,20 @@ class SalesOrderController extends Controller
         $orders = $this->orderRepo->getPaginatedOrders($request->all(), 10);
 
         return view('modules.sales.orders.index', compact('orders'));
+    }
+
+    /**
+     * Export Sales Orders to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', SalesOrder::class);
+        $tenantId = tenant_id() ?? auth()->user()->tenant_id ?? 1;
+
+        return Excel::download(
+            new SalesOrderExport($tenantId, $request->all()),
+            'sales_orders_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function create(Request $request): View

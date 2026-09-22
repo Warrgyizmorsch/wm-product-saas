@@ -5,9 +5,16 @@
 @section('breadcrumb', __('crm.sales_breadcrumb'))
 
 @section('page-actions')
-    <x-ui.button href="{{ route('sales.dispatches.create') }}" variant="primary" icon="feather-plus">
-        {{ __('crm.create_dispatch_order') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="dispatches" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('sales.dispatches.export') }}" />
+        <x-ui.button href="{{ route('sales.dispatches.create') }}" variant="primary" icon="feather-plus">
+            {{ __('crm.create_dispatch_order') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')

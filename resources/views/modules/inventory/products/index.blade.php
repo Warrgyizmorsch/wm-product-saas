@@ -15,9 +15,18 @@
 @endpush
 
 @section('page-actions')
-    <x-ui.button href="{{ route('inventory.products.create') }}" variant="primary" icon="feather-plus">
-        {{ __('inventory.new_item') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="products" 
+            :can-import="true" 
+            :can-download-template="true" 
+            template-route="{{ route('inventory.products.downloadSample') }}" 
+            import-route="{{ route('inventory.products.import') }}" 
+            export-route="{{ route('inventory.products.export') }}" />
+        <x-ui.button href="{{ route('inventory.products.create') }}" variant="primary" icon="feather-plus">
+            {{ __('inventory.new_item') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')

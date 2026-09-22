@@ -34,7 +34,12 @@
 @endpush
 
 @section('page-actions')
-    <div class="d-flex gap-2 flex-wrap">
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+        <x-ui.import-export-dropdown 
+            type="grns" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('grns.export') }}" />
         <x-ui.button href="{{ route('grns.pending') }}" variant="warning" icon="feather-clock" class="text-dark fw-semibold">
             {{ __('purchase.pending_goods_receipts') }}
         </x-ui.button>

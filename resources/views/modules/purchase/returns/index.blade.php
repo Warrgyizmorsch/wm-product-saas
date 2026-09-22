@@ -38,9 +38,16 @@
 @endpush
 
 @section('page-actions')
-    <a href="{{ route('purchase.returns.create') }}" class="btn btn-primary fs-12 px-3 fw-semibold">
-        <i class="feather-plus me-1.5"></i>{{ __('purchase.create_return') }}
-    </a>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="purchase_returns" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('purchase.returns.export') }}" />
+        <a href="{{ route('purchase.returns.create') }}" class="btn btn-primary fs-12 px-3 fw-semibold">
+            <i class="feather-plus me-1.5"></i>{{ __('purchase.create_return') }}
+        </a>
+    </div>
 @endsection
 
 @section('content')

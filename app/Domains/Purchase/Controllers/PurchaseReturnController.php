@@ -11,6 +11,8 @@ use App\Domains\Purchase\Models\PurchaseReturnItem;
 use App\Domains\Purchase\Repositories\PurchaseReturnRepository;
 use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
+use App\Exports\PurchaseReturnExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +31,20 @@ class PurchaseReturnController extends Controller
         $returns = $this->returnRepo->getPaginated($request->all(), 15);
 
         return view('modules.purchase.returns.index', compact('returns'));
+    }
+
+    /**
+     * Export Purchase Returns to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorizePurchase('purchase.returns.view');
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new PurchaseReturnExport($tenantId, $request->all()),
+            'purchase_returns_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function create(Request $request): View

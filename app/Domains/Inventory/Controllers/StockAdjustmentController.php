@@ -12,9 +12,25 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use App\Exports\StockAdjustmentExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class StockAdjustmentController extends Controller
 {
+    /**
+     * Export Stock Adjustments to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', StockAdjustment::class);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new StockAdjustmentExport($tenantId, $request->all()),
+            'stock_adjustments_export_' . date('Y-m-d_His') . '.xlsx'
+        );
+    }
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', StockAdjustment::class);

@@ -12,6 +12,8 @@ use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionRequisitionSlip;
 use App\Domains\Sales\Models\MaterialRequirement;
 use App\Domains\Sales\Models\SalesOrder;
+use App\Exports\PurchaseRequisitionExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 
 class PurchaseRequisitionController extends Controller
@@ -27,6 +29,20 @@ class PurchaseRequisitionController extends Controller
 
         $requisitions = $this->requisitionRepo->getPaginatedRequisitions($request->all(), 10);
         return view('modules.purchase.requisitions.index', compact('requisitions'));
+    }
+
+    /**
+     * Export Purchase Requisitions to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', PurchaseRequisition::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new PurchaseRequisitionExport($tenantId, $request->all()),
+            'purchase_requisitions_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function prApprovals(Request $request)

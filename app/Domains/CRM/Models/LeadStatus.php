@@ -15,7 +15,8 @@ class LeadStatus extends Model
 
     protected $table = 'lead_statuses';
 
-    /** Default masters are seeded without a company/branch and shown in every one. */
+    /** Default masters are seeded without a tenant/company/branch and shown in every one. */
+    public bool $sharedAcrossTenants = true;
     public bool $sharedAcrossCompanies = true;
 
     protected $fillable = [
@@ -41,35 +42,22 @@ class LeadStatus extends Model
     public const PROTECTED_STATUSES = ['New', 'Qualified', 'Dealing', 'Won', 'Lost'];
 
     /**
-     * Helper method to retrieve ordered statuses for a tenant.
-     * Auto-seeds defaults if table is empty for the tenant.
+     * Helper method to retrieve ordered statuses for the active tenant context.
+     * System statuses (tenant_id IS NULL) and tenant custom statuses will both be returned.
      */
     public static function getOrderedStatuses(?int $tenantId = null): Collection
     {
-        $tenantId = $tenantId ?? (tenant_id() ?? 1);
-
-        $statuses = static::where('tenant_id', $tenantId)
+        return static::query()
             ->where('is_active', true)
             ->orderBy('sort_order', 'asc')
             ->orderBy('id', 'asc')
             ->get();
-
-        if ($statuses->isEmpty()) {
-            static::seedDefaultsForTenant($tenantId);
-            $statuses = static::where('tenant_id', $tenantId)
-                ->where('is_active', true)
-                ->orderBy('sort_order', 'asc')
-                ->orderBy('id', 'asc')
-                ->get();
-        }
-
-        return $statuses;
     }
 
     /**
-     * Seed default core statuses for a given tenant.
+     * Seed default core statuses for the whole system (tenant_id = null).
      */
-    public static function seedDefaultsForTenant(int $tenantId): void
+    public static function seedSystemDefaults(): void
     {
         $defaults = [
             ['name' => 'New',       'sort_order' => 1, 'color' => 'bg-primary'],
@@ -80,13 +68,15 @@ class LeadStatus extends Model
         ];
 
         foreach ($defaults as $def) {
-            static::firstOrCreate(
-                ['tenant_id' => $tenantId, 'name' => $def['name']],
+            static::withoutGlobalScopes()->firstOrCreate(
+                ['tenant_id' => null, 'name' => $def['name']],
                 [
-                    'sort_order' => $def['sort_order'],
-                    'color' => $def['color'],
+                    'company_id'   => null,
+                    'branch_id'    => null,
+                    'sort_order'   => $def['sort_order'],
+                    'color'        => $def['color'],
                     'is_protected' => true,
-                    'is_active' => true,
+                    'is_active'    => true,
                 ]
             );
         }
@@ -97,6 +87,6 @@ class LeadStatus extends Model
      */
     public function isProtected(): bool
     {
-        return $this->is_protected || in_array(trim($this->name), self::PROTECTED_STATUSES, true);
+        return $this->tenant_id === null || $this->is_protected || in_array(trim($this->name), self::PROTECTED_STATUSES, true);
     }
 }

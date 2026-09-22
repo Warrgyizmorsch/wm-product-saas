@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Domains\CRM\Models\Quotation;
+use App\Domains\Sales\Models\Invoice;
 use App\Models\WhatsAppConfiguration;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Client\ConnectionException;
@@ -280,6 +281,47 @@ class WhatsAppService
             try {
                 app(\App\Domains\CRM\Services\QuotationService::class)->handleQuotationStatusChange($quotation, 'Quotation Sent');
             } catch (\Throwable $e) {}
+        }
+
+        return $this->sendDocument(
+            mobile: $mobile,
+            binary: $pdfBinary,
+            filename: $filename,
+            caption: $caption
+        );
+    }
+
+    public function sendInvoice(Invoice $invoice, string $mobile, ?string $customCaption = null, $customPdfFile = null): array
+    {
+        $invoice->load(['items.product', 'customer', 'salesOrder.customer', 'allocations']);
+
+        if ($customPdfFile && method_exists($customPdfFile, 'isValid') && $customPdfFile->isValid()) {
+            $pdfBinary = file_get_contents($customPdfFile->getRealPath());
+            $filename = $customPdfFile->getClientOriginalName() ?: "Tax_Invoice_{$invoice->invoice_number}.pdf";
+        } else {
+            $adjustedAmount = $invoice->allocations->sum('allocated_amount');
+            $balanceDue     = $invoice->balance_due;
+
+            $pdf = Pdf::loadView('modules.sales.invoices.pdf', compact('invoice', 'adjustedAmount', 'balanceDue'));
+            $pdfBinary = $pdf->output();
+            $filename = "Tax_Invoice_{$invoice->invoice_number}.pdf";
+        }
+
+        $companyName = tenant() ? tenant()->name : 'Accounts Team';
+        $totalFormatted = format_currency($invoice->total_amount);
+        $balanceFormatted = format_currency($invoice->balance_due);
+
+        $defaultCaption = "Dear Valued Customer,\n\n"
+            . "Please find attached Tax Invoice *{$invoice->invoice_number}*.\n"
+            . "💰 *Total Amount:* {$totalFormatted}\n"
+            . "💳 *Balance Due:* {$balanceFormatted}\n"
+            . "📅 *Due Date:* " . ($invoice->due_date ? date('d-M-Y', strtotime($invoice->due_date)) : 'Immediate') . "\n\n"
+            . "Thank you for your business!\n*{$companyName}*";
+
+        $caption = $customCaption ?: $defaultCaption;
+
+        if ($invoice->status === 'Draft') {
+            $invoice->update(['status' => 'Sent']);
         }
 
         return $this->sendDocument(

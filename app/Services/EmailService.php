@@ -6,7 +6,9 @@ use App\Models\EmailConfiguration;
 use App\Models\EmailMessage;
 use App\Models\EmailAttachment;
 use App\Mail\QuotationMailable;
+use App\Mail\InvoiceMailable;
 use App\Domains\CRM\Models\Quotation;
+use App\Domains\Sales\Models\Invoice;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -163,6 +165,98 @@ class EmailService
         // Update Quotation Status if Draft
         if ($quotation->status === 'Draft') {
             $quotation->update(['status' => 'Quotation Sent']);
+        }
+
+        // Log sent message
+        $emailRecord = EmailMessage::create([
+            'email_configuration_id' => $account?->id,
+            'thread_id' => (string) Str::uuid(),
+            'message_id' => '<' . Str::uuid() . '@' . parse_url(config('app.url', 'http://localhost'), PHP_URL_HOST) . '>',
+            'direction' => 'outbound',
+            'folder' => 'sent',
+            'from_name' => $fromName,
+            'from_email' => $fromEmail,
+            'to_email' => $toEmail,
+            'subject' => $subject,
+            'body_html' => nl2br($bodyHtml),
+            'body_plain' => strip_tags($bodyHtml),
+            'is_read' => true,
+            'has_attachments' => true,
+            'customer_email' => EmailMessage::extractCleanEmail($toEmail),
+            'received_at' => now(),
+        ]);
+
+        return $emailRecord;
+    }
+
+    /**
+     * Generate Invoice PDF and send via SMTP with attachment
+     */
+    public function sendInvoiceEmail(Invoice $invoice, array $data, $customPdfFile = null): EmailMessage
+    {
+        $invoice->load(['items.product', 'customer', 'salesOrder.customer', 'allocations']);
+
+        if ($customPdfFile && method_exists($customPdfFile, 'isValid') && $customPdfFile->isValid()) {
+            $pdfBinary = file_get_contents($customPdfFile->getRealPath());
+            $pdfFileName = $customPdfFile->getClientOriginalName() ?: "Tax_Invoice_{$invoice->invoice_number}.pdf";
+        } else {
+            $adjustedAmount = $invoice->allocations->sum('allocated_amount');
+            $balanceDue     = $invoice->balance_due;
+
+            // Generate PDF Binary using Dompdf
+            $pdf = Pdf::loadView('modules.sales.invoices.pdf', compact('invoice', 'adjustedAmount', 'balanceDue'));
+            $pdfBinary = $pdf->output();
+            $pdfFileName = "Tax_Invoice_{$invoice->invoice_number}.pdf";
+        }
+
+        $toEmail = $data['to_email'] ?? ($invoice->customer?->email ?: ($invoice->salesOrder?->customer?->email ?: null));
+        if (empty($toEmail)) {
+            throw new \InvalidArgumentException("No valid client email address found for Invoice {$invoice->invoice_number}.");
+        }
+
+        $companyName = tenant() ? tenant()->name : config('app.name');
+        $subject = $data['subject'] ?? "Tax Invoice {$invoice->invoice_number} - {$companyName}";
+        $bodyHtml = $data['body_html'] ?? $data['body'] ?? "Dear Valued Customer,\n\nPlease find attached Tax Invoice {$invoice->invoice_number} for your records.\n\nTotal Amount: " . format_currency($invoice->total_amount) . "\nBalance Due: " . format_currency($invoice->balance_due) . "\n\nBest regards,\n" . $companyName;
+
+        $account = null;
+        if (!empty($data['account_id'])) {
+            $account = EmailConfiguration::whereKey($data['account_id'])
+                ->where('tenant_id', current_tenant_id())
+                ->where('is_active', true)
+                ->first();
+        }
+        if (!$account) {
+            $account = EmailConfiguration::forCurrentContext()->where('is_default', true)->where('is_active', true)->first()
+                    ?: EmailConfiguration::forCurrentContext()->where('is_active', true)->first()
+                    ?: EmailConfiguration::where('is_active', true)->first();
+        }
+
+        if (!$account || empty($account->host) || empty($account->username)) {
+            throw new \RuntimeException('No active Email SMTP account found in Database for the current Tenant/Company/Branch. Please configure SMTP under Email Settings.');
+        }
+
+        $fromEmail = $account->email_address;
+        $fromName = $account->from_name ?: $account->name;
+
+        // Dynamic Mail configuration strictly from DB Account
+        config([
+            'mail.default' => 'smtp',
+            'mail.mailers.smtp.host' => $account->host,
+            'mail.mailers.smtp.port' => (int) $account->port,
+            'mail.mailers.smtp.encryption' => $account->encryption === 'none' ? null : ($account->encryption ?: 'tls'),
+            'mail.mailers.smtp.username' => $account->username,
+            'mail.mailers.smtp.password' => $account->password,
+            'mail.from.address' => $fromEmail,
+            'mail.from.name' => $fromName,
+        ]);
+        Mail::purge('smtp');
+
+        $mailable = new InvoiceMailable($subject, nl2br($bodyHtml), $pdfBinary, $pdfFileName);
+        Mail::to($toEmail)->send($mailable);
+
+        // Update Invoice Status if Draft to Sent
+        if ($invoice->status === 'Draft') {
+            $invoice->update(['status' => 'Sent']);
         }
 
         // Log sent message

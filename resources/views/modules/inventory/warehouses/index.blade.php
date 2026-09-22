@@ -3,6 +3,15 @@
 @section('title', __('inventory.warehouses_master'))
 @section('page-title', __('inventory.warehouses'))
 @section('breadcrumb', __('inventory.inventory_warehouses'))
+@section('page-actions')
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="warehouses" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('inventory.warehouses.export') }}" />
+    </div>
+@endsection
 
 @section('content')
     <div class="row">

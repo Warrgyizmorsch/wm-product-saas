@@ -4,6 +4,19 @@
 @section('page-title', __('crm.quotations'))
 @section('breadcrumb', __('crm.crm') . ' / ' . __('crm.quotations'))
 
+@section('page-actions')
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="quotations" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('crm.quotations.export') }}" />
+        <x-ui.button href="{{ route('crm.quotations.create') }}" variant="primary" icon="feather-plus">
+            {{ __('crm.create_quotation') }}
+        </x-ui.button>
+    </div>
+@endsection
+
 @section('content')
 
     @php

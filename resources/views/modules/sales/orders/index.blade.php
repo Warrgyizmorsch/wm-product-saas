@@ -5,9 +5,16 @@
 @section('breadcrumb', __('crm.sales') . ' / ' . __('crm.sales_orders'))
 
 @section('page-actions')
-    <x-ui.button href="{{ route('sales.orders.create') }}" variant="primary" icon="feather-plus">
-        {{ __('crm.create_sales_order') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="sales-orders" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('sales.orders.export') }}" />
+        <x-ui.button href="{{ route('sales.orders.create') }}" variant="primary" icon="feather-plus">
+            {{ __('crm.create_sales_order') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')

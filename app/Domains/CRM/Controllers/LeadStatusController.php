@@ -18,14 +18,7 @@ class LeadStatusController extends Controller
 
     public function index(Request $request): View
     {
-        $tenantId = tenant_id() ?? 1;
-
-        if (LeadStatus::where('tenant_id', $tenantId)->count() === 0) {
-            LeadStatus::seedDefaultsForTenant($tenantId);
-        }
-
         $query = LeadStatus::query()
-            ->where('tenant_id', $tenantId)
             ->where('is_active', true);
 
         if ($request->filled('search')) {
@@ -35,9 +28,9 @@ class LeadStatusController extends Controller
 
         if ($request->filled('type') && $request->type !== 'all') {
             if ($request->type === 'protected') {
-                $query->where('is_protected', true);
+                $query->where(fn ($q) => $q->where('is_protected', true)->orWhereNull('tenant_id'));
             } elseif ($request->type === 'custom') {
-                $query->where('is_protected', false);
+                $query->where('is_protected', false)->whereNotNull('tenant_id');
             }
         }
 
@@ -55,7 +48,12 @@ class LeadStatusController extends Controller
         $tenantId = tenant_id() ?? 1;
 
         $validated = $request->validate([
-            'name'       => 'required|string|max:100|unique:lead_statuses,name,NULL,id,tenant_id,' . $tenantId,
+            'name'       => [
+                'required', 'string', 'max:100',
+                \Illuminate\Validation\Rule::unique('lead_statuses', 'name')->where(function ($query) use ($tenantId) {
+                    return $query->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'));
+                }),
+            ],
             'color'      => 'nullable|string|max:50',
             'sort_order' => 'nullable|integer|min:0',
         ]);
@@ -87,7 +85,14 @@ class LeadStatusController extends Controller
         $tenantId = tenant_id() ?? 1;
 
         $validated = $request->validate([
-            'name'       => 'required|string|max:100|unique:lead_statuses,name,' . $leadStatus->id . ',id,tenant_id,' . $tenantId,
+            'name'       => [
+                'required', 'string', 'max:100',
+                \Illuminate\Validation\Rule::unique('lead_statuses', 'name')
+                    ->ignore($leadStatus->id)
+                    ->where(function ($query) use ($tenantId) {
+                        return $query->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'));
+                    }),
+            ],
             'color'      => 'nullable|string|max:50',
             'sort_order' => 'nullable|integer|min:0',
         ]);

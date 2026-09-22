@@ -5,6 +5,8 @@ namespace App\Domains\Inventory\Controllers;
 use App\Http\Controllers\Controller;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Repositories\WarehouseRepository;
+use App\Exports\WarehouseExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +24,20 @@ class WarehouseController extends Controller
         $this->authorize('viewAny', Warehouse::class);
         $warehouses = $this->warehouseRepo->getAll();
         return view('modules.inventory.warehouses.index', compact('warehouses'));
+    }
+
+    /**
+     * Export Warehouses to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', Warehouse::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new WarehouseExport($tenantId, $request->all()),
+            'warehouses_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function store(Request $request): RedirectResponse
