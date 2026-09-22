@@ -23,6 +23,7 @@ use App\Domains\HRMS\Controllers\Api\ProbationApiController;
 use App\Domains\HRMS\Controllers\Api\EmployeeExitApiController;
 use App\Domains\HRMS\Controllers\Api\PipApiController;
 use App\Domains\HRMS\Controllers\Api\BroadcastApiController;
+use App\Domains\HRMS\Controllers\Api\HelpdeskApiController;
 use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
 /*
@@ -514,6 +515,12 @@ Route::prefix('api/hrms/travel-expense')
         
         // Policy lookup
         Route::get('/employee-policy/{employee}', [TravelExpenseApiController::class, 'getEmployeePolicy'])->name('employee-policy');
+        
+        // Expense Categories (Master Data)
+        Route::get('/categories', [TravelExpenseApiController::class, 'indexExpenseCategories'])->name('categories.index');
+        Route::post('/categories', [TravelExpenseApiController::class, 'storeExpenseCategory'])->name('categories.store');
+        Route::put('/categories/{category}', [TravelExpenseApiController::class, 'updateExpenseCategory'])->name('categories.update');
+        Route::delete('/categories/{category}', [TravelExpenseApiController::class, 'destroyExpenseCategory'])->name('categories.destroy');
     });
 
 // ==========================================
@@ -654,4 +661,35 @@ Route::prefix('api/hrms/broadcasts')
         Route::post('/{id}/comments', [BroadcastApiController::class, 'storeComment'])->name('comments.store');
         Route::get('/{id}/analytics', [BroadcastApiController::class, 'getAnalytics'])->name('analytics');
     });
+
+// ==========================================
+// 21. HELPDESK & SUPPORT API ROUTES
+// ==========================================
+Route::prefix('api/hrms/helpdesk')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.helpdesk.')
+    ->group(function () {
+        // Tickets
+        Route::get('/', [HelpdeskApiController::class, 'index'])->name('index');
+        Route::post('/tickets', [HelpdeskApiController::class, 'storeTicket'])->name('tickets.store');
+        Route::get('/tickets/{id}', [HelpdeskApiController::class, 'showTicket'])->name('tickets.show');
+        Route::post('/tickets/{id}/reply', [HelpdeskApiController::class, 'replyTicket'])->name('tickets.reply');
+        Route::put('/tickets/{id}/status', [HelpdeskApiController::class, 'updateTicketStatus'])->name('tickets.status');
+        Route::post('/tickets/{id}/csat', [HelpdeskApiController::class, 'submitCsat'])->name('tickets.csat');
+
+        // Categories Master
+        Route::get('/categories', [HelpdeskApiController::class, 'indexCategories'])->name('categories.index');
+        Route::post('/categories', [HelpdeskApiController::class, 'storeCategory'])->name('categories.store');
+        Route::put('/categories/{id}', [HelpdeskApiController::class, 'updateCategory'])->name('categories.update');
+        Route::delete('/categories/{id}', [HelpdeskApiController::class, 'destroyCategory'])->name('categories.destroy');
+
+        // Knowledge Base (KB)
+        Route::get('/kb', [HelpdeskApiController::class, 'indexKb'])->name('kb.index');
+        Route::get('/kb/suggest', [HelpdeskApiController::class, 'suggestKb'])->name('kb.suggest');
+        Route::get('/kb/{id}', [HelpdeskApiController::class, 'showKb'])->name('kb.show');
+        Route::post('/kb', [HelpdeskApiController::class, 'storeKb'])->name('kb.store');
+        Route::put('/kb/{id}', [HelpdeskApiController::class, 'updateKb'])->name('kb.update');
+        Route::delete('/kb/{id}', [HelpdeskApiController::class, 'destroyKb'])->name('kb.destroy');
+    });
+
 

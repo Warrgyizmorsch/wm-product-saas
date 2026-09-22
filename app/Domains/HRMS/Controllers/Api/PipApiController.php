@@ -96,7 +96,8 @@ class PipApiController extends Controller
         // Query Plans
         $plansQuery = PerformanceImprovementPlan::query()
             ->where('tenant_id', $tenantId)
-            ->with(['employee.department', 'employee.designation', 'manager', 'hrRepresentative', 'category', 'objectives', 'checkins']);
+            ->with(['employee.department', 'employee.designation', 'manager', 'category'])
+            ->withCount(['objectives', 'checkins']);
 
         if (!$isHrAdmin) {
             if (!$employee) {
@@ -141,7 +142,42 @@ class PipApiController extends Controller
         };
 
         $perPage = $request->integer('per_page', 15);
-        $plans = $plansQuery->paginate($perPage);
+        $plans = $plansQuery->paginate($perPage)->through(function ($pip) {
+            return [
+                'id'                    => $pip->id,
+                'pip_number'            => $pip->pip_number,
+                'status'                => $pip->status,
+                'reason_category'       => $pip->reason_category,
+                'reason_details'        => $pip->reason_details,
+                'start_date'            => $pip->start_date ? (is_string($pip->start_date) ? $pip->start_date : $pip->start_date->format('Y-m-d')) : null,
+                'end_date'              => $pip->end_date ? (is_string($pip->end_date) ? $pip->end_date : $pip->end_date->format('Y-m-d')) : null,
+                'duration_days'         => $pip->duration_days,
+                'checkin_frequency'     => $pip->checkin_frequency,
+                'final_outcome'         => $pip->final_outcome,
+                'completed_at'          => $pip->completed_at ? (is_string($pip->completed_at) ? $pip->completed_at : $pip->completed_at->toIso8601String()) : null,
+                'next_checkin_due_date' => $pip->next_checkin_due_date ? $pip->next_checkin_due_date->format('Y-m-d') : null,
+                'employee'              => $pip->employee ? [
+                    'id'               => $pip->employee->id,
+                    'employee_id'      => $pip->employee->employee_id ?? null,
+                    'name'             => trim(($pip->employee->first_name ?? '') . ' ' . ($pip->employee->last_name ?? '')) ?: ($pip->employee->full_name ?? null),
+                    'email'            => $pip->employee->office_email ?? $pip->employee->personal_email ?? null,
+                    'department_name'  => $pip->employee->department?->name ?? null,
+                    'designation_name' => $pip->employee->designation?->name ?? null,
+                ] : null,
+                'manager'               => $pip->manager ? [
+                    'id'    => $pip->manager->id,
+                    'name'  => trim(($pip->manager->first_name ?? '') . ' ' . ($pip->manager->last_name ?? '')) ?: ($pip->manager->full_name ?? null),
+                    'email' => $pip->manager->office_email ?? $pip->manager->personal_email ?? null,
+                ] : null,
+                'category'              => $pip->category ? [
+                    'id'   => $pip->category->id,
+                    'name' => $pip->category->name,
+                ] : null,
+                'objectives_count'      => $pip->objectives_count ?? 0,
+                'checkins_count'        => $pip->checkins_count ?? 0,
+                'created_at'            => $pip->created_at ? (is_string($pip->created_at) ? $pip->created_at : $pip->created_at->toIso8601String()) : null,
+            ];
+        });
 
         // Stats Computation
         $baseStats = PerformanceImprovementPlan::where('tenant_id', $tenantId);
@@ -164,6 +200,86 @@ class PipApiController extends Controller
             'stats'     => $stats,
             'plans'     => $plans,
         ], 'PIP dashboard data retrieved successfully.');
+    }
+
+    /**
+     * Standardized helper to format a single PIP detailed object.
+     */
+    private function formatPipDetailResponse(PerformanceImprovementPlan $pip): array
+    {
+        $pip->loadMissing([
+            'employee.department',
+            'employee.designation',
+            'manager',
+            'hrRepresentative',
+            'category',
+            'objectives',
+            'checkins.reviewer'
+        ]);
+
+        return [
+            'id'                    => $pip->id,
+            'pip_number'            => $pip->pip_number,
+            'status'                => $pip->status,
+            'reason_category'       => $pip->reason_category,
+            'reason_details'        => $pip->reason_details,
+            'start_date'            => $pip->start_date ? (is_string($pip->start_date) ? $pip->start_date : $pip->start_date->format('Y-m-d')) : null,
+            'end_date'              => $pip->end_date ? (is_string($pip->end_date) ? $pip->end_date : $pip->end_date->format('Y-m-d')) : null,
+            'duration_days'         => $pip->duration_days,
+            'checkin_frequency'     => $pip->checkin_frequency,
+            'final_outcome'         => $pip->final_outcome,
+            'final_comments'        => $pip->final_comments,
+            'completed_at'          => $pip->completed_at ? (is_string($pip->completed_at) ? $pip->completed_at : $pip->completed_at->toIso8601String()) : null,
+            'employee_signed_at'    => $pip->employee_signed_at ? (is_string($pip->employee_signed_at) ? $pip->employee_signed_at : $pip->employee_signed_at->toIso8601String()) : null,
+            'manager_signed_at'     => $pip->manager_signed_at ? (is_string($pip->manager_signed_at) ? $pip->manager_signed_at : $pip->manager_signed_at->toIso8601String()) : null,
+            'hr_signed_at'          => $pip->hr_signed_at ? (is_string($pip->hr_signed_at) ? $pip->hr_signed_at : $pip->hr_signed_at->toIso8601String()) : null,
+            'employee'              => $pip->employee ? [
+                'id'               => $pip->employee->id,
+                'employee_id'      => $pip->employee->employee_id ?? null,
+                'name'             => trim(($pip->employee->first_name ?? '') . ' ' . ($pip->employee->last_name ?? '')) ?: ($pip->employee->full_name ?? null),
+                'email'            => $pip->employee->office_email ?? $pip->employee->personal_email ?? null,
+                'department_name'  => $pip->employee->department?->name ?? null,
+                'designation_name' => $pip->employee->designation?->name ?? null,
+            ] : null,
+            'manager'               => $pip->manager ? [
+                'id'    => $pip->manager->id,
+                'name'  => trim(($pip->manager->first_name ?? '') . ' ' . ($pip->manager->last_name ?? '')) ?: ($pip->manager->full_name ?? null),
+                'email' => $pip->manager->office_email ?? $pip->manager->personal_email ?? null,
+            ] : null,
+            'hr_representative'     => $pip->hrRepresentative ? [
+                'id'    => $pip->hrRepresentative->id,
+                'name'  => $pip->hrRepresentative->name,
+                'email' => $pip->hrRepresentative->email,
+            ] : null,
+            'category'              => $pip->category ? [
+                'id'   => $pip->category->id,
+                'name' => $pip->category->name,
+            ] : null,
+            'objectives'            => $pip->objectives->map(function ($obj) {
+                return [
+                    'id'               => $obj->id,
+                    'title'            => $obj->title,
+                    'description'      => $obj->description,
+                    'target_criteria'  => $obj->target_criteria,
+                    'support_provided' => $obj->support_provided,
+                    'weightage'        => $obj->weightage,
+                    'status'           => $obj->status,
+                    'manager_remarks'  => $obj->manager_remarks,
+                ];
+            }),
+            'checkins'              => $pip->checkins->map(function ($chk) {
+                return [
+                    'id'                => $chk->id,
+                    'review_date'       => $chk->review_date ? (is_string($chk->review_date) ? $chk->review_date : $chk->review_date->format('Y-m-d')) : null,
+                    'rating_status'     => $chk->rating_status,
+                    'manager_comments'  => $chk->manager_comments,
+                    'employee_comments' => $chk->employee_comments,
+                    'action_items'      => $chk->action_items,
+                    'reviewer_name'     => $chk->reviewer ? $chk->reviewer->name : null,
+                ];
+            }),
+            'created_at'            => $pip->created_at ? (is_string($pip->created_at) ? $pip->created_at : $pip->created_at->toIso8601String()) : null,
+        ];
     }
 
     /**
@@ -195,7 +311,7 @@ class PipApiController extends Controller
         $validated['hr_representative_id'] = auth()->id() ?? 1;
         $pip = $this->pipService->createPip($validated);
 
-        return $this->sendSuccess($pip->load(['employee.department', 'employee.designation', 'manager', 'category', 'objectives']), 'Performance Improvement Plan initiated successfully.', 201);
+        return $this->sendSuccess($this->formatPipDetailResponse($pip), 'Performance Improvement Plan initiated successfully.', 201);
     }
 
     /**
@@ -204,16 +320,7 @@ class PipApiController extends Controller
      */
     public function show(mixed $id): JsonResponse
     {
-        $pip = PerformanceImprovementPlan::with([
-            'employee.department',
-            'employee.designation',
-            'employee.reportingManager',
-            'manager',
-            'hrRepresentative',
-            'category',
-            'objectives',
-            'checkins.reviewer'
-        ])->find($id);
+        $pip = PerformanceImprovementPlan::find($id);
 
         if (!$pip) {
             return $this->sendError("Performance Improvement Plan with ID '{$id}' not found.", 404);
@@ -227,7 +334,7 @@ class PipApiController extends Controller
             }
         }
 
-        return $this->sendSuccess($pip, 'PIP plan workspace details retrieved successfully.');
+        return $this->sendSuccess($this->formatPipDetailResponse($pip), 'PIP plan workspace details retrieved successfully.');
     }
 
     /**
@@ -256,7 +363,7 @@ class PipApiController extends Controller
 
         $pip->update($validated);
 
-        return $this->sendSuccess($pip->fresh(['category', 'employee']), 'PIP plan updated successfully.');
+        return $this->sendSuccess($this->formatPipDetailResponse($pip->fresh()), 'PIP plan updated successfully.');
     }
 
     /**
@@ -278,7 +385,7 @@ class PipApiController extends Controller
         $pip->checkins()->delete();
         $pip->delete();
 
-        return $this->sendSuccess(null, 'PIP plan and associated records deleted successfully.');
+        return $this->sendSuccess(['id' => (int) $id], 'PIP plan and associated records deleted successfully.');
     }
 
     /**
@@ -367,7 +474,7 @@ class PipApiController extends Controller
 
         $objective->delete();
 
-        return $this->sendSuccess(null, 'SMART Objective deleted successfully.');
+        return $this->sendSuccess(['id' => (int) $objectiveId], 'SMART Objective deleted successfully.');
     }
 
     /**
@@ -440,7 +547,7 @@ class PipApiController extends Controller
 
         $checkin->delete();
 
-        return $this->sendSuccess(null, 'Milestone check-in log deleted successfully.');
+        return $this->sendSuccess(['id' => (int) $checkinId], 'Milestone check-in log deleted successfully.');
     }
 
     /**
@@ -466,7 +573,7 @@ class PipApiController extends Controller
 
         $this->pipService->evaluateFinalOutcome($pip, $validated);
 
-        return $this->sendSuccess($pip->fresh(['employee', 'objectives', 'checkins']), 'PIP final evaluation submitted successfully.');
+        return $this->sendSuccess($this->formatPipDetailResponse($pip->fresh()), 'PIP final evaluation submitted successfully.');
     }
 
     /**

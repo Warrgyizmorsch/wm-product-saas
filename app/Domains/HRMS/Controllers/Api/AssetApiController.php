@@ -166,7 +166,39 @@ class AssetApiController extends Controller
             default: $query->orderBy('asset_code', 'asc'); break;
         }
 
-        $assets = $query->paginate($request->integer('per_page', 10));
+        $assets = $query->paginate($request->integer('per_page', 10))->through(function ($asset) {
+            return [
+                'id'                  => $asset->id,
+                'asset_code'          => $asset->asset_code,
+                'name'                => $asset->name,
+                'brand'               => $asset->brand,
+                'model_number'        => $asset->model_number,
+                'serial_number'       => $asset->serial_number,
+                'status'              => $asset->status,
+                'condition'           => $asset->condition,
+                'purchase_date'       => $asset->purchase_date ? (is_string($asset->purchase_date) ? $asset->purchase_date : $asset->purchase_date->format('Y-m-d')) : null,
+                'purchase_cost'       => $asset->purchase_cost,
+                'location'            => $asset->location ?? null,
+                'asset_category_id'   => $asset->asset_category_id,
+                'category'            => $asset->category ? [
+                    'id'   => $asset->category->id,
+                    'name' => $asset->category->name,
+                ] : null,
+                'company_id'          => $asset->company_id,
+                'company'             => $asset->company ? [
+                    'id'           => $asset->company->id,
+                    'company_name' => $asset->company->company_name,
+                ] : null,
+                'assigned_employee_id' => $asset->assigned_employee_id,
+                'assigned_employee'   => $asset->assignedEmployee ? [
+                    'id'            => $asset->assignedEmployee->id,
+                    'employee_code' => $asset->assignedEmployee->employee_code ?? null,
+                    'name'          => trim(($asset->assignedEmployee->first_name ?? '') . ' ' . ($asset->assignedEmployee->last_name ?? '')),
+                    'email'         => $asset->assignedEmployee->office_email ?? $asset->assignedEmployee->personal_email ?? null,
+                ] : null,
+                'created_at'          => $asset->created_at ? (is_string($asset->created_at) ? $asset->created_at : $asset->created_at->toIso8601String()) : null,
+            ];
+        });
 
         return $this->sendSuccess($assets, 'Asset registry retrieved successfully');
     }
@@ -453,7 +485,20 @@ class AssetApiController extends Controller
             default: $query->orderBy('name', 'asc'); break;
         }
 
-        $categories = $query->paginate($request->integer('per_page', 10));
+        $categories = $query->withCount('assets')->paginate($request->integer('per_page', 10))->through(function ($category) {
+            return [
+                'id'                 => $category->id,
+                'name'               => $category->name,
+                'description'        => $category->description,
+                'company_id'         => $category->company_id,
+                'company'            => $category->company ? [
+                    'id'           => $category->company->id,
+                    'company_name' => $category->company->company_name,
+                ] : null,
+                'total_assets_count' => $category->assets_count ?? 0,
+                'created_at'         => $category->created_at ? (is_string($category->created_at) ? $category->created_at : $category->created_at->toIso8601String()) : null,
+            ];
+        });
 
         return $this->sendSuccess($categories, 'Asset categories retrieved successfully');
     }
@@ -571,7 +616,25 @@ class AssetApiController extends Controller
             default: $query->orderBy('name', 'asc'); break;
         }
 
-        $items = $query->paginate($request->integer('per_page', 10));
+        $items = $query->withCount('assets')->paginate($request->integer('per_page', 10))->through(function ($item) {
+            return [
+                'id'                 => $item->id,
+                'name'               => $item->name,
+                'description'        => $item->description,
+                'asset_category_id'  => $item->asset_category_id,
+                'category'           => $item->category ? [
+                    'id'   => $item->category->id,
+                    'name' => $item->category->name,
+                ] : null,
+                'company_id'         => $item->company_id,
+                'company'            => $item->company ? [
+                    'id'           => $item->company->id,
+                    'company_name' => $item->company->company_name,
+                ] : null,
+                'total_assets_count' => $item->assets_count ?? 0,
+                'created_at'         => $item->created_at ? (is_string($item->created_at) ? $item->created_at : $item->created_at->toIso8601String()) : null,
+            ];
+        });
 
         return $this->sendSuccess($items, 'Asset items retrieved successfully');
     }
@@ -713,7 +776,23 @@ class AssetApiController extends Controller
             }
         });
 
-        return $this->sendSuccess(null, 'Asset item allocated successfully');
+        $allocatedAssetsData = Asset::whereIn('id', $availableAssets->pluck('id'))->get()->map(function ($asset) {
+            return [
+                'id'            => $asset->id,
+                'asset_code'    => $asset->asset_code,
+                'name'          => $asset->name,
+                'status'        => $asset->status,
+                'condition'     => $asset->condition,
+                'allocated_at'  => $asset->allocated_at ? (\Carbon\Carbon::parse($asset->allocated_at)->format('Y-m-d')) : null,
+            ];
+        })->values()->all();
+
+        return $this->sendSuccess([
+            'item_id'          => $assetItem->id,
+            'item_name'        => $assetItem->name,
+            'allocated_qty'    => count($allocatedAssetsData),
+            'allocated_assets' => $allocatedAssetsData,
+        ], 'Asset item allocated successfully');
     }
 
     public function returnItem(Request $request, \App\Domains\HRMS\Models\AssetItem $assetItem): JsonResponse
@@ -780,7 +859,22 @@ class AssetApiController extends Controller
             }
         });
 
-        return $this->sendSuccess(null, 'Asset item returned successfully');
+        $returnedAssetsData = Asset::whereIn('id', $allocatedAssets->pluck('id'))->get()->map(function ($asset) {
+            return [
+                'id'            => $asset->id,
+                'asset_code'    => $asset->asset_code,
+                'name'          => $asset->name,
+                'status'        => $asset->status,
+                'condition'     => $asset->condition,
+            ];
+        })->values()->all();
+
+        return $this->sendSuccess([
+            'item_id'         => $assetItem->id,
+            'item_name'       => $assetItem->name,
+            'returned_qty'    => count($returnedAssetsData),
+            'returned_assets' => $returnedAssetsData,
+        ], 'Asset item returned successfully');
     }
 
     // ==========================================
@@ -835,6 +929,30 @@ class AssetApiController extends Controller
         }
 
         $requests = $query->paginate($request->integer('per_page', 10));
+
+        $requests->getCollection()->transform(function ($item) {
+            return [
+                'id'                   => $item->id,
+                'company_id'           => $item->company_id,
+                'company_name'         => $item->company?->company_name ?? $item->company?->name,
+                'employee_id'          => $item->employee_id,
+                'employee_name'        => $item->employee?->full_name,
+                'employee_code'        => $item->employee?->employee_id,
+                'asset_category_id'    => $item->asset_category_id,
+                'category_name'        => $item->category?->name,
+                'requested_asset_id'   => $item->requested_asset_id,
+                'requested_asset_name' => $item->requestedAsset?->name,
+                'requested_asset_code' => $item->requestedAsset?->asset_code,
+                'allocated_asset_id'   => $item->allocated_asset_id,
+                'allocated_asset_name' => $item->allocatedAsset?->name,
+                'allocated_asset_code' => $item->allocatedAsset?->asset_code,
+                'reason'               => $item->reason,
+                'request_date'         => $item->request_date ? \Carbon\Carbon::parse($item->request_date)->format('Y-m-d') : null,
+                'status'               => $item->status,
+                'admin_notes'          => $item->admin_notes,
+                'created_at'           => $item->created_at?->toDateTimeString(),
+            ];
+        });
 
         return $this->sendSuccess($requests, 'Asset requests retrieved successfully');
     }
@@ -1159,50 +1277,48 @@ class AssetApiController extends Controller
             return $this->sendError('You do not have an active employee profile associated with your user account.', 403);
         }
 
-        $categories = AssetCategory::orderBy('name')->get();
+        $employeeData = [
+            'id'          => $employee->id,
+            'employee_id' => $employee->employee_id,
+            'full_name'   => $employee->full_name,
+            'designation' => $employee->designation?->name,
+            'department'  => $employee->department?->name,
+            'company'     => $employee->company?->company_name ?? $employee->company?->name,
+        ];
 
-        // Group assigned assets by name (each Asset row = one unit)
         $assignedAssetsRaw = $employee->assets()->with('category')->get();
-        $assignedAssetsGrouped = $assignedAssetsRaw->groupBy('name');
         
-        $assignedAssets = $assignedAssetsGrouped->map(function($group) {
-            $first = $group->first();
-            $latestDate = $group->max('allocated_at');
-            
-            $mappedUnits = $group->map(function($unit) {
-                return [
-                    'id'            => $unit->id,
-                    'asset_code'    => $unit->asset_code,
-                    'serial_number' => $unit->serial_number,
-                    'allocated_at'  => $unit->allocated_at ? (\Carbon\Carbon::parse($unit->allocated_at)->format('Y-m-d')) : null,
-                    'condition'     => $unit->condition,
-                    'notes'         => $unit->notes,
-                ];
-            })->values()->all();
-
+        $assignedAssets = $assignedAssetsRaw->map(function ($unit) {
             return [
-                'asset'               => $first,
-                'units'               => $mappedUnits,
-                'latest_assigned_date'=> $latestDate ? \Carbon\Carbon::parse($latestDate)->format('Y-m-d') : null,
+                'id'                   => $unit->id,
+                'asset_code'           => $unit->asset_code,
+                'name'                 => $unit->name,
+                'brand'                => $unit->brand,
+                'model_number'         => $unit->model_number,
+                'serial_number'        => $unit->serial_number,
+                'category_id'          => $unit->asset_category_id,
+                'category_name'        => $unit->category?->name,
+                'allocated_at'         => $unit->allocated_at ? (\Carbon\Carbon::parse($unit->allocated_at)->format('Y-m-d')) : null,
+                'expected_return_date' => $unit->expected_return_date ? (\Carbon\Carbon::parse($unit->expected_return_date)->format('Y-m-d')) : null,
+                'condition'            => $unit->condition,
+                'notes'                => $unit->notes,
             ];
-        })->values();
+        })->values()->all();
 
-        $assignedAssetCategories = $assignedAssetsRaw->pluck('category.name')->filter()->unique()->sort()->values();
-        $requestAssetCategories = $employee->assetRequests->pluck('category.name')->filter()->unique()->sort()->values();
-        $requestAssetStatuses = $employee->assetRequests->pluck('status')->filter()->unique()->sort()->values();
+        $availableAssetCategories = AssetCategory::where('company_id', $employee->company_id)
+            ->orWhereNull('company_id')
+            ->orderBy('name')
+            ->get(['id', 'name', 'description']);
 
-        $availableAssetItems = \App\Domains\HRMS\Models\AssetItem::whereHas('category', function($q) use ($employee) {
+        $availableAssetItems = \App\Domains\HRMS\Models\AssetItem::whereHas('category', function ($q) use ($employee) {
             $q->where('company_id', $employee->company_id);
-        })->get();
+        })->get(['id', 'asset_category_id', 'name', 'description']);
 
         return $this->sendSuccess([
-            'employee'                  => $employee,
-            'categories'                => $categories,
-            'assigned_assets'           => $assignedAssets,
-            'assigned_asset_categories' => $assignedAssetCategories,
-            'request_asset_categories'  => $requestAssetCategories,
-            'request_asset_statuses'    => $requestAssetStatuses,
-            'available_asset_items'     => $availableAssetItems,
+            'employee'                   => $employeeData,
+            'assigned_assets'            => $assignedAssets,
+            'available_asset_categories' => $availableAssetCategories,
+            'available_asset_items'      => $availableAssetItems,
         ], 'My assets and request settings loaded successfully');
     }
 
@@ -1258,7 +1374,33 @@ class AssetApiController extends Controller
             }
         });
 
-        return $this->sendSuccess(null, 'Asset(s) allocated directly successfully');
+        $employee = Employee::find($validated['employee_id']);
+
+        $allocatedAssetsData = $assets->fresh()->map(function ($asset) {
+            return [
+                'id'                   => $asset->id,
+                'asset_code'           => $asset->asset_code,
+                'name'                 => $asset->name,
+                'brand'                => $asset->brand,
+                'model_number'         => $asset->model_number,
+                'serial_number'        => $asset->serial_number,
+                'status'               => $asset->status,
+                'condition'            => $asset->condition,
+                'allocated_at'         => $asset->allocated_at ? (\Carbon\Carbon::parse($asset->allocated_at)->format('Y-m-d')) : null,
+                'expected_return_date' => $asset->expected_return_date ? (\Carbon\Carbon::parse($asset->expected_return_date)->format('Y-m-d')) : null,
+            ];
+        })->values()->all();
+
+        return $this->sendSuccess([
+            'employee' => [
+                'id'          => $employee?->id,
+                'employee_id' => $employee?->employee_id,
+                'full_name'   => $employee?->full_name,
+            ],
+            'allocated_at'         => $validated['allocated_at'],
+            'expected_return_date' => $validated['expected_return_date'] ?? null,
+            'allocated_assets'     => $allocatedAssetsData,
+        ], 'Asset(s) allocated directly successfully');
     }
 
     public function returnDirectMulti(Request $request): JsonResponse
@@ -1311,6 +1453,22 @@ class AssetApiController extends Controller
             }
         });
 
-        return $this->sendSuccess(null, 'Selected asset(s) returned to inventory successfully');
+        $returnedAssetsData = Asset::whereIn('id', $assetIds)->get()->map(function ($asset) {
+            return [
+                'id'            => $asset->id,
+                'asset_code'    => $asset->asset_code,
+                'name'          => $asset->name,
+                'brand'         => $asset->brand,
+                'model_number'  => $asset->model_number,
+                'serial_number' => $asset->serial_number,
+                'status'        => $asset->status,
+                'condition'     => $asset->condition,
+            ];
+        })->values()->all();
+
+        return $this->sendSuccess([
+            'returned_count'  => count($returnedAssetsData),
+            'returned_assets' => $returnedAssetsData,
+        ], 'Selected asset(s) returned to inventory successfully');
     }
 }

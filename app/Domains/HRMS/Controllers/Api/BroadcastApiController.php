@@ -74,7 +74,7 @@ class BroadcastApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $this->broadcastService->processScheduledBroadcasts($tenantId);
         $employee = $this->getAuthenticatedEmployee();
 
@@ -117,7 +117,7 @@ class BroadcastApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to manage broadcasts.', 403);
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $broadcasts = Broadcast::where('tenant_id', $tenantId)
             ->with(['creator', 'receipts'])
@@ -153,7 +153,7 @@ class BroadcastApiController extends Controller
             'expires_at'                  => 'nullable|date|after_or_equal:scheduled_at',
         ]);
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $validated['tenant_id'] = $tenantId;
 
         $broadcast = $this->broadcastService->createBroadcast($validated);
@@ -232,7 +232,7 @@ class BroadcastApiController extends Controller
         $broadcast->comments()->delete();
         $broadcast->delete();
 
-        return $this->sendSuccess(null, 'Broadcast deleted successfully.');
+        return $this->sendSuccess(['id' => (int) $id], 'Broadcast deleted successfully.');
     }
 
     /**
@@ -258,16 +258,60 @@ class BroadcastApiController extends Controller
     }
 
     /**
+     * Standardized helper to format a single broadcast comment object cleanly.
+     */
+    private function formatComment(BroadcastComment $comment): array
+    {
+        return [
+            'id'           => $comment->id,
+            'broadcast_id' => $comment->broadcast_id,
+            'parent_id'    => $comment->parent_id,
+            'comment_text' => $comment->comment_text,
+            'is_pinned'    => (bool) $comment->is_pinned,
+            'author'       => $comment->employee ? [
+                'id'         => $comment->employee->id,
+                'name'       => trim(($comment->employee->first_name ?? '') . ' ' . ($comment->employee->last_name ?? '')) ?: ($comment->employee->full_name ?? null),
+                'email'      => $comment->employee->office_email ?? $comment->employee->personal_email ?? null,
+                'avatar_url' => $comment->employee->avatar_url ?? null,
+            ] : null,
+            'replies'      => $comment->replies ? $comment->replies->map(function ($reply) {
+                return [
+                    'id'           => $reply->id,
+                    'broadcast_id' => $reply->broadcast_id,
+                    'parent_id'    => $reply->parent_id,
+                    'comment_text' => $reply->comment_text,
+                    'is_pinned'    => (bool) $reply->is_pinned,
+                    'author'       => $reply->employee ? [
+                        'id'         => $reply->employee->id,
+                        'name'       => trim(($reply->employee->first_name ?? '') . ' ' . ($reply->employee->last_name ?? '')) ?: ($reply->employee->full_name ?? null),
+                        'email'      => $reply->employee->office_email ?? $reply->employee->personal_email ?? null,
+                        'avatar_url' => $reply->employee->avatar_url ?? null,
+                    ] : null,
+                    'created_at'   => $reply->created_at ? (is_string($reply->created_at) ? $reply->created_at : $reply->created_at->toIso8601String()) : null,
+                ];
+            })->values() : [],
+            'created_at'   => $comment->created_at ? (is_string($comment->created_at) ? $comment->created_at : $comment->created_at->toIso8601String()) : null,
+        ];
+    }
+
+    /**
      * GET /api/hrms/broadcasts/{id}/comments
      * Get comments for broadcast.
      */
     public function getComments(Request $request, $id): JsonResponse
     {
-        $comments = BroadcastComment::where('broadcast_id', $id)
+        $broadcast = Broadcast::find($id);
+
+        if (!$broadcast) {
+            return $this->sendError("Broadcast record with ID '{$id}' not found.", 404);
+        }
+
+        $comments = BroadcastComment::where('broadcast_id', $broadcast->id)
             ->whereNull('parent_id')
-            ->with(['employee', 'replies'])
+            ->with(['employee', 'replies.employee'])
             ->latest('id')
-            ->paginate($request->integer('per_page', 15));
+            ->paginate($request->integer('per_page', 15))
+            ->through(fn ($comment) => $this->formatComment($comment));
 
         return $this->sendSuccess($comments, 'Broadcast comments retrieved successfully.');
     }
@@ -305,7 +349,9 @@ class BroadcastApiController extends Controller
             $validated['parent_id'] ?? null
         );
 
-        return $this->sendSuccess($comment->load('employee'), 'Comment posted successfully.', 201);
+        $comment->load(['employee', 'replies.employee']);
+
+        return $this->sendSuccess($this->formatComment($comment), 'Comment posted successfully.', 201);
     }
 
     /**
