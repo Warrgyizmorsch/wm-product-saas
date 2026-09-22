@@ -9,6 +9,8 @@ use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\ProductionRequisitionSlip;
 use App\Domains\Production\Models\ProductionRequisitionSlipItem;
 use App\Domains\Purchase\Models\PurchaseRequisitionItem;
+use App\Exports\MaterialRequestExport;
+use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -26,6 +28,19 @@ class MaterialRequestController extends Controller
         $slips = $this->requestRepo->getPaginatedSlips($tenantId, $request->all(), 15);
 
         return view('modules.sales.material-requests.index', compact('slips'));
+    }
+
+    /**
+     * Export Material Requisition Slips to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $tenantId = require_tenant_id();
+
+        return Excel::download(
+            new MaterialRequestExport($tenantId, $request->all()),
+            'material_requests_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function show(int $id)

@@ -9,6 +9,7 @@ Route::prefix('sales')
     ->as('sales.')
     ->group(function (): void {
         Route::get('orders', [SalesOrderController::class, 'index'])->name('orders.index');
+        Route::get('orders/export', [SalesOrderController::class, 'export'])->name('orders.export');
         Route::get('orders/create', [SalesOrderController::class, 'create'])->name('orders.create');
         Route::post('orders', [SalesOrderController::class, 'store'])->name('orders.store');
         Route::get('orders/{order}', [SalesOrderController::class, 'show'])->name('orders.show');
@@ -38,6 +39,7 @@ Route::prefix('sales')
         Route::post('material-requirements/{delivery}/deliver', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'deliver'])->name('material-requirements.deliver');
 
         // Material Requests (Prod) Routes (Alias Redirects to /inventory/material-requests)
+        Route::get('material-requests/export', [\App\Domains\Inventory\Controllers\MaterialRequestController::class, 'export'])->name('sales.material-requests.export');
         Route::get('material-requests', fn() => redirect()->route('inventory.material-requests.index'))->name('material-requests.index');
         Route::get('material-requests/{id}', fn($id) => redirect()->route('inventory.material-requests.show', $id))->name('material-requests.show');
         Route::post('material-requests/items/{id}/reserve', [MaterialRequestController::class, 'reserve'])->name('material-requests.reserve');
@@ -49,6 +51,7 @@ Route::prefix('sales')
 
         // Dispatch Orders Routes (Alias Redirects to /inventory/dispatches)
         Route::get('dispatches', fn() => redirect()->route('inventory.dispatches.index'))->name('dispatches.index');
+        Route::get('dispatches/export', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'export'])->name('dispatches.export');
         Route::get('dispatches/create', fn() => redirect()->route('inventory.dispatches.create', request()->query()))->name('dispatches.create');
         Route::post('dispatches', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'store'])->name('dispatches.store');
         Route::get('dispatches/material-requirements', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'pendingMaterialRequirements'])->name('dispatches.pending-mr');
@@ -65,15 +68,28 @@ Route::prefix('sales')
 
         // Invoices Routes
         Route::get('invoices', [\App\Domains\Sales\Controllers\InvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('invoices/export', [\App\Domains\Sales\Controllers\InvoiceController::class, 'export'])->name('invoices.export');
         Route::get('invoices/create', [\App\Domains\Sales\Controllers\InvoiceController::class, 'create'])->name('invoices.create');
         Route::post('invoices', [\App\Domains\Sales\Controllers\InvoiceController::class, 'store'])->name('invoices.store');
         Route::get('invoices/{invoice}', [\App\Domains\Sales\Controllers\InvoiceController::class, 'show'])->name('invoices.show');
+        Route::get('invoices/{invoice}/preview-pdf', [\App\Domains\Sales\Controllers\InvoiceController::class, 'viewPdf'])->name('invoices.previewPdf');
+        Route::get('invoices/{invoice}/download', [\App\Domains\Sales\Controllers\InvoiceController::class, 'downloadPdf'])->name('invoices.download');
+        Route::post('invoices/{invoice}/send-email', [\App\Domains\Sales\Controllers\InvoiceController::class, 'sendEmail'])->name('invoices.sendEmail');
+        Route::post('invoices/{invoice}/send-whatsapp', [\App\Domains\Sales\Controllers\InvoiceController::class, 'sendWhatsApp'])->name('invoices.sendWhatsApp');
         Route::post('invoices/{invoice}/post', [\App\Domains\Sales\Controllers\InvoiceController::class, 'post'])->name('invoices.post');
         Route::post('invoices/{invoice}/send', [\App\Domains\Sales\Controllers\InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/pay', [\App\Domains\Sales\Controllers\InvoiceController::class, 'pay'])->name('invoices.pay');
 
+        // E-Invoice & E-Way Bill Routes
+        Route::post('invoices/{id}/einvoice/generate', [\App\Domains\Sales\Controllers\EInvoiceController::class, 'generateEInvoice'])->name('invoices.einvoice.generate');
+        Route::post('invoices/{id}/einvoice/cancel', [\App\Domains\Sales\Controllers\EInvoiceController::class, 'cancelEInvoice'])->name('invoices.einvoice.cancel');
+        Route::get('invoices/{id}/einvoice/export-json', [\App\Domains\Sales\Controllers\EInvoiceController::class, 'exportJson'])->name('invoices.einvoice.export-json');
+        Route::post('invoices/{id}/eway-bill/generate', [\App\Domains\Sales\Controllers\EInvoiceController::class, 'generateEWayBill'])->name('invoices.ewaybill.generate');
+        Route::post('invoices/{id}/eway-bill/cancel', [\App\Domains\Sales\Controllers\EInvoiceController::class, 'cancelEWayBill'])->name('invoices.ewaybill.cancel');
+
         // Payments Routes
         Route::get('payments', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'index'])->name('payments.index');
+        Route::get('payments/export', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'export'])->name('payments.export');
         Route::get('payments/create', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'create'])->name('payments.create');
         Route::post('payments', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'store'])->name('payments.store');
         Route::get('payments/{payment}', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'show'])->name('payments.show');
@@ -81,6 +97,7 @@ Route::prefix('sales')
 
         // Returns Routes
         Route::get('returns', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'index'])->name('returns.index');
+        Route::get('returns/export', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'export'])->name('returns.export');
         Route::get('returns/create', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'create'])->name('returns.create');
         Route::post('returns', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'store'])->name('returns.store');
         Route::get('returns/{return}', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'show'])->name('returns.show');

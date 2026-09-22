@@ -5,7 +5,12 @@
 @section('breadcrumb', __('crm.sales') . ' / ' . __('crm.payments'))
 
 @section('page-actions')
-    <div class="d-flex gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="customer-payments" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('sales.payments.export') }}" />
         <a href="{{ route('sales.payments.create') }}" class="btn btn-primary">
             <i class="feather-plus me-2"></i>{{ __('crm.record_payment') }}
         </a>

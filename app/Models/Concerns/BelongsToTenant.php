@@ -15,7 +15,15 @@ trait BelongsToTenant
             $tenantId = tenant_id() ?? app(TenantContext::class)->id();
 
             if ($tenantId !== null) {
-                $builder->where($builder->getModel()->getTable().'.tenant_id', $tenantId);
+                $model = $builder->getModel();
+                $column = $model->getTable().'.tenant_id';
+
+                // Shared masters (no tenant) stay visible in every tenant.
+                if (property_exists($model, 'sharedAcrossTenants') && $model->sharedAcrossTenants) {
+                    $builder->where(fn (Builder $q) => $q->where($column, $tenantId)->orWhereNull($column));
+                } else {
+                    $builder->where($column, $tenantId);
+                }
             }
         });
 

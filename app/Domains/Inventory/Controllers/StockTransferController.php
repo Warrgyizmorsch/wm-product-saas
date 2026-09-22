@@ -13,9 +13,25 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use App\Exports\StockTransferExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class StockTransferController extends Controller
 {
+    /**
+     * Export Stock Transfers to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', StockTransfer::class);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new StockTransferExport($tenantId, $request->all()),
+            'stock_transfers_export_' . date('Y-m-d_His') . '.xlsx'
+        );
+    }
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', StockTransfer::class);

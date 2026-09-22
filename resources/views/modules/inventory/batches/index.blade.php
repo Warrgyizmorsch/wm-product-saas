@@ -4,6 +4,16 @@
 @section('page-title', __('inventory.batch_expiry_master_fefo'))
 @section('breadcrumb', __('inventory.inventory_batches'))
 
+@section('page-actions')
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="batches" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('inventory.batches.export') }}" />
+    </div>
+@endsection
+
 @section('content')
 @php
     $sortBy = request('sort_by', 'expiry_date');

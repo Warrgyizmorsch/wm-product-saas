@@ -14,6 +14,8 @@ use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\PurchaseOrderExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PurchaseOrderController extends Controller
 {
@@ -28,6 +30,20 @@ class PurchaseOrderController extends Controller
 
         $orders = $this->orderRepo->getPaginatedOrders($request->all(), 10);
         return view('modules.purchase.orders.index', compact('orders'));
+    }
+
+    /**
+     * Export Purchase Orders to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', PurchaseOrder::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new PurchaseOrderExport($tenantId, $request->all()),
+            'purchase_orders_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function poApprovals(Request $request)

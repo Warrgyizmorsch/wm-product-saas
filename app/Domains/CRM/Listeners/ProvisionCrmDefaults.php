@@ -33,31 +33,7 @@ class ProvisionCrmDefaults
             return;
         }
 
-        $order = 0;
-        foreach (self::LEAD_STATUSES as $name => [$color, $protected]) {
-            LeadStatus::query()->firstOrCreate(
-                ['tenant_id' => $event->tenantId, 'name' => $name],
-                [
-                    'sort_order' => ++$order,
-                    'color' => $color,
-                    'is_protected' => $protected,
-                    'is_active' => true,
-                ],
-            );
-        }
-
-        $order = 0;
-        foreach (self::DEAL_STATUSES as $name => [$color, $probability, $protected]) {
-            DealStatus::query()->firstOrCreate(
-                ['tenant_id' => $event->tenantId, 'name' => $name],
-                [
-                    'sort_order' => ++$order,
-                    'color' => $color,
-                    'probability' => $probability,
-                    'is_protected' => $protected,
-                    'is_active' => true,
-                ],
-            );
-        }
+        LeadStatus::seedSystemDefaults();
+        DealStatus::seedSystemDefaults();
     }
 }

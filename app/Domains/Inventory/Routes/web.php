@@ -41,15 +41,18 @@ Route::prefix('inventory')
 
         // Serial Numbers & Batches
         Route::get('serial-numbers', [SerialNumberController::class, 'index'])->name('serial-numbers.index');
+        Route::get('batches/export', [BatchController::class, 'export'])->name('batches.export');
         Route::get('batches', [BatchController::class, 'index'])->name('batches.index');
 
         // Warehouses
+        Route::get('warehouses/export', [WarehouseController::class, 'export'])->name('warehouses.export');
         Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
         Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
         Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update'])->name('warehouses.update');
         Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->name('warehouses.destroy');
 
         // Stock Transfers
+        Route::get('transfers/export', [StockTransferController::class, 'export'])->name('transfers.export');
         Route::get('transfers', [StockTransferController::class, 'index'])->name('transfers.index');
         Route::get('transfers/create', [StockTransferController::class, 'create'])->name('transfers.create');
         Route::post('transfers', [StockTransferController::class, 'store'])->name('transfers.store');
@@ -59,6 +62,7 @@ Route::prefix('inventory')
         Route::post('transfers/{transfer}/cancel', [StockTransferController::class, 'cancel'])->name('transfers.cancel');
 
         // Stock Adjustments
+        Route::get('adjustments/export', [StockAdjustmentController::class, 'export'])->name('adjustments.export');
         Route::get('adjustments', [StockAdjustmentController::class, 'index'])->name('adjustments.index');
         Route::get('adjustments/create', [StockAdjustmentController::class, 'create'])->name('adjustments.create');
         Route::post('adjustments', [StockAdjustmentController::class, 'store'])->name('adjustments.store');
@@ -110,6 +114,7 @@ Route::prefix('inventory')
         Route::post('mrp-shortage/generate-pr', [MrpShortageController::class, 'generatePr'])->name('mrp-shortage.generate-pr');
 
         // Material Requests (Prod) Routes (/inventory/material-requests)
+        Route::get('material-requests/export', [MaterialRequestController::class, 'export'])->name('material-requests.export');
         Route::get('material-requests', [MaterialRequestController::class, 'index'])->name('material-requests.index');
         Route::get('material-requests/{id}', [MaterialRequestController::class, 'show'])->name('material-requests.show');
         Route::post('material-requests/items/{id}/reserve', [MaterialRequestController::class, 'reserve'])->name('material-requests.reserve');
@@ -126,6 +131,7 @@ Route::prefix('inventory')
 
         // Dispatch Orders Routes (/inventory/dispatches)
         Route::get('dispatches', [DispatchOrderController::class, 'index'])->name('dispatches.index');
+        Route::get('dispatches/export', [DispatchOrderController::class, 'export'])->name('dispatches.export');
         Route::get('dispatches/create', [DispatchOrderController::class, 'create'])->name('dispatches.create');
         Route::post('dispatches', [DispatchOrderController::class, 'store'])->name('dispatches.store');
         Route::get('dispatches/material-requirements', [DispatchOrderController::class, 'pendingMaterialRequirements'])->name('dispatches.pending-mr');

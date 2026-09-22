@@ -46,12 +46,20 @@ class Customer extends BaseModel
         parent::boot();
 
         static::created(function ($customer) {
-            // Skip when called from deal conversion (account is created manually there)
+            // Skip when called from deal conversion or direct account creation
             if (static::$skipAccountAutoCreate) {
                 return;
             }
 
-            if (!$customer->crmAccount()->exists()) {
+            $alreadyExists = CrmAccount::where('tenant_id', $customer->tenant_id)
+                ->where(function ($q) use ($customer) {
+                    $q->where('customer_id', $customer->id);
+                    if (!empty($customer->email)) {
+                        $q->orWhere('email', $customer->email);
+                    }
+                })->exists();
+
+            if (!$alreadyExists) {
                 CrmAccount::create([
                     'tenant_id'        => $customer->tenant_id,
                     'company_id'       => $customer->company_id,

@@ -5,9 +5,16 @@
 @section('breadcrumb', __('crm.deals'))
 
 @section('page-actions')
-    <x-ui.button href="{{ route('crm.deals.create') }}" variant="primary" icon="feather-plus">
-        {{ __('crm.new_deal') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="deals" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('crm.deals.export') }}" />
+        <x-ui.button href="{{ route('crm.deals.create') }}" variant="primary" icon="feather-plus">
+            {{ __('crm.new_deal') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @push('styles')

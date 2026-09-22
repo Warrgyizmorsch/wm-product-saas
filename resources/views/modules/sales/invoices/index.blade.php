@@ -5,9 +5,16 @@
 @section('breadcrumb', __('crm.sales') . ' / ' . __('crm.invoices'))
 
 @section('page-actions')
-    <x-ui.button href="{{ route('sales.invoices.create') }}" variant="primary" icon="feather-plus">
-        {{ __('crm.create_invoice') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="invoices" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('sales.invoices.export') }}" />
+        <x-ui.button href="{{ route('sales.invoices.create') }}" variant="primary" icon="feather-plus">
+            {{ __('crm.create_invoice') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')
@@ -191,10 +198,42 @@
                                 <span class="badge {{ $badgeClass }} px-2.5 py-1 fs-11 fw-bold">{{ $statusLabel }}</span>
                             </td>
                             <td>
-                                <span class="badge bg-soft-warning text-warning border border-warning fs-11 fw-semibold px-2 py-1"><i class="feather-clock me-1"></i>{{ __('crm.pending') }}</span>
+                                @if ($inv->einvoice_status === 'Generated')
+                                    <span class="badge bg-soft-success text-success border border-success fs-11 fw-semibold px-2 py-1" title="IRN: {{ $inv->irn }}" data-bs-toggle="tooltip">
+                                        <i class="feather-check-circle me-1"></i>Generated
+                                    </span>
+                                @elseif ($inv->einvoice_status === 'Cancelled')
+                                    <span class="badge bg-soft-danger text-danger border border-danger fs-11 fw-semibold px-2 py-1">
+                                        <i class="feather-x-circle me-1"></i>Cancelled
+                                    </span>
+                                @elseif ($inv->einvoice_status === 'Failed')
+                                    <span class="badge bg-soft-danger text-danger border border-danger fs-11 fw-semibold px-2 py-1" title="{{ $inv->einvoice_error }}" data-bs-toggle="tooltip">
+                                        <i class="feather-alert-triangle me-1"></i>Failed
+                                    </span>
+                                @else
+                                    <span class="badge bg-soft-warning text-warning border border-warning fs-11 fw-semibold px-2 py-1">
+                                        <i class="feather-clock me-1"></i>{{ __('crm.pending') }}
+                                    </span>
+                                @endif
                             </td>
                             <td>
-                                <span class="badge bg-soft-warning text-warning border border-warning fs-11 fw-semibold px-2 py-1"><i class="feather-clock me-1"></i>{{ __('crm.pending') }}</span>
+                                @if ($inv->eway_bill_status === 'Generated')
+                                    <span class="badge bg-soft-success text-success border border-success fs-11 fw-semibold px-2 py-1" title="EWB: {{ $inv->eway_bill_no }} (Valid: {{ $inv->eway_bill_valid_till ? date('d/m/Y', strtotime($inv->eway_bill_valid_till)) : '' }})" data-bs-toggle="tooltip">
+                                        <i class="feather-truck me-1"></i>Generated
+                                    </span>
+                                @elseif ($inv->eway_bill_status === 'Cancelled')
+                                    <span class="badge bg-soft-danger text-danger border border-danger fs-11 fw-semibold px-2 py-1">
+                                        <i class="feather-x-circle me-1"></i>Cancelled
+                                    </span>
+                                @elseif ($inv->eway_bill_status === 'Failed')
+                                    <span class="badge bg-soft-danger text-danger border border-danger fs-11 fw-semibold px-2 py-1" title="{{ $inv->eway_bill_error }}" data-bs-toggle="tooltip">
+                                        <i class="feather-alert-triangle me-1"></i>Failed
+                                    </span>
+                                @else
+                                    <span class="badge bg-soft-warning text-warning border border-warning fs-11 fw-semibold px-2 py-1">
+                                        <i class="feather-clock me-1"></i>{{ __('crm.pending') }}
+                                    </span>
+                                @endif
                             </td>
                             <td class="text-end pe-4">
                                 <div class="hstack gap-2 justify-content-end">
@@ -208,12 +247,32 @@
                                     @endif
 
                                     <x-ui.action-dropdown :viewUrl="route('sales.invoices.show', $inv->id)">
+                                        <li>
+                                            <a href="{{ route('sales.invoices.download', $inv->id) }}" class="dropdown-item fw-semibold text-danger">
+                                                <i class="feather-download me-2 text-danger fs-12"></i>Download PDF
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="{{ route('sales.invoices.einvoice.export-json', $inv->id) }}" class="dropdown-item fw-semibold text-success">
+                                                <i class="feather-code me-2 text-success fs-12"></i>Export NIC JSON
+                                            </a>
+                                        </li>
                                         @if ($inv->status === 'Draft')
                                             <li>
                                                 <form action="{{ route('sales.invoices.post', $inv->id) }}" method="POST" class="d-inline">
                                                     @csrf
                                                     <button type="submit" class="dropdown-item fw-semibold border-0 bg-transparent w-100 text-start text-primary">
                                                         <i class="feather-check-circle me-2 text-primary fs-12"></i>{{ __('crm.mark_as_post') }}
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @endif
+                                        @if ($inv->einvoice_status !== 'Generated')
+                                            <li>
+                                                <form action="{{ route('sales.invoices.einvoice.generate', $inv->id) }}" method="POST" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="dropdown-item fw-semibold border-0 bg-transparent w-100 text-start text-primary">
+                                                        <i class="feather-zap me-2 text-primary fs-12"></i>Generate E-Invoice
                                                     </button>
                                                 </form>
                                             </li>

@@ -16,6 +16,8 @@ use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\GoodsReceiptNoteExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class GoodsReceiptNoteController extends Controller
 {
@@ -62,6 +64,20 @@ class GoodsReceiptNoteController extends Controller
 
         $grns = $this->grnRepo->getPaginatedGrns($request->all(), 15);
         return view('modules.purchase.grns.index', compact('grns'));
+    }
+
+    /**
+     * Export GRNs to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', GoodsReceiptNote::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new GoodsReceiptNoteExport($tenantId, $request->all()),
+            'grns_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function create(Request $request)

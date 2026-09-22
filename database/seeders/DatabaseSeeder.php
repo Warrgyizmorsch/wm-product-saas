@@ -49,6 +49,7 @@ class DatabaseSeeder extends Seeder
             RbacSeeder::class,
             PlatformAdminSeeder::class,
             CurrencySeeder::class,
+            CrmStatusMasterSeeder::class,
             AccountingChartOfAccountsSeeder::class,
             PaymentTermSeeder::class,
             InventoryMasterDemoSeeder::class,

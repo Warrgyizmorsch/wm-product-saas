@@ -85,5 +85,11 @@ Route::prefix('platform')
         Route::post('email-settings/{id}/test', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'testConnection'])->name('emailSettings.test');
         Route::post('email-settings/{id}/send-test-email', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'sendTestMail'])->name('emailSettings.sendTestMail');
         Route::delete('email-settings/{id}', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'destroy'])->name('emailSettings.destroy');
+
+        // GST & E-Invoice / E-Way Bill Settings Routes
+        Route::get('gst-settings', [\App\Domains\Platform\Controllers\GstSettingController::class, 'index'])->name('gstSettings.index');
+        Route::post('gst-settings/store', [\App\Domains\Platform\Controllers\GstSettingController::class, 'store'])->name('gstSettings.store');
+        Route::post('gst-settings/{id}/test', [\App\Domains\Platform\Controllers\GstSettingController::class, 'testConnection'])->name('gstSettings.test');
+        Route::delete('gst-settings/{id}', [\App\Domains\Platform\Controllers\GstSettingController::class, 'destroy'])->name('gstSettings.destroy');
     });
 

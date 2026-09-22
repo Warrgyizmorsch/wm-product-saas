@@ -21,6 +21,7 @@ return [
             ['label' => 'Payment Terms', 'route' => 'platform.payment-terms.index'],
             ['label' => 'Email & SMTP Setup', 'route' => 'platform.emailSettings.index'],
             ['label' => 'WhatsApp Web Setup', 'route' => 'platform.whatsappSettings.index'],
+            ['label' => 'GST & E-Invoice Setup', 'route' => 'platform.gstSettings.index'],
         ],
     ],
     [

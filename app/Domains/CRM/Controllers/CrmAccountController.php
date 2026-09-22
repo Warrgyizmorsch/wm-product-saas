@@ -8,8 +8,11 @@ use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\Sales\Models\SalesOrder;
+use App\Exports\AccountExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -48,7 +51,7 @@ class CrmAccountController extends Controller
         return view('modules.crm.accounts.create', compact('users'));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $this->authorize('create', CrmAccount::class);
 
@@ -58,7 +61,7 @@ class CrmAccountController extends Controller
             'name'          => 'required|string|max:255',
             'gstin'         => 'nullable|string|max:50',
             'email'         => [
-                'nullable',
+                'required',
                 'email',
                 'max:255',
                 Rule::unique('crm_accounts', 'email')->where(fn($q) => $q->where('tenant_id', $tenantId))
@@ -101,6 +104,12 @@ class CrmAccountController extends Controller
             // Check if an Account already exists for this customer
             $existingAccount = CrmAccount::where('tenant_id', $tenantId)->where('customer_id', $customer->id)->first();
             if ($existingAccount) {
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'errors'  => ['name' => ['An Account for this Customer / Email / Phone already exists (' . $existingAccount->name . ').']]
+                    ], 422);
+                }
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['name' => 'An Account for this Customer / Email / Phone already exists (' . $existingAccount->name . ').']);
@@ -108,13 +117,17 @@ class CrmAccountController extends Controller
         }
 
         if (!$customer) {
+            Customer::$skipAccountAutoCreate = true;
             $customer = Customer::create([
                 'tenant_id' => $tenantId,
                 'name'      => $validated['name'],
                 'email'     => $validated['email'] ?? null,
                 'phone'     => $validated['phone'] ?? null,
+                'gstin'     => $validated['gstin'] ?? null,
+                'billing_address' => $validated['street'] ?? null,
                 'status'    => 'active',
             ]);
+            Customer::$skipAccountAutoCreate = false;
         }
 
         // 2. Create CRM Account
@@ -138,8 +151,9 @@ class CrmAccountController extends Controller
         ]);
 
         // 3. Create Primary Contact if name provided
+        $contact = null;
         if (!empty($validated['contact_name'])) {
-            CrmContact::create([
+            $contact = CrmContact::create([
                 'tenant_id'      => $tenantId,
                 'crm_account_id' => $account->id,
                 'name'           => $validated['contact_name'],
@@ -150,6 +164,24 @@ class CrmAccountController extends Controller
                 'mobile'         => $validated['contact_phone'] ?? null,
                 'is_primary'     => true,
                 'status'         => 'active',
+            ]);
+        }
+
+        if ($request->ajax() || $request->wantsJson()) {
+            $displayText = $account->name . ($account->account_number ? ' (' . $account->account_number . ')' : '');
+            return response()->json([
+                'success'        => true,
+                'id'             => $account->id,
+                'name'           => $displayText,
+                'account_number' => $account->account_number,
+                'customer_id'    => $customer->id,
+                'primary_contact'=> $contact ? [
+                    'id'          => $contact->id,
+                    'name'        => $contact->name,
+                    'designation' => $contact->designation,
+                    'role'        => $contact->role,
+                ] : null,
+                'message'        => 'Account created successfully.'
             ]);
         }
 
@@ -242,10 +274,17 @@ class CrmAccountController extends Controller
     {
         $this->authorize('update', $account);
 
+        $tenantId = tenant_id() ?? 1;
+
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
             'gstin'         => 'nullable|string|max:50',
-            'email'         => 'nullable|email|max:255',
+            'email'         => [
+                'required',
+                'email',
+                'max:255',
+                Rule::unique('crm_accounts', 'email')->where(fn($q) => $q->where('tenant_id', $tenantId))->ignore($account->id)
+            ],
             'phone'         => 'nullable|string|max:50',
             'website'       => 'nullable|string|max:255',
             'industry_type' => 'nullable|string|max:255',
@@ -391,5 +430,19 @@ class CrmAccountController extends Controller
 
         $account->delete();
         return redirect()->route('crm.accounts.index')->with('success', 'Account deleted successfully.');
+    }
+
+    /**
+     * Export Accounts to Excel with customizable columns and applied filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', CrmAccount::class);
+        $tenantId = tenant_id() ?? auth()->user()->tenant_id ?? 1;
+
+        return Excel::download(
+            new AccountExport($tenantId, $request->all()),
+            'accounts_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 }

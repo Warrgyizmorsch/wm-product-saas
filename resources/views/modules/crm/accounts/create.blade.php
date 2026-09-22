@@ -37,7 +37,7 @@
 
                         <x-ui.odoo-form-ui type="input" :label="__('crm.gstin')" name="gstin" :value="old('gstin')" placeholder="e.g. 27AAAAA0000A1Z5" />
 
-                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.contact_email')" name="email" :value="old('email')" placeholder="info@company.com" />
+                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.contact_email')" name="email" :value="old('email')" :required="true" placeholder="info@company.com" />
 
                         <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone')" placeholder="022-40001122" />
 

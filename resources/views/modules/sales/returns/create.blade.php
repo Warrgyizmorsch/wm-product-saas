@@ -15,6 +15,15 @@
         #returnItemsTable td {
             vertical-align: top !important;
         }
+        .odoo-table-input.is-invalid {
+            border-bottom: 2px solid #dc3545 !important;
+            color: #dc3545 !important;
+        }
+        .btn-disabled-save, #saveReturnBtn:disabled {
+            opacity: 0.55 !important;
+            cursor: not-allowed !important;
+            pointer-events: auto !important;
+        }
     </style>
 @endpush
 
@@ -25,15 +34,9 @@
             @csrf
 
             <x-ui.odoo-form-ui type="sheet">
-                <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2 flex-wrap gap-2">
-                    <div>
-                        <h4 class="fw-bold text-dark mb-0">{{ __('crm.record_customer_return') }}</h4>
-                        <span class="fs-12 text-muted">{{ __('crm.record_customer_return_subtitle') }}</span>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <x-ui.button href="{{ route('sales.returns.index') }}" variant="light" size="sm" class="border">{{ __('crm.cancel') }}</x-ui.button>
-                        <x-ui.button type="submit" id="saveReturnBtn" variant="primary" size="sm" icon="feather-save" style="background-color: #714B67; border-color: #714B67;">{{ __('crm.save_return_draft') }}</x-ui.button>
-                    </div>
+                <div class="mb-4 border-bottom pb-2">
+                    <h4 class="fw-bold text-dark mb-0">{{ __('crm.record_customer_return') }}</h4>
+                    <span class="fs-12 text-muted">{{ __('crm.record_customer_return_subtitle') }}</span>
                 </div>
 
                 <!-- Mode Switcher Bar -->
@@ -141,8 +144,8 @@
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                    <x-ui.button href="{{ route('sales.returns.index') }}" variant="light" class="border px-4">{{ __('crm.discard') }}</x-ui.button>
-                    <x-ui.button type="submit" id="saveReturnBtnFooter" variant="primary" icon="feather-save" class="px-4" style="background-color: #714B67; border-color: #714B67;">{{ __('crm.save_return_draft') }}</x-ui.button>
+                    <x-ui.button href="{{ route('sales.returns.index') }}" variant="light" class="border px-4">{{ __('crm.cancel') }}</x-ui.button>
+                    <x-ui.button type="submit" id="saveReturnBtn" variant="primary" icon="feather-save" class="px-4" style="background-color: #714B67; border-color: #714B67;">{{ __('crm.save_return_draft') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>
@@ -226,6 +229,8 @@
         const productsList = @json($formattedProducts);
         const salesOrdersList = @json($salesOrdersData);
         const invoicesList = @json($invoicesData);
+        const prefillSalesOrderId = @json($prefillSalesOrderId);
+        const prefillInvoiceId = @json($prefillInvoiceId);
         const itemsBody = document.getElementById('returnItemsBody');
         const itemsHint = document.getElementById('itemsHint');
         const directAddContainer = document.getElementById('directAddContainer');
@@ -248,6 +253,7 @@
                 itemsBody.innerHTML = '';
                 if (!items || items.length === 0) {
                     itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>No products found.</td></tr>';
+                    validateReturnForm();
                     return;
                 }
 
@@ -282,14 +288,20 @@
                                 <input type="hidden" name="items[${index}][warehouse_id]" value="${item.warehouse_id}">
                             </td>
                             <td class="text-end px-2 py-2">
-                                <input type="number" 
-                                       name="items[${index}][quantity]" 
-                                       class="form-control odoo-table-input text-end fw-bold text-primary return-qty-input" 
-                                       value="${item.quantity}" 
-                                       min="0.0001" 
-                                       max="${item.quantity}" 
-                                       required 
-                                       style="width: 100px; margin-left: auto;">
+                                <div class="d-inline-flex flex-column align-items-end" style="min-width: 120px;">
+                                    <input type="number" 
+                                           name="items[${index}][quantity]" 
+                                           class="form-control odoo-table-input text-end fw-bold text-primary return-qty-input" 
+                                           value="${item.quantity}" 
+                                           data-max="${item.quantity}"
+                                           min="0.0001" 
+                                           max="${item.quantity}" 
+                                           step="any"
+                                           required 
+                                           style="width: 100px;">
+                                    <span class="text-muted fs-10 mt-1 font-monospace">Max: <strong class="text-dark">${item.quantity}</strong></span>
+                                    <div class="qty-error-msg text-danger fs-11 text-end mt-1 fw-semibold" style="display: none;"></div>
+                                </div>
                             </td>
                             <td class="text-end pe-3 py-2">
                                 <input type="number" 
@@ -313,13 +325,16 @@
 
                     $tr.find('.remove-row-btn').on('click', function() {
                         $tr.remove();
-                        if (itemsBody.children.length === 0) {
+                        if (itemsBody.querySelectorAll('tr.item-row').length === 0) {
                             itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>No products found.</td></tr>';
                         }
+                        validateReturnForm();
                     });
 
                     attachSoldSerialsHandler($tr);
                 });
+
+                validateReturnForm();
             }
 
             function updateModeValidation(mode) {
@@ -332,9 +347,11 @@
                     $('#salesOrderSelect').prop('required', false).val('').trigger('change.select2');
                     $('#customerSelect').prop('required', true);
 
-                    if ($('#returnItemsBody tr').length === 0 || $('#emptyItemsRow').length > 0) {
+                    if ($('#returnItemsBody tr.item-row').length === 0) {
                         itemsBody.innerHTML = '';
                         addDirectItemRow();
+                    } else {
+                        validateReturnForm();
                     }
                 } else {
                     soSelectBlock.style.display = 'block';
@@ -348,20 +365,71 @@
                     itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>Please select a Sales Order to populate items.</td></tr>';
                     if ($('#salesOrderSelect').val()) {
                         $('#salesOrderSelect').trigger('change');
+                    } else {
+                        validateReturnForm();
                     }
                 }
             }
 
-            // Mode Switching Handler
-            document.querySelectorAll('input[name="return_mode"]').forEach(radio => {
-                radio.addEventListener('change', function() {
-                    updateModeValidation(this.value);
-                });
-            });
+            function validateReturnForm() {
+                let isValid = true;
+                const mode = document.querySelector('input[name="return_mode"]:checked')?.value || 'so';
+                const $rows = $('#returnItemsBody tr.item-row');
 
-            // Initialize Mode Validation state
-            const initialMode = document.querySelector('input[name="return_mode"]:checked').value;
-            updateModeValidation(initialMode);
+                if ($rows.length === 0) {
+                    isValid = false;
+                }
+
+                $rows.each(function() {
+                    const $row = $(this);
+                    const $qtyInput = $row.find('.return-qty-input');
+                    const $errorMsg = $row.find('.qty-error-msg');
+                    const rawVal = $qtyInput.val();
+                    const val = parseFloat(rawVal);
+                    const maxAttr = $qtyInput.attr('data-max');
+                    const maxVal = (maxAttr !== undefined && maxAttr !== '') ? parseFloat(maxAttr) : null;
+
+                    if (rawVal === '' || isNaN(val) || val <= 0) {
+                        isValid = false;
+                        $qtyInput.addClass('is-invalid');
+                        if ($errorMsg.length) {
+                            $errorMsg.text('Qty must be > 0').show();
+                        }
+                    } else if (mode === 'so' && maxVal !== null && !isNaN(maxVal) && val > maxVal) {
+                        isValid = false;
+                        $qtyInput.addClass('is-invalid');
+                        if ($errorMsg.length) {
+                            $errorMsg.text(`Max allowed qty is ${maxVal}`).show();
+                        }
+                    } else {
+                        $qtyInput.removeClass('is-invalid');
+                        if ($errorMsg.length) {
+                            $errorMsg.text('').hide();
+                        }
+                    }
+                });
+
+                if (mode === 'so' && !$('#salesOrderSelect').val()) {
+                    isValid = false;
+                }
+                if (mode === 'direct' && !$('#customerSelect').val()) {
+                    isValid = false;
+                }
+
+                $('#saveReturnBtn').prop('disabled', !isValid);
+                if (!isValid) {
+                    $('#saveReturnBtn').addClass('btn-disabled-save');
+                } else {
+                    $('#saveReturnBtn').removeClass('btn-disabled-save');
+                }
+
+                return isValid;
+            }
+
+            // Live event listener on return quantity inputs
+            $(document).on('input change keyup blur', '.return-qty-input', function() {
+                validateReturnForm();
+            });
 
             // Sales Order Selection Handler
             $('#salesOrderSelect').on('change', function() {
@@ -374,6 +442,7 @@
                 if (!soId) {
                     $invoiceSel.trigger('change.select2');
                     itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>Please select a Sales Order to populate items.</td></tr>';
+                    validateReturnForm();
                     return;
                 }
 
@@ -381,17 +450,22 @@
                 const currencySymbol = "{{ active_currency_symbol() }}";
                 const matchingInvoices = invoicesList.filter(inv => inv.sales_order_id == soId);
                 matchingInvoices.forEach(inv => {
-                    $invoiceSel.append(`<option value="${inv.id}">${inv.invoice_number} ({{ __('crm.date') }}: ${inv.invoice_date} - {{ __('crm.total') }}: ${currencySymbol}${inv.total_amount.toFixed(2)} - {{ __('crm.taxes') }}: ${inv.gst_type})</option>`);
+                    const isSelected = (prefillInvoiceId && prefillInvoiceId == inv.id) ? 'selected' : '';
+                    $invoiceSel.append(`<option value="${inv.id}" ${isSelected}>${inv.invoice_number} ({{ __('crm.date') }}: ${inv.invoice_date} - {{ __('crm.total') }}: ${currencySymbol}${inv.total_amount.toFixed(2)} - {{ __('crm.taxes') }}: ${inv.gst_type})</option>`);
                 });
 
                 if (matchingInvoices.length > 0) {
-                    $invoiceSel.val(matchingInvoices[0].id).trigger('change.select2');
-                    renderItemsList(matchingInvoices[0].items);
+                    const activeInvId = (prefillInvoiceId && matchingInvoices.some(i => i.id == prefillInvoiceId)) ? prefillInvoiceId : matchingInvoices[0].id;
+                    $invoiceSel.val(activeInvId).trigger('change.select2');
+                    const targetInvoice = matchingInvoices.find(i => i.id == activeInvId) || matchingInvoices[0];
+                    renderItemsList(targetInvoice.items);
                 } else {
                     $invoiceSel.trigger('change.select2');
                     const selectedSo = salesOrdersList.find(so => so.id == soId);
                     if (selectedSo) {
                         renderItemsList(selectedSo.items);
+                    } else {
+                        validateReturnForm();
                     }
                 }
             });
@@ -414,6 +488,25 @@
                     }
                 }
             });
+
+            // Customer Selection Handler for Direct Mode
+            $('#customerSelect').on('change', function() {
+                validateReturnForm();
+            });
+
+            // Mode Switching Handler
+            document.querySelectorAll('input[name="return_mode"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    updateModeValidation(this.value);
+                });
+            });
+
+            // Initialize Mode Validation state & auto-trigger initial selected SO
+            const initialMode = document.querySelector('input[name="return_mode"]:checked').value;
+            updateModeValidation(initialMode);
+            if (initialMode === 'so' && $('#salesOrderSelect').val()) {
+                $('#salesOrderSelect').trigger('change');
+            }
 
             // Add Direct Item Row Handler
             $('#addDirectItemBtn').on('click', addDirectItemRow);
@@ -454,7 +547,10 @@
                             </select>
                         </td>
                         <td class="text-end px-2 py-2">
-                            <input type="number" name="items[${idx}][quantity]" class="form-control odoo-table-input text-end dispatch-qty-input fw-bold return-qty-input" value="1" min="0.0001" step="any" required style="width: 100px; margin-left: auto;">
+                            <div class="d-inline-flex flex-column align-items-end" style="min-width: 120px;">
+                                <input type="number" name="items[${idx}][quantity]" class="form-control odoo-table-input text-end dispatch-qty-input fw-bold return-qty-input" value="1" min="0.0001" step="any" required style="width: 100px;">
+                                <div class="qty-error-msg text-danger fs-11 text-end mt-1 fw-semibold" style="display: none;"></div>
+                            </div>
                         </td>
                         <td class="text-end pe-3 py-2">
                             <input type="number" name="items[${idx}][unit_price]" class="form-control odoo-table-input text-end unit-price-input fw-bold" value="0.00" min="0" step="0.01" required style="width: 120px; margin-left: auto;">
@@ -482,17 +578,20 @@
                     if (block) {
                         block.style.display = isSerial ? 'block' : 'none';
                     }
+                    validateReturnForm();
                 });
 
                 // Remove Row Handler
                 $tr.find('.remove-row-btn').on('click', function() {
                     $tr.remove();
-                    if (itemsBody.children.length === 0) {
+                    if (itemsBody.querySelectorAll('tr.item-row').length === 0) {
                         itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>No items selected.</td></tr>';
                     }
+                    validateReturnForm();
                 });
 
                 attachSoldSerialsHandler($tr);
+                validateReturnForm();
             }
 
             function attachSoldSerialsHandler($tr) {
@@ -531,21 +630,9 @@
 
             // Form Submit Listener for Validation Check
             document.getElementById('returnForm').addEventListener('submit', function(e) {
-                const mode = document.querySelector('input[name="return_mode"]:checked').value;
-                if (mode === 'so' && !$('#salesOrderSelect').val()) {
+                if (!validateReturnForm()) {
                     e.preventDefault();
-                    alert('Please select a Sales Order before saving.');
-                    return;
-                }
-                if (mode === 'direct' && !$('#customerSelect').val()) {
-                    e.preventDefault();
-                    alert('Please select a Customer before saving.');
-                    return;
-                }
-                if (!itemsBody.querySelector('input[name$="[product_id]"]') && !itemsBody.querySelector('select[name$="[product_id]"]')) {
-                    e.preventDefault();
-                    alert('Please add at least one line item to return.');
-                    return;
+                    return false;
                 }
             });
         });

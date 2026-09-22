@@ -77,4 +77,14 @@ class BatchController extends Controller
 
         return view('modules.inventory.batches.index', compact('batches', 'products', 'warehouses'));
     }
+
+    public function export(Request $request)
+    {
+        $tenantId = require_tenant_id();
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\BatchExport($tenantId, $request->all()),
+            'batches_export_' . date('Y-m-d_His') . '.xlsx'
+        );
+    }
 }

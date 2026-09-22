@@ -11,6 +11,8 @@ use App\Domains\Purchase\Models\VendorBill;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Purchase\Events\BillPosted;
+use App\Exports\VendorBillExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 
 class VendorBillController extends Controller
@@ -64,6 +66,20 @@ class VendorBillController extends Controller
             ->count();
 
         return view('modules.purchase.bills.index', compact('bills', 'pendingGrnsCount', 'pendingFreightCount'));
+    }
+
+    /**
+     * Export Vendor Bills to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', VendorBill::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new VendorBillExport($tenantId, $request->all()),
+            'vendor_bills_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function pendingGrns(Request $request)

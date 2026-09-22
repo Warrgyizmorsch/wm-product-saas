@@ -7,9 +7,16 @@
 @endsection
 
 @section('page-actions')
-    <x-ui.button href="{{ route('purchase.orders.create') }}" variant="primary" icon="feather-plus" style="background-color: #714B67; border-color: #714B67;">
-        {{ __('purchase.create_purchase_order') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="purchase_orders" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('purchase.orders.export') }}" />
+        <x-ui.button href="{{ route('purchase.orders.create') }}" variant="primary" icon="feather-plus" style="background-color: #714B67; border-color: #714B67;">
+            {{ __('purchase.create_purchase_order') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')
