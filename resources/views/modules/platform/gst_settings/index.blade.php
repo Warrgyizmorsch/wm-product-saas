@@ -5,9 +5,9 @@
 @section('breadcrumb', 'Platform / Settings / GST & E-Invoice')
 
 @section('page-actions')
-    <button type="button" class="btn btn-sm btn-primary fw-bold px-3 shadow-2xs" data-bs-toggle="modal" data-bs-target="#addGstConfigModal" onclick="resetGstForm()">
-        <i class="feather-plus me-1.5"></i>ADD GST CONFIGURATION
-    </button>
+    <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addGstConfigModal" onclick="resetGstForm()">
+        ADD GST CONFIGURATION
+    </x-ui.button>
 @endsection
 
 @section('content')
@@ -55,46 +55,46 @@
     @endif
 
     <!-- Provider Presets Banner -->
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-3">
         <div class="col-md-3 col-6">
-            <div class="p-3 rounded border bg-light bg-opacity-50 h-100">
+            <x-ui.card class="border shadow-none bg-light bg-opacity-50 h-100 mb-0" bodyClass="p-3">
                 <div class="d-flex align-items-center gap-2 mb-2">
                     <span class="avatar avatar-xs bg-soft-primary text-primary rounded"><i class="feather-zap fs-13"></i></span>
                     <strong class="fs-13 text-dark">Setu.co (Pine Labs)</strong>
                 </div>
                 <span class="fs-11 text-muted d-block mb-2">Instant Developer API Key / Bearer Token integration.</span>
-                <span class="badge bg-soft-success text-success border fs-10">REST API Ready</span>
-            </div>
+                <x-ui.badge variant="success" :soft="true" class="fs-10">REST API Ready</x-ui.badge>
+            </x-ui.card>
         </div>
         <div class="col-md-3 col-6">
-            <div class="p-3 rounded border bg-light bg-opacity-50 h-100">
+            <x-ui.card class="border shadow-none bg-light bg-opacity-50 h-100 mb-0" bodyClass="p-3">
                 <div class="d-flex align-items-center gap-2 mb-2">
                     <span class="avatar avatar-xs bg-soft-info text-info rounded"><i class="feather-shield fs-13"></i></span>
                     <strong class="fs-13 text-dark">ClearTax Enterprise</strong>
                 </div>
                 <span class="fs-11 text-muted d-block mb-2">India #1 GSP with high-throughput OAuth2 & Client Secret.</span>
-                <span class="badge bg-soft-info text-info border fs-10">OAuth2 Supported</span>
-            </div>
+                <x-ui.badge variant="info" :soft="true" class="fs-10">OAuth2 Supported</x-ui.badge>
+            </x-ui.card>
         </div>
         <div class="col-md-3 col-6">
-            <div class="p-3 rounded border bg-light bg-opacity-50 h-100">
+            <x-ui.card class="border shadow-none bg-light bg-opacity-50 h-100 mb-0" bodyClass="p-3">
                 <div class="d-flex align-items-center gap-2 mb-2">
                     <span class="avatar avatar-xs bg-soft-warning text-warning rounded"><i class="feather-cpu fs-13"></i></span>
                     <strong class="fs-13 text-dark">Masters India / GSP</strong>
                 </div>
                 <span class="fs-11 text-muted d-block mb-2">AutoTax E-Invoice & E-Way Bill gateway credentials.</span>
-                <span class="badge bg-soft-warning text-warning border fs-10">Low Latency</span>
-            </div>
+                <x-ui.badge variant="warning" :soft="true" class="fs-10">Low Latency</x-ui.badge>
+            </x-ui.card>
         </div>
         <div class="col-md-3 col-6">
-            <div class="p-3 rounded border bg-light bg-opacity-50 h-100">
+            <x-ui.card class="border shadow-none bg-light bg-opacity-50 h-100 mb-0" bodyClass="p-3">
                 <div class="d-flex align-items-center gap-2 mb-2">
                     <span class="avatar avatar-xs bg-soft-success text-success rounded"><i class="feather-download-cloud fs-13"></i></span>
                     <strong class="fs-13 text-dark">NIC GEPP JSON Export</strong>
                 </div>
                 <span class="fs-11 text-muted d-block mb-2">100% Free 1-click bulk JSON upload to Government Portal.</span>
-                <span class="badge bg-soft-primary text-primary border fs-10">Standard 1.03 Schema</span>
-            </div>
+                <x-ui.badge variant="primary" :soft="true" class="fs-10">Standard 1.03 Schema</x-ui.badge>
+            </x-ui.card>
         </div>
     </div>
 
@@ -115,15 +115,15 @@
                 @forelse($configurations as $config)
                     <tr>
                         <td class="ps-3">
-                            <div class="d-flex align-items-center gap-2">
-                                <div class="avatar avatar-sm bg-soft-primary text-primary rounded d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                                    <i class="feather-file-text"></i>
+                            <div class="d-flex align-items-center gap-2.5">
+                                <div class="avatar avatar-sm bg-soft-primary text-primary rounded d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px;">
+                                    <i class="feather-file-text fs-14"></i>
                                 </div>
                                 <div>
-                                    <div class="d-flex align-items-center gap-1.5">
+                                    <div class="d-flex align-items-center gap-2">
                                         <strong class="font-monospace text-dark fs-12">{{ $config->seller_gstin }}</strong>
                                         @if($config->is_default)
-                                            <span class="badge bg-primary fs-10 px-1.5 py-0.5">DEFAULT</span>
+                                            <x-ui.badge variant="primary" :soft="true" class="fs-10 px-2 py-0.5 ms-1">Default</x-ui.badge>
                                         @endif
                                     </div>
                                     <span class="text-muted fs-11 d-block">{{ $config->legal_name }}</span>
@@ -139,7 +139,7 @@
                         <td>
                             <div class="fs-12 text-dark">
                                 @if($config->company)
-                                    <i class="feather-briefcase text-muted me-1 fs-11"></i>{{ $config->company->name }}
+                                    <i class="feather-briefcase text-muted me-1 fs-11"></i>{{ $config->company->company_name ?: ($config->company->name ?: $config->company->legal_name) }}
                                 @else
                                     <span class="text-muted">All Companies</span>
                                 @endif
@@ -151,43 +151,46 @@
                         </td>
                         <td>
                             @if($config->environment === 'production')
-                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 fs-11 fw-bold">
-                                    <i class="feather-globe me-1"></i>Production (Live)
-                                </span>
+                                <x-ui.status-badge status="active" label="Production (Live)" :dot="true" size="sm" />
                             @else
-                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-0.5 fs-11 fw-bold">
-                                    <i class="feather-tool me-1"></i>Sandbox (Test)
-                                </span>
+                                <x-ui.status-badge status="on_hold" label="Sandbox (Test)" :dot="true" size="sm" />
                             @endif
                         </td>
                         <td>
-                            @if($config->is_active)
-                                <span class="badge bg-success px-2 py-0.5 fs-11">Active</span>
-                            @else
-                                <span class="badge bg-secondary px-2 py-0.5 fs-11">Inactive</span>
-                            @endif
+                            <x-ui.status-badge :status="$config->is_active ? 'active' : 'inactive'" :dot="true" size="sm" />
                         </td>
                         <td class="text-end pe-3">
-                            <div class="hstack gap-1 justify-content-end">
-                                <!-- Test Connection Ping Button -->
-                                <button type="button" class="btn btn-2xs btn-outline-info fw-bold btn-test-connection" data-id="{{ $config->id }}" data-provider="{{ $config->provider }}" title="Test Connection / Validate Token">
-                                    <i class="feather-activity me-1"></i>Test Ping
-                                </button>
-                                
-                                <!-- Edit Button -->
-                                <button type="button" class="btn btn-2xs btn-outline-primary fw-bold btn-edit-config" data-config='@json($config)' title="Edit Configuration">
-                                    <i class="feather-edit-2"></i>
-                                </button>
-
-                                <!-- Delete Form -->
-                                <form action="{{ route('platform.gstSettings.destroy', $config->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this GST configuration?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-2xs btn-outline-danger" title="Delete Configuration">
-                                        <i class="feather-trash-2"></i>
+                            <x-ui.action-dropdown align="end" id="gstActions_{{ $config->id }}">
+                                <x-slot:extraActions>
+                                    <!-- Test Connection Ping Button -->
+                                    <button type="button" 
+                                            class="action-dropdown-btn btn-test-connection" 
+                                            data-id="{{ $config->id }}" 
+                                            data-provider="{{ $config->provider }}" 
+                                            title="Test Ping" 
+                                            data-bs-toggle="tooltip">
+                                        <i class="feather-activity text-info"></i>
                                     </button>
-                                </form>
-                            </div>
+                                    
+                                    <!-- Edit Button -->
+                                    <button type="button" 
+                                            class="action-dropdown-btn btn-edit-config" 
+                                            data-config='@json($config)' 
+                                            title="Edit Configuration" 
+                                            data-bs-toggle="tooltip">
+                                        <i class="feather-edit-2 text-primary"></i>
+                                    </button>
+
+                                    <!-- Delete Form -->
+                                    <form action="{{ route('platform.gstSettings.destroy', $config->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this GST configuration?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="action-dropdown-btn" title="Delete Configuration" data-bs-toggle="tooltip">
+                                            <i class="feather-trash-2 text-danger"></i>
+                                        </button>
+                                    </form>
+                                </x-slot:extraActions>
+                            </x-ui.action-dropdown>
                         </td>
                     </tr>
                 @empty
@@ -198,15 +201,23 @@
                             </div>
                             <h6 class="fw-bold text-dark mb-1 fs-14">No Custom GST API Configurations Found</h6>
                             <p class="text-muted fs-12 mb-3">System is currently running on the built-in Sandbox Statutory Engine (NIC Schema 1.03).</p>
-                            <button type="button" class="btn btn-sm btn-primary fw-bold px-3" data-bs-toggle="modal" data-bs-target="#addGstConfigModal" onclick="resetGstForm()">
-                                <i class="feather-plus me-1"></i>Setup Custom GSP API Credentials
-                            </button>
+                            <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addGstConfigModal" onclick="resetGstForm()">
+                                Setup Custom GSP API Credentials
+                            </x-ui.button>
                         </td>
                     </tr>
                 @endforelse
             </tbody>
         </x-ui.odoo-form-ui>
     </div>
+
+    <!-- Pagination -->
+    <x-ui.pagination 
+        :currentPage="$configurations->currentPage()" 
+        :totalPages="$configurations->lastPage()" 
+        :totalResults="$configurations->total()" 
+        :perPage="$configurations->perPage()" 
+    />
 </div>
 
 <!-- ADD / EDIT GST CONFIGURATION MODAL -->
@@ -218,34 +229,31 @@
         <div class="row g-3">
             <!-- 1. Scope & Provider Selection -->
             <div class="col-12">
-                <div class="p-3 bg-light rounded border">
+                <div class="p-3 rounded border">
                     <span class="fs-11 text-uppercase fw-bold text-muted d-block mb-2">1. Provider & Environment Details</span>
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label fs-12 fw-bold text-dark">GSP Provider <span class="text-danger">*</span></label>
-                            <select name="provider" id="configProvider" class="form-select form-select-sm" required onchange="handleProviderChange()">
+                            <x-ui.modal-form-ui type="select" label="GSP Provider" name="provider" id="configProvider" :required="true" :searchable="true" onchange="handleProviderChange()">
                                 <option value="sandbox">Built-in Sandbox Engine (Free & Built-in)</option>
                                 <option value="setu">Setu.co (Pine Labs - API Key / Token)</option>
                                 <option value="cleartax">ClearTax Enterprise (Client ID & Secret)</option>
                                 <option value="masters_india">Masters India (AutoTax GSP)</option>
                                 <option value="nic_direct">NIC Direct Government Gateway</option>
                                 <option value="custom">Custom GSP Gateway</option>
-                            </select>
+                            </x-ui.modal-form-ui>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fs-12 fw-bold text-dark">Environment <span class="text-danger">*</span></label>
-                            <select name="environment" id="configEnvironment" class="form-select form-select-sm" required>
+                            <x-ui.modal-form-ui type="select" label="Environment" name="environment" id="configEnvironment" :required="true" :searchable="true">
                                 <option value="sandbox">Sandbox / Testing Kit</option>
                                 <option value="production">Production (Live Government Server)</option>
-                            </select>
+                            </x-ui.modal-form-ui>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fs-12 fw-bold text-dark">Authentication Method <span class="text-danger">*</span></label>
-                            <select name="auth_type" id="configAuthType" class="form-select form-select-sm" required>
+                            <x-ui.modal-form-ui type="select" label="Authentication Method" name="auth_type" id="configAuthType" :required="true" :searchable="true">
                                 <option value="bearer_token">Bearer Token / API Key (Setu / Free Kit)</option>
                                 <option value="api_key">Client ID + Client Secret (ClearTax / Masters)</option>
                                 <option value="gsp_credentials">GST Portal Username & Password (Direct)</option>
-                            </select>
+                            </x-ui.modal-form-ui>
                         </div>
                     </div>
                 </div>
@@ -253,33 +261,26 @@
 
             <!-- 2. API Credentials Box -->
             <div class="col-12" id="credentialsBox">
-                <div class="p-3 bg-light rounded border">
+                <div class="p-3 rounded border">
                     <span class="fs-11 text-uppercase fw-bold text-muted d-block mb-2">2. API Credentials & Tokens</span>
                     <div class="row g-3">
                         <div class="col-md-6" id="fieldApiToken">
-                            <label class="form-label fs-12 fw-bold text-dark">API Key / Bearer Token</label>
-                            <input type="password" name="api_token" id="configApiToken" class="form-control form-control-sm font-monospace" placeholder="e.g. setu_live_token_... or x-api-key">
-                            <span class="fs-10 text-muted">Paste your Setu or Provider API Key here.</span>
+                            <x-ui.modal-form-ui type="input" inputType="password" label="API Key / Bearer Token" name="api_token" id="configApiToken" placeholder="e.g. setu_live_token_... or x-api-key" helperText="Paste your Setu or Provider API Key here." class="font-monospace" />
                         </div>
                         <div class="col-md-6" id="fieldApiBaseUrl">
-                            <label class="form-label fs-12 fw-bold text-dark">API Base URL (Optional)</label>
-                            <input type="url" name="api_base_url" id="configApiBaseUrl" class="form-control form-control-sm font-monospace" placeholder="Leave empty for auto-provider default">
+                            <x-ui.modal-form-ui type="input" inputType="url" label="API Base URL (Optional)" name="api_base_url" id="configApiBaseUrl" placeholder="Leave empty for auto-provider default" class="font-monospace" />
                         </div>
                         <div class="col-md-6" id="fieldClientId">
-                            <label class="form-label fs-12 fw-bold text-dark">Client ID</label>
-                            <input type="text" name="client_id" id="configClientId" class="form-control form-control-sm font-monospace" placeholder="Provider Client ID">
+                            <x-ui.modal-form-ui type="input" label="Client ID" name="client_id" id="configClientId" placeholder="Provider Client ID" class="font-monospace" />
                         </div>
                         <div class="col-md-6" id="fieldClientSecret">
-                            <label class="form-label fs-12 fw-bold text-dark">Client Secret</label>
-                            <input type="password" name="client_secret" id="configClientSecret" class="form-control form-control-sm font-monospace" placeholder="Provider Client Secret">
+                            <x-ui.modal-form-ui type="input" inputType="password" label="Client Secret" name="client_secret" id="configClientSecret" placeholder="Provider Client Secret" class="font-monospace" />
                         </div>
                         <div class="col-md-6" id="fieldGstUser">
-                            <label class="form-label fs-12 fw-bold text-dark">GST Portal API Username</label>
-                            <input type="text" name="gstin_username" id="configGstinUsername" class="form-control form-control-sm" placeholder="Created on einvoice1.gst.gov.in">
+                            <x-ui.modal-form-ui type="input" label="GST Portal API Username" name="gstin_username" id="configGstinUsername" placeholder="Created on einvoice1.gst.gov.in" />
                         </div>
                         <div class="col-md-6" id="fieldGstPass">
-                            <label class="form-label fs-12 fw-bold text-dark">GST Portal API Password</label>
-                            <input type="password" name="gstin_password" id="configGstinPassword" class="form-control form-control-sm" placeholder="Portal API Password">
+                            <x-ui.modal-form-ui type="input" inputType="password" label="GST Portal API Password" name="gstin_password" id="configGstinPassword" placeholder="Portal API Password" />
                         </div>
                     </div>
                 </div>
@@ -287,65 +288,54 @@
 
             <!-- 3. Seller GSTIN Identity & Scope -->
             <div class="col-12">
-                <div class="p-3 bg-light rounded border">
+                <div class="p-3 rounded border">
                     <span class="fs-11 text-uppercase fw-bold text-muted d-block mb-2">3. Seller GSTIN & Business Unit Identity</span>
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label fs-12 fw-bold text-dark">Seller GSTIN <span class="text-danger">*</span></label>
-                            <input type="text" name="seller_gstin" id="configSellerGstin" class="form-control form-control-sm font-monospace text-uppercase" placeholder="e.g. 08AAFCS1234E1Z0" maxlength="15" required value="08AAFCS1234E1Z0">
+                            <x-ui.modal-form-ui type="input" label="Seller GSTIN" name="seller_gstin" id="configSellerGstin" placeholder="e.g. 08AAFCS1234E1Z0" maxlength="15" :required="true" value="08AAFCS1234E1Z0" class="font-monospace text-uppercase" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fs-12 fw-bold text-dark">Legal Entity Name <span class="text-danger">*</span></label>
-                            <input type="text" name="legal_name" id="configLegalName" class="form-control form-control-sm" placeholder="e.g. Acme Industries Ltd" required value="{{ tenant() ? tenant()->name : 'SaaS ERP Global' }}">
+                            <x-ui.modal-form-ui type="input" label="Legal Entity Name" name="legal_name" id="configLegalName" placeholder="e.g. Acme Industries Ltd" :required="true" :value="tenant() ? tenant()->name : 'SaaS ERP Global'" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fs-12 fw-bold text-dark">Trade / Brand Name</label>
-                            <input type="text" name="trade_name" id="configTradeName" class="form-control form-control-sm" placeholder="e.g. Acme ERP">
+                            <x-ui.modal-form-ui type="input" label="Trade / Brand Name" name="trade_name" id="configTradeName" placeholder="e.g. Acme ERP" />
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fs-12 fw-bold text-dark">Address Line 1 <span class="text-danger">*</span></label>
-                            <input type="text" name="address_line1" id="configAddressLine1" class="form-control form-control-sm" placeholder="Floor, Building, Street" required value="H-1, Industrial Area, Sukher">
+                            <x-ui.modal-form-ui type="input" label="Address Line 1" name="address_line1" id="configAddressLine1" placeholder="Floor, Building, Street" :required="true" value="H-1, Industrial Area, Sukher" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fs-12 fw-bold text-dark">Address Line 2</label>
-                            <input type="text" name="address_line2" id="configAddressLine2" class="form-control form-control-sm" placeholder="Area / Landmark">
+                            <x-ui.modal-form-ui type="input" label="Address Line 2" name="address_line2" id="configAddressLine2" placeholder="Area / Landmark" />
                         </div>
 
                         <div class="col-md-3">
-                            <label class="form-label fs-12 fw-bold text-dark">City / Location <span class="text-danger">*</span></label>
-                            <input type="text" name="location" id="configLocation" class="form-control form-control-sm" placeholder="City" required value="Udaipur">
+                            <x-ui.modal-form-ui type="input" label="City / Location" name="location" id="configLocation" placeholder="City" :required="true" value="Udaipur" />
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fs-12 fw-bold text-dark">Pincode <span class="text-danger">*</span></label>
-                            <input type="text" name="pincode" id="configPincode" class="form-control form-control-sm font-monospace" placeholder="e.g. 313001" maxlength="6" required value="313001">
+                            <x-ui.modal-form-ui type="input" label="Pincode" name="pincode" id="configPincode" placeholder="e.g. 313001" maxlength="6" :required="true" value="313001" class="font-monospace" />
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fs-12 fw-bold text-dark">State Code (2 Digits) <span class="text-danger">*</span></label>
-                            <input type="text" name="state_code" id="configStateCode" class="form-control form-control-sm font-monospace" placeholder="e.g. 08" maxlength="2" required value="08">
+                            <x-ui.modal-form-ui type="input" label="State Code (2 Digits)" name="state_code" id="configStateCode" placeholder="e.g. 08" maxlength="2" :required="true" value="08" class="font-monospace" />
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fs-12 fw-bold text-dark">Billing Email</label>
-                            <input type="email" name="contact_email" id="configContactEmail" class="form-control form-control-sm" placeholder="accounts@company.com" value="{{ tenant() ? tenant()->billing_email : 'billing@saaserp.com' }}">
+                            <x-ui.modal-form-ui type="input" inputType="email" label="Billing Email" name="contact_email" id="configContactEmail" placeholder="accounts@company.com" :value="tenant() ? tenant()->billing_email : 'billing@saaserp.com'" />
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fs-12 fw-bold text-dark">Assign to Company (Optional)</label>
-                            <select name="company_id" id="configCompanyId" class="form-select form-select-sm">
+                            <x-ui.modal-form-ui type="select" label="Assign to Company (Optional)" name="company_id" id="configCompanyId" :searchable="true">
                                 <option value="">Global (All Companies in Workspace)</option>
                                 @foreach($companies as $comp)
-                                    <option value="{{ $comp->id }}" {{ $companyId == $comp->id ? 'selected' : '' }}>{{ $comp->name }}</option>
+                                    <option value="{{ $comp->id }}" {{ $companyId == $comp->id ? 'selected' : '' }}>{{ $comp->company_name ?: ($comp->name ?: $comp->legal_name) }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.modal-form-ui>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fs-12 fw-bold text-dark">Assign to Branch (Optional)</label>
-                            <select name="branch_id" id="configBranchId" class="form-select form-select-sm">
+                            <x-ui.modal-form-ui type="select" label="Assign to Branch (Optional)" name="branch_id" id="configBranchId" :searchable="true">
                                 <option value="">All Branches</option>
                                 @foreach($branches as $br)
                                     <option value="{{ $br->id }}" {{ $branchId == $br->id ? 'selected' : '' }}>{{ $br->name }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.modal-form-ui>
                         </div>
                     </div>
                 </div>
@@ -353,28 +343,17 @@
 
             <!-- 4. Flags & Preferences -->
             <div class="col-12">
-                <div class="d-flex align-items-center gap-4 py-1">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" name="is_default" id="configIsDefault" value="1">
-                        <label class="form-check-label fs-12 fw-bold text-dark" for="configIsDefault">Set as Default Configuration</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" name="auto_generate_on_post" id="configAutoGenerate" value="1">
-                        <label class="form-check-label fs-12 fw-bold text-dark" for="configAutoGenerate">Auto-Generate IRN when Invoice is Posted</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" name="is_active" id="configIsActive" value="1" checked>
-                        <label class="form-check-label fs-12 fw-bold text-dark" for="configIsActive">Active</label>
-                    </div>
+                <div class="d-flex align-items-center flex-wrap gap-4 py-1">
+                    <x-ui.modal-form-ui type="switch" label="Set as Default Configuration" name="is_default" id="configIsDefault" value="1" />
+                    <x-ui.modal-form-ui type="switch" label="Auto-Generate IRN when Invoice is Posted" name="auto_generate_on_post" id="configAutoGenerate" value="1" />
+                    <x-ui.modal-form-ui type="switch" label="Active" name="is_active" id="configIsActive" value="1" :checked="true" />
                 </div>
             </div>
         </div>
 
         <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-3">
-            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold px-3" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">
-                <i class="feather-save me-1.5"></i>Save Configuration
-            </button>
+            <x-ui.button variant="secondary" data-bs-dismiss="modal">Cancel</x-ui.button>
+            <x-ui.button variant="primary" type="submit" icon="feather-save">Save Configuration</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
@@ -385,7 +364,7 @@
         <div id="pingStatusIcon" class="mb-2"></div>
         <h5 id="pingStatusTitle" class="fw-bold text-dark mb-2"></h5>
         <div id="pingStatusMsg" class="alert alert-light border fs-12 font-monospace p-2.5 mb-3 text-break"></div>
-        <button type="button" class="btn btn-sm btn-primary fw-bold px-4" data-bs-dismiss="modal">Close</button>
+        <x-ui.button variant="primary" data-bs-dismiss="modal">Close</x-ui.button>
     </div>
 </x-ui.modal>
 
@@ -394,10 +373,14 @@
     function resetGstForm() {
         $('#gstConfigForm')[0].reset();
         $('#configId').val('');
-        $('#configProvider').val('setu');
-        $('#configEnvironment').val('sandbox');
-        $('#configAuthType').val('bearer_token');
+        $('#configProvider').val('setu').trigger('change');
+        $('#configEnvironment').val('sandbox').trigger('change');
+        $('#configAuthType').val('bearer_token').trigger('change');
+        $('#configCompanyId').val('').trigger('change');
+        $('#configBranchId').val('').trigger('change');
         $('#configIsActive').prop('checked', true);
+        $('#configIsDefault').prop('checked', false);
+        $('#configAutoGenerate').prop('checked', false);
         handleProviderChange();
     }
 
@@ -410,7 +393,7 @@
             $('#fieldApiToken, #fieldClientId, #fieldClientSecret').removeClass('d-none');
             $('#fieldGstUser, #fieldGstPass').addClass('d-none');
         } else if (p === 'cleartax' || p === 'masters_india') {
-            $('#configAuthType').val('api_key');
+            $('#configAuthType').val('api_key').trigger('change');
             $('#credentialsBox').removeClass('d-none');
             $('#fieldApiToken').addClass('d-none');
             $('#fieldClientId, #fieldClientSecret, #fieldGstUser, #fieldGstPass').removeClass('d-none');
@@ -423,9 +406,9 @@
     $(document).on('click', '.btn-edit-config', function() {
         const c = $(this).data('config');
         $('#configId').val(c.id);
-        $('#configProvider').val(c.provider);
-        $('#configEnvironment').val(c.environment);
-        $('#configAuthType').val(c.auth_type);
+        $('#configProvider').val(c.provider).trigger('change');
+        $('#configEnvironment').val(c.environment).trigger('change');
+        $('#configAuthType').val(c.auth_type).trigger('change');
         $('#configApiBaseUrl').val(c.api_base_url || '');
         $('#configApiToken').val(c.api_token || '');
         $('#configClientId').val(c.client_id || '');
@@ -441,8 +424,8 @@
         $('#configPincode').val(c.pincode);
         $('#configStateCode').val(c.state_code);
         $('#configContactEmail').val(c.contact_email || '');
-        $('#configCompanyId').val(c.company_id || '');
-        $('#configBranchId').val(c.branch_id || '');
+        $('#configCompanyId').val(c.company_id || '').trigger('change');
+        $('#configBranchId').val(c.branch_id || '').trigger('change');
         $('#configIsDefault').prop('checked', !!c.is_default);
         $('#configAutoGenerate').prop('checked', !!c.auto_generate_on_post);
         $('#configIsActive').prop('checked', !!c.is_active);

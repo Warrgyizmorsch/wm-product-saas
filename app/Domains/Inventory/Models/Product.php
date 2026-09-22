@@ -170,6 +170,81 @@ class Product extends BaseModel
         return $whSum > 0 ? $whSum : (float)$this->opening_stock;
     }
 
+    public function images(): HasMany
+    {
+        return $this->hasMany(ProductImage::class, 'product_id')->orderBy('sort_order', 'asc')->orderBy('id', 'asc');
+    }
+
+    public function primaryImage(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ProductImage::class, 'product_id')->where('is_primary', true);
+    }
+
+    public function detailImages(): HasMany
+    {
+        return $this->hasMany(ProductImage::class, 'product_id')->where('is_primary', false)->orderBy('sort_order', 'asc');
+    }
+
+    /**
+     * Get Main Image URL with fallback to parent template or placeholder
+     */
+    public function getMainImageUrlAttribute(): ?string
+    {
+        if ($this->relationLoaded('primaryImage') && $this->primaryImage) {
+            return $this->primaryImage->url;
+        }
+        
+        $primary = $this->primaryImage()->first();
+        if ($primary) {
+            return $primary->url;
+        }
+
+        // Check if there is any image attached to this product
+        if ($this->relationLoaded('images') && $this->images->isNotEmpty()) {
+            return $this->images->first()->url;
+        }
+        $firstImg = $this->images()->first();
+        if ($firstImg) {
+            return $firstImg->url;
+        }
+
+        // If legacy image_path exists
+        if ($this->image_path) {
+            return asset('storage/' . $this->image_path);
+        }
+
+        // If template master product has child variants, check first variant's image
+        if ($this->variation_type === 'Variant' && !$this->parent_id) {
+            if ($this->relationLoaded('variants')) {
+                foreach ($this->variants as $variant) {
+                    if ($variant->main_image_url) {
+                        return $variant->main_image_url;
+                    }
+                }
+            } else {
+                $variantWithImg = $this->variants()->whereHas('images')->with(['primaryImage', 'images'])->first();
+                if ($variantWithImg && $variantWithImg->main_image_url) {
+                    return $variantWithImg->main_image_url;
+                }
+            }
+        }
+
+        // If child variant, fallback to parent master product primary image
+        if ($this->parent_id && $this->parent) {
+            return $this->parent->main_image_url;
+        }
+
+        return null;
+    }
+
+    /**
+     * Get thumbnail URL with fallback placeholder
+     */
+    public function getThumbnailUrlAttribute(): string
+    {
+        return $this->main_image_url ?: asset('assets/images/icons/default-product.svg');
+    }
+
     /**
      * Scope query to only sellable / transactable products.
      * Excludes master variant parent templates (variation_type = 'Variant' AND parent_id IS NULL)
