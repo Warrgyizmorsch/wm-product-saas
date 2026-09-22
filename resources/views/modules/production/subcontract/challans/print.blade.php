@@ -66,7 +66,7 @@
                 <th style="width: 5%;">#</th>
                 <th style="width: 55%;">Material Description / Item Specification</th>
                 <th style="width: 20%; text-align: right;">Quantity Dispatched</th>
-                <th style="width: 20%;">UOM</th>
+                <th style="width: 20%;">{{ __('production.uom') }}</th>
             </tr>
         </thead>
         <tbody>

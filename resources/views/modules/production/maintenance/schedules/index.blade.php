@@ -61,14 +61,14 @@
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter PM Schedules</h6>
                             
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.search_keywords') }}</label>
                                 <x-ui.odoo-form-ui type="input" name="search" placeholder="Search by code or name..." value="{{ request('search') }}" />
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Machine</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.col_machine') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="machine_id">
-                                    <option value="">All Machines</option>
+                                    <option value="">{{ __('production.all_machines') }}</option>
                                     @foreach($machines as $m)
                                         <option value="{{ $m->id }}" @selected(request('machine_id') == $m->id)>{{ $m->name }}</option>
                                     @endforeach
@@ -76,8 +76,8 @@
                             </div>
 
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('production.maintenance.schedules.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                                <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                                <a href="{{ route('production.maintenance.schedules.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
+                                <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
                             </div>
                         </x-ui.filter>
                     </form>
@@ -90,15 +90,15 @@
             <table class="table table-hover align-middle mb-0 fs-13">
                 <thead class="bg-light text-muted">
                     <tr>
-                        <th>Code</th>
+                        <th>{{ __('production.code') }}</th>
                         <th>Schedule Name</th>
-                        <th>Machine</th>
-                        <th>Type</th>
+                        <th>{{ __('production.col_machine') }}</th>
+                        <th>{{ __('production.routing_type') }}</th>
                         <th>Frequency</th>
                         <th>Last Completed</th>
                         <th>Next Due</th>
-                        <th>Status</th>
-                        <th class="text-end">Actions</th>
+                        <th>{{ __('production.status') }}</th>
+                        <th class="text-end">{{ __('production.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

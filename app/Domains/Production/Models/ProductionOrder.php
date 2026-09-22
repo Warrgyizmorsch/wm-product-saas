@@ -157,6 +157,16 @@ class ProductionOrder extends BaseModel
         return $this->belongsTo(Product::class, 'product_id');
     }
 
+    public function salesOrder(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Sales\Models\SalesOrder::class, 'sales_order_id');
+    }
+
+    public function salesOrderItem(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Sales\Models\SalesOrderItem::class, 'sales_order_item_id');
+    }
+
     public function bom(): BelongsTo
     {
         return $this->belongsTo(ProductionBom::class, 'bom_id')->withoutGlobalScopes();

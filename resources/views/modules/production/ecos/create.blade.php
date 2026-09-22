@@ -40,7 +40,7 @@
 
                     <div class="col-md-3">
                         <x-ui.odoo-form-ui type="select" label="Target Product" name="product_id" :required="true">
-                            <option value="">Select Product...</option>
+                            <option value="">{{ __('production.select_product') }}</option>
                             @foreach($products as $product)
                                 <option value="{{ $product->id }}" {{ old('product_id', $eco->product_id ?? '') == $product->id ? 'selected' : '' }}>
                                     {{ $product->name }} ({{ $product->sku }})
@@ -85,7 +85,7 @@
 
                 <!-- Footer Actions -->
                 <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                    <a href="{{ route('production.ecos.index') }}" class="btn btn-secondary">Cancel</a>
+                    <a href="{{ route('production.ecos.index') }}" class="btn btn-secondary">{{ __('production.cancel') }}</a>
                     <button type="submit" class="btn btn-primary">
                         <i class="feather-check-circle me-1"></i> Create ECO Draft
                     </button>

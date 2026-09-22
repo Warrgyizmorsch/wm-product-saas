@@ -103,7 +103,7 @@
                                 </span>
                             </div>
                             <div class="col-6 pt-2 border-top">
-                                <span class="text-muted d-block fs-11 uppercase font-semibold">Available Qty</span>
+                                <span class="text-muted d-block fs-11 uppercase font-semibold">{{ __('production.available_qty') }}</span>
                                 <span
                                     class="fw-bold text-dark fs-16">{{ number_format($wip->available_quantity, 2) }}</span>
                             </div>
@@ -113,13 +113,13 @@
                                     class="fw-bold text-success fs-16">{{ number_format($wip->completed_quantity, 2) }}</span>
                             </div>
                             <div class="col-6 pt-2 border-top">
-                                <span class="text-muted d-block fs-11 uppercase font-semibold">Rejects & Scrap</span>
+                                <span class="text-muted d-block fs-11 uppercase font-semibold">{{ __('production.rejects_and_scrap') }}</span>
                                 <span class="fw-bold text-danger">{{ number_format($wip->rejected_quantity, 2) }}
                                     Rejects</span> |
                                 <span class="fw-bold text-muted">{{ number_format($wip->scrap_quantity, 2) }} Scrap</span>
                             </div>
                             <div class="col-6 pt-2 border-top">
-                                <span class="text-muted d-block fs-11 uppercase font-semibold">WIP Status</span>
+                                <span class="text-muted d-block fs-11 uppercase font-semibold">{{ __('production.wip_status') }}</span>
                                 @if($wip->status === 'active')
                                     <span class="badge bg-soft-success text-success text-uppercase">Active</span>
                                 @elseif($wip->status === 'quality_hold')
@@ -147,28 +147,28 @@
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0 pt-0">
                                 <div>
                                     <h6 class="mb-0 fw-semibold text-dark">{{ __('production.material_cost') }}</h6>
-                                    <small class="text-muted">Issued component materials cost</small>
+                                    <small class="text-muted">{{ __('production.issued_materials_cost') }}</small>
                                 </div>
                                 <span class="fw-bold text-dark">{{ format_currency($wip->material_cost) }}</span>
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                                 <div>
                                     <h6 class="mb-0 fw-semibold text-dark">{{ __('production.labor_cost') }}</h6>
-                                    <small class="text-muted">Routing labor setup & runtime</small>
+                                    <small class="text-muted">{{ __('production.routing_labor_cost') }}</small>
                                 </div>
                                 <span class="fw-bold text-dark">{{ format_currency($wip->labor_cost) }}</span>
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                                 <div>
                                     <h6 class="mb-0 fw-semibold text-dark">{{ __('production.machine_cost') }}</h6>
-                                    <small class="text-muted">Routing machine operation costs</small>
+                                    <small class="text-muted">{{ __('production.routing_machine_cost') }}</small>
                                 </div>
                                 <span class="fw-bold text-dark">{{ format_currency($wip->machine_cost) }}</span>
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                                 <div>
                                     <h6 class="mb-0 fw-semibold text-dark">{{ __('production.overhead_cost') }}</h6>
-                                    <small class="text-muted">Work center overhead rate</small>
+                                    <small class="text-muted">{{ __('production.wc_overhead_rate') }}</small>
                                 </div>
                                 <span class="fw-bold text-dark">{{ format_currency($wip->overhead_cost) }}</span>
                             </li>
@@ -176,7 +176,7 @@
                                 class="list-group-item d-flex justify-content-between align-items-center px-0 pb-0 border-0 bg-soft-primary rounded p-3 mt-3">
                                 <div>
                                     <h5 class="mb-0 fw-bold text-primary">{{ __('production.total_value') }}</h5>
-                                    <small class="text-primary-emphasis">Total accrued manufacturing value</small>
+                                    <small class="text-primary-emphasis">{{ __('production.total_accrued_mfg_value') }}</small>
                                 </div>
                                 <span class="fs-18 fw-bold text-primary">{{ format_currency($wip->total_value) }}</span>
                             </li>
@@ -266,7 +266,7 @@
                                     @empty
                                         <tr>
                                             <td colspan="7" class="text-center py-5 text-muted">
-                                                No transactions registered for this WIP tracking card yet.
+                                                {{ __('production.no_transactions_for_wip') }}
                                             </td>
                                         </tr>
                                     @endforelse
@@ -314,12 +314,12 @@
 
         <div class="row g-2 mb-3">
             <div class="col-6">
-                <label class="form-label text-muted fw-semibold fs-12">Scrap Quantity</label>
+                <label class="form-label text-muted fw-semibold fs-12">{{ __('production.scrap_quantity') }}</label>
                 <input type="number" name="scrap_quantity" class="form-control form-control-sm"
                     value="{{ $wip->scrap_quantity }}" min="0" step="any" required>
             </div>
             <div class="col-6">
-                <label class="form-label text-muted fw-semibold fs-12">Rejects Quantity</label>
+                <label class="form-label text-muted fw-semibold fs-12">{{ __('production.rejects_quantity') }}</label>
                 <input type="number" name="rejected_quantity" class="form-control form-control-sm"
                     value="{{ $wip->rejected_quantity }}" min="0" step="any" required>
             </div>

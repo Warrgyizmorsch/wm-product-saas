@@ -66,7 +66,7 @@
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                    <a href="{{ route('production.calendars.index') }}" class="btn btn-light border">Cancel</a>
+                    <a href="{{ route('production.calendars.index') }}" class="btn btn-light border">{{ __('production.cancel') }}</a>
                     <button type="submit" class="btn btn-primary">Create Calendar</button>
                 </div>
             </x-ui.odoo-form-ui>

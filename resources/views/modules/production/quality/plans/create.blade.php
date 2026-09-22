@@ -39,7 +39,7 @@
                         <!-- Product Selection -->
                         <div x-show="scopeType === 'product'" x-transition class="mb-3">
                             <x-ui.odoo-form-ui type="select" label="Target Product" name="product_id" id="product_id" :error-text="$errors->first('product_id')">
-                                <option value="">Select Product...</option>
+                                <option value="">{{ __('production.select_product') }}</option>
                                 @foreach($products as $p)
                                     <option value="{{ $p->id }}">{{ $p->sku }} - {{ $p->name }}</option>
                                 @endforeach
@@ -57,8 +57,8 @@
                         </div>
 
                         <x-ui.odoo-form-ui type="select" label="Approval Status" name="status" id="status" :error-text="$errors->first('status')">
-                            <option value="draft">Draft</option>
-                            <option value="submitted">Submitted</option>
+                            <option value="draft">{{ __('production.draft_schedules') }}</option>
+                            <option value="submitted">{{ __('production.submitted') }}</option>
                             <option value="approved">Approved & Active</option>
                         </x-ui.odoo-form-ui>
                     </div>
@@ -78,12 +78,12 @@
                             <thead>
                                 <tr>
                                     <th style="width: 25%">Parameter Name</th>
-                                    <th style="width: 15%">Type</th>
+                                    <th style="width: 15%">{{ __('production.routing_type') }}</th>
                                     <th style="width: 12%">Min Value</th>
                                     <th style="width: 12%">Max Value</th>
-                                    <th style="width: 12%">Unit</th>
+                                    <th style="width: 12%">{{ __('production.unit') }}</th>
                                     <th style="width: 12%">Mandatory</th>
-                                    <th class="text-end" style="width: 12%">Actions</th>
+                                    <th class="text-end" style="width: 12%">{{ __('production.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -124,7 +124,7 @@
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                    <a href="{{ route('production.quality-plans.index') }}" class="btn btn-light border">Cancel</a>
+                    <a href="{{ route('production.quality-plans.index') }}" class="btn btn-light border">{{ __('production.cancel') }}</a>
                     <button type="submit" class="btn btn-primary">Save Quality Plan</button>
                 </div>
             </x-ui.odoo-form-ui>

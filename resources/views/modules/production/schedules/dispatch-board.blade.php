@@ -33,14 +33,14 @@
                             <strong class="text-dark">WHAT-IF SCENARIO MODE (ID
                                 #{{ $scen->id ?? request('scenario_id') }}):</strong>
                             @if($isPromoted)
-                                <span class="badge bg-success ms-1">Promoted to Live</span>
+                                <span class="badge bg-success ms-1">{{ __('production.promoted_to_live') }}</span>
                                 <span class="text-muted small ms-2">This scenario was successfully promoted to the live
                                     schedule.</span>
                             @elseif($isDiscarded)
-                                <span class="badge bg-secondary ms-1">Discarded</span>
-                                <span class="text-muted small ms-2">This scenario was discarded and is in read-only view.</span>
+                                <span class="badge bg-secondary ms-1">{{ __('production.discarded') }}</span>
+                                <span class="text-muted small ms-2">{{ __('production.scenario_discarded_readonly') }}</span>
                             @else
-                                <span class="badge bg-warning text-dark ms-1">Draft</span>
+                                <span class="badge bg-warning text-dark ms-1">{{ __('production.draft_schedules') }}</span>
                                 <span class="text-muted small ms-2">Experimental planning workspace. Changes here do not affect the
                                     live production schedule until promoted.</span>
                             @endif
@@ -50,12 +50,10 @@
                         @if(!$isPromoted && !$isDiscarded)
                             <button type="button" class="btn btn-sm btn-success fw-bold"
                                 onclick="promoteCurrentScenario({{ $scen->id ?? request('scenario_id') }}, '{{ addslashes($scen->name ?? 'Scenario #' . request('scenario_id')) }}')">
-                                <i class="feather-check-circle me-1"></i> Promote to Live Board
-                            </button>
+                                <i class="feather-check-circle me-1"></i>{{ __('production.promote_to_live_board') }}</button>
                         @endif
                         <a href="{{ route('production.schedules.scenarios.index') }}" class="btn btn-sm btn-outline-dark">
-                            <i class="feather-arrow-left me-1"></i> Exit Scenario Mode
-                        </a>
+                            <i class="feather-arrow-left me-1"></i>{{ __('production.exit_scenario_mode') }}</a>
                     </div>
                 </div>
             @endif
@@ -66,7 +64,7 @@
                     <div class="d-flex align-items-center gap-2">
                         <i class="feather-calendar text-primary fs-18"></i>
                         <div>
-                            <strong class="text-dark banner-title">Focused Schedule:</strong>
+                            <strong class="text-dark banner-title">{{ __('production.focused_schedule') }}</strong>
                             <span class="font-monospace fw-bold text-primary me-2">#{{ $activeSchedule->schedule_number }}</span>
                             <span class="text-muted banner-subtitle">Order: <strong class="text-dark">{{ $activeSchedule->order->order_number ?? 'N/A' }}</strong> ({{ $activeSchedule->order->product->name ?? 'N/A' }})</span>
                             <span class="badge {{ $activeSchedule->isReleased() ? 'bg-success' : 'bg-primary' }} ms-2 text-capitalize">{{ $activeSchedule->status }}</span>
@@ -74,8 +72,7 @@
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <a href="{{ route('production.schedules.dispatch-board') }}" class="btn btn-sm btn-outline-secondary">
-                            <i class="feather-x me-1"></i> Clear Schedule Filter
-                        </a>
+                            <i class="feather-x me-1"></i>{{ __('production.clear_schedule_filter') }}</a>
                     </div>
                 </div>
             @endif
@@ -86,24 +83,23 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
                     <div>
                         <h4 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
-                            <i class="feather-grid text-primary"></i> Production Dispatch Board & Timeline
-                            <span id="readOnlyBadge" class="badge bg-soft-secondary text-secondary fs-11 d-none">Read Only</span>
+                            <i class="feather-grid text-primary"></i>{{ __('production.dispatch_board_timeline') }}<span id="readOnlyBadge" class="badge bg-soft-secondary text-secondary fs-11 d-none">Read Only</span>
                         </h4>
-                        <p class="text-muted fs-13 mb-0">Interactive Gantt Planner & Machine Capacity Dispatcher</p>
+                        <p class="text-muted fs-13 mb-0">{{ __('production.interactive_gantt_planner') }}</p>
                     </div>
 
                     <div class="d-flex flex-wrap align-items-center gap-2">
                         {{-- Date Navigation --}}
                         <div class="d-flex align-items-center gap-1 me-2">
                             <button type="button" id="btnNavPrev" class="btn btn-sm btn-outline-secondary px-2 py-1" title="Previous Period"><i class="feather-chevron-left"></i></button>
-                            <button type="button" id="btnNavToday" class="btn btn-sm btn-outline-secondary px-3 py-1 fw-semibold">Today</button>
+                            <button type="button" id="btnNavToday" class="btn btn-sm btn-outline-secondary px-3 py-1 fw-semibold">{{ __('production.today') }}</button>
                             <button type="button" id="btnNavNext" class="btn btn-sm btn-outline-secondary px-2 py-1" title="Next Period"><i class="feather-chevron-right"></i></button>
                         </div>
 
                         {{-- Scale Toggle --}}
                         <div class="d-flex align-items-center gap-1 me-2">
-                            <button type="button" id="btnScaleDay" class="btn btn-sm btn-outline-primary active px-3 py-1 fs-12 fw-semibold">Day View</button>
-                            <button type="button" id="btnScaleWeek" class="btn btn-sm btn-outline-primary px-3 py-1 fs-12 fw-semibold">Week View</button>
+                            <button type="button" id="btnScaleDay" class="btn btn-sm btn-outline-primary active px-3 py-1 fs-12 fw-semibold">{{ __('production.day_view') }}</button>
+                            <button type="button" id="btnScaleWeek" class="btn btn-sm btn-outline-primary px-3 py-1 fs-12 fw-semibold">{{ __('production.week_view') }}</button>
                         </div>
 
                         {{-- Date Range Inputs --}}
@@ -119,12 +115,12 @@
 
                         {{-- Standard ERP Filter Component Dropdown --}}
                         <x-ui.filter label="Filter" offset="0, 5">
-                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Dispatch Board Filters</h6>
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i>{{ __('production.dispatch_board_filters') }}</h6>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Production Schedule</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.production_schedule') }}</label>
                                 <x-ui.odoo-form-ui type="select" id="filterSchedule" name="schedule_id">
-                                    <option value="">All Schedules</option>
+                                    <option value="">{{ __('production.all_schedules') }}</option>
                                     @if(isset($schedulesList))
                                         @foreach($schedulesList as $sch)
                                             <option value="{{ $sch->id }}" data-status="{{ $sch->status }}" {{ (request('schedule_id') == $sch->id || (isset($activeSchedule) && $activeSchedule && $activeSchedule->id == $sch->id)) ? 'selected' : '' }}>
@@ -136,9 +132,9 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Work Center</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.js_work_center_label') }}</label>
                                 <x-ui.odoo-form-ui type="select" id="filterWorkCenter" name="work_center_id">
-                                    <option value="">All Work Centers</option>
+                                    <option value="">{{ __('production.all_work_centers') }}</option>
                                     @foreach($workCenters as $wc)
                                         <option value="{{ $wc->id }}" {{ request('work_center_id') == $wc->id ? 'selected' : '' }}>
                                             {{ $wc->name }} ({{ $wc->code }})
@@ -148,30 +144,27 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Machine</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.col_machine') }}</label>
                                 <x-ui.odoo-form-ui type="select" id="filterMachine" name="machine_id">
-                                    <option value="">All Machines</option>
+                                    <option value="">{{ __('production.all_machines') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Operation Status</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.operation_status') }}</label>
                                 <x-ui.odoo-form-ui type="select" id="filterStatus" name="status">
-                                    <option value="">All Statuses</option>
-                                    <option value="scheduled">Scheduled</option>
-                                    <option value="released">Released</option>
-                                    <option value="in_progress">In Progress</option>
-                                    <option value="completed">Completed</option>
+                                    <option value="">{{ __('production.all_statuses') }}</option>
+                                    <option value="scheduled">{{ __('production.scheduled_schedules') }}</option>
+                                    <option value="released">{{ __('production.released_schedules') }}</option>
+                                    <option value="in_progress">{{ __('production.in_progress') }}</option>
+                                    <option value="completed">{{ __('production.completed_schedules') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
                             <div class="d-flex gap-2 pt-2 border-top">
                                 <button type="button" id="btnApplyFilterInside" class="btn btn-sm btn-primary flex-grow-1">
-                                    <i class="feather-filter me-1"></i> Apply Filters
-                                </button>
-                                <button type="button" id="btnResetDispatchFilters" class="btn btn-sm btn-outline-secondary">
-                                    Reset
-                                </button>
+                                    <i class="feather-filter me-1"></i>{{ __('production.apply_filters') }}</button>
+                                <button type="button" id="btnResetDispatchFilters" class="btn btn-sm btn-outline-secondary">{{ __('production.reset') }}</button>
                             </div>
                         </x-ui.filter>
                     </div>
@@ -190,7 +183,7 @@
                             data-bs-toggle="dropdown"
                             aria-expanded="false"
                             title="Shift Mode determines how downstream operations react to schedule moves">
-                            <span id="currentShiftModeLabel">Ripple Shift</span>
+                            <span id="currentShiftModeLabel">{{ __('production.ripple_shift') }}</span>
                         </x-ui.button>
                         <ul class="dropdown-menu dropdown-menu-end fs-12 shadow p-2" aria-labelledby="btnShiftModeToggle"
                             style="min-width: 300px; max-width: 360px;">
@@ -198,7 +191,7 @@
                                 <a class="dropdown-item active rounded p-2 text-wrap" href="javascript:void(0)"
                                     id="optShiftRipple" onclick="setShiftMode('ripple')">
                                     <div class="fw-bold mb-1"><i class="feather-check me-1 text-success d-inline"
-                                            id="iconRippleCheck"></i> Ripple Shift</div>
+                                            id="iconRippleCheck"></i>{{ __('production.ripple_shift') }}</div>
                                     <div class="text-muted fs-11 text-wrap lh-sm ms-3">Recalculates downstream dependent
                                         operations automatically.</div>
                                 </a>
@@ -210,7 +203,7 @@
                                 <a class="dropdown-item rounded p-2 text-wrap" href="javascript:void(0)"
                                     id="optShiftIsolated" onclick="setShiftMode('isolated')">
                                     <div class="fw-bold mb-1"><i class="feather-check me-1 text-success d-none"
-                                            id="iconIsolatedCheck"></i> Isolated Shift</div>
+                                            id="iconIsolatedCheck"></i>{{ __('production.isolated_shift') }}</div>
                                     <div class="text-muted fs-11 text-wrap lh-sm ms-3">Moves only target operation; rejects
                                         moves that break dependencies.</div>
                                 </a>
@@ -222,24 +215,16 @@
                     <x-ui.button
                         href="{{ route('production.schedules.scenarios.index') }}"
                         variant="outline-primary"
-                        icon="feather-layers">
-                        What-If Scenarios
-                    </x-ui.button>
+                        icon="feather-layers">{{ __('production.what_if_scenarios') }}</x-ui.button>
 
                     {{-- Level Capacity --}}
-                    <x-ui.button id="btnLevelCapacity" variant="outline-warning" icon="feather-zap">
-                        Level Capacity
-                    </x-ui.button>
+                    <x-ui.button id="btnLevelCapacity" variant="outline-warning" icon="feather-zap">{{ __('production.level_capacity') }}</x-ui.button>
 
                     {{-- Pre-Release Check Button (Dynamically visible ONLY when schedule is ready to release) --}}
-                    <x-ui.button id="btnPreReleaseCheck" variant="success" icon="feather-check-circle" class="d-none">
-                        Pre-Release Check
-                    </x-ui.button>
+                    <x-ui.button id="btnPreReleaseCheck" variant="success" icon="feather-check-circle" class="d-none">{{ __('production.pre_release_check') }}</x-ui.button>
 
                     {{-- Audit Log --}}
-                    <x-ui.button id="btnChangeHistory" variant="outline-secondary" icon="feather-clock">
-                        Audit Log
-                    </x-ui.button>
+                    <x-ui.button id="btnChangeHistory" variant="outline-secondary" icon="feather-clock">{{ __('production.audit_log') }}</x-ui.button>
 
                     {{-- Refresh --}}
                     <x-ui.button type="button" id="btnRefreshBoardData" variant="outline-secondary" icon="feather-refresh-cw" title="Refresh Board Data">
@@ -251,37 +236,37 @@
             <div class="row g-3 mb-4">
                 <div class="col-md-2">
                     <div class="p-3 dispatch-stat-card rounded border text-center">
-                        <span class="text-muted fs-11 uppercase fw-bold">Visible Operations</span>
+                        <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.visible_operations') }}</span>
                         <h4 id="statTotalOps" class="fw-bold text-dark mb-0 mt-1">—</h4>
                     </div>
                 </div>
                 <div class="col-md-2">
                     <div class="p-3 dispatch-stat-card rounded border text-center">
-                        <span class="text-muted fs-11 uppercase fw-bold">Active Swimlanes</span>
+                        <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.active_swimlanes') }}</span>
                         <h4 id="statTotalResources" class="fw-bold text-primary mb-0 mt-1">—</h4>
                     </div>
                 </div>
                 <div class="col-md-2">
                     <div class="p-3 dispatch-stat-card rounded border text-center">
-                        <span class="text-muted fs-11 uppercase fw-bold">Locked Ops</span>
+                        <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.locked_ops') }}</span>
                         <h4 id="statTotalLocked" class="fw-bold text-danger mb-0 mt-1">0</h4>
                     </div>
                 </div>
                 <div class="col-md-2">
                     <div class="p-3 dispatch-stat-card rounded border text-center">
-                        <span class="text-muted fs-11 uppercase fw-bold">Manual Adjustments</span>
+                        <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.manual_adjustments') }}</span>
                         <h4 id="statTotalManual" class="fw-bold text-warning mb-0 mt-1">0</h4>
                     </div>
                 </div>
                 <div class="col-md-2">
                     <div class="p-3 dispatch-stat-card rounded border text-center">
-                        <span class="text-muted fs-11 uppercase fw-bold">Active Conflicts</span>
+                        <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.active_conflicts') }}</span>
                         <h4 id="statTotalConflicts" class="fw-bold text-danger mb-0 mt-1">0</h4>
                     </div>
                 </div>
                 <div class="col-md-2">
                     <div class="p-3 dispatch-stat-card rounded border text-center">
-                        <span class="text-muted fs-11 uppercase fw-bold">Work Center Overloads</span>
+                        <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.work_center_overloads') }}</span>
                         <h4 id="statTotalOverloads" class="fw-bold text-warning mb-0 mt-1">0</h4>
                     </div>
                 </div>
@@ -306,8 +291,8 @@
                     style="z-index: 10;">
                     <div class="gantt-resource-col border-end p-2 px-3 bg-light d-flex align-items-center justify-content-between"
                         style="width: 280px; min-width: 280px;">
-                        <span>Work Center / Resource</span>
-                        <span class="text-muted fs-11">Load %</span>
+                        <span>{{ __('production.work_center_resource') }}</span>
+                        <span class="text-muted fs-11">{{ __('production.load_pct') }}</span>
                     </div>
                     <div class="gantt-timeline-col flex-grow-1 overflow-hidden" id="ganttHeaderTimeline">
                         <div class="d-flex align-items-center h-100 text-center" id="ganttHeaderTicks">
@@ -329,13 +314,13 @@
                 <div class="d-flex align-items-center gap-3">
                     <span class="fw-semibold text-dark"><i class="feather-info me-1"></i> Legend:</span>
                     <span class="d-flex align-items-center gap-1"><span class="d-inline-block rounded-circle bg-primary"
-                            style="width: 10px; height: 10px;"></span> Scheduled</span>
+                            style="width: 10px; height: 10px;"></span>{{ __('production.scheduled_schedules') }}</span>
                     <span class="d-flex align-items-center gap-1"><span class="d-inline-block rounded-circle bg-info"
-                            style="width: 10px; height: 10px;"></span> Released</span>
+                            style="width: 10px; height: 10px;"></span>{{ __('production.released_schedules') }}</span>
                     <span class="d-flex align-items-center gap-1"><span class="d-inline-block rounded-circle bg-success"
-                            style="width: 10px; height: 10px;"></span> In Progress</span>
+                            style="width: 10px; height: 10px;"></span>{{ __('production.in_progress') }}</span>
                     <span class="d-flex align-items-center gap-1"><span class="d-inline-block rounded-circle bg-secondary"
-                            style="width: 10px; height: 10px;"></span> Completed</span>
+                            style="width: 10px; height: 10px;"></span>{{ __('production.completed_schedules') }}</span>
                     <span class="d-flex align-items-center gap-1"><i class="feather-lock text-danger"></i> Locked</span>
                     <span class="d-flex align-items-center gap-1"><i class="feather-edit-2 text-warning"></i> Manual
                         Override</span>
@@ -375,7 +360,7 @@
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Work Center Scope" id="levelScopeWorkCenter"
                         name="work_center_id">
-                        <option value="">All Work Centers</option>
+                        <option value="">{{ __('production.all_work_centers') }}</option>
                         @foreach($workCenters as $wc)
                             <option value="{{ $wc->id }}">{{ $wc->name }} ({{ $wc->code }})</option>
                         @endforeach
@@ -383,16 +368,14 @@
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Target Machine Scope" id="levelScopeMachine" name="machine_id">
-                        <option value="">All Machines</option>
+                        <option value="">{{ __('production.all_machines') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
             </div>
 
             <div class="modal-footer px-0 pb-0 pt-3 border-top">
-                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Cancel</x-ui.button>
-                <x-ui.button type="button" id="btnGenerateLevelingPreview" variant="warning" icon="feather-play">
-                    Generate Preview
-                </x-ui.button>
+                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+                <x-ui.button type="button" id="btnGenerateLevelingPreview" variant="warning" icon="feather-play">{{ __('production.generate_preview') }}</x-ui.button>
             </div>
         </x-ui.modal>
 
@@ -407,11 +390,9 @@
                 <span class="text-muted fs-11"><i class="feather-info me-1"></i> Preview expires in 30 minutes. Schedule
                     remains unchanged until applied.</span>
                 <div>
-                    <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Cancel</x-ui.button>
+                    <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
                     <x-ui.button type="button" id="btnApplyLeveling" variant="success"
-                        icon="feather-check-circle">
-                        Apply Leveling Proposal
-                    </x-ui.button>
+                        icon="feather-check-circle">{{ __('production.apply_leveling_proposal') }}</x-ui.button>
                 </div>
             </div>
         </x-ui.modal>
@@ -426,14 +407,14 @@
             <div class="row g-3 mb-3 fs-13">
                 <div class="col-md-6">
                     <div class="p-3 bg-light rounded border">
-                        <span class="text-muted fs-11 uppercase fw-bold">Production Order</span>
+                        <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.production_order') }}</span>
                         <div id="editOrderNumber" class="fw-bold text-dark fs-14 mt-1">—</div>
                         <div id="editProductName" class="text-muted fs-12">—</div>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="p-3 bg-light rounded border">
-                        <span class="text-muted fs-11 uppercase fw-bold">Operation Info</span>
+                        <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.operation_info') }}</span>
                         <div id="editOpName" class="fw-bold text-dark fs-14 mt-1">—</div>
                         <div id="editWorkCenterName" class="text-muted fs-12">—</div>
                     </div>
@@ -447,7 +428,7 @@
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Assigned Machine" id="editMachineId" name="machine_id">
-                        <option value="">No Machine (Manual Operation)</option>
+                        <option value="">{{ __('production.no_machine_manual') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
             </div>
@@ -455,18 +436,18 @@
             <div class="row g-3 mb-3 fs-13">
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Shift Propagation Mode" id="editShiftMode" name="shift_mode">
-                        <option value="ripple">Ripple Shift (Auto-shift successors)</option>
-                        <option value="isolated">Isolated Shift (Move target operation only)</option>
+                        <option value="ripple">{{ __('production.ripple_shift_desc') }}</option>
+                        <option value="isolated">{{ __('production.isolated_shift_desc') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Adjustment Reason" id="editReason" name="reason">
-                        <option value="Planner Adjustment">Planner Manual Adjustment</option>
-                        <option value="Machine Breakdown">Machine Breakdown / Unscheduled Maintenance</option>
-                        <option value="Rush Order">Rush Order / High Priority Shift</option>
-                        <option value="Material Delay">Material Shortage / Delivery Lag</option>
-                        <option value="Operator Absence">Operator Staffing Absence</option>
-                        <option value="Tooling Issue">Tooling / Fixture Calibration</option>
+                        <option value="Planner Adjustment">{{ __('production.planner_manual_adjustment') }}</option>
+                        <option value="Machine Breakdown">{{ __('production.breakdown_unscheduled_maint') }}</option>
+                        <option value="Rush Order">{{ __('production.rush_order_priority_shift') }}</option>
+                        <option value="Material Delay">{{ __('production.material_shortage_lag') }}</option>
+                        <option value="Operator Absence">{{ __('production.operator_staffing_absence') }}</option>
+                        <option value="Tooling Issue">{{ __('production.tooling_fixture_calib') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
             </div>
@@ -476,15 +457,15 @@
                     Schedule Variance</h6>
                 <div class="row text-center fs-12">
                     <div class="col-md-4">
-                        <span class="text-muted d-block">Baseline Start</span>
+                        <span class="text-muted d-block">{{ __('production.baseline_start') }}</span>
                         <strong id="editBaselineStart">—</strong>
                     </div>
                     <div class="col-md-4">
-                        <span class="text-muted d-block">Baseline Finish</span>
+                        <span class="text-muted d-block">{{ __('production.baseline_finish') }}</span>
                         <strong id="editBaselineFinish">—</strong>
                     </div>
                     <div class="col-md-4">
-                        <span class="text-muted d-block">Start Variance</span>
+                        <span class="text-muted d-block">{{ __('production.start_variance') }}</span>
                         <span id="editVarianceBadge" class="badge bg-soft-secondary text-secondary">—</span>
                     </div>
                 </div>
@@ -493,60 +474,54 @@
             <div
                 class="d-flex align-items-center justify-content-between p-3 bg-soft-warning rounded border border-warning mb-3 fs-13">
                 <div>
-                    <strong id="editLockStatusText" class="text-dark">Lock Status: Unlocked</strong>
+                    <strong id="editLockStatusText" class="text-dark">{{ __('production.lock_status_unlocked') }}</strong>
                     <div class="text-muted fs-11">Locked operations cannot be moved via drag-and-drop or automatic capacity
                         leveling.</div>
                 </div>
-                <x-ui.button type="button" id="btnToggleLockInModal" variant="outline-danger" icon="feather-lock">
-                    Toggle Lock
-                </x-ui.button>
+                <x-ui.button type="button" id="btnToggleLockInModal" variant="outline-danger" icon="feather-lock">{{ __('production.toggle_lock') }}</x-ui.button>
             </div>
 
             <div class="modal-footer px-0 pb-0 pt-3 border-top">
-                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Cancel</x-ui.button>
-                <x-ui.button type="button" id="btnSaveQuickEdit" variant="primary" icon="feather-check">
-                    Apply Reschedule
-                </x-ui.button>
+                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+                <x-ui.button type="button" id="btnSaveQuickEdit" variant="primary" icon="feather-check">{{ __('production.apply_reschedule') }}</x-ui.button>
             </div>
         </x-ui.modal>
 
         {{-- Adjustment Drag Drop Confirmation Popover Modal (Using x-ui.modal Component) --}}
         <x-ui.modal id="modalConfirmDrag" title="<i class='feather-move me-2 text-primary'></i>Confirm Schedule Adjustment"
             :centered="true" :static="true" :showFooter="false">
-            <p class="mb-3 text-dark fs-13">Confirm the proposed schedule move for operation <strong id="dragOpTitle">#10
+            <p class="mb-3 text-dark fs-13">{{ __('production.confirm_proposed_move') }}<strong id="dragOpTitle">#10
                     Operation</strong>:</p>
 
             <div class="p-3 bg-light rounded border mb-3 fs-12">
                 <div class="d-flex justify-content-between mb-1">
-                    <span class="text-muted">Proposed Start:</span>
+                    <span class="text-muted">{{ __('production.proposed_start') }}</span>
                     <strong id="dragNewStartDisplay" class="text-primary font-monospace">—</strong>
                 </div>
                 <div class="d-flex justify-content-between mb-1">
-                    <span class="text-muted">Target Machine:</span>
+                    <span class="text-muted">{{ __('production.target_machine') }}</span>
                     <strong id="dragNewMachineDisplay" class="text-dark">—</strong>
                 </div>
                 <div class="d-flex justify-content-between">
-                    <span class="text-muted">Shift Mode:</span>
-                    <span id="dragShiftModeBadge" class="badge bg-soft-info text-info">Ripple Shift</span>
+                    <span class="text-muted">{{ __('production.shift_mode') }}</span>
+                    <span id="dragShiftModeBadge" class="badge bg-soft-info text-info">{{ __('production.ripple_shift') }}</span>
                 </div>
             </div>
 
             <div class="mb-3 fs-13">
                 <x-ui.odoo-form-ui type="select" label="Adjustment Reason" id="dragReasonSelect" name="drag_reason">
-                    <option value="Planner Adjustment">Planner Manual Adjustment</option>
+                    <option value="Planner Adjustment">{{ __('production.planner_manual_adjustment') }}</option>
                     <option value="Machine Breakdown">Machine Breakdown / Maintenance</option>
                     <option value="Rush Order">Rush Order Priority Shift</option>
                     <option value="Material Delay">Material Supply Lag</option>
-                    <option value="Operator Absence">Operator Staffing Absence</option>
+                    <option value="Operator Absence">{{ __('production.operator_staffing_absence') }}</option>
                     <option value="Tooling Issue">Tooling / Fixture Issue</option>
                 </x-ui.odoo-form-ui>
             </div>
 
             <div class="modal-footer px-0 pb-0 pt-3 border-top">
-                <x-ui.button type="button" id="btnCancelDrag" variant="secondary">Cancel</x-ui.button>
-                <x-ui.button type="button" id="btnApplyDrag" variant="primary" icon="feather-check">
-                    Confirm & Save Move
-                </x-ui.button>
+                <x-ui.button type="button" id="btnCancelDrag" variant="secondary">{{ __('production.cancel') }}</x-ui.button>
+                <x-ui.button type="button" id="btnApplyDrag" variant="primary" icon="feather-check">{{ __('production.confirm_save_move') }}</x-ui.button>
             </div>
         </x-ui.modal>
 
@@ -571,8 +546,7 @@
             :showFooter="false">
             <div id="changeHistoryModalBody" class="fs-13">
                 <div class="text-center py-5 text-muted">
-                    <div class="spinner-border spinner-border-sm me-2"></div> Loading change history audit logs...
-                </div>
+                    <div class="spinner-border spinner-border-sm me-2"></div>{{ __('production.loading_audit_logs') }}</div>
             </div>
             <div class="modal-footer px-0 pb-0 pt-3 border-top">
                 <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Close</x-ui.button>
@@ -707,12 +681,12 @@
                                     <x-ui.odoo-form-ui type="table">
                                         <thead class="table-light fs-12">
                                             <tr>
-                                                <th>Order / Op</th>
-                                                <th>Equipment Shift</th>
-                                                <th>Proposed Timings</th>
-                                                <th>Baseline Variance</th>
-                                                <th>Due Date Impact</th>
-                                                <th>Reason</th>
+                                                <th>{{ __('production.order_op') }}</th>
+                                                <th>{{ __('production.equipment_shift') }}</th>
+                                                <th>{{ __('production.proposed_timings') }}</th>
+                                                <th>{{ __('production.baseline_variance') }}</th>
+                                                <th>{{ __('production.due_date_impact') }}</th>
+                                                <th>{{ __('production.reason') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -735,7 +709,7 @@
                                                         ${ch.variance_after_minutes !== 0 ? `<span class="badge bg-warning text-dark">+${ch.variance_after_minutes}m</span>` : '<span class="badge bg-light text-muted">0m</span>'}
                                                     </td>
                                                     <td class="fs-12">
-                                                        ${ch.lateness_after_minutes > 0 ? `<span class="badge bg-danger">Late (+${ch.lateness_after_minutes}m)</span>` : '<span class="badge bg-success">On-Time</span>'}
+                                                        ${ch.lateness_after_minutes > 0 ? `<span class="badge bg-danger">Late (+${ch.lateness_after_minutes}m)</span>` : '<span class="badge bg-success">{{ __('production.on_time') }}</span>'}
                                                     </td>
                                                     <td class="fs-11 text-muted">${ch.reason || 'Capacity Leveling'}</td>
                                                 </tr>
@@ -751,25 +725,25 @@
                                 <div class="row g-3 mb-3 text-center">
                                     <div class="col-md-3">
                                         <div class="p-3 bg-light rounded border">
-                                            <span class="text-muted fs-11 uppercase fw-bold">Overloads Before</span>
+                                            <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.overloads_before') }}</span>
                                             <h4 class="fw-bold text-danger mb-0 mt-1">${summary.overloads_before ?? 0}</h4>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="p-3 bg-light rounded border">
-                                            <span class="text-muted fs-11 uppercase fw-bold">Overloads After</span>
+                                            <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.overloads_after') }}</span>
                                             <h4 class="fw-bold text-success mb-0 mt-1">${summary.overloads_after ?? 0}</h4>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="p-3 bg-light rounded border">
-                                            <span class="text-muted fs-11 uppercase fw-bold">Operations Changed</span>
+                                            <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.operations_changed') }}</span>
                                             <h4 class="fw-bold text-primary mb-0 mt-1">${summary.operations_changed ?? 0}</h4>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="p-3 bg-light rounded border">
-                                            <span class="text-muted fs-11 uppercase fw-bold">Machines Reassigned</span>
+                                            <span class="text-muted fs-11 uppercase fw-bold">{{ __('production.machines_reassigned') }}</span>
                                             <h4 class="fw-bold text-info mb-0 mt-1">${summary.machines_reassigned ?? 0}</h4>
                                         </div>
                                     </div>
@@ -896,7 +870,7 @@
             // Work Center Filter Change -> Populate Machine Filter Dropdown
             filterWorkCenter.addEventListener('change', function () {
                 const wcId = this.value;
-                filterMachine.innerHTML = '<option value="">All Machines</option>';
+                filterMachine.innerHTML = '<option value="">{{ __('production.all_machines') }}</option>';
                 if (dispatchBoardData && dispatchBoardData.resources) {
                     dispatchBoardData.resources.forEach(res => {
                         if (!wcId || res.id == wcId) {
@@ -1003,7 +977,7 @@
                 if (scheduleIdVal || scheduleIdUrl) params.append('schedule_id', scheduleIdVal || scheduleIdUrl);
 
                 const bodyEl = document.getElementById('ganttSwimlanesBody');
-                bodyEl.innerHTML = `<div class="text-center py-5 text-muted fs-13"><div class="spinner-border spinner-border-sm me-2 text-primary"></div> Loading Dispatch Board timeline...</div>`;
+                bodyEl.innerHTML = `<div class="text-center py-5 text-muted fs-13"><div class="spinner-border spinner-border-sm me-2 text-primary"></div>{{ __('production.loading_dispatch_timeline') }}</div>`;
 
                 fetch(`{{ route('production.schedules.dispatch-board.data') }}?${params.toString()}`, {
                     headers: {
@@ -1506,7 +1480,7 @@
 
                 // Populate Machines Select
                 const selectM = document.querySelector('#editMachineId select') || document.getElementById('editMachineId');
-                selectM.innerHTML = '<option value="">No Machine (Manual Operation)</option>';
+                selectM.innerHTML = '<option value="">{{ __('production.no_machine_manual') }}</option>';
                 if (dispatchBoardData && dispatchBoardData.resources) {
                     dispatchBoardData.resources.forEach(res => {
                         if (res.id === op.work_center_id) {
@@ -1626,7 +1600,7 @@
                 if (schedList.length > 1) {
                     selectorHtml = `
                         <div class="mb-3 p-2 bg-white rounded border">
-                            <label class="form-label text-dark fw-bold mb-1 fs-12"><i class="feather-filter me-1 text-primary"></i> Select Schedule to Validate & Release:</label>
+                            <label class="form-label text-dark fw-bold mb-1 fs-12"><i class="feather-filter me-1 text-primary"></i>{{ __('production.select_schedule_to_release') }}</label>
                             <select class="form-select form-select-sm fw-semibold text-dark" onchange="runPreReleaseCheck(this.value)">
                                 ${schedList.map(s => `<option value="${s.id}" ${s.id == scheduleId ? 'selected' : ''}>#${s.number} (${s.orderNumber})</option>`).join('')}
                             </select>
@@ -1681,8 +1655,8 @@
                                     <span class="text-muted fs-11">${res.summary?.total_operations ?? 0} operations evaluated</span>
                                 </div>
                                 <div>
-                                    ${res.can_release ? '<span class="badge bg-success">Can Release</span>' : '<span class="badge bg-danger">Blocked</span>'}
-                                    ${res.has_warnings ? '<span class="badge bg-warning text-dark ms-1">Has Warnings</span>' : ''}
+                                    ${res.can_release ? '<span class="badge bg-success">{{ __('production.can_release') }}</span>' : '<span class="badge bg-danger">Blocked</span>'}
+                                    ${res.has_warnings ? '<span class="badge bg-warning text-dark ms-1">{{ __('production.has_warnings') }}</span>' : ''}
                                 </div>
                             </div>
                             ${errorsHtml}
@@ -1691,11 +1665,11 @@
 
                         if (res.can_release) {
                             const confirmBtn = res.has_warnings
-                                ? `<button type="button" onclick="executeScheduleRelease(${scheduleId}, true)" class="btn btn-warning btn-sm"><i class="feather-play me-1"></i> Release Schedule With Warnings</button>`
-                                : `<button type="button" onclick="executeScheduleRelease(${scheduleId}, false)" class="btn btn-primary btn-sm"><i class="feather-play me-1"></i> Release Schedule to Shop Floor</button>`;
+                                ? `<button type="button" onclick="executeScheduleRelease(${scheduleId}, true)" class="btn btn-warning btn-sm"><i class="feather-play me-1"></i>{{ __('production.release_schedule_with_warnings') }}</button>`
+                                : `<button type="button" onclick="executeScheduleRelease(${scheduleId}, false)" class="btn btn-primary btn-sm"><i class="feather-play me-1"></i>{{ __('production.release_schedule_to_shop_floor') }}</button>`;
                             modalFooter.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button> ${confirmBtn}`;
                         } else {
-                            modalFooter.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button><button class="btn btn-danger btn-sm" disabled>Release Disabled (Blocking Errors Exist)</button>`;
+                            modalFooter.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button><button class="btn btn-danger btn-sm" disabled>{{ __('production.release_disabled_errors') }}</button>`;
                         }
                     })
                     .catch(err => {
@@ -1765,7 +1739,7 @@
                     .then(res => {
                         const logs = res.data || [];
                         if (logs.length === 0) {
-                            modalBody.innerHTML = `<div class="text-center py-5 text-muted">No schedule change logs found.</div>`;
+                            modalBody.innerHTML = `<div class="text-center py-5 text-muted">{{ __('production.no_schedule_change_logs') }}</div>`;
                             return;
                         }
 
@@ -1774,14 +1748,14 @@
                                     <table class="table table-hover align-middle mb-0 fs-12">
                                         <thead class="table-light">
                                             <tr>
-                                                <th>Date & Time</th>
-                                                <th>Changed By</th>
-                                                <th>Operation</th>
-                                                <th>Type</th>
+                                                <th>{{ __('production.transaction_at') }}</th>
+                                                <th>{{ __('production.changed_by') }}</th>
+                                                <th>{{ __('production.operation') }}</th>
+                                                <th>{{ __('production.routing_type') }}</th>
                                                 <th>Mode</th>
-                                                <th>Start Shift</th>
-                                                <th>Machine Shift</th>
-                                                <th>Reason</th>
+                                                <th>{{ __('production.start_shift') }}</th>
+                                                <th>{{ __('production.machine_shift') }}</th>
+                                                <th>{{ __('production.reason') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>

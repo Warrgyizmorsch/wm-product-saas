@@ -51,9 +51,9 @@
             <div class="col-md-3">
                 <div class="card border border-light shadow-sm text-center">
                     <div class="card-body">
-                        <div class="fs-12 text-muted text-uppercase fw-bold">First Pass Yield (FPY)</div>
+                        <div class="fs-12 text-muted text-uppercase fw-bold">{{ __('production.first_pass_yield') }}</div>
                         <h2 class="fw-bold text-success mt-2">{{ number_format($fpy, 2) }}%</h2>
-                        <span class="badge bg-soft-success text-success fs-10 mt-1">Final Stage Quality Rate</span>
+                        <span class="badge bg-soft-success text-success fs-10 mt-1">{{ __('production.final_stage_quality_rate') }}</span>
                     </div>
                 </div>
             </div>
@@ -69,7 +69,7 @@
             <div class="col-md-3">
                 <div class="card border border-light shadow-sm text-center">
                     <div class="card-body">
-                        <div class="fs-12 text-muted text-uppercase fw-bold">Active CAPAs</div>
+                        <div class="fs-12 text-muted text-uppercase fw-bold">{{ __('production.active_capas') }}</div>
                         <h2 class="fw-bold text-primary mt-2">{{ number_format($capaOpen) }}</h2>
                         <span class="badge bg-soft-primary text-primary fs-10 mt-1">Under Action (Verified: {{ $capaClosed }})</span>
                     </div>
@@ -103,7 +103,7 @@
                                         <th>Stage</th>
                                         <th>Order</th>
                                         <th>Result</th>
-                                        <th>Status</th>
+                                        <th>{{ __('production.status') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -149,9 +149,9 @@
                                 <thead>
                                     <tr>
                                         <th>NCR #</th>
-                                        <th>Category</th>
+                                        <th>{{ __('production.category') }}</th>
                                         <th>Order</th>
-                                        <th>Status</th>
+                                        <th>{{ __('production.status') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>

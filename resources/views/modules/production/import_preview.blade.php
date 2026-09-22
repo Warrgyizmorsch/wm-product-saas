@@ -82,7 +82,7 @@
                             <small class="text-muted d-block mt-1">Duplicates are identified using unique business keys (e.g. Codes, BOM Numbers, Routing Numbers).</small>
                         </div>
                         <div class="col-md-8 text-md-end">
-                            <a href="{{ route($cancelRoute) }}" class="btn btn-light border me-2">Cancel</a>
+                            <a href="{{ route($cancelRoute) }}" class="btn btn-light border me-2">{{ __('production.cancel') }}</a>
                             <button type="submit" class="btn btn-primary" @disabled((count($previewRows) - $errorCount) <= 0)>
                                 <i class="feather-check-circle me-1"></i>Confirm Import ({{ count($previewRows) - $errorCount }} valid rows)
                             </button>

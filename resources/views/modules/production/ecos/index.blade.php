@@ -34,10 +34,10 @@
                     <!-- Sort Dropdown -->
                     <x-ui.sort-dropdown label="Sort">
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'desc' ? 'active' : '' }}">
-                            <span>Newest First</span>
+                            <span>{{ __('production.sort_newest_first') }}</span>
                         </a>
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'created_at' && $sortOrder === 'asc' ? 'active' : '' }}">
-                            <span>Oldest First</span>
+                            <span>{{ __('production.sort_oldest_first') }}</span>
                         </a>
                         <div class="dropdown-divider"></div>
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'eco_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'eco_number' && $sortOrder === 'asc' ? 'active' : '' }}">
@@ -51,20 +51,20 @@
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter ECOs</h6>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.search_keywords') }}</label>
                                 <x-ui.odoo-form-ui type="input" name="search" placeholder="Search ECO number or title..." value="{{ request('search') }}" />
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.status') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="status">
-                                    <option value="">All Statuses</option>
-                                    <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
+                                    <option value="">{{ __('production.all_statuses') }}</option>
+                                    <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>{{ __('production.draft_schedules') }}</option>
                                     <option value="under_review" {{ request('status') == 'under_review' ? 'selected' : '' }}>Under Review</option>
-                                    <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Approved</option>
-                                    <option value="released" {{ request('status') == 'released' ? 'selected' : '' }}>Released</option>
-                                    <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>Rejected</option>
-                                    <option value="closed" {{ request('status') == 'closed' ? 'selected' : '' }}>Closed</option>
+                                    <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>{{ __('production.approved') }}</option>
+                                    <option value="released" {{ request('status') == 'released' ? 'selected' : '' }}>{{ __('production.released_schedules') }}</option>
+                                    <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>{{ __('production.rejected') }}</option>
+                                    <option value="closed" {{ request('status') == 'closed' ? 'selected' : '' }}>{{ __('production.closed') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
@@ -79,8 +79,8 @@
                             </div>
 
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('production.ecos.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                                <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                                <a href="{{ route('production.ecos.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
+                                <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
                             </div>
                         </x-ui.filter>
                     </form>
@@ -94,11 +94,11 @@
                 <tr>
                     <th style="width: 15%">ECO Number</th>
                     <th style="width: 25%">Title</th>
-                    <th style="width: 15%">Product</th>
+                    <th style="width: 15%">{{ __('production.product') }}</th>
                     <th style="width: 12%">Change Type</th>
                     <th style="width: 18%">Revisions</th>
-                    <th style="width: 10%">Status</th>
-                    <th style="width: 5%" class="text-end">Actions</th>
+                    <th style="width: 10%">{{ __('production.status') }}</th>
+                    <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -122,15 +122,15 @@
                         </td>
                         <td>
                             @if($eco->status === 'draft')
-                                <span class="badge bg-soft-secondary text-secondary">Draft</span>
+                                <span class="badge bg-soft-secondary text-secondary">{{ __('production.draft_schedules') }}</span>
                             @elseif($eco->status === 'under_review')
                                 <span class="badge bg-soft-warning text-warning">Under Review</span>
                             @elseif($eco->status === 'approved')
-                                <span class="badge bg-soft-primary text-primary">Approved</span>
+                                <span class="badge bg-soft-primary text-primary">{{ __('production.approved') }}</span>
                             @elseif($eco->status === 'released')
-                                <span class="badge bg-soft-success text-success">Released</span>
+                                <span class="badge bg-soft-success text-success">{{ __('production.released_schedules') }}</span>
                             @elseif($eco->status === 'rejected')
-                                <span class="badge bg-soft-danger text-danger">Rejected</span>
+                                <span class="badge bg-soft-danger text-danger">{{ __('production.rejected') }}</span>
                             @else
                                 <span class="badge bg-soft-light text-dark">{{ $eco->status }}</span>
                             @endif

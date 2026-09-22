@@ -48,9 +48,9 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Production Order</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.production_order') }}</label>
                             <x-ui.odoo-form-ui type="select" name="production_order_id">
-                                <option value="">All Production Orders</option>
+                                <option value="">{{ __('production.all_production_orders') }}</option>
                                 @foreach($orders as $ord)
                                     <option value="{{ $ord->id }}" {{ request('production_order_id') == $ord->id ? 'selected' : '' }}>
                                         {{ $ord->order_number }}{{ $ord->product ? ' — ' . $ord->product->name : '' }}
@@ -60,14 +60,14 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Operation Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.operation_status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="operation_status">
                                 <option value="">All Operation Statuses</option>
-                                <option value="ready" {{ request('operation_status') === 'ready' ? 'selected' : '' }}>Ready</option>
-                                <option value="waiting" {{ request('operation_status') === 'waiting' ? 'selected' : '' }}>Waiting</option>
-                                <option value="running" {{ request('operation_status') === 'running' ? 'selected' : '' }}>Running</option>
-                                <option value="paused" {{ request('operation_status') === 'paused' ? 'selected' : '' }}>Paused</option>
-                                <option value="completed" {{ request('operation_status') === 'completed' ? 'selected' : '' }}>Completed</option>
+                                <option value="ready" {{ request('operation_status') === 'ready' ? 'selected' : '' }}>{{ __('production.ready') }}</option>
+                                <option value="waiting" {{ request('operation_status') === 'waiting' ? 'selected' : '' }}>{{ __('production.waiting') }}</option>
+                                <option value="running" {{ request('operation_status') === 'running' ? 'selected' : '' }}>{{ __('production.running') }}</option>
+                                <option value="paused" {{ request('operation_status') === 'paused' ? 'selected' : '' }}>{{ __('production.paused') }}</option>
+                                <option value="completed" {{ request('operation_status') === 'completed' ? 'selected' : '' }}>{{ __('production.completed_schedules') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
@@ -77,8 +77,8 @@
                                 <option value="">All Assignment Statuses</option>
                                 <option value="assigned" {{ request('assignment_status') === 'assigned' ? 'selected' : '' }}>Pending Acceptance</option>
                                 <option value="accepted" {{ request('assignment_status') === 'accepted' ? 'selected' : '' }}>Accepted</option>
-                                <option value="rejected" {{ request('assignment_status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
-                                <option value="completed" {{ request('assignment_status') === 'completed' ? 'selected' : '' }}>Completed</option>
+                                <option value="rejected" {{ request('assignment_status') === 'rejected' ? 'selected' : '' }}>{{ __('production.rejected') }}</option>
+                                <option value="completed" {{ request('assignment_status') === 'completed' ? 'selected' : '' }}>{{ __('production.completed_schedules') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
@@ -94,16 +94,14 @@
                 </form>
 
                 @if($hasFilters)
-                    <x-ui.button href="{{ route('production.mes.operator.my-operations') }}" variant="light" icon="feather-x" class="border text-danger">
-                        Reset
-                    </x-ui.button>
+                    <x-ui.button href="{{ route('production.mes.operator.my-operations') }}" variant="light" icon="feather-x" class="border text-danger">{{ __('production.reset') }}</x-ui.button>
                 @endif
             </div>
         </div>
 
         @if($hasFilters)
             <div class="d-flex flex-wrap align-items-center gap-2 mb-3 pb-2 border-bottom">
-                <span class="fs-12 text-muted fw-semibold">Active Filters:</span>
+                <span class="fs-12 text-muted fw-semibold">{{ __('production.active_filters') }}</span>
                 @if(request('search'))
                     <span class="badge bg-soft-primary text-primary">Keyword: "{{ request('search') }}"</span>
                 @endif
@@ -233,7 +231,7 @@
                                         <div class="d-flex align-items-center gap-3 ms-md-auto flex-wrap">
                                             <!-- Operation Status (Fixed Column / Position) -->
                                             <div class="text-start" style="min-width: 110px;">
-                                                <span class="fs-10 text-muted text-uppercase fw-bold d-block mb-1">Operation</span>
+                                                <span class="fs-10 text-muted text-uppercase fw-bold d-block mb-1">{{ __('production.operation') }}</span>
                                                 <span class="badge {{ $opStatusBadge['class'] }} font-monospace text-uppercase fs-11 px-2.5 py-1.5 d-inline-flex align-items-center gap-1">
                                                     <i class="{{ $opStatusBadge['icon'] }}"></i> {{ $opStatus }}
                                                 </span>
@@ -252,12 +250,10 @@
                                                     </span>
                                                 @elseif($assign->status === 'rejected')
                                                     <span class="badge bg-soft-danger text-danger border border-danger-subtle px-2.5 py-1.5 d-inline-flex align-items-center gap-1 fs-11 fw-bold">
-                                                        <i class="feather-x-circle"></i> Rejected
-                                                    </span>
+                                                        <i class="feather-x-circle"></i>{{ __('production.rejected') }}</span>
                                                 @else
                                                     <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle px-2.5 py-1.5 d-inline-flex align-items-center gap-1 fs-11">
-                                                        <i class="feather-check"></i> Completed
-                                                    </span>
+                                                        <i class="feather-check"></i>{{ __('production.completed_schedules') }}</span>
                                                 @endif
                                             </div>
 
@@ -274,9 +270,7 @@
                                                     </form>
                                                 @elseif($assign->status === 'accepted')
                                                     @if($assign->operation && $assign->operation->status === 'completed')
-                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="secondary" icon="feather-eye" class="px-3 py-1 fs-12">
-                                                            View
-                                                        </x-ui.button>
+                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="secondary" icon="feather-eye" class="px-3 py-1 fs-12">{{ __('production.view') }}</x-ui.button>
                                                     @else
                                                         <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="primary" icon="feather-play" class="px-3 py-1 fs-12">
                                                             Execute
@@ -304,9 +298,7 @@
                             @endif
                         </p>
                         @if($hasFilters)
-                            <x-ui.button href="{{ route('production.mes.operator.my-operations') }}" variant="light" class="border">
-                                Clear Filters
-                            </x-ui.button>
+                            <x-ui.button href="{{ route('production.mes.operator.my-operations') }}" variant="light" class="border">{{ __('production.clear_filters') }}</x-ui.button>
                         @endif
                     </div>
                 </div>

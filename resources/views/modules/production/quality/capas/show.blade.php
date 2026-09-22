@@ -6,8 +6,7 @@
 
 @section('page-actions')
     <a href="{{ route('production.capas.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-arrow-left me-2"></i>Back to List
-    </a>
+        <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}</a>
 @endsection
 
 @section('content')
@@ -88,7 +87,7 @@
                                         <input type="text" name="fishbone[method]" class="form-control form-control-sm" placeholder="Method checks" required>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fs-11 text-muted mb-0">Machine</label>
+                                        <label class="form-label fs-11 text-muted mb-0">{{ __('production.col_machine') }}</label>
                                         <input type="text" name="fishbone[machine]" class="form-control form-control-sm" placeholder="Equipment status" required>
                                     </div>
                                     <div class="col-md-4">

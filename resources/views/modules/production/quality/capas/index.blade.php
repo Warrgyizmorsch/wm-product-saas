@@ -25,10 +25,10 @@
                 @endphp
                 <x-ui.sort-dropdown label="Sort">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Newest First</span>
+                        <span>{{ __('production.sort_newest_first') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Oldest First</span>
+                        <span>{{ __('production.sort_oldest_first') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'target_date', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'target_date' && $sortOrder === 'asc' ? 'active' : '' }}">
@@ -42,15 +42,15 @@
                 <!-- Custom Filter Component -->
                 <form method="GET" action="{{ route('production.capas.index') }}" class="d-inline">
                     <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i>{{ __('production.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.search_keywords') }}</label>
                             <x-ui.input name="search" placeholder="Search CAPA number or action..." value="{{ request('search') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.status') }}</label>
                             <x-ui.select name="status" :options="[
                                 '' => 'All Statuses',
                                 'draft' => 'Draft / Investigation Pending',
@@ -61,8 +61,8 @@
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('production.capas.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('production.capas.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -76,9 +76,9 @@
                     <th style="width: 15%">CAPA Number</th>
                     <th style="width: 25%">Linked NCR</th>
                     <th style="width: 25%">Action Owner</th>
-                    <th style="width: 15%">Status</th>
-                    <th style="width: 15%">Target Date</th>
-                    <th class="text-end" style="width: 5%">Actions</th>
+                    <th style="width: 15%">{{ __('production.status') }}</th>
+                    <th style="width: 15%">{{ __('production.target_date') }}</th>
+                    <th class="text-end" style="width: 5%">{{ __('production.actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -101,9 +101,9 @@
                         <td class="text-dark fw-medium">{{ $capa->owner->name ?? '—' }}</td>
                         <td>
                             @if($capa->status === 'closed')
-                                <span class="erp-badge-active">Closed</span>
+                                <span class="erp-badge-active">{{ __('production.closed') }}</span>
                             @elseif($capa->status === 'active')
-                                <span class="erp-badge-pending">Active</span>
+                                <span class="erp-badge-pending">{{ __('production.status_active') }}</span>
                             @else
                                 <span class="erp-badge-draft text-uppercase">{{ $capa->status }}</span>
                             @endif

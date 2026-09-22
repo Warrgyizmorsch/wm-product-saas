@@ -31,14 +31,12 @@
             <form action="{{ route('production.maintenance.work-orders.cancel', $workOrder->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Cancel this work order?');">
                 @csrf
                 <button type="submit" class="btn btn-outline-danger">
-                    <i class="feather-x me-2"></i>Cancel
-                </button>
+                    <i class="feather-x me-2"></i>{{ __('production.cancel') }}</button>
             </form>
         @endif
 
         <a href="{{ route('production.maintenance.work-orders.index') }}" class="btn btn-light border">
-            <i class="feather-arrow-left me-2"></i>Back to List
-        </a>
+            <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}</a>
     </div>
 @endsection
 
@@ -128,12 +126,12 @@
                                 <thead class="bg-light text-muted">
                                     <tr>
                                         <th>Product / Component</th>
-                                        <th>Warehouse</th>
+                                        <th>{{ __('production.warehouse') }}</th>
                                         <th class="text-center">Requested</th>
                                         <th class="text-center">Issued</th>
-                                        <th class="text-end">Unit Cost</th>
-                                        <th class="text-end">Total Cost</th>
-                                        <th class="text-end">Action</th>
+                                        <th class="text-end">{{ __('production.unit_cost') }}</th>
+                                        <th class="text-end">{{ __('production.total_cost') }}</th>
+                                        <th class="text-end">{{ __('production.action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -183,7 +181,7 @@
                     </div>
                     <div class="card-body p-3 fs-13">
                         <div class="mb-3">
-                            <span class="text-muted d-block fs-12">Planned Window</span>
+                            <span class="text-muted d-block fs-12">{{ __('production.planned_window') }}</span>
                             <strong>{{ $workOrder->planned_start ? $workOrder->planned_start->format('Y-m-d H:i') : 'Not Scheduled' }}</strong>
                             <span class="text-muted">to</span>
                             <strong>{{ $workOrder->planned_end ? $workOrder->planned_end->format('H:i') : '' }}</strong>

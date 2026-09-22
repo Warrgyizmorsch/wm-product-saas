@@ -20,16 +20,16 @@
             <div class="d-flex gap-2 ms-auto">
                 <form method="GET" action="{{ route('production.calendars.index') }}" class="d-inline">
                     <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i>{{ __('production.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.search_keywords') }}</label>
                             <x-ui.input name="search" placeholder="Search by calendar name..." value="{{ request('search') }}" />
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('production.calendars.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('production.calendars.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -43,7 +43,7 @@
                     <th style="width: 35%">Calendar Name</th>
                     <th style="width: 45%">Working Days</th>
                     <th style="width: 15%">Default Calendar</th>
-                    <th class="text-end" style="width: 5%">Actions</th>
+                    <th class="text-end" style="width: 5%">{{ __('production.actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -97,8 +97,7 @@
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="dropdown-item text-danger">
-                                            <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Permanent
-                                        </button>
+                                            <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('production.delete_permanent') }}</button>
                                     </form>
                                 </li>
                             </x-ui.action-dropdown>

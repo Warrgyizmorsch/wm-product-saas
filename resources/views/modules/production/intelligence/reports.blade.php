@@ -252,6 +252,71 @@
                     </form>
                 </x-ui.card>
             </div>
+            {{-- Production Order Detail (Job Card / Shop Traveler) --}}
+            <div class="col-md-4">
+                <x-ui.card class="border border-light shadow-sm h-100 touch-card">
+                    <div class="avatar-text avatar-lg bg-soft-dark text-dark rounded mb-3">
+                        <i class="feather-file-text"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark">Production Order Detail</h5>
+                    <p class="text-muted fs-13">Full job card for a single order — operation stages, work center locations, material consumption, scrap events, and live WIP position.</p>
+
+                    <form method="GET" action="{{ route('production.intelligence.reports.show', 'order-detail') }}" target="_blank" class="mt-3 fs-13 text-dark report-form">
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="select" label="Production Order" name="order_id" :required="true">
+                                <option value="">— Select an Order —</option>
+                                @foreach($orders as $ord)
+                                    <option value="{{ $ord->id }}">{{ $ord->order_number }}</option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="d-flex gap-2 mt-4">
+                            <x-ui.button type="submit" onclick="if(!this.form.order_id.value){alert('Please select an order first.');return false;}this.form.action='{{ route('production.intelligence.reports.show', 'order-detail') }}'; this.form.target='_blank';" variant="primary" class="flex-fill">View Report</x-ui.button>
+                            <x-ui.button type="submit" onclick="if(!this.form.order_id.value){alert('Please select an order first.');return false;}this.form.action='{{ route('production.intelligence.reports.show', 'order-detail') }}'; this.form.target='_blank';" name="print" value="1" variant="light" class="border" title="Print"><i class="feather-printer"></i></x-ui.button>
+                            <x-ui.button type="submit" onclick="if(!this.form.order_id.value){alert('Please select an order first.');return false;}this.form.action='{{ route('production.intelligence.reports.export', 'order-detail') }}'; this.form.target='_self';" variant="light" class="border" title="Export CSV"><i class="feather-download"></i></x-ui.button>
+                        </div>
+                    </form>
+                </x-ui.card>
+            </div>
+
+            {{-- Sales Order Tracking Report (Order-to-Delivery Pipeline) --}}
+            <div class="col-md-4">
+                <x-ui.card class="border border-light shadow-sm h-100 touch-card">
+                    <div class="avatar-text avatar-lg bg-soft-info text-info rounded mb-3">
+                        <i class="feather-activity"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark">Sales Order Tracking</h5>
+                    <p class="text-muted fs-13">End-to-end order fulfillment pipeline: Sales Order ➔ MO ➔ Requisition & Indent ➔ PO ➔ Dispatch & Delivery.</p>
+
+                    <form method="GET" action="{{ route('production.intelligence.reports.show', 'sales-order-tracking') }}" target="_blank" class="mt-3 fs-13 text-dark report-form">
+                        <input type="hidden" name="date_start" value="{{ request('date_start', now()->subMonths(3)->toDateString()) }}">
+                        <input type="hidden" name="date_end" value="{{ request('date_end', now()->toDateString()) }}">
+                        <div class="mb-2">
+                            <x-ui.odoo-form-ui type="select" label="Customer" name="customer_id">
+                                <option value="">All Customers</option>
+                                @foreach($customers as $c)
+                                    <option value="{{ $c->id }}">{{ $c->name }}</option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="select" label="SO Status" name="status">
+                                <option value="">All Statuses</option>
+                                <option value="Open">Open</option>
+                                <option value="Confirmed">Confirmed</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Partially Invoiced">Partially Invoiced</option>
+                                <option value="Completed">Completed</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="d-flex gap-2 mt-4">
+                            <x-ui.button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.show', 'sales-order-tracking') }}'; this.form.target='_blank';" variant="primary" class="flex-fill">View Report</x-ui.button>
+                            <x-ui.button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.show', 'sales-order-tracking') }}'; this.form.target='_blank';" name="print" value="1" variant="light" class="border" title="Print"><i class="feather-printer"></i></x-ui.button>
+                            <x-ui.button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.export', 'sales-order-tracking') }}'; this.form.target='_self';" variant="light" class="border" title="Export CSV"><i class="feather-download"></i></x-ui.button>
+                        </div>
+                    </form>
+                </x-ui.card>
+            </div>
         </div>
     </div>
 @endsection

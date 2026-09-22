@@ -26,8 +26,7 @@
 
 @section('page-actions')
     <a href="{{ route('production.scan-logs.export', request()->query()) }}" class="btn btn-success">
-        <i class="feather-download me-2"></i>Export CSV
-    </a>
+        <i class="feather-download me-2"></i>{{ __('production.export_csv') }}</a>
 @endsection
 
 @section('content')
@@ -66,7 +65,7 @@
                 {{-- Filter Overlay --}}
                 <form method="GET" action="{{ route('production.scan-logs.index') }}" class="d-inline">
                     <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i>{{ __('production.filter_options') }}</h6>
 
                         <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Device / Operator</label>
@@ -77,14 +76,14 @@
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Entity Type</label>
                             <x-ui.odoo-form-ui type="select" name="entity_type">
                                 <option value="">All Entities</option>
-                                <option value="order" @selected(request('entity_type') === 'order')>Production Order</option>
-                                <option value="batch" @selected(request('entity_type') === 'batch')>Batch</option>
-                                <option value="serial" @selected(request('entity_type') === 'serial')>Serial Number</option>
+                                <option value="order" @selected(request('entity_type') === 'order')>{{ __('production.production_order') }}</option>
+                                <option value="batch" @selected(request('entity_type') === 'batch')>{{ __('production.batch') }}</option>
+                                <option value="serial" @selected(request('entity_type') === 'serial')>{{ __('production.serial_number') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Operator</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.operator') }}</label>
                             <x-ui.odoo-form-ui type="select" name="scanned_by">
                                 <option value="">All Operators</option>
                                 @foreach($users as $user)
@@ -94,7 +93,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date Range</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_range') }}</label>
                             <div class="d-flex gap-2">
                                 <x-ui.odoo-form-ui type="input" name="date_start" value="{{ request('date_start') }}" />
                                 <x-ui.odoo-form-ui type="input" name="date_end" value="{{ request('date_end') }}" />
@@ -102,8 +101,8 @@
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('production.scan-logs.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('production.scan-logs.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -122,7 +121,7 @@
                         <th style="width: 15%">Scanned By</th>
                         <th style="width: 20%">Device Identifier</th>
                         <th style="width: 15%">Scan Timestamp</th>
-                        <th style="width: 5%" class="text-end">Actions</th>
+                        <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

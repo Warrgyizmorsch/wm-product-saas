@@ -89,7 +89,7 @@
 
     <div class="label-wrapper">
         <div class="label-header">
-            <span class="label-type">Product / SKU</span>
+            <span class="label-type">{{ __('production.product_sku') }}</span>
         </div>
 
         <div class="label-title">{{ $product->name }}</div>
