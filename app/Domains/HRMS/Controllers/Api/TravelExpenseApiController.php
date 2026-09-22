@@ -17,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class TravelExpenseApiController extends Controller
 {
@@ -1338,6 +1339,133 @@ class TravelExpenseApiController extends Controller
             'policy_name' => $policy ? $policy->name : null,
             'rules'       => $rules
         ], 'Employee active expense policy retrieved.');
+    }
+
+    // ==========================================
+    // EXPENSE CATEGORY MASTER APIs
+    // ==========================================
+
+    public function indexExpenseCategories(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $tenantId = current_tenant_id() ?? require_tenant_id();
+
+        $query = ExpenseCategory::where('tenant_id', $tenantId);
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->has('status') && $request->input('status') !== '') {
+            $query->where('status', filter_var($request->input('status'), FILTER_VALIDATE_BOOLEAN));
+        }
+
+        $categories = $query->orderBy('name', 'asc')->get()->map(function ($cat) {
+            return [
+                'id'          => $cat->id,
+                'name'        => $cat->name,
+                'code'        => $cat->code,
+                'description' => $cat->description,
+                'status'      => (bool) $cat->status,
+                'created_at'  => $cat->created_at?->toIso8601String(),
+            ];
+        });
+
+        return $this->sendSuccess($categories, 'Expense categories retrieved successfully.');
+    }
+
+    public function storeExpenseCategory(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $tenantId = current_tenant_id() ?? require_tenant_id();
+
+        $validated = $request->validate([
+            'name'        => 'required|string|max:255',
+            'code'        => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('expense_categories')->where('tenant_id', $tenantId),
+            ],
+            'description' => 'nullable|string|max:1000',
+            'status'      => 'nullable|boolean',
+        ]);
+
+        $validated['tenant_id'] = $tenantId;
+        $validated['status']    = $request->boolean('status', true);
+
+        $category = ExpenseCategory::create($validated);
+
+        return $this->sendSuccess($category, 'Expense category created successfully.', 201);
+    }
+
+    public function updateExpenseCategory(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $tenantId = current_tenant_id() ?? require_tenant_id();
+
+        $category = ExpenseCategory::where('tenant_id', $tenantId)->find($id);
+        if (!$category) {
+            return $this->sendError("Expense category with ID '{$id}' not found.", 404);
+        }
+
+        $validated = $request->validate([
+            'name'        => 'required|string|max:255',
+            'code'        => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('expense_categories')
+                    ->where('tenant_id', $tenantId)
+                    ->ignore($category->id),
+            ],
+            'description' => 'nullable|string|max:1000',
+            'status'      => 'nullable|boolean',
+        ]);
+
+        if ($request->has('status')) {
+            $validated['status'] = $request->boolean('status');
+        }
+
+        $category->update($validated);
+
+        return $this->sendSuccess($category, 'Expense category updated successfully.');
+    }
+
+    public function destroyExpenseCategory(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $tenantId = current_tenant_id() ?? require_tenant_id();
+
+        $category = ExpenseCategory::where('tenant_id', $tenantId)->find($id);
+        if (!$category) {
+            return $this->sendError("Expense category with ID '{$id}' not found.", 404);
+        }
+
+        if ($category->claims()->exists()) {
+            return $this->sendError("Cannot delete category '{$category->name}' because it has submitted expense claims.", 422);
+        }
+
+        $category->delete();
+
+        return $this->sendSuccess(['id' => (int) $id], 'Expense category deleted successfully.');
     }
 
     /**
