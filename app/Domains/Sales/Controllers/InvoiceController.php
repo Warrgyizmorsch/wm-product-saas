@@ -539,6 +539,14 @@ class InvoiceController extends Controller
 
         event(new InvoicePosted($invoice));
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.invoice.created', [
+            'doc_no' => $invoice->invoice_number,
+            'customer_name' => $invoice->customer?->name ?? 'Customer',
+            'amount' => number_format((float)$invoice->total_amount, 2),
+            'due_date' => $invoice->due_date ? (is_string($invoice->due_date) ? $invoice->due_date : $invoice->due_date->format('Y-m-d')) : 'N/A',
+            'created_by' => auth()->user()?->name ?? 'System',
+        ], $invoice->tenant_id ?? tenant_id() ?? 1, auth()->id());
+
         return redirect()->route('sales.invoices.show', $invoice->id)->with('success', "Invoice {$invoice->invoice_number} created successfully.");
     }
 

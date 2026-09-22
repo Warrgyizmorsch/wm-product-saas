@@ -108,7 +108,7 @@ class StockAdjustmentController extends Controller
             'items.*.unit_cost' => 'nullable|numeric|min:0',
         ]);
 
-        DB::transaction(function () use ($validated, $tenantId) {
+        $adjustment = DB::transaction(function () use ($validated, $tenantId) {
             $adjNumber = 'ADJ-' . strtoupper(uniqid());
 
             $adjustment = StockAdjustment::create([
@@ -140,7 +140,16 @@ class StockAdjustmentController extends Controller
                     'serial_numbers' => !empty($item['serial_numbers']) ? explode(',', $item['serial_numbers']) : null,
                 ]);
             }
+
+            return $adjustment;
         });
+
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('inventory.adjustment.pending', [
+            'doc_no' => $adjustment->adjustment_number,
+            'warehouse' => $adjustment->warehouse?->name ?? 'Warehouse',
+            'reason' => $adjustment->reason ?? 'Adjustment',
+            'created_by' => Auth::user()?->name ?? 'User',
+        ], $tenantId, Auth::id());
 
         return redirect()->route('inventory.adjustments.index')->with('success', 'Stock Adjustment Created successfully.');
     }

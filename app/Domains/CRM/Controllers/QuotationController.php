@@ -195,6 +195,13 @@ class QuotationController extends Controller
 
         $this->quotationService->handleQuotationStatusChange($quotation, $validated['status'], $leadId);
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('crm.quotation.created', [
+            'quotation_no' => $quotation->quotation_number,
+            'customer_name' => $quotation->customer?->name ?? $quotation->lead?->company_name ?? $quotation->deal?->account?->name ?? 'Customer',
+            'amount' => number_format((float)($quotation->grand_total ?? $quotation->total_amount ?? 0), 2),
+            'created_by' => auth()->user()?->name ?? 'User',
+        ], $quotation->tenant_id ?? tenant_id() ?? 1, auth()->id());
+
         if ($dealId) {
             return redirect()->route('crm.deals.show', ['deal' => $dealId, 'quotation_id' => $quotation->id])->with('success', 'Quotation successfully created!');
         }

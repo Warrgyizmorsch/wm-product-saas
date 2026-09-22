@@ -272,6 +272,13 @@ class PurchaseOrderController extends Controller
 
         $po = $this->orderService->storeOrder($validated, $tenantId);
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.order.created', [
+            'po_no' => $po->purchase_order_number ?? $po->po_number ?? 'PO-NEW',
+            'vendor_name' => $po->vendor?->name ?? 'Vendor',
+            'amount' => number_format((float)($po->grand_total ?? $po->total_amount ?? 0), 2),
+            'created_by' => auth()->user()?->name ?? 'User',
+        ], $tenantId, auth()->id());
+
         return redirect()->route('purchase.orders.show', $po->id)
             ->with('success', "Purchase Order {$po->po_number} created successfully.");
     }
@@ -346,6 +353,13 @@ class PurchaseOrderController extends Controller
         }
 
         $this->orderService->confirmOrder($order);
+
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.order.approved', [
+            'po_no' => $order->purchase_order_number ?? $order->po_number ?? 'PO',
+            'vendor_name' => $order->vendor?->name ?? 'Vendor',
+            'amount' => number_format((float)($order->grand_total ?? $order->total_amount ?? 0), 2),
+            'approved_by' => auth()->user()?->name ?? 'Approver',
+        ], $order->tenant_id ?? require_tenant_id(), auth()->id());
 
         return redirect()->back()->with('success', "Purchase Order {$order->purchase_order_number} has been approved successfully.");
     }
