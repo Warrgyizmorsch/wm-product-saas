@@ -9,10 +9,8 @@
 
 @section('content')
     {{-- Workflow Guide Component --}}
-    <x-ui.workflow-guide title="Interactive Dispatch Board & Planner Workspace">
-        Drag-and-drop schedule operations horizontally to adjust timing or vertically across machine swimlanes. The Laravel
-        backend enforces routing dependencies, overlap rules, machine qualifications, downtime collisions, optimistic
-        concurrency, and capacity leveling optimization.
+    <x-ui.workflow-guide :title="__('production.interactive_dispatch_board_title')">
+        {{ __('production.dispatch_board_workflow_guide') }}
     </x-ui.workflow-guide>
 
     <div class="erp-single-panel">

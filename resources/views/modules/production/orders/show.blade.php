@@ -173,14 +173,14 @@
                 {{-- Release & Plan Button (Enabled) --}}
                 <x-ui.button type="button" variant="success" icon="feather-play-circle" data-bs-toggle="modal"
                     data-bs-target="#scheduleModal">
-                    Release & Plan
+                    {{ __('production.release_and_plan') }}
                 </x-ui.button>
             @else
                 {{-- Release & Plan Button (Disabled until store issues raw materials) --}}
                 <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Material issue required: Store must issue raw materials (fully or partially) before releasing & planning order.">
+                    title="{{ __('production.material_issue_required_tooltip') }}">
                     <x-ui.button type="button" variant="secondary" icon="feather-lock" class="opacity-65" disabled>
-                        Release & Plan
+                        {{ __('production.release_and_plan') }}
                     </x-ui.button>
                 </span>
             @endif
@@ -289,12 +289,10 @@
 @section('content')
 
     {{-- ── Workflow Next Step Guidance Component (Placed outside panel, matching mockup) ── --}}
-    <x-ui.workflow-guide title="What's Next?">
+    <x-ui.workflow-guide :title="__('production.whats_next')">
         @if($order->isDraft())
-            Requisition request has been sent to Store. Track material issue under <a href="?tab=vtab-reservations"
-                class="fw-bold text-primary text-decoration-underline">Material Reservations</a>. Once items are issued by
-            Store, click <span class="badge bg-soft-success text-success border border-success-subtle fw-semibold">Release
-                Order</span>.
+            {{ __('production.requisition_sent_store_notice') }} <a href="?tab=vtab-reservations"
+                class="fw-bold text-primary text-decoration-underline">{{ __('production.material_status') }}</a>. {{ __('production.once_items_issued_click_release') }} <span class="badge bg-soft-success text-success border border-success-subtle fw-semibold">{{ __('production.release_order') }}</span>.
         @elseif($order->isReleased())
             @php
                 $existingSchedule = $order->schedules->whereNotIn('status', ['cancelled'])->first();
@@ -303,29 +301,26 @@
                 });
             @endphp
             @if($hasOperator)
-                Operators assigned to operations. You can see assigned operation tasks under <a
+                {{ __('production.operators_assigned_operations_notice') }} <a
                     href="{{ route('production.mes.operator.dashboard') }}"
-                    class="fw-bold text-primary text-decoration-underline">MES Operator Console</a>.
+                    class="fw-bold text-primary text-decoration-underline">{{ __('production.mes_operator_console') }}</a>.
             @elseif($existingSchedule)
-                The schedule <a href="{{ route('production.schedules.show', $existingSchedule->id) }}"
-                    class="fw-bold text-primary text-decoration-underline">[{{ $existingSchedule->schedule_number }}]</a> has been
-                generated for this order. You can assign operators under <a href="?tab=vtab-operations"
-                    class="fw-bold text-primary text-decoration-underline">Operations Routing Tab</a> to begin execution.
+                {{ __('production.the_schedule') }} <a href="{{ route('production.schedules.show', $existingSchedule->id) }}"
+                    class="fw-bold text-primary text-decoration-underline">[{{ $existingSchedule->schedule_number }}]</a> {{ __('production.schedule_generated_notice') }} <a href="?tab=vtab-operations"
+                    class="fw-bold text-primary text-decoration-underline">{{ __('production.operations_routing_tab') }}</a> {{ __('production.to_begin_execution') }}
             @else
-                Order released. Click <a href="javascript:void(0)" class="fw-bold text-primary text-decoration-underline"
-                    data-bs-toggle="modal" data-bs-target="#scheduleModal">{{ __('production.generate_schedule') }}</a> to plan work
-                centers.
+                {{ __('production.order_released_notice') }} <a href="javascript:void(0)" class="fw-bold text-primary text-decoration-underline"
+                    data-bs-toggle="modal" data-bs-target="#scheduleModal">{{ __('production.generate_schedule') }}</a> {{ __('production.to_plan_work_centers') }}
             @endif
         @elseif($order->isInProgress())
-            Production is active on shop floor. Track live progress in <a href="?tab=vtab-wip"
-                class="fw-bold text-primary text-decoration-underline">WIP Tracking</a> or <a
-                href="{{ route('production.mes.dashboard') }}" class="fw-bold text-primary text-decoration-underline">Shop Floor
-                (MES)</a>. Once finished goods are ready, log output & complete the order.
+            {{ __('production.production_active_shopfloor_notice') }} <a href="?tab=vtab-wip"
+                class="fw-bold text-primary text-decoration-underline">{{ __('production.wip_tracking') }}</a> {{ __('production.or') }} <a
+                href="{{ route('production.mes.dashboard') }}" class="fw-bold text-primary text-decoration-underline">{{ __('production.shop_floor_mes') }}</a>. {{ __('production.once_fg_ready_log_output') }}
         @elseif($order->isCompleted())
-            Order completed. Final output received. Review cost variances under <a href="?tab=vtab-cost"
-                class="fw-bold text-primary text-decoration-underline">Cost Analysis</a> and close the order when ready.
+            {{ __('production.order_completed_review_costs') }} <a href="?tab=vtab-cost"
+                class="fw-bold text-primary text-decoration-underline">{{ __('production.cost_analysis') }}</a> {{ __('production.close_order_when_ready') }}
         @else
-            Order Status: {{ ucfirst($order->status) }}
+            {{ __('production.order_status') }}: {{ ucfirst($order->status) }}
         @endif
     </x-ui.workflow-guide>
 
@@ -341,14 +336,13 @@
             <div class="d-flex align-items-center gap-2">
                 <i class="feather-alert-circle fs-18 text-warning-emphasis"></i>
                 <div>
-                    <strong class="text-warning-emphasis">Store Material Partially Issued:</strong>
-                    <span class="fs-13 text-dark">Raw materials for this Production Order have been partially issued by the
-                        store. Track issued and remaining items under <a href="?tab=vtab-procurement"
-                            class="fw-bold text-dark text-decoration-underline">Procurement & Requisitions</a>.</span>
+                    <strong class="text-warning-emphasis">{{ __('production.store_material_partially_issued') }}:</strong>
+                    <span class="fs-13 text-dark">{{ __('production.raw_materials_partially_issued_notice') }} <a href="?tab=vtab-procurement"
+                            class="fw-bold text-dark text-decoration-underline">{{ __('production.procurement_requisitions') }}</a>.</span>
                 </div>
             </div>
             <a href="?tab=vtab-procurement" class="btn btn-sm btn-warning text-dark fw-bold px-3 shadow-sm">
-                View Material Status
+                {{ __('production.view_material_status') }}
             </a>
         </div>
     @endif
@@ -364,16 +358,16 @@
                 @endphp
                 @if($model === 'subcontract_complete')
                     <span class="badge bg-soft-warning text-warning border border-warning-subtle ms-2"><i
-                            class="feather-truck me-1"></i>Complete Subcontracting</span>
+                            class="feather-truck me-1"></i>{{ __('production.complete_subcontracting') }}</span>
                 @elseif($model === 'subcontract_company_material')
                     <span class="badge bg-soft-primary text-primary border border-primary-subtle ms-2"><i
-                            class="feather-package me-1"></i>Company Material Subcontracting</span>
+                            class="feather-package me-1"></i>{{ __('production.company_material_subcontracting') }}</span>
                 @elseif($model === 'hybrid')
                     <span class="badge bg-soft-success text-success border border-success-subtle ms-2"><i
-                            class="feather-cpu me-1"></i>Hybrid Manufacturing + Subcontracting</span>
+                            class="feather-cpu me-1"></i>{{ __('production.hybrid_manufacturing_subcontracting') }}</span>
                 @else
                     <span class="badge bg-soft-info text-info border border-info-subtle ms-2"><i
-                            class="feather-settings me-1"></i>Pure Manufacturing</span>
+                            class="feather-settings me-1"></i>{{ __('production.pure_manufacturing') }}</span>
                 @endif
             </div>
             <div>
@@ -484,19 +478,19 @@
 
             $verticalTabs = [
                 // ── Mandatory Execution Tabs (Top Priority) ──────────────────────────
-                ['is_header' => true, 'header' => 'Mandatory Execution'],
+                ['is_header' => true, 'header' => __('production.mandatory_execution')],
                 ['id' => 'vtab-overview', 'label' => __('production.overview'), 'active' => $activeTab === 'vtab-overview', 'icon' => 'feather-activity'],
-                ['id' => 'vtab-readiness', 'label' => 'Production Readiness', 'active' => $activeTab === 'vtab-readiness', 'icon' => 'feather-check-circle'],
+                ['id' => 'vtab-readiness', 'label' => __('production.production_readiness'), 'active' => $activeTab === 'vtab-readiness', 'icon' => 'feather-check-circle'],
                 ['id' => 'vtab-operations', 'label' => __('production.operations_routing'), 'active' => $activeTab === 'vtab-operations', 'icon' => 'feather-cpu'],
                 ['id' => 'vtab-progress', 'label' => __('production.progress_logs'), 'active' => $activeTab === 'vtab-progress', 'icon' => 'feather-clock'],
                 ['id' => 'vtab-wip', 'label' => __('production.wip_tracking'), 'active' => $activeTab === 'vtab-wip', 'icon' => 'feather-layers'],
 
                 // ── Materials & Warehouse ──────────────────────────────────────────
-                ['is_header' => true, 'header' => 'Materials & Warehouse'],
-                ['id' => 'vtab-component-plan', 'label' => 'Component Plan', 'active' => $activeTab === 'vtab-component-plan', 'icon' => 'feather-grid'],
-                ['id' => 'vtab-reservations', 'label' => 'Material Status', 'active' => $activeTab === 'vtab-reservations', 'icon' => 'feather-archive'],
-                ['id' => 'vtab-issues', 'label' => 'Issued Materials', 'active' => $activeTab === 'vtab-issues', 'icon' => 'feather-arrow-up-right'],
-                ['id' => 'vtab-procurement', 'label' => 'Material Requisitions', 'active' => $activeTab === 'vtab-procurement', 'icon' => 'feather-shopping-cart'],
+                ['is_header' => true, 'header' => __('production.materials_and_warehouse')],
+                ['id' => 'vtab-component-plan', 'label' => __('production.component_plan'), 'active' => $activeTab === 'vtab-component-plan', 'icon' => 'feather-grid'],
+                ['id' => 'vtab-reservations', 'label' => __('production.material_status'), 'active' => $activeTab === 'vtab-reservations', 'icon' => 'feather-archive'],
+                ['id' => 'vtab-issues', 'label' => __('production.issued_materials'), 'active' => $activeTab === 'vtab-issues', 'icon' => 'feather-arrow-up-right'],
+                ['id' => 'vtab-procurement', 'label' => __('production.material_requisitions'), 'active' => $activeTab === 'vtab-procurement', 'icon' => 'feather-shopping-cart'],
             ];
 
             if ($order->production_mode === 'batch') {
@@ -508,18 +502,18 @@
             }
 
             // ── Quality & Subcontracting ───────────────────────────────────────
-            $verticalTabs[] = ['is_header' => true, 'header' => 'Quality & Subcontracting'];
+            $verticalTabs[] = ['is_header' => true, 'header' => __('production.quality_and_subcontracting')];
             $verticalTabs[] = ['id' => 'vtab-scrap', 'label' => __('production.scrap_rework'), 'active' => $activeTab === 'vtab-scrap', 'icon' => 'feather-alert-triangle'];
 
             if ($order->production_model !== 'pure_manufacturing' || $order->operations->contains('is_external', true)) {
-                $verticalTabs[] = ['id' => 'vtab-subcontract', 'label' => 'Subcontracting & Vendor WIP', 'active' => $activeTab === 'vtab-subcontract', 'icon' => 'feather-truck'];
+                $verticalTabs[] = ['id' => 'vtab-subcontract', 'label' => __('production.subcontracting_vendor_wip'), 'active' => $activeTab === 'vtab-subcontract', 'icon' => 'feather-truck'];
             }
 
             // ── Advanced Information & Analytics ──────────────────────────────
             $verticalTabs = array_merge($verticalTabs, [
-                ['is_header' => true, 'header' => 'Advanced Analytics & Audit'],
-                ['id' => 'vtab-variance', 'label' => 'Routing Variance', 'active' => $activeTab === 'vtab-variance', 'icon' => 'feather-bar-chart-2'],
-                ['id' => 'vtab-risk', 'label' => 'Planning Risk Analysis', 'active' => $activeTab === 'vtab-risk', 'icon' => 'feather-alert-circle'],
+                ['is_header' => true, 'header' => __('production.advanced_analytics_audit')],
+                ['id' => 'vtab-variance', 'label' => __('production.routing_variance'), 'active' => $activeTab === 'vtab-variance', 'icon' => 'feather-bar-chart-2'],
+                ['id' => 'vtab-risk', 'label' => __('production.planning_risk_analysis'), 'active' => $activeTab === 'vtab-risk', 'icon' => 'feather-alert-circle'],
                 ['id' => 'vtab-cost', 'label' => __('production.cost_analysis'), 'active' => $activeTab === 'vtab-cost', 'icon' => 'feather-pie-chart'],
                 ['id' => 'vtab-cost-adjustments', 'label' => __('production.cost_adjustments'), 'active' => $activeTab === 'vtab-cost-adjustments', 'icon' => 'feather-dollar-sign'],
                 ['id' => 'vtab-audit', 'label' => __('production.audit_trail_events'), 'active' => $activeTab === 'vtab-audit', 'icon' => 'feather-file-text'],
@@ -665,17 +659,17 @@
                             id="vtab-readiness" role="tabpanel" aria-labelledby="vtab-readiness-tab">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h5 class="fw-bold text-dark mb-0"><i
-                                        class="feather-shield-check me-2 text-primary"></i>Production Readiness Analysis</h5>
+                                        class="feather-shield-check me-2 text-primary"></i>{{ __('production.production_readiness_analysis') }}</h5>
                                 <div>
                                     @if(($readiness['overall_status'] ?? '') === 'READY')
                                         <span class="badge bg-success fs-13 px-3 py-2"><i
-                                                class="feather-check-circle me-1"></i>READY FOR PRODUCTION</span>
+                                                class="feather-check-circle me-1"></i>{{ __('production.ready_for_production') }}</span>
                                     @elseif(($readiness['overall_status'] ?? '') === 'PARTIALLY_READY')
                                         <span class="badge bg-warning text-dark fs-13 px-3 py-2"><i
-                                                class="feather-alert-circle me-1"></i>PARTIALLY READY</span>
+                                                class="feather-alert-circle me-1"></i>{{ __('production.partially_ready') }}</span>
                                     @else
                                         <span class="badge bg-danger fs-13 px-3 py-2"><i
-                                                class="feather-x-circle me-1"></i>BLOCKED</span>
+                                                class="feather-x-circle me-1"></i>{{ __('production.blocked') }}</span>
                                     @endif
                                 </div>
                             </div>
@@ -683,7 +677,7 @@
                             <div class="row g-3 mb-4">
                                 <div class="col-md-3">
                                     <div class="card border border-success-subtle bg-soft-success p-3 text-center">
-                                        <span class="text-success text-uppercase fs-11 fw-bold">Ready Operations</span>
+                                        <span class="text-success text-uppercase fs-11 fw-bold">{{ __('production.ready_operations') }}</span>
                                         <h3 class="fw-bold text-success mb-0 mt-1">
                                             {{ $readiness['ready_operations_count'] ?? 0 }}
                                         </h3>
@@ -691,7 +685,7 @@
                                 </div>
                                 <div class="col-md-3">
                                     <div class="card border border-info-subtle bg-soft-info p-3 text-center">
-                                        <span class="text-info text-uppercase fs-11 fw-bold">Sequential Waiting</span>
+                                        <span class="text-info text-uppercase fs-11 fw-bold">{{ __('production.sequential_waiting') }}</span>
                                         <h3 class="fw-bold text-info mb-0 mt-1">
                                             {{ $readiness['waiting_operations_count'] ?? 0 }}
                                         </h3>
@@ -699,7 +693,7 @@
                                 </div>
                                 <div class="col-md-3">
                                     <div class="card border border-warning-subtle bg-soft-warning p-3 text-center">
-                                        <span class="text-warning-emphasis text-uppercase fs-11 fw-bold">Partially Ready</span>
+                                        <span class="text-warning-emphasis text-uppercase fs-11 fw-bold">{{ __('production.partially_ready') }}</span>
                                         <h3 class="fw-bold text-warning-emphasis mb-0 mt-1">
                                             {{ $readiness['partial_operations_count'] ?? 0 }}
                                         </h3>
@@ -707,7 +701,7 @@
                                 </div>
                                 <div class="col-md-3">
                                     <div class="card border border-danger-subtle bg-soft-danger p-3 text-center">
-                                        <span class="text-danger text-uppercase fs-11 fw-bold">Actionable Blockers</span>
+                                        <span class="text-danger text-uppercase fs-11 fw-bold">{{ __('production.actionable_blockers') }}</span>
                                         <h3 class="fw-bold text-danger mb-0 mt-1">
                                             {{ $readiness['actionable_blockers_count'] ?? 0 }}
                                         </h3>
@@ -717,8 +711,7 @@
 
                             @if(!empty($readiness['actionable_blockers']))
                                 <div class="alert alert-danger border-danger mb-4">
-                                    <h6 class="fw-bold text-danger mb-2"><i class="feather-slash me-2"></i>Active Production
-                                        Blockers ({{ count($readiness['actionable_blockers']) }})</h6>
+                                    <h6 class="fw-bold text-danger mb-2"><i class="feather-slash me-2"></i>{{ __('production.active_production_blockers') }} ({{ count($readiness['actionable_blockers']) }})</h6>
                                     <ul class="mb-0 ps-3 fs-13 text-dark">
                                         @foreach($readiness['actionable_blockers'] as $b)
                                             <li class="mb-1">
@@ -732,12 +725,9 @@
                                 </div>
                             @elseif(!empty($readiness['workflow_dependencies']))
                                 <div class="alert alert-info border-info-subtle bg-soft-info mb-4">
-                                    <h6 class="fw-bold text-info mb-1"><i class="feather-check-circle me-2"></i>Initial Operations
-                                        Ready — Sequential Routing Progression Active</h6>
+                                    <h6 class="fw-bold text-info mb-1"><i class="feather-check-circle me-2"></i>{{ __('production.initial_operations_ready') }}</h6>
                                     <p class="fs-13 text-dark mb-0">
-                                        All initial operations have required raw materials and machine capacity ready. Downstream
-                                        assembly operations will unlock automatically as predecessor operations produce required SFG
-                                        components.
+                                        {{ __('production.initial_operations_ready_desc') }}
                                     </p>
                                 </div>
                             @endif
@@ -745,7 +735,7 @@
                             @if(!empty($readiness['warnings']))
                                 <div class="alert alert-warning border-warning mb-4">
                                     <h6 class="fw-bold text-warning-emphasis mb-2"><i
-                                            class="feather-alert-triangle me-2"></i>Readiness Warnings
+                                            class="feather-alert-triangle me-2"></i>{{ __('production.readiness_warnings') }}
                                         ({{ count($readiness['warnings']) }})</h6>
                                     <ul class="mb-0 ps-3 fs-13 text-dark">
                                         @foreach($readiness['warnings'] as $w)
@@ -757,76 +747,89 @@
                                 </div>
                             @endif
 
-                            <h6 class="fw-bold text-dark mb-3">Six Readiness Dimensions Breakdown</h6>
+                            <h6 class="fw-bold text-dark mb-3">{{ __('production.six_readiness_dimensions') }}</h6>
                             <div class="table-responsive">
                                 <table class="table table-bordered align-middle fs-12">
                                     <thead class="table-light">
                                         <tr>
-                                            <th style="width:5%">Seq</th>
-                                            <th style="width:20%">Operation</th>
-                                            <th style="width:12%">Material</th>
-                                            <th style="width:14%">Operation / WIP</th>
-                                            <th style="width:12%">Machine</th>
-                                            <th style="width:12%">Subcontract</th>
-                                            <th style="width:12%">Quality</th>
-                                            <th style="width:13%">Batch / Lot</th>
+                                            <th style="width:5%">{{ __('production.seq') }}</th>
+                                            <th style="width:20%">{{ __('production.operation') }}</th>
+                                            <th style="width:12%">{{ __('production.material') }}</th>
+                                            <th style="width:14%">{{ __('production.operation_wip') }}</th>
+                                            <th style="width:12%">{{ __('production.machine') }}</th>
+                                            <th style="width:12%">{{ __('production.subcontract') }}</th>
+                                            <th style="width:12%">{{ __('production.quality') }}</th>
+                                            <th style="width:13%">{{ __('production.batch_lot') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
+                                        @php
+                                            $formatDimStatus = function(?string $st) {
+                                                return match($st) {
+                                                    'READY' => __('production.ready'),
+                                                    'BLOCKED' => __('production.blocked'),
+                                                    'WAITING_PREDECESSOR' => __('production.waiting_predecessor'),
+                                                    'PARTIALLY_READY' => __('production.partially_ready'),
+                                                    'NOT_APPLICABLE', 'N/A' => __('production.not_applicable'),
+                                                    default => $st ?? __('production.not_applicable'),
+                                                };
+                                            };
+                                        @endphp
                                         @forelse(($readiness['operations'] ?? []) as $opEval)
                                             <tr>
                                                 <td class="fw-bold">{{ $opEval['sequence'] }}</td>
                                                 <td>
                                                     <div class="fw-bold text-dark">{{ $opEval['operation_name'] }}</div>
-                                                    <small class="text-muted">Target: {{ number_format($opEval['target_qty'], 2) }}
-                                                        | Ready: {{ number_format($opEval['ready_qty'], 2) }}</small>
+                                                    <small class="text-muted">{{ __('production.target') }}: {{ number_format($opEval['target_qty'], 2) }}
+                                                        | {{ __('production.ready') }}: {{ number_format($opEval['ready_qty'], 2) }}</small>
                                                 </td>
                                                 <td>
                                                     <span
                                                         class="badge {{ ($opEval['material']['status'] ?? '') === 'READY' ? 'bg-soft-success text-success' : 'bg-soft-danger text-danger' }}">
-                                                        {{ $opEval['material']['status'] ?? 'N/A' }}
+                                                        {{ $formatDimStatus($opEval['material']['status'] ?? null) }}
                                                     </span>
                                                 </td>
                                                 <td>
                                                     @if(($opEval['dependency']['status'] ?? '') === 'READY')
-                                                        <span class="badge bg-soft-success text-success">READY</span>
+                                                        <span class="badge bg-soft-success text-success">{{ __('production.ready') }}</span>
                                                     @elseif(($opEval['dependency']['status'] ?? '') === 'WAITING_PREDECESSOR')
                                                         <span class="badge bg-soft-info text-info"><i
-                                                                class="feather-clock me-1"></i>WAITING PREDECESSOR</span>
+                                                                class="feather-clock me-1"></i>{{ __('production.waiting_predecessor') }}</span>
+                                                    @elseif(($opEval['dependency']['status'] ?? '') === 'BLOCKED')
+                                                        <span class="badge bg-soft-danger text-danger">{{ __('production.blocked') }}</span>
                                                     @else
                                                         <span
-                                                            class="badge bg-soft-danger text-danger">{{ $opEval['dependency']['status'] ?? 'N/A' }}</span>
+                                                            class="badge bg-soft-danger text-danger">{{ $formatDimStatus($opEval['dependency']['status'] ?? null) }}</span>
                                                     @endif
                                                 </td>
                                                 <td>
                                                     <span
                                                         class="badge {{ ($opEval['machine']['status'] ?? '') === 'READY' ? 'bg-soft-success text-success' : 'bg-soft-danger text-danger' }}">
-                                                        {{ $opEval['machine']['status'] ?? 'N/A' }}
+                                                        {{ $formatDimStatus($opEval['machine']['status'] ?? null) }}
                                                     </span>
                                                 </td>
                                                 <td>
                                                     <span
                                                         class="badge {{ ($opEval['subcontract']['status'] ?? '') === 'READY' ? 'bg-soft-success text-success' : 'bg-soft-secondary text-muted' }}">
-                                                        {{ $opEval['subcontract']['status'] ?? 'N/A' }}
+                                                        {{ $formatDimStatus($opEval['subcontract']['status'] ?? null) }}
                                                     </span>
                                                 </td>
                                                 <td>
                                                     <span
                                                         class="badge {{ ($opEval['quality']['status'] ?? '') === 'READY' ? 'bg-soft-success text-success' : 'bg-soft-warning text-dark' }}">
-                                                        {{ $opEval['quality']['status'] ?? 'N/A' }}
+                                                        {{ $formatDimStatus($opEval['quality']['status'] ?? null) }}
                                                     </span>
                                                 </td>
                                                 <td>
                                                     <span
                                                         class="badge {{ ($opEval['tracking']['status'] ?? '') === 'READY' ? 'bg-soft-success text-success' : 'bg-soft-secondary text-muted' }}">
-                                                        {{ $opEval['tracking']['status'] ?? 'N/A' }}
+                                                        {{ $formatDimStatus($opEval['tracking']['status'] ?? null) }}
                                                     </span>
                                                 </td>
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="8" class="text-center text-muted py-3">No operation readiness details
-                                                    evaluated yet.</td>
+                                                <td colspan="8" class="text-center text-muted py-3">{{ __('production.no_operation_readiness_details') }}</td>
                                             </tr>
                                         @endforelse
                                     </tbody>
@@ -853,26 +856,25 @@
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <div>
                                         <h5 class="fw-bold text-dark mb-1"><i
-                                                class="feather-truck text-primary me-2"></i>Subcontracting & Vendor WIP Execution
+                                                class="feather-truck text-primary me-2"></i>{{ __('production.subcontracting_vendor_wip_execution') }}
                                         </h5>
-                                        <span class="fs-12 text-muted">Turnkey procurement, vendor dispatches, GRN receipts, quality
-                                            clearance, and subcontract costing.</span>
+                                        <span class="fs-12 text-muted">{{ __('production.subcontracting_execution_desc') }}</span>
                                     </div>
                                     <div class="d-flex gap-2">
                                         <x-ui.button href="{{ route('production.subcontract.delivery-challans.index') }}"
                                             variant="outline-info" icon="feather-truck me-1">
-                                            Delivery Challans
+                                            {{ __('production.delivery_challans') }}
                                         </x-ui.button>
                                         @if($canPurchase && \Illuminate\Support\Facades\Route::has('purchase.orders.index'))
                                             <x-ui.button href="{{ route('purchase.orders.index') }}" variant="outline-primary"
                                                 icon="feather-shopping-cart me-1">
-                                                Purchase Orders
+                                                {{ __('production.purchase_orders') }}
                                             </x-ui.button>
                                         @endif
                                         @if($canQuality && \Illuminate\Support\Facades\Route::has('production.quality.rework.index'))
                                             <x-ui.button href="{{ route('production.quality.rework.index') }}" variant="outline-warning"
                                                 icon="feather-shield me-1">
-                                                Quality & Rework
+                                                {{ __('production.quality_rework') }}
                                             </x-ui.button>
                                         @endif
                                     </div>
@@ -882,44 +884,43 @@
                                 <div class="row g-3 mb-4">
                                     <div class="col-md-3">
                                         <div class="card shadow-sm border p-3 bg-light h-100">
-                                            <span class="fs-11 text-uppercase text-muted fw-bold">Subcontract Model</span>
+                                            <span class="fs-11 text-uppercase text-muted fw-bold">{{ __('production.subcontract_model') }}</span>
                                             <div class="fs-14 fw-bold text-dark mt-1">
                                                 {{ str_replace('_', ' ', ucfirst($order->effective_production_model ?? $order->production_model ?? 'subcontract')) }}
                                             </div>
                                             <small
-                                                class="text-muted fs-11 mt-1">{{ $order->operations->where('is_external', true)->count() }}
-                                                outsourced step(s)</small>
+                                                class="text-muted fs-11 mt-1">{{ __('production.outsourced_steps_count', ['count' => $order->operations->where('is_external', true)->count()]) }}</small>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="card shadow-sm border p-3 bg-soft-primary h-100">
-                                            <span class="fs-11 text-uppercase text-primary fw-bold">Authoritative Cost</span>
+                                            <span class="fs-11 text-uppercase text-primary fw-bold">{{ __('production.authoritative_cost') }}</span>
                                             <div class="fs-18 fw-bold text-primary mt-1">
                                                 {{ format_currency($subcost['authoritative'] ?? 0) }}
                                             </div>
-                                            <small class="text-muted fs-11 mt-1">Lifecycle:
-                                                {{ ($subcost['actual'] ?? 0) > 0 ? 'Actual Vendor Bill' : (($subcost['committed'] ?? 0) > 0 ? 'PO Committed' : 'Routing Estimate') }}</small>
+                                            <small class="text-muted fs-11 mt-1">{{ __('production.lifecycle') }}:
+                                                {{ ($subcost['actual'] ?? 0) > 0 ? __('production.actual_vendor_bill') : (($subcost['committed'] ?? 0) > 0 ? __('production.po_committed') : __('production.routing_estimate')) }}</small>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="card shadow-sm border p-3 bg-light h-100">
-                                            <span class="fs-11 text-uppercase text-muted fw-bold">Cost Breakdown</span>
+                                            <span class="fs-11 text-uppercase text-muted fw-bold">{{ __('production.cost_breakdown') }}</span>
                                             <div class="fs-12 text-dark mt-1">
-                                                <div>Estimate: <strong>{{ format_currency($subcost['estimated'] ?? 0) }}</strong>
+                                                <div>{{ __('production.estimate') }}: <strong>{{ format_currency($subcost['estimated'] ?? 0) }}</strong>
                                                 </div>
-                                                <div>Committed: <strong>{{ format_currency($subcost['committed'] ?? 0) }}</strong>
+                                                <div>{{ __('production.committed') }}: <strong>{{ format_currency($subcost['committed'] ?? 0) }}</strong>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="card shadow-sm border p-3 bg-soft-warning h-100">
-                                            <span class="fs-11 text-uppercase text-warning fw-bold">Vendor WIP Status</span>
+                                            <span class="fs-11 text-uppercase text-warning fw-bold">{{ __('production.vendor_wip_status') }}</span>
                                             @php
                                                 $vendorWipUnits = $order->wips->where('currentRoutingOperation.is_external', true)->sum('quantity_available');
                                             @endphp
                                             <div class="fs-18 fw-bold text-dark mt-1">{{ number_format($vendorWipUnits, 2) }} <small
-                                                    class="fs-12 text-muted">units at vendor</small></div>
+                                                    class="fs-12 text-muted">{{ __('production.units_at_vendor') }}</small></div>
                                         </div>
                                     </div>
                                 </div>
@@ -927,25 +928,24 @@
                                 {{-- Outsourced Operations Table --}}
                                 <div class="card border shadow-sm mb-4">
                                     <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
-                                        <h6 class="fw-bold text-dark mb-0"><i class="feather-list me-1 text-primary"></i>Outsourced
-                                            Operations & Vendor Status</h6>
+                                        <h6 class="fw-bold text-dark mb-0"><i class="feather-list me-1 text-primary"></i>{{ __('production.outsourced_operations_vendor_status') }}</h6>
                                         <span
                                             class="badge bg-soft-secondary text-secondary fs-11">{{ $order->operations->where('is_external', true)->count() }}
-                                            Operation(s)</span>
+                                            {{ __('production.operations_count_suffix') }}</span>
                                     </div>
                                     <div class="table-responsive">
                                         <table class="table table-sm align-middle mb-0 fs-12 table-hover">
                                             <thead class="bg-light text-uppercase fs-11 text-muted">
                                                 <tr>
-                                                    <th>Op #</th>
-                                                    <th>Operation</th>
-                                                    <th>Vendor & Supply Type</th>
-                                                    <th>Lead & Buffers</th>
-                                                    <th>PR Reference</th>
-                                                    <th>PO Reference</th>
-                                                    <th>Timing (Planned / Actual)</th>
-                                                    <th>Quantity & QC Status</th>
-                                                    <th>Subcontract Cost</th>
+                                                    <th>{{ __('production.op_hash') }}</th>
+                                                    <th>{{ __('production.operation') }}</th>
+                                                    <th>{{ __('production.vendor_supply_type') }}</th>
+                                                    <th>{{ __('production.lead_and_buffers') }}</th>
+                                                    <th>{{ __('production.pr_reference') }}</th>
+                                                    <th>{{ __('production.po_reference') }}</th>
+                                                    <th>{{ __('production.timing_planned_actual') }}</th>
+                                                    <th>{{ __('production.quantity_qc_status') }}</th>
+                                                    <th>{{ __('production.subcontract_cost') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -980,28 +980,27 @@
                                                         </td>
                                                         <td class="align-top">
                                                             <div class="fw-bold text-dark"><i
-                                                                    class="feather-truck me-1 text-primary"></i>{{ $extOp->vendor->name ?? 'Subcontractor' }}
+                                                                    class="feather-truck me-1 text-primary"></i>{{ $extOp->vendor->name ?? __('production.subcontractor') }}
                                                             </div>
                                                             @if($extOp->isWipJobWork())
                                                                 <span
                                                                     class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 mt-1"><i
-                                                                        class="feather-layers me-1"></i>Previous Op WIP (Job Work)</span>
+                                                                        class="feather-layers me-1"></i>{{ __('production.previous_op_wip') }}</span>
                                                             @elseif(($extOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied')
                                                                 <span
                                                                     class="badge bg-soft-info text-info border border-info-subtle fs-10 mt-1"><i
-                                                                        class="feather-box me-1"></i>Vendor Supplied</span>
+                                                                        class="feather-box me-1"></i>{{ __('production.vendor_supplied') }}</span>
                                                             @else
                                                                 <span
                                                                     class="badge bg-soft-warning text-dark border border-warning-subtle fs-10 mt-1"><i
-                                                                        class="feather-truck me-1"></i>Company Supplied (Raw
-                                                                    Material)</span>
+                                                                        class="feather-truck me-1"></i>{{ __('production.company_supplied_raw') }}</span>
                                                             @endif
                                                         </td>
                                                         <td class="align-top font-monospace fs-11">
-                                                            <div>Lead: <strong>{{ $extOp->subcontract_lead_time_days ?? 0 }}d</strong>
+                                                            <div>{{ __('production.lead') }}: <strong>{{ $extOp->subcontract_lead_time_days ?? 0 }}d</strong>
                                                             </div>
-                                                            <div class="text-muted">Buffers: {{ $extOp->dispatch_buffer_days ?? 0 }}d
-                                                                disp / {{ $extOp->return_buffer_days ?? 0 }}d ret</div>
+                                                            <div class="text-muted">{{ __('production.buffers') }}: {{ $extOp->dispatch_buffer_days ?? 0 }}d
+                                                                {{ __('production.disp') }} / {{ $extOp->return_buffer_days ?? 0 }}d {{ __('production.ret') }}</div>
                                                         </td>
                                                         <td class="align-top">
                                                             @if($pr)
@@ -1018,7 +1017,7 @@
                                                                 </div>
                                                             @else
                                                                 <div class="mb-1"><span
-                                                                        class="badge bg-soft-secondary text-secondary">Awaiting PR</span>
+                                                                        class="badge bg-soft-secondary text-secondary">{{ __('production.awaiting_pr') }}</span>
                                                                 </div>
                                                                 @if($canPurchase && \Illuminate\Support\Facades\Route::has('production.orders.generate-subcontract-pr'))
                                                                     <form
@@ -1028,7 +1027,7 @@
                                                                         <button type="submit"
                                                                             class="btn btn-xs btn-outline-primary py-0.5 px-1.5 shadow-sm"
                                                                             title="Generate Purchase Requisition">
-                                                                            <i class="feather-plus-circle me-1"></i> Generate PR
+                                                                            <i class="feather-plus-circle me-1"></i> {{ __('production.generate_pr') }}
                                                                         </button>
                                                                     </form>
                                                                 @endif
@@ -1049,7 +1048,7 @@
                                                                         class="badge bg-soft-success text-success">{{ ucfirst($po->status) }}</span>
                                                                 </div>
                                                             @else
-                                                                <span class="text-muted fs-11">Awaiting PO</span>
+                                                                <span class="text-muted fs-11">{{ __('production.awaiting_po') }}</span>
                                                             @endif
                                                         </td>
                                                         <td class="align-top fs-11 font-monospace">
@@ -1057,44 +1056,44 @@
                                                                 $expectedReturnDate = $order->start_date ? \Carbon\Carbon::parse($order->start_date)->addDays(($extOp->subcontract_lead_time_days ?? 0) + ($extOp->return_buffer_days ?? 0)) : null;
                                                                 $isOverdue = $expectedReturnDate && $expectedReturnDate->isPast() && !in_array($extOp->status, ['completed', 'cancelled']);
                                                                 $isDueToday = $expectedReturnDate && $expectedReturnDate->isToday() && !in_array($extOp->status, ['completed', 'cancelled']);
-                                                             @endphp
-                                                            <div>Disp: {{ $plannedDispatch }} <small
+                                                            @endphp
+                                                            <div>{{ __('production.disp_label') }}: {{ $plannedDispatch }} <small
                                                                     class="text-muted">({{ $actualDispatch }})</small></div>
-                                                            <div>Ret: {{ $expectedReturn }} <small
+                                                            <div>{{ __('production.ret_label') }}: {{ $expectedReturn }} <small
                                                                     class="text-muted">({{ $actualReturn }})</small></div>
                                                             @if($isOverdue)
                                                                 <span class="badge bg-danger text-white fs-10 mt-1"
                                                                     title="Vendor return date exceeded expected lead time"><i
-                                                                        class="feather-alert-circle me-1"></i>Overdue</span>
+                                                                        class="feather-alert-circle me-1"></i>{{ __('production.overdue') }}</span>
                                                             @elseif($isDueToday)
                                                                 <span class="badge bg-warning text-dark fs-10 mt-1"
                                                                     title="Vendor return expected today"><i
-                                                                        class="feather-clock me-1"></i>Due Today</span>
+                                                                        class="feather-clock me-1"></i>{{ __('production.due_today') }}</span>
                                                             @elseif($extOp->status === 'completed')
                                                                 <span class="badge bg-soft-success text-success fs-10 mt-1"><i
-                                                                        class="feather-check-circle me-1"></i>On Time</span>
+                                                                        class="feather-check-circle me-1"></i>{{ __('production.on_time') }}</span>
                                                             @endif
                                                         </td>
                                                         <td class="align-top fs-11">
-                                                            <div>Req: <strong>{{ number_format($order->quantity_ordered, 2) }}</strong>
-                                                                | Rec: <strong class="text-success">{{ number_format($receivedQty, 2) }}
+                                                            <div>{{ __('production.req') }}: <strong>{{ number_format($order->quantity_ordered, 2) }}</strong>
+                                                                | {{ __('production.rec') }}: <strong class="text-success">{{ number_format($receivedQty, 2) }}
                                                                     / {{ number_format($order->quantity_ordered, 2) }}</strong></div>
-                                                            <div>At Vendor: <strong
+                                                            <div>{{ __('production.at_vendor_label') }}: <strong
                                                                     class="text-warning">{{ number_format($atVendorQty, 2) }}</strong> |
-                                                                QC Pend: <strong
+                                                                {{ __('production.qc_pend') }}: <strong
                                                                     class="text-info">{{ number_format($qcPending, 2) }}</strong></div>
                                                             @if($receivedQty > 0 && $receivedQty < $order->quantity_ordered)
                                                                 <div
                                                                     class="badge bg-soft-warning text-warning-emphasis border border-warning fs-10 mt-1">
-                                                                    Partial Receipt:
+                                                                    {{ __('production.partial_receipt') }}:
                                                                     {{ number_format($receivedQty, 0) }}/{{ number_format($order->quantity_ordered, 0) }}
-                                                                    units
+                                                                    {{ __('production.units') }}
                                                                 </div>
                                                             @endif
                                                             @if($rejectedQty > 0 || $scrappedQty > 0)
-                                                                <div class="text-danger fs-10 fw-bold mt-1">Accepted:
-                                                                    {{ number_format($receivedQty - $rejectedQty, 2) }} | Rej:
-                                                                    {{ number_format($rejectedQty, 2) }} | Scrap:
+                                                                <div class="text-danger fs-10 fw-bold mt-1">{{ __('production.accepted') }}:
+                                                                    {{ number_format($receivedQty - $rejectedQty, 2) }} | {{ __('production.rej') }}:
+                                                                    {{ number_format($rejectedQty, 2) }} | {{ __('production.scrap') }}:
                                                                     {{ number_format($scrappedQty, 2) }}
                                                                 </div>
                                                             @endif
@@ -1102,14 +1101,13 @@
                                                         <td class="align-top font-monospace fw-bold text-end">
                                                             {{ format_currency($extOp->subcontract_cost_per_unit * $order->quantity_ordered) }}
                                                             <div class="fs-10 text-muted">@
-                                                                {{ format_currency($extOp->subcontract_cost_per_unit) }}/unit
+                                                                {{ format_currency($extOp->subcontract_cost_per_unit) }}{{ __('production.per_unit') }}
                                                             </div>
                                                         </td>
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="9" class="text-center text-muted py-3">No outsourced operations
-                                                            defined on this order.</td>
+                                                        <td colspan="9" class="text-center text-muted py-3">{{ __('production.no_outsourced_ops_defined') }}</td>
                                                     </tr>
                                                 @endforelse
                                             </tbody>
@@ -1127,20 +1125,19 @@
                                 @if($hasCompanyMaterialOps || $order->production_model === 'subcontract_company_material' || $order->production_model === 'hybrid')
                                     <div class="card border shadow-sm mb-4">
                                         <div class="card-header bg-light py-2">
-                                            <h6 class="fw-bold text-dark mb-0"><i class="feather-box me-1 text-warning"></i>Company
-                                                Material Balance at Subcontractor</h6>
+                                            <h6 class="fw-bold text-dark mb-0"><i class="feather-box me-1 text-warning"></i>{{ __('production.company_material_balance_subcontractor') }}</h6>
                                         </div>
                                         <div class="table-responsive">
                                             <table class="table table-sm align-middle mb-0 fs-12">
                                                 <thead class="bg-light text-uppercase fs-11 text-muted">
                                                     <tr>
-                                                        <th>Operation</th>
-                                                        <th>Material / Item</th>
-                                                        <th class="text-end">Sent to Vendor</th>
-                                                        <th class="text-end">Consumed</th>
-                                                        <th class="text-end">Returned Unused</th>
-                                                        <th class="text-end">Scrapped</th>
-                                                        <th class="text-end">Remaining at Vendor</th>
+                                                        <th>{{ __('production.operation') }}</th>
+                                                        <th>{{ __('production.material_item') }}</th>
+                                                        <th class="text-end">{{ __('production.sent_to_vendor') }}</th>
+                                                        <th class="text-end">{{ __('production.consumed') }}</th>
+                                                        <th class="text-end">{{ __('production.returned_unused') }}</th>
+                                                        <th class="text-end">{{ __('production.scrapped') }}</th>
+                                                        <th class="text-end">{{ __('production.remaining_at_vendor') }}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1169,8 +1166,7 @@
                                                         </tr>
                                                     @empty
                                                         <tr>
-                                                            <td colspan="7" class="text-center text-muted py-3">No company material balance
-                                                                records found.</td>
+                                                            <td colspan="7" class="text-center text-muted py-3">{{ __('production.no_company_material_records') }}</td>
                                                         </tr>
                                                     @endforelse
                                                 </tbody>
@@ -1189,8 +1185,7 @@
                                     <h5 class="fw-bold text-dark mb-1"><i class="feather-layers text-primary me-2"></i>
                                         {{ __('production.wip_tracking_status') }}
                                     </h5>
-                                    <span class="fs-12 text-muted">Shop floor work center breakdown, batch progress tracking,
-                                        and accrued costing sheets.</span>
+                                    <span class="fs-12 text-muted">{{ __('production.wip_tracking_subtitle') }}</span>
                                 </div>
                             </div>
 
@@ -1199,7 +1194,7 @@
                                 <div class="row g-3 mb-4">
                                     <div class="col-md-3">
                                         <div class="card shadow-sm border-0 bg-light p-3">
-                                            <span class="fs-11 text-uppercase text-muted fw-bold">Active Shop Floor WIP</span>
+                                            <span class="fs-11 text-uppercase text-muted fw-bold">{{ __('production.active_shop_floor_wip') }}</span>
                                             <div class="fs-20 fw-bold text-dark mt-1">
                                                 {{ number_format($wipWorkCenterSummaries->sum('total_available'), 2) }} <small
                                                     class="fs-12 text-muted fw-normal">pcs</small>
@@ -1211,41 +1206,40 @@
                                     </div>
                                     <div class="col-md-3">
                                         <div class="card shadow-sm border-0 bg-soft-success p-3">
-                                            <span class="fs-11 text-uppercase text-success fw-bold">Completed Output (Ready)</span>
+                                            <span class="fs-11 text-uppercase text-success fw-bold">{{ __('production.completed_output_ready') }}</span>
                                             <div class="fs-20 fw-bold text-success mt-1">
                                                 {{ number_format($wipWorkCenterSummaries->sum('total_completed'), 2) }} <small
                                                     class="fs-12 text-success fw-normal">pcs</small>
                                             </div>
-                                            <small class="text-success fs-11 mt-1">Final stage output ready for FG transfer</small>
+                                            <small class="text-success fs-11 mt-1">{{ __('production.final_stage_output_fg_ready') }}</small>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="card shadow-sm border-0 bg-light p-3">
-                                            <span class="fs-11 text-uppercase text-muted fw-bold">Quality Scrapped / Rejected</span>
+                                            <span class="fs-11 text-uppercase text-muted fw-bold">{{ __('production.quality_scrapped_rejected') }}</span>
                                             <div class="fs-20 fw-bold text-danger mt-1">
                                                 {{ number_format($wipWorkCenterSummaries->sum('total_rejected'), 2) }} <small
                                                     class="fs-11 text-muted">rej</small> /
                                                 {{ number_format($wipWorkCenterSummaries->sum('total_scrap'), 2) }} <small
                                                     class="fs-11 text-muted">scrap</small>
                                             </div>
-                                            <small class="text-muted fs-11 mt-1">Defects logged across tracking cards</small>
+                                            <small class="text-muted fs-11 mt-1">{{ __('production.defects_logged_tracking_cards') }}</small>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="card shadow-sm border-0 bg-soft-primary p-3">
-                                            <span class="fs-11 text-uppercase text-primary fw-bold">Total Accrued WIP Value</span>
+                                            <span class="fs-11 text-uppercase text-primary fw-bold">{{ __('production.total_accrued_wip_value') }}</span>
                                             <div class="fs-20 fw-bold text-primary mt-1">
                                                 {{ format_currency($wipWorkCenterSummaries->sum('accrued_value')) }}
                                             </div>
-                                            <small class="text-primary fs-11 mt-1">Material + Labor + Machine + Overhead</small>
+                                            <small class="text-primary fs-11 mt-1">{{ __('production.accrued_cost_elements') }}</small>
                                         </div>
                                     </div>
                                 </div>
 
                                 {{-- Work Center Wise & Batch Wise Progress Tables --}}
                                 <div class="mb-4">
-                                    <h6 class="fw-bold text-dark mb-3"><i class="feather-grid me-2 text-primary"></i> Work Center &
-                                        Batch Tracking Progress</h6>
+                                    <h6 class="fw-bold text-dark mb-3"><i class="feather-grid me-2 text-primary"></i> {{ __('production.work_center_batch_progress') }}</h6>
 
                                     @foreach($wipWorkCenterSummaries as $s)
                                         @php
@@ -1274,17 +1268,17 @@
                                                 </div>
                                                 <div class="d-flex gap-3 text-end fs-12">
                                                     <div>
-                                                        <span class="text-muted">Floor Qty:</span>
+                                                        <span class="text-muted">{{ __('production.floor_qty') }}:</span>
                                                         <strong
                                                             class="text-dark me-2">{{ number_format($s['total_available'], 2) }}</strong>
                                                     </div>
                                                     <div>
-                                                        <span class="text-muted">Ready Output:</span>
+                                                        <span class="text-muted">{{ __('production.ready_output') }}:</span>
                                                         <strong
                                                             class="text-success me-2">{{ number_format($s['total_completed'], 2) }}</strong>
                                                     </div>
                                                     <div>
-                                                        <span class="text-muted">Total Cost:</span>
+                                                        <span class="text-muted">{{ __('production.total_cost') }}:</span>
                                                         <strong class="text-primary">{{ format_currency($s['accrued_value']) }}</strong>
                                                     </div>
                                                 </div>
@@ -1293,14 +1287,14 @@
                                                 <table class="table table-sm align-middle mb-0 fs-12">
                                                     <thead class="bg-light fs-11 text-muted text-uppercase">
                                                         <tr>
-                                                            <th>WIP Card #</th>
-                                                            <th>Batch #</th>
-                                                            <th>Current Stage</th>
-                                                            <th class="text-end">Available Qty</th>
-                                                            <th class="text-end">Completed Qty</th>
-                                                            <th class="text-end">WIP Value</th>
-                                                            <th>Status</th>
-                                                            <th class="text-end">Action</th>
+                                                            <th>{{ __('production.wip_card_hash') }}</th>
+                                                            <th>{{ __('production.batch_hash') }}</th>
+                                                            <th>{{ __('production.current_stage') }}</th>
+                                                            <th class="text-end">{{ __('production.available_qty') }}</th>
+                                                            <th class="text-end">{{ __('production.completed_qty') }}</th>
+                                                            <th class="text-end">{{ __('production.wip_value') }}</th>
+                                                            <th>{{ __('production.status') }}</th>
+                                                            <th class="text-end">{{ __('production.action') }}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody id="wc-batches-tbody-{{ $order->id }}-{{ $wcId }}">
@@ -1327,8 +1321,7 @@
                                 @endphp
                                 <div class="card shadow-sm border">
                                     <div class="card-header bg-light py-2 px-3">
-                                        <h6 class="fw-bold text-dark mb-0"><i class="feather-clock me-2 text-primary"></i> Order
-                                            Stage Movement & Cost Transaction Ledger</h6>
+                                        <h6 class="fw-bold text-dark mb-0"><i class="feather-clock me-2 text-primary"></i> {{ __('production.order_stage_movement_cost_ledger') }}</h6>
                                     </div>
                                     <div class="table-responsive">
                                         <table class="erp-thin-table mb-0">
@@ -1554,7 +1547,7 @@
                                             <th style="width:18%">{{ __('production.operation') }}</th>
                                             <th style="width:12%">{{ __('production.work_center') }}</th>
                                             <th style="width:10%">{{ __('production.machine') }}</th>
-                                            <th style="width:15%">Operator</th>
+                                            <th style="width:15%">{{ __('production.operator') }}</th>
                                             <th style="width:10%" class="text-center">{{ __('production.planned_setup_run') }}
                                             </th>
                                             <th style="width:10%" class="text-center">{{ __('production.actual_setup_run') }}
@@ -1578,26 +1571,26 @@
                                                     @if($opIsQcRequired)
                                                         <span class="badge bg-soft-info text-info border border-info-subtle ms-1"
                                                             title="Quality Check Required for this operation">
-                                                            <i class="feather-shield me-1"></i>QC Required
+                                                            <i class="feather-shield me-1"></i>{{ __('production.qc_required') }}
                                                         </span>
                                                     @endif
                                                     @if($op->sourceProduct && $op->source_product_id !== $order->product_id)
                                                         <span class="badge bg-soft-info text-info border border-info-subtle ms-1"><i
-                                                                class="feather-box me-1"></i>{{ $op->sourceProduct->name }} (Level
+                                                                class="feather-box me-1"></i>{{ $op->sourceProduct->name }} ({{ __('production.level') }}
                                                             {{ $op->bom_level ?? 1 }})</span>
                                                     @elseif($op->bom_level > 1)
-                                                        <span class="badge bg-soft-secondary text-secondary ms-1">Level
+                                                        <span class="badge bg-soft-secondary text-secondary ms-1">{{ __('production.level') }}
                                                             {{ $op->bom_level }}</span>
                                                     @endif
                                                     @if($op->is_external)
                                                         <span class="badge bg-soft-warning text-dark border border-warning ms-1"><i
-                                                                class="feather-external-link me-1"></i>Subcontract</span>
+                                                                class="feather-external-link me-1"></i>{{ __('production.subcontract') }}</span>
                                                         @if($op->purchaseOrder)
                                                             @if($op->purchaseOrder->status === 'Approved')
                                                                 <a href="{{ route('purchase.orders.show', $op->purchaseOrder->id) }}"
                                                                     class="badge bg-soft-success text-success border border-success-subtle text-decoration-none ms-1"
                                                                     title="Subcontract PO Approved">
-                                                                    <i class="feather-check-circle me-1"></i>PO Approved
+                                                                    <i class="feather-check-circle me-1"></i>{{ __('production.po_approved') }}
                                                                     (#{{ $op->purchaseOrder->purchase_order_number }})
                                                                 </a>
                                                             @else
@@ -1619,21 +1612,21 @@
                                                                         <a href="{{ route('production.subcontract.delivery-challans.show', $existingChallan->id) }}"
                                                                             class="badge bg-soft-warning text-dark border border-warning fs-10 text-decoration-none"
                                                                             title="Draft Gate Pass pending dispatch">
-                                                                            <i class="feather-clock me-1"></i>Draft Gate Pass
+                                                                            <i class="feather-clock me-1"></i>{{ __('production.draft_gate_pass') }}
                                                                             (#{{ $existingChallan->challan_number }})
                                                                         </a>
                                                                     @elseif($existingChallan->status === 'dispatched')
                                                                         <a href="{{ route('production.subcontract.delivery-challans.show', $existingChallan->id) }}"
                                                                             class="badge bg-soft-info text-info border border-info-subtle fs-10 text-decoration-none"
                                                                             title="Material Dispatched to Vendor">
-                                                                            <i class="feather-truck me-1"></i>Dispatched
+                                                                            <i class="feather-truck me-1"></i>{{ __('production.dispatched') }}
                                                                             (#{{ $existingChallan->challan_number }})
                                                                         </a>
                                                                     @else
                                                                         <a href="{{ route('production.subcontract.delivery-challans.show', $existingChallan->id) }}"
                                                                             class="badge bg-soft-success text-success border border-success-subtle fs-10 text-decoration-none"
                                                                             title="Delivery Challan Completed">
-                                                                            <i class="feather-check-circle me-1"></i>Challan Completed
+                                                                            <i class="feather-check-circle me-1"></i>{{ __('production.challan_completed') }}
                                                                             (#{{ $existingChallan->challan_number }})
                                                                         </a>
                                                                     @endif
@@ -1641,7 +1634,7 @@
                                                                     <a href="{{ route('production.subcontract.delivery-challans.create', ['production_order_id' => $order->id, 'operation_id' => $op->id]) }}"
                                                                         class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 text-decoration-none"
                                                                         title="Generate Subcontract Material Delivery Challan / Gate Pass to Vendor">
-                                                                        <i class="feather-truck me-1"></i>Dispatch Material (Delivery Challan)
+                                                                        <i class="feather-truck me-1"></i>{{ __('production.dispatch_material_challan') }}
                                                                     </a>
                                                                 @endif
                                                             </div>
@@ -1651,8 +1644,8 @@
                                                 <td>
                                                     @if($op->is_external)
                                                         <span class="fw-semibold text-dark"><i
-                                                                class="feather-truck me-1 text-primary"></i>{{ $op->vendor->name ?? 'Subcontract Vendor' }}</span>
-                                                        <div class="fs-10 text-muted">Lead: {{ $op->subcontract_lead_time_days ?? 0 }}d
+                                                                class="feather-truck me-1 text-primary"></i>{{ $op->vendor->name ?? __('production.subcontract_vendor') }}</span>
+                                                        <div class="fs-10 text-muted">{{ __('production.lead') }}: {{ $op->subcontract_lead_time_days ?? 0 }}d
                                                         </div>
                                                     @else
                                                         {{ $op->workCenter->name }}
@@ -1823,10 +1816,10 @@
                                                             class="text-primary">{{ $order->product->name ?? 'Finished Good' }}</span>
                                                     </div>
                                                     <div class="fs-12 text-muted">
-                                                        Finished Good Target: <strong
+                                                        {{ __('production.finished_good_target') }}: <strong
                                                             class="text-dark">{{ number_format($order->quantity_ordered, 2) }}
                                                             {{ $order->product?->uom?->code ?? 'units' }}</strong>
-                                                        <span class="mx-1">&bull;</span> Due:
+                                                        <span class="mx-1">&bull;</span> {{ __('production.due') }}:
                                                         <strong>{{ $order->due_date ? \Carbon\Carbon::parse($order->due_date)->format('d M Y') : 'N/A' }}</strong>
                                                     </div>
                                                 </div>
@@ -1843,30 +1836,27 @@
                                             <div class="row text-center g-2 fs-11">
                                                 <div class="col-3">
                                                     <div class="p-2 border rounded bg-white">
-                                                        <span class="text-muted d-block fs-10 text-uppercase fw-semibold">Total
-                                                            Operations</span>
+                                                        <span class="text-muted d-block fs-10 text-uppercase fw-semibold">{{ __('production.total_operations') }}</span>
                                                         <span class="fw-bold fs-13 text-dark">{{ $cTotalOps }}</span>
                                                     </div>
                                                 </div>
                                                 <div class="col-3">
                                                     <div class="p-2 border rounded bg-white">
                                                         <span
-                                                            class="text-muted d-block fs-10 text-uppercase fw-semibold">Completed</span>
+                                                            class="text-muted d-block fs-10 text-uppercase fw-semibold">{{ __('production.completed') }}</span>
                                                         <span class="fw-bold fs-13 text-success">{{ $cCompletedOps }}</span>
                                                     </div>
                                                 </div>
                                                 <div class="col-3">
                                                     <div class="p-2 border rounded bg-white">
-                                                        <span class="text-muted d-block fs-10 text-uppercase fw-semibold">Active
-                                                            / Running</span>
+                                                        <span class="text-muted d-block fs-10 text-uppercase fw-semibold">{{ __('production.active_running') }}</span>
                                                         <span class="fw-bold fs-13 text-primary">{{ $cRunningOps }}</span>
                                                     </div>
                                                 </div>
                                                 <div class="col-3">
                                                     <div class="p-2 border rounded bg-white">
                                                         <span
-                                                            class="text-muted d-block fs-10 text-uppercase fw-semibold">Routing
-                                                            Progress</span>
+                                                            class="text-muted d-block fs-10 text-uppercase fw-semibold">{{ __('production.routing_progress') }}</span>
                                                         <span class="fw-bold fs-13 text-info">{{ $cRoutingProgress }}%</span>
                                                     </div>
                                                 </div>
@@ -1908,19 +1898,18 @@
                                     <li class="nav-item" role="presentation">
                                         <button class="nav-link active py-1.5 px-3 fs-12 fw-bold rounded-2" id="cp-matrix-tab"
                                             data-bs-toggle="pill" data-bs-target="#cp-matrix-view" type="button" role="tab">
-                                            <i class="feather-grid me-1.5"></i> Component Plan Matrix
+                                            <i class="feather-grid me-1.5"></i> {{ __('production.component_plan_matrix') }}
                                         </button>
                                     </li>
                                     <li class="nav-item" role="presentation">
                                         <button class="nav-link py-1.5 px-3 fs-12 fw-bold rounded-2" id="cp-tree-tab"
                                             data-bs-toggle="pill" data-bs-target="#cp-tree-view" type="button" role="tab">
-                                            <i class="feather-list me-1.5"></i> Hierarchical Process & BOM Tree
+                                            <i class="feather-list me-1.5"></i> {{ __('production.hierarchical_bom_tree') }}
                                         </button>
                                     </li>
                                 </ul>
                                 <div class="fs-12 text-muted">
-                                    <i class="feather-info me-1 text-primary"></i> Process operations & component materials
-                                    mapped automatically via BOM & Routing
+                                    <i class="feather-info me-1 text-primary"></i> {{ __('production.bom_routing_auto_mapped_desc') }}
                                 </div>
                             </div>
 
@@ -1931,13 +1920,13 @@
                                         <x-ui.odoo-form-ui type="table">
                                             <thead class="bg-light text-uppercase fs-11 text-muted border-bottom">
                                                 <tr>
-                                                    <th style="width: 25%">Item / Component</th>
-                                                    <th style="width: 17%">Operation</th>
-                                                    <th style="width: 17%">Resource</th>
-                                                    <th style="width: 13%" class="text-end">Requirement</th>
-                                                    <th style="width: 12%">Schedule</th>
-                                                    <th style="width: 11%">Execution</th>
-                                                    <th style="width: 5%" class="text-center">Status</th>
+                                                    <th style="width: 25%">{{ __('production.item_component') }}</th>
+                                                    <th style="width: 17%">{{ __('production.operation') }}</th>
+                                                    <th style="width: 17%">{{ __('production.resource') }}</th>
+                                                    <th style="width: 13%" class="text-end">{{ __('production.requirement') }}</th>
+                                                    <th style="width: 12%">{{ __('production.schedule') }}</th>
+                                                    <th style="width: 11%">{{ __('production.execution') }}</th>
+                                                    <th style="width: 5%" class="text-center">{{ __('production.status') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -2402,7 +2391,7 @@
                         <div class="tab-pane fade {{ $activeTab === 'vtab-reservations' ? 'show active' : '' }}"
                             id="vtab-reservations" role="tabpanel" aria-labelledby="vtab-reservations-tab">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h5 class="fw-bold text-dark mb-0">Component Material Reservations & Store Requisitions</h5>
+                                <h5 class="fw-bold text-dark mb-0">{{ __('production.material_reservations_store_requisitions') }}</h5>
                                 @if(($order->isReleased() || $order->isInProgress()) && !$order->isCompleted() && !$order->isClosed() && !$order->isCancelled())
                                     <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal"
                                         data-bs-target="#requestAdditionalMaterialModal">
@@ -2423,11 +2412,11 @@
                                         default => 'bg-soft-warning text-warning border-warning'
                                     };
                                     $slipStatusText = match (true) {
-                                        in_array($latestStatusLower, ['fully issued', 'completed', 'issued']) => 'Fully Issued',
-                                        in_array($latestStatusLower, ['partially issued', 'partial']) => 'Partially Issued',
-                                        $latestStatusLower === 'reserved' => 'Reserved in Store',
-                                        $latestStatusLower === 'approved' => 'Approved - Store Preparing Material',
-                                        default => 'Pending Store Release'
+                                        in_array($latestStatusLower, ['fully issued', 'completed', 'issued']) => __('production.fully_issued'),
+                                        in_array($latestStatusLower, ['partially issued', 'partial']) => __('production.partially_issued'),
+                                        $latestStatusLower === 'reserved' => __('production.reserved_in_store'),
+                                        $latestStatusLower === 'approved' => __('production.approved_store_preparing'),
+                                        default => __('production.pending_store_release')
                                     };
                                 @endphp
                                 <div
@@ -2439,23 +2428,22 @@
                                         </div>
                                         <div>
                                             <div class="d-flex align-items-center gap-2">
-                                                <span class="fw-bold text-dark fs-13">Material Requisition Slip:</span>
+                                                <span class="fw-bold text-dark fs-13">{{ __('production.material_requisition_slip') }}:</span>
                                                 <span
                                                     class="font-monospace fw-bold text-primary fs-13">{{ $latestSlip->requisition_number }}</span>
                                                 <span
                                                     class="badge border {{ $slipBadge }} fs-10 px-2 py-0.5 text-uppercase ms-1">{{ $slipStatusText }}</span>
                                             </div>
-                                            <small class="text-muted">Requested on
+                                            <small class="text-muted">{{ __('production.requested_on') }}
                                                 {{ $latestSlip->requisition_date ? \Carbon\Carbon::parse($latestSlip->requisition_date)->format('d/m/Y') : $latestSlip->created_at->format('d/m/Y') }}
-                                                &bull; Store Requisition Request Sent</small>
+                                                &bull; {{ __('production.store_requisition_request_sent') }}</small>
                                         </div>
                                     </div>
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="text-end">
-                                            <span class="fs-11 text-muted d-block">Requested Components</span>
+                                            <span class="fs-11 text-muted d-block">{{ __('production.requested_components') }}</span>
                                             <span
-                                                class="fw-bold text-dark fs-13">{{ $order->reservations->pluck('product_id')->unique()->count() }}
-                                                items</span>
+                                                class="fw-bold text-dark fs-13">{{ __('production.items_count', ['count' => $order->reservations->pluck('product_id')->unique()->count()]) }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -2466,14 +2454,14 @@
                                     <thead>
                                         <tr>
                                             <th style="width:24%">{{ __('production.material_component') }}</th>
-                                            <th style="width:12%">Classification</th>
+                                            <th style="width:12%">{{ __('production.classification') }}</th>
                                             <th style="width:12%">{{ __('production.warehouse') }}</th>
                                             <th style="width:10%" class="text-center">{{ __('production.planned_qty') }}</th>
-                                            <th style="width:11%" class="text-center">Additional Req</th>
+                                            <th style="width:11%" class="text-center">{{ __('production.additional_req') }}</th>
                                             <th style="width:10%" class="text-center">{{ __('production.reserved_qty') }}</th>
                                             <th style="width:10%" class="text-center">{{ __('production.issued_qty') }}</th>
-                                            <th style="width:11%">Store Status</th>
-                                            <th style="width:5%">UOM</th>
+                                            <th style="width:11%">{{ __('production.store_status') }}</th>
+                                            <th style="width:5%">{{ __('production.uom') }}</th>
                                             <th style="width:5%" class="text-end">{{ __('production.actions') }}</th>
                                         </tr>
                                     </thead>
@@ -2496,19 +2484,19 @@
                                                 // Line level store status
                                                 if ($res->quantity_issued >= $totalDemand && $totalDemand > 0) {
                                                     $lineStatusBadge = 'bg-soft-success text-success';
-                                                    $lineStatusText = 'Issued';
+                                                    $lineStatusText = __('production.issued');
                                                 } elseif ($res->quantity_issued > 0) {
                                                     $lineStatusBadge = 'bg-soft-warning text-warning';
-                                                    $lineStatusText = 'Partially Issued';
+                                                    $lineStatusText = __('production.partially_issued');
                                                 } elseif ($res->quantity_reserved >= $totalDemand && $totalDemand > 0) {
                                                     $lineStatusBadge = 'bg-soft-info text-info';
-                                                    $lineStatusText = 'Reserved in Store';
+                                                    $lineStatusText = __('production.reserved_in_store');
                                                 } elseif ($res->quantity_reserved > 0) {
                                                     $lineStatusBadge = 'bg-soft-warning text-warning';
-                                                    $lineStatusText = 'Partial Reserved';
+                                                    $lineStatusText = __('production.partial_reserved');
                                                 } else {
                                                     $lineStatusBadge = 'bg-soft-danger text-danger';
-                                                    $lineStatusText = 'Store Request Sent';
+                                                    $lineStatusText = __('production.store_request_sent');
                                                 }
                                             @endphp
                                             <tr>
@@ -2525,11 +2513,11 @@
                                                     @if($isSemiFinished)
                                                         <span
                                                             class="badge bg-soft-primary text-primary border border-primary fs-10 fw-bold">
-                                                            <i class="feather-layers me-1"></i>Semi-Finished
+                                                            <i class="feather-layers me-1"></i>{{ __('production.semi_finished') }}
                                                         </span>
                                                     @else
                                                         <span class="badge bg-soft-secondary text-secondary fs-10">
-                                                            <i class="feather-box me-1"></i>Raw Material
+                                                            <i class="feather-box me-1"></i>{{ __('production.raw_material') }}
                                                         </span>
                                                     @endif
                                                 </td>
@@ -2618,12 +2606,12 @@
                                                 </td>
                                                 <td>
                                                     @if($iss->issue_type === 'standard')
-                                                        <span class="badge bg-light text-success border border-success">Standard</span>
+                                                        <span class="badge bg-light text-success border border-success">{{ __('production.standard') }}</span>
                                                     @elseif($iss->issue_type === 'additional')
                                                         <span
-                                                            class="badge bg-light text-warning border border-warning">Additional</span>
+                                                            class="badge bg-light text-warning border border-warning">{{ __('production.additional') }}</span>
                                                     @elseif($iss->issue_type === 'return')
-                                                        <span class="badge bg-light text-danger border border-danger">Return</span>
+                                                        <span class="badge bg-light text-danger border border-danger">{{ __('production.return') }}</span>
                                                     @else
                                                         <span class="badge bg-light text-dark">{{ $iss->issue_type }}</span>
                                                     @endif
@@ -2707,11 +2695,11 @@
                                                 </td>
                                                 <td>
                                                     @if($rec->quality_status === 'passed')
-                                                        <span class="badge bg-success text-white">Passed</span>
+                                                        <span class="badge bg-success text-white">{{ __('production.passed') }}</span>
                                                     @elseif($rec->quality_status === 'quarantine')
-                                                        <span class="badge bg-warning text-dark">Quarantine</span>
+                                                        <span class="badge bg-warning text-dark">{{ __('production.quarantine') }}</span>
                                                     @elseif($rec->quality_status === 'failed')
-                                                        <span class="badge bg-danger text-white">Failed</span>
+                                                        <span class="badge bg-danger text-white">{{ __('production.failed') }}</span>
                                                     @endif
                                                 </td>
                                                 <td>{{ $rec->user->name ?? 'System' }}</td>
@@ -2785,7 +2773,7 @@
                             role="tabpanel" aria-labelledby="vtab-scrap-tab">
                             {{-- Horizontal Sub-tabs Navigation --}}
                             <x-ui.horizontal-tabs id="scrapReworkSubTabs" class="mb-4" :tabs="[
-            ['id' => 'inspections-subtab', 'label' => 'Quality Inspections', 'active' => true, 'icon' => 'feather-shield-check text-primary'],
+            ['id' => 'inspections-subtab', 'label' => __('production.quality_inspections'), 'active' => true, 'icon' => 'feather-shield-check text-primary'],
             ['id' => 'scrap-subtab', 'label' => __('production.scrap_log_entries'), 'active' => false, 'icon' => 'feather-trash-2 text-danger'],
             ['id' => 'rework-subtab', 'label' => __('production.rework_events_track'), 'active' => false, 'icon' => 'feather-refresh-cw text-warning']
         ]" />
@@ -2801,25 +2789,25 @@
                                         <table class="erp-thin-table">
                                             <thead>
                                                 <tr>
-                                                    <th style="width:15%">Date & Time</th>
-                                                    <th style="width:20%">Inspection #</th>
-                                                    <th style="width:25%">Operation</th>
-                                                    <th style="width:10%" class="text-center">Inspected</th>
-                                                    <th style="width:10%" class="text-center">Passed</th>
-                                                    <th style="width:10%" class="text-center">Failed</th>
-                                                    <th style="width:10%">Result</th>
+                                                    <th style="width:15%">{{ __('production.date_time') }}</th>
+                                                    <th style="width:20%">{{ __('production.inspection_hash') }}</th>
+                                                    <th style="width:25%">{{ __('production.operation') }}</th>
+                                                    <th style="width:10%" class="text-center">{{ __('production.inspected') }}</th>
+                                                    <th style="width:10%" class="text-center">{{ __('production.passed') }}</th>
+                                                    <th style="width:10%" class="text-center">{{ __('production.failed') }}</th>
+                                                    <th style="width:10%">{{ __('production.result') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 @forelse($orderInspections as $insp)
                                                     <tr>
                                                         <td class="text-muted">
-                                                            {{ \Carbon\Carbon::parse($insp->inspected_at ?? $insp->created_at)->format('Y-m-d H:i') }}
+                                                             {{ \Carbon\Carbon::parse($insp->inspected_at ?? $insp->created_at)->format('Y-m-d H:i') }}
                                                         </td>
                                                         <td class="fw-bold font-monospace text-primary">
                                                             {{ $insp->inspection_number }}
                                                         </td>
-                                                        <td>{{ $insp->operation ? $insp->operation->name : 'Order Header' }}</td>
+                                                        <td>{{ $insp->operation ? $insp->operation->name : __('production.order_header') }}</td>
                                                         <td class="text-center fw-bold">
                                                             {{ number_format($insp->inspected_quantity, 0) }}
                                                         </td>
@@ -2831,18 +2819,17 @@
                                                         </td>
                                                         <td>
                                                             @if($insp->result === 'passed')
-                                                                <span class="badge bg-success text-white">Passed</span>
+                                                                <span class="badge bg-success text-white">{{ __('production.passed') }}</span>
                                                             @elseif($insp->result === 'partially_passed')
-                                                                <span class="badge bg-warning text-dark">Partially Passed</span>
+                                                                <span class="badge bg-warning text-dark">{{ __('production.partially_passed') }}</span>
                                                             @else
-                                                                <span class="badge bg-danger text-white">Failed</span>
+                                                                <span class="badge bg-danger text-white">{{ __('production.failed') }}</span>
                                                             @endif
                                                         </td>
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="7" class="text-center py-4 text-muted">No quality inspections
-                                                            recorded for this order yet.</td>
+                                                        <td colspan="7" class="text-center py-4 text-muted">{{ __('production.no_inspections_recorded') }}</td>
                                                     </tr>
                                                 @endforelse
                                             </tbody>
@@ -2861,7 +2848,7 @@
                                                     <th style="width:12%" class="text-center">{{ __('production.ordered_qty') }}
                                                     </th>
                                                     <th style="width:28%">{{ __('production.reason') }}</th>
-                                                    <th style="width:20%">Status</th>
+                                                    <th style="width:20%">{{ __('production.status') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -2888,9 +2875,9 @@
                                                             @endphp
                                                             @if($scr->disposal)
                                                                 @if($scr->disposal->status === 'approved')
-                                                                    <span class="badge bg-success text-white">Approved</span>
+                                                                    <span class="badge bg-success text-white">{{ __('production.approved') }}</span>
                                                                 @elseif($scr->disposal->status === 'pending_approval')
-                                                                    <span class="badge bg-warning text-dark">Pending Approval</span>
+                                                                    <span class="badge bg-warning text-dark">{{ __('production.pending_approval') }}</span>
                                                                 @else
                                                                     <span
                                                                         class="badge bg-secondary text-white">{{ ucfirst($scr->disposal->status) }}</span>
@@ -2898,18 +2885,17 @@
                                                             @elseif($scrRes && $scrRes->quantity_issued >= $totalDemand && $totalDemand > 0)
                                                                 <span
                                                                     class="badge bg-soft-success text-success border border-success-subtle fw-semibold fs-11">
-                                                                    <i class="feather-check-circle me-1"></i> Store Request Fulfilled
+                                                                    <i class="feather-check-circle me-1"></i> {{ __('production.store_request_fulfilled') }}
                                                                 </span>
                                                             @elseif($scrRes && $scrRes->quantity_issued > 0)
                                                                 <span
                                                                     class="badge bg-soft-info text-info border border-info-subtle fw-semibold fs-11">
-                                                                    <i class="feather-pie-chart me-1"></i> Store Request Partially
-                                                                    Fulfilled
+                                                                    <i class="feather-pie-chart me-1"></i> {{ __('production.store_request_partially_fulfilled') }}
                                                                 </span>
                                                             @else
                                                                 <span
                                                                     class="badge bg-soft-warning text-warning border border-warning-subtle fw-semibold fs-11">
-                                                                    <i class="feather-clock me-1"></i> Store Request Raised
+                                                                    <i class="feather-clock me-1"></i> {{ __('production.store_request_raised') }}
                                                                 </span>
                                                             @endif
                                                         </td>
@@ -2982,33 +2968,32 @@
                         <div class="tab-pane fade {{ $activeTab === 'vtab-variance' ? 'show active' : '' }}" id="vtab-variance"
                             role="tabpanel" aria-labelledby="vtab-variance-tab">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h5 class="fw-bold text-dark mb-0"><i class="feather-bar-chart-2 me-2 text-primary"></i>Routing
-                                    & Execution Variance</h5>
+                                <h5 class="fw-bold text-dark mb-0"><i class="feather-bar-chart-2 me-2 text-primary"></i>{{ __('production.routing_execution_variance') }}</h5>
                                 @if(!empty($varianceAnalysis['recommendations']))
                                     <span class="badge bg-soft-warning text-dark border border-warning-subtle px-2 py-1"><i
                                             class="feather-info me-1"></i>{{ count($varianceAnalysis['recommendations']) }}
-                                        Recommendations Found</span>
+                                        {{ __('production.recommendations_found') }}</span>
                                 @endif
                             </div>
 
                             <div class="row g-3 mb-4">
                                 <div class="col-md-3">
                                     <div class="bg-light rounded p-3 text-center border">
-                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Planned Quantity</span>
+                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.planned_quantity') }}</span>
                                         <span
                                             class="fw-bold text-dark fs-16">{{ number_format($varianceAnalysis['planned_quantity'] ?? $order->quantity_ordered, 2) }}</span>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="bg-light rounded p-3 text-center border">
-                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Actual Produced</span>
+                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.actual_produced') }}</span>
                                         <span
                                             class="fw-bold text-success fs-16">{{ number_format($varianceAnalysis['actual_quantity'] ?? $order->quantity_produced, 2) }}</span>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="bg-light rounded p-3 text-center border">
-                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Total Planned Runtime</span>
+                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.total_planned_runtime') }}</span>
                                         <span
                                             class="fw-bold text-dark fs-16">{{ number_format($varianceAnalysis['total_planned_runtime_minutes'] ?? 0, 1) }}
                                             min</span>
@@ -3016,7 +3001,7 @@
                                 </div>
                                 <div class="col-md-3">
                                     <div class="bg-light rounded p-3 text-center border">
-                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Total Actual Runtime</span>
+                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.total_actual_runtime') }}</span>
                                         <span
                                             class="fw-bold text-primary fs-16">{{ number_format($varianceAnalysis['total_actual_runtime_minutes'] ?? 0, 1) }}
                                             min</span>
@@ -3027,10 +3012,8 @@
                             @if(!empty($varianceAnalysis['recommendations']))
                                 <div class="card border border-warning bg-soft-warning mb-4">
                                     <div class="card-body p-3">
-                                        <h6 class="fw-bold text-warning-emphasis mb-2"><i class="feather-lightbulb me-2"></i>Routing
-                                            Master Data Recommendations</h6>
-                                        <p class="fs-12 text-dark mb-2">Recommendations do not automatically modify Production
-                                            master data. Draft ECO creation remains an explicit action.</p>
+                                        <h6 class="fw-bold text-warning-emphasis mb-2"><i class="feather-lightbulb me-2"></i>{{ __('production.routing_master_recommendations') }}</h6>
+                                        <p class="fs-12 text-dark mb-2">{{ __('production.routing_recommendations_desc') }}</p>
                                         <ul class="mb-0 ps-3 fs-13 text-dark">
                                             @foreach($varianceAnalysis['recommendations'] as $rec)
                                                 <li class="mb-1">
@@ -3038,7 +3021,7 @@
                                                     {{ $rec['message'] ?? $rec['reason'] ?? '' }}
                                                     @if(!empty($rec['action']) && $rec['action'] === 'CREATE_DRAFT_ECO')
                                                         <a href="{{ route('production.ecos.create', ['routing_id' => $order->routing_id]) }}"
-                                                            class="btn btn-xs btn-outline-primary ms-2 py-0 fs-11">Create Draft ECO</a>
+                                                            class="btn btn-xs btn-outline-primary ms-2 py-0 fs-11">{{ __('production.create_draft_eco') }}</a>
                                                     @endif
                                                 </li>
                                             @endforeach
@@ -3047,19 +3030,19 @@
                                 </div>
                             @endif
 
-                            <h6 class="fw-bold text-dark mb-3">Operation Level Variance Details</h6>
+                            <h6 class="fw-bold text-dark mb-3">{{ __('production.operation_variance_details') }}</h6>
                             <div class="table-responsive">
                                 <table class="table table-striped align-middle fs-12">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>Op #</th>
-                                            <th>Operation Name</th>
-                                            <th class="text-end">Planned Time</th>
-                                            <th class="text-end">Actual Time</th>
-                                            <th class="text-end">Time Variance</th>
-                                            <th class="text-end">Scrap Qty</th>
-                                            <th class="text-end">Rework Qty</th>
-                                            <th class="text-center">Execution Classification</th>
+                                            <th>{{ __('production.op_hash') }}</th>
+                                            <th>{{ __('production.operation_name') }}</th>
+                                            <th class="text-end">{{ __('production.planned_time') }}</th>
+                                            <th class="text-end">{{ __('production.actual_time') }}</th>
+                                            <th class="text-end">{{ __('production.time_variance') }}</th>
+                                            <th class="text-end">{{ __('production.scrap_qty') }}</th>
+                                            <th class="text-end">{{ __('production.rework_qty') }}</th>
+                                            <th class="text-center">{{ __('production.execution_classification') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -3092,8 +3075,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="8" class="text-center text-muted py-3">No operation variance logged
-                                                    yet.</td>
+                                                <td colspan="8" class="text-center text-muted py-3">{{ __('production.no_operation_variance') }}</td>
                                             </tr>
                                         @endforelse
                                     </tbody>
@@ -3105,8 +3087,7 @@
                         <div class="tab-pane fade {{ $activeTab === 'vtab-risk' ? 'show active' : '' }}" id="vtab-risk"
                             role="tabpanel" aria-labelledby="vtab-risk-tab">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h5 class="fw-bold text-dark mb-0"><i class="feather-alert-circle me-2 text-danger"></i>Planning
-                                    Risk Analysis (9 Vectors)</h5>
+                                <h5 class="fw-bold text-dark mb-0"><i class="feather-alert-circle me-2 text-danger"></i>{{ __('production.planning_risk_analysis_vectors') }}</h5>
                                 <div>
                                     @php
                                         $riskLevel = $riskAnalysis['overall_risk'] ?? 'ON_TRACK';
@@ -3117,9 +3098,16 @@
                                             'LOW' => 'bg-secondary',
                                             default => 'bg-success',
                                         };
+                                        $riskLabel = match ($riskLevel) {
+                                            'CRITICAL' => __('production.risk_critical'),
+                                            'HIGH' => __('production.risk_high'),
+                                            'MEDIUM' => __('production.risk_medium'),
+                                            'LOW' => __('production.risk_low'),
+                                            default => __('production.risk_on_track'),
+                                        };
                                     @endphp
-                                    <span class="badge {{ $riskBadgeClass }} fs-13 px-3 py-2">OVERALL RISK:
-                                        {{ $riskLevel }}</span>
+                                    <span class="badge {{ $riskBadgeClass }} fs-13 px-3 py-2">{{ __('production.overall_risk') }}:
+                                        {{ $riskLabel }}</span>
                                 </div>
                             </div>
 
@@ -3131,8 +3119,18 @@
                                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                                     <span class="fw-bold text-dark fs-13"><i
                                                             class="feather-alert-triangle me-1 text-warning"></i>{{ str_replace('_', ' ', $exc['type'] ?? 'Risk') }}</span>
+                                                    @php
+                                                        $sev = $exc['severity'] ?? 'HIGH';
+                                                        $sevLabel = match($sev) {
+                                                            'CRITICAL' => __('production.risk_critical'),
+                                                            'HIGH' => __('production.risk_high'),
+                                                            'MEDIUM' => __('production.risk_medium'),
+                                                            'LOW' => __('production.risk_low'),
+                                                            default => $sev,
+                                                        };
+                                                    @endphp
                                                     <span
-                                                        class="badge bg-soft-danger text-danger fs-11">{{ $exc['severity'] ?? 'HIGH' }}</span>
+                                                        class="badge bg-soft-danger text-danger fs-11">{{ $sevLabel }}</span>
                                                 </div>
                                                 <p class="fs-12 text-dark mb-2">{{ $exc['message'] ?? $exc['reason'] ?? '' }}</p>
                                                 @php
@@ -3140,7 +3138,7 @@
                                                 @endphp
                                                 @if(!empty($actionText))
                                                     <div class="bg-light p-2 rounded fs-11 text-muted">
-                                                        <strong>Recommended Action:</strong>
+                                                        <strong>{{ __('production.recommended_action') }}:</strong>
                                                         {{ str_replace('_', ' ', $actionText) }}
                                                     </div>
                                                 @endif
@@ -3151,10 +3149,8 @@
                             @else
                                 <div class="alert alert-success border-success bg-soft-success p-4 text-center my-3">
                                     <i class="feather-check-circle fs-32 text-success d-block mb-2"></i>
-                                    <h6 class="fw-bold text-success mb-1">No Active Planning Risks Detected</h6>
-                                    <p class="fs-12 text-dark mb-0">This Production Order is evaluated cleanly across all 9 planning
-                                        risk vectors (material, supply, capacity, machine, delay, due date, ECO, quality,
-                                        subcontract).</p>
+                                    <h6 class="fw-bold text-success mb-1">{{ __('production.no_active_planning_risks') }}</h6>
+                                    <p class="fs-12 text-dark mb-0">{{ __('production.clean_planning_risk_vectors_desc') }}</p>
                                 </div>
                             @endif
                         </div>
@@ -3639,15 +3635,14 @@
                                                         $stLower = strtolower($slip->status ?? 'pending');
                                                     @endphp
                                                     @if(in_array($stLower, ['fully issued', 'completed', 'issued']))
-                                                        <span class="badge bg-soft-success text-success text-uppercase">Fully
-                                                            Issued</span>
+                                                        <span class="badge bg-soft-success text-success text-uppercase">{{ __('production.fully_issued') }}</span>
                                                     @elseif(in_array($stLower, ['partially issued', 'partial', 'reserved']))
                                                         <span
-                                                            class="badge bg-soft-warning text-warning text-uppercase">{{ $stLower === 'reserved' ? 'Reserved' : 'Partially Issued' }}</span>
+                                                            class="badge bg-soft-warning text-warning text-uppercase">{{ $stLower === 'reserved' ? __('production.reserved') : __('production.partially_issued') }}</span>
                                                     @elseif($stLower === 'approved')
-                                                        <span class="badge bg-soft-primary text-primary text-uppercase">Approved</span>
+                                                        <span class="badge bg-soft-primary text-primary text-uppercase">{{ __('production.approved') }}</span>
                                                     @else
-                                                        <span class="badge bg-soft-danger text-danger text-uppercase">Pending</span>
+                                                        <span class="badge bg-soft-danger text-danger text-uppercase">{{ __('production.pending') }}</span>
                                                     @endif
                                                 </td>
                                                 <td class="text-center fw-semibold">
@@ -3669,7 +3664,7 @@
                                                             </div>
                                                         @endforeach
                                                     @else
-                                                        <span class="text-muted fs-12">Not required (In Stock)</span>
+                                                        <span class="text-muted fs-12">{{ __('production.not_required_in_stock') }}</span>
                                                     @endif
                                                 </td>
                                                 <td>
@@ -3677,11 +3672,11 @@
                                                         @foreach($slip->purchaseRequisitions as $pr)
                                                             <div>
                                                                 @if($pr->status === 'Approved')
-                                                                    <span class="badge bg-soft-success text-success">PR Approved</span>
+                                                                    <span class="badge bg-soft-success text-success">{{ __('production.pr_approved') }}</span>
                                                                 @elseif($pr->status === 'Cancelled')
-                                                                    <span class="badge bg-soft-danger text-danger">PR Cancelled</span>
+                                                                    <span class="badge bg-soft-danger text-danger">{{ __('production.pr_cancelled') }}</span>
                                                                 @else
-                                                                    <span class="badge bg-soft-warning text-warning">PR Pending Review</span>
+                                                                    <span class="badge bg-soft-warning text-warning">{{ __('production.pr_pending_review') }}</span>
                                                                 @endif
                                                             </div>
                                                         @endforeach

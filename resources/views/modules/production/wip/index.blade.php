@@ -117,13 +117,17 @@
         $orderTargetId = $firstOrder ? $firstOrder->id : null;
     @endphp
 
-    <x-ui.workflow-guide title="What's Next?">
-        Track live shop floor production progress across work centers. The <span class="badge bg-soft-success text-success border border-success-subtle fw-semibold me-1"><i class="feather-box me-1"></i>{{ __('production.receive_completed_fg') }}</span> button will automatically appear once completed finished goods units are available. Clicking it transfers the finished goods into your warehouse. All receipt logs can be tracked under the 
-        @if($orderTargetId)
-            <a href="{{ route('production.orders.show', ['order' => $orderTargetId, 'tab' => 'vtab-progress']) }}" class="fw-bold text-primary text-decoration-underline">{{ __('production.order_progress_receipts_tab') }}</a>.
-        @else
-            <span class="fw-bold text-primary text-decoration-underline">{{ __('production.order_progress_receipts_tab') }}</span> on the Production Order page.
-        @endif
+    <x-ui.workflow-guide :title="__('production.whats_next')">
+        @php
+            $receiptsLink = $orderTargetId
+                ? '<a href="' . route('production.orders.show', ['order' => $orderTargetId, 'tab' => 'vtab-progress']) . '" class="fw-bold text-primary text-decoration-underline">' . __('production.order_progress_receipts_tab') . '</a>'
+                : '<span class="fw-bold text-primary text-decoration-underline">' . __('production.order_progress_receipts_tab') . '</span>';
+            $receiveBadge = '<span class="badge bg-soft-success text-success border border-success-subtle fw-semibold me-1"><i class="feather-box me-1"></i>' . __('production.receive_completed_fg') . '</span>';
+        @endphp
+        {!! __('production.wip_workflow_guide', [
+            'receive_fg_badge' => $receiveBadge,
+            'receipts_link' => $receiptsLink
+        ]) !!}
     </x-ui.workflow-guide>
 
     <div class="erp-single-panel">

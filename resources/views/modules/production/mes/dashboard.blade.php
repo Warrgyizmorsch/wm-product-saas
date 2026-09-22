@@ -330,26 +330,21 @@
 @section('content')
 
     {{-- ── Shop Floor (MES) Workflow Guidance Component ── --}}
-    <x-ui.workflow-guide title="What's Next?">
+    <x-ui.workflow-guide :title="__('production.whats_next')">
         @if(isset($activeSchedules) && $activeSchedules->count() > 0)
-            @php $firstOrder = $activeSchedules->first()->order; @endphp
-            Shop floor operations execution is active. You can assign operators to specific operations from the
-            @if($firstOrder)
-                <a href="{{ route('production.orders.show', ['order' => $firstOrder->id, 'tab' => 'vtab-operations']) }}"
-                    class="fw-bold text-primary text-decoration-underline">Production Order Operations tab</a>
-            @else
-                <a href="{{ route('production.orders.index') }}" class="fw-bold text-primary text-decoration-underline">Production
-                    Order Operations tab</a>
-            @endif
-            to allocate operators for live tracking. Operators can also view assigned tasks in the <a
-                href="{{ route('production.mes.operator.dashboard') }}"
-                class="fw-bold text-primary text-decoration-underline">{{ __('production.mes_operator_console') }}</a>.
+            @php 
+                $firstOrder = $activeSchedules->first()->order; 
+                $opsUrl = $firstOrder ? route('production.orders.show', ['order' => $firstOrder->id, 'tab' => 'vtab-operations']) : route('production.orders.index');
+            @endphp
+            {!! __('production.mes_workflow_guide_active', [
+                'operations_link' => '<a href="' . $opsUrl . '" class="fw-bold text-primary text-decoration-underline">' . __('production.production_order_operations_tab') . '</a>',
+                'console_link' => '<a href="' . route('production.mes.operator.dashboard') . '" class="fw-bold text-primary text-decoration-underline">' . __('production.mes_operator_console') . '</a>'
+            ]) !!}
         @else
-            No active schedules on the shop floor. Release confirmed schedules from <a
-                href="{{ route('production.schedules.index') }}"
-                class="fw-bold text-primary text-decoration-underline">{{ __('production.production_schedules') }}</a> and assign operators under the
-            <a href="{{ route('production.orders.index') }}" class="fw-bold text-primary text-decoration-underline">Production
-                Order Operations tab</a> to begin execution.
+            {!! __('production.mes_workflow_guide_empty', [
+                'schedules_link' => '<a href="' . route('production.schedules.index') . '" class="fw-bold text-primary text-decoration-underline">' . __('production.production_schedules') . '</a>',
+                'operations_link' => '<a href="' . route('production.orders.index') . '" class="fw-bold text-primary text-decoration-underline">' . __('production.production_order_operations_tab') . '</a>'
+            ]) !!}
         @endif
     </x-ui.workflow-guide>
 
