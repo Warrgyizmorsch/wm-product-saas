@@ -236,10 +236,13 @@
                 }
             }
 
-            // A block that draws its own card grows until its content fits.
+            // A block that draws its own card grows until its content fits (except fixed KPI cards).
             function fit(id) {
                 const node = grid.engine.nodes.find(n => n.id === id);
-                const content = node && node.el && node.el.querySelector('.grid-stack-item-content');
+                if (!node) return;
+                const key = meta.get(id)?.key || '';
+                if (key.includes('kpi')) return; // Keep top KPI summary boxes at fixed height
+                const content = node.el && node.el.querySelector('.grid-stack-item-content');
                 if (!content) return;
                 const holder = content.querySelector('.dash-bare');
                 if (!holder || holder.scrollHeight <= holder.clientHeight + 2) return;
@@ -372,7 +375,15 @@
                 try { await send('DELETE'); window.location.reload(); } catch (e) { alert('Could not reset the dashboard.'); }
             };
 
-            window.dashboardReload = () => { preloaded = {}; meta.forEach((_, id) => load(id)); };
+            // Live Web Punch Digital Clock Ticker
+            setInterval(function () {
+                const clockEls = document.querySelectorAll('.live-web-clock');
+                if (clockEls.length > 0) {
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    clockEls.forEach(el => { el.textContent = timeStr; });
+                }
+            }, 1000);
 
             setEditing(false);
             build(saved, true);

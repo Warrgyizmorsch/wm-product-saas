@@ -227,15 +227,30 @@
                     </div>
                 </div>
 
+                @php
+                    $authUser = auth()->user();
+                    $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+                    $canDeleteAnyDoc = false;
+                    if (isset($documents)) {
+                        foreach ($documents as $d) {
+                            if ($workflowService->canDeleteDocument($authUser, $d)) {
+                                $canDeleteAnyDoc = true;
+                                break;
+                            }
+                        }
+                    }
+                @endphp
                 <div class="table-responsive" style="overflow: visible;">
                         <table class="table table-hover align-middle mb-0" style="table-layout: fixed; width: 100%;">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3" style="width: 25%;">Employee</th>
-                                    <th style="width: 23%;">Document & Category</th>
-                                    <th style="width: 26%;">File Copy</th>
-                                    <th style="width: 16%;">Status & Expiry</th>
-                                    <th class="text-end pe-3" style="width: 10%;">Actions</th>
+                                    <th class="ps-3" style="width: {{ $canDeleteAnyDoc ? '25%' : '27%' }};">Employee</th>
+                                    <th style="width: {{ $canDeleteAnyDoc ? '23%' : '25%' }};">Document & Category</th>
+                                    <th style="width: {{ $canDeleteAnyDoc ? '26%' : '28%' }};">File Copy</th>
+                                    <th style="width: {{ $canDeleteAnyDoc ? '16%' : '20%' }};">Status & Expiry</th>
+                                    @if($canDeleteAnyDoc)
+                                        <th class="text-end pe-3" style="width: 10%;">Actions</th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody id="documentsTableBody">
@@ -410,24 +425,26 @@
                                         </td>
 
                                         <!-- Actions Column -->
-                                        <td class="text-end pe-3">
-                                            <div class="d-flex align-items-center justify-content-end gap-1.5">
-                                                 @if($doc->file_path)
-                                                     <!-- Delete document attachment record -->
-                                                     <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_document') }}', { title: '{{ __('hrms.employees.lbl_delete_document') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });" class="m-0 d-inline-flex" onclick="event.stopPropagation();">
-                                                         @csrf
-                                                         @method('DELETE')
-                                                         <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px; background: rgba(220, 53, 69, 0.05);" title="{{ __('hrms.common.delete') }}">
-                                                             <i class="feather-trash-2 fs-13"></i>
-                                                         </button>
-                                                     </form>
-                                                 @endif
-                                            </div>
-                                        </td>
+                                        @if($canDeleteAnyDoc)
+                                            <td class="text-end pe-3">
+                                                <div class="d-flex align-items-center justify-content-end gap-1.5">
+                                                     @if($doc->file_path && $workflowService->canDeleteDocument(auth()->user(), $doc))
+                                                         <!-- Delete document attachment record -->
+                                                         <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_document') }}', { title: '{{ __('hrms.employees.lbl_delete_document') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });" class="m-0 d-inline-flex" onclick="event.stopPropagation();">
+                                                             @csrf
+                                                             @method('DELETE')
+                                                             <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px; background: rgba(220, 53, 69, 0.05);" title="{{ __('hrms.common.delete') }}">
+                                                                 <i class="feather-trash-2 fs-13"></i>
+                                                             </button>
+                                                         </form>
+                                                     @endif
+                                                </div>
+                                            </td>
+                                        @endif
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="py-5 text-center text-muted">
+                                        <td colspan="{{ $canDeleteAnyDoc ? 5 : 4 }}" class="py-5 text-center text-muted">
                                             <i class="feather-file-text fs-24 mb-2 d-block"></i>
                                             No documents found.
                                         </td>

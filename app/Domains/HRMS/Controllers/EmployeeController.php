@@ -669,6 +669,13 @@ class EmployeeController extends Controller
     {
         $this->authorizeHrms('hrms.employees.update');
 
+        $user = auth()->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+
+        if ($user && !$workflowService->canDeleteDocument($user, $document)) {
+            return redirect()->back()->with('error', 'Self-deletion is prohibited. You cannot delete documents from your own employee profile.');
+        }
+
         if ($document->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
             \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
         }

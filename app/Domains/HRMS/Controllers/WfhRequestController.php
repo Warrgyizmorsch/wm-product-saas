@@ -126,6 +126,12 @@ class WfhRequestController extends Controller
     public function updateStatus(Request $request, WfhRequest $wfhRequest, ?string $overrideAction = null): RedirectResponse
     {
         $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $wfhRequest->employee_id) {
+            abort(403, 'Self-approval is prohibited. You cannot approve your own WFH request.');
+        }
+
         $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
         $authEmployee = Employee::resolveForUser($user);
         $emp = $wfhRequest->employee;

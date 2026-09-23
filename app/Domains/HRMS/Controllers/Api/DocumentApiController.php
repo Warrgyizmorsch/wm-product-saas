@@ -735,7 +735,7 @@ class DocumentApiController extends Controller
                 'exception'   => $e,
                 'document_id' => $id,
             ]);
-            return $this->sendError('Failed to digitally sign document: ' . $e->getMessage(), 500);
+            return $this->sendError('Failed to digitally sign document: ' . $e->getMessage(), 400);
         }
     }
 

@@ -387,7 +387,14 @@ class LeaveRequestController extends Controller
 
     public function canApproveLeaveRequest(?\App\Models\User $user, LeaveRequest $leaveRequest): bool
     {
-        if (!$user) {
+        if (!$user || !$leaveRequest->employee) {
+            return false;
+        }
+
+        // Anti self-approval guardrail using ApprovalWorkflowService
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $leaveRequest->employee_id) {
             return false;
         }
 
@@ -402,9 +409,6 @@ class LeaveRequestController extends Controller
         }
 
         $emp = $leaveRequest->employee;
-        if (!$emp) {
-            return false;
-        }
 
         $isReportingManager = (string) $emp->reporting_manager_id === (string) $authEmployee->id;
         $isDepartmentHead   = $emp->department && (string) $emp->department->head_employee_id === (string) $authEmployee->id;
