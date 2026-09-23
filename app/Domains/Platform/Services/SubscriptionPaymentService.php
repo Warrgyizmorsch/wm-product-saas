@@ -2,6 +2,7 @@
 
 namespace App\Domains\Platform\Services;
 
+use App\Core\Tenant\TenantProvisioner;
 use App\Domains\Platform\Models\SubscriptionPayment;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,7 @@ class SubscriptionPaymentService
 {
     public function __construct(
         private readonly TenantService $tenants,
+        private readonly TenantProvisioner $provisioner,
     ) {
     }
 
@@ -63,6 +65,9 @@ class SubscriptionPaymentService
 
             if ($payment->purpose === SubscriptionPayment::PURPOSE_MODULE_ADDON) {
                 $payment->tenant->installModules($payment->modules ?? []);
+
+                // Same as a plan switch: fill the new modules' starter masters.
+                $this->provisioner->provision($payment->tenant->fresh());
             } else {
                 $this->tenants->switchOwnPlan($payment->tenant, $payment->plan_id);
             }

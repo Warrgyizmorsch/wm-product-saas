@@ -20,8 +20,8 @@ use RuntimeException;
  * whichever PaymentGateway is active — same checkout/verify pattern as
  * SubscriptionController, just for a module-add-on order instead of a plan
  * switch (see PaymentGateway::createModuleCheckout, SubscriptionPaymentService).
- * Paying only unlocks access; it does not (yet) retroactively run that module's
- * starter-data seeding. The catalog itself lives on the Subscription page
+ * Paying unlocks access and provisions the new modules' starter masters (same
+ * TenantProvisioner run as a plan switch). The catalog itself lives on the Subscription page
  * (SubscriptionController::index()) — this controller is just the checkout/verify
  * endpoints behind it.
  */

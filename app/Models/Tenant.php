@@ -121,14 +121,23 @@ class Tenant extends Model
     }
 
     /**
-     * Modules the tenant's plan includes, or null when there is no plan/feature
-     * list (everything is allowed, same rule as tenant_allowed_modules()).
+     * Modules the tenant's plan includes plus any self-service add-ons it has
+     * installed (see installModules()), or null when there is no plan/feature
+     * list (everything is allowed). tenant_allowed_modules() delegates here.
      *
      * @return array<int, string>|null
      */
     public function planModules(): ?array
     {
-        return $this->planCatalog?->features;
+        $features = $this->planCatalog?->features;
+
+        if ($features === null) {
+            return null;
+        }
+
+        $installed = $this->settings['installed_modules'] ?? [];
+
+        return array_values(array_unique([...$features, ...$installed]));
     }
 
     /** True when the plan includes ANY of the given modules (or has no module limit). */
