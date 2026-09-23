@@ -153,7 +153,7 @@ class CustomerPaymentController extends Controller
             'amount' => number_format((float)$payment->amount, 2),
             'payment_method' => $payment->payment_method ?? 'Bank/Cash',
             'date' => $payment->payment_date ? (is_string($payment->payment_date) ? $payment->payment_date : $payment->payment_date->format('Y-m-d')) : now()->format('Y-m-d'),
-        ], $payment->tenant_id ?? tenant_id() ?? 1, auth()->id());
+        ], route('sales.payments.show', $payment->id), $payment);
 
         return redirect()->route('sales.payments.show', $payment->id)->with('success', "Payment {$payment->payment_number} recorded successfully.");
     }

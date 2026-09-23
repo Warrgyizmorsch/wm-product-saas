@@ -236,7 +236,7 @@ class VendorBillController extends Controller
             'vendor_name' => $bill->vendor?->name ?? 'Vendor',
             'amount' => number_format((float)($bill->grand_total ?? $bill->total_amount ?? 0), 2),
             'due_date' => $bill->due_date ? (is_string($bill->due_date) ? $bill->due_date : $bill->due_date->format('Y-m-d')) : 'N/A',
-        ], $tenantId, auth()->id());
+        ], route('purchase.bills.show', $bill->id), $bill);
 
         return redirect()->route('purchase.bills.show', $bill->id)
             ->with('success', "Vendor Bill {$bill->bill_number} created successfully.");

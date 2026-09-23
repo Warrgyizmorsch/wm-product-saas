@@ -447,7 +447,7 @@ class LeadController extends Controller
             'source' => $lead->source ?? 'Direct',
             'expected_amount' => number_format((float)($lead->expected_amount ?? 0), 2),
             'created_by' => auth()->user()?->name ?? 'User',
-        ], $lead->tenant_id ?? tenant_id() ?? 1, auth()->id());
+        ], route('crm.leads.edit', $lead->id), $lead);
 
         return redirect()->route('crm.leads.index')->with('success', 'Lead successfully saved to Database!');
     }

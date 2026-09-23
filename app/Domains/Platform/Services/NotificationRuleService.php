@@ -15,35 +15,67 @@ class NotificationRuleService
      *
      * @param string $eventKey e.g. 'sales.order.confirmed'
      * @param array $data Dynamic variables e.g. ['doc_no' => 'SO-001', 'customer_name' => 'Acme Corp', 'amount' => '$5,000']
-     * @param string|null $actionUrl URL or route name to open when notification is clicked
-     * @param Model|null $subjectModel Optional subject Eloquent model
+     * @param mixed $actionUrl URL or route name (string), or Eloquent Model, or tenant_id (int)
+     * @param mixed $subjectModel Optional subject Eloquent model or user_id (int)
      */
     public static function trigger(
         string $eventKey,
         array $data = [],
-        ?string $actionUrl = null,
-        ?Model $subjectModel = null
+        mixed $actionUrl = null,
+        mixed $subjectModel = null
     ): void {
         try {
-            $tenantId = (function_exists('tenant_id') && tenant_id()) ? tenant_id() : (auth()->user()?->tenant_id ?? 1);
+            $resolvedActionUrl = null;
+            $resolvedSubjectModel = null;
+            $resolvedTenantId = null;
+
+            // 1. Resolve Argument 3 ($actionUrl OR $tenantId OR Model)
+            if ($actionUrl instanceof Model) {
+                $resolvedSubjectModel = $actionUrl;
+            } elseif (is_string($actionUrl) && !is_numeric($actionUrl)) {
+                $resolvedActionUrl = $actionUrl;
+            } elseif (is_numeric($actionUrl)) {
+                $resolvedTenantId = (int)$actionUrl;
+            }
+
+            // 2. Resolve Argument 4 ($subjectModel OR $userId)
+            if ($subjectModel instanceof Model) {
+                $resolvedSubjectModel = $subjectModel;
+            } elseif (is_numeric($subjectModel)) {
+                if (empty($data['created_by_user_id'])) {
+                    $data['created_by_user_id'] = (int)$subjectModel;
+                }
+            }
+
+            // 3. Fallback Tenant ID resolution
+            if (!$resolvedTenantId) {
+                if ($resolvedSubjectModel && isset($resolvedSubjectModel->tenant_id)) {
+                    $resolvedTenantId = (int)$resolvedSubjectModel->tenant_id;
+                } else {
+                    $resolvedTenantId = (function_exists('tenant_id') && tenant_id())
+                        ? (int)tenant_id()
+                        : (auth()->user()?->tenant_id ? (int)auth()->user()->tenant_id : 1);
+                }
+            }
+
             $eventDetails = NotificationEventCatalog::getEventDetails($eventKey);
             $module = $eventDetails['module'] ?? 'system';
 
             // Query configured rules in DB for this tenant
             $rules = NotificationRule::query()
-                ->where('tenant_id', $tenantId)
+                ->where('tenant_id', $resolvedTenantId)
                 ->where('event_key', $eventKey)
                 ->where('is_active', true)
                 ->get();
 
             if ($rules->isNotEmpty()) {
                 foreach ($rules as $rule) {
-                    self::executeRule($rule, $data, $actionUrl, $subjectModel, $module);
+                    self::executeRule($rule, $data, $resolvedActionUrl, $resolvedSubjectModel, $module);
                 }
             } else {
                 // If no custom rule defined, use Catalog default roles and templates
                 if ($eventDetails) {
-                    self::executeDefaultCatalogEvent($eventDetails, $data, $actionUrl, $tenantId, $module);
+                    self::executeDefaultCatalogEvent($eventDetails, $data, $resolvedActionUrl, $resolvedSubjectModel, $resolvedTenantId, $module);
                 }
             }
         } catch (\Throwable $e) {
@@ -102,6 +134,7 @@ class NotificationRuleService
         array $eventDetails,
         array $data,
         ?string $actionUrl,
+        ?Model $subjectModel,
         int|string $tenantId,
         string $module
     ): void {
@@ -112,7 +145,7 @@ class NotificationRuleService
             notifyCreator: false,
             notifyAssignedUser: false,
             data: $data,
-            subjectModel: null,
+            subjectModel: $subjectModel,
             tenantId: $tenantId
         );
 
@@ -122,7 +155,7 @@ class NotificationRuleService
 
         $title = NotificationRule::interpolate($eventDetails['default_title'] ?? 'System Notification', $data);
         $message = NotificationRule::interpolate($eventDetails['default_body'] ?? '', $data);
-        $url = $actionUrl ?: ($eventDetails['action_route'] ?? null);
+        $url = $actionUrl ?: (isset($eventDetails['action_route']) ? self::resolveRoute($eventDetails['action_route'], $subjectModel) : null);
         $icon = $eventDetails['icon'] ?? 'feather-bell';
 
         NotificationService::sendToUserIds(

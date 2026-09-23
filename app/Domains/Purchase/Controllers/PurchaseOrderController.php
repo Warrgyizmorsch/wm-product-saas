@@ -277,7 +277,7 @@ class PurchaseOrderController extends Controller
             'vendor_name' => $po->vendor?->name ?? 'Vendor',
             'amount' => number_format((float)($po->grand_total ?? $po->total_amount ?? 0), 2),
             'created_by' => auth()->user()?->name ?? 'User',
-        ], $tenantId, auth()->id());
+        ], route('purchase.orders.show', $po->id), $po);
 
         return redirect()->route('purchase.orders.show', $po->id)
             ->with('success', "Purchase Order {$po->po_number} created successfully.");
@@ -359,7 +359,7 @@ class PurchaseOrderController extends Controller
             'vendor_name' => $order->vendor?->name ?? 'Vendor',
             'amount' => number_format((float)($order->grand_total ?? $order->total_amount ?? 0), 2),
             'approved_by' => auth()->user()?->name ?? 'Approver',
-        ], $order->tenant_id ?? require_tenant_id(), auth()->id());
+        ], route('purchase.orders.show', $order->id), $order);
 
         return redirect()->back()->with('success', "Purchase Order {$order->purchase_order_number} has been approved successfully.");
     }

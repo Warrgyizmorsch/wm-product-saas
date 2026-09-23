@@ -446,7 +446,7 @@ class CrmDealController extends Controller
                 'customer_name' => $deal->account?->name ?? 'Customer',
                 'amount' => number_format((float)($deal->estimated_value ?? $deal->amount ?? 0), 2),
                 'won_by' => auth()->user()?->name ?? 'User',
-            ], $deal->tenant_id ?? tenant_id() ?? 1, auth()->id());
+            ], route('crm.deals.show', $deal->id), $deal);
         }
 
         return redirect()->route('crm.deals.show', $deal)->with('success', 'Deal updated successfully.');
@@ -516,7 +516,7 @@ class CrmDealController extends Controller
                 'customer_name' => $deal->account?->name ?? 'Customer',
                 'amount' => number_format((float)($deal->estimated_value ?? $deal->amount ?? 0), 2),
                 'won_by' => auth()->user()?->name ?? 'User',
-            ], $deal->tenant_id ?? tenant_id() ?? 1, auth()->id());
+            ], route('crm.deals.show', $deal->id), $deal);
         }
 
         $msg = "Deal stage updated to {$stage} successfully!";
