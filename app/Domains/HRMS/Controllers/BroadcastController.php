@@ -247,6 +247,19 @@ class BroadcastController extends Controller
                     );
                 }
             }
+
+            try {
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.broadcast.published', [
+                    'tenant_id'    => $tenantId,
+                    'broadcast_no' => $broadcast->broadcast_number ?? ('BC-' . $broadcast->id),
+                    'title'        => $broadcast->title,
+                    'priority'     => ucfirst($broadcast->priority),
+                    'published_by' => auth()->user()?->name ?? 'HR Management',
+                    'action_url'   => route('hrms.broadcasts.index'),
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
+            }
         }
 
         return redirect()->route('hrms.broadcasts.index')

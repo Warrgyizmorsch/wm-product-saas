@@ -179,6 +179,18 @@
 
     <!-- Active Company Broadcasts & Announcements Section (Exact 1:1 match with user screenshot) -->
     @if(!empty($latestBroadcasts) && count($latestBroadcasts) > 0)
+        @php
+            $hasUnacknowledgedBroadcasts = false;
+            foreach ($latestBroadcasts as $bcCheck) {
+                if ($bcCheck->is_acknowledgement_required) {
+                    $receipt = ($currentEmployee ?? null) && $bcCheck->receipts ? $bcCheck->receipts->where('employee_id', $currentEmployee->id)->first() : null;
+                    if (!$receipt || !$receipt->acknowledged_at) {
+                        $hasUnacknowledgedBroadcasts = true;
+                        break;
+                    }
+                }
+            }
+        @endphp
         <div class="card border shadow-sm mb-3.5 rounded-3 overflow-hidden" style="border-color: #e2e8f0 !important;">
             <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom">
                 <div class="d-flex align-items-center gap-3">
@@ -195,12 +207,12 @@
                         <span class="fs-12 text-muted d-block mt-0.5">Stay updated with company notifications, policy updates and official notices.</span>
                     </div>
                 </div>
-                <button type="button" class="btn btn-sm btn-icon btn-light rounded-2 border shadow-2xs" data-bs-toggle="collapse" data-bs-target="#broadcastsCollapse" aria-expanded="true">
-                    <i class="feather-chevron-up"></i>
+                <button type="button" class="btn btn-sm btn-icon btn-light rounded-2 border shadow-2xs d-inline-flex align-items-center justify-content-center" data-bs-toggle="collapse" data-bs-target="#broadcastsCollapse" aria-expanded="{{ $hasUnacknowledgedBroadcasts ? 'true' : 'false' }}" id="broadcastsCollapseToggle" title="Toggle announcements" style="width: 32px; height: 32px;">
+                    <i class="feather-chevron-up" id="broadcastsCollapseIcon" style="transition: transform 0.25s ease; transform: {{ $hasUnacknowledgedBroadcasts ? 'rotate(0deg)' : 'rotate(180deg)' }};"></i>
                 </button>
             </div>
 
-            <div class="collapse show" id="broadcastsCollapse">
+            <div class="collapse {{ $hasUnacknowledgedBroadcasts ? 'show' : '' }}" id="broadcastsCollapse">
                 <div class="card-body p-4 bg-white">
                     <div class="d-flex flex-column gap-3">
                         @foreach($latestBroadcasts as $bc)
@@ -236,14 +248,89 @@
                                                 <i class="feather-check-circle fs-12"></i> Acknowledged
                                             </span>
                                         @endif
-                                        <button type="button" class="btn text-white fw-bold text-uppercase fs-11 px-3 py-1.5 rounded-2 d-inline-flex align-items-center gap-1.5 shadow-2xs" style="background: #4a3b32; border: none;">
-                                            <i class="feather-message-square fs-13"></i> ADD COMMENT
-                                        </button>
+                                        @if($bc->allow_comments ?? true)
+                                            <button type="button" class="btn text-white fw-bold text-uppercase fs-11 px-3 py-1.5 rounded-2 d-inline-flex align-items-center gap-1.5 shadow-2xs" style="background: #6343e8; border: none;" data-bs-toggle="modal" data-bs-target="#employeeBroadcastModal{{ $bc->id }}">
+                                                <i class="feather-message-square fs-13"></i> ADD COMMENT
+                                            </button>
+                                        @endif
                                     </div>
                                 </div>
                                 <h6 class="fw-bold text-dark fs-15 mb-1.5" style="color: #0f172a !important;">{{ $bc->title }}</h6>
                                 <p class="fs-12 text-secondary mb-0" style="line-height: 1.5; color: #64748b !important;">{{ strip_tags($bc->content ?? '') }}</p>
+
+                                @php
+                                    $topLevelComments = $bc->comments ? $bc->comments->where('parent_id', null) : collect();
+                                @endphp
+                                @if(($bc->allow_comments ?? true) && $topLevelComments->isNotEmpty())
+                                    <div class="mt-2.5 pt-2.5 border-top" style="border-color: #f1f5f9 !important;">
+                                        <div class="mb-1.5">
+                                            <span class="fs-11 fw-bold text-dark d-inline-flex align-items-center gap-1.5">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6343e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                                </svg>
+                                                Comments & Discussion ({{ $topLevelComments->count() }})
+                                            </span>
+                                        </div>
+
+                                        <div class="d-flex flex-column gap-1.5" style="max-height: 140px; overflow-y: auto;">
+                                            @foreach($topLevelComments as $comm)
+                                                <div class="py-1 px-0 border-bottom d-flex align-items-center justify-content-between gap-2 fs-11" style="border-color: #f8fafc !important; background: transparent;">
+                                                    <div class="d-flex align-items-center text-truncate" style="min-width: 0;">
+                                                        <span class="rounded-circle text-white fw-bold d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 17px; height: 17px; font-size: 9.5px; line-height: 1; background-color: #6343e8 !important; margin-right: 6px;">
+                                                            {{ strtoupper(substr($comm->employee->full_name ?? ($comm->user->name ?? 'U'), 0, 1)) }}
+                                                        </span>
+                                                        <strong class="fw-bold fs-11 text-nowrap" style="color: #0f172a !important; margin-right: 4px;">{{ $comm->employee->full_name ?? ($comm->user->name ?? 'Employee') }}:</strong>
+                                                        <span class="text-secondary fs-11 text-truncate" style="color: #334155 !important;" title="{{ $comm->comment_text }}">{{ $comm->comment_text }}</span>
+                                                    </div>
+                                                    <div class="d-inline-flex align-items-center gap-1 text-muted fs-10 flex-shrink-0 ms-2" style="white-space: nowrap;">
+                                                        <i class="feather-clock fs-10 text-muted"></i>
+                                                        <span>{{ $comm->created_at ? $comm->created_at->diffForHumans() : '' }}</span>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
                             </div>
+
+                            @if($bc->allow_comments ?? true)
+                                <!-- Comment Modal for Broadcast (Exact 1:1 Match) -->
+                                <div class="modal fade" id="employeeBroadcastModal{{ $bc->id }}" tabindex="-1" aria-labelledby="employeeBroadcastModalLabel{{ $bc->id }}" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
+                                            <div class="modal-header bg-white border-0 pt-4 px-4 pb-2 d-flex align-items-center justify-content-between">
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px; background-color: #eef2ff; border: 1px solid #e0e7ff;">
+                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6343e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                                        </svg>
+                                                    </div>
+                                                    <div>
+                                                        <h6 class="modal-title fw-bold text-dark fs-16 mb-0" id="employeeBroadcastModalLabel{{ $bc->id }}" style="color: #0f172a !important; line-height: 1.2;">Post a Comment</h6>
+                                                        <span class="fs-12 text-muted d-block mt-0.5" style="line-height: 1.3;">Adding comment for <strong class="fw-bold" style="color: #0f172a;">{{ $bc->title }}</strong></span>
+                                                    </div>
+                                                </div>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <form action="{{ \Illuminate\Support\Facades\Route::has('hrms.broadcasts.comment.store') ? route('hrms.broadcasts.comment.store', $bc->id) : '#' }}" method="POST">
+                                                @csrf
+                                                <div class="modal-body px-4 py-3 text-dark bg-white">
+                                                    <div class="mb-0">
+                                                        <label class="form-label fs-12 fw-bold text-dark mb-1">Your Comment / Reply</label>
+                                                        <textarea name="comment_text" rows="4" class="form-control fs-12 p-3 text-dark rounded-3" placeholder="Write a comment, query or reply regarding this announcement..." required style="border: 1px solid #cbd5e1; resize: vertical;"></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer py-3 px-4 border-0 d-flex justify-content-between align-items-center" style="background-color: #f4f6fa !important;">
+                                                    <button type="button" class="btn btn-sm btn-link text-uppercase text-dark fw-bold text-decoration-none px-2 py-1 fs-12" data-bs-dismiss="modal">CANCEL</button>
+                                                    <button type="submit" class="btn btn-sm text-white fw-bold px-4 py-2 rounded-3 shadow-2xs d-inline-flex align-items-center gap-1.5 text-uppercase fs-12" style="background-color: #6343e8; border: none;">
+                                                        <i class="feather-send fs-12 me-1"></i> <span>POST COMMENT</span>
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
                         @endforeach
                     </div>
                 </div>
@@ -262,3 +349,20 @@
     @include('partials.dashboard.grid')
 
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const bcCollapse = document.getElementById('broadcastsCollapse');
+        const bcIcon = document.getElementById('broadcastsCollapseIcon');
+        if (bcCollapse && bcIcon) {
+            bcCollapse.addEventListener('show.bs.collapse', function () {
+                bcIcon.style.transform = 'rotate(0deg)';
+            });
+            bcCollapse.addEventListener('hide.bs.collapse', function () {
+                bcIcon.style.transform = 'rotate(180deg)';
+            });
+        }
+    });
+</script>
+@endpush

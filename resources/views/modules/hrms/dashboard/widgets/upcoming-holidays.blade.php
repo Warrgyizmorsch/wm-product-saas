@@ -9,11 +9,11 @@
 
 <div class="card border-0 mb-0 h-100 shadow-sm" style="border-radius: 16px; background: #ffffff;">
     <div class="card-header bg-white pt-4 pb-3 px-4 d-flex align-items-center justify-content-between border-bottom-0">
-        <div class="d-flex align-items-center">
-            <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px; background: #fff1f2; border-radius: 10px; color: #e11d48;">
-                <i class="feather-gift fs-16"></i>
+        <div class="d-flex align-items-center gap-2.5" style="gap: 10px;">
+            <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px; background: #fff1f2; border-radius: 8px; color: #e11d48;">
+                <i class="feather-gift fs-14"></i>
             </div>
-            <h6 class="fw-bold mb-0 text-dark ms-2.5" style="font-size: 16px; color: #1e293b !important; font-weight: 700;">Upcoming Holidays</h6>
+            <h6 class="fw-bold mb-0 text-dark" style="font-size: 16px; color: #1e293b !important; font-weight: 700;">Upcoming Holidays</h6>
         </div>
         <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.holidays.index') ? route('hrms.holidays.index') : '#' }}" class="fs-12 fw-bold text-decoration-none" style="color: var(--bs-primary, #6337fa);">Calendar &rarr;</a>
     </div>

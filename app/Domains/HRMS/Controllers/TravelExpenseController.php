@@ -923,6 +923,19 @@ class TravelExpenseController extends Controller
             iconClass: 'feather-file-text'
         );
 
+        try {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.expense.submitted', [
+                'tenant_id'     => $expenseReport->tenant_id,
+                'claim_no'      => 'EXP-' . str_pad($expenseReport->id, 5, '0', STR_PAD_LEFT),
+                'employee_name' => $emp ? $emp->full_name : 'Employee',
+                'amount'        => number_format((float) $expenseReport->total_amount, 2),
+                'purpose'       => $expenseReport->title,
+                'action_url'    => route('hrms.travel-expense.index', ['tab' => 'report']),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
+        }
+
         return redirect()->back()->with('success', 'Expense report submitted for approval.');
     }
 
@@ -1186,6 +1199,21 @@ class TravelExpenseController extends Controller
             );
         }
 
+        if (in_array($status, ['approved', 'partially_approved'])) {
+            try {
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.expense.approved', [
+                    'tenant_id'     => $expenseReport->tenant_id,
+                    'claim_no'      => 'EXP-' . str_pad($expenseReport->id, 5, '0', STR_PAD_LEFT),
+                    'employee_name' => $expenseReport->employee?->full_name ?? 'Employee',
+                    'amount'        => number_format((float) $approvedAmount, 2),
+                    'approved_by'   => auth()->user()?->name ?? 'HR Manager',
+                    'action_url'    => route('hrms.travel-expense.index', ['tab' => 'report']),
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
+            }
+        }
+
         return redirect()->back()->with('success', 'Expense report approved with approved budget: $' . number_format($approvedAmount, 2));
     }
 
@@ -1271,6 +1299,19 @@ class TravelExpenseController extends Controller
                 $advance->update(['status' => 'settled']);
             }
         });
+
+        try {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.expense.settled', [
+                'tenant_id'     => $expenseReport->tenant_id,
+                'claim_no'      => 'EXP-' . str_pad($expenseReport->id, 5, '0', STR_PAD_LEFT),
+                'employee_name' => $expenseReport->employee?->full_name ?? 'Employee',
+                'amount'        => number_format((float) ($expenseReport->approved_net_reimbursement ?? $expenseReport->approved_amount ?? $expenseReport->total_amount), 2),
+                'payment_mode'  => ucfirst($expenseReport->payout_channel ?? 'Bank Transfer / Payroll'),
+                'action_url'    => route('hrms.travel-expense.index', ['tab' => 'report']),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', 'Expense payout processed successfully and accounting entries updated.');
     }

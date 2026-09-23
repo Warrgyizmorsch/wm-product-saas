@@ -237,10 +237,10 @@ class HrmsDashboardController extends Controller
         }
 
         if ($activeShift) {
-            $startTime = $activeShift->start_time ? Carbon::parse($activeShift->start_time)->format('H:i') : '09:00';
-            $endTime   = $activeShift->end_time ? Carbon::parse($activeShift->end_time)->format('H:i') : '18:00';
+            $startTime = $activeShift->start_time ? Carbon::parse($activeShift->start_time)->format('h:i A') : '09:00 AM';
+            $endTime   = $activeShift->end_time ? Carbon::parse($activeShift->end_time)->format('h:i A') : '06:00 PM';
             $myShiftDetails = [
-                'name'            => $activeShift->name ?: 'General Shift',
+                'name'            => $activeShift->name ?: 'Day Shift',
                 'badge'           => $activeShift->code ?: 'Default',
                 'timing'          => $startTime . ' - ' . $endTime,
                 'overtime_status' => $activeShift->overtime_allowed ? 'Allowed' : 'Not Allowed',
@@ -248,9 +248,9 @@ class HrmsDashboardController extends Controller
             ];
         } else {
             $myShiftDetails = [
-                'name'            => 'General Shift',
+                'name'            => 'Day Shift',
                 'badge'           => 'Default',
-                'timing'          => '09:00 - 18:00',
+                'timing'          => '09:00 AM - 06:00 PM',
                 'overtime_status' => 'Not Allowed',
                 'is_ot_allowed'   => false,
             ];
@@ -498,9 +498,6 @@ class HrmsDashboardController extends Controller
         $user = auth()->user();
         $activeView = $request->input('view', 'overview');
 
-        // Reset layout DB entries so the 4 top KPI cards always sit at row 0 (y=0) by default
-        \App\Domains\Platform\Models\DashboardLayout::query()->where('dashboard', 'hrms')->delete();
-
         $widgetQuery = array_filter([
             'preset' => $request->input('preset', 'this_month'),
             'from' => $request->input('from'),
@@ -619,10 +616,12 @@ class HrmsDashboardController extends Controller
             $activeShift = $currentEmployee->resolveShiftForDate($today);
         }
 
+        $startTime = $activeShift?->start_time ? Carbon::parse($activeShift->start_time)->format('h:i A') : '09:00 AM';
+        $endTime   = $activeShift?->end_time ? Carbon::parse($activeShift->end_time)->format('h:i A') : '06:00 PM';
         $myShiftDetails = [
-            'name' => $activeShift?->name ?: 'General Shift',
+            'name' => $activeShift?->name ?: 'Day Shift',
             'badge' => $activeShift?->code ?: 'Default',
-            'timing' => ($activeShift?->start_time ? Carbon::parse($activeShift->start_time)->format('H:i') : '09:00') . ' - ' . ($activeShift?->end_time ? Carbon::parse($activeShift->end_time)->format('H:i') : '18:00'),
+            'timing' => $startTime . ' - ' . $endTime,
         ];
 
         return compact('currentEmployee', 'myTodayAttendance', 'recentPunches', 'myShiftDetails');
@@ -698,6 +697,9 @@ class HrmsDashboardController extends Controller
                 'allocated' => $allocated,
                 'used' => $used,
                 'remaining' => $remaining,
+                'type' => $type->type ?? 'paid',
+                'description' => $type->description ?? '',
+                'rules' => is_array($type->rules) ? $type->rules : (json_decode($type->rules ?? '[]', true) ?: []),
             ];
         }
 
@@ -758,7 +760,7 @@ class HrmsDashboardController extends Controller
                 })->first();
         }
 
-        $latestBroadcasts = Broadcast::with(['receipts'])
+        $latestBroadcasts = Broadcast::with(['receipts', 'comments.employee'])
             ->where('tenant_id', $tenantId)
             ->where('status', 'published')
             ->latest()

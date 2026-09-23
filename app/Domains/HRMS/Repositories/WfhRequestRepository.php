@@ -132,7 +132,7 @@ class WfhRequestRepository implements WfhRequestRepositoryInterface
         $adminEmployee = $user ? $approvalService->getEmployeeFromUser($user) : null;
 
         if ($action === 'approved' && $user && $wfhRequest->employee) {
-            $approvalService->authorizeApproval($user, $wfhRequest->employee);
+            $approvalService->authorizeApproval($user, $wfhRequest->employee, $wfhRequest);
         }
 
         if ($action === 'approved') {

@@ -1,10 +1,10 @@
 <div class="card border-0 mb-0 h-100 shadow-sm" style="border-radius: 16px; background: #ffffff;">
     <div class="card-header bg-white pt-4 pb-3 px-4 d-flex align-items-center justify-content-between border-bottom-0">
-        <div class="d-flex align-items-center">
-            <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px; background: #fef2f2; border-radius: 10px; color: #ef4444;">
-                <i class="feather-alert-triangle fs-16"></i>
+        <div class="d-flex align-items-center gap-2.5" style="gap: 10px;">
+            <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px; background: #fef2f2; border-radius: 8px; color: #ef4444;">
+                <i class="feather-alert-triangle fs-14"></i>
             </div>
-            <h6 class="fw-bold mb-0 text-dark ms-2.5" style="font-size: 16px; color: #1e293b !important; font-weight: 700;">Unprocessed Penalties</h6>
+            <h6 class="fw-bold mb-0 text-dark" style="font-size: 16px; color: #1e293b !important; font-weight: 700;">Unprocessed Penalties</h6>
         </div>
         <span class="badge px-2.5 py-1 fs-11 fw-bold rounded-2" style="background: #fee2e2; color: #b91c1c;">
             {{ isset($unprocessedPenalties) ? count($unprocessedPenalties) : 0 }} Pending

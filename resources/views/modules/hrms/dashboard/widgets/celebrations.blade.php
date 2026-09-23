@@ -10,11 +10,11 @@
 
 <div class="card border-0 mb-0 h-100 shadow-sm" style="border-radius: 16px; background: #ffffff;">
     <div class="card-header bg-white pt-4 pb-3 px-4 d-flex align-items-center justify-content-between border-bottom-0">
-        <div class="d-flex align-items-center">
-            <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px; background: #fff7ed; border-radius: 10px; color: #ea580c;">
-                <i class="feather-award fs-16"></i>
+        <div class="d-flex align-items-center gap-2.5" style="gap: 10px;">
+            <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px; background: #fff7ed; border-radius: 8px; color: #ea580c;">
+                <i class="feather-award fs-14"></i>
             </div>
-            <h6 class="fw-bold mb-0 text-dark ms-2.5" style="font-size: 16px; color: #1e293b !important; font-weight: 700;">Celebrations This Month</h6>
+            <h6 class="fw-bold mb-0 text-dark" style="font-size: 16px; color: #1e293b !important; font-weight: 700;">Celebrations This Month</h6>
         </div>
         <span class="badge px-2.5 py-1 fs-11 fw-bold rounded-2" style="background: #ffedd5; color: #c2410c;">
             {{ count($bDays) + count($annivs) }} Events
@@ -28,8 +28,9 @@
                     @foreach($bDays as $bday)
                         <tr>
                             <td class="py-3 ps-4 border-bottom" style="border-color: #f1f5f9;">
-                                <div class="fw-bold text-dark fs-14" style="color: #1e293b !important; font-weight: 700;">
-                                    <i class="feather-gift text-warning me-1.5"></i>{{ $bday->full_name }}
+                                <div class="fw-bold text-dark fs-14 d-inline-flex align-items-center gap-2" style="color: #1e293b !important; font-weight: 700;">
+                                    <i class="feather-gift text-warning fs-15"></i>
+                                    <span>{{ $bday->full_name }}</span>
                                 </div>
                             </td>
                             <td class="py-3 pe-4 text-end border-bottom" style="border-color: #f1f5f9;">
@@ -40,8 +41,9 @@
                     @foreach($annivs as $anniv)
                         <tr>
                             <td class="py-3 ps-4 border-bottom" style="border-color: #f1f5f9;">
-                                <div class="fw-bold text-dark fs-14" style="color: #1e293b !important; font-weight: 700;">
-                                    <i class="feather-award text-primary me-1.5"></i>{{ $anniv->full_name }}
+                                <div class="fw-bold text-dark fs-14 d-inline-flex align-items-center gap-2" style="color: #1e293b !important; font-weight: 700;">
+                                    <i class="feather-award text-primary fs-15"></i>
+                                    <span>{{ $anniv->full_name }}</span>
                                 </div>
                             </td>
                             <td class="py-3 pe-4 text-end border-bottom" style="border-color: #f1f5f9;">

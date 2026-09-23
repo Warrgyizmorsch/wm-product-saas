@@ -258,6 +258,14 @@ class AttendanceCorrectionController extends Controller
             'status'              => 'pending',
         ]);
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.attendance.regularization_applied', [
+            'employee_name' => $employee->full_name,
+            'date'          => Carbon::parse($dateStr)->format('d M Y'),
+            'check_in'      => $requestedCheckIn ?? 'N/A',
+            'check_out'     => $requestedCheckOut ?? 'N/A',
+            'reason'        => $validated['reason'] ?? '',
+        ]);
+
         \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'Attendance Correction Request',
             message: "{$employee->full_name} requested attendance correction for " . Carbon::parse($dateStr)->format('M d, Y') . ".",
@@ -451,6 +459,12 @@ class AttendanceCorrectionController extends Controller
 
             DB::commit();
 
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.attendance.regularization_approved', [
+                'employee_name' => $correction->employee?->full_name ?? 'Employee',
+                'date'          => $correction->date ? $correction->date->format('d M Y') : now()->format('d M Y'),
+                'approved_by'   => auth()->user()?->name ?? 'Manager',
+            ]);
+
             if ($correction->employee_id) {
                 \App\Services\Notification\NotificationService::sendToEmployee(
                     employeeId: $correction->employee_id,
@@ -504,14 +518,12 @@ class AttendanceCorrectionController extends Controller
             return redirect()->back()->with('error', 'This request is no longer pending.');
         }
 
-        $validated = $request->validate([
-            'rejected_reason' => 'required|string|max:500',
-        ]);
+        $reason = $request->input('rejected_reason') ?: 'Rejected by administrator';
 
         $correction->update([
             'status'          => 'rejected',
             'approved_by'     => auth()->id(),
-            'rejected_reason' => $validated['rejected_reason']
+            'rejected_reason' => $reason
         ]);
 
         if ($correction->employee_id) {

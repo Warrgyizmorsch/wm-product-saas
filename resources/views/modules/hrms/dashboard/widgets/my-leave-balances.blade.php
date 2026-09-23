@@ -9,7 +9,7 @@
                 <span class="fs-11 text-muted">Allocated vs Used leave quota</span>
             </div>
         </div>
-        <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leave_requests.index') ? route('hrms.leave_requests.index') : '#' }}" class="btn btn-xs btn-primary rounded-pill px-2.5 py-1 fs-11">Apply Leave</a>
+        <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leaves.index') ? route('hrms.leaves.index', ['action' => 'apply']) : url('/hrms/leaves?action=apply') }}" class="btn btn-xs btn-primary rounded-pill px-2.5 py-1 fs-11">Apply Leave</a>
     </div>
 
     <div class="card-body p-3">

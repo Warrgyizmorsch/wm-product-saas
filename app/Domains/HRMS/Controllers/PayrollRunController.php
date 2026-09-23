@@ -643,7 +643,20 @@ class PayrollRunController extends Controller
 
     public function mySalary()
     {
-        $employee = auth()->user()->employee;
+        $user = auth()->user();
+        $employee = $user?->employee;
+        if (!$employee && $user) {
+            $employee = Employee::where('tenant_id', tenant_id())
+                ->where(function ($q) use ($user) {
+                    if ($user->email) {
+                        $q->where('office_email', $user->email)
+                          ->orWhere('personal_email', $user->email);
+                    }
+                })->first();
+        }
+        if (!$employee) {
+            $employee = Employee::where('tenant_id', tenant_id())->first();
+        }
         if (!$employee) {
             return redirect()->back()->with('error', 'No employee profile linked to your user account.');
         }
@@ -755,9 +768,35 @@ class PayrollRunController extends Controller
             'payroll_month_formatted' => \Carbon\Carbon::parse($run->payroll_month . '-01')->format('F Y'),
         ];
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.hrms.payroll.pdf_payslip', $data);
         $fileName = 'payslip_' . $employee->employee_id . '_' . $run->payroll_month . '.pdf';
-        
+
+        // Check if an active custom document template exists for payslips
+        try {
+            $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+            $template = \App\Domains\HRMS\Models\DocumentTemplate::query()
+                ->where('status', 'active')
+                ->where(function ($q) {
+                    $q->whereIn('code', ['PAYSLIP', 'SALARY_SLIP', 'SALARYSLIP'])
+                      ->orWhereHas('category', function ($cq) {
+                          $cq->where('name', 'like', '%payroll%')
+                             ->orWhere('name', 'like', '%salary%');
+                      });
+                })
+                ->orderBy('is_default', 'desc')
+                ->first();
+
+            if ($template && !empty($template->body_content)) {
+                $renderedHtml = $templateService->renderPayslip($template, $data);
+                $printableHtml = $templateService->toPrintableDocument($renderedHtml, 'Payslip - ' . $employee->full_name);
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($printableHtml);
+                return $pdf->download($fileName);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Custom payslip template rendering failed, falling back to default: " . $e->getMessage());
+        }
+
+        // Standard built-in fallback
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.hrms.payroll.pdf_payslip', $data);
         return $pdf->download($fileName);
     }
 
