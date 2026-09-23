@@ -354,8 +354,8 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" value="{{ $product->selling_price }}" inputType="number" step="0.01" :placeholder="__('inventory.selling_price')" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" :required="true" :errorText="$errors->first('sales_account')">
-                                <option value="" disabled {{ empty($product->sales_account) ? 'selected' : '' }}>{{ __('inventory.select_sales_account') }}</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" :errorText="$errors->first('sales_account')">
+                                <option value="" {{ empty($product->sales_account) ? 'selected' : '' }}>{{ __('inventory.select_sales_account') }}</option>
                                 @forelse($salesAccounts as $acc)
                                     <option value="{{ $acc->name }}" {{ $product->sales_account === $acc->name ? 'selected' : '' }}>
                                         {{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}
@@ -369,8 +369,8 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" value="{{ $product->cost_price }}" inputType="number" step="0.01" :placeholder="__('inventory.cost_price')" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" :required="true" :errorText="$errors->first('purchase_account')">
-                                <option value="" disabled {{ empty($product->purchase_account) ? 'selected' : '' }}>{{ __('inventory.select_purchase_account') }}</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" :errorText="$errors->first('purchase_account')">
+                                <option value="" {{ empty($product->purchase_account) ? 'selected' : '' }}>{{ __('inventory.select_purchase_account') }}</option>
                                 @forelse($purchaseAccounts as $acc)
                                     <option value="{{ $acc->name }}" {{ $product->purchase_account === $acc->name ? 'selected' : '' }}>
                                         {{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}
@@ -440,8 +440,8 @@
                         
                         <div class="row g-4 fs-13 text-dark">
                             <div class="col-lg-6 border-end">
-                                <x-ui.odoo-form-ui type="select" :label="__('inventory.inventory_account')" name="inventory_account" :required="true" :errorText="$errors->first('inventory_account')">
-                                    <option value="" disabled {{ empty($product->inventory_account) ? 'selected' : '' }}>{{ __('inventory.select_inventory_account') }}</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('inventory.inventory_account')" name="inventory_account" :errorText="$errors->first('inventory_account')">
+                                    <option value="" {{ empty($product->inventory_account) ? 'selected' : '' }}>{{ __('inventory.select_inventory_account') }}</option>
                                     @forelse($inventoryAccounts as $acc)
                                         <option value="{{ $acc->name }}" {{ ($product->inventory_account ?? '') === $acc->name ? 'selected' : '' }}>
                                             {{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}

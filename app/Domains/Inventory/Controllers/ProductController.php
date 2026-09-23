@@ -121,18 +121,9 @@ class ProductController extends Controller
             'preferred_vendor_id' => 'nullable|exists:vendors,id',
             'selling_price' => 'nullable|numeric|min:0',
             'cost_price' => 'nullable|numeric|min:0',
-            'sales_account' => 'required|string|max:255',
-            'purchase_account' => 'required|string|max:255',
-            'inventory_account' => [
-                'nullable',
-                'string',
-                'max:255',
-                function ($attribute, $value, $fail) use ($request) {
-                    if ($request->input('item_type', 'Goods') === 'Goods' && empty($value)) {
-                        $fail("The Inventory Account field is required.");
-                    }
-                }
-            ],
+            'sales_account' => 'nullable|string|max:255',
+            'purchase_account' => 'nullable|string|max:255',
+            'inventory_account' => 'nullable|string|max:255',
             'reorder_point' => 'nullable|numeric|min:0',
             'minimum_order_qty' => 'nullable|numeric|min:0',
             'order_multiple' => 'nullable|numeric|min:0',
@@ -238,19 +229,9 @@ class ProductController extends Controller
             'preferred_vendor_id' => 'nullable|exists:vendors,id',
             'selling_price' => 'nullable|numeric|min:0',
             'cost_price' => 'nullable|numeric|min:0',
-            'sales_account' => 'required|string|max:255',
-            'purchase_account' => 'required|string|max:255',
-            'inventory_account' => [
-                'nullable',
-                'string',
-                'max:255',
-                function ($attribute, $value, $fail) use ($request, $product) {
-                    $itemType = $request->input('item_type', $product->item_type ?? 'Goods');
-                    if ($itemType === 'Goods' && empty($value)) {
-                        $fail("The Inventory Account field is required.");
-                    }
-                }
-            ],
+            'sales_account' => 'nullable|string|max:255',
+            'purchase_account' => 'nullable|string|max:255',
+            'inventory_account' => 'nullable|string|max:255',
             'reorder_point' => 'nullable|numeric|min:0',
             'minimum_order_qty' => 'nullable|numeric|min:0',
             'order_multiple' => 'nullable|numeric|min:0',
