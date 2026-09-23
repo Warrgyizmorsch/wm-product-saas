@@ -306,4 +306,19 @@ class FakeModuleGateway implements PaymentGateway
     {
         return null;
     }
+
+    public function createSubscription(Tenant $tenant, \App\Domains\Platform\Models\TenantSubscription $subscription): array
+    {
+        throw new \LogicException('Not used in these tests.');
+    }
+
+    public function verifySubscriptionCallback(array $callbackInput, \App\Domains\Platform\Models\TenantSubscription $subscription): bool
+    {
+        return false;
+    }
+
+    public function resolveSubscriptionWebhook(Request $request): ?array
+    {
+        return null;
+    }
 }

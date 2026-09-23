@@ -14,10 +14,12 @@ class SubscriptionPayment extends BaseModel
 
     public const PURPOSE_PLAN_SWITCH = 'plan_switch';
     public const PURPOSE_MODULE_ADDON = 'module_addon';
+    public const PURPOSE_SUBSCRIPTION = 'subscription';
 
     protected $fillable = [
         'tenant_id',
         'plan_id',
+        'tenant_subscription_id',
         'purpose',
         'modules',
         'gateway',

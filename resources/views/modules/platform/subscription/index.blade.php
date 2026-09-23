@@ -21,7 +21,16 @@
                 @if ($currentPlan)
                     @php $current = $planPrices[$currentPlan->id] ?? ['monthly' => null, 'yearly' => null]; @endphp
                     <span class="fs-13 text-muted">
-                        @if ($current['yearly'] !== null || $current['monthly'] !== null)
+                        @if ($liveSubscription)
+                            {{ $liveSubscription->seats }} users &middot; billed {{ $liveSubscription->cycle }}
+                            &middot; ₹{{ number_format($liveSubscription->total / 100, 2) }} incl. GST
+                            @if ($liveSubscription->current_end)
+                                &middot; renews {{ $liveSubscription->current_end->format('d M Y') }}
+                            @endif
+                            @if ($liveSubscription->grace_ends_at)
+                                <span class="d-block text-danger">Renewal payment failed — please update your payment method before {{ $liveSubscription->grace_ends_at->format('d M Y') }}.</span>
+                            @endif
+                        @elseif ($current['yearly'] !== null || $current['monthly'] !== null)
                             {{ $perUser($current) }} &middot; no paid subscription yet
                         @else
                             {{ $currentPlan->price > 0 ? $currentPlan->currency.' '.number_format($currentPlan->price).' / '.$currentPlan->billing_cycle : 'Free' }}
@@ -238,7 +247,9 @@
                             <tr>
                                 <td class="fs-13">{{ $payment->created_at->format('d M Y, h:i A') }}</td>
                                 <td class="fs-13">
-                                    @if ($payment->purpose === \App\Domains\Platform\Models\SubscriptionPayment::PURPOSE_MODULE_ADDON)
+                                    @if ($payment->purpose === \App\Domains\Platform\Models\SubscriptionPayment::PURPOSE_SUBSCRIPTION)
+                                        Subscription: {{ $payment->plan?->name ?? '—' }}
+                                    @elseif ($payment->purpose === \App\Domains\Platform\Models\SubscriptionPayment::PURPOSE_MODULE_ADDON)
                                         Module add-on:
                                         {{ collect($payment->modules)->map(fn ($m) => config("navigation.apps.$m.label", ucfirst($m)))->implode(', ') }}
                                     @else

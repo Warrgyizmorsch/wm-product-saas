@@ -8,6 +8,7 @@ use App\Domains\Platform\Services\PaymentGatewayManager;
 use App\Domains\Platform\Services\SubscriptionPaymentService;
 use App\Domains\Platform\Services\SubscriptionPricing;
 use App\Domains\Platform\Services\TenantModuleService;
+use App\Domains\Platform\Services\TenantSubscriptionService;
 use App\Domains\Platform\Services\TenantService;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureTenantModuleAccess;
@@ -35,6 +36,7 @@ class SubscriptionController extends Controller
         private readonly SubscriptionPaymentService $payments,
         private readonly TenantModuleService $tenantModules,
         private readonly SubscriptionPricing $pricing,
+        private readonly TenantSubscriptionService $subscriptions,
     ) {
     }
 
@@ -77,6 +79,7 @@ class SubscriptionController extends Controller
                 'yearly' => $this->pricing->planPricePerUser($plan, 'yearly'),
             ]])->all(),
             'modules' => $modules,
+            'liveSubscription' => $this->subscriptions->live($tenant)?->load('plan'),
             'modulePrice' => config('navigation.module_addon_price'),
             'moduleCurrency' => 'INR',
             'payments' => SubscriptionPayment::query()

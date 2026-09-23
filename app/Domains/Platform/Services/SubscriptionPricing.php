@@ -186,7 +186,10 @@ class SubscriptionPricing
 
     private function withGst(int $planId, string $cycle, int $seats, array $lines, int $subtotal): SubscriptionQuote
     {
-        $gst = $this->gstOn($subtotal);
+        // GST per seat × seats: the gateway charges (per-seat amount incl. GST) ×
+        // quantity, so the quote must round the same way to match it to the paisa.
+        // Every line is price × seats, so the subtotal always divides evenly.
+        $gst = $this->gstOn(intdiv($subtotal, $seats)) * $seats;
 
         return new SubscriptionQuote(
             planId: $planId,

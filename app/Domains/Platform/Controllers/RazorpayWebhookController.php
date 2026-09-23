@@ -5,6 +5,7 @@ namespace App\Domains\Platform\Controllers;
 use App\Domains\Platform\Models\SubscriptionPayment;
 use App\Domains\Platform\Services\PaymentGatewayManager;
 use App\Domains\Platform\Services\SubscriptionPaymentService;
+use App\Domains\Platform\Services\TenantSubscriptionService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,6 +33,7 @@ class RazorpayWebhookController extends Controller
     public function __construct(
         private readonly PaymentGatewayManager $gateways,
         private readonly SubscriptionPaymentService $payments,
+        private readonly TenantSubscriptionService $subscriptions,
     ) {
     }
 
@@ -41,6 +43,15 @@ class RazorpayWebhookController extends Controller
 
         if ($gateway === null) {
             return response()->json(['status' => 'ignored']);
+        }
+
+        // Recurring subscriptions: activated / charged / pending / halted / cancelled.
+        $subscriptionEvent = $gateway->resolveSubscriptionWebhook($request);
+
+        if ($subscriptionEvent !== null) {
+            $this->subscriptions->handleWebhook($subscriptionEvent);
+
+            return response()->json(['status' => 'ok']);
         }
 
         $resolved = $gateway->resolveWebhookPayment($request);

@@ -4,6 +4,7 @@ namespace App\Domains\Platform\Contracts;
 
 use App\Domains\Platform\Models\Plan;
 use App\Domains\Platform\Models\SubscriptionPayment;
+use App\Domains\Platform\Models\TenantSubscription;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
 
@@ -81,4 +82,33 @@ interface PaymentGateway
      * @return array{order_id: string, payment_id: string}|null
      */
     public function resolveWebhookPayment(Request $request): ?array;
+
+    /**
+     * Starts a recurring per-user subscription for an already-created (status
+     * created) TenantSubscription: charges $subscription->perSeatTotal() ×
+     * $subscription->seats every $subscription->cycle, GST included. Returns
+     * the gateway's plan/subscription ids and whatever the checkout widget
+     * needs. Amounts come from the row (server-computed quote), never the client.
+     *
+     * @return array{gateway_plan_id: string, gateway_subscription_id: string, checkout: array<string, mixed>}
+     */
+    public function createSubscription(Tenant $tenant, TenantSubscription $subscription): array;
+
+    /**
+     * Verifies the browser callback after the first subscription payment
+     * (Razorpay: payment_id|subscription_id signed with the key secret).
+     *
+     * @param array<string, mixed> $callbackInput gateway_payment_id, gateway_signature
+     */
+    public function verifySubscriptionCallback(array $callbackInput, TenantSubscription $subscription): bool;
+
+    /**
+     * Verifies a webhook's signature and, for a subscription lifecycle event,
+     * returns it normalised — or null for anything else / a bad signature.
+     * `event` is one of: authenticated, activated, charged, pending, halted,
+     * cancelled, completed. Timestamps are unix seconds from the gateway.
+     *
+     * @return array{event: string, subscription_id: string, payment_id: ?string, amount: ?int, current_start: ?int, current_end: ?int}|null
+     */
+    public function resolveSubscriptionWebhook(Request $request): ?array;
 }
