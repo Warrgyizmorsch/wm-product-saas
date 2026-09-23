@@ -26,7 +26,7 @@ return [
         'children' => [
             ['label' => 'crm.lead_status_master', 'default' => 'Lead Status Master', 'route' => 'crm.masters.lead-statuses.index'],
             ['label' => 'crm.deal_stage_master', 'default' => 'Deal Stage Master', 'route' => 'crm.masters.deal-statuses.index'],
-            ['label' => 'crm.crm_sales_settings', 'default' => 'CRM & Sales Settings', 'route' => 'crm.settings.index'],
+            ['label' => 'crm.crm_settings', 'default' => 'CRM Settings', 'route' => 'crm.settings.index'],
         ],
     ],
     [

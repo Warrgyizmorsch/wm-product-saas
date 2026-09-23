@@ -132,7 +132,7 @@
                             </td>
                             <td>
                                 @if ($dispatch->materialRequirement)
-                                    <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-semibold text-dark">
+                                    <a href="{{ route('inventory.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-semibold text-dark">
                                         {{ $dispatch->materialRequirement->requirement_number }}
                                     </a>
                                 @else

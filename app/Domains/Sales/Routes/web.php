@@ -20,11 +20,11 @@ Route::prefix('sales')
         Route::post('orders/{order}/cancel', [SalesOrderController::class, 'cancel'])->name('orders.cancel');
         Route::get('orders/{order}/download', [SalesOrderController::class, 'downloadPdf'])->name('orders.download');
 
-        // Material Requirements Routes
-        Route::get('material-requirements', [MaterialRequirementController::class, 'index'])->name('material-requirements.index');
-        Route::get('material-requirements/create', [MaterialRequirementController::class, 'create'])->name('material-requirements.create');
+        // Material Requirements Routes (Alias Redirects to /inventory/material-requirements)
+        Route::get('material-requirements', fn() => redirect()->route('inventory.material-requirements.index'))->name('material-requirements.index');
+        Route::get('material-requirements/create', fn(\Illuminate\Http\Request $request) => redirect()->route('inventory.material-requirements.create', $request->query()))->name('material-requirements.create');
         Route::post('material-requirements', [MaterialRequirementController::class, 'store'])->name('material-requirements.store');
-        Route::get('material-requirements/{delivery}', [MaterialRequirementController::class, 'show'])->name('material-requirements.show');
+        Route::get('material-requirements/{delivery}', fn($delivery) => redirect()->route('inventory.material-requirements.show', $delivery))->name('material-requirements.show');
         Route::post('material-requirements/{delivery}/ship', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'ship'])->name('material-requirements.ship');
         Route::post('material-requirements/{delivery}/cancel', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'cancel'])->name('material-requirements.cancel');
 
@@ -103,4 +103,8 @@ Route::prefix('sales')
         Route::get('returns/{return}', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'show'])->name('returns.show');
         Route::post('returns/{return}/approve', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'approve'])->name('returns.approve');
         Route::post('returns/{return}/complete', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'complete'])->name('returns.complete');
+
+        // Sales Settings Routes
+        Route::get('settings', [\App\Domains\Sales\Controllers\SalesSettingsController::class, 'index'])->name('settings.index');
+        Route::post('settings/invoicing-policy', [\App\Domains\Sales\Controllers\SalesSettingsController::class, 'updateInvoicingPolicy'])->name('settings.update-invoicing-policy');
     });

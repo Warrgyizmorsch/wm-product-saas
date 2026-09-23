@@ -28,7 +28,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link pb-3 px-3 @if(Route::is('sales.material-requirements.*')) active fw-bold text-primary border-bottom border-primary border-2 @else text-muted border-0 @endif" href="{{ route('sales.material-requirements.index') }}">
+                    <a class="nav-link pb-3 px-3 @if(Route::is('inventory.material-requirements.*') || Route::is('sales.material-requirements.*')) active fw-bold text-primary border-bottom border-primary border-2 @else text-muted border-0 @endif" href="{{ route('inventory.material-requirements.index') }}">
                         <i class="feather-clipboard me-1"></i> Material Requirements
                     </a>
                 </li>

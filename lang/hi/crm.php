@@ -428,6 +428,8 @@ return array (
   'crm_masters_sidebar' => 'सीआरएम मास्टर्स',
   'lead_status_master' => 'लीड स्टेटस मास्टर',
   'deal_stage_master' => 'डील स्टेज मास्टर',
+  'crm_settings' => 'सीआरएम सेटिंग्स',
+  'sales_settings' => 'बिक्री सेटिंग्स',
   'crm_sales_settings' => 'सीआरएम और बिक्री सेटिंग्स',
   'tabs' => 
   array (
@@ -1017,6 +1019,7 @@ return array (
   'revenue_cycle' => 'राजस्व चक्र',
   'settings' => 'सेटिंग्स',
   'configure_invoicing_policy_subtext' => 'राजस्व चक्र के लिए चालान नीति और कार्यप्रवाह स्वचालन नियमों को कॉन्फ़िगर करें।',
+  'configure_quotation_approval_subtext' => 'सीआरएम के लिए कोटेशन अनुमोदन नीति और कार्यप्रवाह स्वचालन नियमों को कॉन्फ़िगर करें।',
   'invoicing_policy_workflow_mode' => 'चालान नीति और कार्यप्रवाह मोड',
   'revenue_cycle_setting' => 'राजस्व चक्र सेटिंग',
   'select_default_invoicing_policy' => 'डिफ़ॉल्ट चालान नीति चुनें',

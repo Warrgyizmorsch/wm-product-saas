@@ -428,6 +428,8 @@ return array (
   'crm_masters_sidebar' => 'CRM Masters',
   'lead_status_master' => 'Lead Status Master',
   'deal_stage_master' => 'Deal Stage Master',
+  'crm_settings' => 'CRM Settings',
+  'sales_settings' => 'Sales Settings',
   'crm_sales_settings' => 'CRM & Sales Settings',
   'tabs' => 
   array (
@@ -1017,6 +1019,7 @@ return array (
   'revenue_cycle' => 'Revenue Cycle',
   'settings' => 'Settings',
   'configure_invoicing_policy_subtext' => 'Configure invoicing policy and workflow automation rules for Revenue Cycle.',
+  'configure_quotation_approval_subtext' => 'Configure quotation approval policy and workflow automation rules for CRM.',
   'invoicing_policy_workflow_mode' => 'Invoicing Policy & Workflow Mode',
   'revenue_cycle_setting' => 'Revenue Cycle Setting',
   'select_default_invoicing_policy' => 'Select Default Invoicing Policy',

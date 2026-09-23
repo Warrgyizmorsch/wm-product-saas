@@ -2,7 +2,7 @@
 
 @section('title', __('crm.material_requirements') . ' | SaaS ERP')
 @section('page-title', __('crm.material_requirements'))
-@section('breadcrumb', __('ui.sales') . ' / ' . __('crm.material_requirements'))
+@section('breadcrumb', __('ui.inventory') . ' / ' . __('crm.material_requirements'))
 
 @section('content')
 
@@ -42,7 +42,7 @@
                 </x-ui.sort-dropdown>
 
                 <!-- Custom Filter Component -->
-                <form method="GET" action="{{ route('sales.material-requirements.index') }}" class="d-inline">
+                <form method="GET" action="{{ route('inventory.material-requirements.index') }}" class="d-inline">
                     <x-ui.filter :label="__('crm.filter') ?: 'Filter'" offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') ?: 'Filter Options' }}</h6>
                         
@@ -73,7 +73,7 @@
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('sales.material-requirements.index') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') ?: 'Reset' }}</a>
+                            <a href="{{ route('inventory.material-requirements.index') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') ?: 'Reset' }}</a>
                             <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') ?: 'Apply Filters' }}</button>
                         </div>
                     </x-ui.filter>
@@ -139,7 +139,7 @@
                         @endphp
                         <tr>
                             <td class="ps-4">
-                                <a href="{{ route('sales.material-requirements.show', $do->id) }}" class="fw-bold text-primary">
+                                <a href="{{ route('inventory.material-requirements.show', $do->id) }}" class="fw-bold text-primary">
                                     {{ $do->requirement_number }}
                                 </a>
                             </td>
@@ -169,8 +169,8 @@
                                         ? in_array($do->status, ['Dispatched', 'Delivered', 'Shipped'])
                                         : ($do->status === 'Delivered');
                                 @endphp
-                                <x-ui.action-dropdown :viewUrl="route('sales.material-requirements.show', $do->id)">
-                                    <x-ui.dropdown-item href="{{ route('sales.material-requirements.show', $do->id) }}" icon="feather-eye">
+                                <x-ui.action-dropdown :viewUrl="route('inventory.material-requirements.show', $do->id)">
+                                    <x-ui.dropdown-item href="{{ route('inventory.material-requirements.show', $do->id) }}" icon="feather-eye">
                                         {{ __('crm.view_details') ?: 'View Details' }}
                                     </x-ui.dropdown-item>
                                     @if ($canInvoice && !$invoiced)

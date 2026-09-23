@@ -505,7 +505,7 @@
                                             <th class="text-center p-2 vendor-col-header" style="min-width: 200px; background-color: #f8fafc;" data-vendor-id="{{ $rv->id }}">
                                                 <div class="form-check d-flex align-items-center justify-content-center gap-1.5 mb-1.5">
                                                     <input type="radio"
-                                                        class="form-check-input supplier-po-radio"
+                                                        class="form-check-input supplier-po-radio supplier-select-radio"
                                                         name="selected_po_vendor"
                                                         id="vendor_radio_{{ $rv->id }}"
                                                         value="{{ $rv->id }}"
@@ -777,6 +777,41 @@
     @endif
 
     {{-- ===================== Create PO Modal ===================== --}}
+    @php
+        $requestedWarehouseName = null;
+
+        // 1. Check from Requisition items
+        if ($rfq->requisition && $rfq->requisition->items) {
+            $firstWhItem = $rfq->requisition->items->first(function($item) {
+                return !empty($item->warehouse_id) || !empty($item->warehouse);
+            });
+            if ($firstWhItem) {
+                if ($firstWhItem->warehouse) {
+                    $requestedWarehouseName = $firstWhItem->warehouse->name;
+                } elseif ($firstWhItem->warehouse_id) {
+                    $wh = $warehouses->firstWhere('id', $firstWhItem->warehouse_id);
+                    if ($wh) $requestedWarehouseName = $wh->name;
+                }
+            }
+        }
+
+        // 2. Check from RFQ items directly
+        if (!$requestedWarehouseName && $rfq->items) {
+            $firstRfqWhItem = $rfq->items->first(function($item) {
+                return !empty($item->warehouse_id);
+            });
+            if ($firstRfqWhItem && $firstRfqWhItem->warehouse_id) {
+                $wh = $warehouses->firstWhere('id', $firstRfqWhItem->warehouse_id);
+                if ($wh) $requestedWarehouseName = $wh->name;
+            }
+        }
+
+        // 3. Fallback to default tenant warehouse or first warehouse
+        if (!$requestedWarehouseName && $warehouses->isNotEmpty()) {
+            $defaultWh = $warehouses->firstWhere('is_default', 1) ?? $warehouses->first();
+            if ($defaultWh) $requestedWarehouseName = $defaultWh->name;
+        }
+    @endphp
     <x-ui.modal id="createPoModal" title="{{ __('purchase.create_purchase_order') }}" size="xl" :centered="true" :showFooter="true" formAction="{{ route('purchase.rfqs.create-po', $rfq->id) }}" formMethod="POST">
         <input type="hidden" name="vendor_id" id="po-form-vendor-id" value="">
         <input type="hidden" name="source_type" value="rfq">
@@ -803,7 +838,7 @@
                     <x-ui.odoo-form-ui type="select" label="{{ __('purchase.location_warehouse') }}" name="location" id="po-location" required="true">
                         <option value="">{{ __('purchase.select_warehouse') }}</option>
                         @foreach($warehouses as $w)
-                            <option value="{{ $w->name }}">{{ $w->name }}</option>
+                            <option value="{{ $w->name }}" @selected($requestedWarehouseName === $w->name)>{{ $w->name }}</option>
                         @endforeach
                     </x-ui.odoo-form-ui>
                 </div>
@@ -1088,23 +1123,31 @@
             });
 
             // ---- Select-all checkbox ----
-            $('#select-all-items').on('change', function() {
-                $('.item-select-cb').prop('checked', $(this).prop('checked'));
+            $(document).on('change', '#selectAllItems, #select-all-items, .select-all-items', function() {
+                const isChecked = $(this).prop('checked');
+                $('.item-select-cb:not(:disabled)').prop('checked', isChecked);
+                $('#selectAllItems, #select-all-items, .select-all-items').prop('checked', isChecked).prop('indeterminate', false);
                 updatePoBtn();
                 syncPoPreview();
             });
 
             $(document).on('change', '.item-select-cb', function() {
-                const total = $('.item-select-cb').length;
-                const checked = $('.item-select-cb:checked').length;
-                $('#select-all-items').prop('indeterminate', checked > 0 && checked < total);
-                $('#select-all-items').prop('checked', checked === total && total > 0);
+                const enabledItems = $('.item-select-cb:not(:disabled)');
+                const total = enabledItems.length;
+                const checked = enabledItems.filter(':checked').length;
+                const isIndeterminate = checked > 0 && checked < total;
+                const allChecked = total > 0 && checked === total;
+
+                $('#selectAllItems, #select-all-items, .select-all-items')
+                    .prop('indeterminate', isIndeterminate)
+                    .prop('checked', allChecked);
+
                 updatePoBtn();
                 syncPoPreview();
             });
 
             // ---- Supplier radio ----
-            $(document).on('change', '.supplier-select-radio', function() {
+            $(document).on('change', '.supplier-select-radio, .supplier-po-radio', function() {
                 const selectedVendorId = $(this).attr('data-vendor-id');
                 
                 // Re-enable and reset style for all items first
@@ -1133,8 +1176,9 @@
 
             // Handle form submission to validate inputs and set vendor ID
             $('#createPoModal form').on('submit', function(e) {
-                const vendorId = $('.supplier-select-radio:checked').attr('data-vendor-id');
-                const dbVendorId = $('.supplier-select-radio:checked').attr('data-db-vendor-id');
+                const vendorRadio = $('.supplier-select-radio:checked, .supplier-po-radio:checked');
+                const vendorId = vendorRadio.attr('data-vendor-id');
+                const dbVendorId = vendorRadio.attr('data-db-vendor-id');
                 const items = $('.item-select-cb:checked');
                 const alertEl = $('#po-alert');
                 alertEl.addClass('d-none').text('');
@@ -1182,7 +1226,7 @@
 
         function updatePoBtn() {
             const items      = $('.item-select-cb:checked').length;
-            const vendorRadio = $('.supplier-select-radio:checked');
+            const vendorRadio = $('.supplier-select-radio:checked, .supplier-po-radio:checked');
             const vendorName = vendorRadio.attr('data-vendor-name') || 'None';
             const bar        = document.getElementById('po-action-bar');
 
@@ -1205,13 +1249,13 @@
 
         function clearPoSelection() {
             $('.item-select-cb').prop('checked', false);
-            $('.supplier-select-radio').prop('checked', false);
-            $('#select-all-items').prop('checked', false).prop('indeterminate', false);
+            $('.supplier-select-radio, .supplier-po-radio').prop('checked', false);
+            $('#selectAllItems, #select-all-items, .select-all-items').prop('checked', false).prop('indeterminate', false);
             updatePoBtn();
         }
 
         function syncPoPreview() {
-            const vendorRadio = $('.supplier-select-radio:checked');
+            const vendorRadio = $('.supplier-select-radio:checked, .supplier-po-radio:checked');
             const vendorId   = vendorRadio.attr('data-vendor-id')   || '';
             const vendorName = vendorRadio.attr('data-vendor-name') || 'None selected';
             const quoteNo    = vendorRadio.attr('data-quotation-number') || '';
