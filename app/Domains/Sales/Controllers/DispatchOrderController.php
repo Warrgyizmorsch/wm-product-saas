@@ -278,6 +278,15 @@ class DispatchOrderController extends Controller
 
         try {
             $dispatch = $this->dispatchService->shipDispatchOrder($dispatch);
+
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.dispatch.shipped', [
+                'doc_no' => $dispatch->dispatch_number,
+                'customer_name' => $dispatch->customer?->name ?? 'Customer',
+                'transporter' => $dispatch->transporter?->name ?? $dispatch->carrier ?? 'Carrier',
+                'tracking_no' => $dispatch->tracking_number ?? $dispatch->lr_number ?? 'N/A',
+                'date' => now()->format('Y-m-d'),
+            ], $dispatch->tenant_id ?? tenant_id() ?? 1, auth()->id());
+
             return redirect()->back()
                 ->with('success', "Dispatch Order {$dispatch->dispatch_number} marked as Shipped (Gate Outward) and physical stock deducted from warehouse successfully.");
         } catch (Exception $e) {

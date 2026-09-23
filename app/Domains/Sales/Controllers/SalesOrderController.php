@@ -131,6 +131,17 @@ class SalesOrderController extends Controller
 
         $order = $this->salesOrders->create($validated, $request->input('items', []));
 
+        // Trigger Notification Master Rules
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.order.created', [
+            'doc_no'             => $order->sales_order_number,
+            'customer_name'      => $order->customer?->name ?? 'Customer',
+            'amount'             => format_currency($order->total_amount ?? 0),
+            'created_by'         => auth()->user()?->name ?? 'User',
+            'created_by_user_id' => auth()->id(),
+            'assigned_user_id'   => $order->sales_person_id,
+            'date'               => now()->format('d M Y h:i A'),
+        ], route('sales.orders.show', $order->id), $order);
+
         return redirect()->route('sales.orders.show', $order->id)->with('success', 'Sales Order successfully created!');
     }
 
@@ -226,6 +237,17 @@ class SalesOrderController extends Controller
 
         $nextRequirementNumber = $this->materialRequirementService->getNextRequirementNumber();
         $this->orderRepo->confirmOrder($order, $nextRequirementNumber);
+
+        // Trigger Notification Master Rules
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.order.confirmed', [
+            'doc_no'             => $order->sales_order_number,
+            'customer_name'      => $order->customer?->name ?? 'Customer',
+            'amount'             => format_currency($order->total_amount ?? 0),
+            'confirmed_by'       => auth()->user()?->name ?? 'User',
+            'created_by_user_id' => $order->created_by,
+            'assigned_user_id'   => $order->sales_person_id,
+            'date'               => now()->format('d M Y h:i A'),
+        ], route('sales.orders.show', $order->id), $order);
 
         return redirect()->route('sales.orders.show', $order->id)->with('success', 'Sales Order confirmed and Material Requirement generated successfully!');
     }

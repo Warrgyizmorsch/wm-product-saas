@@ -7,6 +7,33 @@
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    <style>
+        .product-thumb-wrapper {
+            width: 44px;
+            height: 44px;
+        }
+        .product-thumb-link {
+            width: 44px;
+            height: 44px;
+            border-color: #e2e8f0 !important;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .product-thumb-link:hover {
+            transform: scale(1.08);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+            border-color: #6366f1 !important;
+        }
+        .product-img-display {
+            transition: transform 0.25s ease;
+        }
+        .product-thumb-link:hover .product-img-display {
+            transform: scale(1.06);
+        }
+        .product-initials-badge {
+            letter-spacing: 0.5px;
+            font-family: inherit;
+        }
+    </style>
 @endpush
 
 @push('scripts')
@@ -106,30 +133,6 @@
                         </div>
                     </x-ui.filter>
                 </form>
-
-                <div class="dropdown d-inline-block">
-                    <a href="javascript:void(0)" class="action-dropdown-btn" data-bs-toggle="dropdown" aria-expanded="false" title="{{ __('inventory.import_export_options') }}">
-                        <i class="feather-paperclip"></i>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end fs-13 shadow-lg">
-                        <li>
-                            <a href="{{ route('inventory.products.export') }}" class="dropdown-item">
-                                <i class="feather-download me-2 text-muted fs-12"></i>{{ __('inventory.export_excel') }}
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{{ route('inventory.products.downloadSample') }}" class="dropdown-item">
-                                <i class="feather-file-text me-2 text-muted fs-12"></i>{{ __('inventory.download_sample') }}
-                            </a>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importProductsModal">
-                                <i class="feather-upload me-2 text-muted fs-12"></i>{{ __('inventory.import') }}
-                            </a>
-                        </li>
-                    </ul>
-                </div>
             </div>
         </div>
 
@@ -138,9 +141,6 @@
             <x-ui.odoo-form-ui type="table" id="productsTable">
                 <thead>
                     <tr>
-                        <th style="width: 3%" class="text-center">
-                            <input type="checkbox" class="form-check-input">
-                        </th>
                         <th>{{ __('inventory.item_name_sku') }}</th>
                         <th>{{ __('inventory.type') }}</th>
                         <th>{{ __('inventory.material_type') }}</th>
@@ -155,15 +155,56 @@
                 <tbody class="fs-13 text-dark">
                     @forelse ($products as $product)
                         <tr>
-                            <td class="text-center">
-                                <input type="checkbox" class="form-check-input">
-                            </td>
                             <td>
-                                <div class="d-flex flex-column">
-                                    <a href="{{ route('inventory.products.show', $product) }}" class="fw-bold text-primary hover-primary">
-                                        {{ $product->name }}
-                                    </a>
-                                    <small class="text-muted font-monospace fs-10">{{ $product->sku ?: '—' }}</small>
+                                @php
+                                    $mainImg = $product->main_image_url;
+                                    $words = preg_split('/\s+/', trim($product->name));
+                                    $initials = '';
+                                    if (count($words) >= 2) {
+                                        $initials = mb_strtoupper(mb_substr($words[0], 0, 1) . mb_substr($words[1], 0, 1));
+                                    } else {
+                                        $initials = mb_strtoupper(mb_substr($product->name, 0, 2));
+                                    }
+                                    $colors = ['primary', 'info', 'success', 'warning', 'danger', 'secondary'];
+                                    $colorClass = $colors[abs(crc32($product->name)) % count($colors)];
+                                    $photoCount = ($product->relationLoaded('images') ? $product->images->count() : 0) + 
+                                                  ($product->relationLoaded('variants') ? $product->variants->sum(fn($v) => $v->images->count()) : 0);
+                                @endphp
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="product-thumb-wrapper position-relative flex-shrink-0">
+                                        <a href="{{ route('inventory.products.show', $product) }}" class="product-thumb-link d-block rounded-3 border bg-white overflow-hidden shadow-2xs position-relative">
+                                            @if($mainImg)
+                                                <img src="{{ $mainImg }}" alt="{{ $product->name }}" class="product-img-display w-100 h-100 object-fit-cover" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                <div class="product-initials-badge bg-soft-{{ $colorClass }} text-{{ $colorClass }} fw-bold fs-12 d-none align-items-center justify-content-center w-100 h-100">
+                                                    {{ $initials }}
+                                                </div>
+                                            @else
+                                                <div class="product-initials-badge bg-soft-{{ $colorClass }} text-{{ $colorClass }} fw-bold fs-12 d-flex align-items-center justify-content-center w-100 h-100">
+                                                    {{ $initials }}
+                                                </div>
+                                            @endif
+                                        </a>
+                                        @if($product->variation_type === 'Variant')
+                                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary border border-white text-white p-1" style="font-size: 9px; line-height: 1; transform: translate(-30%, -30%) !important;" title="{{ $product->variants->count() }} {{ __('inventory.variants') }}">
+                                                <i class="feather-layers" style="font-size: 8px;"></i>
+                                            </span>
+                                        @elseif($photoCount > 1)
+                                            <span class="position-absolute bottom-0 end-0 badge rounded-pill bg-dark bg-opacity-75 text-white p-1" style="font-size: 9px; line-height: 1; margin: 2px;" title="{{ $photoCount }} {{ __('inventory.photos') }}">
+                                                <i class="feather-image" style="font-size: 8px;"></i> {{ $photoCount }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="d-flex flex-column min-w-0">
+                                        <a href="{{ route('inventory.products.show', $product) }}" class="fw-bold text-dark hover-primary fs-13 text-truncate" title="{{ $product->name }}">
+                                            {{ $product->name }}
+                                        </a>
+                                        <div class="d-flex align-items-center gap-2 mt-0.5">
+                                            <span class="text-muted font-monospace fs-11">{{ $product->sku ?: '—' }}</span>
+                                            @if($product->barcode)
+                                                <span class="text-muted fs-11 font-monospace d-none d-md-inline" title="Barcode: {{ $product->barcode }}"><i class="feather-maximize-2 fs-10 me-1"></i>{{ $product->barcode }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
                                 </div>
                             </td>
                             <td>

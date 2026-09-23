@@ -74,6 +74,7 @@
             /* Select2 Container Overrides for modal-form-ui */
             .form-ui-select2-container {
                 width: 100%;
+                position: relative;
             }
             .form-ui-select2-container .select2-container--bootstrap-5 {
                 display: block;
@@ -108,6 +109,26 @@
                 background-color: #ffffff !important;
                 padding: 0.25rem 0.5rem !important;
             }
+            .form-ui-select2-container .select2-container--bootstrap-5.select2-container--open.select2-container--below .select2-selection {
+                border-bottom-left-radius: 0 !important;
+                border-bottom-right-radius: 0 !important;
+            }
+            .select2-dropdown {
+                z-index: 1065 !important;
+                border: 1px solid #3b82f6 !important;
+                border-top: none !important;
+                border-bottom-left-radius: 8px !important;
+                border-bottom-right-radius: 8px !important;
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+            }
+            .select2-container--bootstrap-5 .select2-results__option {
+                font-size: 13px !important;
+                padding: 8px 12px !important;
+            }
+            .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] {
+                background-color: #3b82f6 !important;
+                color: #ffffff !important;
+            }
         </style>
     @endpush
 
@@ -118,11 +139,11 @@
                     $('.form-ui-select2').each(function() {
                         var select = $(this);
                         if (!select.hasClass('select2-hidden-accessible')) {
-                            var parentModal = select.closest('.modal');
+                            var parentContainer = select.closest('.modal-content, .offcanvas-body, .offcanvas, .modal');
                             select.select2({
                                 theme: "bootstrap-5",
                                 width: "100%",
-                                dropdownParent: parentModal.length ? parentModal : $(document.body)
+                                dropdownParent: parentContainer.length ? parentContainer : $(document.body)
                             });
                         }
                     });
@@ -133,8 +154,8 @@
                 initFormUiComponents();
             });
 
-            $(document).on('show.bs.modal show.bs.offcanvas', function () {
-                setTimeout(initFormUiComponents, 150);
+            $(document).on('show.bs.modal show.bs.offcanvas shown.bs.modal shown.bs.offcanvas', function () {
+                setTimeout(initFormUiComponents, 100);
             });
         </script>
     @endpush

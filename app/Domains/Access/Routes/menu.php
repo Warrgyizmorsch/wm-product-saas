@@ -17,6 +17,7 @@ return [
         'section' => 'platform_admin', 'order' => 20,
         'label' => 'Automation', 'icon' => 'feather-zap',
         'children' => [
+            ['label' => 'Notification Master', 'route' => 'platform.notification-rules.index'],
             ['label' => 'Workflows'],
             ['label' => 'Alerts'],
             ['label' => 'Schedulers'],

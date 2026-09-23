@@ -4,6 +4,61 @@
 @section('page-title', __('inventory.item_details'))
 @section('breadcrumb', __('inventory.inventory_items_details'))
 
+@push('styles')
+    <style>
+        .erp-media-box {
+            background: #ffffff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+            gap: 12px;
+        }
+        .gallery-card-item {
+            position: relative;
+            border-radius: 8px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            overflow: hidden;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            aspect-ratio: 1 / 1;
+        }
+        .gallery-card-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-color: #cbd5e1;
+        }
+        .gallery-card-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .gallery-view-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            color: #ffffff;
+            text-decoration: none;
+        }
+        .gallery-card-item:hover .gallery-view-overlay {
+            opacity: 1;
+            color: #ffffff;
+        }
+    </style>
+@endpush
+
 @section('page-actions')
     <div class="d-flex gap-2">
         <a href="{{ route('inventory.products.index') }}" class="btn btn-light">
@@ -28,8 +83,17 @@
                 <!-- Item Summary Header -->
                 <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 border-bottom pb-3">
                     <div class="d-flex align-items-center gap-3">
-                        <div class="avatar-text avatar-lg bg-soft-primary text-primary fs-4 fw-bold">
-                            {{ strtoupper(substr($product->name, 0, 1)) }}
+                        <div class="avatar avatar-xl rounded-3 border bg-light d-flex align-items-center justify-content-center overflow-hidden flex-shrink-0 shadow-2xs" style="width: 68px; height: 68px;">
+                            @if($product->main_image_url)
+                                <img src="{{ $product->main_image_url }}" alt="{{ $product->name }}" class="w-100 h-100 object-fit-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <div class="avatar-text avatar-lg bg-soft-primary text-primary fs-4 fw-bold d-none align-items-center justify-content-center w-100 h-100">
+                                    {{ strtoupper(substr($product->name, 0, 2)) }}
+                                </div>
+                            @else
+                                <div class="avatar-text avatar-lg bg-soft-primary text-primary fs-4 fw-bold d-flex align-items-center justify-content-center w-100 h-100">
+                                    {{ strtoupper(substr($product->name, 0, 2)) }}
+                                </div>
+                            @endif
                         </div>
                         <div>
                             <h3 class="fw-bold text-dark mb-1">{{ $product->name }}</h3>
@@ -340,6 +404,37 @@
                                 </table>
                             </div>
                         </div>
+
+                        <!-- Product Media Gallery Showcase -->
+                        @if($product->images->isNotEmpty())
+                            <div class="border-top pt-4 mt-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-bold text-primary mb-0 d-flex align-items-center gap-2">
+                                        <i class="feather-image"></i>
+                                        <span>{{ __('inventory.product_media_gallery') }}</span>
+                                    </h6>
+                                    <x-ui.badge variant="primary" :soft="true">
+                                        {{ $product->images->count() }} {{ __('inventory.photos') }}
+                                    </x-ui.badge>
+                                </div>
+                                
+                                <div class="gallery-grid">
+                                    @foreach($product->images as $img)
+                                        <div class="gallery-card-item">
+                                            <img src="{{ $img->url }}" alt="{{ $img->alt_text ?: $product->name }}">
+                                            @if($img->is_primary)
+                                                <span class="badge bg-primary position-absolute top-0 start-0 m-1.5 fs-10" style="z-index: 4;">
+                                                    <i class="feather-star me-1"></i>{{ __('inventory.is_main') }}
+                                                </span>
+                                            @endif
+                                            <a href="{{ $img->url }}" target="_blank" class="gallery-view-overlay" title="{{ __('inventory.view_detail') }}">
+                                                <i class="feather-maximize-2 fs-18"></i>
+                                            </a>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     </div> <!-- Close Tab 1: Overview Pane -->
 
                     <!-- Tab 2: Warehouse Stock -->
@@ -426,8 +521,10 @@
                                 <table class="table table-hover align-middle">
                                     <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                                         <tr>
+                                            <th style="width: 60px;">{{ __('inventory.image') }}</th>
                                             <th>{{ __('inventory.variant_details') }}</th>
                                             <th>{{ __('inventory.sku_code') }}</th>
+                                            <th>{{ __('inventory.photos') }}</th>
                                             <th>{{ __('inventory.selling_price') }}</th>
                                             <th>{{ __('inventory.cost_price') }}</th>
                                             <th>{{ __('inventory.valuation_cost') }}</th>
@@ -440,12 +537,39 @@
                                             @php
                                                 $variantValuation = $variant->warehouseStocks->sum(fn($ws) => $ws->quantity * $ws->unit_cost);
                                                 $variantAvgCost = $variant->total_stock > 0 ? ($variantValuation / $variant->total_stock) : $variant->cost_price;
+                                                $vMainUrl = $variant->main_image_url;
+                                                $vImagesCount = $variant->images->count();
                                             @endphp
                                             <tr>
+                                                <td>
+                                                    <div class="avatar rounded-3 border bg-light d-flex align-items-center justify-content-center overflow-hidden flex-shrink-0" style="width: 44px; height: 44px;">
+                                                        @if($vMainUrl)
+                                                            <img src="{{ $vMainUrl }}" alt="{{ $variant->name }}" class="w-100 h-100 object-fit-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                            <div class="avatar-text bg-soft-primary text-primary fw-bold fs-12 d-none align-items-center justify-content-center w-100 h-100">
+                                                                {{ strtoupper(substr($variant->name, 0, 2)) }}
+                                                            </div>
+                                                        @else
+                                                            <div class="avatar-text bg-soft-primary text-primary fw-bold fs-12 d-flex align-items-center justify-content-center w-100 h-100">
+                                                                {{ strtoupper(substr($variant->name, 0, 2)) }}
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                </td>
                                                 <td class="fw-semibold">
-                                                    {{ $variant->name }}
+                                                    <a href="{{ route('inventory.products.show', $variant) }}" class="text-dark text-decoration-none hover-primary">
+                                                        {{ $variant->name }}
+                                                    </a>
                                                 </td>
                                                 <td class="font-monospace">{{ $variant->sku }}</td>
+                                                <td>
+                                                    @if($vImagesCount > 0)
+                                                        <span class="badge bg-soft-primary text-primary fs-11">
+                                                            <i class="feather-camera me-1"></i>{{ $vImagesCount }} {{ __('inventory.photos') }}
+                                                        </span>
+                                                    @else
+                                                        <span class="text-muted fs-12">—</span>
+                                                    @endif
+                                                </td>
                                                 <td>{{ format_currency($variant->selling_price) }}</td>
                                                 <td class="text-muted">{{ format_currency($variant->cost_price) }}</td>
                                                 <td class="fw-semibold text-primary">{{ format_currency($variantAvgCost) }}</td>

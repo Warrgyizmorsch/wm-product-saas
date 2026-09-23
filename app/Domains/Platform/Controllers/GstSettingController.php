@@ -34,7 +34,7 @@ class GstSettingController extends Controller
             });
         }
 
-        $configurations = $query->orderByDesc('is_default')->orderByDesc('created_at')->get();
+        $configurations = $query->orderByDesc('is_default')->orderByDesc('created_at')->paginate(10)->withQueryString();
 
         $companies = Company::where('tenant_id', $tenantId)->get();
         $branches = $companyId 

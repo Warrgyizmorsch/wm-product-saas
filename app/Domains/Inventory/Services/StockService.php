@@ -708,6 +708,23 @@ class StockService
 
             event(new StockOutflowRecorded($transaction));
 
+            // Check for low stock trigger
+            if ($product && (float)($product->reorder_point ?? 0) > 0) {
+                $totalStock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                    ->where('product_id', $productId)
+                    ->sum('quantity');
+
+                if ($totalStock <= (float)$product->reorder_point) {
+                    \App\Domains\Platform\Services\NotificationRuleService::trigger('inventory.stock.low', [
+                        'item_name' => $product->name,
+                        'sku' => $product->sku ?? $product->code ?? 'N/A',
+                        'current_stock' => (string)$totalStock,
+                        'reorder_point' => (string)$product->reorder_point,
+                        'uom' => $product->uom?->name ?? 'Units',
+                    ], $tenantId);
+                }
+            }
+
             return $transaction;
         });
     }

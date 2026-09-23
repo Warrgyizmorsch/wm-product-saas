@@ -439,7 +439,16 @@ class LeadController extends Controller
         $this->authorize('create', Lead::class);
         $validated = $request->validate($this->getLeadValidationRules($request), $this->getLeadValidationMessages());
 
-        $this->leadService->storeLead($validated, $request->input('items', []), $request->input('product_ids', []));
+        $lead = $this->leadService->storeLead($validated, $request->input('items', []), $request->input('product_ids', []));
+
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('crm.lead.created', [
+            'company_name' => $lead->company_name ?? 'Lead',
+            'contact_person' => $lead->contact_person ?? 'N/A',
+            'source' => $lead->source ?? 'Direct',
+            'expected_amount' => number_format((float)($lead->expected_amount ?? 0), 2),
+            'created_by' => auth()->user()?->name ?? 'User',
+        ], $lead->tenant_id ?? tenant_id() ?? 1, auth()->id());
+
         return redirect()->route('crm.leads.index')->with('success', 'Lead successfully saved to Database!');
     }
 
