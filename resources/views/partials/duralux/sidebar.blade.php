@@ -34,7 +34,7 @@
             ['label' => __('crm.crm_masters_sidebar') ?: 'CRM Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
                 ['label' => __('crm.lead_status_master') ?: 'Lead Status Master', 'route' => 'crm.masters.lead-statuses.index'],
                 ['label' => __('crm.deal_stage_master') ?: 'Deal Stage Master', 'route' => 'crm.masters.deal-statuses.index'],
-                ['label' => __('crm.crm_sales_settings') ?: 'CRM & Sales Settings', 'route' => 'crm.settings.index'],
+                ['label' => __('crm.crm_settings') ?: 'CRM Settings', 'route' => 'crm.settings.index'],
             ]],
             ['label' => 'Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quotation Approval', 'route' => 'crm.approvals.quotations.index'],
@@ -54,6 +54,7 @@
                 ['label' => 'Invoices', 'route' => 'sales.invoices.index'],
                 ['label' => 'Receipts (Payments)', 'route' => 'sales.payments.index'],
                 ['label' => 'Sales Returns', 'route' => 'sales.returns.index'],
+                ['label' => 'Sales Settings', 'route' => 'sales.settings.index'],
             ]],
             ['label' => 'Store', 'icon' => 'feather-archive', 'url' => '#', 'children' => [
                 ['label' => 'Material Requirements', 'route' => 'inventory.material-requirements.index'],

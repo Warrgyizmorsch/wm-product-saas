@@ -17,13 +17,11 @@ class CrmSettingsController extends Controller
         $tenant = tenant();
         $settings = is_array($tenant?->settings) ? $tenant->settings : [];
 
-        $invoicingPolicy = $settings['invoicing_policy'] ?? 'both';
         $quotationApprovalPolicy = $settings['quotation_approval_policy'] ?? 'approval_required';
 
         return view('modules.crm.settings.index', [
             'tenant' => $tenant,
             'settings' => $settings,
-            'invoicingPolicy' => $invoicingPolicy,
             'quotationApprovalPolicy' => $quotationApprovalPolicy,
         ]);
     }

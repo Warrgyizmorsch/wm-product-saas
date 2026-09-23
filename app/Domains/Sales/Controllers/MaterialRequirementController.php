@@ -70,7 +70,7 @@ class MaterialRequirementController extends Controller
 
         try {
             $delivery = $this->deliveryService->create($validated, $request->input('items', []));
-            return redirect()->route('sales.material-requirements.show', $delivery->id)->with('success', 'Material Requirement successfully created!');
+            return redirect()->route('inventory.material-requirements.show', $delivery->id)->with('success', 'Material Requirement successfully created!');
         } catch (\Exception $e) {
             return back()->withErrors([$e->getMessage()])->withInput();
         }
@@ -216,7 +216,7 @@ class MaterialRequirementController extends Controller
 
         try {
             $this->deliveryService->ship($delivery, $allocations);
-            return redirect()->route('sales.material-requirements.show', $delivery->id)->with('success', 'Material Requirement shipped successfully! Inventory updated.');
+            return redirect()->route('inventory.material-requirements.show', $delivery->id)->with('success', 'Material Requirement shipped successfully! Inventory updated.');
         } catch (\Exception $e) {
             return back()->withErrors([$e->getMessage()]);
         }

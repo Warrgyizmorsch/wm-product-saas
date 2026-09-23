@@ -644,7 +644,7 @@
                             @if ($invoice->materialRequirement)
                                 <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
                                     <span class="text-muted">{{ __('crm.dispatch_order_reference') }}:</span>
-                                    <a href="{{ route('sales.material-requirements.show', $invoice->material_requirement_id) }}" class="fw-bold text-info">
+                                    <a href="{{ route('inventory.material-requirements.show', $invoice->material_requirement_id) }}" class="fw-bold text-info">
                                         {{ $invoice->materialRequirement->requirement_number }}
                                     </a>
                                 </div>

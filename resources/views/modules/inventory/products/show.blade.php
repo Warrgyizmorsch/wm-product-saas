@@ -632,7 +632,7 @@
                                                             <i class="feather-file-text me-1"></i>{{ $tx->document_number }}
                                                         </a>
                                                     @elseif(in_array($tx->reference_type, ['MaterialRequirement', 'DeliveryOrder']) && $tx->reference_id)
-                                                        <a href="{{ route('sales.material-requirements.show', $tx->reference_id) }}" class="fw-bold text-primary">
+                                                        <a href="{{ route('inventory.material-requirements.show', $tx->reference_id) }}" class="fw-bold text-primary">
                                                             <i class="feather-package me-1"></i>{{ $tx->document_number }}
                                                         </a>
                                                     @else

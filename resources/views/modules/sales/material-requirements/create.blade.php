@@ -2,7 +2,7 @@
 
 @section('title', __('crm.create_material_requirement') . ' | SaaS ERP')
 @section('page-title', __('crm.create_material_requirement'))
-@section('breadcrumb', __('ui.sales') . ' / ' . __('crm.material_requirements') . ' / ' . __('crm.create'))
+@section('breadcrumb', __('ui.inventory') . ' / ' . __('crm.material_requirements') . ' / ' . __('crm.create'))
 
 @section('content')
     @if ($errors->any())
@@ -16,7 +16,7 @@
         </x-ui.alert>
     @endif
 
-    <form action="{{ route('sales.material-requirements.store') }}" method="POST" id="deliveryForm">
+    <form action="{{ route('inventory.material-requirements.store') }}" method="POST" id="deliveryForm">
         @csrf
         <input type="hidden" name="sales_order_id" value="{{ $salesOrder->id }}">
 

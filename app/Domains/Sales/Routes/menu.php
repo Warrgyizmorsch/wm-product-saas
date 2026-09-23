@@ -12,6 +12,7 @@ return [
             ['label' => 'crm.invoices', 'default' => 'Invoices', 'route' => 'sales.invoices.index', 'permission' => 'sales.invoices.view'],
             ['label' => 'crm.receipts_payments', 'default' => 'Receipts (Payments)', 'route' => 'sales.payments.index', 'permission' => 'sales.payments.view'],
             ['label' => 'crm.sales_returns', 'default' => 'Sales Returns', 'route' => 'sales.returns.index', 'permission' => 'sales.returns.view'],
+            ['label' => 'crm.sales_settings', 'default' => 'Sales Settings', 'route' => 'sales.settings.index', 'permission' => 'sales.orders.view'],
         ],
     ],
 ];
