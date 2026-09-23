@@ -29,6 +29,53 @@
         </div>
     </x-ui.card>
 
+    @php $installableModules = collect($modules)->reject(fn ($module) => $module['installed']); @endphp
+
+    <x-ui.card class="mb-4">
+        <div class="mb-3">
+            <span class="text-muted fs-12 text-uppercase">Modules</span>
+            <p class="fs-13 text-muted mb-0">Every module included in your plan, plus any installed as a paid add-on.</p>
+        </div>
+
+        <div class="row g-3 erp-apps-grid">
+            @foreach ($modules as $module)
+                <div class="col-sm-6 col-lg-3">
+                    <label class="card h-100 erp-app-tile {{ $module['installed'] ? 'installed' : 'selectable' }}">
+                        <div class="card-body d-flex flex-column align-items-center text-center gap-3 py-4 position-relative">
+                            @if (! $module['installed'])
+                                <input type="checkbox" name="modules[]" value="{{ $module['key'] }}" class="form-check-input erp-app-tile-check">
+                            @endif
+
+                            <span class="erp-app-icon erp-app-icon-lg" style="background: {{ $module['color'] }}">
+                                <i class="{{ $module['icon'] }}"></i>
+                            </span>
+                            <div>
+                                <h6 class="fw-bolder text-dark mb-1">{{ $module['label'] }}</h6>
+                                <p class="fs-12 text-muted mb-0">{{ $module['description'] }}</p>
+                            </div>
+
+                            @if ($module['installed'])
+                                <span class="badge bg-soft-success text-success">Installed</span>
+                            @else
+                                <span class="fs-13 fw-bolder text-dark">{{ $moduleCurrency }} {{ number_format($modulePrice) }}</span>
+                            @endif
+                        </div>
+                    </label>
+                </div>
+            @endforeach
+        </div>
+
+        @if ($installableModules->isNotEmpty())
+            <div class="erp-module-select-bar mt-3">
+                <span class="fs-13 text-muted">
+                    <span id="module-select-count">0</span> module(s) selected
+                    &middot; Total: <strong id="module-select-total" class="text-dark">{{ $moduleCurrency }} 0</strong>
+                </span>
+                <button type="button" class="btn btn-primary" id="module-select-submit" disabled>Pay &amp; Install Selected Modules</button>
+            </div>
+        @endif
+    </x-ui.card>
+
     <div class="row g-4">
         @forelse ($plans as $plan)
             @php $isCurrent = $currentPlan && $currentPlan->id === $plan->id; @endphp
@@ -90,6 +137,52 @@
         @endforelse
     </div>
 
+    <x-ui.card class="mt-4">
+        <div class="mb-3">
+            <span class="text-muted fs-12 text-uppercase">Payment History</span>
+        </div>
+
+        @if ($payments->isEmpty())
+            <div class="text-center py-4 text-muted">No payments yet.</div>
+        @else
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Payment ID</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($payments as $payment)
+                            <tr>
+                                <td class="fs-13">{{ $payment->created_at->format('d M Y, h:i A') }}</td>
+                                <td class="fs-13">
+                                    @if ($payment->purpose === \App\Domains\Platform\Models\SubscriptionPayment::PURPOSE_MODULE_ADDON)
+                                        Module add-on:
+                                        {{ collect($payment->modules)->map(fn ($m) => config("navigation.apps.$m.label", ucfirst($m)))->implode(', ') }}
+                                    @else
+                                        Plan switch: {{ $payment->plan?->name ?? '—' }}
+                                    @endif
+                                </td>
+                                <td class="fs-13">{{ $payment->currency }} {{ number_format($payment->amount / 100, 2) }}</td>
+                                <td>
+                                    <x-ui.badge variant="{{ $payment->status === 'paid' ? 'success' : ($payment->status === 'failed' ? 'danger' : 'warning') }}" soft>
+                                        {{ ucfirst($payment->status) }}
+                                    </x-ui.badge>
+                                </td>
+                                <td class="fs-12 text-muted">{{ $payment->gateway_payment_id ?? '—' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </x-ui.card>
+
     <form action="{{ route('platform.subscription.verify') }}" method="POST" id="gatewayVerifyForm" class="d-none">
         @csrf
         <input type="hidden" name="gateway_order_id" id="gw_order_id">
@@ -97,7 +190,30 @@
         <input type="hidden" name="gateway_signature" id="gw_signature">
     </form>
 
+    <form action="{{ route('platform.modules.verify') }}" method="POST" id="moduleGatewayVerifyForm" class="d-none">
+        @csrf
+        <input type="hidden" name="gateway_order_id" id="mgw_order_id">
+        <input type="hidden" name="gateway_payment_id" id="mgw_payment_id">
+        <input type="hidden" name="gateway_signature" id="mgw_signature">
+    </form>
+
 @endsection
+
+<style>
+.erp-app-tile { transition: all .2s ease; border: 1px solid rgba(0,0,0,.08); margin-bottom: 0; cursor: default; }
+.erp-app-tile.selectable { cursor: pointer; }
+.erp-app-tile.selectable:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,.1); border-color: rgba(var(--bs-primary-rgb, 59,130,246), .3); }
+.erp-app-tile.installed { border-color: rgba(25, 135, 84, .3); background: rgba(25, 135, 84, .03); }
+.erp-app-tile:has(.erp-app-tile-check:checked) { border-color: var(--bs-primary, #3B82F6); box-shadow: 0 0 0 1px var(--bs-primary, #3B82F6) inset; background: rgba(var(--bs-primary-rgb, 59,130,246), .04); }
+.erp-app-icon-lg { border-radius: 16px; height: 56px; width: 56px; box-shadow: 0 6px 14px -6px rgba(0,0,0,.35); }
+.erp-app-icon-lg i { font-size: 24px; }
+.erp-app-tile-check { position: absolute; top: 12px; right: 12px; width: 18px; height: 18px; }
+.erp-module-select-bar {
+    position: sticky; bottom: 0; padding: 14px 20px; background: #fff;
+    border: 1px solid rgba(0,0,0,.08); border-radius: 12px; box-shadow: 0 -4px 16px rgba(0,0,0,.06);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+</style>
 
 {{--
     Gateway-agnostic on the backend (SubscriptionController/PaymentGatewayManager
@@ -181,5 +297,104 @@
                 });
             });
         });
+    </script>
+
+    {{-- Module add-on checkout: same pattern as the plan checkout above, its own
+        order endpoint/verify form/hidden inputs since it's a separate SubscriptionPayment
+        purpose (see TenantModuleController, SubscriptionPaymentService::markPaid). --}}
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var pricePerModule = {{ (int) $modulePrice }};
+        var currency = @json($moduleCurrency);
+        var checkboxes = document.querySelectorAll('.erp-app-tile-check');
+        var submitBtn = document.getElementById('module-select-submit');
+        var countEl = document.getElementById('module-select-count');
+        var totalEl = document.getElementById('module-select-total');
+
+        function selectedModules() {
+            return Array.from(document.querySelectorAll('.erp-app-tile-check:checked')).map(function (cb) { return cb.value; });
+        }
+
+        function syncModuleSelection() {
+            if (!submitBtn) return;
+            var count = selectedModules().length;
+            countEl.textContent = count;
+            totalEl.textContent = currency + ' ' + (count * pricePerModule).toLocaleString();
+            submitBtn.disabled = count === 0;
+        }
+        checkboxes.forEach(function (cb) { cb.addEventListener('change', syncModuleSelection); });
+        syncModuleSelection();
+
+        function submitModuleGatewayVerify(orderId, paymentId, signature) {
+            document.getElementById('mgw_order_id').value = orderId;
+            document.getElementById('mgw_payment_id').value = paymentId;
+            document.getElementById('mgw_signature').value = signature;
+            document.getElementById('moduleGatewayVerifyForm').submit();
+        }
+
+        function openModuleRazorpayCheckout(order, moduleCount, onDismiss, onFailed) {
+            var rzp = new Razorpay({
+                key: order.key,
+                amount: order.amount,
+                currency: order.currency,
+                order_id: order.order_id,
+                name: 'SaaS ERP Platform',
+                description: 'Install ' + moduleCount + ' module(s)',
+                prefill: {
+                    name: order.tenant_name || '',
+                    email: order.tenant_email || '',
+                },
+                handler: function (response) {
+                    submitModuleGatewayVerify(response.razorpay_order_id, response.razorpay_payment_id, response.razorpay_signature);
+                },
+                modal: { ondismiss: onDismiss },
+            });
+            rzp.on('payment.failed', onFailed);
+            rzp.open();
+        }
+
+        if (!submitBtn) return;
+        submitBtn.addEventListener('click', function () {
+            var modules = selectedModules();
+            if (modules.length === 0) return;
+
+            var originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Starting checkout&hellip;';
+            var reset = function () {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            };
+
+            fetch(@json(route('platform.modules.checkout')), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': @json(csrf_token()),
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ modules: modules }),
+            })
+                .then(function (res) {
+                    if (!res.ok) {
+                        return res.json().then(function (body) {
+                            throw new Error(body.message || 'Could not start checkout for these modules.');
+                        });
+                    }
+                    return res.json();
+                })
+                .then(function (order) {
+                    if (order.gateway === 'razorpay') {
+                        openModuleRazorpayCheckout(order, modules.length, reset, reset);
+                    } else {
+                        throw new Error('Unsupported payment gateway: ' + order.gateway);
+                    }
+                })
+                .catch(function (err) {
+                    alert(err.message || 'Something went wrong starting checkout.');
+                    reset();
+                });
+        });
+    });
     </script>
 @endpush

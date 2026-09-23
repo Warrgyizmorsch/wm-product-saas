@@ -61,7 +61,7 @@ class RazorpayWebhookController extends Controller
         if ($payment !== null) {
             // No authenticated tenant on a webhook request — trust the row's
             // own tenant_id (see SubscriptionPaymentService's doc comment).
-            $this->payments->markPaidAndSwitchPlan($payment, $resolved['payment_id'], null);
+            $this->payments->markPaid($payment, $resolved['payment_id'], null);
         }
 
         return response()->json(['status' => 'ok']);

@@ -4,7 +4,7 @@
 
 return [
     [
-        'section' => 'supply_chain', 'order' => 5,
+        'section' => 'supply_chain', 'order' => 5, 'app' => 'sales',
         'label' => 'ui.sales', 'default' => 'Sales', 'icon' => 'feather-shopping-cart',
         'children' => [
             ['label' => 'crm.quotations', 'default' => 'Quotations', 'route' => 'crm.quotations.index', 'permission' => 'crm.quotations.view'],

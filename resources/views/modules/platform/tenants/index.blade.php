@@ -10,6 +10,12 @@
     </x-ui.button>
 @endsection
 
+@php
+    // Switching into another tenant is narrower than the platform.tenants.manage
+    // permission that gates this whole page — see TenantSwitchController.
+    $canSwitchTenant = app(\App\Services\Access\AccessService::class)->hasRole(auth()->user(), 'super_admin');
+@endphp
+
 @section('content')
 
     <div class="row g-4">
@@ -82,7 +88,9 @@
                                 </td>
                                 <td class="text-end pe-4">
                                     <div class="hstack gap-2 justify-content-end">
-                                        <x-ui.icon-btn href="{{ route('tenant.switch', $tenant->slug) }}" variant="soft-success" size="md" icon="feather-repeat" title="Switch" />
+                                        @if ($canSwitchTenant)
+                                            <x-ui.icon-btn href="{{ route('tenant.switch', $tenant->slug) }}" variant="soft-success" size="md" icon="feather-repeat" title="Switch" />
+                                        @endif
                                         <x-ui.icon-btn href="{{ route('platform.tenants.edit', $tenant) }}" variant="soft-info" size="md" icon="feather-edit-3" data-bs-toggle="modal" data-bs-target="#editTenantModal{{ $tenant->id }}" aria-label="Edit {{ $tenant->name }}" />
                                         <form action="{{ route('platform.tenants.status', $tenant) }}" method="POST" class="d-inline">
                                             @csrf

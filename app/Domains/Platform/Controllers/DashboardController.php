@@ -4,6 +4,7 @@ namespace App\Domains\Platform\Controllers;
 
 use App\Core\Dashboard\Period;
 use App\Core\Dashboard\WidgetRegistry;
+use App\Core\Navigation\MenuBuilder;
 use App\Domains\HRMS\Models\Company;
 use App\Domains\Platform\Requests\SaveDashboardLayoutRequest;
 use App\Domains\Platform\Services\DashboardService;
@@ -19,6 +20,7 @@ class DashboardController extends Controller
     public function __construct(
         private readonly DashboardService $dashboard,
         private readonly WidgetRegistry $registry,
+        private readonly MenuBuilder $menu,
     ) {
     }
 
@@ -26,6 +28,14 @@ class DashboardController extends Controller
     {
         return view('modules.dashboard.index', $this->dashboard->pageState($request->user(), $this->tenantId($request), 'common') + [
             'multiCompany' => Company::query()->withoutGlobalScopes()->where('tenant_id', $this->tenantId($request))->count() > 1,
+        ]);
+    }
+
+    /** The Apps grid: every module the user can open, for jumping in from the workspace. */
+    public function apps(Request $request): View
+    {
+        return view('modules.dashboard.apps', [
+            'apps' => $this->menu->navigation($request->user())['apps'],
         ]);
     }
 

@@ -5,6 +5,7 @@ use App\Domains\Platform\Controllers\PaymentGatewaySettingsController;
 use App\Domains\Platform\Controllers\PlanController;
 use App\Domains\Platform\Controllers\SubscriptionController;
 use App\Domains\Platform\Controllers\TenantController;
+use App\Domains\Platform\Controllers\TenantModuleController;
 use App\Domains\Platform\Controllers\TransporterController;
 use App\Domains\Platform\Controllers\UsageOverviewController;
 use Illuminate\Support\Facades\Route;
@@ -38,6 +39,11 @@ Route::prefix('platform')
 
         Route::get('usage', [UsageOverviewController::class, 'index'])
             ->name('usage.index');
+
+        Route::post('modules/checkout', [TenantModuleController::class, 'checkout'])
+            ->name('modules.checkout');
+        Route::post('modules/verify', [TenantModuleController::class, 'verify'])
+            ->name('modules.verify');
 
         Route::get('payment-gateway', [PaymentGatewaySettingsController::class, 'index'])
             ->name('payment-gateway.index');

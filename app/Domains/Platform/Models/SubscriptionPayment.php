@@ -12,9 +12,14 @@ class SubscriptionPayment extends BaseModel
     public const STATUS_PAID = 'paid';
     public const STATUS_FAILED = 'failed';
 
+    public const PURPOSE_PLAN_SWITCH = 'plan_switch';
+    public const PURPOSE_MODULE_ADDON = 'module_addon';
+
     protected $fillable = [
         'tenant_id',
         'plan_id',
+        'purpose',
+        'modules',
         'gateway',
         'gateway_order_id',
         'gateway_payment_id',
@@ -28,6 +33,7 @@ class SubscriptionPayment extends BaseModel
     {
         return [
             'amount' => 'integer',
+            'modules' => 'array',
         ];
     }
 

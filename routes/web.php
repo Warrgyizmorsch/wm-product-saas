@@ -59,6 +59,7 @@ Route::middleware(['tenant'])->group(function (): void {
         })->name('ui-elements');
 
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/apps', [DashboardController::class, 'apps'])->name('apps');
         Route::get('/dashboard/widgets/{key}', [DashboardController::class, 'widget'])
             ->middleware('throttle:240,1')->name('dashboard.widget');
         Route::put('/dashboard/layout', [DashboardController::class, 'save'])->name('dashboard.layout.save');

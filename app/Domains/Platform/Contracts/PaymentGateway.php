@@ -49,6 +49,19 @@ interface PaymentGateway
     public function createCheckout(Tenant $tenant, Plan $plan): array;
 
     /**
+     * Same idea as createCheckout(), for a self-service module add-on purchase
+     * instead of a plan switch — the amount is computed by the caller (see
+     * TenantModuleController), never trusted from the client. Implementations
+     * create the SubscriptionPayment row with purpose=module_addon and the
+     * given $modules recorded on it, so SubscriptionPaymentService::markPaid()
+     * knows to grant those modules rather than switch the tenant's plan.
+     *
+     * @param list<string> $modules
+     * @return array{payment: SubscriptionPayment, checkout: array<string, mixed>}
+     */
+    public function createModuleCheckout(Tenant $tenant, array $modules, int $amountInSmallestUnit, string $currency): array;
+
+    /**
      * Verifies a browser-side checkout success callback's authenticity
      * against the given SubscriptionPayment (e.g. Razorpay's
      * order_id/payment_id/signature triad). Returns true only if genuinely

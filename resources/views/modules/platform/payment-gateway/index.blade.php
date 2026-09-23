@@ -49,8 +49,8 @@
                                     @csrf
                                     @method('PUT')
                                     <input type="hidden" name="gateway" value="{{ $gateway->identifier() }}">
-                                    <x-ui.button type="button" variant="primary" size="sm" @disabled(! $isConfigured)
-                                        onclick="confirmAction({title: 'Set Active Gateway', message: 'Switch every tenant\'s checkout to {{ $gateway->label() }}?', variant: 'primary', confirmText: 'Set Active'}, function() { document.getElementById('setActiveGatewayForm{{ $gateway->identifier() }}').submit(); })">
+                                    <x-ui.button type="button" variant="primary" size="sm" :disabled="! $isConfigured"
+                                        onclick="confirmAction({title: 'Set Active Gateway', message: 'Switch every tenant checkout to {{ $gateway->label() }}?', variant: 'primary', confirmText: 'Set Active'}, function() { document.getElementById('setActiveGatewayForm{{ $gateway->identifier() }}').submit(); })">
                                         Set Active
                                     </x-ui.button>
                                 </form>

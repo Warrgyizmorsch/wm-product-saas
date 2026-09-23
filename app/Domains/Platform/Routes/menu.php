@@ -9,7 +9,7 @@ return [
         'route' => 'dashboard', 'active_routes' => ['home'],
     ],
     [
-        'section' => 'workspace', 'order' => 20,
+        'section' => 'workspace', 'order' => 20, 'app' => 'admin',
         'label' => 'Tenant Console', 'icon' => 'feather-grid',
         'children' => [
             ['label' => 'Tenants', 'route' => 'platform.tenants.index', 'permission' => 'platform.tenants.manage'],

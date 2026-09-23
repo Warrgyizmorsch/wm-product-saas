@@ -326,7 +326,9 @@
     }
     // Menu entries live in each module's Routes/menu.php and are filtered by plan,
     // role, permission and route existence — see App\Core\Navigation\MenuBuilder.
-    $sections = app(\App\Core\Navigation\MenuBuilder::class)->build(auth()->user(), request()->route()?->getName());
+    // While you are inside an app (CRM, Inventory, ...) only that app's menu is listed.
+    $nav = app(\App\Core\Navigation\MenuBuilder::class)->navigation(auth()->user(), request()->route()?->getName());
+    $sections = $nav['sections'];
 @endphp
 
 <nav class="nxl-navigation">
@@ -348,41 +350,50 @@
         </div>
         <div class="navbar-content">
             <ul class="nxl-navbar">
-                @foreach ($sections as $section)
-                    <li class="nxl-item nxl-caption premium-module-header" data-module="{{ $section['slug'] }}" onclick="toggleModuleSidebar('{{ $section['slug'] }}', this)">
-                        <div class="premium-module-header-content">
-                            <span class="premium-module-header-title">{{ strtoupper($section['label']) }}</span>
-                            <span class="premium-module-accordion-btn">
-                                <span class="premium-module-arrow-container">
-                                    <i class="feather-chevron-right premium-module-arrow"></i>
-                                </span>
-                            </span>
+                @if ($nav['app'] !== null)
+                    @php
+                        $currentApp = $nav['apps'][$nav['app']];
+                    @endphp
+                    <li class="nxl-item nxl-caption app-context" data-nav-app="{{ $nav['app'] }}">
+                        <a href="{{ route('dashboard') }}" class="app-context-home">
+                            <i class="feather-arrow-left"></i> {{ __('ui.workspace') }}
+                        </a>
+                        <button type="button" class="app-context-current" id="app-switcher-toggle" aria-expanded="false" aria-controls="app-switcher-list">
+                            <span class="app-context-icon erp-app-icon" style="background: {{ $currentApp['color'] ?? '#3B82F6' }}"><i class="{{ $currentApp['icon'] }}"></i></span>
+                            <span class="app-context-name">{{ $currentApp['label'] }}</span>
+                            <i class="feather-chevron-down app-context-caret"></i>
+                        </button>
+                        <div class="app-context-list" id="app-switcher-list" hidden>
+                            @foreach ($nav['apps'] as $app)
+                                <a href="{{ $app['url'] }}" class="app-context-option {{ $app['active'] ? 'active' : '' }}">
+                                    <span class="erp-app-icon erp-app-icon-sm" style="background: {{ $app['color'] ?? '#3B82F6' }}"><i class="{{ $app['icon'] }}"></i></span>
+                                    <span>{{ $app['label'] }}</span>
+                                </a>
+                            @endforeach
                         </div>
                     </li>
-                    @foreach ($section['items'] as $item)
-                        @php
-                            $hasChildren = $item['children'] !== [];
-                        @endphp
-                        <li class="nxl-item {{ $hasChildren ? 'nxl-hasmenu' : '' }} {{ $item['active'] ? 'active nxl-trigger' : '' }} premium-module-child module-{{ $section['slug'] }}">
-                            <a href="{{ $hasChildren ? 'javascript:void(0);' : $item['url'] }}" class="nxl-link">
-                                <span class="nxl-micon"><i class="{{ $item['icon'] }}"></i></span>
-                                <span class="nxl-mtext">{{ $item['label'] }}</span>
-                                @if ($hasChildren)
-                                    <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
-                                @endif
-                            </a>
-                            @if ($hasChildren)
-                                <ul class="nxl-submenu">
-                                    @foreach ($item['children'] as $child)
-                                        <li class="nxl-item {{ $child['active'] ? 'active' : '' }}">
-                                            <a class="nxl-link" href="{{ $child['url'] }}">{{ $child['label'] }}</a>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            @endif
-                        </li>
+                    @foreach ($nav['items'] as $item)
+                        @include('partials.duralux.sidebar-item', ['item' => $item])
                     @endforeach
-                @endforeach
+                @else
+                    {{-- On the workspace home, the sidebar stays to workspace-level items (not every
+                         module stacked) — modules are opened from the Apps grid or the header launcher. --}}
+                    <li class="nxl-item nxl-caption">
+                        <span>{{ __('ui.workspace') }}</span>
+                    </li>
+                    <li class="nxl-item {{ request()->routeIs('apps') ? 'active' : '' }}">
+                        <a href="{{ route('apps') }}" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-grid"></i></span>
+                            <span class="nxl-mtext">{{ __('ui.modules') }}</span>
+                        </a>
+                    </li>
+                    @foreach ($sections as $section)
+                        @continue($section['key'] !== 'workspace')
+                        @foreach ($section['items'] as $item)
+                            @include('partials.duralux.sidebar-item', ['item' => $item, 'class' => 'module-'.$section['slug']])
+                        @endforeach
+                    @endforeach
+                @endif
             </ul>
             <div class="card text-center">
                 <div class="card-body">
@@ -731,65 +742,46 @@ html.app-skin-dark .premium-module-header:hover .premium-module-accordion-btn {
 }
 </style>
 
-{{-- Accordion Expanded State Persistence Script --}}
-<script>
-function toggleModuleSidebar(moduleName, headerEl) {
-    const isCollapsed = headerEl.classList.contains('collapsed');
-
-    if (typeof jQuery !== 'undefined') {
-        const $ = jQuery;
-        const $header = $(headerEl);
-        const $children = $('.premium-module-child.module-' + moduleName);
-
-        if (isCollapsed) {
-            $header.removeClass('collapsed');
-            $children.stop(true, true).slideDown(250);
-            localStorage.setItem('wm_sidebar_module_' + moduleName, 'expanded');
-        } else {
-            $header.addClass('collapsed');
-            $children.stop(true, true).slideUp(250);
-            localStorage.setItem('wm_sidebar_module_' + moduleName, 'collapsed');
-        }
-    } else {
-        const children = document.querySelectorAll('.premium-module-child.module-' + moduleName);
-        if (isCollapsed) {
-            headerEl.classList.remove('collapsed');
-            children.forEach(c => c.style.display = 'block');
-            localStorage.setItem('wm_sidebar_module_' + moduleName, 'expanded');
-        } else {
-            headerEl.classList.add('collapsed');
-            children.forEach(c => c.style.display = 'none');
-            localStorage.setItem('wm_sidebar_module_' + moduleName, 'collapsed');
-        }
-    }
+{{-- App context header (shown while you are inside an app) --}}
+<style>
+.nxl-navigation .app-context { padding: 14px 18px 8px 18px !important; display: block !important; }
+.nxl-navigation .app-context-home {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+    color: var(--sidebar-muted, #94a3b8) !important; padding: 0 !important; margin-bottom: 10px; border: 0 !important; background: transparent !important;
 }
+.nxl-navigation .app-context-home:hover { color: var(--bs-primary) !important; transform: none !important; background: transparent !important; }
+.nxl-navigation .app-context-current {
+    width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; font-size: 15px;
+    border: 1px solid rgba(var(--bs-primary-rgb, 59, 130, 246), 0.22); border-radius: 12px;
+    background: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.08); color: var(--bs-primary); font-weight: 700; font-size: 14px; text-align: left;
+}
+.nxl-navigation .app-context-icon {
+    flex: 0 0 34px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 10px; background: var(--bs-primary, #3B82F6); color: #fff;
+}
+.nxl-navigation .app-context-icon i { font-size: 17px !important; color: #fff !important; }
+.nxl-navigation .app-context-name { flex: 1; font-size: 15px !important; font-weight: 700 !important; color: var(--bs-primary) !important; text-transform: none !important; letter-spacing: 0 !important; line-height: 1.2; }
+.nxl-navigation .app-context-caret { transition: transform .2s; }
+.nxl-navigation .app-context-current[aria-expanded="true"] .app-context-caret { transform: rotate(180deg); }
+.nxl-navigation .app-context-list { margin-top: 6px; border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 12px; padding: 4px; background: var(--bs-body-bg, #fff); }
+.nxl-navigation .app-context-list[hidden] { display: none; }
+.nxl-navigation .app-context-option {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    color: var(--sidebar-text, #475569) !important; text-transform: none; border: 0 !important;
+}
+.nxl-navigation .app-context-option:hover, .nxl-navigation .app-context-option.active { background: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.1) !important; color: var(--bs-primary) !important; transform: none !important; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const toggle = document.getElementById('app-switcher-toggle');
+    const list = document.getElementById('app-switcher-list');
+    if (!toggle || !list) return;
 
-document.addEventListener("DOMContentLoaded", function () {
-    const headers = document.querySelectorAll('.premium-module-header');
-
-    headers.forEach(function (header) {
-        const moduleName = header.getAttribute('data-module');
-        const savedState = localStorage.getItem('wm_sidebar_module_' + moduleName);
-        const children = document.querySelectorAll('.premium-module-child.module-' + moduleName);
-
-        let hasActiveChild = false;
-        children.forEach(function (child) {
-            if (child.classList.contains('active') || child.querySelector('.active') !== null) {
-                hasActiveChild = true;
-            }
-        });
-
-        if (hasActiveChild) {
-            header.classList.remove('collapsed');
-            children.forEach(c => c.style.display = 'block');
-            localStorage.setItem('wm_sidebar_module_' + moduleName, 'expanded');
-        } else if (savedState === 'collapsed') {
-            header.classList.add('collapsed');
-            children.forEach(c => c.style.display = 'none');
-        } else {
-            header.classList.remove('collapsed');
-            children.forEach(c => c.style.display = 'block');
-        }
+    toggle.addEventListener('click', function () {
+        const open = list.hasAttribute('hidden');
+        list.toggleAttribute('hidden', !open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
 });
 </script>
+

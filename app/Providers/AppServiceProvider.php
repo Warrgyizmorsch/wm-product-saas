@@ -38,6 +38,9 @@ class AppServiceProvider extends ServiceProvider
         // Loads every module's Routes/menu.php once per request.
         $this->app->singleton(\App\Core\Navigation\MenuRegistry::class);
 
+        // One builder per request, so the sidebar and the header's app launcher share a single computation.
+        $this->app->scoped(\App\Core\Navigation\MenuBuilder::class);
+
         // Loads every module's Dashboard/widgets.php once per request.
         $this->app->singleton(\App\Core\Dashboard\WidgetRegistry::class);
 

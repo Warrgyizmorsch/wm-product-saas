@@ -74,6 +74,44 @@ class RazorpayGateway implements PaymentGateway
         ];
     }
 
+    public function createModuleCheckout(Tenant $tenant, array $modules, int $amountInSmallestUnit, string $currency): array
+    {
+        $razorpayOrder = $this->api()->order->create([
+            'amount' => $amountInSmallestUnit,
+            'currency' => $currency,
+            'receipt' => 'tenant-' . $tenant->id . '-modules-' . now()->timestamp,
+            'notes' => [
+                'tenant_id' => (string) $tenant->id,
+                'modules' => implode(',', $modules),
+            ],
+        ]);
+
+        $payment = SubscriptionPayment::create([
+            'tenant_id' => $tenant->id,
+            'plan_id' => $tenant->plan_id,
+            'purpose' => SubscriptionPayment::PURPOSE_MODULE_ADDON,
+            'modules' => $modules,
+            'gateway' => $this->identifier(),
+            'gateway_order_id' => $razorpayOrder['id'],
+            'amount' => $amountInSmallestUnit,
+            'currency' => $currency,
+            'status' => SubscriptionPayment::STATUS_CREATED,
+        ]);
+
+        return [
+            'payment' => $payment,
+            'checkout' => [
+                'gateway' => $this->identifier(),
+                'order_id' => $payment->gateway_order_id,
+                'amount' => $payment->amount,
+                'currency' => $payment->currency,
+                'key' => config('services.razorpay.key'),
+                'tenant_name' => $tenant->name,
+                'tenant_email' => $tenant->billing_email,
+            ],
+        ];
+    }
+
     public function verifyCheckoutCallback(array $callbackInput, SubscriptionPayment $payment): bool
     {
         try {

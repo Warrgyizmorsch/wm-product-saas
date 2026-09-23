@@ -8,6 +8,7 @@ use App\Domains\Platform\Services\PaymentGatewayManager;
 use App\Domains\Platform\Services\SubscriptionPaymentService;
 use App\Domains\Platform\Services\TenantService;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureTenantModuleAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -39,6 +40,17 @@ class SubscriptionController extends Controller
 
         $this->authorize('viewSubscription', $tenant);
 
+        $installed = tenant_allowed_modules();
+        $apps = config('navigation.apps');
+
+        $modules = [];
+        foreach (EnsureTenantModuleAccess::GATED_MODULES as $module) {
+            $modules[] = [
+                'key' => $module,
+                'installed' => $installed === null || in_array($module, $installed, true),
+            ] + ($apps[$module] ?? ['label' => ucfirst($module), 'icon' => 'feather-grid', 'description' => '', 'color' => '#3B82F6']);
+        }
+
         return view('modules.platform.subscription.index', [
             'tenant' => $tenant,
             'currentPlan' => $tenant->planCatalog,
@@ -46,6 +58,13 @@ class SubscriptionController extends Controller
                 ->where('is_active', true)
                 ->where('is_demo', false)
                 ->orderBy('sort_order')
+                ->get(),
+            'modules' => $modules,
+            'modulePrice' => config('navigation.module_addon_price'),
+            'moduleCurrency' => 'INR',
+            'payments' => SubscriptionPayment::query()
+                ->where('tenant_id', $tenant->id)
+                ->latest()
                 ->get(),
         ]);
     }
@@ -149,7 +168,7 @@ class SubscriptionController extends Controller
         }
 
         try {
-            $this->payments->markPaidAndSwitchPlan(
+            $this->payments->markPaid(
                 $payment,
                 $validated['gateway_payment_id'],
                 $validated['gateway_signature'],

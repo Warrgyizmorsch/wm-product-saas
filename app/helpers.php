@@ -55,13 +55,19 @@ if (! function_exists('tenant_allowed_modules')) {
      */
     function tenant_allowed_modules(): ?array
     {
-        $plan = tenant()?->planCatalog;
+        $currentTenant = tenant();
+        $plan = $currentTenant?->planCatalog;
 
         if ($plan === null || $plan->features === null) {
             return null;
         }
 
-        return $plan->features;
+        // Self-service "install a module" (see TenantModuleController) adds modules
+        // on top of the plan's own list, per tenant, without touching the plan row
+        // other tenants on the same plan share.
+        $installed = $currentTenant->settings['installed_modules'] ?? [];
+
+        return array_values(array_unique([...$plan->features, ...$installed]));
     }
 }
 

@@ -17,6 +17,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Module add-on pricing
+    |--------------------------------------------------------------------------
+    |
+    | The one-time price (in whole rupees) a tenant pays via Razorpay to
+    | self-install any module not already in their plan — flat across every
+    | module for now (see TenantModuleController). Paise conversion happens
+    | at checkout time, same as Plan::price.
+    |
+    */
+
+    'module_addon_price' => (int) env('MODULE_ADDON_PRICE', 999),
+
+    /*
+    |--------------------------------------------------------------------------
     | Sidebar sections
     |--------------------------------------------------------------------------
     |
@@ -34,7 +48,62 @@ return [
         'production' => ['label' => 'ui.production', 'default' => 'Production'],
         'hrms' => ['label' => 'ui.hrms', 'default' => 'HRMS'],
         'finance' => ['label' => 'ui.finance_people', 'default' => 'Finance & People'],
-        'platform_admin' => ['label' => 'ui.platform_admin', 'default' => 'Platform Admin'],
+        'platform_admin' => ['label' => 'ui.platform_admin', 'default' => 'Platform Admin', 'app' => 'admin'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Apps
+    |--------------------------------------------------------------------------
+    |
+    | Like Zoho's apps: while you work in one (CRM, Inventory, ...) the sidebar
+    | shows only that app's menu, kept open on the page you are on, and the
+    | header's Modules launcher switches between them. A menu entry belongs to
+    | an app through its `app` key, else its `module`, else the app of its
+    | parent, else the module its route belongs to (see MenuBuilder). Entries
+    | that belong to no app (the workspace dashboard, approvals) show on the
+    | home page, where every section is listed. Each app also carries a
+    | `color` (hex) for its icon tile — like Odoo's app grid, every app gets
+    | its own distinct color rather than one uniform brand blue, so the
+    | launcher and switcher stay scannable at a glance.
+    |
+    */
+
+    'apps' => [
+        'crm' => ['label' => 'CRM', 'icon' => 'feather-users', 'description' => 'Leads, deals, customers, activities', 'color' => '#7C3AED'],
+        'sales' => ['label' => 'Sales', 'icon' => 'feather-shopping-cart', 'description' => 'Quotations, orders, invoices, receipts', 'color' => '#2563EB'],
+        'inventory' => ['label' => 'Inventory', 'icon' => 'feather-box', 'description' => 'Products, stock, warehouses, store', 'color' => '#EA580C'],
+        'purchase' => ['label' => 'Purchase', 'icon' => 'feather-truck', 'description' => 'Suppliers, POs, bills, goods receipts', 'color' => '#0D9488'],
+        'production' => ['label' => 'Production', 'icon' => 'feather-cpu', 'description' => 'BOM, orders, shop floor, quality', 'color' => '#DB2777'],
+        'hrms' => ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'description' => 'Employees, attendance, leave, payroll', 'color' => '#16A34A'],
+        'accounting' => ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'description' => 'Ledgers, journals, tax, reports', 'color' => '#CA8A04'],
+        'projects' => ['label' => 'Projects', 'icon' => 'feather-briefcase', 'description' => 'Projects, milestones, tasks', 'color' => '#4F46E5'],
+        'admin' => ['label' => 'Administration', 'icon' => 'feather-shield', 'description' => 'Tenants, plans, users, roles, audit', 'color' => '#475569'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Route prefix → app
+    |--------------------------------------------------------------------------
+    |
+    | For pages that are not in the menu themselves (a "create lead" form): the
+    | first segment of the route name tells which app's menu to show.
+    |
+    */
+
+    'route_apps' => [
+        'crm' => 'crm',
+        'sales' => 'sales',
+        'inventory' => 'inventory',
+        'supply-chain' => 'inventory',
+        'purchase' => 'purchase',
+        'grns' => 'purchase',
+        'production' => 'production',
+        'hrms' => 'hrms',
+        'accounting' => 'accounting',
+        'projects' => 'projects',
+        'platform' => 'admin',
+        'access' => 'admin',
     ],
 
 ];

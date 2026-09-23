@@ -7,15 +7,8 @@
     $resolvedCompany = company();
     $resolvedBranch = branch();
 
-    // Switching tenants is a platform-admin capability — TenantSwitchController
-    // already enforces this on the action, but the dropdown itself had no
-    // visibility gate, so a plain tenant owner could see every other tenant's
-    // name in the list even though clicking one would 403. Company/Branch
-    // switching stays open to any authenticated user, since it's scoped to
-    // their own tenant's data, not a cross-tenant capability.
-    $isPlatformAdmin = auth()->user()
-        ? app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'platform.tenants.manage')
-        : false;
+    // The apps this user can open (config/navigation.php), shared with the sidebar's computation.
+    $nav = app(\App\Core\Navigation\MenuBuilder::class)->navigation(auth()->user(), request()->route()?->getName());
 
     // Live current period, not a stored setting — same lookup the Accounting
     // engine itself uses (FiscalPeriodService::periodForDate), so this label
@@ -42,20 +35,7 @@
         'currency' => $currentTenant['currency'],
     ];
 
-    $tenants = \Illuminate\Support\Facades\Schema::hasTable('tenants')
-        ? \App\Models\Tenant::query()
-            ->whereIn('status', \App\Models\Tenant::accessibleStatuses())
-            ->orderBy('name')
-            ->get()
-            ->map(fn($tenant) => [
-                'name' => $tenant->name,
-                'code' => strtoupper($tenant->slug),
-                'slug' => $tenant->slug,
-                'active' => $resolvedTenant?->is($tenant) ?? false,
-            ])
-        : collect();
-
-    $companies = ($resolvedTenant && \Illuminate\Support\Facades\Schema::hasTable('companies'))
+    $companies =($resolvedTenant && \Illuminate\Support\Facades\Schema::hasTable('companies'))
         ? \App\Domains\HRMS\Models\Company::withoutGlobalScopes()
             ->where('tenant_id', $resolvedTenant->id)
             ->orderBy('company_name')
@@ -88,68 +68,6 @@
         ['label' => __('ui.journal_entry'), 'icon' => 'feather-credit-card'],
     ];
 
-    $moduleTabs = [
-        [
-            'target' => 'erp-front-office',
-            'size' => 'sm',
-            'title' => __('ui.front_office'),
-            'icon' => 'feather-users',
-            'description' => 'Customer lifecycle, pipeline, sales execution, and project delivery.',
-            'modules' => [
-                ['label' => 'CRM', 'icon' => 'feather-users', 'meta' => 'Leads, contacts, activities'],
-                ['label' => 'Sales', 'icon' => 'feather-shopping-cart', 'meta' => 'Quotes, orders, invoices'],
-                ['label' => 'Projects', 'icon' => 'feather-briefcase', 'meta' => 'Milestones, tasks, timesheets'],
-                ['label' => 'Customers', 'icon' => 'feather-user-check', 'meta' => 'Accounts and contacts'],
-                ['label' => 'Receivables', 'icon' => 'feather-dollar-sign', 'meta' => 'Collections and aging'],
-                ['label' => 'Contracts', 'icon' => 'feather-file-text', 'meta' => 'Terms and renewals'],
-            ],
-        ],
-        [
-            'target' => 'erp-operations',
-            'size' => 'md',
-            'title' => __('ui.operations'),
-            'icon' => 'feather-box',
-            'description' => 'Procurement, inventory movement, production planning, and quality control.',
-            'modules' => [
-                ['label' => 'Inventory', 'icon' => 'feather-box', 'meta' => 'Items, stock, warehouses'],
-                ['label' => 'Purchase', 'icon' => 'feather-truck', 'meta' => 'Suppliers, POs, bills'],
-                ['label' => 'Production', 'icon' => 'feather-cpu', 'meta' => 'BOM, work orders, QC'],
-                ['label' => 'Warehouses', 'icon' => 'feather-map-pin', 'meta' => 'Bins, transfers, counts'],
-                ['label' => 'Suppliers', 'icon' => 'feather-briefcase', 'meta' => 'Vendor master data'],
-                ['label' => 'Quality', 'icon' => 'feather-check-circle', 'meta' => 'Inspection and claims'],
-            ],
-        ],
-        [
-            'target' => 'erp-back-office',
-            'size' => 'lg',
-            'title' => __('ui.back_office'),
-            'icon' => 'feather-credit-card',
-            'description' => 'Accounting, payroll, compliance reports, and management dashboards.',
-            'modules' => [
-                ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'meta' => 'Ledgers, journals, tax'],
-                ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'meta' => 'Employees, leave, salary'],
-                ['label' => 'Reports', 'icon' => 'feather-bar-chart-2', 'meta' => 'Financial and BI reports'],
-                ['label' => 'Tax', 'icon' => 'feather-percent', 'meta' => 'GST, VAT, compliance'],
-                ['label' => 'Payables', 'icon' => 'feather-file-minus', 'meta' => 'Bills and payments'],
-                ['label' => 'Analytics', 'icon' => 'feather-pie-chart', 'meta' => 'KPIs and dashboards'],
-            ],
-        ],
-        [
-            'target' => 'erp-platform',
-            'size' => 'xl',
-            'title' => __('ui.platform'),
-            'icon' => 'feather-shield',
-            'description' => 'Tenant administration, access policies, workflow automation, and audit trail.',
-            'modules' => [
-                ['label' => 'Tenants', 'icon' => 'feather-grid', 'meta' => 'Companies, branches, plans'],
-                ['label' => 'Roles', 'icon' => 'feather-shield', 'meta' => 'Permissions, teams, policies'],
-                ['label' => 'Audit Logs', 'icon' => 'feather-activity', 'meta' => 'Security and data history'],
-                ['label' => 'Workflows', 'icon' => 'feather-zap', 'meta' => 'Approvals and automation'],
-                ['label' => 'Localization', 'icon' => 'feather-globe', 'meta' => 'Languages and currencies'],
-                ['label' => 'Integrations', 'icon' => 'feather-link-2', 'meta' => 'APIs and webhooks'],
-            ],
-        ],
-    ];
 
 @endphp
 
@@ -218,126 +136,42 @@
                             </x-ui.button>
                         </x-slot>
 
-                        <div class="d-lg-flex align-items-start">
-                            <div class="nav flex-column nxl-mega-menu-tabs" role="tablist" aria-orientation="vertical">
-                                @foreach ($moduleTabs as $index => $tab)
-                                    <button
-                                        class="nav-link {{ $index === 0 ? 'active' : '' }} nxl-mega-menu-{{ $tab['size'] }}"
-                                        data-bs-toggle="pill" data-bs-target="#{{ $tab['target'] }}" type="button"
-                                        role="tab">
-                                        <span class="menu-icon">
-                                            <i class="{{ $tab['icon'] }}"></i>
-                                        </span>
-                                        <span class="menu-title">{{ $tab['title'] }}</span>
-                                        <span class="menu-arrow">
-                                            <i class="feather-chevron-right"></i>
-                                        </span>
-                                    </button>
-                                @endforeach
+                        <div class="erp-app-launcher p-3" style="min-width: 320px; max-width: 560px;">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <h6 class="fw-bolder text-dark mb-0">{{ __('ui.modules') }}</h6>
+                                <a href="{{ route('apps') }}" class="fs-12 text-primary">{{ __('ui.workspace') }} &rarr;</a>
                             </div>
-
-                            <div class="tab-content nxl-mega-menu-tabs-content">
-                                @foreach ($moduleTabs as $index => $tab)
-                                    <div class="tab-pane fade {{ $index === 0 ? 'show active' : '' }}"
-                                        id="{{ $tab['target'] }}" role="tabpanel">
-                                        <div class="d-lg-flex align-items-start justify-content-between mb-4">
-                                            <div>
-                                                <h6 class="fw-bolder text-dark">{{ $tab['title'] }}</h6>
-                                                <p class="fs-12 text-muted mb-0 text-truncate-2-line">
-                                                    {{ $tab['description'] }}</p>
-                                            </div>
-                                            <a href="javascript:void(0);" class="fs-13 text-primary mt-2 mt-lg-0">Open
-                                                Module &rarr;</a>
-                                        </div>
-
-                                        <div class="row g-3 erp-mega-module-grid">
-                                            @foreach ($tab['modules'] as $module)
-                                                <div class="col-lg-4">
-                                                    <x-ui.dropdown-item class="erp-module-link">
-                                                        <span class="avatar-text avatar-md bg-soft-primary text-primary">
-                                                            <i class="{{ $module['icon'] }}"></i>
-                                                        </span>
-                                                        <span class="erp-module-link-copy">
-                                                            <span>{{ $module['label'] }}</span>
-                                                            <small>{{ $module['meta'] }}</small>
-                                                        </span>
-                                                        <i class="feather-arrow-right ms-auto me-0"></i>
-                                                    </x-ui.dropdown-item>
-                                                </div>
-                                            @endforeach
-                                        </div>
-
-                                        <hr class="border-top-dashed">
-                                        <div class="erp-module-footer">
-                                            <x-ui.badge variant="success" soft>Enterprise</x-ui.badge>
-                                            <span class="fs-11 text-muted">Tenant scoped</span>
-                                            <span class="fs-11 text-muted">Role aware</span>
-                                            <a href="javascript:void(0);" class="fs-12 fw-bold text-primary ms-auto">Access
-                                                Control &rarr;</a>
-                                        </div>
+                            <div class="row g-2">
+                                @forelse ($nav['apps'] as $app)
+                                    <div class="col-sm-6">
+                                        <a href="{{ $app['url'] }}" class="dropdown-item erp-module-link d-flex align-items-center gap-2 rounded {{ $app['active'] ? 'active' : '' }}">
+                                            <span class="erp-app-icon" style="background: {{ $app['color'] ?? '#3B82F6' }}">
+                                                <i class="{{ $app['icon'] }}"></i>
+                                            </span>
+                                            <span class="erp-module-link-copy">
+                                                <span>{{ $app['label'] }}</span>
+                                                <small>{{ $app['description'] }}</small>
+                                            </span>
+                                        </a>
                                     </div>
-                                @endforeach
+                                @empty
+                                    <div class="col-12 text-muted fs-13">No modules are available for your role.</div>
+                                @endforelse
                             </div>
                         </div>
                     </x-ui.dropdown>
 
-                    @if ($isPlatformAdmin)
-                        <x-ui.dropdown class="nxl-h-item erp-tenant-switcher d-none d-xl-flex"
-                            menu-class="nxl-h-dropdown erp-tenant-dropdown">
-                            <x-slot name="trigger">
-                                <x-ui.button href="javascript:void(0);" variant="light-brand"
-                                    class="erp-tenant-button dropdown-toggle" data-bs-toggle="dropdown"
-                                    data-bs-auto-close="outside" role="button" aria-expanded="false">
-                                    <span class="avatar-text avatar-sm bg-soft-success text-success">
-                                        <i class="feather-briefcase"></i>
-                                    </span>
-                                    <span class="erp-tenant-copy">
-                                        <strong>{{ $currentTenant['name'] }}</strong>
-                                        <small>{{ $currentTenant['branch'] }} - {{ $currentTenant['year'] }}</small>
-                                    </span>
-                                    <i class="feather-chevron-down ms-2"></i>
-                                </x-ui.button>
-                            </x-slot>
-
-                            <div class="px-4 py-3 border-bottom">
-                                <h6 class="mb-1">{{ __('ui.switch_tenant') }}</h6>
-                                <p class="fs-11 text-muted mb-0">{{ $currentTenant['currency'] }} -
-                                    {{ $currentTenant['plan'] }} Plan</p>
-                            </div>
-                            @foreach ($tenants as $tenant)
-                                <x-ui.dropdown-item href="{{ route('tenant.switch', $tenant['slug']) }}"
-                                    :active="!empty($tenant['active'])">
-                                    <span
-                                        class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($tenant['name'], 0, 1) }}</span>
-                                    <span>
-                                        <span class="d-block fw-semibold">{{ $tenant['name'] }}</span>
-                                        <span class="fs-11 text-muted">{{ $tenant['code'] }}</span>
-                                    </span>
-                                    @if (!empty($tenant['active']))
-                                        <i class="feather-check ms-auto me-0 text-success"></i>
-                                    @endif
-                                </x-ui.dropdown-item>
-                            @endforeach
-                            <div class="dropdown-divider"></div>
-                            <x-ui.dropdown-item href="{{ route('platform.tenants.create') }}" icon="feather-plus">
-                                <span>{{ __('ui.add_tenant') }}</span>
-                            </x-ui.dropdown-item>
-                        </x-ui.dropdown>
-                    @else
-                        {{-- Non-platform-admin users (tenant owners, staff) get the same info display
-                        but no switcher — switching tenants is a platform-admin-only capability,
-                        enforced server-side by TenantSwitchController; hiding the list here too
-                        avoids exposing every other tenant's name to a plain tenant owner. --}}
-                        <div class="nxl-h-item erp-tenant-switcher d-none d-xl-flex erp-tenant-button">
-                            <span class="avatar-text avatar-sm bg-soft-success text-success">
-                                <i class="feather-briefcase"></i>
-                            </span>
-                            <span class="erp-tenant-copy">
-                                <strong>{{ $currentTenant['name'] }}</strong>
-                                <small>{{ $currentTenant['branch'] }} - {{ $currentTenant['year'] }}</small>
-                            </span>
-                        </div>
-                    @endif
+                    {{-- Switching tenants lives in Tenant Console (super_admin only, see
+                    TenantSwitchController) — the header just shows where you are. --}}
+                    <div class="nxl-h-item erp-tenant-switcher d-none d-xl-flex erp-tenant-button">
+                        <span class="avatar-text avatar-sm bg-soft-success text-success">
+                            <i class="feather-briefcase"></i>
+                        </span>
+                        <span class="erp-tenant-copy">
+                            <strong>{{ $currentTenant['name'] }}</strong>
+                            <small>{{ $currentTenant['branch'] }} - {{ $currentTenant['year'] }}</small>
+                        </span>
+                    </div>
 
                     @if ($companies->count() > 1)
                         <x-ui.dropdown class="nxl-h-item erp-company-switcher d-none d-xl-flex"

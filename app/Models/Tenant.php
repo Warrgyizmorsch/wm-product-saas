@@ -139,6 +139,24 @@ class Tenant extends Model
         return $allowed === null || array_intersect($modules, $allowed) !== [];
     }
 
+    /**
+     * Self-service module add-ons (see TenantModuleController): grants these modules
+     * to this tenant only, on top of its plan, without touching the Plan row every
+     * other tenant on that plan shares. Merged into tenant_allowed_modules().
+     */
+    public function installModules(array $modules): void
+    {
+        if ($modules === []) {
+            return;
+        }
+
+        $settings = $this->settings ?? [];
+        $installed = $settings['installed_modules'] ?? [];
+        $settings['installed_modules'] = array_values(array_unique([...$installed, ...$modules]));
+
+        $this->update(['settings' => $settings]);
+    }
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
