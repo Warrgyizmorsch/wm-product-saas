@@ -75,22 +75,45 @@ class DispatchOrderService
             ->whereIn('status', ['Posted', 'Partially Paid', 'Paid'])
             ->get();
 
-        return $invoices->map(function ($invoice) {
-            $itemsData = $invoice->items->map(function ($item) {
+        $mr = MaterialRequirement::with('items.warehouse')
+            ->where('sales_order_id', $salesOrderId)
+            ->first();
+
+        $mrItems = $mr ? $mr->items : collect();
+
+        return $invoices->map(function ($invoice) use ($mrItems) {
+            $itemsData = $invoice->items->map(function ($item) use ($mrItems) {
                 $alreadyDispatched = $this->dispatchRepo->getDispatchedQtyForInvoiceItem($item->id);
                 $remainingQty = max(0, (float) $item->quantity - $alreadyDispatched);
-                $unreservedAvail = StockService::getAvailableStock((int) $item->product_id, (int) ($item->warehouse_id ?? 0));
+
+                $matchingMrItem = null;
+                if (!empty($item->material_requirement_item_id)) {
+                    $matchingMrItem = $mrItems->firstWhere('id', $item->material_requirement_item_id);
+                }
+                if (!$matchingMrItem && !empty($item->sales_order_item_id)) {
+                    $matchingMrItem = $mrItems->firstWhere('sales_order_item_id', $item->sales_order_item_id);
+                }
+                if (!$matchingMrItem) {
+                    $matchingMrItem = $mrItems->firstWhere('product_id', $item->product_id);
+                }
+
+                $warehouseId = $item->warehouse_id ?: ($matchingMrItem?->warehouse_id ?: 1);
+                $warehouseName = $item->warehouse?->name ?: ($matchingMrItem?->warehouse?->name ?: 'Main Warehouse');
+                $quantityReserved = (float) ($matchingMrItem?->quantity_reserved ?? 0);
+                $unreservedAvail = StockService::getAvailableStock((int) $item->product_id, (int) $warehouseId);
 
                 return [
                     'id' => $item->id,
                     'invoice_item_id' => $item->id,
+                    'material_requirement_item_id' => $matchingMrItem?->id,
                     'product_id' => $item->product_id,
                     'product_name' => $item->product?->name ?? 'Unknown',
                     'product_sku' => $item->product?->sku ?? '',
                     'sku' => $item->product?->sku ?? '',
-                    'warehouse_id' => $item->warehouse_id,
-                    'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
+                    'warehouse_id' => $warehouseId,
+                    'warehouse_name' => $warehouseName,
                     'available_qty' => $unreservedAvail,
+                    'quantity_reserved' => $quantityReserved,
                     'quantity_ordered' => (float) $item->quantity,
                     'invoiced_qty' => (float) $item->quantity,
                     'already_dispatched' => $alreadyDispatched,
@@ -131,6 +154,12 @@ class DispatchOrderService
         foreach ($validated['items'] as $item) {
             $mrItemId = $item['material_requirement_item_id'] ?? null;
             $mrItem = $mrItemId ? MaterialRequirementItem::find($mrItemId) : null;
+            if (!$mrItem && !empty($finalSalesOrderId)) {
+                $mrItem = MaterialRequirementItem::whereHas('materialRequirement', function($q) use ($finalSalesOrderId) {
+                    $q->where('sales_order_id', $finalSalesOrderId);
+                })->where('product_id', $item['product_id'])->first();
+            }
+
             if ($mrItem) {
                 $alreadyDispatched = $this->dispatchRepo->getDispatchedQtyForMRItem($mrItem->id);
                 $remainingQty = max(0, (float) $mrItem->quantity - $alreadyDispatched);

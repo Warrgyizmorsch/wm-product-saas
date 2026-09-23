@@ -168,7 +168,8 @@ class PurchaseRfqRepository
         $tenantId = require_tenant_id();
         return PurchaseRfq::where('tenant_id', $tenantId)
             ->with([
-                'requisition',
+                'requisition.items.warehouse',
+                'creator',
                 'items.product',
                 'items.vendors',
                 'rfqVendors.vendor',

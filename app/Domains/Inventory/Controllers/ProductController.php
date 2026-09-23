@@ -556,6 +556,8 @@ class ProductController extends Controller
         $productId = $request->input('product_id');
         $warehouseId = $request->input('warehouse_id');
         $mrItemId = $request->input('material_requirement_item_id');
+        $invoiceItemId = $request->input('invoice_item_id');
+        $salesOrderId = $request->input('sales_order_id');
 
         if (!$productId || !$warehouseId) {
             return response()->json(['success' => false, 'message' => 'Missing product or warehouse ID'], 400);
@@ -573,26 +575,47 @@ class ProductController extends Controller
             ->sum('reserved_qty');
 
         $itemReservedQty = 0;
+        $mrItem = null;
         if ($mrItemId) {
             $mrItem = \App\Domains\Sales\Models\MaterialRequirementItem::find($mrItemId);
-            if ($mrItem) {
-                $res = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
-                    ->where('product_id', $productId)
-                    ->where('warehouse_id', $warehouseId)
-                    ->where(function($q) use ($mrItem) {
-                        $q->where(function($q2) use ($mrItem) {
-                            $q2->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement'])
-                               ->where('reference_id', $mrItem->material_requirement_id);
-                        })->orWhere('reference_item_id', $mrItem->id);
-                    })
-                    ->where('status', 'Active')
-                    ->sum('reserved_qty');
-
-                $itemReservedQty = (float)$res;
-
-                if ($itemReservedQty <= 0 && (int)($mrItem->warehouse_id ?: 1) === (int)$warehouseId) {
-                    $itemReservedQty = (float)$mrItem->quantity_reserved;
+        }
+        if (!$mrItem && $invoiceItemId) {
+            $invItem = \App\Domains\Sales\Models\InvoiceItem::with('invoice')->find($invoiceItemId);
+            if ($invItem) {
+                if (!empty($invItem->material_requirement_item_id)) {
+                    $mrItem = \App\Domains\Sales\Models\MaterialRequirementItem::find($invItem->material_requirement_item_id);
+                } elseif (!empty($invItem->sales_order_item_id)) {
+                    $mrItem = \App\Domains\Sales\Models\MaterialRequirementItem::where('sales_order_item_id', $invItem->sales_order_item_id)->first();
+                } elseif (!empty($invItem->invoice?->sales_order_id)) {
+                    $mrItem = \App\Domains\Sales\Models\MaterialRequirementItem::whereHas('materialRequirement', function($q) use ($invItem) {
+                        $q->where('sales_order_id', $invItem->invoice->sales_order_id);
+                    })->where('product_id', $productId)->first();
                 }
+            }
+        }
+        if (!$mrItem && $salesOrderId) {
+            $mrItem = \App\Domains\Sales\Models\MaterialRequirementItem::whereHas('materialRequirement', function($q) use ($salesOrderId) {
+                $q->where('sales_order_id', $salesOrderId);
+            })->where('product_id', $productId)->first();
+        }
+
+        if ($mrItem) {
+            $res = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
+                ->where('product_id', $productId)
+                ->where('warehouse_id', $warehouseId)
+                ->where(function($q) use ($mrItem) {
+                    $q->where(function($q2) use ($mrItem) {
+                        $q2->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement', 'SalesOrder'])
+                           ->where('reference_id', $mrItem->material_requirement_id);
+                    })->orWhere('reference_item_id', $mrItem->id);
+                })
+                ->where('status', 'Active')
+                ->sum('reserved_qty');
+
+            $itemReservedQty = (float)$res;
+
+            if ($itemReservedQty <= 0 && (int)($mrItem->warehouse_id ?: 1) === (int)$warehouseId) {
+                $itemReservedQty = (float)$mrItem->quantity_reserved;
             }
         }
 
