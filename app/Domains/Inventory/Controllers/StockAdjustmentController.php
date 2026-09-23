@@ -149,7 +149,7 @@ class StockAdjustmentController extends Controller
             'warehouse' => $adjustment->warehouse?->name ?? 'Warehouse',
             'reason' => $adjustment->reason ?? 'Adjustment',
             'created_by' => Auth::user()?->name ?? 'User',
-        ], $tenantId, Auth::id());
+        ], route('inventory.adjustments.show', $adjustment->id), $adjustment);
 
         return redirect()->route('inventory.adjustments.index')->with('success', 'Stock Adjustment Created successfully.');
     }

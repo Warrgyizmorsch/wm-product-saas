@@ -210,7 +210,7 @@ class StockTransferController extends Controller
             'from_warehouse' => $transfer->fromWarehouse?->name ?? 'Origin Warehouse',
             'to_warehouse' => $transfer->toWarehouse?->name ?? 'Destination Warehouse',
             'items_count' => (string) $transfer->items()->count(),
-        ], $transfer->tenant_id ?? current_tenant_id() ?? 1, Auth::id());
+        ], route('inventory.transfers.show', $transfer->id), $transfer);
 
         return back()->with('success', 'Stock Transfer dispatched and items are now In-Transit.');
     }
@@ -263,7 +263,7 @@ class StockTransferController extends Controller
             'from_warehouse' => $transfer->fromWarehouse?->name ?? 'Origin Warehouse',
             'to_warehouse' => $transfer->toWarehouse?->name ?? 'Destination Warehouse',
             'received_by' => Auth::user()?->name ?? 'Warehouse Staff',
-        ], $transfer->tenant_id ?? $tenantId, Auth::id());
+        ], route('inventory.transfers.show', $transfer->id), $transfer);
 
         return back()->with('success', 'Stock Transfer successfully received at destination warehouse.');
     }

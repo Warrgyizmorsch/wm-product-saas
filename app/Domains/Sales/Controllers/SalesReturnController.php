@@ -199,7 +199,7 @@ class SalesReturnController extends Controller
             'customer_name' => $returnOrder->customer?->name ?? 'Customer',
             'reason' => $returnOrder->reason ?? 'Return requested',
             'date' => $returnOrder->return_date ? (is_string($returnOrder->return_date) ? $returnOrder->return_date : $returnOrder->return_date->format('Y-m-d')) : now()->format('Y-m-d'),
-        ], $returnOrder->tenant_id ?? tenant_id() ?? 1, auth()->id());
+        ], route('sales.returns.show', $returnOrder->id), $returnOrder);
 
         return redirect()->route('sales.returns.show', $returnOrder->id)->with('success', "Sales Return {$returnOrder->return_number} recorded successfully.");
     }

@@ -247,7 +247,7 @@ class GoodsReceiptNoteController extends Controller
             'vendor_name' => $grn->vendor?->name ?? 'Vendor',
             'warehouse' => $grn->warehouse?->name ?? 'Main Warehouse',
             'po_no' => $grn->purchaseOrder?->purchase_order_number ?? $grn->purchaseOrder?->po_number ?? 'Direct Inward',
-        ], $tenantId, auth()->id());
+        ], route('purchase.grns.show', $grn->id), $grn);
 
         return redirect()->route('purchase.grns.show', $grn->id)
             ->with('success', "Goods Receipt Note {$grn->grn_number} created and approved successfully.");
