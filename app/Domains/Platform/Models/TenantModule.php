@@ -12,9 +12,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class TenantModule extends BaseModel
 {
+    /** Bought with the old one-time fee — free for life, never billed. */
+    public const BILLING_LIFETIME = 'lifetime';
+
+    /** Billed per user every cycle on the tenant's subscription. */
+    public const BILLING_RECURRING = 'recurring';
+
     protected $fillable = [
         'tenant_id',
         'module',
+        'billing',
         'subscription_payment_id',
         'installed_at',
         'installed_by',

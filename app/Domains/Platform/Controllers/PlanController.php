@@ -82,6 +82,8 @@ class PlanController extends Controller
             ],
             'description' => ['nullable', 'string', 'max:1000'],
             'price' => ['nullable', 'integer', 'min:0'],
+            'monthly_price_per_user' => ['nullable', 'integer', 'min:0'],
+            'yearly_price_per_user' => ['nullable', 'integer', 'min:0'],
             'currency' => ['nullable', 'string', 'max:10'],
             'billing_cycle' => ['required', 'string', Rule::in(['monthly', 'yearly'])],
             'max_users' => ['nullable', 'integer', 'min:1'],

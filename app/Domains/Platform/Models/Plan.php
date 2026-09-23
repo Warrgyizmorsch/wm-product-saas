@@ -15,6 +15,8 @@ class Plan extends Model
         'slug',
         'description',
         'price',
+        'monthly_price_per_user',
+        'yearly_price_per_user',
         'currency',
         'billing_cycle',
         'max_users',
@@ -30,6 +32,8 @@ class Plan extends Model
     {
         return [
             'price' => 'integer',
+            'monthly_price_per_user' => 'integer',
+            'yearly_price_per_user' => 'integer',
             'max_users' => 'integer',
             'max_storage_mb' => 'integer',
             'trial_days' => 'integer',

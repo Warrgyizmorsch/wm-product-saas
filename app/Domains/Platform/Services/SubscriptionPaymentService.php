@@ -3,6 +3,7 @@
 namespace App\Domains\Platform\Services;
 
 use App\Domains\Platform\Models\SubscriptionPayment;
+use App\Domains\Platform\Models\TenantModule;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
 
@@ -64,7 +65,8 @@ class SubscriptionPaymentService
 
             if ($payment->purpose === SubscriptionPayment::PURPOSE_MODULE_ADDON) {
                 // Grants the modules and fills their starter masters, like a plan switch.
-                $this->modules->install($payment->tenant, $payment->modules ?? [], $payment);
+                // Paid with the one-time fee, so free for life (never recurring-billed).
+                $this->modules->install($payment->tenant, $payment->modules ?? [], $payment, null, TenantModule::BILLING_LIFETIME);
             } else {
                 $this->tenants->switchOwnPlan($payment->tenant, $payment->plan_id);
             }

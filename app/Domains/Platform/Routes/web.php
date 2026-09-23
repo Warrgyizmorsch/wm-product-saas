@@ -2,6 +2,7 @@
 
 use App\Domains\Platform\Controllers\CurrencyController;
 use App\Domains\Platform\Controllers\PaymentGatewaySettingsController;
+use App\Domains\Platform\Controllers\ModulePriceController;
 use App\Domains\Platform\Controllers\PlanController;
 use App\Domains\Platform\Controllers\SubscriptionController;
 use App\Domains\Platform\Controllers\TenantController;
@@ -36,6 +37,10 @@ Route::prefix('platform')
             ->name('plans.edit');
         Route::put('plans/{plan}', [PlanController::class, 'update'])
             ->name('plans.update');
+        Route::get('module-prices', [ModulePriceController::class, 'index'])
+            ->name('module-prices.index');
+        Route::put('module-prices', [ModulePriceController::class, 'update'])
+            ->name('module-prices.update');
 
         Route::get('usage', [UsageOverviewController::class, 'index'])
             ->name('usage.index');

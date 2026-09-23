@@ -83,20 +83,27 @@ class TenantModuleService
      * Grants $modules to the tenant (new rows, or reactivates uninstalled ones)
      * and fills their starter masters. Called once a module-add-on payment is
      * confirmed (SubscriptionPaymentService) and for a free reinstall.
+     * $billing only applies to modules never bought before.
      *
      * @param list<string> $modules
      */
-    public function install(Tenant $tenant, array $modules, ?SubscriptionPayment $payment = null, ?int $userId = null): void
-    {
+    public function install(
+        Tenant $tenant,
+        array $modules,
+        ?SubscriptionPayment $payment = null,
+        ?int $userId = null,
+        string $billing = TenantModule::BILLING_RECURRING,
+    ): void {
         if ($modules === []) {
             return;
         }
 
         $userId ??= auth()->id();
 
-        DB::transaction(function () use ($tenant, $modules, $payment, $userId): void {
+        DB::transaction(function () use ($tenant, $modules, $payment, $userId, $billing): void {
             foreach (array_unique($modules) as $module) {
-                $row = $tenant->addonModules()->firstOrNew(['module' => $module]);
+                // A reinstalled row keeps its original billing (a lifetime add-on stays free).
+                $row = $tenant->addonModules()->firstOrNew(['module' => $module], ['billing' => $billing]);
 
                 $row->fill([
                     'tenant_id' => $tenant->id,

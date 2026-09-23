@@ -55,7 +55,17 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td>{{ $plan->price > 0 ? $plan->currency.' '.number_format($plan->price).' / '.$plan->billing_cycle : 'Free' }}</td>
+                                <td>
+                                    {{ $plan->price > 0 ? $plan->currency.' '.number_format($plan->price).' / '.$plan->billing_cycle : 'Free' }}
+                                    @if ($plan->monthly_price_per_user !== null || $plan->yearly_price_per_user !== null)
+                                        <span class="d-block fs-11 text-muted">
+                                            Per user/month:
+                                            {{ $plan->monthly_price_per_user !== null ? $plan->currency.' '.number_format($plan->monthly_price_per_user).' monthly' : '' }}
+                                            {{ $plan->monthly_price_per_user !== null && $plan->yearly_price_per_user !== null ? '·' : '' }}
+                                            {{ $plan->yearly_price_per_user !== null ? $plan->currency.' '.number_format($plan->yearly_price_per_user).' yearly' : '' }}
+                                        </span>
+                                    @endif
+                                </td>
                                 <td>
                                     <span class="d-block fs-12">{{ $plan->max_users ? $plan->max_users.' users' : 'Users unlimited' }}</span>
                                     <span class="d-block fs-11 text-muted">{{ $plan->max_storage_mb ? number_format($plan->max_storage_mb).' MB' : 'Storage unlimited' }}</span>
