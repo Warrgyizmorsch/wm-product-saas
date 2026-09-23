@@ -98,6 +98,12 @@ class LeaveEncashmentController extends Controller
     public function approve(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
         $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $leaveEncashment->employee_id) {
+            abort(403, 'Self-approval is prohibited. You cannot approve your own leave encashment request.');
+        }
+
         $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
         abort_unless($isHrAdmin, 403);
 
@@ -116,6 +122,12 @@ class LeaveEncashmentController extends Controller
     public function reject(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
         $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $leaveEncashment->employee_id) {
+            abort(403, 'Self-approval is prohibited. You cannot reject your own leave encashment request.');
+        }
+
         $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
         abort_unless($isHrAdmin, 403);
 

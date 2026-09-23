@@ -193,6 +193,26 @@ class ApprovalWorkflowService
     }
 
     /**
+     * Document Module: Determine if an actor is authorized to delete a document.
+     * Prevents employees, HR managers, and line managers from deleting documents on their OWN profile.
+     */
+    public function canDeleteDocument(User|Employee $actor, \App\Domains\HRMS\Models\Document $document): bool
+    {
+        if ($actor instanceof User && $this->isSuperAdmin($actor)) {
+            return true;
+        }
+
+        $actorEmployeeId = $this->getEmployeeIdForActor($actor);
+
+        // Anti Self-Deletion: Cannot delete documents on one's own employee profile
+        if ($actorEmployeeId && (int) $actorEmployeeId === (int) $document->documentable_id) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Helper to get the Employee ID associated with a User or Employee actor.
      */
     public function getEmployeeIdForActor(User|Employee $actor): ?int

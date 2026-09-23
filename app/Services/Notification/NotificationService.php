@@ -33,21 +33,26 @@ class NotificationService
 
         $employee = Employee::where('user_id', $userId)->first();
 
-        return Notification::create([
-            'tenant_id' => $recipientUser->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : 1) ?? 1,
-            'company_id' => $employee?->company_id,
-            'business_unit_id' => $employee?->business_unit_id,
-            'branch_id' => $employee?->branch_id,
-            'user_id' => $userId,
-            'employee_id' => $employee?->id,
-            'module' => strtolower($module),
-            'type' => $type,
-            'title' => $title,
-            'message' => $message,
-            'action_url' => self::resolveUrl($actionUrl),
-            'icon_class' => $iconClass,
-            'data' => $extraData,
-        ]);
+        try {
+            return Notification::create([
+                'tenant_id' => $recipientUser->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : 1) ?? 1,
+                'company_id' => $employee?->company_id,
+                'business_unit_id' => $employee?->business_unit_id,
+                'branch_id' => $employee?->branch_id,
+                'user_id' => $userId,
+                'employee_id' => $employee?->id,
+                'module' => strtolower($module),
+                'type' => $type,
+                'title' => $title,
+                'message' => $message,
+                'action_url' => self::resolveUrl($actionUrl),
+                'icon_class' => $iconClass,
+                'data' => $extraData,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Notification creation failed: " . $e->getMessage());
+            return null;
+        }
     }
 
     /**
