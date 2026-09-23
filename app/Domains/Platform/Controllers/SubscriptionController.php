@@ -6,6 +6,7 @@ use App\Domains\Platform\Models\Plan;
 use App\Domains\Platform\Models\SubscriptionPayment;
 use App\Domains\Platform\Services\PaymentGatewayManager;
 use App\Domains\Platform\Services\SubscriptionPaymentService;
+use App\Domains\Platform\Services\SubscriptionPricing;
 use App\Domains\Platform\Services\TenantModuleService;
 use App\Domains\Platform\Services\TenantService;
 use App\Http\Controllers\Controller;
@@ -33,6 +34,7 @@ class SubscriptionController extends Controller
         private readonly PaymentGatewayManager $gateways,
         private readonly SubscriptionPaymentService $payments,
         private readonly TenantModuleService $tenantModules,
+        private readonly SubscriptionPricing $pricing,
     ) {
     }
 
@@ -53,17 +55,27 @@ class SubscriptionController extends Controller
                 'state' => $state,
                 'installed' => in_array($state, ['plan', 'addon'], true),
                 'requires' => $requires === [] ? null : $this->tenantModules->labels($requires),
+                // Per user per month; set → a recurring add-on bought in the plan checkout.
+                'prices' => [
+                    'monthly' => $this->pricing->modulePricePerUser($module, 'monthly'),
+                    'yearly' => $this->pricing->modulePricePerUser($module, 'yearly'),
+                ],
             ] + ($apps[$module] ?? ['label' => ucfirst($module), 'icon' => 'feather-grid', 'description' => '', 'color' => '#3B82F6']);
         }
 
         return view('modules.platform.subscription.index', [
             'tenant' => $tenant,
             'currentPlan' => $tenant->planCatalog,
-            'plans' => Plan::query()
+            'plans' => $plans = Plan::query()
                 ->where('is_active', true)
                 ->where('is_demo', false)
                 ->orderBy('sort_order')
                 ->get(),
+            // plan id => per user per month on each cycle (null = not sold on it)
+            'planPrices' => $plans->mapWithKeys(fn (Plan $plan) => [$plan->id => [
+                'monthly' => $this->pricing->planPricePerUser($plan, 'monthly'),
+                'yearly' => $this->pricing->planPricePerUser($plan, 'yearly'),
+            ]])->all(),
             'modules' => $modules,
             'modulePrice' => config('navigation.module_addon_price'),
             'moduleCurrency' => 'INR',
@@ -91,7 +103,7 @@ class SubscriptionController extends Controller
 
         $plan = Plan::findOrFail($validated['plan_id']);
 
-        if ($plan->price > 0) {
+        if ($plan->price > 0 || $this->pricing->sellsPerUser($plan)) {
             return redirect()->route('platform.subscription.index')
                 ->with('error', "{$plan->name} is a paid plan — use the checkout flow, not a direct switch.");
         }
@@ -118,6 +130,10 @@ class SubscriptionController extends Controller
         ]);
 
         $plan = Plan::findOrFail($validated['plan_id']);
+
+        if ($this->pricing->sellsPerUser($plan)) {
+            return response()->json(['message' => "{$plan->name} is billed per user — choose it in the plan checkout."], 422);
+        }
 
         if ($plan->price <= 0) {
             return response()->json(['message' => 'This plan is free — no checkout needed.'], 422);

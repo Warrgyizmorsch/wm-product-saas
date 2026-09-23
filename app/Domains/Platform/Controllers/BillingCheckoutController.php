@@ -28,7 +28,12 @@ class BillingCheckoutController extends Controller
     ) {
     }
 
-    public function show(): View
+    /**
+     * ?plan=, ?cycle= and ?modules[]= preselect the checkout (links from the
+     * Subscription page's plan cards and module tiles); anything invalid is
+     * just ignored — quote() still validates the final pick.
+     */
+    public function show(Request $request): View
     {
         $tenant = tenant();
 
@@ -46,7 +51,10 @@ class BillingCheckoutController extends Controller
                 'name' => $plan->name,
                 'description' => $plan->description,
                 'features' => $plan->features,
-                'prices' => ['monthly' => $plan->monthly_price_per_user, 'yearly' => $plan->yearly_price_per_user],
+                'prices' => [
+                    'monthly' => $this->pricing->planPricePerUser($plan, 'monthly'),
+                    'yearly' => $this->pricing->planPricePerUser($plan, 'yearly'),
+                ],
             ])->values(),
             'modules' => collect(EnsureTenantModuleAccess::GATED_MODULES)->map(fn (string $module) => [
                 'key' => $module,
@@ -59,11 +67,16 @@ class BillingCheckoutController extends Controller
             ] + config("navigation.apps.$module", ['label' => ucfirst($module), 'icon' => 'feather-grid', 'description' => '', 'color' => '#3B82F6']))->values(),
             'cycles' => collect(config('billing.cycles'))->map(fn (array $cycle, string $key) => ['key' => $key, 'label' => $cycle['label']])->values(),
             'selection' => [
-                'plan_id' => $currentPlan?->id ?? $plans->first()?->id,
-                'cycle' => 'yearly',
+                'plan_id' => $plans->firstWhere('id', (int) $request->query('plan'))?->id ?? $currentPlan?->id ?? $plans->first()?->id,
+                'cycle' => in_array($request->query('cycle'), $this->pricing->cycles(), true) ? $request->query('cycle') : 'yearly',
                 'seats' => max($minimumSeats, (int) $this->usage->maxUsers($tenant)),
-                'modules' => $this->checkout->recurringModules($tenant),
+                'modules' => array_values(array_unique([
+                    ...$this->checkout->recurringModules($tenant),
+                    ...array_intersect((array) $request->query('modules', []), EnsureTenantModuleAccess::GATED_MODULES),
+                ])),
             ],
+            'startStep' => $request->filled('modules') ? 2 : 1,
+            'canManagePrices' => $request->user()?->can('viewAny', Plan::class) ?? false,
             'minimumSeats' => $minimumSeats,
             'gstRate' => $this->pricing->gstRate(),
             'currency' => config('billing.currency'),

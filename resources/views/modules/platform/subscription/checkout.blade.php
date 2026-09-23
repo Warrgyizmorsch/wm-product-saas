@@ -50,7 +50,16 @@
                         </div>
 
                         @if ($plans->isEmpty())
-                            <div class="text-center py-5 text-muted">No per-user plans are on sale yet. Please check back soon.</div>
+                            <div class="text-center py-5">
+                                <p class="text-muted mb-3">No plans are on sale yet.</p>
+                                @if ($canManagePrices)
+                                    <p class="fs-13 text-muted mb-3">A plan is priced from its modules' per-user prices — set every module's price, or give the plan its own price.</p>
+                                    <a href="{{ route('platform.module-prices.index') }}" class="btn btn-primary btn-sm">Set add-on prices</a>
+                                    <a href="{{ route('platform.plans.index') }}" class="btn btn-light border btn-sm">Plans</a>
+                                @else
+                                    <a href="{{ route('platform.subscription.index') }}" class="btn btn-light border btn-sm">Back to Subscription</a>
+                                @endif
+                            </div>
                         @else
                             <div class="row g-3" id="planCards">
                                 @foreach ($plans as $plan)
@@ -175,7 +184,7 @@
                     </x-ui.card>
                 </section>
 
-                <div class="d-flex justify-content-between" id="stepNav">
+                <div class="d-flex justify-content-between {{ $plans->isEmpty() ? 'd-none' : '' }}" id="stepNav">
                     <button type="button" class="btn btn-light border" id="stepBack">Back</button>
                     <button type="button" class="btn btn-primary" id="stepNext">Continue</button>
                 </div>
@@ -235,7 +244,7 @@
     var CSRF = @json(csrf_token());
 
     var state = @json($selection);
-    var step = 1;
+    var step = {{ (int) $startStep }};
     var lastQuote = null;
     var quoteTimer = null;
     var quoteSeq = 0;
@@ -443,7 +452,7 @@
         });
         var back = document.getElementById('stepBack');
         var next = document.getElementById('stepNext');
-        document.getElementById('stepNav').classList.toggle('d-none', step === 4);
+        document.getElementById('stepNav').classList.toggle('d-none', step === 4 || PLANS.length === 0);
         back.classList.toggle('invisible', step === 1);
         next.disabled = !lastQuote;
         next.textContent = step === 3 ? (lastQuote ? 'Pay ' + money(lastQuote.total) : 'Pay') : 'Continue';

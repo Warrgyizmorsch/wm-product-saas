@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureTenantModuleAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -43,6 +44,19 @@ class ModulePriceController extends Controller
             'prices.*.is_active' => ['nullable', 'boolean'],
         ]);
 
+        $errors = [];
+        foreach ($validated['prices'] as $module => $input) {
+            $error = self::yearlyTotalMistake($input['monthly_price_per_user'] ?? null, $input['yearly_price_per_user'] ?? null);
+
+            if ($error !== null) {
+                $errors["prices.$module.yearly_price_per_user"] = config("navigation.apps.$module.label", ucfirst((string) $module)).': '.$error;
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
         foreach (EnsureTenantModuleAccess::GATED_MODULES as $module) {
             $input = $validated['prices'][$module] ?? null;
 
@@ -58,6 +72,25 @@ class ModulePriceController extends Controller
         }
 
         return redirect()->route('platform.module-prices.index')->with('success', 'Add-on prices saved.');
+    }
+
+    /**
+     * The billed-yearly price is per user PER MONTH. A figure above the monthly
+     * price is almost always a yearly total typed into the wrong unit (₹360
+     * instead of ₹30), which would bill 12× too much — reject it.
+     */
+    public static function yearlyTotalMistake(mixed $monthly, mixed $yearly): ?string
+    {
+        if ($monthly === null || $monthly === '' || $yearly === null || $yearly === '' || (int) $yearly <= (int) $monthly) {
+            return null;
+        }
+
+        return sprintf(
+            'the billed-yearly price is per user per month and cannot be more than the monthly price (₹%s). For ₹%s per user per year, enter ₹%s.',
+            number_format((int) $monthly),
+            number_format((int) $yearly),
+            number_format(intdiv((int) $yearly, 12)),
+        );
     }
 
     private function price(mixed $value): ?int

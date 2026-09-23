@@ -5,6 +5,7 @@ namespace App\Domains\Platform\Services;
 use App\Domains\Platform\DTO\SubscriptionQuote;
 use App\Domains\Platform\Models\ModulePrice;
 use App\Domains\Platform\Models\Plan;
+use App\Http\Middleware\EnsureTenantModuleAccess;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -36,10 +37,55 @@ class SubscriptionPricing
         return (int) $months;
     }
 
-    /** Whole rupees per user per month for $plan on $cycle, or null when not sold on it. */
+    /**
+     * Whole rupees per user per month for $plan on $cycle, or null when not sold
+     * on it. A plan is a bundle of modules: its price is the admin's override
+     * when set, else the sum of its modules' prices on that cycle.
+     */
     public function planPricePerUser(Plan $plan, string $cycle): ?int
     {
-        return $cycle === 'yearly' ? $plan->yearly_price_per_user : $plan->monthly_price_per_user;
+        $override = $cycle === 'yearly' ? $plan->yearly_price_per_user : $plan->monthly_price_per_user;
+
+        return $override ?? $this->bundlePricePerUser($plan, $cycle);
+    }
+
+    /**
+     * Sum of the plan's modules' prices on $cycle, or null when any of them has
+     * no price on it (the bundle can't be priced). Uses the price even when the
+     * module isn't for sale as an add-on — that flag only governs add-ons.
+     */
+    public function bundlePricePerUser(Plan $plan, string $cycle): ?int
+    {
+        $modules = $plan->features ?? EnsureTenantModuleAccess::GATED_MODULES;
+
+        if ($modules === []) {
+            return null;
+        }
+
+        $total = 0;
+        foreach ($modules as $module) {
+            $price = $this->modulePrices()->get($module)?->pricePerUser($cycle);
+
+            if ($price === null) {
+                return null;
+            }
+
+            $total += $price;
+        }
+
+        return $total;
+    }
+
+    /** True when the plan can be bought per user on at least one cycle. */
+    public function sellsPerUser(Plan $plan): bool
+    {
+        foreach ($this->cycles() as $cycle) {
+            if ($this->planPricePerUser($plan, $cycle) !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Whole rupees per user per month for an add-on module on $cycle, or null when not for sale. */

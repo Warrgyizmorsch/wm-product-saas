@@ -35,9 +35,10 @@ class BillingCheckoutService
         return Plan::query()
             ->where('is_active', true)
             ->where('is_demo', false)
-            ->where(fn ($q) => $q->whereNotNull('monthly_price_per_user')->orWhereNotNull('yearly_price_per_user'))
             ->orderBy('sort_order')
-            ->get();
+            ->get()
+            ->filter(fn (Plan $plan) => $this->pricing->sellsPerUser($plan))
+            ->values();
     }
 
     /** Fewest users the tenant can buy: everyone who can already log in. */

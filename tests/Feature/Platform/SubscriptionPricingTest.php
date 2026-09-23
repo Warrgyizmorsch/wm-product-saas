@@ -215,4 +215,94 @@ class SubscriptionPricingTest extends TestCase
         $this->assertSame(3000, $plan->monthly_price_per_user);
         $this->assertNull($plan->yearly_price_per_user);
     }
+
+    public function test_a_plan_without_its_own_price_costs_the_sum_of_its_modules(): void
+    {
+        ModulePrice::query()->where('module', 'crm')->update(['monthly_price_per_user' => 30, 'yearly_price_per_user' => 25]);
+        ModulePrice::query()->where('module', 'sales')->update(['monthly_price_per_user' => 40, 'yearly_price_per_user' => 35]);
+        $this->plan->update(['monthly_price_per_user' => null, 'yearly_price_per_user' => null]);
+        $plan = $this->plan->fresh();
+
+        $this->assertSame(70, $this->pricing->planPricePerUser($plan, 'monthly'));
+        $this->assertSame(60, $this->pricing->planPricePerUser($plan, 'yearly'));
+        $this->assertSame(3 * 60 * 100 * 12, $this->pricing->quote($plan, 'yearly', 3)->subtotal);
+
+        // An override wins over the bundle (e.g. a bundle discount).
+        $plan->update(['monthly_price_per_user' => 55]);
+        $this->assertSame(55, app(SubscriptionPricing::class)->planPricePerUser($plan->fresh(), 'monthly'));
+    }
+
+    public function test_a_bundle_with_an_unpriced_module_is_not_sold(): void
+    {
+        ModulePrice::query()->where('module', 'crm')->update(['monthly_price_per_user' => 30]);
+        $this->plan->update(['monthly_price_per_user' => null, 'yearly_price_per_user' => null]);
+        $plan = $this->plan->fresh();
+
+        $this->assertNull($this->pricing->planPricePerUser($plan, 'monthly'));   // sales has no price
+        $this->assertFalse($this->pricing->sellsPerUser($plan));
+    }
+
+    public function test_a_yearly_total_typed_into_the_per_month_field_is_rejected(): void
+    {
+        $admin = $this->platformAdmin();
+
+        $this->actingAs($admin)->put(route('platform.module-prices.update'), [
+            'prices' => ['crm' => ['monthly_price_per_user' => '30', 'yearly_price_per_user' => '360', 'is_active' => '1']],
+        ])->assertSessionHasErrors([
+            'prices.crm.yearly_price_per_user' => 'CRM: the billed-yearly price is per user per month and cannot be more than the monthly price (₹30). For ₹360 per user per year, enter ₹30.',
+        ]);
+        $this->assertNull(ModulePrice::query()->where('module', 'crm')->sole()->yearly_price_per_user);
+
+        $this->actingAs($admin)->put(route('platform.plans.update', $this->plan), [
+            'name' => 'Standard', 'slug' => 'standard-test', 'billing_cycle' => 'monthly', 'price' => 0,
+            'monthly_price_per_user' => '2500', 'yearly_price_per_user' => '30000', 'features' => ['crm'], 'is_active' => '1',
+        ])->assertSessionHasErrors('yearly_price_per_user');
+        $this->assertSame(1250, $this->plan->fresh()->yearly_price_per_user);
+    }
+
+    public function test_the_old_free_switch_and_one_time_checkouts_refuse_per_user_priced_items(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme', 'status' => 'active', 'plan' => 'standard-test', 'plan_id' => $this->plan->id]);
+        app(TenantContext::class)->set($tenant);
+        $owner = User::create(['tenant_id' => $tenant->id, 'name' => 'Owner', 'email' => 'owner@acme.test', 'password' => bcrypt('password')]);
+        UserRole::create(['user_id' => $owner->id, 'role_id' => Role::query()->whereNull('tenant_id')->where('slug', 'tenant_owner')->firstOrFail()->id, 'tenant_id' => $tenant->id]);
+        $this->withHeader('X-Tenant', 'acme')->actingAs($owner);
+
+        $pro = Plan::create([
+            'name' => 'Pro', 'slug' => 'pro-test', 'price' => 0, 'currency' => 'INR', 'billing_cycle' => 'monthly',
+            'features' => ['crm', 'sales', 'inventory'], 'is_active' => true, 'monthly_price_per_user' => 4000,
+        ]);
+
+        // Legacy price is 0, but the plan is sold per user → no free switch.
+        $this->put(route('platform.subscription.update'), ['plan_id' => $pro->id])->assertSessionHas('error');
+        $this->assertSame($this->plan->id, $tenant->fresh()->plan_id);
+
+        $this->postJson(route('platform.subscription.checkout'), ['plan_id' => $pro->id])
+            ->assertStatus(422)->assertJson(['message' => 'Pro is billed per user — choose it in the plan checkout.']);
+
+        $this->postJson(route('platform.modules.checkout'), ['modules' => ['inventory']])
+            ->assertStatus(422)->assertJson(['message' => 'Inventory is billed per user — add it in the plan checkout.']);
+    }
+
+    public function test_subscription_page_sends_per_user_plans_and_add_ons_to_the_checkout(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme', 'status' => 'active', 'plan' => 'standard-test', 'plan_id' => $this->plan->id]);
+        app(TenantContext::class)->set($tenant);
+        $owner = User::create(['tenant_id' => $tenant->id, 'name' => 'Owner', 'email' => 'owner@acme.test', 'password' => bcrypt('password')]);
+        UserRole::create(['user_id' => $owner->id, 'role_id' => Role::query()->whereNull('tenant_id')->where('slug', 'tenant_owner')->firstOrFail()->id, 'tenant_id' => $tenant->id]);
+
+        $this->withHeader('X-Tenant', 'acme')->actingAs($owner)->get(route('platform.subscription.index'))
+            ->assertOk()
+            ->assertSee('₹1,250 /user/month billed yearly', false)
+            ->assertSee('no paid subscription yet')
+            ->assertSee(route('platform.billing.checkout', ['plan' => $this->plan->id]), false)
+            ->assertSee(e(route('platform.billing.checkout', ['modules' => ['inventory']])), false)
+            ->assertSee('₹300 /user/month billed yearly', false)
+            // Per-user priced modules are no longer sold with the one-time checkbox.
+            ->assertDontSee('value="inventory" class="form-check-input erp-app-tile-check"', false)
+            ->assertSee('value="purchase" class="form-check-input erp-app-tile-check"', false)
+            ->assertDontSee('Switch to Standard');
+    }
 }
