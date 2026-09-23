@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domains\Platform\Models\Plan;
+use App\Domains\Platform\Models\TenantModule;
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -37,6 +38,10 @@ class Tenant extends Model
         'slug',
         'domain',
         'billing_email',
+        'billing_name',
+        'billing_gstin',
+        'billing_address',
+        'billing_state',
         'status',
         'plan',
         'plan_id',
@@ -121,14 +126,36 @@ class Tenant extends Model
     }
 
     /**
-     * Modules the tenant's plan includes, or null when there is no plan/feature
-     * list (everything is allowed, same rule as tenant_allowed_modules()).
+     * Modules the tenant's plan includes plus its active self-service add-ons
+     * (see TenantModuleService), or null when there is no plan/feature list
+     * (everything is allowed). tenant_allowed_modules() delegates here.
      *
      * @return array<int, string>|null
      */
     public function planModules(): ?array
     {
-        return $this->planCatalog?->features;
+        $features = $this->planCatalog?->features;
+
+        if ($features === null) {
+            return null;
+        }
+
+        $addons = $this->addonModules
+            ->filter(fn (TenantModule $row) => $row->isActive())
+            ->pluck('module')
+            ->all();
+
+        return array_values(array_unique([...$features, ...$addons]));
+    }
+
+    /**
+     * Every module this tenant ever bought as an add-on, installed or not.
+     * Unscoped from the current tenant context: a webhook or platform admin
+     * may be acting on a different tenant than the one resolved for the request.
+     */
+    public function addonModules(): HasMany
+    {
+        return $this->hasMany(TenantModule::class)->withoutGlobalScope('tenant');
     }
 
     /** True when the plan includes ANY of the given modules (or has no module limit). */
@@ -137,24 +164,6 @@ class Tenant extends Model
         $allowed = $this->planModules();
 
         return $allowed === null || array_intersect($modules, $allowed) !== [];
-    }
-
-    /**
-     * Self-service module add-ons (see TenantModuleController): grants these modules
-     * to this tenant only, on top of its plan, without touching the Plan row every
-     * other tenant on that plan shares. Merged into tenant_allowed_modules().
-     */
-    public function installModules(array $modules): void
-    {
-        if ($modules === []) {
-            return;
-        }
-
-        $settings = $this->settings ?? [];
-        $installed = $settings['installed_modules'] ?? [];
-        $settings['installed_modules'] = array_values(array_unique([...$installed, ...$modules]));
-
-        $this->update(['settings' => $settings]);
     }
 
     public function users(): HasMany

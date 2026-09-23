@@ -14,6 +14,7 @@ return [
         'children' => [
             ['label' => 'Tenants', 'route' => 'platform.tenants.index', 'permission' => 'platform.tenants.manage'],
             ['label' => 'Plans', 'route' => 'platform.plans.index', 'permission' => 'platform.plans.manage'],
+            ['label' => 'Add-on Prices', 'route' => 'platform.module-prices.index', 'permission' => 'platform.plans.manage'],
             ['label' => 'Currencies', 'route' => 'platform.currencies.index', 'permission' => 'platform.currencies.manage'],
             ['label' => 'Subscriptions', 'route' => 'platform.subscription.index', 'permission' => 'tenant.subscription.manage'],
             ['label' => 'Usage Limits', 'route' => 'platform.usage.index', 'permission' => 'platform.usage.view'],

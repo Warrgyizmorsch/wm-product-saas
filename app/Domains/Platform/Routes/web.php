@@ -2,6 +2,8 @@
 
 use App\Domains\Platform\Controllers\CurrencyController;
 use App\Domains\Platform\Controllers\PaymentGatewaySettingsController;
+use App\Domains\Platform\Controllers\BillingCheckoutController;
+use App\Domains\Platform\Controllers\ModulePriceController;
 use App\Domains\Platform\Controllers\PlanController;
 use App\Domains\Platform\Controllers\SubscriptionController;
 use App\Domains\Platform\Controllers\TenantController;
@@ -36,14 +38,29 @@ Route::prefix('platform')
             ->name('plans.edit');
         Route::put('plans/{plan}', [PlanController::class, 'update'])
             ->name('plans.update');
+        Route::get('module-prices', [ModulePriceController::class, 'index'])
+            ->name('module-prices.index');
+        Route::put('module-prices', [ModulePriceController::class, 'update'])
+            ->name('module-prices.update');
 
         Route::get('usage', [UsageOverviewController::class, 'index'])
             ->name('usage.index');
+
+        Route::get('subscription/checkout', [BillingCheckoutController::class, 'show'])
+            ->name('billing.checkout');
+        Route::post('subscription/quote', [BillingCheckoutController::class, 'quote'])
+            ->name('billing.quote');
+        Route::put('subscription/billing-details', [BillingCheckoutController::class, 'saveBillingDetails'])
+            ->name('billing.details');
 
         Route::post('modules/checkout', [TenantModuleController::class, 'checkout'])
             ->name('modules.checkout');
         Route::post('modules/verify', [TenantModuleController::class, 'verify'])
             ->name('modules.verify');
+        Route::post('modules/{module}/uninstall', [TenantModuleController::class, 'uninstall'])
+            ->name('modules.uninstall');
+        Route::post('modules/{module}/reinstall', [TenantModuleController::class, 'reinstall'])
+            ->name('modules.reinstall');
 
         Route::get('payment-gateway', [PaymentGatewaySettingsController::class, 'index'])
             ->name('payment-gateway.index');

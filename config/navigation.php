@@ -31,6 +31,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Module dependencies
+    |--------------------------------------------------------------------------
+    |
+    | module => modules it cannot work without. A tenant can't install a module
+    | unless its requirements are installed (or bought in the same checkout),
+    | and can't uninstall a module another installed module requires (see
+    | TenantModuleService). Only functional needs belong here — models shared
+    | across domains don't count, since uninstalling hides a module's screens
+    | but never deletes or stops its data.
+    |
+    */
+
+    'module_requires' => [
+        'production' => ['inventory'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Sidebar sections
     |--------------------------------------------------------------------------
     |

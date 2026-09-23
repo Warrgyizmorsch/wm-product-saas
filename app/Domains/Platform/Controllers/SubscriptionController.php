@@ -6,6 +6,7 @@ use App\Domains\Platform\Models\Plan;
 use App\Domains\Platform\Models\SubscriptionPayment;
 use App\Domains\Platform\Services\PaymentGatewayManager;
 use App\Domains\Platform\Services\SubscriptionPaymentService;
+use App\Domains\Platform\Services\TenantModuleService;
 use App\Domains\Platform\Services\TenantService;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureTenantModuleAccess;
@@ -31,6 +32,7 @@ class SubscriptionController extends Controller
         private readonly TenantService $tenants,
         private readonly PaymentGatewayManager $gateways,
         private readonly SubscriptionPaymentService $payments,
+        private readonly TenantModuleService $tenantModules,
     ) {
     }
 
@@ -40,14 +42,17 @@ class SubscriptionController extends Controller
 
         $this->authorize('viewSubscription', $tenant);
 
-        $installed = tenant_allowed_modules();
         $apps = config('navigation.apps');
 
         $modules = [];
-        foreach (EnsureTenantModuleAccess::GATED_MODULES as $module) {
+        foreach ($this->tenantModules->states($tenant) as $module => $state) {
+            $requires = $this->tenantModules->requirements($module);
+
             $modules[] = [
                 'key' => $module,
-                'installed' => $installed === null || in_array($module, $installed, true),
+                'state' => $state,
+                'installed' => in_array($state, ['plan', 'addon'], true),
+                'requires' => $requires === [] ? null : $this->tenantModules->labels($requires),
             ] + ($apps[$module] ?? ['label' => ucfirst($module), 'icon' => 'feather-grid', 'description' => '', 'color' => '#3B82F6']);
         }
 
