@@ -18,6 +18,9 @@
                 @endif
             </div>
             <div class="text-end fs-13 text-muted">
+                @can('updateSubscription', $tenant)
+                    <a href="{{ route('platform.billing.checkout') }}" class="btn btn-primary btn-sm mb-2">Choose plan, users &amp; add-ons</a>
+                @endcan
                 <div>Status: <x-ui.badge variant="{{ $tenant->subscription_status === 'active' ? 'success' : 'warning' }}" soft>{{ ucfirst($tenant->subscription_status ?? 'trial') }}</x-ui.badge></div>
                 @if ($tenant->plan_started_at)
                     <div class="mt-1">Since {{ $tenant->plan_started_at->format('d M Y') }}</div>

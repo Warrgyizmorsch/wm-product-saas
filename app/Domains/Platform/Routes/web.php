@@ -2,6 +2,7 @@
 
 use App\Domains\Platform\Controllers\CurrencyController;
 use App\Domains\Platform\Controllers\PaymentGatewaySettingsController;
+use App\Domains\Platform\Controllers\BillingCheckoutController;
 use App\Domains\Platform\Controllers\ModulePriceController;
 use App\Domains\Platform\Controllers\PlanController;
 use App\Domains\Platform\Controllers\SubscriptionController;
@@ -44,6 +45,13 @@ Route::prefix('platform')
 
         Route::get('usage', [UsageOverviewController::class, 'index'])
             ->name('usage.index');
+
+        Route::get('subscription/checkout', [BillingCheckoutController::class, 'show'])
+            ->name('billing.checkout');
+        Route::post('subscription/quote', [BillingCheckoutController::class, 'quote'])
+            ->name('billing.quote');
+        Route::put('subscription/billing-details', [BillingCheckoutController::class, 'saveBillingDetails'])
+            ->name('billing.details');
 
         Route::post('modules/checkout', [TenantModuleController::class, 'checkout'])
             ->name('modules.checkout');
