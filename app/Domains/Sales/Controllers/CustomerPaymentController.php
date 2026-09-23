@@ -147,6 +147,14 @@ class CustomerPaymentController extends Controller
             return $payment;
         });
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.payment.received', [
+            'doc_no' => $payment->payment_number,
+            'customer_name' => $payment->customer?->name ?? 'Customer',
+            'amount' => number_format((float)$payment->amount, 2),
+            'payment_method' => $payment->payment_method ?? 'Bank/Cash',
+            'date' => $payment->payment_date ? (is_string($payment->payment_date) ? $payment->payment_date : $payment->payment_date->format('Y-m-d')) : now()->format('Y-m-d'),
+        ], $payment->tenant_id ?? tenant_id() ?? 1, auth()->id());
+
         return redirect()->route('sales.payments.show', $payment->id)->with('success', "Payment {$payment->payment_number} recorded successfully.");
     }
 

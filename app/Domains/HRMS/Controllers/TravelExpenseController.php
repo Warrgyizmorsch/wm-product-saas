@@ -278,6 +278,13 @@ class TravelExpenseController extends Controller
     {
         $this->authorizeHrms('hrms.travel_expenses.approve');
 
+        $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $travelRequest->employee_id) {
+            abort(403, 'Self-approval is prohibited. You cannot approve your own travel request.');
+        }
+
         $approvedBudget = $request->input('approved_budget', $travelRequest->estimated_budget);
         
         $levels = $travelRequest->approval_levels ?: 1;
@@ -411,6 +418,13 @@ class TravelExpenseController extends Controller
     public function approveCashAdvance(Request $request, CashAdvance $cashAdvance): RedirectResponse
     {
         $this->authorizeHrms('hrms.travel_expenses.approve');
+
+        $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $cashAdvance->employee_id) {
+            abort(403, 'Self-approval is prohibited. You cannot approve your own cash advance request.');
+        }
 
         $approvedAmount = $request->input('approved_amount', $cashAdvance->amount);
 
@@ -915,6 +929,13 @@ class TravelExpenseController extends Controller
     public function approveExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
     {
         $this->authorizeHrms('hrms.travel_expenses.approve');
+
+        $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $expenseReport->employee_id) {
+            abort(403, 'Self-approval is prohibited. You cannot approve your own expense report.');
+        }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 

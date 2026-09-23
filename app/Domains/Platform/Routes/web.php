@@ -97,5 +97,12 @@ Route::prefix('platform')
         Route::post('gst-settings/store', [\App\Domains\Platform\Controllers\GstSettingController::class, 'store'])->name('gstSettings.store');
         Route::post('gst-settings/{id}/test', [\App\Domains\Platform\Controllers\GstSettingController::class, 'testConnection'])->name('gstSettings.test');
         Route::delete('gst-settings/{id}', [\App\Domains\Platform\Controllers\GstSettingController::class, 'destroy'])->name('gstSettings.destroy');
+
+        // Notification Rules Master (Absolute ERP Style)
+        Route::post('notification-rules/{notificationRule}/toggle-status', [\App\Domains\Platform\Controllers\NotificationRuleController::class, 'toggleStatus'])
+            ->name('notification-rules.toggle-status');
+        Route::post('notification-rules/{notificationRule}/test-send', [\App\Domains\Platform\Controllers\NotificationRuleController::class, 'testSend'])
+            ->name('notification-rules.test-send');
+        Route::resource('notification-rules', \App\Domains\Platform\Controllers\NotificationRuleController::class);
     });
 

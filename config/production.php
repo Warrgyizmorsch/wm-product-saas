@@ -11,6 +11,15 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Production REST API Secret Key
+    |--------------------------------------------------------------------------
+    | Mandatory security gate for /api/v1/production/* endpoints.
+    | Header: X-API-SECRET
+    */
+    'api_secret' => env('PRODUCTION_API_SECRET'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Routing Number Format
     |--------------------------------------------------------------------------
     | Q1: Format for auto-generated routing numbers.

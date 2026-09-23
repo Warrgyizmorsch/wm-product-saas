@@ -12,15 +12,16 @@ use Illuminate\Support\Facades\DB;
 class ProductService
 {
     public function __construct(
-        protected ProductRepository $productRepo
+        protected ProductRepository $productRepo,
+        protected ProductImageService $imageService
     ) {}
 
     /**
-     * Create product (Single or Variant) along with warehouse stock records.
+     * Create product (Single or Variant) along with warehouse stock records and media.
      */
-    public function createProduct(array $validated, int $tenantId): Product
+    public function createProduct(array $validated, int $tenantId, array $requestInput = []): Product
     {
-        return DB::transaction(function () use ($validated, $tenantId) {
+        return DB::transaction(function () use ($validated, $tenantId, $requestInput) {
             $isService = ($validated['item_type'] ?? '') === 'Service';
 
             // 1. Create Parent Product
@@ -102,27 +103,33 @@ class ProductService
                     );
                 }
             } else {
-                if (!empty($validated['variants'])) {
+                $submittedVariants = $requestInput['variants'] ?? $validated['variants'] ?? [];
+                if (!empty($submittedVariants)) {
                     $defaultWarehouse = Warehouse::ensureDefaultWarehouse($tenantId);
 
-                    foreach ($validated['variants'] as $vData) {
+                    foreach ($submittedVariants as $idx => $vData) {
+                        $variantSku = trim($vData['sku'] ?? '');
+                        if (!$variantSku) {
+                            continue;
+                        }
+                        $attrLabel = trim($vData['attributes'] ?? '');
                         $variantProduct = $this->productRepo->create([
                             'tenant_id' => $tenantId,
                             'parent_id' => $parentProduct->id,
-                            'name' => $parentProduct->name . ' (' . ($vData['attributes'] ?? '') . ')',
-                            'sku' => $vData['sku'],
+                            'name' => $parentProduct->name . ($attrLabel ? " ({$attrLabel})" : ''),
+                            'sku' => $variantSku,
                             'type' => $parentProduct->type,
                             'item_type' => $parentProduct->item_type,
                             'variation_type' => 'Single',
                             'uom_id' => $parentProduct->uom_id,
-                            'status' => 'active',
-                            'selling_price' => $vData['selling_price'] ?? $parentProduct->selling_price,
-                            'cost_price' => $vData['cost_price'] ?? $parentProduct->cost_price,
-                            'unit_cost' => $vData['cost_price'] ?? $parentProduct->cost_price,
-                            'reorder_point' => $vData['reorder_point'] ?? 0,
-                            'opening_stock' => $vData['opening_stock'] ?? 0,
-                            'opening_stock_rate' => $vData['cost_price'] ?? $parentProduct->cost_price,
-                            'variant_values' => ['label' => $vData['attributes'] ?? ''],
+                            'status' => $vData['status'] ?? 'active',
+                            'selling_price' => !empty($vData['selling_price']) ? (float)$vData['selling_price'] : $parentProduct->selling_price,
+                            'cost_price' => !empty($vData['cost_price']) ? (float)$vData['cost_price'] : $parentProduct->cost_price,
+                            'unit_cost' => !empty($vData['cost_price']) ? (float)$vData['cost_price'] : $parentProduct->cost_price,
+                            'reorder_point' => !empty($vData['reorder_point']) ? (float)$vData['reorder_point'] : 0,
+                            'opening_stock' => !empty($vData['opening_stock']) ? (float)$vData['opening_stock'] : 0,
+                            'opening_stock_rate' => !empty($vData['cost_price']) ? (float)$vData['cost_price'] : $parentProduct->cost_price,
+                            'variant_values' => ['label' => $attrLabel],
                             'track_serial_number' => $parentProduct->track_serial_number,
                             'track_batch' => $parentProduct->track_batch,
                             'supplier_method' => $parentProduct->supplier_method,
@@ -139,8 +146,19 @@ class ProductService
                                 'Opening Stock'
                             );
                         }
+
+                        // Variant media upload (main image & detail gallery photos)
+                        $this->imageService->saveVariantMedia($variantProduct, $vData, $tenantId);
                     }
                 }
+            }
+
+            // Save parent product Main Image & Detail Images
+            if (!empty($requestInput['main_image']) && $requestInput['main_image'] instanceof \Illuminate\Http\UploadedFile) {
+                $this->imageService->saveMainImage($parentProduct, $requestInput['main_image'], $tenantId);
+            }
+            if (!empty($requestInput['detail_images']) && is_array($requestInput['detail_images'])) {
+                $this->imageService->saveDetailImages($parentProduct, $requestInput['detail_images'], $tenantId);
             }
 
             return $parentProduct;
@@ -252,6 +270,9 @@ class ProductService
                             'uom_id' => $validated['uom_id'] ?? null,
                         ]);
                         $processedIds[] = $variant->id;
+
+                        // Variant media update (main & detail images)
+                        $this->imageService->saveVariantMedia($variant, $vData, $tenantId);
                     } else if (!empty($variantSku)) {
                         $newVariant = Product::create([
                             'tenant_id' => $tenantId,
@@ -275,6 +296,9 @@ class ProductService
                             'supplier_method' => $validated['supplier_method'] ?? 'buy',
                         ]);
                         $processedIds[] = $newVariant->id;
+
+                        // Variant media upload
+                        $this->imageService->saveVariantMedia($newVariant, $vData, $tenantId);
 
                         if ($vOpening > 0 && $defaultWarehouse) {
                             try {
@@ -337,6 +361,27 @@ class ProductService
                         }
                     }
                 }
+            }
+
+            // Media & Image updates for parent product
+            if (!empty($requestInput['deleted_image_ids']) && is_array($requestInput['deleted_image_ids'])) {
+                foreach ($requestInput['deleted_image_ids'] as $delId) {
+                    if (!empty($delId)) {
+                        $this->imageService->deleteImage((int)$delId, $product);
+                    }
+                }
+            }
+
+            if (!empty($requestInput['primary_image_id'])) {
+                $this->imageService->setPrimary((int)$requestInput['primary_image_id'], $product);
+            }
+
+            if (!empty($requestInput['main_image']) && $requestInput['main_image'] instanceof \Illuminate\Http\UploadedFile) {
+                $this->imageService->saveMainImage($product, $requestInput['main_image'], $tenantId);
+            }
+
+            if (!empty($requestInput['detail_images']) && is_array($requestInput['detail_images'])) {
+                $this->imageService->saveDetailImages($product, $requestInput['detail_images'], $tenantId);
             }
 
             return true;

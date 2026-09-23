@@ -42,48 +42,39 @@
         $isFinalOp = ($op->sequence == $maxSeq);
     @endphp
 
-    <x-ui.workflow-guide title="What's Next?">
+    <x-ui.workflow-guide :title="__('production.whats_next')">
         @if($op->status !== 'running' && $op->status !== 'paused' && $op->status !== 'completed')
-            Click <span class="badge bg-soft-success text-success border border-success-subtle fw-semibold">START
-                OPERATION</span> below to begin shop floor execution.
+            {!! __('production.op_execution_guide_not_started', [
+                'start_badge' => '<span class="badge bg-soft-success text-success border border-success-subtle fw-semibold">' . __('production.start_operation') . '</span>'
+            ]) !!}
         @elseif($op->status === 'completed')
             @if($isFinalOp)
-                Operation complete. This was the final routing operation for Order <strong
-                    class="text-dark">{{ $order->order_number }}</strong>. Finished goods production can now be transferred into the
-                warehouse from the <a href="{{ url('production/wip') }}?search={{ $order->order_number }}"
-                    class="fw-bold text-primary text-decoration-underline">WIP Tracking Page</a>.
+                {!! __('production.op_execution_guide_completed_final', [
+                    'order' => '<strong class="text-dark">' . e($order->order_number) . '</strong>',
+                    'wip_link' => '<a href="' . url('production/wip') . '?search=' . urlencode($order->order_number) . '" class="fw-bold text-primary text-decoration-underline">' . __('production.wip_tracking_page') . '</a>'
+                ]) !!}
             @else
-                Operation complete. The WIP batch and completed output have transitioned to the next routing operation.
+                {{ __('production.op_execution_guide_completed_intermediate') }}
             @endif
         @else
+            @php
+                $reworkLink = '<a href="' . url('production/quality/rework') . '" class="fw-bold text-primary text-decoration-underline">' . __('production.rework_management') . '</a>';
+                $scrapLink = '<a href="' . url('production/quality/scrap') . '" class="fw-bold text-primary text-decoration-underline">' . __('production.scrap_management') . '</a>';
+            @endphp
             @if(strtolower($order->production_mode ?? '') === 'batch')
-                Create or select the required production batch below and log progress for that batch. Any rejected or scrapped
-                quantities will automatically move under Quality Control (<a href="{{ url('production/quality/rework') }}"
-                    class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a
-                    href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap
-                    Management</a>). Once completed with rework/scrap decomposition, the WIP batch will transition to the next
-                operation.
+                {!! __('production.op_execution_guide_running_batch', ['rework_link' => $reworkLink, 'scrap_link' => $scrapLink]) !!}
             @elseif(strtolower($order->production_mode ?? '') === 'serial')
-                Scan or select serial numbers below to log progress. Any rejected or scrapped units will automatically move under
-                Quality Control (<a href="{{ url('production/quality/rework') }}"
-                    class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a
-                    href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap
-                    Management</a>).
+                {!! __('production.op_execution_guide_running_serial', ['rework_link' => $reworkLink, 'scrap_link' => $scrapLink]) !!}
             @else
-                Log completed output or progress below. Any rejected or scrapped quantities will automatically move under Quality
-                Control (<a href="{{ url('production/quality/rework') }}"
-                    class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a
-                    href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap
-                    Management</a>).
+                {!! __('production.op_execution_guide_running_standard', ['rework_link' => $reworkLink, 'scrap_link' => $scrapLink]) !!}
             @endif
 
             @if($isFinalOp)
                 <div class="mt-1.5 fs-12 text-dark">
-                    <i class="feather-check-circle me-1 text-primary"></i><strong>Final Operation Note:</strong> Upon completing
-                    this final routing operation, finished goods production can be moved from WIP into the warehouse directly from
-                    the <a href="{{ url('production/wip') }}?search={{ $order->order_number }}"
-                        class="fw-bold text-primary text-decoration-underline">Work-in-Progress (WIP) Tracking Page</a> for Order
-                    <strong>{{ $order->order_number }}</strong>.
+                    <i class="feather-check-circle me-1 text-primary"></i>{!! __('production.op_execution_guide_final_note', [
+                        'wip_link' => '<a href="' . url('production/wip') . '?search=' . urlencode($order->order_number) . '" class="fw-bold text-primary text-decoration-underline">' . __('production.wip_tracking_page') . '</a>',
+                        'order' => '<strong>' . e($order->order_number) . '</strong>'
+                    ]) !!}
                 </div>
             @endif
         @endif

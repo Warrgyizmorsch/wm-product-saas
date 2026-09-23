@@ -36,3 +36,7 @@ Route::prefix('maps')
         Route::get('/geocode', [MapApiController::class, 'geocode'])->name('geocode');
         Route::get('/autocomplete', [MapApiController::class, 'autocomplete'])->name('autocomplete');
     });
+
+// Production Module API v1
+Route::prefix('v1/production')->group(base_path('app/Domains/Production/Routes/api.php'));
+

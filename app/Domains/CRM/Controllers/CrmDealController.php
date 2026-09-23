@@ -440,6 +440,15 @@ class CrmDealController extends Controller
             }
         }
 
+        if (in_array($stage, ['Won', 'Closed Won'])) {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('crm.deal.won', [
+                'deal_title' => $deal->title,
+                'customer_name' => $deal->account?->name ?? 'Customer',
+                'amount' => number_format((float)($deal->estimated_value ?? $deal->amount ?? 0), 2),
+                'won_by' => auth()->user()?->name ?? 'User',
+            ], $deal->tenant_id ?? tenant_id() ?? 1, auth()->id());
+        }
+
         return redirect()->route('crm.deals.show', $deal)->with('success', 'Deal updated successfully.');
     }
 
@@ -500,6 +509,15 @@ class CrmDealController extends Controller
             'probability'  => $prob,
             'close_reason' => $validated['close_reason'] ?? $deal->close_reason,
         ]);
+
+        if (in_array($stage, ['Won', 'Closed Won'])) {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('crm.deal.won', [
+                'deal_title' => $deal->title,
+                'customer_name' => $deal->account?->name ?? 'Customer',
+                'amount' => number_format((float)($deal->estimated_value ?? $deal->amount ?? 0), 2),
+                'won_by' => auth()->user()?->name ?? 'User',
+            ], $deal->tenant_id ?? tenant_id() ?? 1, auth()->id());
+        }
 
         $msg = "Deal stage updated to {$stage} successfully!";
 

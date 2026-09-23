@@ -194,6 +194,13 @@ class SalesReturnController extends Controller
             return $salesReturn;
         });
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.return.created', [
+            'doc_no' => $returnOrder->return_number,
+            'customer_name' => $returnOrder->customer?->name ?? 'Customer',
+            'reason' => $returnOrder->reason ?? 'Return requested',
+            'date' => $returnOrder->return_date ? (is_string($returnOrder->return_date) ? $returnOrder->return_date : $returnOrder->return_date->format('Y-m-d')) : now()->format('Y-m-d'),
+        ], $returnOrder->tenant_id ?? tenant_id() ?? 1, auth()->id());
+
         return redirect()->route('sales.returns.show', $returnOrder->id)->with('success', "Sales Return {$returnOrder->return_number} recorded successfully.");
     }
 

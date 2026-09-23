@@ -282,6 +282,19 @@ class AttendanceCorrectionController extends Controller
      */
     public function approve(Request $request, AttendanceCorrection $correction)
     {
+        $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $correction->employee_id) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Self-approval is prohibited. You cannot approve your own attendance correction request.'
+                ], 403);
+            }
+            return redirect()->back()->with('error', 'Self-approval is prohibited. You cannot approve your own attendance correction request.');
+        }
+
         if ($correction->status !== 'pending') {
             if ($request->expectsJson()) {
                 return response()->json([

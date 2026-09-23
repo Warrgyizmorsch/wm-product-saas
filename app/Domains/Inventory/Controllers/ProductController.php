@@ -123,7 +123,16 @@ class ProductController extends Controller
             'cost_price' => 'nullable|numeric|min:0',
             'sales_account' => 'required|string|max:255',
             'purchase_account' => 'required|string|max:255',
-            'inventory_account' => 'nullable|string|max:255',
+            'inventory_account' => [
+                'nullable',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) use ($request) {
+                    if ($request->input('item_type', 'Goods') === 'Goods' && empty($value)) {
+                        $fail("The Inventory Account field is required.");
+                    }
+                }
+            ],
             'reorder_point' => 'nullable|numeric|min:0',
             'minimum_order_qty' => 'nullable|numeric|min:0',
             'order_multiple' => 'nullable|numeric|min:0',
@@ -148,11 +157,33 @@ class ProductController extends Controller
             'inventory_valuation_method' => 'nullable|string|in:FIFO,Weighted Average',
             'default_production_model' => 'nullable|string|in:pure_manufacturing,subcontract_complete,subcontract_company_material,hybrid',
             'attributes' => 'nullable|array',
+            'attributes.*.name' => 'nullable|string',
+            'attributes.*.options' => 'nullable|array',
+            'attributes.*.values' => 'nullable|array',
             'variants' => 'nullable|array',
+            'variants.*.id' => 'nullable|integer',
+            'variants.*.name' => 'nullable|string|max:255',
+            'variants.*.sku' => 'nullable|string|max:255',
+            'variants.*.attributes' => 'nullable|string|max:255',
+            'variants.*.selling_price' => 'nullable|numeric|min:0',
+            'variants.*.cost_price' => 'nullable|numeric|min:0',
+            'variants.*.opening_stock' => 'nullable|numeric|min:0',
+            'variants.*.reorder_point' => 'nullable|numeric|min:0',
+            'variants.*.status' => 'nullable|in:active,inactive',
+            'variants.*.image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.main_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.detail_images' => 'nullable|array',
+            'variants.*.detail_images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.deleted_image_ids' => 'nullable|array',
+            'variants.*.deleted_image_ids.*' => 'nullable|integer',
+            'variants.*.primary_image_id' => 'nullable|integer',
             'warehouse_stocks' => 'nullable|array',
+            'main_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'detail_images' => 'nullable|array',
+            'detail_images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
-        $this->productService->createProduct($validated, $tenantId);
+        $this->productService->createProduct($validated, $tenantId, $request->all());
 
         return redirect()->route('inventory.products.index')->with('success', 'Product created successfully.');
     }
@@ -161,6 +192,7 @@ class ProductController extends Controller
     {
         $this->authorize('view', $product);
         $product = $this->productRepo->findWithDetails($product);
+        $product->load(['images', 'primaryImage', 'detailImages', 'variants.images', 'variants.primaryImage', 'variants.detailImages']);
         $warehouses = $this->warehouseRepo->getActive();
 
         return view('modules.inventory.products.show', compact('product', 'warehouses'));
@@ -170,7 +202,7 @@ class ProductController extends Controller
     {
         $this->authorize('update', $product);
 
-        $product->load(['uom', 'vendor', 'warehouseStocks', 'variants.warehouseStocks']);
+        $product->load(['uom', 'vendor', 'warehouseStocks', 'variants.warehouseStocks', 'images', 'primaryImage', 'detailImages', 'variants.images', 'variants.primaryImage', 'variants.detailImages']);
         $uoms = $this->uomRepo->getAll();
         $vendors = Vendor::query()->where('status', 'active')->get();
         $warehouses = $this->warehouseRepo->getActive();
@@ -208,7 +240,17 @@ class ProductController extends Controller
             'cost_price' => 'nullable|numeric|min:0',
             'sales_account' => 'required|string|max:255',
             'purchase_account' => 'required|string|max:255',
-            'inventory_account' => 'nullable|string|max:255',
+            'inventory_account' => [
+                'nullable',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) use ($request, $product) {
+                    $itemType = $request->input('item_type', $product->item_type ?? 'Goods');
+                    if ($itemType === 'Goods' && empty($value)) {
+                        $fail("The Inventory Account field is required.");
+                    }
+                }
+            ],
             'reorder_point' => 'nullable|numeric|min:0',
             'minimum_order_qty' => 'nullable|numeric|min:0',
             'order_multiple' => 'nullable|numeric|min:0',
@@ -231,13 +273,33 @@ class ProductController extends Controller
             'inventory_valuation_method' => 'nullable|string|in:FIFO,Weighted Average',
             'default_production_model' => 'nullable|string|in:pure_manufacturing,subcontract_complete,subcontract_company_material,hybrid',
             'warehouse_stocks' => 'nullable|array',
+            'attributes' => 'nullable|array',
+            'attributes.*.name' => 'nullable|string',
+            'attributes.*.options' => 'nullable|array',
+            'attributes.*.values' => 'nullable|array',
             'variants' => 'nullable|array',
+            'variants.*.id' => 'nullable|integer',
             'variants.*.name' => 'nullable|string|max:255',
             'variants.*.sku' => 'nullable|string|max:255',
+            'variants.*.attributes' => 'nullable|string|max:255',
             'variants.*.selling_price' => 'nullable|numeric|min:0',
             'variants.*.cost_price' => 'nullable|numeric|min:0',
+            'variants.*.opening_stock' => 'nullable|numeric|min:0',
             'variants.*.reorder_point' => 'nullable|numeric|min:0',
             'variants.*.status' => 'nullable|in:active,inactive',
+            'variants.*.image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.main_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.detail_images' => 'nullable|array',
+            'variants.*.detail_images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.deleted_image_ids' => 'nullable|array',
+            'variants.*.deleted_image_ids.*' => 'nullable|integer',
+            'variants.*.primary_image_id' => 'nullable|integer',
+            'main_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'detail_images' => 'nullable|array',
+            'detail_images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'deleted_image_ids' => 'nullable|array',
+            'deleted_image_ids.*' => 'nullable|integer',
+            'primary_image_id' => 'nullable|integer',
             'status' => 'required|in:active,inactive',
         ]);
 

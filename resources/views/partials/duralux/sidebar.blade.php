@@ -237,8 +237,23 @@
                 'Teams',
                 'Policies',
             ]],
-            ['label' => 'Automation', 'icon' => 'feather-zap', 'url' => '#', 'children' => ['Workflows', 'Alerts', 'Schedulers', 'Webhooks']],
-            ['label' => 'Audit & Settings', 'icon' => 'feather-settings', 'url' => '#', 'children' => ['Audit Logs', 'Localization', 'Currencies', 'System Settings']],
+            ['label' => 'Automation', 'icon' => 'feather-zap', 'url' => '#', 'children' => [
+                ['label' => 'Notification Master', 'route' => 'platform.notification-rules.index'],
+                ['label' => 'Email Settings (SMTP)', 'route' => 'platform.emailSettings.index'],
+                ['label' => 'WhatsApp Settings', 'route' => 'platform.whatsappSettings.index'],
+                ['label' => 'GST & E-Invoice Settings', 'route' => 'platform.gstSettings.index'],
+                'Workflows',
+                'Schedulers',
+                'Webhooks',
+            ]],
+            ['label' => 'Audit & Settings', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
+                ['label' => 'Currencies', 'route' => 'platform.currencies.index'],
+                ['label' => 'Payment Terms', 'route' => 'platform.payment-terms.index'],
+                ['label' => 'Transporters', 'route' => 'platform.transporters.index'],
+                ['label' => 'Tenants', 'route' => 'platform.tenants.index'],
+                ['label' => 'Plans', 'route' => 'platform.plans.index'],
+                'Audit Logs',
+            ]],
         ],
     ];
 

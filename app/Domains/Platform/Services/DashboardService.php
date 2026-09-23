@@ -21,7 +21,7 @@ use Illuminate\Support\Str;
  */
 class DashboardService
 {
-    public const DASHBOARDS = ['common', 'accounting'];
+    public const DASHBOARDS = ['common', 'accounting', 'hrms'];
 
     public const MIN_LIMIT = 3;
 
@@ -60,9 +60,24 @@ class DashboardService
                 'accounting.report_links',
             ],
         ],
+        'hrms' => [
+            'overview' => [
+                'hrms.kpi_total_employees', 'hrms.kpi_today_attendance', 'hrms.kpi_pending_approvals', 'hrms.kpi_probation_exits',
+                'hrms.web_punch', 'hrms.assigned_leave_plan',
+                'hrms.pending_approvals', 'hrms.my_shift_details',
+                'hrms.recent_late_arrivals', 'hrms.unprocessed_penalties', 'hrms.latest_salary_slip',
+                'hrms.approved_leaves', 'hrms.upcoming_holidays', 'hrms.celebrations',
+                'hrms.probation_ending_soon', 'hrms.active_exits_offboarding', 'hrms.department_headcount',
+                'hrms.new_joinees_spotlight',
+            ],
+            'self_service' => [
+                'hrms.web_punch', 'hrms.assigned_leave_plan', 'hrms.my_shift_details',
+                'hrms.latest_salary_slip', 'hrms.celebrations', 'hrms.upcoming_holidays',
+            ],
+        ],
     ];
 
-    private const DEFAULT_STARTER = ['common' => 'default', 'accounting' => 'overview'];
+    private const DEFAULT_STARTER = ['common' => 'default', 'accounting' => 'overview', 'hrms' => 'overview'];
 
     public function __construct(
         private readonly WidgetRegistry $registry,

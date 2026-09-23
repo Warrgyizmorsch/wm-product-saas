@@ -232,14 +232,22 @@ class BroadcastController extends Controller
 
         $broadcast = $this->broadcastService->createBroadcast($validated);
 
-        // Notify all active employees
-        \App\Services\Notification\NotificationService::sendToAllEmployees(
-            title: "Announcement: {$validated['title']}",
-            message: \Illuminate\Support\Str::limit(strip_tags($validated['content']), 100),
-            actionUrl: route('hrms.broadcasts.index'),
-            type: 'broadcast',
-            iconClass: 'feather-volume-2'
-        );
+        // Notify targeted employees
+        if ($broadcast->status === 'published') {
+            $receipts = $broadcast->receipts()->with('employee')->get();
+            foreach ($receipts as $receipt) {
+                if ($receipt->employee) {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        $receipt->employee,
+                        title: "Announcement: {$validated['title']}",
+                        message: \Illuminate\Support\Str::limit(strip_tags($validated['content']), 100),
+                        actionUrl: route('hrms.broadcasts.index'),
+                        type: 'broadcast',
+                        iconClass: 'feather-volume-2'
+                    );
+                }
+            }
+        }
 
         return redirect()->route('hrms.broadcasts.index')
             ->with('success', 'Broadcast announcement created successfully.');

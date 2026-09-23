@@ -37,6 +37,16 @@ class DocumentSignatureService
             $relativePath = "{$folder}/{$filename}";
             
             Storage::disk('public')->put($relativePath, $imageDecoded);
+        } elseif (!str_contains($signatureInput, '/') && !str_contains($signatureInput, '\\') && strlen($signatureInput) > 30) {
+            // Raw base64 string without data:image scheme
+            $imageDecoded = base64_decode($signatureInput);
+            if ($imageDecoded !== false) {
+                $filename = "sig_" . Str::random(12) . "_" . time() . ".png";
+                $relativePath = "{$folder}/{$filename}";
+                Storage::disk('public')->put($relativePath, $imageDecoded);
+            } else {
+                $relativePath = $signatureInput;
+            }
         } else {
             $relativePath = $signatureInput;
         }
@@ -198,6 +208,8 @@ class DocumentSignatureService
             if (Storage::disk('public')->exists($signaturePath)) {
                 $fileBytes = Storage::disk('public')->get($signaturePath);
                 $sigDataUri = 'data:image/png;base64,' . base64_encode($fileBytes);
+            } elseif (!empty($signatureImageInput) && strlen($signatureImageInput) > 30) {
+                $sigDataUri = 'data:image/png;base64,' . ltrim($signatureImageInput, 'data:image/png;base64,');
             }
         }
 
@@ -303,7 +315,7 @@ class DocumentSignatureService
         try {
             $pdf = Pdf::loadHTML($signedHtml)->setPaper('a4', 'portrait')->setWarnings(false);
             Storage::disk('public')->put($pdfStoragePath, $pdf->output());
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error("Failed to generate signed document PDF: " . $e->getMessage());
             $pdfStoragePath = $originalFilePath;
         }
@@ -327,27 +339,35 @@ class DocumentSignatureService
             ]),
         ]);
 
-        // Send notifications upon successful signature completion
-        \App\Services\Notification\NotificationService::sendToHrAdmins(
-            title: 'Document Digitally Signed',
-            message: "{$signerName} has digitally signed the document '{$document->name}'.",
-            actionUrl: route('hrms.documents.index'),
-            module: 'hrms',
-            type: 'signature_completed',
-            iconClass: 'feather-check-square'
-        );
+        // Send notifications upon successful signature completion safely
+        try {
+            $notificationUrl = function_exists('route') && \Illuminate\Support\Facades\Route::has('hrms.documents.index')
+                ? route('hrms.documents.index')
+                : url('/hrms/documents');
 
-        $targetUserId = $user?->id ?? ($document->documentable_type === Employee::class ? $document->documentable?->user_id : null);
-        if ($targetUserId) {
-            \App\Services\Notification\NotificationService::send(
-                user: $targetUserId,
-                title: 'Document Signed Successfully',
-                message: "You have successfully digitally signed '{$document->name}'.",
-                actionUrl: route('hrms.documents.index'),
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'Document Digitally Signed',
+                message: "{$signerName} has digitally signed the document '{$document->name}'.",
+                actionUrl: $notificationUrl,
                 module: 'hrms',
                 type: 'signature_completed',
-                iconClass: 'feather-check-circle'
+                iconClass: 'feather-check-square'
             );
+
+            $targetUserId = $user?->id ?? ($document->documentable_type === Employee::class ? $document->documentable?->user_id : null);
+            if ($targetUserId) {
+                \App\Services\Notification\NotificationService::send(
+                    user: $targetUserId,
+                    title: 'Document Signed Successfully',
+                    message: "You have successfully digitally signed '{$document->name}'.",
+                    actionUrl: $notificationUrl,
+                    module: 'hrms',
+                    type: 'signature_completed',
+                    iconClass: 'feather-check-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Signature notification exception caught: " . $e->getMessage());
         }
 
         return $document->fresh(['signedBy', 'documentable']);
