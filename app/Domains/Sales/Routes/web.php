@@ -39,7 +39,7 @@ Route::prefix('sales')
         Route::post('material-requirements/{delivery}/deliver', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'deliver'])->name('material-requirements.deliver');
 
         // Material Requests (Prod) Routes (Alias Redirects to /inventory/material-requests)
-        Route::get('material-requests/export', [\App\Domains\Inventory\Controllers\MaterialRequestController::class, 'export'])->name('sales.material-requests.export');
+        Route::get('material-requests/export', [\App\Domains\Sales\Controllers\MaterialRequestController::class, 'export'])->name('sales.material-requests.export');
         Route::get('material-requests', fn() => redirect()->route('inventory.material-requests.index'))->name('material-requests.index');
         Route::get('material-requests/{id}', fn($id) => redirect()->route('inventory.material-requests.show', $id))->name('material-requests.show');
         Route::post('material-requests/items/{id}/reserve', [MaterialRequestController::class, 'reserve'])->name('material-requests.reserve');

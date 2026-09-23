@@ -17,8 +17,8 @@
 
 @section('content')
     {{-- Workflow Guide Component placed ABOVE erp-single-panel --}}
-    <x-ui.workflow-guide title="Schedule Change Audit Log">
-        Review planner adjustment history for Schedule [{{ $schedule->schedule_number }}]. Tracks all manual timing shifts, machine reassignments, ripple propagation, and shift mode reasons.
+    <x-ui.workflow-guide :title="__('production.schedule_change_audit_log')">
+        {{ __('production.change_history_workflow_guide', ['number' => $schedule->schedule_number]) }}
     </x-ui.workflow-guide>
 
     <div class="erp-single-panel">

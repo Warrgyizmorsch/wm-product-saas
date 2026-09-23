@@ -327,6 +327,27 @@ class AppServiceProvider extends ServiceProvider
         // users.email) exceed that. 191 chars * 4 bytes = 764 bytes, safely under it.
         Schema::defaultStringLength(191);
 
+        // ── Production Module Named API Rate Limiters ─────────────────────────
+        $productionRateLimitKey = function (\Illuminate\Http\Request $request): string {
+            $tenantId = $request->user()?->tenant_id
+                ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null)
+                ?? 'global';
+            $client = $request->user()?->id ? "u:{$request->user()->id}" : "ip:{$request->ip()}";
+            return "t:{$tenantId}:{$client}";
+        };
+
+        \Illuminate\Support\Facades\RateLimiter::for('production-api', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(120)->by($productionRateLimitKey($request));
+        });
+
+        \Illuminate\Support\Facades\RateLimiter::for('production-api-write', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($productionRateLimitKey($request));
+        });
+
+        \Illuminate\Support\Facades\RateLimiter::for('production-api-mes', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(180)->by($productionRateLimitKey($request));
+        });
+
         // ── Cross-module morph map (Journal.reference_type/reference_id) ───────
         // Journal::reference() is a real morphTo(); these short, stable keys are
         // what gets stored in reference_type, never the FQCN. Using morphMap()

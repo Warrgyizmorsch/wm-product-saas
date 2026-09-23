@@ -32,6 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'company' => ResolveCompany::class,
             'branch' => ResolveBranch::class,
             'module.access' => EnsureTenantModuleAccess::class,
+            'production.api.secret' => \App\Http\Middleware\ProductionApiSecretMiddleware::class,
+            'production.api.tenant' => \App\Http\Middleware\ProductionTenantEnforcementMiddleware::class,
+            'production.api.idempotency' => \App\Http\Middleware\ProductionIdempotencyMiddleware::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [
@@ -41,6 +44,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhooks/razorpay',
             'api/*',
         ]);
+
+            $middleware->prependToPriorityList(
+                before: ResolveTenant::class,
+                prepend: \App\Http\Middleware\ProductionApiSecretMiddleware::class,
+            );
 
             // ResolveTenant must run before auth resolves the user (TenantAwareUserProvider
             // needs the tenant context to decide whether the session user is accessible),

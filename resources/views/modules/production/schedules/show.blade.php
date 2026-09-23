@@ -9,11 +9,11 @@
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button :href="route('production.schedules.dispatch-board', ['schedule_id' => $schedule->id])" variant="outline-primary" icon="feather-grid">
-            Open Dispatch Board
+            {{ __('production.open_dispatch_board') }}
         </x-ui.button>
 
         <x-ui.button :href="route('production.schedules.change-history', $schedule->id)" variant="outline-secondary" icon="feather-clock">
-            History
+            {{ __('production.history') }}
         </x-ui.button>
 
         @if($schedule->isScheduled())
@@ -26,11 +26,11 @@
             <x-ui.action-dropdown id="scheduleHeaderActionsDropdown">
                 <li>
                     <a href="javascript:void(0)" class="dropdown-item py-1.5 fs-12" data-bs-toggle="modal" data-bs-target="#rescheduleStartModal">
-                        <i class="feather-calendar me-2 text-warning fs-12"></i>Change Schedule Start Date
+                        <i class="feather-calendar me-2 text-warning fs-12"></i>{{ __('production.change_schedule_start_date') }}
                     </a>
                 </li>
                 <li>
-                    <form method="POST" action="{{ route('production.schedules.cancel', $schedule->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('production.cancel_schedule_confirm', ['number' => $schedule->schedule_number]) }}', { title: 'Cancel Production Schedule', variant: 'danger', confirmButtonText: 'Cancel Schedule' });">
+                    <form method="POST" action="{{ route('production.schedules.cancel', $schedule->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('production.cancel_schedule_confirm', ['number' => $schedule->schedule_number]) }}', { title: '{{ __('production.cancel_schedule') }}', variant: 'danger', confirmButtonText: '{{ __('production.cancel_schedule') }}' });">
                         @csrf
                         <button type="submit" class="dropdown-item text-danger py-1.5 fs-12">
                             <i class="feather-slash me-2 text-danger fs-12"></i>{{ __('production.cancel_schedule') }}
@@ -45,13 +45,20 @@
 @section('content')
 
     {{-- ── Schedule Workflow Guidance Component (Placed outside panel, matching mockup) ── --}}
-    <x-ui.workflow-guide title="What's Next?">
+    <x-ui.workflow-guide :title="__('production.whats_next')">
         @if($schedule->isScheduled())
-            Schedule created for Order <a href="{{ route('production.orders.show', $schedule->production_order_id) }}" class="fw-bold text-primary text-decoration-underline">{{ $schedule->order->order_number ?? '' }}</a>. Review the machine allocations below and click <a href="javascript:void(0)" class="fw-bold text-primary text-decoration-underline" onclick="openShowPreReleaseModal({{ $schedule->id }});">Release to Shop Floor</a> to begin execution.
+            {!! __('production.schedule_workflow_guide_scheduled', [
+                'order' => '<a href="' . route('production.orders.show', $schedule->production_order_id) . '" class="fw-bold text-primary text-decoration-underline">' . e($schedule->order->order_number ?? '') . '</a>',
+                'release_link' => '<a href="javascript:void(0)" class="fw-bold text-primary text-decoration-underline" onclick="openShowPreReleaseModal(' . $schedule->id . ');">' . __('production.release_to_shop_floor') . '</a>'
+            ]) !!}
         @elseif($schedule->isReleased() || $schedule->isInProgress())
-            Schedule released to Shop Floor. Visit <a href="{{ route('production.mes.dashboard') }}" class="fw-bold text-primary text-decoration-underline me-1">Shop Floor (MES)</a> or <a href="{{ route('production.mes.work-centers.index') }}" class="fw-bold text-primary text-decoration-underline me-1">Work Center Monitor</a> to view live operation execution. Assign operators under <a href="{{ route('production.orders.show', ['order' => $schedule->production_order_id, 'tab' => 'vtab-operations']) }}" class="fw-bold text-primary text-decoration-underline">Production Order Operations</a>.
+            {!! __('production.schedule_workflow_guide_released', [
+                'mes_link' => '<a href="' . route('production.mes.dashboard') . '" class="fw-bold text-primary text-decoration-underline me-1">' . __('production.step_shop_floor') . '</a>',
+                'monitor_link' => '<a href="' . route('production.mes.work-centers.index') . '" class="fw-bold text-primary text-decoration-underline me-1">' . __('production.work_center_board') . '</a>',
+                'operations_link' => '<a href="' . route('production.orders.show', ['order' => $schedule->production_order_id, 'tab' => 'vtab-operations']) . '" class="fw-bold text-primary text-decoration-underline">' . __('production.operations_routing') . '</a>'
+            ]) !!}
         @else
-            Schedule Status: {{ ucfirst($schedule->status) }}
+            {{ __('production.schedule_status_notice', ['status' => ucfirst($schedule->status)]) }}
         @endif
     </x-ui.workflow-guide>
 
@@ -143,13 +150,13 @@
                     <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.scheduling_type') }}:</span></div>
                     <div class="col-md-8">
                         <span class="badge bg-soft-info text-info text-capitalize">
-                            {{ $schedule->scheduling_type === 'backward' ? 'Backward / JIT' : 'Forward' }}
+                            {{ $schedule->scheduling_type === 'backward' ? __('production.backward_jit') : __('production.forward') }}
                         </span>
                     </div>
                 </div>
                 @if($schedule->order && $schedule->order->end_date)
                     <div class="row erp-form-row mb-2">
-                        <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Due Date / Target:</span></div>
+                        <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.due_date_target') }}:</span></div>
                         <div class="col-md-8">
                             <span class="fw-bold text-dark font-monospace fs-13">{{ \Illuminate\Support\Carbon::parse($schedule->order->end_date)->format('d/m/Y') }}</span>
                         </div>
@@ -168,13 +175,13 @@
                     <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $schedule->creator->name ?? '—' }}</span></div>
                 </div>
                 <div class="row erp-form-row mb-2">
-                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.scheduled_schedules') }} At:</span></div>
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.scheduled_at') }}:</span></div>
                     <div class="col-md-8"><span class="text-dark fs-13">{{ $schedule->scheduled_at?->format('d/m/Y H:i') ?? '—' }}</span></div>
                 </div>
                 <div class="row erp-form-row mb-2">
-                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.source_item') ?? 'Source' }}:</span></div>
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.source') }}:</span></div>
                     <div class="col-md-8">
-                        <span class="badge bg-soft-secondary text-secondary text-uppercase">{{ $schedule->generated_by ?? 'forward' }}</span>
+                        <span class="badge bg-soft-secondary text-secondary text-uppercase">{{ $schedule->generated_by === 'forward' ? __('production.forward') : ($schedule->generated_by ?? 'forward') }}</span>
                     </div>
                 </div>
                 <div class="row erp-form-row mb-2">
@@ -536,11 +543,9 @@
                 <div class="capacity-info-box alert border-0 shadow-sm d-flex align-items-start mb-4 p-3 rounded fs-13">
                     <i class="feather-info me-3 fs-20 text-primary mt-1"></i>
                     <div>
-                        <h6 class="fw-bold text-primary mb-1">Understanding Work Center Capacity</h6>
+                        <h6 class="fw-bold text-primary mb-1">{{ __('production.understanding_work_center_capacity') }}</h6>
                         <p class="mb-0 text-muted fs-12">
-                            The table below shows the <strong>total accumulated capacity</strong> summed over the entire scheduled period. 
-                            If a work center is flagged with an overload warning above, it means scheduled work exceeded capacity on a <strong>specific day</strong> (e.g. on a weekend or shift overflow). 
-                            <span class="fw-bold text-dark">Click on any work center row below</span> to toggle a detailed day-by-day breakdown.
+                            {{ __('production.understanding_work_center_capacity_desc') }}
                         </p>
                     </div>
                 </div>
@@ -548,18 +553,19 @@
                     <div class="text-muted fs-12 ms-2">
                         @php
                             $currentGroup = $capacityDetails[0]['group_type'] ?? 'day';
+                            $currentGroupLabel = $currentGroup === 'week' ? __('production.week') : ($currentGroup === 'month' ? __('production.month') : __('production.day'));
                         @endphp
-                        Showing breakdown grouped by: <strong class="text-capitalize text-dark">{{ $currentGroup }}</strong>
+                        {{ __('production.showing_breakdown_grouped_by') }}: <strong class="text-capitalize text-dark">{{ $currentGroupLabel }}</strong>
                     </div>
                     <div class="btn-group btn-group-sm" style="gap:10px;" role="group" aria-label="Capacity grouping">
                         <a href="{{ request()->fullUrlWithQuery(['group_by' => 'day']) }}" class="btn btn-outline-primary {{ $currentGroup === 'day' ? 'active' : '' }}">
-                            Day
+                            {{ __('production.day') }}
                         </a>
                         <a href="{{ request()->fullUrlWithQuery(['group_by' => 'week']) }}" class="btn btn-outline-primary {{ $currentGroup === 'week' ? 'active' : '' }}">
-                            Week
+                            {{ __('production.week') }}
                         </a>
                         <a href="{{ request()->fullUrlWithQuery(['group_by' => 'month']) }}" class="btn btn-outline-primary {{ $currentGroup === 'month' ? 'active' : '' }}">
-                            Month
+                            {{ __('production.month') }}
                         </a>
                     </div>
                 </div>
@@ -626,10 +632,10 @@
                                                         <tr>
                                                             <th>{{ $col1Label }}</th>
                                                             <th>{{ $col2Label }}</th>
-                                                            <th class="text-end">Scheduled Minutes</th>
-                                                            <th class="text-end">Available Capacity</th>
-                                                            <th class="text-end">Utilization %</th>
-                                                            <th>Capacity Status</th>
+                                                            <th class="text-end">{{ __('production.scheduled_minutes') }}</th>
+                                                            <th class="text-end">{{ __('production.available_capacity') }}</th>
+                                                            <th class="text-end">{{ __('production.utilization_percent') }}</th>
+                                                            <th>{{ __('production.capacity_status') }}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -648,13 +654,13 @@
                                                                 </td>
                                                                 <td class="align-middle">
                                                                     @if($isSundayOverload)
-                                                                        <span class="badge bg-soft-danger text-danger border border-danger-subtle"><i class="feather-alert-triangle me-1"></i>Overloaded (Non-working Day)</span>
+                                                                        <span class="badge bg-soft-danger text-danger border border-danger-subtle"><i class="feather-alert-triangle me-1"></i>{{ __('production.overloaded_non_working_day') }}</span>
                                                                     @elseif($isOverloaded)
-                                                                        <span class="badge bg-soft-danger text-danger border border-danger-subtle"><i class="feather-alert-octagon me-1"></i>Overloaded</span>
+                                                                        <span class="badge bg-soft-danger text-danger border border-danger-subtle"><i class="feather-alert-octagon me-1"></i>{{ __('production.overloaded') }}</span>
                                                                     @elseif($day['capacity_minutes'] == 0)
-                                                                        <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle">Closed</span>
+                                                                        <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle">{{ __('production.closed') }}</span>
                                                                     @else
-                                                                        <span class="badge bg-soft-success text-success border border-success-subtle">Normal Capacity</span>
+                                                                        <span class="badge bg-soft-success text-success border border-success-subtle">{{ __('production.normal_capacity') }}</span>
                                                                     @endif
                                                                 </td>
                                                             </tr>
@@ -692,34 +698,35 @@
     </x-ui.modal>
 
     {{-- Reschedule Start Modal --}}
-    <x-ui.modal id="rescheduleStartModal" title="Change Schedule Start Date" class="text-start">
+    {{-- Reschedule Start Modal --}}
+    <x-ui.modal id="rescheduleStartModal" :title="__('production.change_schedule_start_date')" class="text-start">
         <form method="POST" action="{{ route('production.schedules.reschedule-start', $schedule->id) }}" id="rescheduleStartFormMain">
             @csrf
             <div class="mb-3 text-dark">
-                <label class="form-label fw-bold fs-12 mb-1">New Start Date & Time</label>
+                <label class="form-label fw-bold fs-12 mb-1">{{ __('production.new_start_date_time') }}</label>
                 <input type="datetime-local" name="start_date" class="form-control fs-13" value="{{ $schedule->operations->min('planned_start')?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i') }}" required>
                 <small class="text-muted mt-2 d-block fs-11">
-                    This will delete all current planned operations for this order, recalculate using the corrected calendar working days, and schedule them starting from this new date.
+                    {{ __('production.reschedule_start_date_help') }}
                 </small>
             </div>
         </form>
         <x-slot name="footer">
-            <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button type="submit" variant="warning" onclick="document.getElementById('rescheduleStartFormMain').submit();">Apply & Recalculate</x-ui.button>
+            <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') ?? 'Cancel' }}</x-ui.button>
+            <x-ui.button type="submit" variant="warning" onclick="document.getElementById('rescheduleStartFormMain').submit();">{{ __('production.apply_recalculate') }}</x-ui.button>
         </x-slot>
     </x-ui.modal>
 
     {{-- Pre-Release Validation Modal --}}
-    <x-ui.modal id="showPreReleaseModal" title="Schedule Pre-Release Validation" size="lg" centered="true">
+    <x-ui.modal id="showPreReleaseModal" :title="__('production.schedule_pre_release_validation')" size="lg" centered="true">
         <div id="showPreReleaseModalBody" class="text-start">
             <div class="text-center py-4 text-muted">
                 <div class="spinner-border spinner-border-sm me-2 text-info"></div>
-                Running completeness, machine readiness, downtime collision, dependency, and material availability checks...
+                {{ __('production.running_pre_release_checks') }}
             </div>
         </div>
         <x-slot name="footer">
             <div id="showPreReleaseModalFooter" class="d-flex align-items-center justify-content-end gap-2 w-100">
-                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Close</x-ui.button>
+                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.close') }}</x-ui.button>
             </div>
         </x-slot>
     </x-ui.modal>
@@ -730,7 +737,7 @@
         const modalBody = document.getElementById('showPreReleaseModalBody');
         const modalFooter = document.getElementById('showPreReleaseModalFooter');
         
-        modalBody.innerHTML = `<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2 text-info"></div> Running completeness, machine readiness, downtime collision, dependency, and material availability checks...</div>`;
+        modalBody.innerHTML = `<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2 text-info"></div> {{ __('production.running_pre_release_checks') }}</div>`;
         
         const bsModal = new bootstrap.Modal(modalEl);
         bsModal.show();
@@ -749,7 +756,7 @@
             if (res.errors && res.errors.length > 0) {
                 errorsHtml = `
                     <div class="alert alert-danger border-danger p-3 mb-3">
-                        <h6 class="fw-bold text-danger mb-2"><i class="feather-x-circle me-1"></i> Blocking Errors (${res.errors.length})</h6>
+                        <h6 class="fw-bold text-danger mb-2"><i class="feather-x-circle me-1"></i> {{ __('production.blocking_errors') }} (${res.errors.length})</h6>
                         <ul class="mb-0 ps-3">
                             ${res.errors.map(e => `<li><strong>${e.code}:</strong> ${e.message}</li>`).join('')}
                         </ul>
@@ -760,7 +767,7 @@
             if (res.warnings && res.warnings.length > 0) {
                 warningsHtml = `
                     <div class="alert alert-warning border-warning p-3 mb-3">
-                        <h6 class="fw-bold text-warning-dark mb-2"><i class="feather-alert-triangle me-1"></i> Warnings (${res.warnings.length})</h6>
+                        <h6 class="fw-bold text-warning-dark mb-2"><i class="feather-alert-triangle me-1"></i> {{ __('production.warnings') }} (${res.warnings.length})</h6>
                         <ul class="mb-0 ps-3">
                             ${res.warnings.map(w => `<li><strong>${w.code}:</strong> ${w.message}</li>`).join('')}
                         </ul>
@@ -769,18 +776,18 @@
             }
 
             if (!errorsHtml && !warningsHtml) {
-                errorsHtml = `<div class="alert alert-success border-success p-3 mb-3"><i class="feather-check-circle me-1"></i> Schedule passed all pre-release validation checks cleanly! Ready for shop-floor release.</div>`;
+                errorsHtml = `<div class="alert alert-success border-success p-3 mb-3"><i class="feather-check-circle me-1"></i> {{ __('production.schedule_pre_release_clean_success') }}</div>`;
             }
 
             modalBody.innerHTML = `
                 <div class="d-flex align-items-center justify-content-between mb-3 p-3 bg-light rounded border">
                     <div>
-                        <h6 class="fw-bold text-dark mb-0">Schedule Pre-Release Summary</h6>
-                        <span class="text-muted fs-11">${res.summary?.total_operations ?? 0} operations evaluated</span>
+                        <h6 class="fw-bold text-dark mb-0">{{ __('production.schedule_pre_release_summary') }}</h6>
+                        <span class="text-muted fs-11">${res.summary?.total_operations ?? 0} {{ __('production.operations_evaluated') }}</span>
                     </div>
                     <div>
-                        ${res.can_release ? '<span class="badge bg-success">Can Release</span>' : '<span class="badge bg-danger">Blocked</span>'}
-                        ${res.has_warnings ? '<span class="badge bg-warning text-dark ms-1">Has Warnings</span>' : ''}
+                        ${res.can_release ? '<span class="badge bg-success">{{ __("production.can_release") }}</span>' : '<span class="badge bg-danger">{{ __("production.blocked") }}</span>'}
+                        ${res.has_warnings ? '<span class="badge bg-warning text-dark ms-1">{{ __("production.has_warnings") }}</span>' : ''}
                     </div>
                 </div>
                 ${errorsHtml}
@@ -789,11 +796,11 @@
 
             if (res.can_release) {
                 const confirmBtn = res.has_warnings
-                    ? `<button type="button" onclick="executeShowScheduleRelease(${scheduleId}, true)" class="btn btn-warning btn-sm"><i class="feather-play me-1"></i> Release Schedule With Warnings</button>`
-                    : `<button type="button" onclick="executeShowScheduleRelease(${scheduleId}, false)" class="btn btn-primary btn-sm"><i class="feather-play me-1"></i> Release Schedule to Shop Floor</button>`;
-                modalFooter.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button> ${confirmBtn}`;
+                    ? `<button type="button" onclick="executeShowScheduleRelease(${scheduleId}, true)" class="btn btn-warning btn-sm"><i class="feather-play me-1"></i> {{ __('production.release_schedule_with_warnings') }}</button>`
+                    : `<button type="button" onclick="executeShowScheduleRelease(${scheduleId}, false)" class="btn btn-primary btn-sm"><i class="feather-play me-1"></i> {{ __('production.release_schedule_to_shop_floor') }}</button>`;
+                modalFooter.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">{{ __('production.close') }}</button> ${confirmBtn}`;
             } else {
-                modalFooter.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button><button class="btn btn-danger btn-sm" disabled>Release Disabled (Blocking Errors Exist)</button>`;
+                modalFooter.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">{{ __('production.close') }}</button><button class="btn btn-danger btn-sm" disabled>{{ __('production.release_disabled_blocking_errors') }}</button>`;
             }
         })
         .catch(err => {

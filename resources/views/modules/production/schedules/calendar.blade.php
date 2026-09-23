@@ -149,8 +149,8 @@
 
 @section('content')
     {{-- Workflow Guide Component --}}
-    <x-ui.workflow-guide title="Production Scheduling Calendar & Timeline">
-        View scheduled production operations across work centers and machines in interactive Gantt or tabular format. Use time horizon filters to switch between day, week, and month views.
+    <x-ui.workflow-guide :title="__('production.production_scheduling_calendar_timeline')">
+        {{ __('production.calendar_workflow_guide') }}
     </x-ui.workflow-guide>
 
     <div class="erp-single-panel">

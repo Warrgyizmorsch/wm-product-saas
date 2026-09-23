@@ -1,5 +1,5 @@
 @props([
-    'title'       => "What's Next?",
+    'title'       => null,
     'icon'        => 'feather-info',
     'dismissible' => true,
 ])
@@ -75,14 +75,14 @@
             <i class="{{ $icon }} fs-14"></i>
         </div>
         <div class="flex-grow-1 fs-13">
-            <div class="erp-workflow-guide-title fw-bold mb-1">{{ $title }}</div>
+            <div class="erp-workflow-guide-title fw-bold mb-1">{{ $title ?? __('production.whats_next') }}</div>
             <div class="erp-workflow-guide-body lh-base fs-13">
                 {{ $slot }}
             </div>
         </div>
         @if($dismissible)
             <button type="button" @click="open = false" class="erp-workflow-guide-dismiss btn btn-link p-0 ms-3 text-decoration-none fs-12 fw-medium flex-shrink-0 d-inline-flex align-items-center gap-1 mt-0.5">
-                <span>Dismiss</span> <i class="feather-x fs-14"></i>
+                <span>{{ __('production.dismiss') }}</span> <i class="feather-x fs-14"></i>
             </button>
         @endif
     </div>
