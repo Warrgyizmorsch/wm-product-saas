@@ -44,6 +44,10 @@ Route::prefix('platform')
             ->name('modules.checkout');
         Route::post('modules/verify', [TenantModuleController::class, 'verify'])
             ->name('modules.verify');
+        Route::post('modules/{module}/uninstall', [TenantModuleController::class, 'uninstall'])
+            ->name('modules.uninstall');
+        Route::post('modules/{module}/reinstall', [TenantModuleController::class, 'reinstall'])
+            ->name('modules.reinstall');
 
         Route::get('payment-gateway', [PaymentGatewaySettingsController::class, 'index'])
             ->name('payment-gateway.index');

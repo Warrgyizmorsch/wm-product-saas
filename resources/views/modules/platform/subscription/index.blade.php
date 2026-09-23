@@ -29,20 +29,24 @@
         </div>
     </x-ui.card>
 
-    @php $installableModules = collect($modules)->reject(fn ($module) => $module['installed']); @endphp
+    @php
+        $installableModules = collect($modules)->where('state', 'available');
+        $canManageModules = auth()->user()?->can('updateSubscription', $tenant) ?? false;
+    @endphp
 
     <x-ui.card class="mb-4">
         <div class="mb-3">
             <span class="text-muted fs-12 text-uppercase">Modules</span>
-            <p class="fs-13 text-muted mb-0">Every module included in your plan, plus any installed as a paid add-on.</p>
+            <p class="fs-13 text-muted mb-0">Every module included in your plan, plus any installed as a paid add-on. Uninstalling an add-on only hides it — its data is kept and reinstalling is free.</p>
         </div>
 
         <div class="row g-3 erp-apps-grid">
             @foreach ($modules as $module)
+                @php $tag = $module['state'] === 'available' ? 'label' : 'div'; @endphp
                 <div class="col-sm-6 col-lg-3">
-                    <label class="card h-100 erp-app-tile {{ $module['installed'] ? 'installed' : 'selectable' }}">
+                    <{{ $tag }} class="card h-100 erp-app-tile {{ $module['installed'] ? 'installed' : ($module['state'] === 'available' ? 'selectable' : 'uninstalled') }}">
                         <div class="card-body d-flex flex-column align-items-center text-center gap-3 py-4 position-relative">
-                            @if (! $module['installed'])
+                            @if ($module['state'] === 'available')
                                 <input type="checkbox" name="modules[]" value="{{ $module['key'] }}" class="form-check-input erp-app-tile-check">
                             @endif
 
@@ -52,15 +56,41 @@
                             <div>
                                 <h6 class="fw-bolder text-dark mb-1">{{ $module['label'] }}</h6>
                                 <p class="fs-12 text-muted mb-0">{{ $module['description'] }}</p>
+                                @if ($module['requires'] && ! $module['installed'])
+                                    <p class="fs-11 text-muted mb-0 mt-1">Needs {{ $module['requires'] }}</p>
+                                @endif
                             </div>
 
-                            @if ($module['installed'])
-                                <span class="badge bg-soft-success text-success">Installed</span>
-                            @else
-                                <span class="fs-13 fw-bolder text-dark">{{ $moduleCurrency }} {{ number_format($modulePrice) }}</span>
-                            @endif
+                            @switch($module['state'])
+                                @case('plan')
+                                    <span class="badge bg-soft-success text-success">Included in plan</span>
+                                    @break
+                                @case('addon')
+                                    <span class="badge bg-soft-success text-success">Installed add-on</span>
+                                    @if ($canManageModules)
+                                        <form action="{{ route('platform.modules.uninstall', $module['key']) }}" method="POST" id="uninstallModule-{{ $module['key'] }}">
+                                            @csrf
+                                            <button type="button" class="btn btn-sm btn-light border"
+                                                onclick="confirmAction({title: 'Uninstall {{ $module['label'] }}', message: '{{ $module['label'] }} will be hidden for everyone in your workspace. Its data is kept, and you can reinstall it any time for free.', variant: 'danger', confirmText: 'Uninstall'}, function() { document.getElementById('uninstallModule-{{ $module['key'] }}').submit(); })">
+                                                Uninstall
+                                            </button>
+                                        </form>
+                                    @endif
+                                    @break
+                                @case('uninstalled')
+                                    <span class="badge bg-soft-secondary text-secondary">Uninstalled &middot; data kept</span>
+                                    @if ($canManageModules)
+                                        <form action="{{ route('platform.modules.reinstall', $module['key']) }}" method="POST">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-primary">Reinstall &mdash; free</button>
+                                        </form>
+                                    @endif
+                                    @break
+                                @default
+                                    <span class="fs-13 fw-bolder text-dark">{{ $moduleCurrency }} {{ number_format($modulePrice) }}</span>
+                            @endswitch
                         </div>
-                    </label>
+                    </{{ $tag }}>
                 </div>
             @endforeach
         </div>
@@ -204,6 +234,8 @@
 .erp-app-tile.selectable { cursor: pointer; }
 .erp-app-tile.selectable:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,.1); border-color: rgba(var(--bs-primary-rgb, 59,130,246), .3); }
 .erp-app-tile.installed { border-color: rgba(25, 135, 84, .3); background: rgba(25, 135, 84, .03); }
+.erp-app-tile.uninstalled { border-style: dashed; }
+.erp-app-tile.uninstalled .erp-app-icon-lg { filter: grayscale(1); opacity: .6; }
 .erp-app-tile:has(.erp-app-tile-check:checked) { border-color: var(--bs-primary, #3B82F6); box-shadow: 0 0 0 1px var(--bs-primary, #3B82F6) inset; background: rgba(var(--bs-primary-rgb, 59,130,246), .04); }
 .erp-app-icon-lg { border-radius: 16px; height: 56px; width: 56px; box-shadow: 0 6px 14px -6px rgba(0,0,0,.35); }
 .erp-app-icon-lg i { font-size: 24px; }

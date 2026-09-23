@@ -5,6 +5,7 @@ namespace App\Domains\Platform\Controllers;
 use App\Domains\Platform\Models\SubscriptionPayment;
 use App\Domains\Platform\Services\PaymentGatewayManager;
 use App\Domains\Platform\Services\SubscriptionPaymentService;
+use App\Domains\Platform\Services\TenantModuleService;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureTenantModuleAccess;
 use Illuminate\Http\JsonResponse;
@@ -21,7 +22,9 @@ use RuntimeException;
  * SubscriptionController, just for a module-add-on order instead of a plan
  * switch (see PaymentGateway::createModuleCheckout, SubscriptionPaymentService).
  * Paying unlocks access and provisions the new modules' starter masters (same
- * TenantProvisioner run as a plan switch). The catalog itself lives on the Subscription page
+ * TenantProvisioner run as a plan switch). A bought module can be uninstalled
+ * (hidden, data kept) and reinstalled for free — see TenantModuleService.
+ * The catalog itself lives on the Subscription page
  * (SubscriptionController::index()) — this controller is just the checkout/verify
  * endpoints behind it.
  */
@@ -30,6 +33,7 @@ class TenantModuleController extends Controller
     public function __construct(
         private readonly PaymentGatewayManager $gateways,
         private readonly SubscriptionPaymentService $payments,
+        private readonly TenantModuleService $modules,
     ) {
     }
 
@@ -54,6 +58,21 @@ class TenantModuleController extends Controller
 
         if ($toBuy === []) {
             return response()->json(['message' => 'The selected modules are already installed.'], 422);
+        }
+
+        $states = $this->modules->states($tenant);
+        $alreadyPaid = array_values(array_filter($toBuy, fn (string $m) => $states[$m] === 'uninstalled'));
+
+        if ($alreadyPaid !== []) {
+            return response()->json([
+                'message' => "{$this->modules->labels($alreadyPaid)} was paid for already — use Reinstall, it's free.",
+            ], 422);
+        }
+
+        try {
+            $this->modules->assertRequirementsMet($tenant, $toBuy);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
 
         $pricePerModule = (int) config('navigation.module_addon_price');
@@ -118,5 +137,37 @@ class TenantModuleController extends Controller
 
         return redirect()->route('platform.subscription.index')
             ->with('success', "Payment received — {$labels} installed for your workspace.");
+    }
+
+    /** Hides a bought module; its data stays and reinstalling is free. */
+    public function uninstall(string $module): RedirectResponse
+    {
+        return $this->change($module, fn ($tenant) => $this->modules->uninstall($tenant, $module),
+            '%s uninstalled. Its data is kept — reinstall any time for free.');
+    }
+
+    /** Brings back a module this tenant bought and later uninstalled, at no charge. */
+    public function reinstall(string $module): RedirectResponse
+    {
+        return $this->change($module, fn ($tenant) => $this->modules->reinstall($tenant, $module),
+            '%s reinstalled.');
+    }
+
+    private function change(string $module, callable $action, string $success): RedirectResponse
+    {
+        $tenant = tenant();
+
+        $this->authorize('updateSubscription', $tenant);
+
+        abort_unless(in_array($module, EnsureTenantModuleAccess::GATED_MODULES, true), 404);
+
+        try {
+            $action($tenant);
+        } catch (RuntimeException $e) {
+            return redirect()->route('platform.subscription.index')->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('platform.subscription.index')
+            ->with('success', sprintf($success, $this->modules->label($module)));
     }
 }

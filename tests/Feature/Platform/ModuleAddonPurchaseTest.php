@@ -7,6 +7,7 @@ use App\Domains\Platform\Contracts\PaymentGateway;
 use App\Domains\Platform\Models\Plan;
 use App\Domains\Platform\Models\PlatformSetting;
 use App\Domains\Platform\Models\SubscriptionPayment;
+use App\Domains\Platform\Models\TenantModule;
 use App\Domains\Platform\Services\PaymentGatewayManager;
 use App\Domains\Platform\Services\SubscriptionPaymentService;
 use App\Models\Access\Role;
@@ -38,7 +39,7 @@ class ModuleAddonPurchaseTest extends TestCase
 
         $this->plan = Plan::create([
             'name' => 'Addon Test', 'slug' => 'addon-test', 'price' => 0, 'currency' => 'INR',
-            'billing_cycle' => 'monthly', 'features' => ['crm', 'sales'], 'is_active' => true,
+            'billing_cycle' => 'monthly', 'features' => ['crm', 'sales', 'inventory'], 'is_active' => true,
         ]);
 
         $this->tenant = $this->makeTenant('acme');
@@ -72,6 +73,12 @@ class ModuleAddonPurchaseTest extends TestCase
         }
 
         return $user;
+    }
+
+    /** @return list<string> active add-on modules, read straight from the table */
+    private function addons(Tenant $tenant): array
+    {
+        return $tenant->fresh()->addonModules->filter->isActive()->pluck('module')->values()->all();
     }
 
     private function checkout(array $modules, ?User $user = null)
@@ -156,14 +163,16 @@ class ModuleAddonPurchaseTest extends TestCase
         app(TenantContext::class)->set($this->tenant);
 
         $this->assertSame(SubscriptionPayment::STATUS_PAID, $payment->fresh()->status);
-        $this->assertSame(['production'], $this->tenant->settings['installed_modules']);
-        $this->assertEqualsCanonicalizing(['crm', 'sales', 'production'], tenant_allowed_modules());
+        $this->assertSame(['production'], $this->addons($this->tenant));
+        $this->assertSame($payment->id, TenantModule::query()->sole()->subscription_payment_id);
+        $this->assertSame($this->owner->id, TenantModule::query()->sole()->installed_by);
+        $this->assertEqualsCanonicalizing(['crm', 'sales', 'inventory', 'production'], tenant_allowed_modules());
 
         // Starter masters for the new module were filled ...
         $this->assertSame(2, DB::table('production_shifts')->where('tenant_id', $this->tenant->id)->count());
 
         // ... without touching the Plan other tenants share, or the tenant's plan.
-        $this->assertSame(['crm', 'sales'], $this->plan->fresh()->features);
+        $this->assertSame(['crm', 'sales', 'inventory'], $this->plan->fresh()->features);
         $this->assertSame($this->plan->id, $this->tenant->plan_id);
     }
 
@@ -189,7 +198,7 @@ class ModuleAddonPurchaseTest extends TestCase
             ->assertSessionHas('error');
 
         $this->assertSame(SubscriptionPayment::STATUS_CREATED, $payment->fresh()->status);
-        $this->assertArrayNotHasKey('installed_modules', $this->tenant->fresh()->settings ?? []);
+        $this->assertSame([], $this->addons($this->tenant));
     }
 
     public function test_a_plan_switch_order_cannot_be_verified_as_a_module_install(): void
@@ -219,8 +228,8 @@ class ModuleAddonPurchaseTest extends TestCase
         $this->verify($payment)->assertSessionHas('error');
 
         $this->assertSame(SubscriptionPayment::STATUS_CREATED, $payment->fresh()->status);
-        $this->assertArrayNotHasKey('installed_modules', $other->fresh()->settings ?? []);
-        $this->assertArrayNotHasKey('installed_modules', $this->tenant->fresh()->settings ?? []);
+        $this->assertSame([], $this->addons($other));
+        $this->assertSame([], $this->addons($this->tenant));
     }
 
     public function test_marking_paid_twice_is_idempotent(): void
@@ -233,7 +242,7 @@ class ModuleAddonPurchaseTest extends TestCase
         $service->markPaid($payment->fresh(), 'pay_2', null);
 
         $this->assertSame('pay_1', $payment->fresh()->gateway_payment_id);
-        $this->assertSame(['production'], $this->tenant->fresh()->settings['installed_modules']);
+        $this->assertSame(['production'], $this->addons($this->tenant));
         $this->assertSame(2, DB::table('production_shifts')->where('tenant_id', $this->tenant->id)->count());
     }
 }
