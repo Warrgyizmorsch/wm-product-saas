@@ -422,34 +422,23 @@
 
                 @php
                     $headerAuthUser = auth()->user();
-                    $headerEmployee = null;
-                    if ($headerAuthUser) {
-                        $headerEmployee = \App\Domains\HRMS\Models\Employee::resolveForUser($headerAuthUser);
-                    }
-                    $headerProfileUrl = $headerEmployee ? route('hrms.employees.show', $headerEmployee->id) : (Route::has('hrms.employees.index') ? route('hrms.employees.index') : 'javascript:void(0);');
+                    $headerAvatarUrl = $headerAuthUser ? $headerAuthUser->avatar_url : '/assets/images/avatar/default.png';
+                    $headerProfileUrl = route('profile.show');
                 @endphp
                 <div class="dropdown nxl-h-item">
                     <a href="javascript:void(0);" data-bs-toggle="dropdown" role="button" data-bs-auto-close="outside">
-                        @if($headerEmployee && !empty($headerEmployee->photo))
-                            <img src="{{ asset('storage/' . $headerEmployee->photo) }}" alt="user-image"
-                                class="img-fluid user-avtar me-0 object-fit-cover"
-                                style="width: 38px; height: 38px; border-radius: 50%;">
-                        @else
-                            <img src="{{ asset('assets/images/avatar/1.png') }}" alt="user-image"
-                                class="img-fluid user-avtar me-0">
-                        @endif
+                        <img src="{{ $headerAvatarUrl }}" alt="user-image"
+                            class="img-fluid user-avtar me-0 object-fit-cover"
+                            style="width: 38px; height: 38px; border-radius: 50%;"
+                            onerror="this.onerror=null; this.src='/assets/images/avatar/default.png';">
                     </a>
                     <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-user-dropdown">
                         <div class="dropdown-header">
                             <a href="{{ $headerProfileUrl }}" class="d-flex align-items-center text-decoration-none">
-                                @if($headerEmployee && !empty($headerEmployee->photo))
-                                    <img src="{{ asset('storage/' . $headerEmployee->photo) }}" alt="user-image"
-                                        class="img-fluid user-avtar object-fit-cover"
-                                        style="width: 38px; height: 38px; border-radius: 50%;">
-                                @else
-                                    <img src="{{ asset('assets/images/avatar/1.png') }}" alt="user-image"
-                                        class="img-fluid user-avtar">
-                                @endif
+                                <img src="{{ $headerAvatarUrl }}" alt="user-image"
+                                    class="img-fluid user-avtar object-fit-cover"
+                                    style="width: 38px; height: 38px; border-radius: 50%;"
+                                    onerror="this.onerror=null; this.src='/assets/images/avatar/default.png';">
                                 <div>
                                     <h6 class="text-dark mb-0">{{ auth()->user()->name ?? __('ui.erp_admin') }} <span
                                             class="badge bg-soft-success text-success ms-1">{{ $currentTenant['plan'] }}</span>
@@ -474,7 +463,7 @@
                             <i class="feather-shield"></i>
                             <span>{{ __('ui.roles_permissions') }}</span>
                         </a>
-                        <a href="javascript:void(0);" class="dropdown-item">
+                        <a href="{{ route('account.settings') }}" class="dropdown-item">
                             <i class="feather-settings"></i>
                             <span>{{ __('ui.account_settings') }}</span>
                         </a>

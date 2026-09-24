@@ -80,6 +80,21 @@ Route::middleware(['tenant'])->group(function (): void {
             Route::delete('/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy'])->name('destroy');
         });
 
+        // Universal User Profile & Account Settings
+        Route::prefix('profile')->name('profile.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\ProfileController::class, 'show'])->name('show');
+            Route::put('/', [\App\Http\Controllers\ProfileController::class, 'update'])->name('update');
+            Route::put('/password', [\App\Http\Controllers\ProfileController::class, 'updatePassword'])->name('password.update');
+        });
+
+        Route::prefix('account-settings')->name('account.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\AccountSettingsController::class, 'index'])->name('settings');
+            Route::put('/profile', [\App\Http\Controllers\AccountSettingsController::class, 'updateProfile'])->name('settings.profile');
+            Route::put('/password', [\App\Http\Controllers\AccountSettingsController::class, 'updatePassword'])->name('settings.password');
+            Route::put('/notifications', [\App\Http\Controllers\AccountSettingsController::class, 'updateNotifications'])->name('settings.notifications');
+            Route::delete('/deactivate', [\App\Http\Controllers\AccountSettingsController::class, 'deactivateAccount'])->name('settings.delete');
+        });
+
         Route::middleware(['module.access'])->group(function (): void {
             foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/web.php'))) as $moduleRoutes) {
                 require $moduleRoutes;
@@ -96,3 +111,21 @@ Route::middleware(['tenant'])->group(function (): void {
         }
     });
 });
+
+// Universal Public Storage Media Route (ensures avatars & public assets render in local, live, and shared hosting)
+Route::get('/storage/{path}', function (string $path) {
+    $cleanPath = str_replace(['..', '\\'], ['', '/'], $path);
+
+    // 1. Check in storage/app/public
+    if (\Illuminate\Support\Facades\Storage::disk('public')->exists($cleanPath)) {
+        return \Illuminate\Support\Facades\Storage::disk('public')->response($cleanPath);
+    }
+
+    // 2. Check in public/storage
+    $publicFilePath = public_path('storage/' . $cleanPath);
+    if (file_exists($publicFilePath) && is_file($publicFilePath)) {
+        return response()->file($publicFilePath);
+    }
+
+    abort(404);
+})->where('path', '.*')->name('storage.media');

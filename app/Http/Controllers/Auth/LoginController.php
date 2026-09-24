@@ -47,6 +47,19 @@ class LoginController extends Controller
                 ->onlyInput('email');
         }
 
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if ($user && $user->isDeactivated()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login')
+                ->withErrors(['email' => __('This account has been deactivated. Please contact your workspace administrator to reactivate your access.')])
+                ->onlyInput('email');
+        }
+
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard'));
@@ -75,7 +88,16 @@ class LoginController extends Controller
             ], 401);
         }
 
+        /** @var \App\Models\User $user */
         $user = Auth::user();
+
+        if ($user && $user->isDeactivated()) {
+            Auth::logout();
+            return response()->json([
+                'message' => __('This account has been deactivated. Please contact your workspace administrator.')
+            ], 403);
+        }
+
         if ($user->role_id && !$user->role) {
             $user->role = $user->primaryRole?->name;
         }
