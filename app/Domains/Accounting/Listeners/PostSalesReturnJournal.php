@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\Listeners;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Models\VoucherDetail;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
+use App\Domains\Accounting\Services\AccountResolverService;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Accounting\Support\VoucherType;
@@ -17,6 +18,7 @@ class PostSalesReturnJournal
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
         private readonly PostingFailureRecorder $failures,
+        private readonly AccountResolverService $accountResolver,
     ) {
     }
 
@@ -31,6 +33,8 @@ class PostSalesReturnJournal
         $tenantId = $salesReturn->tenant_id ?: (tenant_id() ?? 1);
 
         try {
+            $salesReturn->loadMissing('items.product');
+
             $itemTaxableSubtotal = (float) $salesReturn->items->sum(fn($i) => (float)$i->quantity * (float)$i->unit_price);
             if ($itemTaxableSubtotal <= 0) {
                 $itemTaxableSubtotal = (float) ($salesReturn->total_refund_amount > 0 ? $salesReturn->total_refund_amount : $salesReturn->total_amount);
@@ -43,9 +47,8 @@ class PostSalesReturnJournal
             // Accounts Receivable (1100) - Asset Account
             $accountsReceivable = $this->accounts->findByCode('1100', $tenantId);
             // Sales Returns & Allowances (4030), falling back to Sales Revenue (4010)
-            // for tenants provisioned before the dedicated returns ledger existed.
             $salesReturnAccount = $this->accounts->findByCode('4030', $tenantId)
-                ?? $this->accounts->findByCode('4010', $tenantId);
+                ?? $this->accountResolver->resolveSalesAccount(null, $tenantId);
 
             // Output GST Accounts
             $cgstAccount = $this->accounts->findByCode('2110', $tenantId);
@@ -172,62 +175,75 @@ class PostSalesReturnJournal
             ]);
 
             // 2. COGS & Inventory Asset Restocking Journal
-            $inventoryAcc = $this->accounts->findByCode('1200', $tenantId);
-            $cogsAcc = $this->accounts->findByCode('5010', $tenantId);
+            $inventoryBuckets = []; // inv_account_id => amount
+            $cogsBuckets = [];      // cogs_account_id => amount
 
-            if ($inventoryAcc && $cogsAcc) {
-                $totalCostValue = 0.0;
-                foreach ($salesReturn->items as $item) {
-                    $unitCost = 0.0;
-                    if ($salesReturn->sales_order_id) {
-                        $soOutTx = \App\Domains\Inventory\Models\StockTransaction::where('tenant_id', $tenantId)
-                            ->where('product_id', $item->product_id)
-                            ->where('reference_type', 'SalesOrder')
-                            ->where('reference_id', $salesReturn->sales_order_id)
-                            ->first();
+            foreach ($salesReturn->items as $item) {
+                $unitCost = 0.0;
+                if ($salesReturn->sales_order_id) {
+                    $soOutTx = \App\Domains\Inventory\Models\StockTransaction::where('tenant_id', $tenantId)
+                        ->where('product_id', $item->product_id)
+                        ->where('reference_type', 'SalesOrder')
+                        ->where('reference_id', $salesReturn->sales_order_id)
+                        ->first();
 
-                        if ($soOutTx && (float)$soOutTx->unit_cost > 0) {
-                            $unitCost = (float)$soOutTx->unit_cost;
-                        }
+                    if ($soOutTx && (float)$soOutTx->unit_cost > 0) {
+                        $unitCost = (float)$soOutTx->unit_cost;
                     }
-
-                    if ($unitCost <= 0) {
-                        $product = \App\Domains\Inventory\Models\Product::find($item->product_id);
-                        if ($product) {
-                            $unitCost = (float)($product->opening_stock_rate ?: ($product->cost_price ?: $product->unit_cost));
-                        }
-                    }
-
-                    if ($unitCost <= 0) {
-                        $unitCost = (float)$item->unit_price;
-                    }
-
-                    $totalCostValue += (float)$item->quantity * $unitCost;
                 }
 
-                if ($totalCostValue > 0) {
-                    $cogsLines = [
-                        [
-                            'chart_of_account_id' => $inventoryAcc->id,
-                            'debit'               => round($totalCostValue, 2),
+                if ($unitCost <= 0) {
+                    $product = $item->product ?? \App\Domains\Inventory\Models\Product::find($item->product_id);
+                    if ($product) {
+                        $unitCost = (float)($product->opening_stock_rate ?: ($product->cost_price ?: $product->unit_cost));
+                    }
+                }
+
+                if ($unitCost <= 0) {
+                    $unitCost = (float)$item->unit_price;
+                }
+
+                $lineCost = (float)$item->quantity * $unitCost;
+                if ($lineCost <= 0) continue;
+
+                $invAcc  = $this->accountResolver->resolveInventoryAccount($item->product ?? $item->product_id, $tenantId);
+                $cogsAcc = $this->accountResolver->resolveCogsAccount($item->product ?? $item->product_id, $tenantId);
+
+                if ($invAcc && $cogsAcc) {
+                    $inventoryBuckets[$invAcc->id] = ($inventoryBuckets[$invAcc->id] ?? 0.0) + $lineCost;
+                    $cogsBuckets[$cogsAcc->id] = ($cogsBuckets[$cogsAcc->id] ?? 0.0) + $lineCost;
+                }
+            }
+
+            if (!empty($inventoryBuckets) && !empty($cogsBuckets)) {
+                $cogsLines = [];
+                foreach ($inventoryBuckets as $invAccId => $amount) {
+                    if ($amount > 0) {
+                        $cogsLines[] = [
+                            'chart_of_account_id' => $invAccId,
+                            'debit'               => round($amount, 2),
                             'description'         => "Restock Inventory Asset {$salesReturn->return_number}",
-                        ],
-                        [
-                            'chart_of_account_id' => $cogsAcc->id,
-                            'credit'              => round($totalCostValue, 2),
-                            'description'         => "COGS Expense Reversal {$salesReturn->return_number}",
-                        ],
-                    ];
-
-                    $this->journals->post($cogsLines, [
-                        'tenant_id'      => $tenantId,
-                        'journal_date'   => $salesReturn->return_date ?: now(),
-                        'source'         => Journal::SOURCE_INVENTORY,
-                        'reference_type' => 'sales_return_cogs',
-                        'reference_id'   => $salesReturn->id,
-                        'memo'           => "Sales Return Inventory Restock COGS Reversal {$salesReturn->return_number}",
-                    ]);
+                        ];
+                    }
                 }
+                foreach ($cogsBuckets as $cogsAccId => $amount) {
+                    if ($amount > 0) {
+                        $cogsLines[] = [
+                            'chart_of_account_id' => $cogsAccId,
+                            'credit'              => round($amount, 2),
+                            'description'         => "COGS Expense Reversal {$salesReturn->return_number}",
+                        ];
+                    }
+                }
+
+                $this->journals->post($cogsLines, [
+                    'tenant_id'      => $tenantId,
+                    'journal_date'   => $salesReturn->return_date ?: now(),
+                    'source'         => Journal::SOURCE_INVENTORY,
+                    'reference_type' => 'sales_return_cogs',
+                    'reference_id'   => $salesReturn->id,
+                    'memo'           => "Sales Return Inventory Restock COGS Reversal {$salesReturn->return_number}",
+                ]);
             }
 
             Log::info("PostSalesReturnJournal: Credit Note & COGS Journals posted for Sales Return {$salesReturn->return_number}");

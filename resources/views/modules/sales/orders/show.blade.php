@@ -52,7 +52,7 @@
         @endif
 
         <!-- Action Dropdown using CRM Leads component -->
-        @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
+        @if ($order->status === 'Draft')
             <x-ui.action-dropdown id="soProfileActionsDropdown">
                 <li>
                     <a href="{{ route('sales.orders.edit', $order->id) }}" class="dropdown-item py-2">

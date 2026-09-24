@@ -191,11 +191,12 @@
                     <!-- Tab 1: Overview -->
                     <div class="tab-pane fade show active" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab">
                         @php
-                            $getAccountDisplay = function($accValue) {
+                            $getAccountDisplay = function($accValue) use ($product) {
                                 if (!$accValue) return '—';
-                                if (is_numeric($accValue)) {
-                                    $coa = \App\Domains\Accounting\Models\ChartOfAccount::find($accValue);
-                                    return $coa ? ($coa->code ? $coa->code . ' - ' . $coa->name : $coa->name) : $accValue;
+                                $tenantId = $product->tenant_id ?? (tenant_id() ?? 1);
+                                $coa = app(\App\Domains\Accounting\Services\AccountResolverService::class)->resolveAccount($accValue, $tenantId);
+                                if ($coa) {
+                                    return ($coa->code ? $coa->code . ' - ' : '') . $coa->name;
                                 }
                                 return $accValue;
                             };
@@ -611,7 +612,11 @@
                                             <th class="text-end">{{ __('inventory.qty') }}</th>
                                             <th class="text-end">{{ __('inventory.rate') }}</th>
                                             <th class="text-end">{{ __('inventory.total') }}</th>
-                                            <th class="text-end">{{ __('inventory.unconsumed_qty') }}</th>
+                                            @if(($product->inventory_valuation_method ?? 'FIFO') === 'FIFO')
+                                                <th class="text-end">{{ __('inventory.unconsumed_qty') }}</th>
+                                            @else
+                                                <th class="text-end">{{ __('inventory.valuation_tracking') }}</th>
+                                            @endif
                                         </tr>
                                     </thead>
                                     <tbody class="fs-13 text-dark">
@@ -655,14 +660,22 @@
                                                 <td class="text-end">{{ format_currency($tx->unit_cost) }}</td>
                                                 <td class="text-end fw-bold">{{ format_currency($tx->total_value) }}</td>
                                                 <td class="text-end">
-                                                    @if($tx->type === 'IN')
-                                                        @if($tx->balance_qty > 0)
-                                                            <span class="badge bg-soft-primary text-primary">{{ number_format($tx->balance_qty, 0) }} {{ __('inventory.left') }}</span>
+                                                    @if(($product->inventory_valuation_method ?? 'FIFO') === 'FIFO')
+                                                        @if($tx->type === 'IN')
+                                                            @if($tx->balance_qty > 0)
+                                                                <span class="badge bg-soft-primary text-primary">{{ number_format($tx->balance_qty, 0) }} {{ __('inventory.left') }}</span>
+                                                            @else
+                                                                <span class="badge bg-light text-muted">{{ __('inventory.depleted') }}</span>
+                                                            @endif
                                                         @else
-                                                            <span class="badge bg-light text-muted">{{ __('inventory.depleted') }}</span>
+                                                            <span class="text-muted">—</span>
                                                         @endif
                                                     @else
-                                                        <span class="text-muted">—</span>
+                                                        @if($tx->type === 'IN')
+                                                            <span class="badge bg-soft-info text-info"><i class="feather-layers me-1"></i>{{ __('inventory.pooled_avg') }}</span>
+                                                        @else
+                                                            <span class="badge bg-soft-secondary text-dark"><i class="feather-check-circle me-1"></i>{{ __('inventory.outward_avg') }}</span>
+                                                        @endif
                                                     @endif
                                                 </td>
                                             </tr>
