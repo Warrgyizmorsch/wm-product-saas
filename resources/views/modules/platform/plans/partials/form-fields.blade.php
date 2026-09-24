@@ -23,11 +23,11 @@
         <h6 class="fw-bold text-uppercase fs-11 text-muted mb-2 border-top pt-3 mt-2">Pricing</h6>
     </div>
     <div class="col-md-6">
-        <x-ui.odoo-form-ui type="input" inputType="number" label="Per user / month — monthly billing" name="monthly_price_per_user" :value="old('monthly_price_per_user', $plan->monthly_price_per_user)" min="0" helperText="Whole rupees, excl. GST. Blank = not sold monthly." class="@error('monthly_price_per_user') is-invalid @enderror" />
+        <x-ui.odoo-form-ui type="input" inputType="number" label="Per user / month — monthly billing" name="monthly_price_per_user" :value="old('monthly_price_per_user', $plan->monthly_price_per_user)" min="0" helperText="Whole rupees, excl. GST. Blank = sum of its modules' monthly prices." class="@error('monthly_price_per_user') is-invalid @enderror" />
         @error('monthly_price_per_user')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
     <div class="col-md-6">
-        <x-ui.odoo-form-ui type="input" inputType="number" label="Per user / month — billed yearly" name="yearly_price_per_user" :value="old('yearly_price_per_user', $plan->yearly_price_per_user)" min="0" helperText="Usually lower than monthly. Blank = not sold yearly." class="@error('yearly_price_per_user') is-invalid @enderror" />
+        <x-ui.odoo-form-ui type="input" inputType="number" label="Per user / month — billed yearly" name="yearly_price_per_user" :value="old('yearly_price_per_user', $plan->yearly_price_per_user)" min="0" helperText="Per user PER MONTH, charged 12 months up front — not the yearly total. Blank = sum of its modules' yearly prices." class="@error('yearly_price_per_user') is-invalid @enderror" />
         @error('yearly_price_per_user')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
     <div class="col-md-4">

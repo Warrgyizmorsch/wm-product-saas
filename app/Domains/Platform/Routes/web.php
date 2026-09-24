@@ -52,6 +52,10 @@ Route::prefix('platform')
             ->name('billing.quote');
         Route::put('subscription/billing-details', [BillingCheckoutController::class, 'saveBillingDetails'])
             ->name('billing.details');
+        Route::post('subscription/subscribe', [BillingCheckoutController::class, 'subscribe'])
+            ->name('billing.subscribe');
+        Route::post('subscription/subscribe/verify', [BillingCheckoutController::class, 'verify'])
+            ->name('billing.verify');
 
         Route::post('modules/checkout', [TenantModuleController::class, 'checkout'])
             ->name('modules.checkout');

@@ -15,9 +15,19 @@
                 <p class="fs-13 text-muted mb-0">
                     Per user per month, in whole {{ $currency }}, excluding GST ({{ rtrim(rtrim(number_format(config('billing.gst_rate'), 2), '0'), '.') }}% is added at checkout).
                     Tenants add these on top of their plan; a module their plan already includes is never charged.
+                    Both columns are <strong>per user per month</strong> — "billed yearly" is the discounted monthly rate charged for 12 months up front
+                    (e.g. ₹300 per user per year → enter 25). A plan costs the sum of its modules' prices unless the plan sets its own.
                     Leave a price blank to stop selling that module on that cycle.
                 </p>
             </div>
+
+            @if ($errors->any())
+                <div class="alert alert-danger fs-13">
+                    @foreach ($errors->all() as $error)
+                        <div>{{ $error }}</div>
+                    @endforeach
+                </div>
+            @endif
 
             <div class="table-responsive">
                 <table class="table table-hover mb-0 align-middle">
@@ -25,7 +35,7 @@
                         <tr>
                             <th>Module</th>
                             <th style="width: 220px">Monthly billing</th>
-                            <th style="width: 220px">Billed yearly</th>
+                            <th style="width: 220px">Billed yearly <span class="fw-normal text-muted">(per month)</span></th>
                             <th style="width: 110px">For sale</th>
                         </tr>
                     </thead>

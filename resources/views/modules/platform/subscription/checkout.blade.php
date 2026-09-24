@@ -20,6 +20,15 @@
 
 @section('content')
     <div class="erp-checkout" id="billingCheckout">
+        @if (session('error'))
+            <div class="alert alert-danger fs-13">{{ session('error') }}</div>
+        @endif
+        @if ($liveSubscription && ! $subscribed)
+            <div class="alert alert-info fs-13">
+                You're subscribed to {{ $liveSubscription->plan?->name }} for {{ $liveSubscription->seats }} users, billed {{ $liveSubscription->cycle }}.
+                Changing users or add-ons on an active subscription is coming next.
+            </div>
+        @endif
         <ol class="erp-checkout-steps mb-4">
             @foreach (['Plan', 'Add-Ons', 'Pay', 'Confirmation'] as $i => $label)
                 <li data-step-dot="{{ $i + 1 }}" class="{{ $i === 0 ? 'active' : '' }}">
@@ -50,7 +59,16 @@
                         </div>
 
                         @if ($plans->isEmpty())
-                            <div class="text-center py-5 text-muted">No per-user plans are on sale yet. Please check back soon.</div>
+                            <div class="text-center py-5">
+                                <p class="text-muted mb-3">No plans are on sale yet.</p>
+                                @if ($canManagePrices)
+                                    <p class="fs-13 text-muted mb-3">A plan is priced from its modules' per-user prices — set every module's price, or give the plan its own price.</p>
+                                    <a href="{{ route('platform.module-prices.index') }}" class="btn btn-primary btn-sm">Set add-on prices</a>
+                                    <a href="{{ route('platform.plans.index') }}" class="btn btn-light border btn-sm">Plans</a>
+                                @else
+                                    <a href="{{ route('platform.subscription.index') }}" class="btn btn-light border btn-sm">Back to Subscription</a>
+                                @endif
+                            </div>
                         @else
                             <div class="row g-3" id="planCards">
                                 @foreach ($plans as $plan)
@@ -170,12 +188,27 @@
                     <x-ui.card class="mb-4 text-center py-5">
                         <span class="erp-app-icon erp-app-icon-lg mx-auto mb-3" style="background: #16A34A"><i class="feather-check"></i></span>
                         <h5 class="mb-1">You're subscribed</h5>
-                        <p class="fs-13 text-muted mb-4" id="confirmationText"></p>
+                        <p class="fs-13 text-muted mb-4" id="confirmationText">
+                            @if ($subscribed)
+                                {{ $subscribed['plan'] }} for {{ $subscribed['seats'] }} users, billed {{ $subscribed['cycle'] }}
+                                — ₹{{ number_format($subscribed['total'] / 100, 2) }} incl. GST.
+                                @if ($subscribed['renews'])
+                                    Renews automatically on {{ $subscribed['renews'] }}.
+                                @endif
+                            @endif
+                        </p>
                         <a href="{{ route('platform.subscription.index') }}" class="btn btn-primary">Go to Subscription</a>
                     </x-ui.card>
                 </section>
 
-                <div class="d-flex justify-content-between" id="stepNav">
+                <form action="{{ route('platform.billing.verify') }}" method="POST" id="subscriptionVerifyForm" class="d-none">
+                    @csrf
+                    <input type="hidden" name="gateway_subscription_id" id="sv_subscription_id">
+                    <input type="hidden" name="gateway_payment_id" id="sv_payment_id">
+                    <input type="hidden" name="gateway_signature" id="sv_signature">
+                </form>
+
+                <div class="d-flex justify-content-between {{ $plans->isEmpty() ? 'd-none' : '' }}" id="stepNav">
                     <button type="button" class="btn btn-light border" id="stepBack">Back</button>
                     <button type="button" class="btn btn-primary" id="stepNext">Continue</button>
                 </div>
@@ -225,17 +258,22 @@
 @endpush
 
 @push('scripts')
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
 (function () {
     var PLANS = @json($plans);
     var MODULES = @json($modules);
     var MIN_SEATS = {{ (int) $minimumSeats }};
     var CURRENCY = @json($currency);
-    var ROUTES = { quote: @json(route('platform.billing.quote')), details: @json(route('platform.billing.details')) };
+    var ROUTES = {
+        quote: @json(route('platform.billing.quote')),
+        details: @json(route('platform.billing.details')),
+        subscribe: @json(route('platform.billing.subscribe')),
+    };
     var CSRF = @json(csrf_token());
 
     var state = @json($selection);
-    var step = 1;
+    var step = {{ (int) $startStep }};
     var lastQuote = null;
     var quoteTimer = null;
     var quoteSeq = 0;
@@ -443,7 +481,7 @@
         });
         var back = document.getElementById('stepBack');
         var next = document.getElementById('stepNext');
-        document.getElementById('stepNav').classList.toggle('d-none', step === 4);
+        document.getElementById('stepNav').classList.toggle('d-none', step === 4 || PLANS.length === 0);
         back.classList.toggle('invisible', step === 1);
         next.disabled = !lastQuote;
         next.textContent = step === 3 ? (lastQuote ? 'Pay ' + money(lastQuote.total) : 'Pay') : 'Continue';
@@ -498,14 +536,52 @@
         });
     }
 
-    // Replaced by the Razorpay Subscriptions checkout (next step of the billing rollout).
-    function startPayment() {
+    function showPayError(message) {
         var errors = document.getElementById('billingDetailsErrors');
-        errors.classList.remove('alert-danger');
-        errors.classList.add('alert-info');
-        errors.textContent = 'Your billing details are saved. Online payment for per-user plans is being switched on — you will be able to complete this order shortly.';
+        errors.classList.remove('alert-info');
+        errors.classList.add('alert-danger');
+        errors.textContent = message;
         errors.classList.remove('d-none');
         document.getElementById('stepNext').disabled = false;
+        renderNav();
+    }
+
+    // Starts the recurring subscription on the server (amount re-priced there),
+    // then opens the gateway's checkout for the first payment. Verified server-side.
+    function startPayment() {
+        var next = document.getElementById('stepNext');
+        next.disabled = true;
+        next.textContent = 'Starting payment…';
+
+        post(ROUTES.subscribe, { plan_id: state.plan_id, cycle: state.cycle, seats: state.seats, modules: state.modules })
+            .then(function (res) {
+                if (!res.ok) { showPayError(firstError(res.data)); return; }
+                var order = res.data;
+                if (order.gateway !== 'razorpay' || typeof Razorpay === 'undefined') {
+                    showPayError('The payment window could not be opened. Please refresh and try again.');
+                    return;
+                }
+                var rzp = new Razorpay({
+                    key: order.key,
+                    subscription_id: order.subscription_id,
+                    name: 'SaaS ERP Platform',
+                    description: lastQuote ? (lastQuote.lines[0].label + ' · ' + lastQuote.seats + ' users · ' + (lastQuote.cycle === 'yearly' ? 'yearly' : 'monthly')) : 'Subscription',
+                    prefill: { name: order.tenant_name || '', email: order.tenant_email || '' },
+                    handler: function (response) {
+                        document.getElementById('sv_subscription_id').value = response.razorpay_subscription_id;
+                        document.getElementById('sv_payment_id').value = response.razorpay_payment_id;
+                        document.getElementById('sv_signature').value = response.razorpay_signature;
+                        next.textContent = 'Confirming payment…';
+                        document.getElementById('subscriptionVerifyForm').submit();
+                    },
+                    modal: { ondismiss: function () { next.disabled = false; renderNav(); } },
+                });
+                rzp.on('payment.failed', function (resp) {
+                    showPayError((resp && resp.error && resp.error.description) || 'The payment failed. Please try again.');
+                });
+                rzp.open();
+            })
+            .catch(function () { showPayError('Something went wrong starting the payment.'); });
     }
 
     refresh();
