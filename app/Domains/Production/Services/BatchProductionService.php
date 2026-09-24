@@ -504,23 +504,59 @@ class BatchProductionService
         $orderId = $operation->production_order_id;
         $opProductId = $operation->source_product_id ?? $operation->order?->product_id;
 
-        // Determine if initial routing operation for this production order
-        $isFirstOp = !\App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
-            ->where('production_order_id', $orderId)
-            ->where('sequence', '<', $operation->sequence)
-            ->exists();
-
-        $prevOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
-            ->where('production_order_id', $orderId)
-            ->where('sequence', '<', $operation->sequence)
-            ->orderBy('sequence', 'desc')
-            ->first();
+        // Resolve explicit predecessor and successor relationships first
+        $prevOp = null;
+        if ($operation->previous_operation_id) {
+            $prevOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+                ->where('production_order_id', $orderId)
+                ->find($operation->previous_operation_id);
+        }
+        if (!$prevOp) {
+            $prevOp = $operation->predecessorDependencies()
+                ->where('production_order_operations.production_order_id', $orderId)
+                ->first();
+        }
+        if (!$prevOp) {
+            $prevOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+                ->where('production_order_id', $orderId)
+                ->where(function ($q) use ($operation) {
+                    if ($operation->source_product_id) {
+                        $q->where('source_product_id', $operation->source_product_id);
+                    } else {
+                        $q->whereNull('source_product_id');
+                    }
+                })
+                ->where('sequence', '<', $operation->sequence)
+                ->orderBy('sequence', 'desc')
+                ->first();
+        }
 
         $nextOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
-            ->where('sequence', '>', $operation->sequence)
-            ->orderBy('sequence', 'asc')
+            ->where('previous_operation_id', $operation->id)
             ->first();
+        if (!$nextOp) {
+            $nextOp = $operation->successorDependencies()
+                ->where('production_order_operations.production_order_id', $orderId)
+                ->first();
+        }
+        if (!$nextOp) {
+            $nextOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+                ->where('production_order_id', $orderId)
+                ->where(function ($q) use ($operation) {
+                    if ($operation->source_product_id) {
+                        $q->where('source_product_id', $operation->source_product_id);
+                    } else {
+                        $q->whereNull('source_product_id');
+                    }
+                })
+                ->where('sequence', '>', $operation->sequence)
+                ->orderBy('sequence', 'asc')
+                ->first();
+        }
+
+        // Determine if initial routing operation for this production order
+        $isFirstOp = $operation->isEntryOperation() && $prevOp === null;
 
         $batches = ProductionBatch::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)

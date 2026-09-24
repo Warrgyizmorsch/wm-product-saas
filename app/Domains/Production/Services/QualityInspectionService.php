@@ -248,6 +248,18 @@ class QualityInspectionService
             // Handle subcontract operation QC disposition
             if ($inspection->production_order_operation_id) {
                 app(SubcontractReceiptOrchestrator::class)->processQcApproval($inspection);
+
+                if ($newResult === 'passed') {
+                    app(ProductionWipService::class)->evaluateAndExecuteWipTransfers(
+                        $inspection->production_order_operation_id,
+                        $userId,
+                        $inspection->batch_id
+                    );
+                    if ($inspection->production_order_id) {
+                        app(\App\Domains\Production\Services\ProductionOrderService::class)->reconcileOperationReadiness($inspection->production_order_id);
+                        app(\App\Domains\Production\Services\ProductionOrderService::class)->evaluateAndAutoCompleteOrder($inspection->production_order_id, $userId);
+                    }
+                }
             }
 
             // If inspection passed, clear quarantine status on receipts and transfer stock from Quarantine Warehouse to Main FG Warehouse
@@ -410,6 +422,8 @@ class QualityInspectionService
 
                 // Unlock successor operations for partial/full WIP transfer
                 app(ProductionWipService::class)->evaluateAndExecuteWipTransfers($orderOpId, $userId, $effectiveBatchId);
+                app(\App\Domains\Production\Services\ProductionOrderService::class)->reconcileOperationReadiness($orderId);
+                app(\App\Domains\Production\Services\ProductionOrderService::class)->evaluateAndAutoCompleteOrder($orderId, $userId);
             }
 
             // Auto-create NCR for rejected quantity

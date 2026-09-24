@@ -5,6 +5,7 @@ namespace App\Domains\Production\Controllers;
 use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionWip;
 use App\Domains\Production\Models\ProductionWipTransaction;
+use App\Domains\Production\Models\ProductionOrderOperation;
 use App\Domains\Production\Repositories\ProductionWipRepositoryInterface;
 use App\Domains\Production\Services\ProductionWipService;
 use App\Domains\Inventory\Models\Warehouse;
@@ -145,19 +146,37 @@ class WipController extends Controller
     public function transfer(Request $request, int $id)
     {
         abort_unless(auth()->user() && (auth()->user()->role === 'admin' || auth()->user()->hasProductionPermission('production.mes.execute')), 403);
+        $tenantId = require_tenant_id();
+
+        $wip = ProductionWip::where('tenant_id', $tenantId)->findOrFail($id);
 
         $request->validate([
-            'from_operation_id' => 'required|exists:production_routing_operations,id',
-            'to_operation_id' => 'required|exists:production_routing_operations,id',
+            'from_operation_id' => 'required|integer',
+            'to_operation_id' => 'required|integer',
             'quantity' => 'required|numeric|min:0.0001',
             'remarks' => 'nullable|string|max:255',
         ]);
 
+        $fromOpId = (int) $request->input('from_operation_id');
+        $toOpId = (int) $request->input('to_operation_id');
+
+        // Context & Tenant validation: Ensure operations belong to this WIP's production order
+        $orderOpExists = ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('production_order_id', $wip->production_order_id)
+            ->where(function ($q) use ($toOpId) {
+                $q->where('id', $toOpId)->orWhere('routing_operation_id', $toOpId);
+            })
+            ->exists();
+
+        if (!$orderOpExists) {
+            return redirect()->back()->with('error', 'Destination operation does not belong to this Production Order.');
+        }
+
         try {
             $this->wipService->transferWip(
                 $id,
-                (int) $request->input('from_operation_id'),
-                (int) $request->input('to_operation_id'),
+                $fromOpId,
+                $toOpId,
                 (float) $request->input('quantity'),
                 $request->input('remarks'),
                 auth()->id()
@@ -165,6 +184,8 @@ class WipController extends Controller
 
             return redirect()->back()->with('success', 'WIP quantity transferred to next stage successfully.');
         } catch (InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
     }

@@ -594,11 +594,38 @@ class CapacityPlanningService
             }
 
             // Predecessor Check
-            $predecessor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
-                ->where('sequence', '<', $schedOp->sequence)
-                ->whereNotIn('status', ['cancelled', 'skipped'])
-                ->orderBy('sequence', 'desc')
-                ->first();
+            $predecessor = null;
+            $orderOp = $schedOp->orderOperation;
+            if ($orderOp && $orderOp->previous_operation_id) {
+                $predecessor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                    ->where('production_order_operation_id', $orderOp->previous_operation_id)
+                    ->whereNotIn('status', ['cancelled', 'skipped'])
+                    ->first();
+            }
+            if (!$predecessor && $orderOp) {
+                $predOpIds = $orderOp->predecessorDependencies()->pluck('predecessor_operation_id')->toArray();
+                if (!empty($predOpIds)) {
+                    $predecessor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                        ->whereIn('production_order_operation_id', $predOpIds)
+                        ->whereNotIn('status', ['cancelled', 'skipped'])
+                        ->orderBy('planned_finish', 'desc')
+                        ->first();
+                }
+            }
+            if (!$predecessor && $orderOp && !$orderOp->isEntryOperation()) {
+                $predecessor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                    ->whereHas('orderOperation', function ($q) use ($orderOp) {
+                        if ($orderOp->source_product_id) {
+                            $q->where('source_product_id', $orderOp->source_product_id);
+                        } else {
+                            $q->whereNull('source_product_id');
+                        }
+                        $q->where('sequence', '<', $orderOp->sequence);
+                    })
+                    ->whereNotIn('status', ['cancelled', 'skipped'])
+                    ->orderBy('sequence', 'desc')
+                    ->first();
+            }
 
             if ($predecessor) {
                 $predOrderOp = $predecessor->orderOperation;
@@ -628,12 +655,38 @@ class CapacityPlanningService
             }
 
             if ($shiftMode === ProductionScheduleChangeLog::SHIFT_MODE_ISOLATED) {
-                // Successor Check for Isolated shift
-                $successor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
-                    ->where('sequence', '>', $schedOp->sequence)
-                    ->whereNotIn('status', ['cancelled', 'skipped'])
-                    ->orderBy('sequence', 'asc')
-                    ->first();
+                $successor = null;
+                $orderOp = $schedOp->orderOperation;
+                if ($orderOp) {
+                    $successor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                        ->whereHas('orderOperation', fn($q) => $q->where('previous_operation_id', $orderOp->id))
+                        ->whereNotIn('status', ['cancelled', 'skipped'])
+                        ->first();
+                }
+                if (!$successor && $orderOp) {
+                    $succOpIds = $orderOp->successorDependencies()->pluck('operation_id')->toArray();
+                    if (!empty($succOpIds)) {
+                        $successor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                            ->whereIn('production_order_operation_id', $succOpIds)
+                            ->whereNotIn('status', ['cancelled', 'skipped'])
+                            ->orderBy('planned_start', 'asc')
+                            ->first();
+                    }
+                }
+                if (!$successor && $orderOp) {
+                    $successor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                        ->whereHas('orderOperation', function ($q) use ($orderOp) {
+                            if ($orderOp->source_product_id) {
+                                $q->where('source_product_id', $orderOp->source_product_id);
+                            } else {
+                                $q->whereNull('source_product_id');
+                            }
+                            $q->where('sequence', '>', $orderOp->sequence);
+                        })
+                        ->whereNotIn('status', ['cancelled', 'skipped'])
+                        ->orderBy('sequence', 'asc')
+                        ->first();
+                }
 
                 if ($successor) {
                     $orderOp = $schedOp->orderOperation;
@@ -701,13 +754,16 @@ class CapacityPlanningService
                 // Downstream Ripple recalculation
                 $successors = ProductionScheduleOperation::lockForUpdate()
                     ->where('production_schedule_id', $schedOp->production_schedule_id)
-                    ->where('sequence', '>', $schedOp->sequence)
+                    ->where('id', '!=', $schedOp->id)
                     ->whereNotIn('status', ['cancelled', 'skipped'])
+                    ->orderBy('planned_start', 'asc')
                     ->orderBy('sequence', 'asc')
                     ->get();
 
                 $scheduledMap = [
-                    $schedOp->sequence => [
+                    $schedOp->id => [
+                        'id'             => $schedOp->id,
+                        'production_order_operation_id' => $schedOp->production_order_operation_id,
                         'sequence'       => $schedOp->sequence,
                         'parallel_group' => $schedOp->orderOperation?->parallel_group,
                         'is_parallel'    => $schedOp->orderOperation?->is_parallel,
@@ -727,7 +783,8 @@ class CapacityPlanningService
                         $succOp->orderOperation?->parallel_group,
                         (bool) $succOp->orderOperation?->is_parallel,
                         $newStart,
-                        (float) ($order->quantity_ordered ?? 1)
+                        (float) ($order->quantity_ordered ?? 1),
+                        $succOp->orderOperation
                     );
 
                     if ($isSuccFrozen) {
@@ -739,7 +796,9 @@ class CapacityPlanningService
                                 'message'               => "LOCKED_OPERATION_CONFLICT: Operation sequence [{$succOp->sequence}] ({$succOp->orderOperation?->name}) is locked/running and prevents downstream ripple propagation (Requires start at {$earliestStart->toDateTimeString()}, locked at {$succOp->planned_start->toDateTimeString()}).",
                             ]));
                         }
-                        $scheduledMap[$succOp->sequence] = [
+                        $scheduledMap[$succOp->id] = [
+                            'id'             => $succOp->id,
+                            'production_order_operation_id' => $succOp->production_order_operation_id,
                             'sequence'       => $succOp->sequence,
                             'parallel_group' => $succOp->orderOperation?->parallel_group,
                             'is_parallel'    => $succOp->orderOperation?->is_parallel,
@@ -788,7 +847,9 @@ class CapacityPlanningService
                         $adjustedCount++;
                     }
 
-                    $scheduledMap[$succOp->sequence] = [
+                    $scheduledMap[$succOp->id] = [
+                        'id'             => $succOp->id,
+                        'production_order_operation_id' => $succOp->production_order_operation_id,
                         'sequence'       => $succOp->sequence,
                         'parallel_group' => $succOp->orderOperation?->parallel_group,
                         'is_parallel'    => $succOp->orderOperation?->is_parallel,

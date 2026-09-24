@@ -312,14 +312,21 @@
     @if($wip->status !== 'completed' && $wip->available_quantity > 0)
         <x-ui.modal id="transferWipModal" title="{{ __('production.transfer_wip') }}"
             formAction="{{ route('production.wip.transfer', $wip->id) }}" submitText="Transfer WIP" closeText="Cancel">
-            <input type="hidden" name="from_operation_id" value="{{ $wip->current_routing_operation_id }}">
-            <x-ui.odoo-form-ui type="input" label="From Stage" name="from_stage_dummy" :value="$wip->currentRoutingOperation ? $wip->currentRoutingOperation->name : 'Start'" readonly />
+            @php
+                $currentOrderOp = $wip->order?->operations->first(function ($o) use ($wip) {
+                    return (int) $o->id === (int) $wip->current_routing_operation_id
+                        || (int) $o->routing_operation_id === (int) $wip->current_routing_operation_id;
+                });
+                $fromOpIdVal = $currentOrderOp ? $currentOrderOp->id : $wip->current_routing_operation_id;
+            @endphp
+            <input type="hidden" name="from_operation_id" value="{{ $fromOpIdVal }}">
+            <x-ui.odoo-form-ui type="input" label="From Stage" name="from_stage_dummy" :value="$currentOrderOp ? $currentOrderOp->name : ($wip->currentRoutingOperation ? $wip->currentRoutingOperation->name : 'Start')" readonly />
 
             <x-ui.odoo-form-ui type="select" label="To Stage" name="to_operation_id" :searchable="false" required>
                 @if($wip->order)
                     @foreach($wip->order->operations as $op)
-                        @if($op->routing_operation_id !== $wip->current_routing_operation_id)
-                            <option value="{{ $op->routing_operation_id }}">{{ $op->name }} (Seq: {{ $op->sequence }})</option>
+                        @if((int) $op->id !== (int) $fromOpIdVal)
+                            <option value="{{ $op->id }}">{{ $op->name }} (Seq: {{ $op->sequence }})</option>
                         @endif
                     @endforeach
                 @endif

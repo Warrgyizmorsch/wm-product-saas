@@ -155,7 +155,7 @@ class ProductionOrderOperation extends BaseModel
             return false;
         }
 
-        if ($this->relationLoaded('routingOperation') && $this->routingOperation?->previous_operation_id) {
+        if ($this->routingOperation?->previous_operation_id) {
             return false;
         }
 
@@ -165,6 +165,23 @@ class ProductionOrderOperation extends BaseModel
             ->exists();
 
         if ($hasInterPred) {
+            return false;
+        }
+
+        // Check if there is an earlier operation in the same product chain
+        $hasEarlierOp = static::where('production_order_id', $this->production_order_id)
+            ->where('id', '!=', $this->id)
+            ->where(function ($q) {
+                if ($this->source_product_id) {
+                    $q->where('source_product_id', $this->source_product_id);
+                } else {
+                    $q->whereNull('source_product_id');
+                }
+            })
+            ->where('sequence', '<', $this->sequence)
+            ->exists();
+
+        if ($hasEarlierOp) {
             return false;
         }
 

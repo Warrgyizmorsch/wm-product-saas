@@ -228,7 +228,18 @@ class ReworkService
 
                     if ($wip) {
                         $nextOpExists = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $wip->production_order_id)
-                            ->where('sequence', '>', $originalOp->sequence)
+                            ->where(function ($q) use ($originalOp) {
+                                $q->where('previous_operation_id', $originalOp->id)
+                                  ->orWhereHas('predecessorDependencies', fn($d) => $d->where('predecessor_operation_id', $originalOp->id))
+                                  ->orWhere(function ($sub) use ($originalOp) {
+                                      if ($originalOp->source_product_id) {
+                                          $sub->where('source_product_id', $originalOp->source_product_id);
+                                      } else {
+                                          $sub->whereNull('source_product_id');
+                                      }
+                                      $sub->where('sequence', '>', $originalOp->sequence);
+                                  });
+                            })
                             ->exists();
 
                         $wip->rejected_quantity = max(0.0000, $wip->rejected_quantity - $reworkQty);

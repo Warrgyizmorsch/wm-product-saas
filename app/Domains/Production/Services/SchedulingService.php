@@ -1521,13 +1521,19 @@ class SchedulingService
             }
         }
 
-        $successors = collect($scheduledData)->filter(function ($succ) use ($opSequence, $parallelGroup, $isParallel, $successorOpIds) {
+        $successors = collect($scheduledData)->filter(function ($succ) use ($opSequence, $parallelGroup, $isParallel, $successorOpIds, $currentOp) {
             if (!empty($successorOpIds)) {
                 $succOpId = $succ['order_op']?->id ?? $succ['production_order_operation_id'] ?? null;
                 if (!$succOpId || !in_array($succOpId, $successorOpIds)) {
                     return false;
                 }
             } else {
+                if ($currentOp && $currentOp->source_product_id) {
+                    $succProduct = $succ['order_op']?->source_product_id ?? null;
+                    if ($succProduct !== $currentOp->source_product_id) {
+                        return false;
+                    }
+                }
                 if ($succ['sequence'] <= $opSequence) {
                     return false;
                 }
@@ -1621,13 +1627,19 @@ class SchedulingService
         }
         $predecessorOpIds = array_values(array_unique(array_filter($predecessorOpIds)));
 
-        $predecessors = collect($scheduledData)->filter(function ($prev) use ($opSequence, $parallelGroup, $isParallel, $predecessorOpIds) {
+        $predecessors = collect($scheduledData)->filter(function ($prev) use ($opSequence, $parallelGroup, $isParallel, $predecessorOpIds, $currentOp) {
             if (!empty($predecessorOpIds)) {
                 $prevOpId = $prev['order_op']?->id ?? $prev['production_order_operation_id'] ?? null;
                 if (!$prevOpId || !in_array($prevOpId, $predecessorOpIds)) {
                     return false;
                 }
             } else {
+                if ($currentOp && $currentOp->source_product_id) {
+                    $prevProduct = $prev['order_op']?->source_product_id ?? null;
+                    if ($prevProduct !== $currentOp->source_product_id) {
+                        return false;
+                    }
+                }
                 if ($prev['sequence'] >= $opSequence) {
                     return false;
                 }
