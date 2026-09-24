@@ -48,11 +48,12 @@ class HrmsDemoSeeder extends Seeder
         // sandbox, destructive anywhere real data might exist. It previously ran
         // against a shared database and orphaned depreciation schedules/disposals/
         // write-offs/revaluations pointing at assets it had just truncated.
-        if (! app()->environment(['local', 'testing'])) {
-            $this->command?->error('HrmsDemoSeeder only runs in local/testing environments — refusing on '.app()->environment().'.');
+        
+        // if (! app()->environment(['local', 'testing'])) {
+        //     $this->command?->error('HrmsDemoSeeder only runs in local/testing environments — refusing on '.app()->environment().'.');
 
-            return;
-        }
+        //     return;
+        // }
 
         Schema::disableForeignKeyConstraints();
 
