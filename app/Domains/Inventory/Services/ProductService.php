@@ -369,19 +369,14 @@ class ProductService
                         // Always update unit_cost on ProductWarehouseStock if cost was provided or changed
                         $targetCost = $cost > 0 ? $cost : (float)$product->cost_price;
                         if ($targetCost > 0) {
-                            if ($oldStock) {
-                                if ($targetCost != $oldCost) {
-                                    $oldStock->update(['unit_cost' => $targetCost]);
-                                }
-                            } elseif ($qty > 0) {
-                                ProductWarehouseStock::create([
-                                    'tenant_id' => $tenantId,
-                                    'product_id' => $product->id,
-                                    'warehouse_id' => $whId,
-                                    'quantity' => $qty,
-                                    'available_qty' => $qty,
-                                    'unit_cost' => $targetCost,
-                                ]);
+                            $currentStock = ProductWarehouseStock::query()
+                                ->where('tenant_id', $tenantId)
+                                ->where('product_id', $product->id)
+                                ->where('warehouse_id', $whId)
+                                ->first();
+
+                            if ($currentStock && (float)$currentStock->unit_cost != $targetCost) {
+                                $currentStock->update(['unit_cost' => $targetCost]);
                             }
                         }
 
@@ -482,19 +477,14 @@ class ProductService
                         // Always update unit_cost on ProductWarehouseStock
                         $targetCost = $cost > 0 ? $cost : (float)$variant->cost_price;
                         if ($targetCost > 0) {
-                            if ($stock) {
-                                if ($targetCost != $oldCost) {
-                                    $stock->update(['unit_cost' => $targetCost]);
-                                }
-                            } elseif ($qty > 0) {
-                                ProductWarehouseStock::create([
-                                    'tenant_id' => $tenantId,
-                                    'product_id' => $variantId,
-                                    'warehouse_id' => $warehouseId,
-                                    'quantity' => $qty,
-                                    'available_qty' => $qty,
-                                    'unit_cost' => $targetCost,
-                                ]);
+                            $currentStock = ProductWarehouseStock::query()
+                                ->where('tenant_id', $tenantId)
+                                ->where('product_id', $variantId)
+                                ->where('warehouse_id', $warehouseId)
+                                ->first();
+
+                            if ($currentStock && (float)$currentStock->unit_cost != $targetCost) {
+                                $currentStock->update(['unit_cost' => $targetCost]);
                             }
                         }
 
@@ -558,19 +548,14 @@ class ProductService
                     // Always update unit_cost on ProductWarehouseStock
                     $targetCost = $cost > 0 ? $cost : (float)$product->cost_price;
                     if ($targetCost > 0) {
-                        if ($stock) {
-                            if ($targetCost != $oldCost) {
-                                $stock->update(['unit_cost' => $targetCost]);
-                            }
-                        } elseif ($qty > 0) {
-                            ProductWarehouseStock::create([
-                                'tenant_id' => $tenantId,
-                                'product_id' => $product->id,
-                                'warehouse_id' => $warehouseId,
-                                'quantity' => $qty,
-                                'available_qty' => $qty,
-                                'unit_cost' => $targetCost,
-                            ]);
+                        $currentStock = ProductWarehouseStock::query()
+                            ->where('tenant_id', $tenantId)
+                            ->where('product_id', $product->id)
+                            ->where('warehouse_id', $warehouseId)
+                            ->first();
+
+                        if ($currentStock && (float)$currentStock->unit_cost != $targetCost) {
+                            $currentStock->update(['unit_cost' => $targetCost]);
                         }
                     }
 
@@ -599,9 +584,9 @@ class ProductService
             'unit_cost' => $validated['unit_cost'] ?? 0.0,
             'selling_price' => $validated['selling_price'] ?? 0.0,
             'cost_price' => $validated['unit_cost'] ?? 0.0,
-            'sales_account' => $validated['sales_account'],
-            'purchase_account' => $validated['purchase_account'],
-            'inventory_account' => $validated['inventory_account'],
+            'sales_account' => $validated['sales_account'] ?? null,
+            'purchase_account' => $validated['purchase_account'] ?? null,
+            'inventory_account' => $validated['inventory_account'] ?? null,
             'preferred_vendor_id' => $validated['preferred_vendor_id'] ?? null,
             'status' => 'active',
             'planning_type' => $validated['supplier_method'] === 'manufacture' ? 'manufacture' : 'purchase',

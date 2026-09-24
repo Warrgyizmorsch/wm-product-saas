@@ -353,9 +353,6 @@ class ProductController extends Controller
             'supplier_method' => $request->input('supplier_method', 'buy'),
             'uom_id' => $defaultUomId,
             'inventory_valuation_method' => $request->input('inventory_valuation_method', 'FIFO'),
-            'sales_account' => $request->input('sales_account', '4000 Sales'),
-            'purchase_account' => $request->input('purchase_account', '5000 COGS'),
-            'inventory_account' => $request->input('inventory_account', '1400 Inventory'),
         ]);
 
         $validated = $request->validate([
@@ -376,9 +373,9 @@ class ProductController extends Controller
             'inventory_valuation_method' => 'required|in:FIFO,Weighted Average',
             'unit_cost' => 'nullable|numeric|min:0',
             'selling_price' => 'nullable|numeric|min:0',
-            'sales_account' => 'required|string|max:255',
-            'purchase_account' => 'required|string|max:255',
-            'inventory_account' => 'required|string|max:255',
+            'sales_account' => 'nullable|string|max:255',
+            'purchase_account' => 'nullable|string|max:255',
+            'inventory_account' => 'nullable|string|max:255',
             'preferred_vendor_id' => 'nullable|exists:vendors,id',
         ]);
 

@@ -55,17 +55,20 @@ $masterDefinitions = [
             ]]],
             ['component' => 'input',  'props' => ['label' => 'Standard Unit Cost',    'name' => 'unit_cost', 'type' => 'number', 'step' => 'any', 'placeholder' => '0.00', 'value' => '0.00']],
             ['component' => 'input',  'props' => ['label' => 'Selling Price',         'name' => 'selling_price', 'type' => 'number', 'step' => 'any', 'placeholder' => '0.00', 'value' => '0.00']],
-            ['component' => 'select', 'props' => ['label' => 'Sales Account',          'name' => 'sales_account', 'required' => true, 'selected' => 'Sales Income', 'options' => [
+            ['component' => 'select', 'props' => ['label' => 'Sales Account',          'name' => 'sales_account', 'options' => [
+                ''                => 'Select Sales Account',
                 'Sales Income'    => 'Sales Income Account',
                 'General Income'  => 'General Income Account',
                 'Interest Income' => 'Interest Income Account',
             ]]],
-            ['component' => 'select', 'props' => ['label' => 'Purchase Account',       'name' => 'purchase_account', 'required' => true, 'selected' => 'Cost of Goods Sold', 'options' => [
+            ['component' => 'select', 'props' => ['label' => 'Purchase Account',       'name' => 'purchase_account', 'options' => [
+                ''                   => 'Select Purchase Account',
                 'Cost of Goods Sold' => 'Cost of Goods Sold (COGS)',
                 'Purchases'          => 'Purchases Expense Account',
                 'Job Costs'          => 'Job Costs Expense Account',
             ]]],
-            ['component' => 'select', 'props' => ['label' => 'Inventory Account',      'name' => 'inventory_account', 'required' => true, 'selected' => 'Inventory Asset', 'options' => [
+            ['component' => 'select', 'props' => ['label' => 'Inventory Account',      'name' => 'inventory_account', 'options' => [
+                ''                     => 'Select Inventory Account',
                 'Inventory Asset'      => 'Inventory Asset Account',
                 'Raw Materials Stock'  => 'Raw Materials Stock',
                 'Finished Goods Stock' => 'Finished Goods Stock',
@@ -257,9 +260,9 @@ $masterDefinitions = [
                                 type="select"
                                 label="Sales Account"
                                 name="sales_account"
-                                :required="true"
                             >
-                                <option value="Sales Income" selected>Sales Income Account</option>
+                                <option value="" selected>Select Sales Account</option>
+                                <option value="Sales Income">Sales Income Account</option>
                                 <option value="General Income">General Income Account</option>
                                 <option value="Interest Income">Interest Income Account</option>
                             </x-ui.odoo-form-ui>
@@ -268,9 +271,9 @@ $masterDefinitions = [
                                 type="select"
                                 label="Purchase Acc."
                                 name="purchase_account"
-                                :required="true"
                             >
-                                <option value="Cost of Goods Sold" selected>Cost of Goods Sold (COGS)</option>
+                                <option value="" selected>Select Purchase Account</option>
+                                <option value="Cost of Goods Sold">Cost of Goods Sold (COGS)</option>
                                 <option value="Purchases">Purchases Expense Account</option>
                                 <option value="Job Costs">Job Costs Expense Account</option>
                             </x-ui.odoo-form-ui>
@@ -279,9 +282,9 @@ $masterDefinitions = [
                                 type="select"
                                 label="Inventory Acc."
                                 name="inventory_account"
-                                :required="true"
                             >
-                                <option value="Inventory Asset" selected>Inventory Asset Account</option>
+                                <option value="" selected>Select Inventory Account</option>
+                                <option value="Inventory Asset">Inventory Asset Account</option>
                                 <option value="Raw Materials Stock">Raw Materials Stock</option>
                                 <option value="Finished Goods Stock">Finished Goods Stock</option>
                             </x-ui.odoo-form-ui>

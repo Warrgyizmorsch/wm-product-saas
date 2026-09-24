@@ -447,7 +447,7 @@
                                             {{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}
                                         </option>
                                     @empty
-                                        <option value="Inventory Asset" {{ ($product->inventory_account ?? 'Inventory Asset') === 'Inventory Asset' ? 'selected' : '' }}>{{ __('inventory.inventory_asset_account') }}</option>
+                                        <option value="Inventory Asset" {{ ($product->inventory_account ?? '') === 'Inventory Asset' ? 'selected' : '' }}>{{ __('inventory.inventory_asset_account') }}</option>
                                         <option value="Raw Materials Stock" {{ ($product->inventory_account ?? '') === 'Raw Materials Stock' ? 'selected' : '' }}>{{ __('inventory.raw_materials_stock') }}</option>
                                         <option value="Finished Goods Stock" {{ ($product->inventory_account ?? '') === 'Finished Goods Stock' ? 'selected' : '' }}>{{ __('inventory.finished_goods_stock') }}</option>
                                     @endforelse
