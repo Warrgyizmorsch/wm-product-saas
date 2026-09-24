@@ -42,7 +42,7 @@
                             @endphp
 
                             @if($orders->isNotEmpty())
-                                <div class="fs-11 text-muted uppercase font-semibold mb-2 mt-2">Production Orders</div>
+                                <div class="fs-11 text-muted uppercase font-semibold mb-2 mt-2">{{ __('production.step_production_orders') }}</div>
                                 @foreach($orders as $o)
                                     @php $oCode = "ORD-" . str_pad($o->id, 8, '0', STR_PAD_LEFT); @endphp
                                     <button class="list-group-item list-group-item-action font-monospace fs-13 d-flex justify-content-between align-items-center rounded border mb-2 py-2" onclick="simulateScan('{{ $oCode }}')">
@@ -53,7 +53,7 @@
                             @endif
 
                             @if($batches->isNotEmpty())
-                                <div class="fs-11 text-muted uppercase font-semibold mb-2 mt-3">Production Batches</div>
+                                <div class="fs-11 text-muted uppercase font-semibold mb-2 mt-3">{{ __('production.production_batches') }}</div>
                                 @foreach($batches as $b)
                                     @php $bCode = "BAT-" . str_pad($b->id, 8, '0', STR_PAD_LEFT); @endphp
                                     <button class="list-group-item list-group-item-action font-monospace fs-13 d-flex justify-content-between align-items-center rounded border mb-2 py-2" onclick="simulateScan('{{ $bCode }}')">
@@ -64,7 +64,7 @@
                             @endif
 
                             @if($serials->isNotEmpty())
-                                <div class="fs-11 text-muted uppercase font-semibold mb-2 mt-3">Serial Numbers</div>
+                                <div class="fs-11 text-muted uppercase font-semibold mb-2 mt-3">{{ __('production.serial_numbers') }}</div>
                                 @foreach($serials as $s)
                                     @php $sCode = "SER-" . str_pad($s->id, 8, '0', STR_PAD_LEFT); @endphp
                                     <button class="list-group-item list-group-item-action font-monospace fs-13 d-flex justify-content-between align-items-center rounded border mb-2 py-2" onclick="simulateScan('{{ $sCode }}')">

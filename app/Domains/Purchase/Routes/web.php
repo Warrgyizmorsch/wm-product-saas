@@ -15,6 +15,7 @@ use App\Domains\Purchase\Controllers\LandedCostController;
 Route::prefix('purchase')
     ->as('purchase.')
     ->group(function (): void {
+        Route::get('requisitions/export', [PurchaseRequisitionController::class, 'export'])->name('requisitions.export');
         Route::get('requisitions/get-source-items', [PurchaseRequisitionController::class, 'getSourceItems'])->name('requisitions.get-source-items');
         Route::get('requisitions/pending-items', [PurchaseRequisitionController::class, 'pendingItems'])->name('requisitions.pending-items');
         Route::post('requisitions/pending-items/create-po', [PurchaseRequisitionController::class, 'createPosFromPendingItems'])->name('requisitions.pending-items.create-po');
@@ -25,6 +26,7 @@ Route::prefix('purchase')
         Route::get('pr-approvals', [PurchaseRequisitionController::class, 'prApprovals'])->name('pr-approvals.index');
         Route::resource('requisitions', PurchaseRequisitionController::class);
 
+        Route::get('rfqs/export', [PurchaseRfqController::class, 'export'])->name('rfqs.export');
         Route::get('rfqs/{rfq}/enter-quotes', [PurchaseRfqController::class, 'enterQuotes'])->name('rfqs.enter-quotes');
         Route::post('rfqs/{rfq}/store-quotes', [PurchaseRfqController::class, 'storeQuotes'])->name('rfqs.store-quotes');
         Route::post('rfqs/{rfq}/send', [PurchaseRfqController::class, 'sendRfq'])->name('rfqs.send');
@@ -37,6 +39,7 @@ Route::prefix('purchase')
         Route::get('rfqs/get-requisition-items', [PurchaseRfqController::class, 'getRequisitionItems'])->name('rfqs.get-requisition-items');
         Route::resource('rfqs', PurchaseRfqController::class);
 
+        Route::get('orders/export', [PurchaseOrderController::class, 'export'])->name('orders.export');
         Route::get('orders/get-requisition-items', [PurchaseOrderController::class, 'getRequisitionItems'])->name('orders.get-requisition-items');
         Route::post('orders/{order}/approve', [PurchaseOrderController::class, 'approve'])->name('orders.approve');
         Route::post('orders/{order}/reject', [PurchaseOrderController::class, 'reject'])->name('orders.reject');
@@ -52,35 +55,41 @@ Route::prefix('purchase')
         Route::post('landed-costs/{landed_cost}/post', [LandedCostController::class, 'post'])->name('landed-costs.post');
         Route::resource('landed-costs', LandedCostController::class);
 
+        Route::get('bills/export', [VendorBillController::class, 'export'])->name('bills.export');
         Route::get('bills/pending', [VendorBillController::class, 'pendingGrns'])->name('bills.pending');
         Route::get('bills/pending-freight', [VendorBillController::class, 'pendingFreight'])->name('bills.pending-freight');
         Route::get('bills/create-service', [VendorBillController::class, 'createService'])->name('bills.create-service');
         Route::post('bills/store-service', [VendorBillController::class, 'storeService'])->name('bills.store-service');
         Route::post('bills/{bill}/apply-advance', [VendorBillController::class, 'applyAdvance'])->name('bills.apply-advance');
         Route::resource('bills', VendorBillController::class);
+        Route::get('payments/export', [VendorPaymentController::class, 'export'])->name('payments.export');
         Route::resource('payments', VendorPaymentController::class);
         Route::resource('advances', PurchaseAdvancePaymentController::class);
         Route::resource('advance-payments', PurchaseAdvancePaymentController::class);
 
         Route::get('returns', [PurchaseReturnController::class, 'index'])->name('returns.index');
+        Route::get('returns/export', [PurchaseReturnController::class, 'export'])->name('returns.export');
         Route::get('returns/create', [PurchaseReturnController::class, 'create'])->name('returns.create');
         Route::post('returns', [PurchaseReturnController::class, 'store'])->name('returns.store');
         Route::get('returns/{return}', [PurchaseReturnController::class, 'show'])->name('returns.show');
         Route::post('returns/{return}/approve', [PurchaseReturnController::class, 'approve'])->name('returns.approve');
 
         // Vendor / Supplier Management Routes
+        Route::get('vendors/export', [\App\Domains\Purchase\Controllers\VendorController::class, 'export'])->name('vendors.export');
         Route::post('vendors/quick-create', [\App\Domains\Purchase\Controllers\VendorController::class, 'quickCreate'])->name('vendors.quick-create');
         Route::post('vendors/{vendor}/toggle-status', [\App\Domains\Purchase\Controllers\VendorController::class, 'toggleStatus'])->name('vendors.toggle-status');
         Route::resource('vendors', \App\Domains\Purchase\Controllers\VendorController::class);
     });
 
 // Top level alias /vendors resource
+Route::get('vendors/export', [\App\Domains\Purchase\Controllers\VendorController::class, 'export']);
 Route::resource('vendors', \App\Domains\Purchase\Controllers\VendorController::class);
 
 // Standalone Top-Level GRN Routes (/grns/...)
 Route::prefix('grns')
     ->as('grns.')
     ->group(function (): void {
+        Route::get('export', [GoodsReceiptNoteController::class, 'export'])->name('export');
         Route::get('pending', [GoodsReceiptNoteController::class, 'indexPending'])->name('pending');
         Route::get('get-po-items/{po}', [GoodsReceiptNoteController::class, 'getPurchaseOrderItems'])->name('get-po-items');
         Route::post('{grn}/approve', [GoodsReceiptNoteController::class, 'approve'])->name('approve');
@@ -92,6 +101,7 @@ Route::prefix('grns')
 Route::prefix('purchase/grns')
     ->as('purchase.grns.')
     ->group(function (): void {
+        Route::get('export', [GoodsReceiptNoteController::class, 'export'])->name('export');
         Route::get('pending', fn() => redirect()->route('grns.pending'))->name('pending');
         Route::get('get-po-items/{po}', [GoodsReceiptNoteController::class, 'getPurchaseOrderItems'])->name('get-po-items');
         Route::post('{grn}/approve', [GoodsReceiptNoteController::class, 'approve'])->name('approve');

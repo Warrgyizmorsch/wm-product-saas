@@ -133,7 +133,7 @@
                                 <th style="width: 25%">{{ $isWipJobWork ? 'DISPATCH LOCATION / WAREHOUSE *' : 'SOURCE WAREHOUSE *' }}</th>
                                 <th style="width: 15%">{{ $isWipJobWork ? 'AVAILABLE WIP QTY' : 'AVAILABLE QTY' }}</th>
                                 <th style="width: 12%">DISPATCH QTY *</th>
-                                <th style="width: 8%">UOM</th>
+                                <th style="width: 8%">{{ __('production.uom') }}</th>
                                 <th style="width: 5%" class="text-center">ACTION</th>
                             </tr>
                         </thead>
@@ -227,14 +227,13 @@
 
                 <div class="mb-4">
                     <button type="button" class="btn btn-link p-0 text-primary fw-semibold text-decoration-none shadow-none border-0 bg-transparent" id="add-item-btn">
-                        <i class="feather-plus me-1 fs-14"></i>Add Material Line
-                    </button>
+                        <i class="feather-plus me-1 fs-14"></i>{{ __('production.add_material_line') }}</button>
                 </div>
             </div>
 
             <!-- Footer Action Buttons -->
             <div class="d-flex justify-content-end gap-2 pt-3 border-top">
-                <a href="{{ route('production.subcontract.delivery-challans.index') }}" class="btn btn-sm btn-light border">Cancel</a>
+                <a href="{{ route('production.subcontract.delivery-challans.index') }}" class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
                 <button type="submit" name="status" value="draft" class="btn btn-sm btn-outline-secondary">
                     <i class="feather-save me-1"></i> Save Draft Gate Pass
                 </button>

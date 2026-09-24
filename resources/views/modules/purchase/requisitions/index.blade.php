@@ -18,9 +18,16 @@
 @endpush
 
 @section('page-actions')
-    <x-ui.button href="{{ route('purchase.requisitions.create') }}" variant="primary" icon="feather-plus">
-        {{ __('purchase.create_purchase_request') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="purchase_requisitions" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('purchase.requisitions.export') }}" />
+        <x-ui.button href="{{ route('purchase.requisitions.create') }}" variant="primary" icon="feather-plus">
+            {{ __('purchase.create_purchase_request') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')
@@ -212,7 +219,7 @@
                                 @elseif($req->source_type === 'material_request' && $req->sourceable)
                                     <a href="{{ route('sales.material-requests.show', $req->source_id) }}" class="text-primary fw-medium">{{ $req->sourceable->requisition_number }}</a>
                                 @elseif($req->source_type === 'material_requirement' && $req->sourceable)
-                                    <a href="{{ route('sales.material-requirements.show', $req->source_id) }}" class="text-primary fw-medium">{{ $req->sourceable->requirement_number }}</a>
+                                    <a href="{{ route('inventory.material-requirements.show', $req->source_id) }}" class="text-primary fw-medium">{{ $req->sourceable->requirement_number }}</a>
                                 @elseif($req->source_type === 'so' && $req->sourceable)
                                     <a href="{{ route('sales.orders.show', $req->source_id) }}" class="text-primary fw-medium">{{ $req->sourceable->sales_order_number }}</a>
                                 @elseif($req->source_type === 'requisition_slip')

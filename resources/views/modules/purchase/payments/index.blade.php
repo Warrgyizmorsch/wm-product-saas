@@ -29,9 +29,16 @@
 @endpush
 
 @section('page-actions')
-    <x-ui.button href="{{ route('purchase.payments.create') }}" variant="primary" icon="feather-plus">
-        {{ __('purchase.register_vendor_payment') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="vendor_payments" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('purchase.payments.export') }}" />
+        <x-ui.button href="{{ route('purchase.payments.create') }}" variant="primary" icon="feather-plus">
+            {{ __('purchase.register_vendor_payment') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')

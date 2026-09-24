@@ -9,6 +9,8 @@ use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Events\CustomerPaymentReceived;
 use App\Domains\Sales\Repositories\CustomerPaymentRepository;
 use App\Domains\CRM\Models\Customer;
+use App\Exports\CustomerPaymentExport;
+use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,6 +29,20 @@ class CustomerPaymentController extends Controller
         $payments = $this->paymentRepo->getPaginated($request->all(), 15);
 
         return view('modules.sales.payments.index', compact('payments'));
+    }
+
+    /**
+     * Export Customer Payment Receipts to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', CustomerPayment::class);
+        $tenantId = tenant_id() ?? auth()->user()->tenant_id ?? 1;
+
+        return Excel::download(
+            new CustomerPaymentExport($tenantId, $request->all()),
+            'customer_payments_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function create(Request $request): View
@@ -130,6 +146,14 @@ class CustomerPaymentController extends Controller
 
             return $payment;
         });
+
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.payment.received', [
+            'doc_no' => $payment->payment_number,
+            'customer_name' => $payment->customer?->name ?? 'Customer',
+            'amount' => number_format((float)$payment->amount, 2),
+            'payment_method' => $payment->payment_method ?? 'Bank/Cash',
+            'date' => $payment->payment_date ? (is_string($payment->payment_date) ? $payment->payment_date : $payment->payment_date->format('Y-m-d')) : now()->format('Y-m-d'),
+        ], route('sales.payments.show', $payment->id), $payment);
 
         return redirect()->route('sales.payments.show', $payment->id)->with('success', "Payment {$payment->payment_number} recorded successfully.");
     }

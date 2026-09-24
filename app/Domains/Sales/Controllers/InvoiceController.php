@@ -11,6 +11,9 @@ use App\Domains\Sales\Models\PaymentAllocation;
 use App\Domains\Sales\Events\InvoicePosted;
 use App\Domains\Sales\Repositories\InvoiceRepository;
 use App\Domains\Platform\Models\PaymentTerm;
+use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\InvoiceExport;
+use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,6 +32,20 @@ class InvoiceController extends Controller
         $invoices = $this->invoiceRepo->getPaginated($request->all(), 15);
 
         return view('modules.sales.invoices.index', compact('invoices'));
+    }
+
+    /**
+     * Export Invoices to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', Invoice::class);
+        $tenantId = tenant_id() ?? auth()->user()->tenant_id ?? 1;
+
+        return Excel::download(
+            new InvoiceExport($tenantId, $request->all()),
+            'invoices_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function create(Request $request): View
@@ -522,6 +539,14 @@ class InvoiceController extends Controller
 
         event(new InvoicePosted($invoice));
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.invoice.created', [
+            'doc_no' => $invoice->invoice_number,
+            'customer_name' => $invoice->customer?->name ?? 'Customer',
+            'amount' => number_format((float)$invoice->total_amount, 2),
+            'due_date' => $invoice->due_date ? (is_string($invoice->due_date) ? $invoice->due_date : $invoice->due_date->format('Y-m-d')) : 'N/A',
+            'created_by' => auth()->user()?->name ?? 'System',
+        ], route('sales.invoices.show', $invoice->id), $invoice);
+
         return redirect()->route('sales.invoices.show', $invoice->id)->with('success', "Invoice {$invoice->invoice_number} created successfully.");
     }
 
@@ -531,10 +556,20 @@ class InvoiceController extends Controller
         if (!$invoice) abort(404);
         $this->authorize('view', $invoice);
 
+        $invoice->loadMissing(['customer', 'salesOrder.customer', 'materialRequirement', 'items.product', 'allocations']);
+
         $adjustedAmount = $invoice->allocations->sum('allocated_amount');
         $balanceDue     = $invoice->balance_due;
 
-        return view('modules.sales.invoices.show', compact('invoice', 'adjustedAmount', 'balanceDue'));
+        $transporters = \App\Domains\Platform\Models\Transporter::where('tenant_id', require_tenant_id())
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
+
+        $count = \App\Domains\Platform\Models\Transporter::where('tenant_id', require_tenant_id())->count() + 1;
+        $autoTransporterCode = 'TRP-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+
+        return view('modules.sales.invoices.show', compact('invoice', 'adjustedAmount', 'balanceDue', 'transporters', 'autoTransporterCode'));
     }
 
 
@@ -588,5 +623,106 @@ class InvoiceController extends Controller
         $inv->save();
 
         return redirect()->route('sales.invoices.show', $inv->id)->with('success', "Invoice {$inv->invoice_number} marked as Paid.");
+    }
+
+    public function viewPdf(int $id)
+    {
+        $invoice = $this->invoiceRepo->find($id);
+        if (!$invoice) abort(404, 'Invoice not found.');
+        $this->authorize('view', $invoice);
+
+        $adjustedAmount = $invoice->allocations->sum('allocated_amount');
+        $balanceDue     = $invoice->balance_due;
+
+        $pdf = Pdf::loadView('modules.sales.invoices.pdf', compact('invoice', 'adjustedAmount', 'balanceDue'));
+        return $pdf->stream("Tax_Invoice_{$invoice->invoice_number}.pdf");
+    }
+
+    public function downloadPdf(int $id)
+    {
+        $invoice = $this->invoiceRepo->find($id);
+        if (!$invoice) abort(404, 'Invoice not found.');
+        $this->authorize('view', $invoice);
+
+        $adjustedAmount = $invoice->allocations->sum('allocated_amount');
+        $balanceDue     = $invoice->balance_due;
+
+        $pdf = Pdf::loadView('modules.sales.invoices.pdf', compact('invoice', 'adjustedAmount', 'balanceDue'));
+        return $pdf->download("Tax_Invoice_{$invoice->invoice_number}.pdf");
+    }
+
+    public function sendEmail(Request $request, int $id)
+    {
+        $invoice = $this->invoiceRepo->find($id);
+        if (!$invoice) abort(404, 'Invoice not found.');
+        $this->authorize('view', $invoice);
+
+        $request->validate([
+            'to_email'   => 'required|email',
+            'subject'    => 'required|string|max:255',
+            'body_html'  => 'required|string',
+            'account_id' => 'nullable|exists:email_configurations,id',
+            'custom_pdf' => 'nullable|file|mimes:pdf|max:10240',
+        ]);
+
+        try {
+            /** @var \App\Services\EmailService $emailService */
+            $emailService = app(\App\Services\EmailService::class);
+            $msgRecord = $emailService->sendInvoiceEmail($invoice, $request->all(), $request->file('custom_pdf'));
+
+            return response()->json([
+                'success' => true,
+                'message' => "Invoice {$invoice->invoice_number} sent successfully to {$request->input('to_email')} with PDF attached!",
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send Invoice Email: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function sendWhatsApp(Request $request, int $id)
+    {
+        $invoice = $this->invoiceRepo->find($id);
+        if (!$invoice) abort(404, 'Invoice not found.');
+        $this->authorize('view', $invoice);
+
+        $request->validate([
+            'phone'      => 'required|string',
+            'caption'    => 'nullable|string',
+            'custom_pdf' => 'nullable|file|mimes:pdf|max:10240',
+        ]);
+
+        $phone = $request->input('phone');
+
+        try {
+            /** @var \App\Services\WhatsAppService $waService */
+            $waService = app(\App\Services\WhatsAppService::class);
+            $result = $waService->sendInvoice(
+                invoice: $invoice,
+                mobile: $phone,
+                customCaption: $request->input('caption'),
+                customPdfFile: $request->file('custom_pdf')
+            );
+
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $result['message'],
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Failed to send WhatsApp message.',
+                    'status'  => $result['status'] ?? 'error',
+                ], 422);
+            }
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send WhatsApp: ' . $e->getMessage(),
+            ], 422);
+        }
     }
 }

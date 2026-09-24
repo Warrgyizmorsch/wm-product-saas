@@ -77,6 +77,149 @@
             font-size: 13px;
             min-width: 120px;
         }
+
+        /* Modern ERP Media Uploader Styles */
+        .erp-media-box {
+            background: #ffffff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .erp-media-dropzone {
+            border: 1.5px dashed #cbd5e1;
+            background: #f8fafc;
+            border-radius: 8px;
+            transition: all 0.2s ease-in-out;
+        }
+        .erp-media-dropzone:hover {
+            border-color: #3b82f6;
+            background: #f1f5f9;
+        }
+        .variant-thumb-box {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .variant-thumb-box:hover {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25) !important;
+            transform: scale(1.05);
+        }
+        .main-img-preview-box {
+            width: 150px;
+            height: 150px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            margin: 0 auto 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .main-img-preview-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .main-img-hover-actions {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .main-img-preview-box:hover .main-img-hover-actions {
+            opacity: 1;
+        }
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+            gap: 12px;
+        }
+        .gallery-card-item {
+            position: relative;
+            border-radius: 8px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            overflow: hidden;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            aspect-ratio: 1 / 1;
+        }
+        .gallery-card-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-color: #cbd5e1;
+        }
+        .gallery-card-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .gallery-remove-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 24px;
+            height: 24px;
+            background: #ef4444;
+            color: #ffffff;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+            transition: background 0.15s ease, transform 0.15s ease;
+            z-index: 5;
+        }
+        .gallery-remove-btn:hover {
+            background: #dc2626;
+            transform: scale(1.12);
+            color: #ffffff;
+        }
+        .gallery-card-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(15, 23, 42, 0.8));
+            color: #ffffff;
+            font-size: 10px;
+            padding: 14px 6px 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .gallery-add-more-box {
+            border: 1.5px dashed #3b82f6;
+            background: rgba(59, 130, 246, 0.04);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            aspect-ratio: 1 / 1;
+            color: #3b82f6;
+        }
+        .gallery-add-more-box:hover {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: #2563eb;
+            transform: translateY(-2px);
+        }
     </style>
 @endpush
 
@@ -92,7 +235,7 @@
 
             <!-- Zoho / Odoo Style Flat Form Sheet -->
             <div class="card border-0 shadow-sm p-4 p-md-5 bg-white">
-                <form action="{{ route('inventory.products.store') }}" method="POST" id="productForm" class="odoo-sheet">
+                <form action="{{ route('inventory.products.store') }}" method="POST" id="productForm" class="odoo-sheet" enctype="multipart/form-data">
                     @csrf
 
                     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
@@ -181,8 +324,8 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" :value="old('selling_price')" inputType="number" step="0.01" :placeholder="__('inventory.selling_price')" :errorText="$errors->first('selling_price')" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" required="true" :errorText="$errors->first('sales_account')">
-                                <option value="" disabled {{ old('sales_account') ? '' : 'selected' }}>{{ __('inventory.select_sales_account') }}</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" :errorText="$errors->first('sales_account')">
+                                <option value="" {{ old('sales_account') ? '' : 'selected' }}>{{ __('inventory.select_sales_account') }}</option>
                                 @forelse($salesAccounts as $acc)
                                     <option value="{{ $acc->name }}" {{ old('sales_account') === $acc->name ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
                                 @empty
@@ -194,8 +337,8 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" :value="old('cost_price')" inputType="number" step="0.01" :placeholder="__('inventory.purchase_cost')" :errorText="$errors->first('cost_price')" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" required="true" :errorText="$errors->first('purchase_account')">
-                                <option value="" disabled {{ old('purchase_account') ? '' : 'selected' }}>{{ __('inventory.select_purchase_account') }}</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" :errorText="$errors->first('purchase_account')">
+                                <option value="" {{ old('purchase_account') ? '' : 'selected' }}>{{ __('inventory.select_purchase_account') }}</option>
                                 @forelse($purchaseAccounts as $acc)
                                     <option value="{{ $acc->name }}" {{ old('purchase_account') === $acc->name ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
                                 @empty
@@ -257,18 +400,22 @@
                         </div>
                     </div>
 
-                    <!-- Inventory tracking section (Only relevant for Goods & Single variation) -->
-                    <div id="inventorySection" class="border-top pt-4 mt-4 single-item-only">
+                    <!-- Inventory tracking section (Relevant for Goods: Single and Variant) -->
+                    <div id="inventorySection" class="border-top pt-4 mt-4 physical-goods-only">
                         <h6 class="fw-bold text-primary mb-3"><i class="feather-box me-2"></i>{{ __('inventory.inventory_tracking_settings') }}</h6>
                         
                         <div class="row g-4 fs-13 text-dark">
                             <div class="col-lg-6 border-end">
-                                <x-ui.odoo-form-ui type="select" :label="__('inventory.inventory_account')" name="inventory_account" required="true" :errorText="$errors->first('inventory_account')">
-                                    <option value="" disabled {{ old('inventory_account') ? '' : 'selected' }}>{{ __('inventory.select_inventory_account') }}</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('inventory.inventory_account')" name="inventory_account" :errorText="$errors->first('inventory_account')">
                                     @forelse($inventoryAccounts as $acc)
-                                        <option value="{{ $acc->name }}" {{ old('inventory_account') === $acc->name ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
+                                        @php
+                                            $isDefault = old('inventory_account') 
+                                                ? (old('inventory_account') === $acc->name) 
+                                                : ($acc->code == '1200' || strtolower($acc->name) === 'inventory'  || $loop->first);
+                                        @endphp
+                                        <option value="{{ $acc->name }}" {{ $isDefault ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
                                     @empty
-                                        <option value="Inventory Asset" {{ old('inventory_account') === 'Inventory Asset' ? 'selected' : '' }}>{{ __('inventory.inventory_asset_account') }}</option>
+                                        <option value="Inventory Asset" {{ old('inventory_account', 'Inventory Asset') === 'Inventory Asset' ? 'selected' : '' }}>1200 - {{ __('inventory.inventory_asset_account') }}</option>
                                         <option value="Raw Materials Stock" {{ old('inventory_account') === 'Raw Materials Stock' ? 'selected' : '' }}>{{ __('inventory.raw_materials_stock') }}</option>
                                         <option value="Finished Goods Stock" {{ old('inventory_account') === 'Finished Goods Stock' ? 'selected' : '' }}>{{ __('inventory.finished_goods_stock') }}</option>
                                     @endforelse
@@ -339,9 +486,9 @@
                     <div id="variantsSection" class="border-top pt-4 mt-4" style="display: none;">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h6 class="fw-bold text-primary mb-0"><i class="feather-git-branch me-2"></i>{{ __('inventory.attributes_options_builder') }}</h6>
-                            <button type="button" class="btn btn-sm btn-soft-primary" id="addAttributeBtn">
-                                <i class="feather-plus me-1"></i>{{ __('inventory.add_attribute') }}
-                            </button>
+                            <x-ui.button type="button" variant="soft-primary" size="sm" id="addAttributeBtn" icon="feather-plus">
+                                {{ __('inventory.add_attribute') }}
+                            </x-ui.button>
                         </div>
 
                         <!-- Attributes List -->
@@ -388,6 +535,7 @@
                             <x-ui.table :title="__('inventory.configure_variants')" bordered="true" class="variants-table-container">
                                 <thead class="table-light fw-bold text-uppercase text-muted">
                                     <tr>
+                                        <th style="width: 170px;" class="text-center">{{ __('inventory.image_media') }}</th>
                                         <th>{{ __('inventory.variant_details') }}</th>
                                         <th>{{ __('inventory.sku') }} *</th>
                                         <th>{{ __('inventory.selling_price') }}</th>
@@ -400,6 +548,94 @@
                                     <!-- Computed Variant Rows will be injected here by Javascript -->
                                 </tbody>
                             </x-ui.table>
+                        </div>
+                    </div>
+
+                    <!-- Media & Product Images Section -->
+                    <div class="border-top pt-4 mt-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h6 class="fw-bold text-primary mb-0 d-flex align-items-center gap-2">
+                                    <i class="feather-image"></i>
+                                    <span>{{ __('inventory.product_media_gallery') }}</span>
+                                </h6>
+                                <p class="fs-12 text-muted mb-0 mt-0.5">{{ __('inventory.product_media_desc') }}</p>
+                            </div>
+                            <x-ui.badge variant="primary" :soft="true">
+                                <i class="feather-info me-1"></i>JPG, PNG, WebP (Max 5MB)
+                            </x-ui.badge>
+                        </div>
+                        
+                        <div class="row g-4">
+                            <!-- 1. Main Display Thumbnail -->
+                            <div class="col-lg-4 border-end">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="fw-bold text-dark fs-12 mb-0">{{ __('inventory.main_showcase_image') }}</label>
+                                    <x-ui.badge variant="primary" :soft="true">{{ __('inventory.catalog_pos') }}</x-ui.badge>
+                                </div>
+                                
+                                <div class="erp-media-dropzone p-3 text-center position-relative">
+                                    <div class="main-img-preview-box">
+                                        <img id="mainImagePreview" src="{{ asset('assets/images/icons/default-product.svg') }}" alt="{{ __('inventory.main_image') }}" class="d-none">
+                                        
+                                        <div id="mainImagePlaceholder" class="text-center p-3">
+                                            <div class="avatar avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center">
+                                                <i class="feather-camera fs-18"></i>
+                                            </div>
+                                            <span class="fs-12 fw-semibold text-dark d-block">{{ __('inventory.upload_main_image') }}</span>
+                                            <span class="fs-11 text-muted d-block">{{ __('inventory.recommended_size_800') }}</span>
+                                        </div>
+
+                                        <div id="mainImageHoverActions" class="main-img-hover-actions">
+                                            <label class="btn btn-xs btn-light shadow-sm cursor-pointer mb-0" title="{{ __('inventory.change_image') }}">
+                                                <i class="feather-edit-2 me-1"></i>{{ __('inventory.change_image') }}
+                                                <input type="file" name="main_image" id="mainImageInput" accept="image/jpeg,image/png,image/webp" class="d-none" onchange="previewMainImage(this)">
+                                            </label>
+                                            <button type="button" class="btn btn-xs btn-danger shadow-sm" onclick="clearMainImage()" title="{{ __('inventory.remove_image') }}">
+                                                <i class="feather-trash-2"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div id="mainImageDefaultActions">
+                                        <label class="btn btn-sm btn-outline-primary cursor-pointer mb-0">
+                                            <i class="feather-upload me-1"></i>{{ __('inventory.browse_image') }}
+                                            <input type="file" name="main_image" id="mainImageTriggerInput" accept="image/jpeg,image/png,image/webp" class="d-none" onchange="syncMainImageInput(this)">
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 2. Detail Gallery Images -->
+                            <div class="col-lg-8">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <label class="fw-bold text-dark fs-12 mb-0">{{ __('inventory.detail_gallery_images') }}</label>
+                                        <x-ui.badge variant="info" :soft="true" id="detailCountBadge">{{ __('inventory.images_count_label', ['count' => 0]) }}</x-ui.badge>
+                                    </div>
+                                    <label class="btn btn-sm btn-outline-primary cursor-pointer mb-0">
+                                        <i class="feather-plus me-1"></i>{{ __('inventory.add_detail_images') }}
+                                        <input type="file" name="detail_images[]" id="detailImagesInput" accept="image/jpeg,image/png,image/webp" multiple class="d-none" onchange="previewDetailImages(this)">
+                                    </label>
+                                </div>
+                                
+                                <div id="detailImagesContainer" class="erp-media-dropzone p-3" style="min-height: 190px;">
+                                    <div id="detailImagesEmpty" class="text-center py-4">
+                                        <div class="avatar avatar-lg bg-soft-info text-info rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center">
+                                            <i class="feather-images fs-22"></i>
+                                        </div>
+                                        <h6 class="fs-13 fw-bold text-dark mb-1">{{ __('inventory.no_gallery_images_added') }}</h6>
+                                        <p class="fs-12 text-muted mb-2">{{ __('inventory.detail_images_help') }}</p>
+                                        <label class="btn btn-sm btn-soft-primary cursor-pointer mb-0">
+                                            <i class="feather-upload me-1"></i>{{ __('inventory.choose_photos') }}
+                                            <input type="file" accept="image/jpeg,image/png,image/webp" multiple class="d-none" onchange="previewDetailImages(this)">
+                                        </label>
+                                    </div>
+                                    <div id="detailImagesGrid" class="gallery-grid d-none">
+                                        <!-- Dynamic preview cards with individual remove button injected here -->
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -424,6 +660,8 @@
     <!-- Select2 JS -->
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script>
+        window.variantMediaStore = window.variantMediaStore || {};
+
         $(document).ready(function() {
             let attributeIndex = 1;
 
@@ -517,14 +755,13 @@
                     $('select[name="type"]').closest('.odoo-form-group').show();
                     $('.variant-stock-col').show();
 
+                    $('#inventorySection').show();
+                    $('select[name="inventory_account"]').prop('required', false);
+
                     if (variationType === 'Single') {
-                        $('#inventorySection').show();
                         $('#warehouseStocksSection').show();
-                        $('select[name="inventory_account"]').prop('required', true);
                     } else {
-                        $('#inventorySection').hide();
                         $('#warehouseStocksSection').hide();
-                        $('select[name="inventory_account"]').prop('required', false);
                     }
                 }
 
@@ -639,6 +876,33 @@
                 generateMatrix();
             });
 
+            // ── Auto-propagate Selling Price & Cost Price to Matrix Rows ───────
+            $(document).on('input', 'input[name="selling_price"]', function() {
+                const val = $(this).val();
+                $('#variantsMatrixBody tr').each(function() {
+                    const $sellingInput = $(this).find('input.variant-selling-price');
+                    if ($sellingInput.length && (!$sellingInput.val() || $sellingInput.attr('data-auto-filled') === 'true')) {
+                        $sellingInput.val(val);
+                        $sellingInput.attr('data-auto-filled', 'true');
+                    }
+                });
+            });
+
+            $(document).on('input', 'input[name="cost_price"]', function() {
+                const val = $(this).val();
+                $('#variantsMatrixBody tr').each(function() {
+                    const $costInput = $(this).find('input.variant-cost-price');
+                    if ($costInput.length && (!$costInput.val() || $costInput.attr('data-auto-filled') === 'true')) {
+                        $costInput.val(val);
+                        $costInput.attr('data-auto-filled', 'true');
+                    }
+                });
+            });
+
+            $(document).on('input', '#variantsMatrixBody input.variant-selling-price, #variantsMatrixBody input.variant-cost-price', function() {
+                $(this).attr('data-auto-filled', 'false');
+            });
+
             // ── Dynamic Combination Matrix (Cartesian Product) ─────────────────
             function generateMatrix() {
                 const attributes = [];
@@ -684,21 +948,43 @@
                     const comboString = comboTextParts.join(', ');
                     const autoSku = combo.join('-').toUpperCase().replace(/\s+/g, '');
 
+                    const store = window.variantMediaStore && window.variantMediaStore[index] ? window.variantMediaStore[index] : null;
+                    const mainImgUrl = store && store.mainPreviewUrl ? store.mainPreviewUrl : '';
+                    const photoCount = store ? ((store.mainFile ? 1 : 0) + (store.detailDT ? store.detailDT.files.length : 0)) : 0;
+
                     const rowHtml = `
-                        <tr>
+                        <tr id="variant_row_${index}">
+                            <td class="text-center align-middle" style="width: 170px;">
+                                <div class="d-inline-flex align-items-center justify-content-center gap-2 py-1">
+                                    <div class="variant-thumb-box position-relative rounded-2 border bg-light d-flex align-items-center justify-content-center shadow-2xs" 
+                                         style="width: 40px; height: 40px; overflow: hidden; border-color: #e2e8f0; flex-shrink: 0;"
+                                         onclick="openVariantMediaModal(${index})"
+                                         title="Click to manage Main & Gallery photos for this variant">
+                                        <img id="v_row_thumb_${index}" src="${mainImgUrl || ''}" class="w-100 h-100 object-fit-cover ${mainImgUrl ? '' : 'd-none'}" alt="Variant">
+                                        <i id="v_row_icon_${index}" class="feather-camera text-muted fs-15 ${mainImgUrl ? 'd-none' : ''}"></i>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-soft-primary d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-2 shadow-none border-0 text-nowrap" onclick="openVariantMediaModal(${index})" title="Manage Photos for this variant">
+                                        <i class="feather-image fs-12"></i>
+                                        <span class="fs-11 fw-semibold">Photos</span>
+                                        <span class="badge bg-primary text-white rounded-pill px-1.5 py-0.5 fs-10" id="v_row_count_${index}">${photoCount}</span>
+                                    </button>
+                                    <input type="file" name="variants[${index}][main_image]" id="v_input_main_${index}" accept="image/jpeg,image/png,image/webp" class="d-none">
+                                    <input type="file" name="variants[${index}][detail_images][]" id="v_input_detail_${index}" accept="image/jpeg,image/png,image/webp" multiple class="d-none">
+                                </div>
+                            </td>
                             <td class="fw-semibold text-dark">
                                 <span class="badge bg-soft-primary text-primary me-2">Variant #${index + 1}</span>
-                                <span>${parentName} (${comboString})</span>
+                                <span class="variant-name-label">${parentName} (${comboString})</span>
                                 <input type="hidden" name="variants[${index}][attributes]" value="${comboString}">
                             </td>
                             <td>
                                 <input type="text" name="variants[${index}][sku]" value="${autoSku}" class="form-control form-control-sm py-1 fw-semibold" required style="border-radius: 0; min-width: 140px;">
                             </td>
                             <td>
-                                <input type="number" step="0.01" name="variants[${index}][selling_price]" value="${defaultSellingPrice}" class="form-control form-control-sm py-1" style="border-radius: 0; min-width: 100px;">
+                                <input type="number" step="0.01" name="variants[${index}][selling_price]" value="${defaultSellingPrice}" class="form-control form-control-sm py-1 variant-selling-price" style="border-radius: 0; min-width: 100px;" data-auto-filled="${defaultSellingPrice ? 'true' : 'false'}">
                             </td>
                             <td>
-                                <input type="number" step="0.01" name="variants[${index}][cost_price]" value="${defaultCostPrice}" class="form-control form-control-sm py-1" style="border-radius: 0; min-width: 100px;">
+                                <input type="number" step="0.01" name="variants[${index}][cost_price]" value="${defaultCostPrice}" class="form-control form-control-sm py-1 variant-cost-price" style="border-radius: 0; min-width: 100px;" data-auto-filled="${defaultCostPrice ? 'true' : 'false'}">
                             </td>
                             <td class="variant-stock-col">
                                 <input type="number" step="0.01" name="variants[${index}][opening_stock]" value="0" class="form-control form-control-sm py-1" style="border-radius: 0; min-width: 80px;">
@@ -842,37 +1128,469 @@
                     }
                 });
             });
+
+            // ── Product Media & Detail Gallery Handlers ────────────────────────
+            window.syncMainImageInput = function(triggerInput) {
+                if (triggerInput.files && triggerInput.files[0]) {
+                    const mainInput = document.getElementById('mainImageInput');
+                    const dt = new DataTransfer();
+                    dt.items.add(triggerInput.files[0]);
+                    mainInput.files = dt.files;
+                    window.previewMainImage(mainInput);
+                }
+            };
+
+            window.previewMainImage = function(input) {
+                if (input.files && input.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        $('#mainImagePreview').attr('src', e.target.result).removeClass('d-none');
+                        $('#mainImagePlaceholder').addClass('d-none');
+                        $('#mainImageHoverActions').css('display', 'flex');
+                        $('#mainImageDefaultActions').addClass('d-none');
+                    };
+                    reader.readAsDataURL(input.files[0]);
+                }
+            };
+
+            window.clearMainImage = function() {
+                $('#mainImageInput').val('');
+                $('#mainImageTriggerInput').val('');
+                $('#mainImagePreview').attr('src', '').addClass('d-none');
+                $('#mainImagePlaceholder').removeClass('d-none');
+                $('#mainImageHoverActions').removeAttr('style');
+                $('#mainImageDefaultActions').removeClass('d-none');
+            };
+
+            // Detail Gallery DataTransfer & Dynamic Previews
+            window.detailFilesDT = new DataTransfer();
+
+            window.previewDetailImages = function(input) {
+                if (!input.files || input.files.length === 0) return;
+
+                // Add newly selected files to existing DataTransfer
+                Array.from(input.files).forEach(file => {
+                    window.detailFilesDT.items.add(file);
+                });
+
+                // Keep real input element in sync
+                const mainDetailInput = document.getElementById('detailImagesInput');
+                if (mainDetailInput) {
+                    mainDetailInput.files = window.detailFilesDT.files;
+                }
+
+                window.renderDetailPreviews();
+            };
+
+            window.removeDetailImage = function(indexToRemove) {
+                const newDT = new DataTransfer();
+                Array.from(window.detailFilesDT.files).forEach((file, idx) => {
+                    if (idx !== indexToRemove) {
+                        newDT.items.add(file);
+                    }
+                });
+                window.detailFilesDT = newDT;
+
+                const mainDetailInput = document.getElementById('detailImagesInput');
+                if (mainDetailInput) {
+                    mainDetailInput.files = window.detailFilesDT.files;
+                }
+
+                window.renderDetailPreviews();
+            };
+
+            window.renderDetailPreviews = function() {
+                const grid = $('#detailImagesGrid');
+                const empty = $('#detailImagesEmpty');
+                const badge = $('#detailCountBadge');
+                const files = Array.from(window.detailFilesDT.files);
+
+                grid.empty();
+
+                if (files.length === 0) {
+                    empty.removeClass('d-none');
+                    grid.addClass('d-none');
+                    badge.text('0 images');
+                    return;
+                }
+
+                empty.addClass('d-none');
+                grid.removeClass('d-none');
+                badge.text(`${files.length} image${files.length > 1 ? 's' : ''}`);
+
+                files.forEach((file, idx) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const cardHtml = `
+                            <div class="gallery-card-item" id="detail_img_${idx}">
+                                <img src="${e.target.result}" alt="${file.name}">
+                                <button type="button" class="gallery-remove-btn" onclick="removeDetailImage(${idx})" title="Remove ${file.name}">
+                                    <i class="feather-x"></i>
+                                </button>
+                                <div class="gallery-card-info" title="${file.name}">
+                                    ${file.name}
+                                </div>
+                            </div>
+                        `;
+                        grid.append(cardHtml);
+                    };
+                    reader.readAsDataURL(file);
+                });
+
+                // Append + Add More button card
+                const addMoreHtml = `
+                    <label class="gallery-add-more-box mb-0" title="Add more detail images">
+                        <i class="feather-plus fs-20 mb-1"></i>
+                        <span class="fs-11 fw-semibold">Add More</span>
+                        <input type="file" accept="image/jpeg,image/png,image/webp" multiple class="d-none" onchange="previewDetailImages(this)">
+                    </label>
+                `;
+                grid.append(addMoreHtml);
+            };
+
+            // ── Variant Media Manager ──────────────────────────────────────────
+            window.variantMediaStore = {};
+            let currentVModalIndex = null;
+
+            function getOrCreateVMediaStore(index) {
+                if (!window.variantMediaStore[index]) {
+                    window.variantMediaStore[index] = {
+                        mainFile: null,
+                        mainPreviewUrl: null,
+                        detailDT: new DataTransfer()
+                    };
+                }
+                return window.variantMediaStore[index];
+            }
+
+            window.openVariantMediaModal = function(index) {
+                currentVModalIndex = index;
+                const store = getOrCreateVMediaStore(index);
+
+                // Set variant title badge
+                const row = $(`#variant_row_${index}`);
+                const titleText = row.find('.variant-name-label').text().trim() || `Variant #${index + 1}`;
+                $('#vModalVariantTitle').text(titleText);
+
+                // Render main image state
+                renderVModalMainImage(store);
+
+                // Render detail gallery state
+                renderVModalDetailImages(store);
+
+                const modalEl = document.getElementById('variantMediaModal');
+                if (modalEl) {
+                    const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    bsModal.show();
+                }
+            };
+
+            function renderVModalMainImage(store) {
+                const previewImg = $('#vModalMainPreview');
+                const placeholder = $('#vModalMainPlaceholder');
+                const hoverActions = $('#vModalMainHoverActions');
+                const defaultActions = $('#vModalMainDefaultActions');
+
+                if (store.mainPreviewUrl) {
+                    previewImg.attr('src', store.mainPreviewUrl).removeClass('d-none');
+                    placeholder.addClass('d-none');
+                    hoverActions.css('display', 'flex');
+                    defaultActions.addClass('d-none');
+                } else {
+                    previewImg.attr('src', '').addClass('d-none');
+                    placeholder.removeClass('d-none');
+                    hoverActions.removeAttr('style');
+                    defaultActions.removeClass('d-none');
+                }
+            }
+
+            window.vModalOnMainImageChange = function(input) {
+                if (!input.files || !input.files[0] || currentVModalIndex === null) return;
+                const file = input.files[0];
+                const store = getOrCreateVMediaStore(currentVModalIndex);
+                store.mainFile = file;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    store.mainPreviewUrl = e.target.result;
+                    renderVModalMainImage(store);
+
+                    // Update row thumbnail in matrix table
+                    $(`#v_row_thumb_${currentVModalIndex}`).attr('src', e.target.result).removeClass('d-none');
+                    $(`#v_row_icon_${currentVModalIndex}`).addClass('d-none');
+
+                    // Sync hidden file input in row
+                    const mainInput = document.getElementById(`v_input_main_${currentVModalIndex}`);
+                    if (mainInput) {
+                        const dt = new DataTransfer();
+                        dt.items.add(file);
+                        mainInput.files = dt.files;
+                    }
+
+                    updateVRowPhotoCount(currentVModalIndex);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            window.vModalClearMainImage = function() {
+                if (currentVModalIndex === null) return;
+                const store = getOrCreateVMediaStore(currentVModalIndex);
+                store.mainFile = null;
+                store.mainPreviewUrl = null;
+                renderVModalMainImage(store);
+
+                // Update row thumbnail in matrix table
+                $(`#v_row_thumb_${currentVModalIndex}`).attr('src', '').addClass('d-none');
+                $(`#v_row_icon_${currentVModalIndex}`).removeClass('d-none');
+
+                // Sync hidden file input in row
+                const mainInput = document.getElementById(`v_input_main_${currentVModalIndex}`);
+                if (mainInput) {
+                    mainInput.value = '';
+                }
+
+                updateVRowPhotoCount(currentVModalIndex);
+            };
+
+            function renderVModalDetailImages(store) {
+                const grid = $('#vModalDetailGrid');
+                const empty = $('#vModalDetailEmpty');
+                const badge = $('#vModalDetailCountBadge');
+                const files = Array.from(store.detailDT.files);
+
+                grid.empty();
+
+                if (files.length === 0) {
+                    empty.removeClass('d-none');
+                    grid.addClass('d-none');
+                    badge.text('0 images');
+                    return;
+                }
+
+                empty.addClass('d-none');
+                grid.removeClass('d-none');
+                badge.text(`${files.length} image${files.length > 1 ? 's' : ''}`);
+
+                files.forEach((file, idx) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const cardHtml = `
+                            <div class="gallery-card-item">
+                                <img src="${e.target.result}" alt="${file.name}">
+                                <button type="button" class="gallery-remove-btn" onclick="vModalRemoveDetailImage(${idx})" title="Remove ${file.name}">
+                                    <i class="feather-x"></i>
+                                </button>
+                                <div class="gallery-card-info" title="${file.name}">
+                                    ${file.name}
+                                </div>
+                            </div>
+                        `;
+                        grid.append(cardHtml);
+                    };
+                    reader.readAsDataURL(file);
+                });
+
+                // Append + Add More button card
+                const addMoreHtml = `
+                    <label class="gallery-add-more-box mb-0" title="Add more detail images">
+                        <i class="feather-plus fs-18 mb-1"></i>
+                        <span class="fs-10 fw-semibold">Add More</span>
+                        <input type="file" accept="image/jpeg,image/png,image/webp" multiple class="d-none" onchange="vModalOnDetailImagesChange(this)">
+                    </label>
+                `;
+                grid.append(addMoreHtml);
+            }
+
+            window.vModalOnDetailImagesChange = function(input) {
+                if (!input.files || input.files.length === 0 || currentVModalIndex === null) return;
+                const store = getOrCreateVMediaStore(currentVModalIndex);
+
+                Array.from(input.files).forEach(file => {
+                    store.detailDT.items.add(file);
+                });
+
+                // Sync hidden detail input in row
+                const detailInput = document.getElementById(`v_input_detail_${currentVModalIndex}`);
+                if (detailInput) {
+                    detailInput.files = store.detailDT.files;
+                }
+
+                renderVModalDetailImages(store);
+                updateVRowPhotoCount(currentVModalIndex);
+            };
+
+            window.vModalRemoveDetailImage = function(indexToRemove) {
+                if (currentVModalIndex === null) return;
+                const store = getOrCreateVMediaStore(currentVModalIndex);
+
+                const newDT = new DataTransfer();
+                Array.from(store.detailDT.files).forEach((file, idx) => {
+                    if (idx !== indexToRemove) {
+                        newDT.items.add(file);
+                    }
+                });
+                store.detailDT = newDT;
+
+                // Sync hidden detail input in row
+                const detailInput = document.getElementById(`v_input_detail_${currentVModalIndex}`);
+                if (detailInput) {
+                    detailInput.files = store.detailDT.files;
+                }
+
+                renderVModalDetailImages(store);
+                updateVRowPhotoCount(currentVModalIndex);
+            };
+
+            function updateVRowPhotoCount(index) {
+                const store = window.variantMediaStore[index];
+                const count = store ? ((store.mainFile ? 1 : 0) + (store.detailDT ? store.detailDT.files.length : 0)) : 0;
+                $(`#v_row_count_${index}`).text(count);
+            }
+
+            // Sync all variant files before form submit
+            $('#productForm').on('submit', function() {
+                if (window.variantMediaStore) {
+                    Object.keys(window.variantMediaStore).forEach(idx => {
+                        const store = window.variantMediaStore[idx];
+                        if (store) {
+                            if (store.mainFile) {
+                                const mainIn = document.getElementById(`v_input_main_${idx}`);
+                                if (mainIn) {
+                                    const dt = new DataTransfer();
+                                    dt.items.add(store.mainFile);
+                                    mainIn.files = dt.files;
+                                }
+                            }
+                            if (store.detailDT && store.detailDT.files.length > 0) {
+                                const detailIn = document.getElementById(`v_input_detail_${idx}`);
+                                if (detailIn) {
+                                    detailIn.files = store.detailDT.files;
+                                }
+                            }
+                        }
+                    });
+                }
+            });
         });
     </script>
 
+    <!-- Variant Media Modal (Dedicated Multi-Angle & Main Image Uploader per Variant) -->
+    <!-- Variant Media Modal (Dedicated Multi-Angle & Main Image Uploader per Variant) -->
+    <x-ui.modal id="variantMediaModal" :title="'<i class=\'feather-image text-primary me-2\'></i>' . __('inventory.variant_photos_gallery')" centered="true" size="lg" :showFooter="false">
+        <div class="p-1">
+            <div class="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom">
+                <div>
+                    <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                        <span>{{ __('inventory.variation') }}:</span>
+                        <span id="vModalVariantTitle" class="badge bg-soft-primary text-primary fs-12"></span>
+                    </h6>
+                    <span class="fs-11 text-muted">{{ __('inventory.variant_media_desc') }}</span>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <!-- 1. Variant Main Image -->
+                <div class="col-md-5 border-end">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="fw-bold text-dark fs-12 mb-0">{{ __('inventory.variant_main_image') }}</label>
+                        <x-ui.badge variant="primary" :soft="true">{{ __('inventory.showcase') }}</x-ui.badge>
+                    </div>
+                    
+                    <div class="erp-media-dropzone p-3 text-center position-relative">
+                        <div class="main-img-preview-box" style="width: 130px; height: 130px;">
+                            <img id="vModalMainPreview" src="" alt="{{ __('inventory.variant_main_image') }}" class="d-none">
+                            
+                            <div id="vModalMainPlaceholder" class="text-center p-2">
+                                <div class="avatar avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-1 d-flex align-items-center justify-content-center">
+                                    <i class="feather-camera fs-16"></i>
+                                </div>
+                                <span class="fs-11 fw-semibold text-dark d-block">{{ __('inventory.main_thumbnail') }}</span>
+                                <span class="fs-10 text-muted d-block">800×800 px</span>
+                            </div>
+
+                            <div id="vModalMainHoverActions" class="main-img-hover-actions">
+                                <label class="btn btn-xs btn-light shadow-sm cursor-pointer mb-0" title="{{ __('inventory.change_image') }}">
+                                    <i class="feather-edit-2 me-1"></i>{{ __('inventory.change_image') }}
+                                    <input type="file" accept="image/jpeg,image/png,image/webp" class="d-none" onchange="vModalOnMainImageChange(this)">
+                                </label>
+                                <button type="button" class="btn btn-xs btn-danger shadow-sm" onclick="vModalClearMainImage()" title="{{ __('inventory.remove_image') }}">
+                                    <i class="feather-trash-2"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="vModalMainDefaultActions">
+                            <label class="btn btn-xs btn-outline-primary cursor-pointer mb-0">
+                                <i class="feather-upload me-1"></i>{{ __('inventory.browse_main') }}
+                                <input type="file" accept="image/jpeg,image/png,image/webp" class="d-none" onchange="vModalOnMainImageChange(this)">
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Variant Detail Gallery Images -->
+                <div class="col-md-7">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="fw-bold text-dark fs-12 mb-0">{{ __('inventory.variant_detail_gallery') }}</label>
+                            <x-ui.badge variant="info" :soft="true" id="vModalDetailCountBadge">{{ __('inventory.images_count_label', ['count' => 0]) }}</x-ui.badge>
+                        </div>
+                        <label class="btn btn-xs btn-outline-primary cursor-pointer mb-0">
+                            <i class="feather-plus me-1"></i>{{ __('inventory.add_detail_images') }}
+                            <input type="file" accept="image/jpeg,image/png,image/webp" multiple class="d-none" onchange="vModalOnDetailImagesChange(this)">
+                        </label>
+                    </div>
+                    
+                    <div id="vModalDetailContainer" class="erp-media-dropzone p-2.5" style="min-height: 160px;">
+                        <div id="vModalDetailEmpty" class="text-center py-3">
+                            <i class="feather-images fs-22 text-muted d-block mb-1"></i>
+                            <p class="fs-11 text-muted mb-1">{{ __('inventory.variant_detail_empty_desc') }}</p>
+                            <label class="btn btn-xs btn-soft-primary cursor-pointer mb-0">
+                                <i class="feather-upload me-1"></i>{{ __('inventory.choose_photos') }}
+                                <input type="file" accept="image/jpeg,image/png,image/webp" multiple class="d-none" onchange="vModalOnDetailImagesChange(this)">
+                            </label>
+                        </div>
+                        <div id="vModalDetailGrid" class="gallery-grid d-none"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                <button type="button" class="btn btn-sm btn-primary" data-bs-dismiss="modal">
+                    <i class="feather-check me-1"></i>{{ __('inventory.done_apply') }}
+                </button>
+            </div>
+        </div>
+    </x-ui.modal>
+
     <!-- Quick Add Unit Modal (Common Component Modal) -->
-    <x-ui.modal id="quickAddUnitModal" title="<i class='feather-package text-primary me-2'></i>Add New Unit of Measure" centered="true" :showFooter="false">
+    <x-ui.modal id="quickAddUnitModal" :title="'<i class=\'feather-package text-primary me-2\'></i>' . __('inventory.add_new_uom')" centered="true" :showFooter="false">
         <form id="quickAddUnitForm" method="POST" action="{{ route('uoms.quick-create') }}" novalidate>
             @csrf
             <x-ui.modal-form-ui 
                 type="input" 
-                label="Unit Name" 
+                :label="__('inventory.unit_name')" 
                 name="name" 
                 id="quick_uom_name" 
                 required="true" 
-                placeholder="e.g. Kilogram, Box, Meter, Pair" 
+                :placeholder="__('inventory.unit_name_placeholder')" 
             />
 
             <x-ui.modal-form-ui 
                 type="input" 
-                label="Unit Code / Symbol" 
+                :label="__('inventory.unit_code_symbol')" 
                 name="code" 
                 id="quick_uom_code" 
                 required="true" 
-                placeholder="e.g. KG, BOX, MTR, PR" 
+                :placeholder="__('inventory.unit_code_placeholder')" 
             />
 
             <div id="quickUnitAlert" class="alert alert-danger d-none fs-12 py-2 my-2"></div>
 
             <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('inventory.cancel') }}</button>
                 <button type="submit" id="saveQuickUnitBtn" class="btn btn-sm btn-primary">
-                    <i class="feather-check me-1"></i>Save & Select Unit
+                    <i class="feather-check me-1"></i>{{ __('inventory.save_select_unit') }}
                 </button>
             </div>
         </form>

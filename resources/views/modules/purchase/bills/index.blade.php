@@ -43,6 +43,19 @@
     </style>
 @endpush
 
+@section('page-actions')
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="vendor_bills" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('purchase.bills.export') }}" />
+        <a href="{{ route('purchase.bills.create-service') }}" class="btn btn-primary fs-12 px-3 fw-semibold">
+            <i class="feather-plus me-1.5"></i>{{ __('purchase.create_service_bill') }}
+        </a>
+    </div>
+@endsection
+
 @section('content')
 
     <div class="erp-single-panel">

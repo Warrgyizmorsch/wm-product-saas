@@ -46,6 +46,7 @@ Route::prefix('crm')
 
         // CRM Accounts Routes
         Route::get('accounts', [CrmAccountController::class, 'index'])->name('accounts.index');
+        Route::get('accounts/export', [CrmAccountController::class, 'export'])->name('accounts.export');
         Route::get('accounts/create', [CrmAccountController::class, 'create'])->name('accounts.create');
         Route::post('accounts', [CrmAccountController::class, 'store'])->name('accounts.store');
         Route::get('accounts/{account}', [CrmAccountController::class, 'show'])->name('accounts.show');
@@ -58,6 +59,7 @@ Route::prefix('crm')
 
         // CRM Deals Routes
         Route::get('deals', [CrmDealController::class, 'index'])->name('deals.index');
+        Route::get('deals/export', [CrmDealController::class, 'export'])->name('deals.export');
         Route::get('deals/kanban', [CrmDealController::class, 'kanban'])->name('deals.kanban');
         Route::get('deals/activities', [DealActivityController::class, 'index'])->name('deals.activities');
         Route::get('deals/create', [CrmDealController::class, 'create'])->name('deals.create');
@@ -145,6 +147,8 @@ Route::prefix('crm')
 
         Route::get('customers', [CustomerController::class, 'index'])
             ->name('customers.index');
+        Route::get('customers/export', [CustomerController::class, 'export'])
+            ->name('customers.export');
         Route::get('customers/create', [CustomerController::class, 'create'])
             ->name('customers.create');
         Route::post('customers', [CustomerController::class, 'store'])
@@ -160,6 +164,7 @@ Route::prefix('crm')
 
         Route::get('approvals/quotations', [QuotationController::class, 'approvalsIndex'])->name('approvals.quotations.index');
         Route::get('quotations', [QuotationController::class, 'index'])->name('quotations.index');
+        Route::get('quotations/export', [QuotationController::class, 'export'])->name('quotations.export');
         Route::get('quotations/create', [QuotationController::class, 'create'])->name('quotations.create');
         Route::post('quotations', [QuotationController::class, 'store'])->name('quotations.store');
         Route::get('quotations/{quotation}', [QuotationController::class, 'show'])->name('quotations.show');

@@ -11,6 +11,8 @@ use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\DealStatus;
 use App\Domains\CRM\Services\DealHealthService;
+use App\Exports\DealExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
@@ -438,6 +440,15 @@ class CrmDealController extends Controller
             }
         }
 
+        if (in_array($stage, ['Won', 'Closed Won'])) {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('crm.deal.won', [
+                'deal_title' => $deal->title,
+                'customer_name' => $deal->account?->name ?? 'Customer',
+                'amount' => number_format((float)($deal->estimated_value ?? $deal->amount ?? 0), 2),
+                'won_by' => auth()->user()?->name ?? 'User',
+            ], route('crm.deals.show', $deal->id), $deal);
+        }
+
         return redirect()->route('crm.deals.show', $deal)->with('success', 'Deal updated successfully.');
     }
 
@@ -498,6 +509,15 @@ class CrmDealController extends Controller
             'probability'  => $prob,
             'close_reason' => $validated['close_reason'] ?? $deal->close_reason,
         ]);
+
+        if (in_array($stage, ['Won', 'Closed Won'])) {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('crm.deal.won', [
+                'deal_title' => $deal->title,
+                'customer_name' => $deal->account?->name ?? 'Customer',
+                'amount' => number_format((float)($deal->estimated_value ?? $deal->amount ?? 0), 2),
+                'won_by' => auth()->user()?->name ?? 'User',
+            ], route('crm.deals.show', $deal->id), $deal);
+        }
 
         $msg = "Deal stage updated to {$stage} successfully!";
 
@@ -942,5 +962,19 @@ class CrmDealController extends Controller
 
         $result = $service->generateDraftReply($deal);
         return response()->json($result);
+    }
+
+    /**
+     * Export Deals to Excel with customizable columns and applied filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', CrmDeal::class);
+        $tenantId = tenant_id() ?? auth()->user()->tenant_id ?? 1;
+
+        return Excel::download(
+            new DealExport($tenantId, $request->all()),
+            'deals_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 }

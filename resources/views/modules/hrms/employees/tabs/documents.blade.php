@@ -79,7 +79,18 @@
 </style>
 @php
     $authUser = auth()->user();
+    $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
     $canManageDocStatus = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
+    
+    $canDeleteAnyDoc = false;
+    if (isset($documents)) {
+        foreach ($documents as $d) {
+            if ($workflowService->canDeleteDocument($authUser, $d)) {
+                $canDeleteAnyDoc = true;
+                break;
+            }
+        }
+    }
 @endphp
 <div class="tab-pane fade {{ $activeTabName === 'documents' ? 'show active' : '' }}" id="documents-pane" role="tabpanel" aria-labelledby="documents-tab">
     <div class="row">
@@ -159,11 +170,11 @@
                         <table class="table table-hover align-middle mb-0 documents-table" id="documentsTable" style="table-layout: fixed; width: 100%;">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3" style="width: {{ $canManageDocStatus ? '32%' : '35%' }};">{{ __('hrms.employees.tbl_doc_title') }}</th>
-                                    <th style="width: {{ $canManageDocStatus ? '18%' : '20%' }};">{{ __('hrms.employees.tbl_source_expiry') }}</th>
-                                    <th style="width: {{ $canManageDocStatus ? '26%' : '25%' }};">{{ __('hrms.employees.tbl_file') }}</th>
-                                    <th style="width: {{ $canManageDocStatus ? '16%' : '20%' }};">{{ __('hrms.employees.tbl_status') }}</th>
-                                    @if($canManageDocStatus)
+                                    <th class="ps-3" style="width: {{ $canDeleteAnyDoc ? '32%' : '35%' }};">{{ __('hrms.employees.tbl_doc_title') }}</th>
+                                    <th style="width: {{ $canDeleteAnyDoc ? '18%' : '20%' }};">{{ __('hrms.employees.tbl_source_expiry') }}</th>
+                                    <th style="width: {{ $canDeleteAnyDoc ? '26%' : '25%' }};">{{ __('hrms.employees.tbl_file') }}</th>
+                                    <th style="width: {{ $canDeleteAnyDoc ? '16%' : '20%' }};">{{ __('hrms.employees.tbl_status') }}</th>
+                                    @if($canDeleteAnyDoc)
                                         <th class="text-end pe-3" style="width: 8%;">{{ __('hrms.employees.tbl_actions') }}</th>
                                     @endif
                                 </tr>
@@ -436,6 +447,7 @@
                                                         Approved
                                                     </span>
                                                 @endif
+                                                @endif
                                                 @if($doc->is_signed)
                                                     <div class="mt-0.5">
                                                         <span class="badge bg-soft-success text-success px-1.5 py-0.5 rounded fs-9" title="Digitally Signed on {{ $doc->signed_at?->format('d M Y, H:i') }}">
@@ -443,32 +455,33 @@
                                                         </span>
                                                     </div>
                                                 @endif
-                                            @endif
-                                        </td>
-                                        @if($canManageDocStatus)
-                                            <td class="text-end pe-3">
-                                                <div class="d-flex align-items-center justify-content-end gap-2">
-                                                    <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_document') }}', { title: '{{ __('hrms.employees.lbl_delete_document') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });" class="m-0 d-inline-flex" onclick="event.stopPropagation();">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px; background: rgba(220, 53, 69, 0.05);" title="{{ __('hrms.common.delete') }}">
-                                                            <i class="feather-trash-2 fs-13"></i>
-                                                        </button>
-                                                    </form>
-                                                </div>
                                             </td>
-                                        @endif
-                                    </tr>
+                                         @if($canDeleteAnyDoc)
+                                             <td class="text-end pe-3">
+                                                 <div class="d-flex align-items-center justify-content-end gap-2">
+                                                     @if($workflowService->canDeleteDocument($authUser, $doc))
+                                                         <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_document') }}', { title: '{{ __('hrms.employees.lbl_delete_document') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });" class="m-0 d-inline-flex" onclick="event.stopPropagation();">
+                                                             @csrf
+                                                             @method('DELETE')
+                                                             <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px; background: rgba(220, 53, 69, 0.05);" title="{{ __('hrms.common.delete') }}">
+                                                                 <i class="feather-trash-2 fs-13"></i>
+                                                             </button>
+                                                         </form>
+                                                     @endif
+                                                 </div>
+                                             </td>
+                                         @endif
+                                     </tr>
                                 @empty
                                     <tr id="documentEmptyStateRow">
-                                        <td colspan="{{ $canManageDocStatus ? 5 : 4 }}" class="text-center py-5 text-muted fs-13">
+                                        <td colspan="{{ $canDeleteAnyDoc ? 5 : 4 }}" class="text-center py-5 text-muted fs-13">
                                             <i class="feather-file-text d-block fs-32 text-light-muted mb-2" style="font-size: 28px;"></i>
                                             No documents found.
                                         </td>
                                     </tr>
                                 @endforelse
                                 <tr id="documentNoResultsRow" class="d-none">
-                                    <td colspan="{{ $canManageDocStatus ? 5 : 4 }}" class="text-center py-5 text-muted fs-13">
+                                    <td colspan="{{ $canDeleteAnyDoc ? 5 : 4 }}" class="text-center py-5 text-muted fs-13">
                                         <i class="feather-folder-minus d-block fs-32 text-light-muted mb-2"></i>
                                         {{ __('hrms.employees.lbl_no_docs_match') }}
                                     </td>

@@ -16,6 +16,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use App\Exports\DispatchOrderExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class DispatchOrderController extends Controller
 {
@@ -31,6 +33,20 @@ class DispatchOrderController extends Controller
         $dispatches = $this->dispatchRepo->getPaginated($request->all(), 15);
 
         return view('modules.sales.dispatches.index', compact('dispatches'));
+    }
+
+    /**
+     * Export Dispatch Orders to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', DispatchOrder::class);
+        $tenantId = tenant_id() ?? auth()->user()->tenant_id ?? 1;
+
+        return Excel::download(
+            new DispatchOrderExport($tenantId, $request->all()),
+            'dispatch_orders_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function create(Request $request): View
@@ -262,6 +278,15 @@ class DispatchOrderController extends Controller
 
         try {
             $dispatch = $this->dispatchService->shipDispatchOrder($dispatch);
+
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.dispatch.shipped', [
+                'doc_no' => $dispatch->dispatch_number,
+                'customer_name' => $dispatch->customer?->name ?? 'Customer',
+                'transporter' => $dispatch->transporter?->name ?? $dispatch->carrier ?? 'Carrier',
+                'tracking_no' => $dispatch->tracking_number ?? $dispatch->lr_number ?? 'N/A',
+                'date' => now()->format('Y-m-d'),
+            ], route('dispatches.show', $dispatch->id), $dispatch);
+
             return redirect()->back()
                 ->with('success', "Dispatch Order {$dispatch->dispatch_number} marked as Shipped (Gate Outward) and physical stock deducted from warehouse successfully.");
         } catch (Exception $e) {

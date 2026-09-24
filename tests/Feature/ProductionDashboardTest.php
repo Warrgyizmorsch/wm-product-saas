@@ -674,7 +674,7 @@ class ProductionDashboardTest extends TestCase
         $response->assertSee('Plant Maintenance &amp; Subcontracting SLA', false);
         $response->assertSee('Overdue PM');
         $response->assertSee('Breakdown WOs');
-        $response->assertSee('Vendor SLA &amp; External Operations', false);
+        $response->assertSee(__('production.multi_model_subcontracting_vendor_metrics'));
         $response->assertSee('OTD:');
         $response->assertSee(route('production.maintenance.dashboard'));
         $response->assertSee(route('production.maintenance.work-orders.index'));

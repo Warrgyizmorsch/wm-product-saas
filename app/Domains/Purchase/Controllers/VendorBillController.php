@@ -11,6 +11,8 @@ use App\Domains\Purchase\Models\VendorBill;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Purchase\Events\BillPosted;
+use App\Exports\VendorBillExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 
 class VendorBillController extends Controller
@@ -64,6 +66,20 @@ class VendorBillController extends Controller
             ->count();
 
         return view('modules.purchase.bills.index', compact('bills', 'pendingGrnsCount', 'pendingFreightCount'));
+    }
+
+    /**
+     * Export Vendor Bills to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', VendorBill::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new VendorBillExport($tenantId, $request->all()),
+            'vendor_bills_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function pendingGrns(Request $request)
@@ -214,6 +230,13 @@ class VendorBillController extends Controller
         $bill = $this->billService->storeBill($validated, $tenantId);
 
         event(new BillPosted($bill));
+
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.bill.created', [
+            'bill_no' => $bill->bill_number ?? $bill->vendor_bill_number ?? 'BILL',
+            'vendor_name' => $bill->vendor?->name ?? 'Vendor',
+            'amount' => number_format((float)($bill->grand_total ?? $bill->total_amount ?? 0), 2),
+            'due_date' => $bill->due_date ? (is_string($bill->due_date) ? $bill->due_date : $bill->due_date->format('Y-m-d')) : 'N/A',
+        ], route('purchase.bills.show', $bill->id), $bill);
 
         return redirect()->route('purchase.bills.show', $bill->id)
             ->with('success', "Vendor Bill {$bill->bill_number} created successfully.");

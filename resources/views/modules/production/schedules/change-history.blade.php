@@ -17,8 +17,8 @@
 
 @section('content')
     {{-- Workflow Guide Component placed ABOVE erp-single-panel --}}
-    <x-ui.workflow-guide title="Schedule Change Audit Log">
-        Review planner adjustment history for Schedule [{{ $schedule->schedule_number }}]. Tracks all manual timing shifts, machine reassignments, ripple propagation, and shift mode reasons.
+    <x-ui.workflow-guide :title="__('production.schedule_change_audit_log')">
+        {{ __('production.change_history_workflow_guide', ['number' => $schedule->schedule_number]) }}
     </x-ui.workflow-guide>
 
     <div class="erp-single-panel">
@@ -28,8 +28,7 @@
                     <h4 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
                         <i class="feather-clock text-primary"></i> Schedule Change History
                     </h4>
-                    <p class="text-muted fs-13 mb-0">
-                        Schedule <span class="font-monospace fw-bold text-primary">#{{ $schedule->schedule_number }}</span> | Production Order: <strong>{{ $schedule->order->order_number ?? 'N/A' }}</strong> ({{ $schedule->order->product->name ?? 'N/A' }})
+                    <p class="text-muted fs-13 mb-0">{{ __('production.schedule') }}<span class="font-monospace fw-bold text-primary">#{{ $schedule->schedule_number }}</span> | Production Order: <strong>{{ $schedule->order->order_number ?? 'N/A' }}</strong> ({{ $schedule->order->product->name ?? 'N/A' }})
                     </p>
                 </div>
             </div>
@@ -38,12 +37,12 @@
                 <thead class="table-light fs-12">
                     <tr>
                         <th style="width: 15%">Timestamp / User</th>
-                        <th style="width: 18%">Operation</th>
+                        <th style="width: 18%">{{ __('production.col_operation') }}</th>
                         <th style="width: 12%">Change Type</th>
                         <th style="width: 10%">Shift Mode</th>
                         <th style="width: 20%">Original Timings</th>
                         <th style="width: 20%">New Timings</th>
-                        <th style="width: 15%">Reason</th>
+                        <th style="width: 15%">{{ __('production.reason') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -61,7 +60,7 @@
                                 @if($log->change_type === 'manual_shift')
                                     <span class="badge bg-soft-warning text-warning"><i class="feather-edit-2 me-1"></i> Manual Shift</span>
                                 @elseif($log->change_type === 'ripple_shift')
-                                    <span class="badge bg-soft-info text-info"><i class="feather-refresh-cw me-1"></i> Ripple Shift</span>
+                                    <span class="badge bg-soft-info text-info"><i class="feather-refresh-cw me-1"></i>{{ __('production.ripple_shift') }}</span>
                                 @else
                                     <span class="badge bg-soft-secondary text-secondary">{{ $log->change_type }}</span>
                                 @endif

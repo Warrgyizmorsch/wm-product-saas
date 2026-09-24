@@ -27,6 +27,10 @@ use Illuminate\View\View;
 
 class HrmsDashboardController extends Controller
 {
+    public function __construct(
+        private readonly \App\Domains\Platform\Services\DashboardService $layouts,
+    ) {
+    }
     /**
      * Display the comprehensive Role-Ready HRMS Dashboard.
      */
@@ -233,10 +237,10 @@ class HrmsDashboardController extends Controller
         }
 
         if ($activeShift) {
-            $startTime = $activeShift->start_time ? Carbon::parse($activeShift->start_time)->format('H:i') : '09:00';
-            $endTime   = $activeShift->end_time ? Carbon::parse($activeShift->end_time)->format('H:i') : '18:00';
+            $startTime = $activeShift->start_time ? Carbon::parse($activeShift->start_time)->format('h:i A') : '09:00 AM';
+            $endTime   = $activeShift->end_time ? Carbon::parse($activeShift->end_time)->format('h:i A') : '06:00 PM';
             $myShiftDetails = [
-                'name'            => $activeShift->name ?: 'General Shift',
+                'name'            => $activeShift->name ?: 'Day Shift',
                 'badge'           => $activeShift->code ?: 'Default',
                 'timing'          => $startTime . ' - ' . $endTime,
                 'overtime_status' => $activeShift->overtime_allowed ? 'Allowed' : 'Not Allowed',
@@ -244,9 +248,9 @@ class HrmsDashboardController extends Controller
             ];
         } else {
             $myShiftDetails = [
-                'name'            => 'General Shift',
+                'name'            => 'Day Shift',
                 'badge'           => 'Default',
-                'timing'          => '09:00 - 18:00',
+                'timing'          => '09:00 AM - 06:00 PM',
                 'overtime_status' => 'Not Allowed',
                 'is_ot_allowed'   => false,
             ];
@@ -491,7 +495,17 @@ class HrmsDashboardController extends Controller
             return strtotime($b->published_at ?? $b->created_at) <=> strtotime($a->published_at ?? $a->created_at);
         })->take(3)->values();
 
-        return view('modules.hrms.dashboard.index', compact(
+        $user = auth()->user();
+        $activeView = $request->input('view', 'overview');
+
+        $widgetQuery = array_filter([
+            'preset' => $request->input('preset', 'this_month'),
+            'from' => $request->input('from'),
+            'to' => $request->input('to'),
+        ], fn ($val) => $val !== null && $val !== '');
+        $state = $this->layouts->pageState($user, $tenantId, 'hrms', $activeView);
+
+        $viewData = compact(
             'currentEmployee',
             'totalEmployees',
             'probationCount',
@@ -530,7 +544,385 @@ class HrmsDashboardController extends Controller
             'latestBroadcasts',
             'totalBroadcastsCount',
             'isHrOrAdmin'
-        ));
+        );
+
+        return view('modules.hrms.dashboard.index', $viewData + $state + [
+            'initial' => $this->layouts->preload($state['layout'], $user, $tenantId, $widgetQuery),
+            'widgetQuery' => (object) $widgetQuery,
+            'activeView' => $activeView,
+            'canManage' => $this->layouts->canManage($user),
+        ]);
+    }
+
+    public function getWebPunchData(?\App\Models\User $user, int $tenantId): array
+    {
+        $today = Carbon::today()->format('Y-m-d');
+        $now = Carbon::now();
+        $currentEmployee = null;
+        if ($user) {
+            $currentEmployee = Employee::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($user) {
+                    if ($user->email) {
+                        $q->where('office_email', $user->email)
+                          ->orWhere('personal_email', $user->email);
+                    }
+                })->first();
+        }
+        if (!$currentEmployee) {
+            $currentEmployee = Employee::where('tenant_id', $tenantId)->first();
+        }
+
+        $myTodayAttendance = null;
+        $recentPunches = [];
+        $activeShift = null;
+
+        if ($currentEmployee) {
+            $myTodayAttendance = Attendance::with('breaks')
+                ->where('tenant_id', $tenantId)
+                ->where('employee_id', $currentEmployee->id)
+                ->whereDate('date', $today)
+                ->first();
+
+            for ($i = 6; $i >= 0; $i--) {
+                $pastDate = $now->copy()->subDays($i);
+                $pastDateStr = $pastDate->format('Y-m-d');
+                $isWeekend = $pastDate->isWeekend();
+
+                $att = Attendance::where('tenant_id', $tenantId)
+                    ->where('employee_id', $currentEmployee->id)
+                    ->whereDate('date', $pastDateStr)
+                    ->first();
+
+                $status = 'unmarked';
+                if ($att) {
+                    $status = $att->status ?: 'present';
+                } elseif ($isWeekend) {
+                    $status = 'off';
+                } elseif ($pastDate->isPast() && !$pastDate->isToday()) {
+                    $status = 'absent';
+                }
+
+                $recentPunches[] = [
+                    'day_name' => $pastDate->format('D'),
+                    'day_num' => $pastDate->format('d'),
+                    'date' => $pastDateStr,
+                    'status' => $status,
+                    'check_in' => $att?->check_in ? Carbon::parse($att->check_in)->format('h:i A') : null,
+                    'check_out' => $att?->check_out ? Carbon::parse($att->check_out)->format('h:i A') : null,
+                    'is_today' => $pastDate->isToday(),
+                ];
+            }
+
+            $activeShift = $currentEmployee->resolveShiftForDate($today);
+        }
+
+        $startTime = $activeShift?->start_time ? Carbon::parse($activeShift->start_time)->format('h:i A') : '09:00 AM';
+        $endTime   = $activeShift?->end_time ? Carbon::parse($activeShift->end_time)->format('h:i A') : '06:00 PM';
+        $myShiftDetails = [
+            'name' => $activeShift?->name ?: 'Day Shift',
+            'badge' => $activeShift?->code ?: 'Default',
+            'timing' => $startTime . ' - ' . $endTime,
+        ];
+
+        return compact('currentEmployee', 'myTodayAttendance', 'recentPunches', 'myShiftDetails');
+    }
+
+    public function getApprovalsData(?\App\Models\User $user, int $tenantId): array
+    {
+        $pendingLeaves = LeaveRequest::with(['employee.department', 'employee.designation', 'leaveType'])
+            ->where('tenant_id', $tenantId)->where('status', 'pending')->latest()->take(10)->get();
+
+        $pendingWfh = WfhRequest::with(['employee.department', 'employee.designation'])
+            ->where('tenant_id', $tenantId)->where('status', 'pending')->latest()->take(10)->get();
+
+        $pendingCorrections = AttendanceCorrection::with(['employee.department'])
+            ->where('tenant_id', $tenantId)->where('status', 'pending')->latest()->take(10)->get();
+
+        $pendingExpenses = ExpenseReport::with(['employee.department'])
+            ->where('tenant_id', $tenantId)->where('status', 'pending')->latest()->take(10)->get();
+
+        $totalPendingApprovals = $pendingLeaves->count() + $pendingWfh->count() + $pendingCorrections->count() + $pendingExpenses->count();
+
+        return compact('pendingLeaves', 'pendingWfh', 'pendingCorrections', 'pendingExpenses', 'totalPendingApprovals');
+    }
+
+    public function getLeaveBalancesData(?\App\Models\User $user, int $tenantId): array
+    {
+        $currentEmployee = null;
+        if ($user) {
+            $currentEmployee = Employee::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($user) {
+                    if ($user->email) {
+                        $q->where('office_email', $user->email)
+                          ->orWhere('personal_email', $user->email);
+                    }
+                })->first();
+        }
+        if (!$currentEmployee) {
+            $currentEmployee = Employee::where('tenant_id', $tenantId)->first();
+        }
+
+        $myAssignedPlan = null;
+        if ($currentEmployee && $currentEmployee->leave_plan_id) {
+            $myAssignedPlan = LeavePlan::with('types')->find($currentEmployee->leave_plan_id);
+        }
+        if (!$myAssignedPlan) {
+            $myAssignedPlan = LeavePlan::where('tenant_id', $tenantId)->where('status', true)->with('types')->first();
+        }
+
+        $planTypesCollection = collect();
+        if ($myAssignedPlan && $myAssignedPlan->types->isNotEmpty()) {
+            $planTypesCollection = $myAssignedPlan->types;
+        } else {
+            $dbBalances = $currentEmployee ? LeaveBalance::where('tenant_id', $tenantId)->where('employee_id', $currentEmployee->id)->with('leaveType')->get() : collect();
+            if ($dbBalances->isNotEmpty()) {
+                $planTypesCollection = $dbBalances->pluck('leaveType')->filter()->unique('id');
+            } else {
+                $planTypesCollection = LeaveType::where('tenant_id', $tenantId)->where('status', true)->take(4)->get();
+            }
+        }
+
+        $myLeaveTypesList = [];
+        foreach ($planTypesCollection as $type) {
+            $bal = $currentEmployee ? LeaveBalance::where('tenant_id', $tenantId)->where('employee_id', $currentEmployee->id)->where('leave_type_id', $type->id)->first() : null;
+            $allocated = $bal ? floatval($bal->allocated) : floatval($type->quota ?? 12);
+            $used = $bal ? floatval($bal->used) : 0;
+            $remaining = $bal ? floatval($bal->remaining) : $allocated;
+
+            $myLeaveTypesList[] = [
+                'id' => $type->id,
+                'name' => $type->name,
+                'code' => $type->code ?: strtoupper(substr($type->name, 0, 2)),
+                'color' => $type->color ?: '#3b82f6',
+                'allocated' => $allocated,
+                'used' => $used,
+                'remaining' => $remaining,
+                'type' => $type->type ?? 'paid',
+                'description' => $type->description ?? '',
+                'rules' => is_array($type->rules) ? $type->rules : (json_decode($type->rules ?? '[]', true) ?: []),
+            ];
+        }
+
+        return compact('myLeaveTypesList', 'myAssignedPlan');
+    }
+
+    public function getShiftData(?\App\Models\User $user, int $tenantId): array
+    {
+        $today = Carbon::today()->format('Y-m-d');
+        $now = Carbon::now();
+        $currentEmployee = null;
+        if ($user) {
+            $currentEmployee = Employee::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($user) {
+                    if ($user->email) {
+                        $q->where('office_email', $user->email)
+                          ->orWhere('personal_email', $user->email);
+                    }
+                })->first();
+        }
+        if (!$currentEmployee) {
+            $currentEmployee = Employee::where('tenant_id', $tenantId)->first();
+        }
+
+        $activeShift = $currentEmployee ? $currentEmployee->resolveShiftForDate($today) : null;
+        $myShiftDetails = [
+            'name' => $activeShift?->name ?: 'General Shift',
+            'badge' => $activeShift?->code ?: 'Default',
+            'timing' => ($activeShift?->start_time ? Carbon::parse($activeShift->start_time)->format('H:i') : '09:00') . ' - ' . ($activeShift?->end_time ? Carbon::parse($activeShift->end_time)->format('H:i') : '18:00'),
+            'overtime_status' => ($activeShift?->overtime_allowed ?? false) ? 'Allowed' : 'Not Allowed',
+            'is_ot_allowed' => (bool) ($activeShift?->overtime_allowed ?? false),
+        ];
+
+        $myWeeklyPattern = [];
+        $startOfWeek = $now->copy()->startOfWeek(Carbon::SUNDAY);
+        for ($i = 0; $i < 7; $i++) {
+            $dayDate = $startOfWeek->copy()->addDays($i);
+            $isWeekend = ($dayDate->dayOfWeek === 0 || $dayDate->dayOfWeek === 6);
+            $myWeeklyPattern[] = [
+                'day' => $dayDate->format('D'),
+                'is_off' => $isWeekend,
+            ];
+        }
+
+        return compact('myShiftDetails', 'myWeeklyPattern');
+    }
+
+    public function getBroadcastsData(?\App\Models\User $user, int $tenantId): array
+    {
+        $currentEmployee = null;
+        if ($user) {
+            $currentEmployee = Employee::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($user) {
+                    if ($user->email) {
+                        $q->where('office_email', $user->email)
+                          ->orWhere('personal_email', $user->email);
+                    }
+                })->first();
+        }
+
+        $latestBroadcasts = Broadcast::with(['receipts', 'comments.employee'])
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'published')
+            ->latest()
+            ->take(5)
+            ->get();
+
+        $totalBroadcastsCount = Broadcast::where('tenant_id', $tenantId)->where('status', 'published')->count();
+
+        return compact('latestBroadcasts', 'totalBroadcastsCount', 'currentEmployee');
+    }
+
+    public function getProbationData(?\App\Models\User $user, int $tenantId): array
+    {
+        $upcomingProbationEmployees = Employee::with(['department'])
+            ->where('tenant_id', $tenantId)
+            ->where('employee_stage', 'Probation')
+            ->whereNotNull('probation_end_date')
+            ->orderBy('probation_end_date', 'asc')
+            ->take(10)
+            ->get();
+
+        return compact('upcomingProbationEmployees');
+    }
+
+    public function getExitData(?\App\Models\User $user, int $tenantId): array
+    {
+        $activeExits = EmployeeExit::with(['employee.department'])
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', ['initiated', 'in_clearance', 'approved'])
+            ->latest()
+            ->take(10)
+            ->get();
+
+        return compact('activeExits');
+    }
+
+    public function getKpiData(?\App\Models\User $user, int $tenantId): array
+    {
+        $today = Carbon::today()->format('Y-m-d');
+        $totalEmployees = Employee::where('tenant_id', $tenantId)->count();
+        $probationCount = Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Probation')->count();
+        $confirmedCount = Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Confirmed')->count();
+        $noticeCount = Employee::where('tenant_id', $tenantId)->whereIn('employee_stage', ['Notice Period', 'Serving Notice'])->count();
+
+        $todayAttendances = Attendance::where('tenant_id', $tenantId)->whereDate('date', $today)->get();
+        $presentCount = $todayAttendances->whereIn('status', ['present', 'late', 'half_day'])->count();
+        $lateCount = $todayAttendances->where('status', 'late')->count();
+
+        $wfhCount = WfhRequest::where('tenant_id', $tenantId)->where('status', 'approved')->whereDate('start_date', '<=', $today)->whereDate('end_date', '>=', $today)->count() + $todayAttendances->where('location_type', 'wfh')->count();
+        $onLeaveCount = LeaveRequest::where('tenant_id', $tenantId)->where('status', 'approved')->whereDate('start_date', '<=', $today)->whereDate('end_date', '>=', $today)->count();
+        $attendancePercent = $totalEmployees > 0 ? round(($presentCount / $totalEmployees) * 100, 1) : 0;
+
+        $pendingLeaves = LeaveRequest::where('tenant_id', $tenantId)->where('status', 'pending')->get();
+        $pendingWfh = WfhRequest::where('tenant_id', $tenantId)->where('status', 'pending')->get();
+        $pendingCorrections = AttendanceCorrection::where('tenant_id', $tenantId)->where('status', 'pending')->get();
+        $totalPendingApprovals = $pendingLeaves->count() + $pendingWfh->count() + $pendingCorrections->count();
+
+        $upcomingProbationEmployees = Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Probation')->whereNotNull('probation_end_date')->get();
+        $activeExits = EmployeeExit::where('tenant_id', $tenantId)->whereIn('status', ['initiated', 'in_clearance', 'approved'])->get();
+
+        return compact('totalEmployees', 'probationCount', 'confirmedCount', 'noticeCount', 'presentCount', 'lateCount', 'wfhCount', 'onLeaveCount', 'attendancePercent', 'pendingLeaves', 'pendingWfh', 'pendingCorrections', 'totalPendingApprovals', 'upcomingProbationEmployees', 'activeExits');
+    }
+
+    public function getLateArrivalsData(?\App\Models\User $user, int $tenantId): array
+    {
+        $now = Carbon::now();
+        $recentLateArrivals = Attendance::with(['employee.department'])
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', ['late', 'half_day'])
+            ->whereDate('date', '>=', $now->copy()->subDays(7))
+            ->orderBy('date', 'desc')
+            ->take(10)
+            ->get();
+
+        return compact('recentLateArrivals');
+    }
+
+    public function getPenaltiesData(?\App\Models\User $user, int $tenantId): array
+    {
+        $unprocessedPenalties = EmployeePenalty::with(['employee.department'])
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'pending')->orWhere('status', 'unprocessed');
+            })
+            ->latest()
+            ->take(10)
+            ->get();
+
+        return compact('unprocessedPenalties');
+    }
+
+    public function getApprovedLeavesData(?\App\Models\User $user, int $tenantId): array
+    {
+        $today = Carbon::today()->format('Y-m-d');
+        $approvedLeaves = LeaveRequest::with(['employee.department', 'leaveType'])
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'approved')
+            ->whereDate('end_date', '>=', $today)
+            ->orderBy('start_date', 'asc')
+            ->take(10)
+            ->get();
+
+        return compact('approvedLeaves');
+    }
+
+    public function getHolidaysData(?\App\Models\User $user, int $tenantId): array
+    {
+        $today = Carbon::today()->format('Y-m-d');
+        $upcomingHolidays = HolidayCalendar::where('tenant_id', $tenantId)
+            ->where('status', true)
+            ->whereDate('holiday_date', '>=', $today)
+            ->orderBy('holiday_date', 'asc')
+            ->take(10)
+            ->get();
+
+        return compact('upcomingHolidays');
+    }
+
+    public function getCelebrationsData(?\App\Models\User $user, int $tenantId): array
+    {
+        $now = Carbon::now();
+        $allActiveEmployees = Employee::where('tenant_id', $tenantId)->where('status', true)->get();
+
+        $upcomingBirthdays = $allActiveEmployees->filter(function ($emp) use ($now) {
+            return $emp->date_of_birth && Carbon::parse($emp->date_of_birth)->month === $now->month;
+        })->sortBy(fn ($emp) => Carbon::parse($emp->date_of_birth)->day)->values();
+
+        $upcomingAnniversaries = $allActiveEmployees->filter(function ($emp) use ($now) {
+            return $emp->date_of_joining && Carbon::parse($emp->date_of_joining)->month === $now->month && Carbon::parse($emp->date_of_joining)->year < $now->year;
+        })->sortBy(fn ($emp) => Carbon::parse($emp->date_of_joining)->day)->values();
+
+        return compact('upcomingBirthdays', 'upcomingAnniversaries');
+    }
+
+    public function getDepartmentData(?\App\Models\User $user, int $tenantId): array
+    {
+        $totalEmployees = Employee::where('tenant_id', $tenantId)->count();
+        $departments = Department::where('tenant_id', $tenantId)
+            ->withCount('employees')
+            ->orderBy('employees_count', 'desc')
+            ->take(6)
+            ->get();
+
+        return compact('departments', 'totalEmployees');
+    }
+
+    public function getNewJoineesData(?\App\Models\User $user, int $tenantId): array
+    {
+        $now = Carbon::now();
+        $today = Carbon::today()->format('Y-m-d');
+        $newHiresList = Employee::with(['department', 'designation'])
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('date_of_joining')
+            ->whereDate('date_of_joining', '>=', $now->copy()->subDays(30))
+            ->whereDate('date_of_joining', '<=', $today)
+            ->orderBy('date_of_joining', 'desc')
+            ->take(6)
+            ->get();
+
+        $newHiresThisMonth = $newHiresList->count();
+
+        return compact('newHiresList', 'newHiresThisMonth');
     }
 
     /**

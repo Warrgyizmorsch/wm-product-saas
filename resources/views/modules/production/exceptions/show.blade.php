@@ -43,7 +43,7 @@
                 @endif
             </div>
             <div class="col-md-3">
-                <span class="text-uppercase fs-11 fw-bold text-muted d-block mb-1">Product</span>
+                <span class="text-uppercase fs-11 fw-bold text-muted d-block mb-1">{{ __('production.product') }}</span>
                 <span class="fw-bold text-dark">{{ $analysis['product_name'] }}</span>
             </div>
             <div class="col-md-3">
@@ -69,9 +69,9 @@
                 <thead>
                     <tr>
                         <th style="width: 20%">Vector / Type</th>
-                        <th style="width: 12%">Severity</th>
+                        <th style="width: 12%">{{ __('production.severity') }}</th>
                         <th style="width: 35%">Reason & Evidence</th>
-                        <th style="width: 15%">Operation</th>
+                        <th style="width: 15%">{{ __('production.operation') }}</th>
                         <th style="width: 18%">Recommended Action</th>
                     </tr>
                 </thead>

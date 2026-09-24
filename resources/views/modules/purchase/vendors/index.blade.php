@@ -5,9 +5,16 @@
 @section('breadcrumb', __('purchase.supply_chain_purchase_vendors'))
 
 @section('page-actions')
-    <x-ui.button href="{{ route('purchase.vendors.create') }}" variant="primary" icon="feather-plus">
-        {{ __('purchase.new_supplier') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="vendors" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('purchase.vendors.export') }}" />
+        <x-ui.button href="{{ route('purchase.vendors.create') }}" variant="primary" icon="feather-plus">
+            {{ __('purchase.new_supplier') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')

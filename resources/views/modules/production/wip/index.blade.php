@@ -117,13 +117,17 @@
         $orderTargetId = $firstOrder ? $firstOrder->id : null;
     @endphp
 
-    <x-ui.workflow-guide title="What's Next?">
-        Track live shop floor production progress across work centers. The <span class="badge bg-soft-success text-success border border-success-subtle fw-semibold me-1"><i class="feather-box me-1"></i>Receive Completed FG</span> button will automatically appear once completed finished goods units are available. Clicking it transfers the finished goods into your warehouse. All receipt logs can be tracked under the 
-        @if($orderTargetId)
-            <a href="{{ route('production.orders.show', ['order' => $orderTargetId, 'tab' => 'vtab-progress']) }}" class="fw-bold text-primary text-decoration-underline">Order Progress & Receipts Tab</a>.
-        @else
-            <span class="fw-bold text-primary text-decoration-underline">Order Progress & Receipts Tab</span> on the Production Order page.
-        @endif
+    <x-ui.workflow-guide :title="__('production.whats_next')">
+        @php
+            $receiptsLink = $orderTargetId
+                ? '<a href="' . route('production.orders.show', ['order' => $orderTargetId, 'tab' => 'vtab-progress']) . '" class="fw-bold text-primary text-decoration-underline">' . __('production.order_progress_receipts_tab') . '</a>'
+                : '<span class="fw-bold text-primary text-decoration-underline">' . __('production.order_progress_receipts_tab') . '</span>';
+            $receiveBadge = '<span class="badge bg-soft-success text-success border border-success-subtle fw-semibold me-1"><i class="feather-box me-1"></i>' . __('production.receive_completed_fg') . '</span>';
+        @endphp
+        {!! __('production.wip_workflow_guide', [
+            'receive_fg_badge' => $receiveBadge,
+            'receipts_link' => $receiptsLink
+        ]) !!}
     </x-ui.workflow-guide>
 
     <div class="erp-single-panel">
@@ -141,7 +145,7 @@
                                 </div>
                                 <div>
                                     <div class="fs-18 fw-bold text-dark">{{ number_format($wipSummary['total_count']) }}</div>
-                                    <div class="fs-11 text-muted text-uppercase">Total WIP Cards</div>
+                                    <div class="fs-11 text-muted text-uppercase">{{ __('production.total_wip_cards') }}</div>
                                 </div>
                             </div>
                         </div>
@@ -159,7 +163,7 @@
                                         {{ number_format($wipSummary['active_count']) }}
                                         <span class="fs-10 text-muted fw-normal">({{ number_format($wipSummary['total_available'], 1) }} u)</span>
                                     </div>
-                                    <div class="fs-11 text-muted text-uppercase">Active / In-Process</div>
+                                    <div class="fs-11 text-muted text-uppercase">{{ __('production.active_in_process') }}</div>
                                 </div>
                             </div>
                         </div>
@@ -174,7 +178,7 @@
                                 </div>
                                 <div>
                                     <div class="fs-18 fw-bold text-dark">{{ number_format($wipSummary['hold_count']) }}</div>
-                                    <div class="fs-11 text-muted text-uppercase">Quality Hold</div>
+                                    <div class="fs-11 text-muted text-uppercase">{{ __('production.quality_hold') }}</div>
                                 </div>
                             </div>
                         </div>
@@ -238,11 +242,11 @@
             <div class="btn-group btn-group-sm ms-3 gap-2" role="group">
                 <a href="{{ route('production.wip.index', array_merge(request()->query(), ['view' => 'order'])) }}" 
                    class="btn {{ $viewMode === 'order' ? 'btn-primary' : 'btn-outline-secondary' }}" title="Consolidate WIP cards by Production Order">
-                    <i class="feather-layers me-1"></i> By Production Order
+                    <i class="feather-layers me-1"></i> {{ __('production.by_production_order') }}
                 </a>
                 <a href="{{ route('production.wip.index', array_merge(request()->query(), ['view' => 'detailed'])) }}" 
                    class="btn {{ $viewMode === 'detailed' ? 'btn-primary' : 'btn-outline-secondary' }}" title="View individual stage/batch WIP cards">
-                    <i class="feather-list me-1"></i> All WIP Sub-Cards
+                    <i class="feather-list me-1"></i> {{ __('production.all_wip_sub_cards') }}
                 </a>
             </div>
 
@@ -262,7 +266,7 @@
                             <x-ui.odoo-form-ui type="select" name="status">
                                 <option value="">All Statuses</option>
                                 <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
-                                <option value="quality_hold" {{ request('status') === 'quality_hold' ? 'selected' : '' }}>Quality Hold</option>
+                                <option value="quality_hold" {{ request('status') === 'quality_hold' ? 'selected' : '' }}>{{ __('production.quality_hold') }}</option>
                                 <option value="rework" {{ request('status') === 'rework' ? 'selected' : '' }}>Rework</option>
                                 <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>Completed</option>
                             </x-ui.odoo-form-ui>
@@ -329,14 +333,14 @@
                             <th style="width: 5%"></th>
                             <th style="width: 15%">{{ __('production.production_order') }}</th>
                             <th style="width: 20%">{{ __('production.product') }}</th>
-                            <th style="width: 20%">Active Work Centers</th>
+                            <th style="width: 20%">{{ __('production.active_work_centers') }}</th>
                             <th class="text-end" style="width: 10%" title="Total physical units currently on the factory floor across all operation stages">
-                                Shop Floor Qty
+                                {{ __('production.shop_floor_qty') }}
                             </th>
                             <th class="text-end" style="width: 10%" title="Finished units that completed final production step ready for warehouse receipt">
-                                Completed FG
+                                {{ __('production.completed_fg') }}
                             </th>
-                            <th class="text-end" style="width: 10%">Total WIP Value</th>
+                            <th class="text-end" style="width: 10%">{{ __('production.wip_value') }}</th>
                             <th style="width: 5%">Status</th>
                             <th class="text-end" style="width: 5%">{{ __('production.actions') }}</th>
                         </tr>
@@ -400,7 +404,7 @@
                                     @if($orderStatus === 'active')
                                         <span class="badge bg-soft-success text-success text-uppercase">Active</span>
                                     @elseif($orderStatus === 'quality_hold')
-                                        <span class="badge bg-soft-warning text-warning text-uppercase">Quality Hold</span>
+                                        <span class="badge bg-soft-warning text-warning text-uppercase">{{ __('production.quality_hold') }}</span>
                                     @elseif($orderStatus === 'rework')
                                         <span class="badge bg-soft-danger text-danger text-uppercase">Rework</span>
                                     @else
@@ -413,7 +417,7 @@
                                 <td class="text-end">
                                     @if($readyQtyToReceive > 0)
                                         <button type="button" class="btn btn-xs btn-success me-1 text-nowrap" data-bs-toggle="modal" data-bs-target="#bulkFgModal{{ $orderId }}" title="Receive all completed units into warehouse">
-                                            <i class="feather-arrow-down-right me-1"></i> Receive Completed FG ({{ number_format($readyQtyToReceive, 0) }})
+                                            <i class="feather-arrow-down-right me-1"></i> {{ __('production.receive_completed_fg') }} ({{ number_format($readyQtyToReceive, 0) }})
                                         </button>
                                     @endif
                                     <x-ui.action-dropdown :viewUrl="route('production.orders.show', $orderId)" />
@@ -422,7 +426,7 @@
                                     <x-ui.modal id="bulkFgModal{{ $orderId }}" title="Receive Finished Goods - Order #{{ $order->order_number ?? $orderId }}"
                                         formAction="{{ route('production.wip.convert-order', $orderId) }}" submitText="Receive {{ number_format($readyQtyToReceive, 2) }} Units into Warehouse" closeText="Cancel" class="text-start">
                                         <div class="alert alert-info py-2 fs-12 mb-3 text-start">
-                                            <i class="feather-info me-1"></i> Transfer all <strong>{{ number_format($readyQtyToReceive, 2) }} completed finished units</strong> across all sub-cards for this order directly into Finished Goods warehouse inventory in one click.
+                                            <i class="feather-info me-1"></i> {{ __('production.transfer_all') }} <strong>{{ number_format($readyQtyToReceive, 2) }} completed finished units</strong> across all sub-cards for this order directly into Finished Goods warehouse inventory in one click.
                                         </div>
 
                                         <x-ui.odoo-form-ui type="select" label="Quality Disposition" name="quality_status" :required="true">
@@ -455,7 +459,7 @@
                                                     <span class="fs-12 fw-bold text-primary text-uppercase">
                                                         <i class="feather-git-commit me-1"></i> Live Batch Progress Pipeline ({{ $pipelines->count() }} {{ Str::plural('Batch', $pipelines->count()) }})
                                                     </span>
-                                                    <span class="fs-11 text-muted">Real-time unit movement across operation stages</span>
+                                                    <span class="fs-11 text-muted">{{ __('production.realtime_unit_movement') }}</span>
                                                 </div>
                                                 <div class="card-body p-3">
                                                     @foreach($pipelines as $pipeline)
@@ -487,17 +491,17 @@
                                                                                 <strong class="fs-11 {{ ($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']) ? 'text-success' : (($stage['stage_status'] ?? '') === 'active' || !empty($stage['is_current']) ? 'text-primary' : 'text-dark') }}">{{ $stage['operation_number'] }}</strong>
                                                                                 <div class="d-flex gap-1 align-items-center">
                                                                                     @if(($stage['qc_status'] ?? 'none') === 'passed')
-                                                                                        <span class="badge bg-soft-success text-success border border-success-subtle fs-9" title="Quality Inspection Passed"><i class="feather-shield me-0.5"></i>QC PASSED</span>
+                                                                                        <span class="badge bg-soft-success text-success border border-success-subtle fs-9" title="Quality Inspection Passed"><i class="feather-shield me-0.5"></i>{{ __('production.qc_passed') }}</span>
                                                                                     @elseif(($stage['qc_status'] ?? 'none') === 'hold')
-                                                                                        <span class="badge bg-soft-danger text-danger border border-danger-subtle fs-9" title="Quality Hold"><i class="feather-alert-octagon me-0.5"></i>QC HOLD</span>
+                                                                                        <span class="badge bg-soft-danger text-danger border border-danger-subtle fs-9" title="{{ __('production.quality_hold') }}"><i class="feather-alert-octagon me-0.5"></i>{{ __('production.qc_hold') }}</span>
                                                                                     @elseif(($stage['qc_status'] ?? 'none') === 'required')
-                                                                                        <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-9" title="Quality Check Required"><i class="feather-shield me-0.5"></i>QC REQ</span>
+                                                                                        <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-9" title="Quality Check Required"><i class="feather-shield me-0.5"></i>{{ __('production.qc_req') }}</span>
                                                                                     @endif
                                                                                     
                                                                                     @if(($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']))
                                                                                         <span class="badge bg-success text-white fs-9"><i class="feather-check me-0.5"></i>PASSED</span>
                                                                                     @elseif(($stage['stage_status'] ?? '') === 'active' || !empty($stage['is_current']))
-                                                                                        <span class="badge bg-primary text-white fs-9">ACTIVE STAGE</span>
+                                                                                        <span class="badge bg-primary text-white fs-9">{{ __('production.active_stage') }}</span>
                                                                                     @else
                                                                                         <span class="badge bg-secondary text-white fs-9">UPCOMING</span>
                                                                                     @endif
@@ -678,7 +682,7 @@
                                     @if($wip->status === 'active')
                                         <span class="badge bg-soft-success text-success text-uppercase">Active</span>
                                     @elseif($wip->status === 'quality_hold')
-                                        <span class="badge bg-soft-warning text-warning text-uppercase">Quality Hold</span>
+                                        <span class="badge bg-soft-warning text-warning text-uppercase">{{ __('production.quality_hold') }}</span>
                                     @elseif($wip->status === 'rework')
                                         <span class="badge bg-soft-danger text-danger text-uppercase">Rework</span>
                                     @else

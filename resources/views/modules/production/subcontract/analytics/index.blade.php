@@ -17,8 +17,7 @@
                 <i class="feather-truck me-1"></i> Delivery Challans
             </a>
             <a href="{{ route('production.dashboard') }}" class="btn btn-sm btn-light border">
-                <i class="feather-arrow-left me-1"></i> Production Dashboard
-            </a>
+                <i class="feather-arrow-left me-1"></i>{{ __('production.production_dashboard') }}</a>
         </div>
     </div>
 
@@ -29,7 +28,7 @@
                 <label class="form-label fs-12 fw-bold text-muted text-uppercase mb-1">Time Period</label>
                 <select name="period" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="all" @selected(($filters['period'] ?? 'all') === 'all')>All Time</option>
-                    <option value="this_month" @selected(($filters['period'] ?? '') === 'this_month')>This Month</option>
+                    <option value="this_month" @selected(($filters['period'] ?? '') === 'this_month')>{{ __('production.this_month') }}</option>
                     <option value="last_month" @selected(($filters['period'] ?? '') === 'last_month')>Last Month</option>
                     <option value="this_quarter" @selected(($filters['period'] ?? '') === 'this_quarter')>This Quarter</option>
                     <option value="this_year" @selected(($filters['period'] ?? '') === 'this_year')>This Year</option>
@@ -151,8 +150,8 @@
             <thead class="table-light fs-11 text-uppercase text-muted">
                 <tr>
                     <th style="width: 25%">Vendor Name</th>
-                    <th style="width: 10%" class="text-center">Active Ops</th>
-                    <th style="width: 10%" class="text-center">Completed</th>
+                    <th style="width: 10%" class="text-center">{{ __('production.active_ops') }}</th>
+                    <th style="width: 10%" class="text-center">{{ __('production.completed_schedules') }}</th>
                     <th style="width: 12%" class="text-center">On-Time %</th>
                     <th style="width: 10%" class="text-center">Avg Delay</th>
                     <th style="width: 12%" class="text-center">Acceptance %</th>
@@ -207,7 +206,7 @@
             <thead class="table-light fs-11 text-uppercase text-muted">
                 <tr>
                     <th style="width: 15%">MO # & Product</th>
-                    <th style="width: 20%">Operation</th>
+                    <th style="width: 20%">{{ __('production.operation') }}</th>
                     <th style="width: 18%">Vendor</th>
                     <th style="width: 12%">Dispatch Date</th>
                     <th style="width: 12%">Expected Return</th>

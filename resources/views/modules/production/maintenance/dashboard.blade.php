@@ -105,10 +105,10 @@
                                 <thead class="bg-light text-muted">
                                     <tr>
                                         <th>WO Number</th>
-                                        <th>Machine</th>
-                                        <th>Type</th>
-                                        <th>Priority</th>
-                                        <th>Status</th>
+                                        <th>{{ __('production.col_machine') }}</th>
+                                        <th>{{ __('production.routing_type') }}</th>
+                                        <th>{{ __('production.priority') }}</th>
+                                        <th>{{ __('production.status') }}</th>
                                         <th class="text-end">Cost</th>
                                     </tr>
                                 </thead>
@@ -163,7 +163,7 @@
                                 <thead class="bg-light text-muted">
                                     <tr>
                                         <th>Schedule</th>
-                                        <th>Machine</th>
+                                        <th>{{ __('production.col_machine') }}</th>
                                         <th>Next Due</th>
                                     </tr>
                                 </thead>
@@ -205,9 +205,9 @@
         </x-ui.odoo-form-ui>
 
         <x-ui.odoo-form-ui type="select" label="Priority" name="priority" :required="true">
-            <option value="high" selected>High</option>
-            <option value="critical">Critical</option>
-            <option value="medium">Medium</option>
+            <option value="high" selected>{{ __('production.priority_high') }}</option>
+            <option value="critical">{{ __('production.critical') }}</option>
+            <option value="medium">{{ __('production.priority_medium') }}</option>
         </x-ui.odoo-form-ui>
 
         <x-ui.odoo-form-ui type="textarea" label="Breakdown Description / Reason" name="reason" rows="3" :required="true" placeholder="Describe the failure, error codes, or abnormal sounds..." />

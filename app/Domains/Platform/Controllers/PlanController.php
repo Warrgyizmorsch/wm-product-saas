@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PlanController extends Controller
@@ -82,6 +83,8 @@ class PlanController extends Controller
             ],
             'description' => ['nullable', 'string', 'max:1000'],
             'price' => ['nullable', 'integer', 'min:0'],
+            'monthly_price_per_user' => ['nullable', 'integer', 'min:0'],
+            'yearly_price_per_user' => ['nullable', 'integer', 'min:0'],
             'currency' => ['nullable', 'string', 'max:10'],
             'billing_cycle' => ['required', 'string', Rule::in(['monthly', 'yearly'])],
             'max_users' => ['nullable', 'integer', 'min:1'],
@@ -93,6 +96,11 @@ class PlanController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        $mistake = ModulePriceController::yearlyTotalMistake($validated['monthly_price_per_user'] ?? null, $validated['yearly_price_per_user'] ?? null);
+        if ($mistake !== null) {
+            throw ValidationException::withMessages(['yearly_price_per_user' => ucfirst($mistake)]);
+        }
 
         $validated['is_demo'] = $request->boolean('is_demo');
         $validated['is_active'] = $request->boolean('is_active');

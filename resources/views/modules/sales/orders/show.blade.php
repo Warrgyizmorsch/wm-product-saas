@@ -655,7 +655,7 @@
                                                     <i class="feather-truck me-1"></i>{{ $inv->dispatchOrders->first()->dispatch_number }}
                                                 </a>
                                             @elseif ($inv->materialRequirement)
-                                                <a href="{{ route('sales.material-requirements.show', $inv->material_requirement_id) }}" class="text-muted fw-semibold font-monospace">
+                                                <a href="{{ route('inventory.material-requirements.show', $inv->material_requirement_id) }}" class="text-muted fw-semibold font-monospace">
                                                     {{ $inv->materialRequirement->requirement_number }}
                                                 </a>
                                             @else

@@ -55,17 +55,20 @@ $masterDefinitions = [
             ]]],
             ['component' => 'input',  'props' => ['label' => 'Standard Unit Cost',    'name' => 'unit_cost', 'type' => 'number', 'step' => 'any', 'placeholder' => '0.00', 'value' => '0.00']],
             ['component' => 'input',  'props' => ['label' => 'Selling Price',         'name' => 'selling_price', 'type' => 'number', 'step' => 'any', 'placeholder' => '0.00', 'value' => '0.00']],
-            ['component' => 'select', 'props' => ['label' => 'Sales Account',          'name' => 'sales_account', 'required' => true, 'selected' => 'Sales Income', 'options' => [
+            ['component' => 'select', 'props' => ['label' => 'Sales Account',          'name' => 'sales_account', 'options' => [
+                ''                => 'Select Sales Account',
                 'Sales Income'    => 'Sales Income Account',
                 'General Income'  => 'General Income Account',
                 'Interest Income' => 'Interest Income Account',
             ]]],
-            ['component' => 'select', 'props' => ['label' => 'Purchase Account',       'name' => 'purchase_account', 'required' => true, 'selected' => 'Cost of Goods Sold', 'options' => [
+            ['component' => 'select', 'props' => ['label' => 'Purchase Account',       'name' => 'purchase_account', 'options' => [
+                ''                   => 'Select Purchase Account',
                 'Cost of Goods Sold' => 'Cost of Goods Sold (COGS)',
                 'Purchases'          => 'Purchases Expense Account',
                 'Job Costs'          => 'Job Costs Expense Account',
             ]]],
-            ['component' => 'select', 'props' => ['label' => 'Inventory Account',      'name' => 'inventory_account', 'required' => true, 'selected' => 'Inventory Asset', 'options' => [
+            ['component' => 'select', 'props' => ['label' => 'Inventory Account',      'name' => 'inventory_account', 'options' => [
+                ''                     => 'Select Inventory Account',
                 'Inventory Asset'      => 'Inventory Asset Account',
                 'Raw Materials Stock'  => 'Raw Materials Stock',
                 'Finished Goods Stock' => 'Finished Goods Stock',
@@ -131,14 +134,19 @@ $masterDefinitions = [
             ['component' => 'input', 'props' => ['label' => 'Email Address', 'name' => 'email', 'placeholder' => 'e.g. prakash@company.com', 'type' => 'email']],
         ],
     ],
+    'account' => [
+        'label'  => 'Account / Customer',
+        'route'  => 'crm.accounts.store',
+        'fields' => [],
+    ],
 ];
 @endphp
 
 @foreach($masters as $masterKey)
     @if(isset($masterDefinitions[$masterKey]))
         @php $def = $masterDefinitions[$masterKey]; @endphp
-        @if($masterKey === 'contact' || \Illuminate\Support\Facades\Route::has($def['route']))
-        <x-ui.modal id="quickCreateModal_{{ $masterKey }}" :title="$masterKey === 'customer' ? __('crm.quick_create_customer') : ($masterKey === 'contact' ? (__('crm.quick_create') . ' ' . __('crm.contact_person')) : ('Quick Create ' . $def['label']))" size="{{ in_array($masterKey, ['product', 'contact', 'customer']) ? 'lg' : '' }}">
+        @if($masterKey === 'contact' || $masterKey === 'account' || \Illuminate\Support\Facades\Route::has($def['route']))
+        <x-ui.modal id="quickCreateModal_{{ $masterKey }}" :title="$masterKey === 'account' ? __('crm.create_new_account_title') : ($masterKey === 'customer' ? __('crm.quick_create_customer') : ($masterKey === 'contact' ? (__('crm.quick_create') . ' ' . __('crm.contact_person')) : ('Quick Create ' . $def['label'])))" size="{{ in_array($masterKey, ['product', 'contact', 'customer', 'account']) ? 'lg' : '' }}">
             @if($masterKey === 'product')
                 <!-- Handcrafted Premium Product Modal layout matching Inventory Create screen section headers -->
                 <div data-action="{{ route('products.quick-create') }}"
@@ -252,9 +260,9 @@ $masterDefinitions = [
                                 type="select"
                                 label="Sales Account"
                                 name="sales_account"
-                                :required="true"
                             >
-                                <option value="Sales Income" selected>Sales Income Account</option>
+                                <option value="" selected>Select Sales Account</option>
+                                <option value="Sales Income">Sales Income Account</option>
                                 <option value="General Income">General Income Account</option>
                                 <option value="Interest Income">Interest Income Account</option>
                             </x-ui.odoo-form-ui>
@@ -263,9 +271,9 @@ $masterDefinitions = [
                                 type="select"
                                 label="Purchase Acc."
                                 name="purchase_account"
-                                :required="true"
                             >
-                                <option value="Cost of Goods Sold" selected>Cost of Goods Sold (COGS)</option>
+                                <option value="" selected>Select Purchase Account</option>
+                                <option value="Cost of Goods Sold">Cost of Goods Sold (COGS)</option>
                                 <option value="Purchases">Purchases Expense Account</option>
                                 <option value="Job Costs">Job Costs Expense Account</option>
                             </x-ui.odoo-form-ui>
@@ -274,9 +282,9 @@ $masterDefinitions = [
                                 type="select"
                                 label="Inventory Acc."
                                 name="inventory_account"
-                                :required="true"
                             >
-                                <option value="Inventory Asset" selected>Inventory Asset Account</option>
+                                <option value="" selected>Select Inventory Account</option>
+                                <option value="Inventory Asset">Inventory Asset Account</option>
                                 <option value="Raw Materials Stock">Raw Materials Stock</option>
                                 <option value="Finished Goods Stock">Finished Goods Stock</option>
                             </x-ui.odoo-form-ui>
@@ -402,6 +410,134 @@ $masterDefinitions = [
                         </div>
                     </div>
                 </div>
+            @elseif($masterKey === 'account')
+                <!-- Handcrafted Account & Customer Quick Create Modal layout -->
+                <div data-action="{{ route('crm.accounts.store') }}"
+                     class="quick-create-form"
+                     id="quickCreateForm_account">
+                    @csrf
+                    <div class="row g-4 text-dark fs-13">
+                        <!-- Column 1: Company / Account Master Details -->
+                        <div class="col-md-6 border-end-md pe-md-3">
+                            <h6 class="fw-bold text-primary mb-3"><i class="feather-briefcase me-1.5"></i>{{ __('crm.company_master_details') }}</h6>
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="text"
+                                :label="__('crm.company_name')"
+                                name="name"
+                                :placeholder="__('crm.company_name_placeholder')"
+                                :required="true"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="text"
+                                :label="__('crm.gstin')"
+                                name="gstin"
+                                :placeholder="__('crm.gstin_placeholder')"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="email"
+                                :label="__('crm.contact_email')"
+                                name="email"
+                                :placeholder="__('crm.contact_email_placeholder')"
+                                :required="true"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="tel"
+                                :label="__('crm.contact_phone')"
+                                name="phone"
+                                :placeholder="__('crm.contact_phone_placeholder')"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="text"
+                                :label="__('crm.industry_type')"
+                                name="industry_type"
+                                :placeholder="__('crm.industry_placeholder')"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="text"
+                                :label="__('crm.website_url')"
+                                name="website"
+                                :placeholder="__('crm.website_placeholder')"
+                            />
+                        </div>
+
+                        <!-- Column 2: Primary Contact & Address Details -->
+                        <div class="col-md-6 ps-md-3">
+                            <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-1.5"></i>{{ __('crm.primary_contact_person') }}</h6>
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="text"
+                                :label="__('crm.primary_contact')"
+                                name="contact_name"
+                                :placeholder="__('crm.primary_contact_placeholder')"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="text"
+                                :label="__('crm.designation_role')"
+                                name="designation"
+                                :placeholder="__('crm.designation_placeholder')"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="tel"
+                                :label="__('crm.contact_phone')"
+                                name="contact_phone"
+                                :placeholder="__('crm.primary_contact_phone_placeholder')"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="email"
+                                :label="__('crm.contact_email')"
+                                name="contact_email"
+                                :placeholder="__('crm.primary_contact_email_placeholder')"
+                            />
+
+                            <div class="border-top pt-3 mt-3">
+                                <h6 class="fw-bold text-primary mb-2"><i class="feather-map-pin me-1.5"></i>{{ __('crm.address_location') }}</h6>
+
+                                <x-ui.odoo-form-ui
+                                    type="input"
+                                    inputType="text"
+                                    :label="__('crm.street_address')"
+                                    name="street"
+                                    :placeholder="__('crm.street_placeholder')"
+                                />
+
+                                <x-ui.odoo-form-ui
+                                    type="input"
+                                    inputType="text"
+                                    :label="__('crm.city')"
+                                    name="city"
+                                    :placeholder="__('crm.city_placeholder')"
+                                />
+
+                                <x-ui.odoo-form-ui
+                                    type="input"
+                                    inputType="text"
+                                    :label="__('crm.state')"
+                                    name="state"
+                                    :placeholder="__('crm.state_placeholder')"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
             @else
                 <!-- Generic layout for other masters -->
                 <div data-action="{{ route($def['route']) }}"
@@ -453,7 +589,7 @@ $masterDefinitions = [
                 <button type="button"
                         class="btn btn-primary btn-save-master"
                         data-form="quickCreateForm_{{ $masterKey }}">
-                    {{ $masterKey === 'customer' ? __('crm.save_customer') : ($masterKey === 'contact' ? __('crm.save_contact') : ('Save ' . $def['label'])) }}
+                    {{ $masterKey === 'account' ? __('crm.save_account') : ($masterKey === 'customer' ? __('crm.save_customer') : ($masterKey === 'contact' ? __('crm.save_contact') : ('Save ' . $def['label']))) }}
                 </button>
             </x-slot>
         </x-ui.modal>

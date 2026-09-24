@@ -35,16 +35,16 @@ class ProductionBomDTO
         }
 
         return new self(
-            bom_number: $data['bom_number'],
+            bom_number: $data['bom_number'] ?? '',
             bom_name: $data['bom_name'] ?? null,
             bom_type: $data['bom_type'] ?? 'manufacturing',
-            product_id: (int) $data['product_id'],
+            product_id: (int) ($data['product_id'] ?? 0),
             base_quantity: isset($data['base_quantity']) ? (float) $data['base_quantity'] : 1.00,
             base_uom_id: !empty($data['base_uom_id']) ? (int) $data['base_uom_id'] : null,
             version: $data['version'] ?? '1.0.0',
             revision_reason: $data['revision_reason'] ?? null,
             routing_id: !empty($data['routing_id']) ? (int) $data['routing_id'] : null,
-            effective_date: $data['effective_date'],
+            effective_date: $data['effective_date'] ?? now()->toDateString(),
             expiry_date: $data['expiry_date'] ?? null,
             notes: $data['notes'] ?? null,
             items: $items,

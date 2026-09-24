@@ -44,6 +44,8 @@ class PlanService
             'slug' => ($data['slug'] ?? null) ?: Str::slug($data['name']),
             'description' => ($data['description'] ?? null) ?: null,
             'price' => ($data['price'] ?? null) ?: 0,
+            'monthly_price_per_user' => isset($data['monthly_price_per_user']) && $data['monthly_price_per_user'] !== '' ? (int) $data['monthly_price_per_user'] : null,
+            'yearly_price_per_user' => isset($data['yearly_price_per_user']) && $data['yearly_price_per_user'] !== '' ? (int) $data['yearly_price_per_user'] : null,
             'currency' => ($data['currency'] ?? null) ?: 'INR',
             'billing_cycle' => ($data['billing_cycle'] ?? null) ?: 'monthly',
             'max_users' => ($data['max_users'] ?? null) ?: null,

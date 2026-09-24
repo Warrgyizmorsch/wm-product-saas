@@ -19,9 +19,11 @@ class TenantSwitchController extends Controller
 
         $user = $request->user();
         $ownsTenant = $user !== null && $user->tenant_id !== null && (int) $user->tenant_id === (int) $tenant->id;
-        $isPlatformAdmin = $user !== null && $this->access->allows($user, 'platform.tenants.manage');
+        // Switching into another tenant is a super_admin-only capability, narrower than
+        // platform.tenants.manage (which also covers plans/currencies/etc. for 'admin').
+        $isSuperAdmin = $user !== null && $this->access->hasRole($user, 'super_admin');
 
-        abort_unless($ownsTenant || $isPlatformAdmin, 403, 'You are not assigned to this tenant.');
+        abort_unless($ownsTenant || $isSuperAdmin, 403, 'You are not assigned to this tenant.');
 
         $request->session()->put('tenant_slug', $tenant->slug);
 

@@ -56,15 +56,17 @@
 
 @section('page-actions')
     <a href="{{ route('production.mes.scanner.index') }}" class="btn btn-primary">
-        <i class="feather-camera me-2"></i> Scan Barcode
+        <i class="feather-camera me-2"></i> {{ __('production.scan_barcode') }}
     </a>
 @endsection
 
 @section('content')
 
     {{-- ── MES Operator Console Workflow Guidance Component ── --}}
-    <x-ui.workflow-guide title="What's Next?">
-        Review your assigned operation tasks below. Accept task assignments and click <span class="badge bg-soft-primary text-primary border border-primary-subtle fw-semibold">Execute</span> to open the operation execution console and start production.
+    <x-ui.workflow-guide :title="__('production.whats_next')">
+        {!! __('production.operator_dashboard_workflow_guide', [
+            'execute_badge' => '<span class="badge bg-soft-primary text-primary border border-primary-subtle fw-semibold">' . __('production.execute') . '</span>'
+        ]) !!}
     </x-ui.workflow-guide>
 
     <div class="erp-single-panel bg-white p-4 rounded shadow-sm">
@@ -141,9 +143,9 @@
                                                     @elseif($assign->status === 'accepted')
                                                         <span class="badge bg-soft-success text-success fs-9">Accepted</span>
                                                     @elseif($assign->status === 'rejected')
-                                                        <span class="badge bg-soft-danger text-danger fs-9">Rejected</span>
+                                                        <span class="badge bg-soft-danger text-danger fs-9">{{ __('production.rejected') }}</span>
                                                     @else
-                                                        <span class="badge bg-soft-secondary text-secondary fs-9">Completed</span>
+                                                        <span class="badge bg-soft-secondary text-secondary fs-9">{{ __('production.completed_schedules') }}</span>
                                                     @endif
                                                 </div>
                                                 <h6 class="fw-bold text-dark mb-1">{{ $assign->operation->name ?? '—' }}</h6>
@@ -167,13 +169,11 @@
                                                     </form>
                                                     <form method="POST" action="{{ route('production.mes.assignments.reject', $assign->id) }}" class="flex-fill">
                                                         @csrf
-                                                        <x-ui.button type="submit" variant="outline-danger" icon="feather-x" class="w-100 btn-touch">Reject</x-ui.button>
+                                                        <x-ui.button type="submit" variant="outline-danger" icon="feather-x" class="w-100 btn-touch">{{ __('production.reject') }}</x-ui.button>
                                                     </form>
                                                 @elseif($assign->status === 'accepted')
                                                     @if($assign->operation && $assign->operation->status === 'completed')
-                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="secondary" icon="feather-eye" class="">
-                                                            View
-                                                        </x-ui.button>
+                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="secondary" icon="feather-eye" class="">{{ __('production.view') }}</x-ui.button>
                                                     @else
                                                         <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="primary" icon="feather-play" class="">
                                                             Go to Execution

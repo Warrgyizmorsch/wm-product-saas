@@ -652,14 +652,26 @@
                     }
                 });
 
-                // Clear errors on interaction
-                $(document).on('input change keyup', '.odoo-form-control, .odoo-table-input, .odoo-table-select, .erp-file-input', function() {
-                    clearOdooError(this);
+                // Clear errors on interaction when field has valid content
+                $(document).on('input change', '.odoo-form-control, .odoo-table-input, .odoo-table-select, .erp-file-input', function() {
+                    let val = $(this).val();
+                    if (this.type === 'checkbox' || this.type === 'radio') {
+                        clearOdooError(this);
+                    } else if (this.type === 'file') {
+                        if (this.files && this.files.length > 0) {
+                            clearOdooError(this);
+                        }
+                    } else if (val !== null && val !== undefined && (typeof val !== 'string' || val.trim() !== '')) {
+                        clearOdooError(this);
+                    }
                 });
 
                 // Handle select2 change clearing
                 $(document).on('change.select2', 'select', function() {
-                    clearOdooError(this);
+                    let val = $(this).val();
+                    if (val !== null && val !== undefined && val !== '') {
+                        clearOdooError(this);
+                    }
                 });
 
                 // Generic form submit required validator

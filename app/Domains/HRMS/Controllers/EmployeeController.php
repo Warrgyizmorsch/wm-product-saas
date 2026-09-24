@@ -308,6 +308,14 @@ class EmployeeController extends Controller
             \Illuminate\Support\Facades\Log::error("Failed to send Welcome Email to employee: " . $emEx->getMessage());
         }
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.employee.onboarded', [
+            'employee_name' => $employee->full_name,
+            'employee_code' => $employee->employee_id ?? ('EMP-' . $employee->id),
+            'designation'   => $employee->designation?->name ?? 'Staff',
+            'department'    => $employee->department?->name ?? 'General',
+            'joining_date'  => $employee->date_of_joining ? \Carbon\Carbon::parse($employee->date_of_joining)->format('d M Y') : now()->format('d M Y'),
+        ]);
+
         return redirect()
             ->route('hrms.employees.index')
             ->with('success', "🎉 Employee {$employee->full_name} created successfully and Welcome Email dispatched!");
@@ -643,7 +651,7 @@ class EmployeeController extends Controller
             $requiresSignature = (bool) $documentMaster->requires_signature;
             $status = $requiresSignature ? 'pending_signature' : ($approvalRequired ? 'uploaded' : 'approved');
 
-            \App\Domains\HRMS\Models\Document::create([
+            $createdDoc = \App\Domains\HRMS\Models\Document::create([
                 'tenant_id'          => $tenantId,
                 'documentable_id'    => $employee->id,
                 'documentable_type'  => Employee::class,
@@ -660,7 +668,17 @@ class EmployeeController extends Controller
                 'expiry_date'        => $documentMaster->expiry_applicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
                 'requested_by_id'    => auth()->id(),
             ]);
+
+            $documentName = $documentMaster->name;
+            $catName = $documentMaster->category?->name ?? 'General';
         }
+
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.uploaded', [
+            'employee_name' => $employee->full_name,
+            'document_type' => $documentName ?? ($file->getClientOriginalName()),
+            'category_name' => $catName ?? 'General Documents',
+            'uploaded_at'   => now()->format('d M Y, h:i A'),
+        ]);
 
         return redirect()->back()->with('success', 'Document uploaded successfully.');
     }
@@ -668,6 +686,13 @@ class EmployeeController extends Controller
     public function destroyDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
     {
         $this->authorizeHrms('hrms.employees.update');
+
+        $user = auth()->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+
+        if ($user && !$workflowService->canDeleteDocument($user, $document)) {
+            return redirect()->back()->with('error', 'Self-deletion is prohibited. You cannot delete documents from your own employee profile.');
+        }
 
         if ($document->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
             \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
@@ -686,6 +711,14 @@ class EmployeeController extends Controller
             'status' => 'approved',
         ]);
 
+        $emp = $document->documentable;
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.approved', [
+            'employee_name' => $emp?->full_name ?? 'Employee',
+            'document_type' => $document->name ?? 'Document',
+            'approved_by'   => auth()->user()?->name ?? 'HR Department',
+            'date'          => now()->format('d M Y'),
+        ]);
+
         return redirect()->back()->with('success', 'Document approved successfully.');
     }
 
@@ -695,6 +728,14 @@ class EmployeeController extends Controller
 
         $document->update([
             'status' => 'rejected',
+        ]);
+
+        $emp = $document->documentable;
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.rejected', [
+            'employee_name' => $emp?->full_name ?? 'Employee',
+            'document_type' => $document->name ?? 'Document',
+            'reason'        => request('reason', 'Document rejected upon verification'),
+            'rejected_by'   => auth()->user()?->name ?? 'HR Department',
         ]);
 
         return redirect()->back()->with('success', 'Document rejected successfully.');
@@ -734,6 +775,13 @@ class EmployeeController extends Controller
                 'pos_y'    => $request->input('pos_y'),
             ]
         );
+
+        $emp = $document->documentable;
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.signed', [
+            'employee_name'  => $emp?->full_name ?? (auth()->user()?->name ?? 'Employee'),
+            'document_title' => $document->name ?? 'Document',
+            'signed_at'      => now()->format('d M Y, h:i A'),
+        ]);
 
         return redirect()->back()->with('success', 'Document digitally signed successfully.');
     }

@@ -3,20 +3,23 @@
 namespace App\Domains\Platform\Services;
 
 use App\Domains\Platform\Models\SubscriptionPayment;
+use App\Domains\Platform\Models\TenantModule;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The one place a SubscriptionPayment ever actually transitions to "paid"
- * and switches the tenant's plan — shared by every PaymentGateway
- * implementation (called from both the browser-callback verification path
- * and each gateway's webhook handler) so this business rule exists exactly
- * once, regardless of which gateway confirmed the payment.
+ * The one place a SubscriptionPayment ever actually transitions to "paid" and
+ * takes its effect — a plan switch, or (for a module add-on checkout) granting
+ * the purchased modules — shared by every PaymentGateway implementation
+ * (called from both the browser-callback verification path and each gateway's
+ * webhook handler) so this business rule exists exactly once, regardless of
+ * which gateway confirmed the payment or what the payment was for.
  */
 class SubscriptionPaymentService
 {
     public function __construct(
         private readonly TenantService $tenants,
+        private readonly TenantModuleService $modules,
     ) {
     }
 
@@ -27,13 +30,13 @@ class SubscriptionPaymentService
      * $expectedTenant is a defense-in-depth check for the authenticated
      * browser-callback path: a valid gateway signature only proves the
      * payment is genuine, not that it belongs to the tenant making this
-     * request, so a mismatch is rejected rather than silently switching a
-     * different tenant's plan. Webhooks have no authenticated tenant to
-     * compare against and pass null, trusting the row's own tenant_id.
+     * request, so a mismatch is rejected rather than silently applying it to
+     * a different tenant. Webhooks have no authenticated tenant to compare
+     * against and pass null, trusting the row's own tenant_id.
      *
      * @throws \RuntimeException if $expectedTenant doesn't own this payment
      */
-    public function markPaidAndSwitchPlan(
+    public function markPaid(
         SubscriptionPayment $payment,
         string $gatewayPaymentId,
         ?string $gatewaySignature,
@@ -60,7 +63,13 @@ class SubscriptionPaymentService
                 'status' => SubscriptionPayment::STATUS_PAID,
             ]);
 
-            $this->tenants->switchOwnPlan($payment->tenant, $payment->plan_id);
+            if ($payment->purpose === SubscriptionPayment::PURPOSE_MODULE_ADDON) {
+                // Grants the modules and fills their starter masters, like a plan switch.
+                // Paid with the one-time fee, so free for life (never recurring-billed).
+                $this->modules->install($payment->tenant, $payment->modules ?? [], $payment, null, TenantModule::BILLING_LIFETIME);
+            } else {
+                $this->tenants->switchOwnPlan($payment->tenant, $payment->plan_id);
+            }
 
             return $payment;
         });

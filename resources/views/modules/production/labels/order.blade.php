@@ -95,7 +95,7 @@
 
     <div class="label-wrapper">
         <div class="label-header">
-            <span class="label-type">Production Order</span>
+            <span class="label-type">{{ __('production.production_order') }}</span>
             <span class="status-badge">{{ strtoupper($order->status) }}</span>
         </div>
 

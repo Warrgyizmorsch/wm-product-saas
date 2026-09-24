@@ -101,6 +101,14 @@ class LeaveRequestController extends Controller
 
         $leaveRequest = $this->leaveRequestRepository->storeLeaveRequest($validated, $request);
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.applied', [
+            'employee_name' => $employee->full_name,
+            'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
+            'from_date'     => $startDate->format('d M Y'),
+            'to_date'       => $endDate->format('d M Y'),
+            'days'          => (string) $duration,
+        ]);
+
         // Send Notifications
         \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'New Leave Request',
@@ -154,12 +162,33 @@ class LeaveRequestController extends Controller
 
         $this->leaveRequestRepository->updateStatus($leaveRequest, $validated, $request);
 
+        $startFormatted = \Carbon\Carbon::parse($leaveRequest->start_date)->format('d M Y');
+        $endFormatted = \Carbon\Carbon::parse($leaveRequest->end_date)->format('d M Y');
+
+        if ($validated['action'] === 'approved') {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.approved', [
+                'employee_name' => $leaveRequest->employee?->full_name ?? 'Employee',
+                'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
+                'from_date'     => $startFormatted,
+                'to_date'       => $endFormatted,
+                'days'          => (string) ($leaveRequest->duration ?? 1),
+                'approved_by'   => auth()->user()?->name ?? 'Manager',
+            ]);
+        } elseif ($validated['action'] === 'rejected') {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.rejected', [
+                'employee_name' => $leaveRequest->employee?->full_name ?? 'Employee',
+                'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
+                'from_date'     => $startFormatted,
+                'to_date'       => $endFormatted,
+                'reason'        => $validated['rejection_reason'] ?? 'Not specified',
+                'rejected_by'   => auth()->user()?->name ?? 'Manager',
+            ]);
+        }
+
         // Send Status Notification to Employee
         if ($leaveRequest->employee) {
             $statusText = ucfirst($validated['action']);
             $iconClass = $validated['action'] === 'approved' ? 'feather-check-circle' : 'feather-x-circle';
-            $startFormatted = \Carbon\Carbon::parse($leaveRequest->start_date)->format('M d, Y');
-            $endFormatted = \Carbon\Carbon::parse($leaveRequest->end_date)->format('M d, Y');
         \App\Services\Notification\NotificationService::sendToEmployee(
                 employee: $leaveRequest->employee,
                 title: "Leave Request {$statusText}",
@@ -387,54 +416,11 @@ class LeaveRequestController extends Controller
 
     public function canApproveLeaveRequest(?\App\Models\User $user, LeaveRequest $leaveRequest): bool
     {
-        if (!$user) {
+        if (!$user || !$leaveRequest->employee) {
             return false;
         }
 
-        $isHrAdmin = $user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve');
-        if ($isHrAdmin) {
-            return true;
-        }
-
-        $authEmployee = Employee::resolveForUser($user);
-        if (!$authEmployee) {
-            return false;
-        }
-
-        $emp = $leaveRequest->employee;
-        if (!$emp) {
-            return false;
-        }
-
-        $isReportingManager = (string) $emp->reporting_manager_id === (string) $authEmployee->id;
-        $isDepartmentHead   = $emp->department && (string) $emp->department->head_employee_id === (string) $authEmployee->id;
-
-        $rules = $leaveRequest->leaveType->rules ?? [];
-        $workflowLevel = $rules['approval']['workflow_level'] ?? '1_level';
-        $firstApprover = $rules['approval']['first_approver'] ?? 'reporting_manager';
-        $secondApprover = $rules['approval']['second_approver'] ?? 'hr_manager';
-
-        $currentLevel = (string) ($leaveRequest->current_level ?? '1');
-
-        if ($currentLevel === '1' || $currentLevel === '') {
-            if ($firstApprover === 'department_head') {
-                return $isDepartmentHead;
-            } elseif ($firstApprover === 'reporting_manager') {
-                return $isReportingManager;
-            } else {
-                return $isReportingManager || $isDepartmentHead;
-            }
-        } elseif ($currentLevel === '2' && $workflowLevel === '2_level') {
-            if ($secondApprover === 'department_head') {
-                return $isDepartmentHead;
-            } elseif ($secondApprover === 'reporting_manager') {
-                return $isReportingManager;
-            } else {
-                return false;
-            }
-        }
-
-        return false;
+        return app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class)->canApprove($user, $leaveRequest->employee, $leaveRequest);
     }
 }
 

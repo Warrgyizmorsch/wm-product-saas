@@ -168,6 +168,11 @@ class ProductionOrderOperation extends BaseModel
         return $this->belongsTo(ProductionOrder::class, 'production_order_id');
     }
 
+    public function productionOrder(): BelongsTo
+    {
+        return $this->order();
+    }
+
     public function routingOperation(): BelongsTo
     {
         return $this->belongsTo(RoutingOperation::class, 'routing_operation_id');

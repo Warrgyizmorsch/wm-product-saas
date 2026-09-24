@@ -17,13 +17,13 @@
     <div class="row g-3 mb-4">
         <div class="col-md-2">
             <div class="card border-0 shadow-sm text-center py-3 bg-white">
-                <span class="text-uppercase fs-11 fw-bold text-muted">Total Orders</span>
+                <span class="text-uppercase fs-11 fw-bold text-muted">{{ __('production.total_orders') }}</span>
                 <h3 class="fw-bold mb-0 text-dark">{{ $summary['total_orders'] }}</h3>
             </div>
         </div>
         <div class="col-md-2">
             <div class="card border-0 shadow-sm text-center py-3 bg-soft-danger text-danger">
-                <span class="text-uppercase fs-11 fw-bold">Critical</span>
+                <span class="text-uppercase fs-11 fw-bold">{{ __('production.critical') }}</span>
                 <h3 class="fw-bold mb-0">{{ $summary['critical'] }}</h3>
             </div>
         </div>
@@ -62,7 +62,7 @@
                     <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Risk Exception Orders</h6>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Severity Level</label>
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.severity_level') }}</label>
                         <x-ui.odoo-form-ui type="select" name="severity">
                             <option value="">All Severities</option>
                             <option value="CRITICAL" {{ (request('severity') ?? '') === 'CRITICAL' ? 'selected' : '' }}>CRITICAL</option>
@@ -73,8 +73,8 @@
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('production.planning-exceptions.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                        <a href="{{ route('production.planning-exceptions.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
+                        <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
                     </div>
                 </x-ui.filter>
             </form>
@@ -85,12 +85,12 @@
     <x-ui.odoo-form-ui type="table">
         <thead>
             <tr>
-                <th style="width: 15%">Order Number</th>
-                <th style="width: 25%">Product</th>
-                <th style="width: 10%" class="text-center">Quantity</th>
+                <th style="width: 15%">{{ __('production.order_number') }}</th>
+                <th style="width: 25%">{{ __('production.product') }}</th>
+                <th style="width: 10%" class="text-center">{{ __('production.quantity') }}</th>
                 <th style="width: 12%" class="text-center">Overall Risk</th>
                 <th style="width: 28%">Primary Exception Vectors</th>
-                <th style="width: 10%" class="text-end">Actions</th>
+                <th style="width: 10%" class="text-end">{{ __('production.actions') }}</th>
             </tr>
         </thead>
         <tbody>

@@ -496,7 +496,7 @@
                             }
                         });
 
-                        if (triggerSelect) {
+                        if (triggerSelect && $(triggerSelect).length) {
                             var isMultiple = $(triggerSelect).prop('multiple');
                             var displayText = response.name + (response.sku ? ' (' + response.sku + ')' : '');
 
@@ -515,7 +515,7 @@
                                 optionEl.attr('data-shipping', response.shipping_address);
                             }
 
-                            // Append new DB product option to dropdown
+                            // Append new DB option to dropdown
                             $(triggerSelect).append(optionEl);
 
                             if (isMultiple) {
@@ -533,6 +533,9 @@
                             } else {
                                 $(triggerSelect).val(response.id).trigger('change').trigger('change.select2');
                             }
+                        } else {
+                            // If modal was opened from listing page button (e.g. + New Customer), reload page to show new record in table
+                            window.location.reload();
                         }
                     }
                 },

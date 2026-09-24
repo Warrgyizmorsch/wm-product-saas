@@ -12,15 +12,16 @@ use Illuminate\Support\Facades\DB;
 class ProductService
 {
     public function __construct(
-        protected ProductRepository $productRepo
+        protected ProductRepository $productRepo,
+        protected ProductImageService $imageService
     ) {}
 
     /**
-     * Create product (Single or Variant) along with warehouse stock records.
+     * Create product (Single or Variant) along with warehouse stock records and media.
      */
-    public function createProduct(array $validated, int $tenantId): Product
+    public function createProduct(array $validated, int $tenantId, array $requestInput = []): Product
     {
-        return DB::transaction(function () use ($validated, $tenantId) {
+        return DB::transaction(function () use ($validated, $tenantId, $requestInput) {
             $isService = ($validated['item_type'] ?? '') === 'Service';
 
             // 1. Create Parent Product
@@ -36,9 +37,9 @@ class ProductService
                 'hsn_sac' => $validated['hsn_sac'] ?? null,
                 'gst_rate' => $validated['gst_rate'] ?? 18.00,
                 'preferred_vendor_id' => $isService ? null : ($validated['preferred_vendor_id'] ?? null),
-                'selling_price' => $validated['selling_price'],
-                'cost_price' => $validated['cost_price'],
-                'unit_cost' => $validated['cost_price'],
+                'selling_price' => (float)($validated['selling_price'] ?? 0),
+                'cost_price' => (float)($validated['cost_price'] ?? 0),
+                'unit_cost' => (float)($validated['cost_price'] ?? 0),
                 'sales_account' => $validated['sales_account'] ?? null,
                 'purchase_account' => $validated['purchase_account'] ?? null,
                 'inventory_account' => $isService ? null : ($validated['inventory_account'] ?? null),
@@ -102,27 +103,33 @@ class ProductService
                     );
                 }
             } else {
-                if (!empty($validated['variants'])) {
+                $submittedVariants = $requestInput['variants'] ?? $validated['variants'] ?? [];
+                if (!empty($submittedVariants)) {
                     $defaultWarehouse = Warehouse::ensureDefaultWarehouse($tenantId);
 
-                    foreach ($validated['variants'] as $vData) {
+                    foreach ($submittedVariants as $idx => $vData) {
+                        $variantSku = trim($vData['sku'] ?? '');
+                        if (!$variantSku) {
+                            continue;
+                        }
+                        $attrLabel = trim($vData['attributes'] ?? '');
                         $variantProduct = $this->productRepo->create([
                             'tenant_id' => $tenantId,
                             'parent_id' => $parentProduct->id,
-                            'name' => $parentProduct->name . ' (' . ($vData['attributes'] ?? '') . ')',
-                            'sku' => $vData['sku'],
+                            'name' => $parentProduct->name . ($attrLabel ? " ({$attrLabel})" : ''),
+                            'sku' => $variantSku,
                             'type' => $parentProduct->type,
                             'item_type' => $parentProduct->item_type,
                             'variation_type' => 'Single',
                             'uom_id' => $parentProduct->uom_id,
-                            'status' => 'active',
-                            'selling_price' => $vData['selling_price'] ?? $parentProduct->selling_price,
-                            'cost_price' => $vData['cost_price'] ?? $parentProduct->cost_price,
-                            'unit_cost' => $vData['cost_price'] ?? $parentProduct->cost_price,
-                            'reorder_point' => $vData['reorder_point'] ?? 0,
-                            'opening_stock' => $vData['opening_stock'] ?? 0,
-                            'opening_stock_rate' => $vData['cost_price'] ?? $parentProduct->cost_price,
-                            'variant_values' => ['label' => $vData['attributes'] ?? ''],
+                            'status' => $vData['status'] ?? 'active',
+                            'selling_price' => !empty($vData['selling_price']) ? (float)$vData['selling_price'] : $parentProduct->selling_price,
+                            'cost_price' => !empty($vData['cost_price']) ? (float)$vData['cost_price'] : $parentProduct->cost_price,
+                            'unit_cost' => !empty($vData['cost_price']) ? (float)$vData['cost_price'] : $parentProduct->cost_price,
+                            'reorder_point' => !empty($vData['reorder_point']) ? (float)$vData['reorder_point'] : 0,
+                            'opening_stock' => !empty($vData['opening_stock']) ? (float)$vData['opening_stock'] : 0,
+                            'opening_stock_rate' => !empty($vData['cost_price']) ? (float)$vData['cost_price'] : $parentProduct->cost_price,
+                            'variant_values' => ['label' => $attrLabel],
                             'track_serial_number' => $parentProduct->track_serial_number,
                             'track_batch' => $parentProduct->track_batch,
                             'supplier_method' => $parentProduct->supplier_method,
@@ -139,8 +146,19 @@ class ProductService
                                 'Opening Stock'
                             );
                         }
+
+                        // Variant media upload (main image & detail gallery photos)
+                        $this->imageService->saveVariantMedia($variantProduct, $vData, $tenantId);
                     }
                 }
+            }
+
+            // Save parent product Main Image & Detail Images
+            if (!empty($requestInput['main_image']) && $requestInput['main_image'] instanceof \Illuminate\Http\UploadedFile) {
+                $this->imageService->saveMainImage($parentProduct, $requestInput['main_image'], $tenantId);
+            }
+            if (!empty($requestInput['detail_images']) && is_array($requestInput['detail_images'])) {
+                $this->imageService->saveDetailImages($parentProduct, $requestInput['detail_images'], $tenantId);
             }
 
             return $parentProduct;
@@ -164,13 +182,13 @@ class ProductService
                 'hsn_sac' => $validated['hsn_sac'] ?? null,
                 'gst_rate' => $validated['gst_rate'] ?? 18.00,
                 'preferred_vendor_id' => $isService ? null : ($validated['preferred_vendor_id'] ?? null),
-                'selling_price' => $validated['selling_price'],
-                'cost_price' => $validated['cost_price'],
-                'unit_cost' => $validated['cost_price'],
-                'sales_account' => $validated['sales_account'] ?? $product->sales_account ?? 'Sales Income',
+                'selling_price' => (float)($validated['selling_price'] ?? $product->selling_price ?? 0),
+                'cost_price' => (float)($validated['cost_price'] ?? $product->cost_price ?? 0),
+                'unit_cost' => (float)($validated['cost_price'] ?? $product->unit_cost ?? $product->cost_price ?? 0),
+                'sales_account' => $validated['sales_account'] ?? null,
                 'default_production_model' => $validated['default_production_model'] ?? $product->default_production_model ?? 'pure_manufacturing',
-                'purchase_account' => $validated['purchase_account'] ?? $product->purchase_account ?? 'Cost of Goods Sold',
-                'inventory_account' => $isService ? null : ($validated['inventory_account'] ?? $product->inventory_account ?? 'Inventory Asset'),
+                'purchase_account' => $validated['purchase_account'] ?? null,
+                'inventory_account' => $isService ? null : ($validated['inventory_account'] ?? null),
                 'reorder_point' => $isService ? 0 : ($validated['reorder_point'] ?? 0),
                 'description' => $validated['description'] ?? null,
                 'brand' => $isService ? null : ($validated['brand'] ?? null),
@@ -252,6 +270,9 @@ class ProductService
                             'uom_id' => $validated['uom_id'] ?? null,
                         ]);
                         $processedIds[] = $variant->id;
+
+                        // Variant media update (main & detail images)
+                        $this->imageService->saveVariantMedia($variant, $vData, $tenantId);
                     } else if (!empty($variantSku)) {
                         $newVariant = Product::create([
                             'tenant_id' => $tenantId,
@@ -276,6 +297,9 @@ class ProductService
                         ]);
                         $processedIds[] = $newVariant->id;
 
+                        // Variant media upload
+                        $this->imageService->saveVariantMedia($newVariant, $vData, $tenantId);
+
                         if ($vOpening > 0 && $defaultWarehouse) {
                             try {
                                 StockService::recordInflow(
@@ -299,8 +323,9 @@ class ProductService
             }
 
             if ($product->variation_type === 'Single') {
-                if (!empty($validated['warehouse_stocks'])) {
-                    foreach ($validated['warehouse_stocks'] as $whId => $stockData) {
+                $stocksInput = $validated['warehouse_stocks'] ?? ($requestInput['warehouse_stocks'] ?? []);
+                if (!empty($stocksInput) && is_array($stocksInput)) {
+                    foreach ($stocksInput as $whId => $stockData) {
                         $qty = (float)($stockData['quantity'] ?? 0);
                         $cost = (float)($stockData['unit_cost'] ?? 0);
 
@@ -311,7 +336,12 @@ class ProductService
                             ->first();
 
                         $oldQty = $oldStock ? (float)$oldStock->quantity : 0.0;
-                        $rate = $cost > 0 ? $cost : $product->cost_price;
+                        $oldCost = $oldStock ? (float)$oldStock->unit_cost : 0.0;
+                        $rate = $cost > 0 ? $cost : ($product->cost_price > 0 ? (float)$product->cost_price : $oldCost);
+
+                        $oldTotalVal = $oldQty * $oldCost;
+                        $newTotalVal = $qty * $rate;
+                        $netValDiff = round($newTotalVal - $oldTotalVal, 2);
 
                         if ($qty != $oldQty) {
                             if ($qty > $oldQty) {
@@ -322,7 +352,7 @@ class ProductService
                                     $whId,
                                     $diff,
                                     $rate,
-                                    'Adjustment'
+                                    'Opening Stock'
                                 );
                             } else {
                                 $diff = $oldQty - $qty;
@@ -335,8 +365,48 @@ class ProductService
                                 );
                             }
                         }
+
+                        // Always update unit_cost on ProductWarehouseStock if cost was provided or changed
+                        $targetCost = $cost > 0 ? $cost : (float)$product->cost_price;
+                        if ($targetCost > 0) {
+                            $currentStock = ProductWarehouseStock::query()
+                                ->where('tenant_id', $tenantId)
+                                ->where('product_id', $product->id)
+                                ->where('warehouse_id', $whId)
+                                ->first();
+
+                            if ($currentStock && (float)$currentStock->unit_cost != $targetCost) {
+                                $currentStock->update(['unit_cost' => $targetCost]);
+                            }
+                        }
+
+                        // If quantity was the same but unit rate was changed, post the net difference journal entry to accounting
+                        if ($qty == $oldQty && $qty > 0 && abs($netValDiff) > 0.005) {
+                            StockService::postOpeningStockAccountingJournal($tenantId, $product->id, $netValDiff);
+                        }
                     }
                 }
+            }
+
+            // Media & Image updates for parent product
+            if (!empty($requestInput['deleted_image_ids']) && is_array($requestInput['deleted_image_ids'])) {
+                foreach ($requestInput['deleted_image_ids'] as $delId) {
+                    if (!empty($delId)) {
+                        $this->imageService->deleteImage((int)$delId, $product);
+                    }
+                }
+            }
+
+            if (!empty($requestInput['primary_image_id'])) {
+                $this->imageService->setPrimary((int)$requestInput['primary_image_id'], $product);
+            }
+
+            if (!empty($requestInput['main_image']) && $requestInput['main_image'] instanceof \Illuminate\Http\UploadedFile) {
+                $this->imageService->saveMainImage($product, $requestInput['main_image'], $tenantId);
+            }
+
+            if (!empty($requestInput['detail_images']) && is_array($requestInput['detail_images'])) {
+                $this->imageService->saveDetailImages($product, $requestInput['detail_images'], $tenantId);
             }
 
             return true;
@@ -369,7 +439,12 @@ class ProductService
                             ->first();
 
                         $oldQty = $stock ? (float)$stock->quantity : 0.0;
-                        $rate = $cost > 0 ? $cost : $variant->cost_price;
+                        $oldCost = $stock ? (float)$stock->unit_cost : 0.0;
+                        $rate = $cost > 0 ? $cost : ($variant->cost_price > 0 ? (float)$variant->cost_price : $oldCost);
+
+                        $oldTotalVal = $oldQty * $oldCost;
+                        $newTotalVal = $qty * $rate;
+                        $netValDiff = round($newTotalVal - $oldTotalVal, 2);
 
                         if ($qty != $oldQty) {
                             if ($qty > $oldQty) {
@@ -398,6 +473,25 @@ class ProductService
                                 );
                             }
                         }
+
+                        // Always update unit_cost on ProductWarehouseStock
+                        $targetCost = $cost > 0 ? $cost : (float)$variant->cost_price;
+                        if ($targetCost > 0) {
+                            $currentStock = ProductWarehouseStock::query()
+                                ->where('tenant_id', $tenantId)
+                                ->where('product_id', $variantId)
+                                ->where('warehouse_id', $warehouseId)
+                                ->first();
+
+                            if ($currentStock && (float)$currentStock->unit_cost != $targetCost) {
+                                $currentStock->update(['unit_cost' => $targetCost]);
+                            }
+                        }
+
+                        // If quantity was the same but unit rate was changed, post accounting journal
+                        if ($qty == $oldQty && $qty > 0 && abs($netValDiff) > 0.005) {
+                            StockService::postOpeningStockAccountingJournal($tenantId, $variantId, $netValDiff);
+                        }
                     }
                 }
             } else {
@@ -416,7 +510,12 @@ class ProductService
                         ->first();
 
                     $oldQty = $stock ? (float)$stock->quantity : 0.0;
-                    $rate = $cost > 0 ? $cost : $product->cost_price;
+                    $oldCost = $stock ? (float)$stock->unit_cost : 0.0;
+                    $rate = $cost > 0 ? $cost : ($product->cost_price > 0 ? (float)$product->cost_price : $oldCost);
+
+                    $oldTotalVal = $oldQty * $oldCost;
+                    $newTotalVal = $qty * $rate;
+                    $netValDiff = round($newTotalVal - $oldTotalVal, 2);
 
                     if ($qty != $oldQty) {
                         if ($qty > $oldQty) {
@@ -445,6 +544,25 @@ class ProductService
                             );
                         }
                     }
+
+                    // Always update unit_cost on ProductWarehouseStock
+                    $targetCost = $cost > 0 ? $cost : (float)$product->cost_price;
+                    if ($targetCost > 0) {
+                        $currentStock = ProductWarehouseStock::query()
+                            ->where('tenant_id', $tenantId)
+                            ->where('product_id', $product->id)
+                            ->where('warehouse_id', $warehouseId)
+                            ->first();
+
+                        if ($currentStock && (float)$currentStock->unit_cost != $targetCost) {
+                            $currentStock->update(['unit_cost' => $targetCost]);
+                        }
+                    }
+
+                    // If quantity was the same but unit rate was changed, post accounting journal
+                    if ($qty == $oldQty && $qty > 0 && abs($netValDiff) > 0.005) {
+                        StockService::postOpeningStockAccountingJournal($tenantId, $product->id, $netValDiff);
+                    }
                 }
             }
         });
@@ -466,9 +584,9 @@ class ProductService
             'unit_cost' => $validated['unit_cost'] ?? 0.0,
             'selling_price' => $validated['selling_price'] ?? 0.0,
             'cost_price' => $validated['unit_cost'] ?? 0.0,
-            'sales_account' => $validated['sales_account'],
-            'purchase_account' => $validated['purchase_account'],
-            'inventory_account' => $validated['inventory_account'],
+            'sales_account' => $validated['sales_account'] ?? null,
+            'purchase_account' => $validated['purchase_account'] ?? null,
+            'inventory_account' => $validated['inventory_account'] ?? null,
             'preferred_vendor_id' => $validated['preferred_vendor_id'] ?? null,
             'status' => 'active',
             'planning_type' => $validated['supplier_method'] === 'manufacture' ? 'manufacture' : 'purchase',

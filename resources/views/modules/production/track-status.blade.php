@@ -326,7 +326,7 @@
             <div class="card border-0 shadow-sm bg-primary text-white">
                 <div class="card-body p-4 text-white">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="text-uppercase text-white-50 fw-bold fs-12 mb-0">Overall Completion</h6>
+                        <h6 class="text-uppercase text-white-50 fw-bold fs-12 mb-0">{{ __('production.overall_completion') }}</h6>
                         <div class="bg-white bg-opacity-20 p-2 rounded-circle">
                             <i class="feather-trending-up text-white fs-18"></i>
                         </div>
@@ -446,8 +446,8 @@
                             <x-ui.odoo-form-ui type="table">
                                 <thead class="table-light fs-11 text-uppercase text-muted">
                                     <tr>
-                                        <th class="ps-4">Description</th>
-                                        <th class="text-end pe-4" style="width: 250px;">Actions</th>
+                                        <th class="ps-4">{{ __('production.col_description') }}</th>
+                                        <th class="text-end pe-4" style="width: 250px;">{{ __('production.actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="fs-13 text-dark">
@@ -473,12 +473,12 @@
                                             <td class="text-end pe-4">
                                                 <div class="form-group select-wd-lg mb-0 ms-auto" style="width: 230px;">
                                                     <select class="form-control status-select" data-select2-selector="icon">
-                                                        <option value="Pending" data-icon="feather-clock" {{ $task['status'] === 'Pending' ? 'selected' : '' }}>Pending</option>
+                                                        <option value="Pending" data-icon="feather-clock" {{ $task['status'] === 'Pending' ? 'selected' : '' }}>{{ __('production.pending') }}</option>
                                                         <option value="Developer Complete" data-icon="feather-code" {{ $task['status'] === 'Developer Complete' ? 'selected' : '' }}>Developer Complete</option>
                                                         <option value="Internal Testing Complete" data-icon="feather-check" {{ $task['status'] === 'Internal Testing Complete' ? 'selected' : '' }}>Internal Testing Complete</option>
                                                         <option value="External Testing Complete" data-icon="feather-shield" {{ $task['status'] === 'External Testing Complete' ? 'selected' : '' }}>External Testing Complete</option>
                                                         <option value="Rework" data-icon="feather-rotate-ccw" {{ $task['status'] === 'Rework' ? 'selected' : '' }}>Rework</option>
-                                                        <option value="Complete" data-icon="feather-check-circle" {{ $task['status'] === 'Complete' ? 'selected' : '' }}>Complete</option>
+                                                        <option value="Complete" data-icon="feather-check-circle" {{ $task['status'] === 'Complete' ? 'selected' : '' }}>{{ __('production.complete') }}</option>
                                                     </select>
                                                 </div>
                                             </td>

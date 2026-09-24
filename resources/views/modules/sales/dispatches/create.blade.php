@@ -575,7 +575,7 @@
                 ).join('');
 
                 const itemRefInput = isInvoice 
-                    ? `<input type="hidden" name="items[${index}][invoice_item_id]" value="${item.invoice_item_id || item.id}">`
+                    ? `<input type="hidden" name="items[${index}][invoice_item_id]" value="${item.invoice_item_id || item.id}">${item.material_requirement_item_id ? `<input type="hidden" name="items[${index}][material_requirement_item_id]" value="${item.material_requirement_item_id}">` : ''}`
                     : `<input type="hidden" name="items[${index}][material_requirement_item_id]" value="${item.id}">`;
 
                 if (item.fully_dispatched) {
@@ -948,6 +948,8 @@
             const warehouseId = $tr.find('select[name$="[warehouse_id]"]').val();
             let productId = $tr.find('input[name$="[product_id]"]').val() || $tr.find('select[name$="[product_id]"]').val();
             let mrItemId = $tr.find('input[name$="[material_requirement_item_id]"]').val();
+            let invItemId = $tr.find('input[name$="[invoice_item_id]"]').val();
+            let soId = $('#salesOrderId').val();
             const $availCell = $tr.find('.avail-qty-cell');
             const $reservedCell = $tr.find('.reserved-qty-cell');
             const $availBadgeSpan = $tr.find('.avail-qty-span');
@@ -961,7 +963,9 @@
                 data: {
                     product_id: productId,
                     warehouse_id: warehouseId,
-                    material_requirement_item_id: mrItemId || null
+                    material_requirement_item_id: mrItemId || null,
+                    invoice_item_id: invItemId || null,
+                    sales_order_id: soId || null
                 },
                 success: function(response) {
                     if (response && response.success) {

@@ -8,8 +8,8 @@ use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Unified service handling dynamic approval workflows, hierarchy resolution,
- * and strict conflict-of-interest / anti-self-action guardrails across HRMS modules.
+ * Unified enterprise approval engine handling dynamic workflows, multi-level hierarchy resolution,
+ * admin master overrides, and strict conflict-of-interest / anti-self-action guardrails across HRMS modules.
  */
 class ApprovalWorkflowService
 {
@@ -18,27 +18,39 @@ class ApprovalWorkflowService
      * Automatically escalates to higher management/HR if the employee has no reporting manager
      * or is themselves an HR/Manager (preventing self-approval).
      */
-    public function resolveApprover(Employee $requester, string $module = 'general'): ?Employee
+    public function resolveApprover(Employee $requester, string $module = 'general', int $level = 1): ?Employee
     {
         // Level 1: Direct Reporting Manager (must not be the requester themselves)
-        if ($requester->reporting_manager_id && (int) $requester->reporting_manager_id !== (int) $requester->id) {
-            $manager = Employee::find($requester->reporting_manager_id);
-            if ($manager) {
-                return $manager;
+        if ($level === 1) {
+            if ($requester->reporting_manager_id && (int) $requester->reporting_manager_id !== (int) $requester->id) {
+                $manager = Employee::where('company_id', $requester->company_id)
+                    ->where('id', $requester->reporting_manager_id)
+                    ->first();
+                if ($manager) {
+                    return $manager;
+                }
             }
         }
 
-        // Level 2: Escalation to HR Director / HR Manager / VP (excluding requester)
+        // Level 2 / Escalation: HR Manager / HR Director / Department Head
         $hrApprover = Employee::where('company_id', $requester->company_id)
             ->where('id', '!=', $requester->id)
-            ->whereIn('role', ['hr_director', 'hr_manager', 'admin', 'director'])
+            ->whereIn('role', ['hr_director', 'hr_manager', 'hr', 'admin', 'director'])
             ->first();
 
         if ($hrApprover) {
             return $hrApprover;
         }
 
-        // Level 3: Fallback to Company Admin / CEO (excluding requester)
+        // Fallback: Skip-level manager (Manager's Manager)
+        if ($requester->reportingManager && $requester->reportingManager->reporting_manager_id && (int) $requester->reportingManager->reporting_manager_id !== (int) $requester->id) {
+            $skipManager = Employee::find($requester->reportingManager->reporting_manager_id);
+            if ($skipManager) {
+                return $skipManager;
+            }
+        }
+
+        // Final Fallback: Company Admin / Executive (excluding requester)
         return Employee::where('company_id', $requester->company_id)
             ->where('id', '!=', $requester->id)
             ->first();
@@ -46,37 +58,99 @@ class ApprovalWorkflowService
 
     /**
      * Determine if an actor (User or Employee) is authorized to approve a request for a requester.
-     * Enforces the strict NO SELF-APPROVAL rule.
+     * Enforces the strict NO SELF-APPROVAL rule and standard enterprise escalation policies.
      */
-    public function canApprove(User|Employee $actor, Employee $requester): bool
+    public function canApprove(User|Employee $actor, Employee $requester, mixed $requestModel = null): bool
     {
         $actorEmployeeId = $this->getEmployeeIdForActor($actor);
 
-        // Rule 1: Anti Self-Approval (STRICT: Requester cannot approve their own request)
+        // Rule 1: Anti Self-Approval (STRICT & UNIVERSAL: Requester cannot approve their own request)
         if ($actorEmployeeId && (int) $actorEmployeeId === (int) $requester->id) {
             return false;
         }
 
-        // Rule 2: Super Admin override (allowed to approve anyone except themselves)
+        // Rule 2: Super Admin & Platform Admin Override
         if ($actor instanceof User && $this->isSuperAdmin($actor)) {
             return true;
         }
 
-        // Rule 3: Direct Line Manager
+        // Rule 3: Company Admin & HR Admin Master Override
+        // In standard enterprise platforms, administrators and HR managers have authority to intervene at any stage
+        if ($this->isHrOrAdminActor($actor)) {
+            return true;
+        }
+
+        // Multi-level workflow evaluation if request model context is provided
+        if ($requestModel && isset($requestModel->current_level)) {
+            $rules = $requestModel->leaveType->rules ?? ($requestModel->rules ?? []);
+            $workflowLevel = $rules['approval']['workflow_level'] ?? '1_level';
+            $firstApprover = $rules['approval']['first_approver'] ?? 'reporting_manager';
+            $secondApprover = $rules['approval']['second_approver'] ?? 'hr_manager';
+            $currentLevel = (string) ($requestModel->current_level ?? '1');
+
+            if ($workflowLevel === '2_level') {
+                if ($currentLevel === '2') {
+                    // Level 2: Check designated second approver
+                    if ($secondApprover === 'department_head') {
+                        return $actorEmployeeId && $requester->department && (int) $actorEmployeeId === (int) $requester->department->head_employee_id;
+                    } elseif ($secondApprover === 'reporting_manager') {
+                        return $actorEmployeeId && (int) $actorEmployeeId === (int) $requester->reporting_manager_id;
+                    }
+                    // Standard Level 2 default is HR / Admin
+                    return $this->isHrOrAdminActor($actor);
+                } else {
+                    // Level 1: Check designated first approver
+                    if ($firstApprover === 'department_head') {
+                        return $actorEmployeeId && $requester->department && (int) $actorEmployeeId === (int) $requester->department->head_employee_id;
+                    }
+                }
+            }
+        }
+
+        // Rule 4: Direct Reporting Line Manager
         if ($actorEmployeeId && $requester->reporting_manager_id && (int) $actorEmployeeId === (int) $requester->reporting_manager_id) {
             return true;
         }
 
-        // Rule 4: Escalated Line Manager (Manager's Manager)
+        // Rule 5: Skip-Level Line Manager (Manager's Manager)
         if ($actorEmployeeId && $requester->reportingManager && $requester->reportingManager->reporting_manager_id) {
             if ((int) $actorEmployeeId === (int) $requester->reportingManager->reporting_manager_id) {
                 return true;
             }
         }
 
-        // Rule 5: Authorized HR or Admin Role (for employees other than themselves)
-        $actorEmployee = $actor instanceof Employee ? $actor : $this->getEmployeeFromUser($actor);
-        if ($actorEmployee && in_array(strtolower($actorEmployee->role ?? ''), ['hr', 'hr_manager', 'hr_director', 'admin', 'super_admin'])) {
+        // Rule 6: Department Head
+        if ($actorEmployeeId && $requester->department && (int) $actorEmployeeId === (int) $requester->department->head_employee_id) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if actor possesses HR or Administrator authority.
+     */
+    public function isHrOrAdminActor(User|Employee $actor): bool
+    {
+        if ($actor instanceof User) {
+            if ($this->isSuperAdmin($actor)) {
+                return true;
+            }
+            $userRole = strtolower($actor->role ?? '');
+            if (in_array($userRole, ['super_admin', 'super-admin', 'admin', 'company_admin', 'hr', 'hr_manager', 'hr_director'])) {
+                return true;
+            }
+            if (method_exists($actor, 'hasHrPermission') && (
+                $actor->hasHrPermission('hrms.leave_requests.approve') ||
+                $actor->hasHrPermission('hr.settings.manage') ||
+                $actor->hasHrPermission('hrms.wfh.approve')
+            )) {
+                return true;
+            }
+        }
+
+        $employee = $actor instanceof Employee ? $actor : $this->getEmployeeFromUser($actor);
+        if ($employee && in_array(strtolower($employee->role ?? ''), ['hr', 'hr_manager', 'hr_director', 'admin', 'super_admin', 'director'])) {
             return true;
         }
 
@@ -88,7 +162,7 @@ class ApprovalWorkflowService
      *
      * @throws ValidationException
      */
-    public function authorizeApproval(User|Employee $actor, Employee $requester): void
+    public function authorizeApproval(User|Employee $actor, Employee $requester, mixed $requestModel = null): void
     {
         $actorEmployeeId = $this->getEmployeeIdForActor($actor);
 
@@ -98,7 +172,7 @@ class ApprovalWorkflowService
             ]);
         }
 
-        if (! $this->canApprove($actor, $requester)) {
+        if (! $this->canApprove($actor, $requester, $requestModel)) {
             throw ValidationException::withMessages([
                 'approval' => 'You are not authorized to approve this request.',
             ]);
@@ -112,7 +186,6 @@ class ApprovalWorkflowService
     {
         $actorEmployeeId = $this->getEmployeeIdForActor($actor);
 
-        // Anti Self-Management: Cannot resolve/manage ticket created by oneself
         if ($actorEmployeeId && (int) $actorEmployeeId === (int) $ticket->employee_id) {
             return false;
         }
@@ -142,7 +215,7 @@ class ApprovalWorkflowService
         $actorEmployeeId = $this->getEmployeeIdForActor($actor);
 
         if ($actorEmployeeId && (int) $actorEmployeeId === (int) $recipient->id) {
-            return false; // HR cannot be the authority signer for their own official document
+            return false;
         }
 
         return true;
@@ -163,14 +236,12 @@ class ApprovalWorkflowService
     }
 
     /**
-     * Employee Profile Module: Prevent HR staff from modifying their own official office records
-     * (salary, designation, department, reporting manager).
+     * Employee Profile Module: Prevent HR staff from modifying their own official office records.
      */
     public function canEditOfficeRecord(User|Employee $actor, Employee $targetEmployee): bool
     {
         $actorEmployeeId = $this->getEmployeeIdForActor($actor);
 
-        // Anti Self-Modification: Cannot edit one's own official office record
         if ($actorEmployeeId && (int) $actorEmployeeId === (int) $targetEmployee->id) {
             return false;
         }
@@ -190,6 +261,24 @@ class ApprovalWorkflowService
                 'employee' => 'Conflict of Interest: You cannot modify your own official office records (salary, designation, department).',
             ]);
         }
+    }
+
+    /**
+     * Document Module: Determine if an actor is authorized to delete a document.
+     */
+    public function canDeleteDocument(User|Employee $actor, \App\Domains\HRMS\Models\Document $document): bool
+    {
+        if ($actor instanceof User && $this->isSuperAdmin($actor)) {
+            return true;
+        }
+
+        $actorEmployeeId = $this->getEmployeeIdForActor($actor);
+
+        if ($actorEmployeeId && (int) $actorEmployeeId === (int) $document->documentable_id) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -225,6 +314,8 @@ class ApprovalWorkflowService
      */
     private function isSuperAdmin(User $user): bool
     {
-        return strtolower($user->role ?? '') === 'super_admin' || $user->email === 'admin@warrgyizmorsch.com';
+        return strtolower($user->role ?? '') === 'super_admin' 
+            || strtolower($user->role ?? '') === 'super-admin'
+            || (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin());
     }
 }

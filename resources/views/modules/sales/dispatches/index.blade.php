@@ -5,9 +5,16 @@
 @section('breadcrumb', __('crm.sales_breadcrumb'))
 
 @section('page-actions')
-    <x-ui.button href="{{ route('sales.dispatches.create') }}" variant="primary" icon="feather-plus">
-        {{ __('crm.create_dispatch_order') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="dispatches" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('sales.dispatches.export') }}" />
+        <x-ui.button href="{{ route('sales.dispatches.create') }}" variant="primary" icon="feather-plus">
+            {{ __('crm.create_dispatch_order') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')
@@ -125,7 +132,7 @@
                             </td>
                             <td>
                                 @if ($dispatch->materialRequirement)
-                                    <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-semibold text-dark">
+                                    <a href="{{ route('inventory.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-semibold text-dark">
                                         {{ $dispatch->materialRequirement->requirement_number }}
                                     </a>
                                 @else

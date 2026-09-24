@@ -130,7 +130,7 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
         $adminEmployee = $user ? $approvalService->getEmployeeFromUser($user) : null;
 
         if ($action === 'approved' && $user && $requestModel->employee) {
-            $approvalService->authorizeApproval($user, $requestModel->employee);
+            $approvalService->authorizeApproval($user, $requestModel->employee, $requestModel);
         }
 
         if ($action === 'approved') {

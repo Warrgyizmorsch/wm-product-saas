@@ -1,5 +1,6 @@
 <?php
 
+use App\Domains\Platform\Controllers\DashboardController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BranchSwitchController;
@@ -51,17 +52,18 @@ Route::middleware(['tenant'])->group(function (): void {
         Route::get('/branch-switch/{branch}', BranchSwitchController::class)
             ->name('branch.switch');
 
-        Route::get('/', function () {
-            return view('dashboard');
-        })->name('home');
+        Route::get('/', [DashboardController::class, 'index'])->name('home');
 
         Route::get('/ui-elements', function () {
             return view('ui-elements');
         })->name('ui-elements');
 
-        Route::get('/dashboard', function () {
-            return view('dashboard');
-        })->name('dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/apps', [DashboardController::class, 'apps'])->name('apps');
+        Route::get('/dashboard/widgets/{key}', [DashboardController::class, 'widget'])
+            ->middleware('throttle:240,1')->name('dashboard.widget');
+        Route::put('/dashboard/layout', [DashboardController::class, 'save'])->name('dashboard.layout.save');
+        Route::delete('/dashboard/layout', [DashboardController::class, 'reset'])->name('dashboard.layout.reset');
 
         Route::get('/global-search', [GlobalSearchController::class, 'search'])
             ->name('global-search');
@@ -78,6 +80,21 @@ Route::middleware(['tenant'])->group(function (): void {
             Route::delete('/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy'])->name('destroy');
         });
 
+        // Universal User Profile & Account Settings
+        Route::prefix('profile')->name('profile.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\ProfileController::class, 'show'])->name('show');
+            Route::put('/', [\App\Http\Controllers\ProfileController::class, 'update'])->name('update');
+            Route::put('/password', [\App\Http\Controllers\ProfileController::class, 'updatePassword'])->name('password.update');
+        });
+
+        Route::prefix('account-settings')->name('account.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\AccountSettingsController::class, 'index'])->name('settings');
+            Route::put('/profile', [\App\Http\Controllers\AccountSettingsController::class, 'updateProfile'])->name('settings.profile');
+            Route::put('/password', [\App\Http\Controllers\AccountSettingsController::class, 'updatePassword'])->name('settings.password');
+            Route::put('/notifications', [\App\Http\Controllers\AccountSettingsController::class, 'updateNotifications'])->name('settings.notifications');
+            Route::delete('/deactivate', [\App\Http\Controllers\AccountSettingsController::class, 'deactivateAccount'])->name('settings.delete');
+        });
+
         Route::middleware(['module.access'])->group(function (): void {
             foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/web.php'))) as $moduleRoutes) {
                 require $moduleRoutes;
@@ -87,7 +104,28 @@ Route::middleware(['tenant'])->group(function (): void {
 
     Route::middleware(['auth:sanctum', 'company', 'branch'])->group(function (): void {
         foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/api.php'))) as $moduleApiRoutes) {
+            if (str_contains($moduleApiRoutes, 'Production')) {
+                continue;
+            }
             require $moduleApiRoutes;
         }
     });
 });
+
+// Universal Public Storage Media Route (ensures avatars & public assets render in local, live, and shared hosting)
+Route::get('/storage/{path}', function (string $path) {
+    $cleanPath = str_replace(['..', '\\'], ['', '/'], $path);
+
+    // 1. Check in storage/app/public
+    if (\Illuminate\Support\Facades\Storage::disk('public')->exists($cleanPath)) {
+        return \Illuminate\Support\Facades\Storage::disk('public')->response($cleanPath);
+    }
+
+    // 2. Check in public/storage
+    $publicFilePath = public_path('storage/' . $cleanPath);
+    if (file_exists($publicFilePath) && is_file($publicFilePath)) {
+        return response()->file($publicFilePath);
+    }
+
+    abort(404);
+})->where('path', '.*')->name('storage.media');

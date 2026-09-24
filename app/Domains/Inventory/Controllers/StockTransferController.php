@@ -13,9 +13,25 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use App\Exports\StockTransferExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class StockTransferController extends Controller
 {
+    /**
+     * Export Stock Transfers to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', StockTransfer::class);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new StockTransferExport($tenantId, $request->all()),
+            'stock_transfers_export_' . date('Y-m-d_His') . '.xlsx'
+        );
+    }
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', StockTransfer::class);
@@ -189,6 +205,13 @@ class StockTransferController extends Controller
             ]);
         });
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('inventory.transfer.dispatched', [
+            'transfer_no' => $transfer->transfer_number,
+            'from_warehouse' => $transfer->fromWarehouse?->name ?? 'Origin Warehouse',
+            'to_warehouse' => $transfer->toWarehouse?->name ?? 'Destination Warehouse',
+            'items_count' => (string) $transfer->items()->count(),
+        ], route('inventory.transfers.show', $transfer->id), $transfer);
+
         return back()->with('success', 'Stock Transfer dispatched and items are now In-Transit.');
     }
 
@@ -234,6 +257,13 @@ class StockTransferController extends Controller
                 'received_by' => Auth::id(),
             ]);
         });
+
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('inventory.transfer.received', [
+            'transfer_no' => $transfer->transfer_number,
+            'from_warehouse' => $transfer->fromWarehouse?->name ?? 'Origin Warehouse',
+            'to_warehouse' => $transfer->toWarehouse?->name ?? 'Destination Warehouse',
+            'received_by' => Auth::user()?->name ?? 'Warehouse Staff',
+        ], route('inventory.transfers.show', $transfer->id), $transfer);
 
         return back()->with('success', 'Stock Transfer successfully received at destination warehouse.');
     }

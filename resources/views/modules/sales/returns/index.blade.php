@@ -5,7 +5,12 @@
 @section('breadcrumb', __('crm.sales') . ' / ' . __('crm.sales_returns'))
 
 @section('page-actions')
-    <div class="d-flex gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="sales-returns" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('sales.returns.export') }}" />
         <a href="{{ route('sales.returns.create') }}" class="btn btn-primary">
             <i class="feather-plus me-2"></i>{{ __('crm.create_return') }}
         </a>

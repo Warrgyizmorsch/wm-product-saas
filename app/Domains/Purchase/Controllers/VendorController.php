@@ -9,6 +9,8 @@ use App\Domains\Purchase\Models\VendorPayment;
 use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
+use App\Exports\VendorExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,6 +19,20 @@ use Illuminate\View\View;
 
 class VendorController extends Controller
 {
+    /**
+     * Export Vendors to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorizePurchase('purchase.vendors.view');
+        $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new VendorExport($tenantId, $request->all()),
+            'vendors_export_' . date('Y-m-d_His') . '.xlsx'
+        );
+    }
+
     public function index(Request $request): View
     {
         $this->authorizePurchase('purchase.vendors.view');

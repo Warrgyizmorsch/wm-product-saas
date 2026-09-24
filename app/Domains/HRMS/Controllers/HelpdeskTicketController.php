@@ -57,6 +57,20 @@ class HelpdeskTicketController extends Controller
             iconClass: 'feather-help-circle'
         );
 
+        try {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.ticket.created', [
+                'tenant_id'     => $ticket->tenant_id,
+                'ticket_no'     => $ticket->ticket_number ?? ('#' . $ticket->id),
+                'subject'       => $ticket->subject,
+                'category'      => $ticket->category?->name ?? 'General',
+                'priority'      => ucfirst($ticket->priority),
+                'employee_name' => $ticket->employee?->full_name ?? (auth()->user()?->name ?? 'Employee'),
+                'action_url'    => route('hrms.helpdesk.tickets.show', $ticket->id),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
+        }
+
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
             ->with('success', "Helpdesk Ticket #{$ticket->ticket_number} created successfully.");
     }
@@ -174,6 +188,20 @@ class HelpdeskTicketController extends Controller
                 type: 'helpdesk_status',
                 iconClass: 'feather-check-circle'
             );
+        }
+
+        if ($request->input('status') === 'resolved') {
+            try {
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.ticket.resolved', [
+                    'tenant_id'   => $ticket->tenant_id,
+                    'ticket_no'   => $ticket->ticket_number ?? ('#' . $ticket->id),
+                    'subject'     => $ticket->subject,
+                    'resolved_by' => auth()->user()?->name ?? 'Support Agent',
+                    'action_url'  => route('hrms.helpdesk.tickets.show', $ticket->id),
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
+            }
         }
 
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)

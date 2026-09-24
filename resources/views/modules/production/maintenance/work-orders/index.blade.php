@@ -32,7 +32,7 @@
 
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex align-items-center mb-3">
-            <h5 class="fw-bold text-dark mb-0">Maintenance Work Orders</h5>
+            <h5 class="fw-bold text-dark mb-0">{{ __('production.maintenance_work_orders') }}</h5>
             <div class="d-flex gap-2 ms-auto">
                 <div id="normal-toolbar" class="d-flex gap-2">
                     <!-- Sort Component -->
@@ -55,14 +55,14 @@
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Work Orders</h6>
                             
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.search_keywords') }}</label>
                                 <x-ui.odoo-form-ui type="input" name="search" placeholder="Search WO number or description..." value="{{ request('search') }}" />
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Machine</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.col_machine') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="machine_id">
-                                    <option value="">All Machines</option>
+                                    <option value="">{{ __('production.all_machines') }}</option>
                                     @foreach($machines as $m)
                                         <option value="{{ $m->id }}" @selected(request('machine_id') == $m->id)>{{ $m->name }}</option>
                                     @endforeach
@@ -72,28 +72,28 @@
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">WO Type</label>
                                 <x-ui.odoo-form-ui type="select" name="type">
-                                    <option value="">All Types</option>
+                                    <option value="">{{ __('production.all_types') }}</option>
                                     <option value="preventive" @selected(request('type') == 'preventive')>Preventive</option>
-                                    <option value="breakdown" @selected(request('type') == 'breakdown')>Breakdown</option>
+                                    <option value="breakdown" @selected(request('type') == 'breakdown')>{{ __('production.breakdown_machines') }}</option>
                                     <option value="calibration" @selected(request('type') == 'calibration')>Calibration</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.status') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="status">
-                                    <option value="">All Statuses</option>
-                                    <option value="draft" @selected(request('status') === 'draft')>Draft</option>
-                                    <option value="scheduled" @selected(request('status') === 'scheduled')>Scheduled</option>
-                                    <option value="in_progress" @selected(request('status') === 'in_progress')>In Progress</option>
-                                    <option value="completed" @selected(request('status') === 'completed')>Completed</option>
-                                    <option value="cancelled" @selected(request('status') === 'cancelled')>Cancelled</option>
+                                    <option value="">{{ __('production.all_statuses') }}</option>
+                                    <option value="draft" @selected(request('status') === 'draft')>{{ __('production.draft_schedules') }}</option>
+                                    <option value="scheduled" @selected(request('status') === 'scheduled')>{{ __('production.scheduled_schedules') }}</option>
+                                    <option value="in_progress" @selected(request('status') === 'in_progress')>{{ __('production.in_progress') }}</option>
+                                    <option value="completed" @selected(request('status') === 'completed')>{{ __('production.completed_schedules') }}</option>
+                                    <option value="cancelled" @selected(request('status') === 'cancelled')>{{ __('production.cancelled_schedules') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('production.maintenance.work-orders.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                                <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                                <a href="{{ route('production.maintenance.work-orders.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
+                                <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
                             </div>
                         </x-ui.filter>
                     </form>
@@ -107,14 +107,14 @@
                 <thead class="bg-light text-muted">
                     <tr>
                         <th>WO Number</th>
-                        <th>Machine</th>
-                        <th>Type</th>
-                        <th>Priority</th>
+                        <th>{{ __('production.col_machine') }}</th>
+                        <th>{{ __('production.routing_type') }}</th>
+                        <th>{{ __('production.priority') }}</th>
                         <th>Technician</th>
-                        <th>Status</th>
-                        <th>Planned Start</th>
-                        <th class="text-end">Total Cost</th>
-                        <th class="text-end">Actions</th>
+                        <th>{{ __('production.status') }}</th>
+                        <th>{{ __('production.modal_planned_start_label') }}</th>
+                        <th class="text-end">{{ __('production.total_cost') }}</th>
+                        <th class="text-end">{{ __('production.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -174,9 +174,9 @@
         </x-ui.odoo-form-ui>
 
         <x-ui.odoo-form-ui type="select" label="Priority" name="priority" :required="true">
-            <option value="high" selected>High</option>
-            <option value="critical">Critical</option>
-            <option value="medium">Medium</option>
+            <option value="high" selected>{{ __('production.priority_high') }}</option>
+            <option value="critical">{{ __('production.critical') }}</option>
+            <option value="medium">{{ __('production.priority_medium') }}</option>
         </x-ui.odoo-form-ui>
 
         <x-ui.odoo-form-ui type="textarea" label="Breakdown Description / Reason" name="reason" rows="3" :required="true" placeholder="Describe the failure, error codes, or abnormal sounds..." />

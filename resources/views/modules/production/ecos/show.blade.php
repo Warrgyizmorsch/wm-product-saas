@@ -28,17 +28,17 @@
                     <div class="d-flex align-items-center gap-2 mb-1">
                         <h3 class="fw-bold text-dark mb-0">{{ $eco->eco_number }}</h3>
                         @if($eco->status === 'draft')
-                            <span class="badge bg-soft-secondary text-secondary">Draft</span>
+                            <span class="badge bg-soft-secondary text-secondary">{{ __('production.draft_schedules') }}</span>
                         @elseif($eco->status === 'under_review')
                             <span class="badge bg-soft-warning text-warning">Under Review</span>
                         @elseif($eco->status === 'approved')
-                            <span class="badge bg-soft-primary text-primary">Approved</span>
+                            <span class="badge bg-soft-primary text-primary">{{ __('production.approved') }}</span>
                         @elseif($eco->status === 'released')
-                            <span class="badge bg-soft-success text-success">Released</span>
+                            <span class="badge bg-soft-success text-success">{{ __('production.released_schedules') }}</span>
                         @elseif($eco->status === 'rejected')
-                            <span class="badge bg-soft-danger text-danger">Rejected</span>
+                            <span class="badge bg-soft-danger text-danger">{{ __('production.rejected') }}</span>
                         @elseif($eco->status === 'closed')
-                            <span class="badge bg-soft-dark text-dark">Closed</span>
+                            <span class="badge bg-soft-dark text-dark">{{ __('production.closed') }}</span>
                         @else
                             <span class="badge bg-soft-light text-dark">{{ $eco->status }}</span>
                         @endif
@@ -66,8 +66,7 @@
                         <form method="POST" action="{{ route('production.ecos.reject', $eco->id) }}">
                             @csrf
                             <button type="submit" class="btn btn-outline-danger">
-                                <i class="feather-x me-1"></i> Reject
-                            </button>
+                                <i class="feather-x me-1"></i>{{ __('production.reject') }}</button>
                         </form>
                     @endif
 
@@ -102,22 +101,22 @@
                     <span class="fw-bold text-dark">{{ $eco->effective_date ? $eco->effective_date->format('Y-m-d') : 'Immediate' }}</span>
                 </div>
                 <div class="col-md-3">
-                    <span class="text-uppercase fs-11 fw-bold text-muted d-block">Created By</span>
+                    <span class="text-uppercase fs-11 fw-bold text-muted d-block">{{ __('production.created_by') }}</span>
                     <span class="fw-bold text-dark">{{ $eco->creator ? $eco->creator->name : 'System' }}</span>
                 </div>
                 <div class="col-md-3">
-                    <span class="text-uppercase fs-11 fw-bold text-muted d-block">Approved By</span>
+                    <span class="text-uppercase fs-11 fw-bold text-muted d-block">{{ __('production.approved_by') }}</span>
                     <span class="fw-bold text-dark">{{ $eco->approver ? $eco->approver->name : 'N/A' }}</span>
                 </div>
                 @if($eco->reason)
                     <div class="col-md-12">
-                        <span class="text-uppercase fs-11 fw-bold text-muted d-block">Reason</span>
+                        <span class="text-uppercase fs-11 fw-bold text-muted d-block">{{ __('production.reason') }}</span>
                         <p class="mb-0 text-dark">{{ $eco->reason }}</p>
                     </div>
                 @endif
                 @if($eco->description)
                     <div class="col-md-12">
-                        <span class="text-uppercase fs-11 fw-bold text-muted d-block">Description</span>
+                        <span class="text-uppercase fs-11 fw-bold text-muted d-block">{{ __('production.col_description') }}</span>
                         <p class="mb-0 text-dark">{{ $eco->description }}</p>
                     </div>
                 @endif
@@ -175,7 +174,7 @@
                     <x-ui.odoo-form-ui type="table">
                         <thead>
                             <tr>
-                                <th>Component Product</th>
+                                <th>{{ __('production.component_product') }}</th>
                                 <th>Change Type</th>
                                 <th class="text-end">Previous Qty</th>
                                 <th class="text-end">Proposed Qty</th>

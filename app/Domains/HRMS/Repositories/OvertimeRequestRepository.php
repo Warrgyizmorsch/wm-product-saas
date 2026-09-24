@@ -152,7 +152,7 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         $adminEmployee = $user ? $approvalService->getEmployeeFromUser($user) : null;
 
         if ($action === 'approved' && $user && $requestModel->employee) {
-            $approvalService->authorizeApproval($user, $requestModel->employee);
+            $approvalService->authorizeApproval($user, $requestModel->employee, $requestModel);
         }
 
         $finalApprovedHours = $approvedHours ?? $requestModel->duration_hours;

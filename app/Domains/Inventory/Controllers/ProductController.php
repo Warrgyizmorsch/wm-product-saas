@@ -59,10 +59,14 @@ class ProductController extends Controller
         }
     }
 
-    public function export()
+    public function export(Request $request)
     {
         $this->authorize('viewAny', Product::class);
-        return Excel::download(new ProductExport, 'products_export.xlsx');
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        return Excel::download(
+            new ProductExport($tenantId, $request->all()),
+            'products_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function index(Request $request): View
@@ -117,8 +121,8 @@ class ProductController extends Controller
             'preferred_vendor_id' => 'nullable|exists:vendors,id',
             'selling_price' => 'nullable|numeric|min:0',
             'cost_price' => 'nullable|numeric|min:0',
-            'sales_account' => 'required|string|max:255',
-            'purchase_account' => 'required|string|max:255',
+            'sales_account' => 'nullable|string|max:255',
+            'purchase_account' => 'nullable|string|max:255',
             'inventory_account' => 'nullable|string|max:255',
             'reorder_point' => 'nullable|numeric|min:0',
             'minimum_order_qty' => 'nullable|numeric|min:0',
@@ -144,11 +148,33 @@ class ProductController extends Controller
             'inventory_valuation_method' => 'nullable|string|in:FIFO,Weighted Average',
             'default_production_model' => 'nullable|string|in:pure_manufacturing,subcontract_complete,subcontract_company_material,hybrid',
             'attributes' => 'nullable|array',
+            'attributes.*.name' => 'nullable|string',
+            'attributes.*.options' => 'nullable|array',
+            'attributes.*.values' => 'nullable|array',
             'variants' => 'nullable|array',
+            'variants.*.id' => 'nullable|integer',
+            'variants.*.name' => 'nullable|string|max:255',
+            'variants.*.sku' => 'nullable|string|max:255',
+            'variants.*.attributes' => 'nullable|string|max:255',
+            'variants.*.selling_price' => 'nullable|numeric|min:0',
+            'variants.*.cost_price' => 'nullable|numeric|min:0',
+            'variants.*.opening_stock' => 'nullable|numeric|min:0',
+            'variants.*.reorder_point' => 'nullable|numeric|min:0',
+            'variants.*.status' => 'nullable|in:active,inactive',
+            'variants.*.image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.main_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.detail_images' => 'nullable|array',
+            'variants.*.detail_images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.deleted_image_ids' => 'nullable|array',
+            'variants.*.deleted_image_ids.*' => 'nullable|integer',
+            'variants.*.primary_image_id' => 'nullable|integer',
             'warehouse_stocks' => 'nullable|array',
+            'main_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'detail_images' => 'nullable|array',
+            'detail_images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
-        $this->productService->createProduct($validated, $tenantId);
+        $this->productService->createProduct($validated, $tenantId, $request->all());
 
         return redirect()->route('inventory.products.index')->with('success', 'Product created successfully.');
     }
@@ -157,6 +183,7 @@ class ProductController extends Controller
     {
         $this->authorize('view', $product);
         $product = $this->productRepo->findWithDetails($product);
+        $product->load(['images', 'primaryImage', 'detailImages', 'variants.images', 'variants.primaryImage', 'variants.detailImages']);
         $warehouses = $this->warehouseRepo->getActive();
 
         return view('modules.inventory.products.show', compact('product', 'warehouses'));
@@ -166,7 +193,7 @@ class ProductController extends Controller
     {
         $this->authorize('update', $product);
 
-        $product->load(['uom', 'vendor', 'warehouseStocks', 'variants.warehouseStocks']);
+        $product->load(['uom', 'vendor', 'warehouseStocks', 'variants.warehouseStocks', 'images', 'primaryImage', 'detailImages', 'variants.images', 'variants.primaryImage', 'variants.detailImages']);
         $uoms = $this->uomRepo->getAll();
         $vendors = Vendor::query()->where('status', 'active')->get();
         $warehouses = $this->warehouseRepo->getActive();
@@ -202,8 +229,8 @@ class ProductController extends Controller
             'preferred_vendor_id' => 'nullable|exists:vendors,id',
             'selling_price' => 'nullable|numeric|min:0',
             'cost_price' => 'nullable|numeric|min:0',
-            'sales_account' => 'required|string|max:255',
-            'purchase_account' => 'required|string|max:255',
+            'sales_account' => 'nullable|string|max:255',
+            'purchase_account' => 'nullable|string|max:255',
             'inventory_account' => 'nullable|string|max:255',
             'reorder_point' => 'nullable|numeric|min:0',
             'minimum_order_qty' => 'nullable|numeric|min:0',
@@ -227,13 +254,33 @@ class ProductController extends Controller
             'inventory_valuation_method' => 'nullable|string|in:FIFO,Weighted Average',
             'default_production_model' => 'nullable|string|in:pure_manufacturing,subcontract_complete,subcontract_company_material,hybrid',
             'warehouse_stocks' => 'nullable|array',
+            'attributes' => 'nullable|array',
+            'attributes.*.name' => 'nullable|string',
+            'attributes.*.options' => 'nullable|array',
+            'attributes.*.values' => 'nullable|array',
             'variants' => 'nullable|array',
+            'variants.*.id' => 'nullable|integer',
             'variants.*.name' => 'nullable|string|max:255',
             'variants.*.sku' => 'nullable|string|max:255',
+            'variants.*.attributes' => 'nullable|string|max:255',
             'variants.*.selling_price' => 'nullable|numeric|min:0',
             'variants.*.cost_price' => 'nullable|numeric|min:0',
+            'variants.*.opening_stock' => 'nullable|numeric|min:0',
             'variants.*.reorder_point' => 'nullable|numeric|min:0',
             'variants.*.status' => 'nullable|in:active,inactive',
+            'variants.*.image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.main_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.detail_images' => 'nullable|array',
+            'variants.*.detail_images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'variants.*.deleted_image_ids' => 'nullable|array',
+            'variants.*.deleted_image_ids.*' => 'nullable|integer',
+            'variants.*.primary_image_id' => 'nullable|integer',
+            'main_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'detail_images' => 'nullable|array',
+            'detail_images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'deleted_image_ids' => 'nullable|array',
+            'deleted_image_ids.*' => 'nullable|integer',
+            'primary_image_id' => 'nullable|integer',
             'status' => 'required|in:active,inactive',
         ]);
 
@@ -306,9 +353,6 @@ class ProductController extends Controller
             'supplier_method' => $request->input('supplier_method', 'buy'),
             'uom_id' => $defaultUomId,
             'inventory_valuation_method' => $request->input('inventory_valuation_method', 'FIFO'),
-            'sales_account' => $request->input('sales_account', '4000 Sales'),
-            'purchase_account' => $request->input('purchase_account', '5000 COGS'),
-            'inventory_account' => $request->input('inventory_account', '1400 Inventory'),
         ]);
 
         $validated = $request->validate([
@@ -329,9 +373,9 @@ class ProductController extends Controller
             'inventory_valuation_method' => 'required|in:FIFO,Weighted Average',
             'unit_cost' => 'nullable|numeric|min:0',
             'selling_price' => 'nullable|numeric|min:0',
-            'sales_account' => 'required|string|max:255',
-            'purchase_account' => 'required|string|max:255',
-            'inventory_account' => 'required|string|max:255',
+            'sales_account' => 'nullable|string|max:255',
+            'purchase_account' => 'nullable|string|max:255',
+            'inventory_account' => 'nullable|string|max:255',
             'preferred_vendor_id' => 'nullable|exists:vendors,id',
         ]);
 
@@ -490,6 +534,8 @@ class ProductController extends Controller
         $productId = $request->input('product_id');
         $warehouseId = $request->input('warehouse_id');
         $mrItemId = $request->input('material_requirement_item_id');
+        $invoiceItemId = $request->input('invoice_item_id');
+        $salesOrderId = $request->input('sales_order_id');
 
         if (!$productId || !$warehouseId) {
             return response()->json(['success' => false, 'message' => 'Missing product or warehouse ID'], 400);
@@ -507,26 +553,47 @@ class ProductController extends Controller
             ->sum('reserved_qty');
 
         $itemReservedQty = 0;
+        $mrItem = null;
         if ($mrItemId) {
             $mrItem = \App\Domains\Sales\Models\MaterialRequirementItem::find($mrItemId);
-            if ($mrItem) {
-                $res = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
-                    ->where('product_id', $productId)
-                    ->where('warehouse_id', $warehouseId)
-                    ->where(function($q) use ($mrItem) {
-                        $q->where(function($q2) use ($mrItem) {
-                            $q2->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement'])
-                               ->where('reference_id', $mrItem->material_requirement_id);
-                        })->orWhere('reference_item_id', $mrItem->id);
-                    })
-                    ->where('status', 'Active')
-                    ->sum('reserved_qty');
-
-                $itemReservedQty = (float)$res;
-
-                if ($itemReservedQty <= 0 && (int)($mrItem->warehouse_id ?: 1) === (int)$warehouseId) {
-                    $itemReservedQty = (float)$mrItem->quantity_reserved;
+        }
+        if (!$mrItem && $invoiceItemId) {
+            $invItem = \App\Domains\Sales\Models\InvoiceItem::with('invoice')->find($invoiceItemId);
+            if ($invItem) {
+                if (!empty($invItem->material_requirement_item_id)) {
+                    $mrItem = \App\Domains\Sales\Models\MaterialRequirementItem::find($invItem->material_requirement_item_id);
+                } elseif (!empty($invItem->sales_order_item_id)) {
+                    $mrItem = \App\Domains\Sales\Models\MaterialRequirementItem::where('sales_order_item_id', $invItem->sales_order_item_id)->first();
+                } elseif (!empty($invItem->invoice?->sales_order_id)) {
+                    $mrItem = \App\Domains\Sales\Models\MaterialRequirementItem::whereHas('materialRequirement', function($q) use ($invItem) {
+                        $q->where('sales_order_id', $invItem->invoice->sales_order_id);
+                    })->where('product_id', $productId)->first();
                 }
+            }
+        }
+        if (!$mrItem && $salesOrderId) {
+            $mrItem = \App\Domains\Sales\Models\MaterialRequirementItem::whereHas('materialRequirement', function($q) use ($salesOrderId) {
+                $q->where('sales_order_id', $salesOrderId);
+            })->where('product_id', $productId)->first();
+        }
+
+        if ($mrItem) {
+            $res = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
+                ->where('product_id', $productId)
+                ->where('warehouse_id', $warehouseId)
+                ->where(function($q) use ($mrItem) {
+                    $q->where(function($q2) use ($mrItem) {
+                        $q2->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement', 'SalesOrder'])
+                           ->where('reference_id', $mrItem->material_requirement_id);
+                    })->orWhere('reference_item_id', $mrItem->id);
+                })
+                ->where('status', 'Active')
+                ->sum('reserved_qty');
+
+            $itemReservedQty = (float)$res;
+
+            if ($itemReservedQty <= 0 && (int)($mrItem->warehouse_id ?: 1) === (int)$warehouseId) {
+                $itemReservedQty = (float)$mrItem->quantity_reserved;
             }
         }
 

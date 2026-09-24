@@ -8,6 +8,8 @@ use App\Domains\Purchase\Repositories\VendorBillRepository;
 use App\Domains\Purchase\Services\VendorPaymentService;
 use App\Domains\Inventory\Models\Vendor;
 use App\Services\Access\AccessService;
+use App\Exports\VendorPaymentExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 
 class VendorPaymentController extends Controller
@@ -24,6 +26,20 @@ class VendorPaymentController extends Controller
 
         $payments = $this->paymentRepo->getPaginatedPayments($request->all(), 10);
         return view('modules.purchase.payments.index', compact('payments'));
+    }
+
+    /**
+     * Export Vendor Payments to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorizePurchase('purchase.payments.view');
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new VendorPaymentExport($tenantId, $request->all()),
+            'vendor_payments_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function create(Request $request)

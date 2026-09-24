@@ -38,6 +38,12 @@ class AppServiceProvider extends ServiceProvider
         // Loads every module's Routes/menu.php once per request.
         $this->app->singleton(\App\Core\Navigation\MenuRegistry::class);
 
+        // One builder per request, so the sidebar and the header's app launcher share a single computation.
+        $this->app->scoped(\App\Core\Navigation\MenuBuilder::class);
+
+        // Loads every module's Dashboard/widgets.php once per request.
+        $this->app->singleton(\App\Core\Dashboard\WidgetRegistry::class);
+
         // Payment gateways: register every known PaymentGateway implementation
         // here. Which one is actually used is a stored setting resolved at
         // call time (PaymentGatewayManager::active()), not this list — adding
@@ -324,6 +330,27 @@ class AppServiceProvider extends ServiceProvider
         // users.email) exceed that. 191 chars * 4 bytes = 764 bytes, safely under it.
         Schema::defaultStringLength(191);
 
+        // ── Production Module Named API Rate Limiters ─────────────────────────
+        $productionRateLimitKey = function (\Illuminate\Http\Request $request): string {
+            $tenantId = $request->user()?->tenant_id
+                ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null)
+                ?? 'global';
+            $client = $request->user()?->id ? "u:{$request->user()->id}" : "ip:{$request->ip()}";
+            return "t:{$tenantId}:{$client}";
+        };
+
+        \Illuminate\Support\Facades\RateLimiter::for('production-api', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(120)->by($productionRateLimitKey($request));
+        });
+
+        \Illuminate\Support\Facades\RateLimiter::for('production-api-write', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($productionRateLimitKey($request));
+        });
+
+        \Illuminate\Support\Facades\RateLimiter::for('production-api-mes', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(180)->by($productionRateLimitKey($request));
+        });
+
         // ── Cross-module morph map (Journal.reference_type/reference_id) ───────
         // Journal::reference() is a real morphTo(); these short, stable keys are
         // what gets stored in reference_type, never the FQCN. Using morphMap()
@@ -413,6 +440,7 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Listeners\ProvisionAccountingMasters::class,
             \App\Domains\Accounting\Listeners\ProvisionCostCentersAndAssetCategories::class,
             \App\Domains\Platform\Listeners\ProvisionPaymentTerms::class,
+            \App\Domains\Platform\Listeners\ProvisionDashboardLayout::class,
             \App\Domains\CRM\Listeners\ProvisionCrmDefaults::class,
             \App\Domains\Inventory\Listeners\ProvisionInventoryDefaults::class,
             \App\Domains\Production\Listeners\ProvisionProductionDefaults::class,

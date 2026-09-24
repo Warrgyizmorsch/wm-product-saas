@@ -96,7 +96,7 @@
                         <i class="feather-file-text me-1"></i>{{ $requisition->sourceable->requisition_number }}
                     </a>
                 @elseif($requisition->source_type === 'material_requirement' && $requisition->sourceable)
-                    <a href="{{ route('sales.material-requirements.show', $requisition->source_id) }}" class="text-primary">
+                    <a href="{{ route('inventory.material-requirements.show', $requisition->source_id) }}" class="text-primary">
                         <i class="feather-archive me-1"></i>{{ $requisition->sourceable->requirement_number }}
                     </a>
                 @elseif($requisition->source_type === 'so' && $requisition->sourceable)

@@ -10,6 +10,8 @@ use App\Domains\HRMS\Models\DocumentTemplate;
 use App\Domains\HRMS\Services\DocumentSignatureService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class DocumentApiController extends Controller
 {
@@ -696,32 +698,45 @@ class DocumentApiController extends Controller
             $path = $file->store("signatures/tenant_{$tenantId}/user_{$userId}", 'public');
             $signatureInput = $path;
         } else {
-            $validated = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'signature_image' => 'required|string',
                 'coordinates'     => 'nullable|array',
             ]);
-            $signatureInput = $validated['signature_image'];
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation failed. Please provide a signature image (base64 string) or signature file.', 422, $validator->errors());
+            }
+
+            $signatureInput = $request->input('signature_image');
         }
 
-        $coordinates = $request->input('coordinates');
+        try {
+            $coordinates = $request->input('coordinates');
 
-        $signedDoc = $this->documentSignatureService->signUploadedDocument(
-            $document,
-            $signatureInput,
-            is_array($coordinates) ? $coordinates : null
-        );
+            $signedDoc = $this->documentSignatureService->signUploadedDocument(
+                $document,
+                $signatureInput,
+                is_array($coordinates) ? $coordinates : null
+            );
 
-        return $this->sendSuccess([
-            'id'               => $signedDoc->id,
-            'name'             => $signedDoc->name,
-            'is_signed'        => $signedDoc->is_signed,
-            'status'           => $signedDoc->status,
-            'signed_at'        => $signedDoc->signed_at?->toIso8601String(),
-            'signed_by'        => $signedDoc->signedBy?->name,
-            'signature_ip'     => $signedDoc->signature_ip,
-            'file_url'         => asset('storage/' . $signedDoc->file_path),
-            'signed_file_url'  => $signedDoc->signed_file_path ? asset('storage/' . $signedDoc->signed_file_path) : null,
-        ], 'Document digitally signed successfully.');
+            return $this->sendSuccess([
+                'id'               => $signedDoc->id,
+                'name'             => $signedDoc->name,
+                'is_signed'        => $signedDoc->is_signed,
+                'status'           => $signedDoc->status,
+                'signed_at'        => $signedDoc->signed_at?->toIso8601String(),
+                'signed_by'        => $signedDoc->signedBy?->name,
+                'signature_ip'     => $signedDoc->signature_ip,
+                'file_url'         => asset('storage/' . $signedDoc->file_path),
+                'signed_file_url'  => $signedDoc->signed_file_path ? asset('storage/' . $signedDoc->signed_file_path) : null,
+            ], 'Document digitally signed successfully.');
+        } catch (\Throwable $e) {
+            Log::error("Document signature failed: " . $e->getMessage(), [
+                'exception'   => $e,
+                'document_id' => $id,
+            ]);
+            return $this->sendError('Failed to digitally sign document: ' . $e->getMessage(), 400);
+        }
     }
 
     /**

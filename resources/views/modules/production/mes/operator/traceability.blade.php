@@ -15,8 +15,8 @@
                     <div class="col-md-3">
                         <x-ui.odoo-form-ui type="select" label="Entity Type" name="type" id="type" :required="true">
                             <option value="batch" @selected(request('type', 'batch') === 'batch')>Production Batch</option>
-                            <option value="serial" @selected(request('type') === 'serial')>Serial Number</option>
-                            <option value="order" @selected(request('type') === 'order')>Production Order</option>
+                            <option value="serial" @selected(request('type') === 'serial')>{{ __('production.serial_number') }}</option>
+                            <option value="order" @selected(request('type') === 'order')>{{ __('production.production_order') }}</option>
                             <option value="lot" @selected(request('type') === 'lot')>Inventory Lot</option>
                         </x-ui.odoo-form-ui>
                     </div>
@@ -50,8 +50,7 @@
                                 <span class="badge bg-soft-info text-info text-uppercase fs-10 mt-1">Direction: {{ $searchedDirection ?? 'both' }}</span>
                             </div>
                             <a href="{{ route('production.mes.traceability.export-csv', ['type' => $searchedType, 'code' => $searchedCode]) }}" class="btn btn-sm btn-outline-secondary">
-                                <i class="feather-download me-1"></i> Export CSV
-                            </a>
+                                <i class="feather-download me-1"></i>{{ __('production.export_csv') }}</a>
                         </div>
                         <div class="card-body">
                             {{-- Visual Genealogy Tree Timeline --}}

@@ -17,6 +17,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\QuotationExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class QuotationController extends Controller
 {
@@ -31,6 +33,20 @@ class QuotationController extends Controller
         $quotations = $this->quotationRepo->getPaginatedQuotations($request->all(), 10);
 
         return view('modules.crm.quotations.index', compact('quotations'));
+    }
+
+    /**
+     * Export Quotations to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', Quotation::class);
+        $tenantId = tenant_id() ?? auth()->user()->tenant_id ?? 1;
+
+        return Excel::download(
+            new QuotationExport($tenantId, $request->all()),
+            'quotations_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function approvalsIndex(Request $request): View
@@ -178,6 +194,13 @@ class QuotationController extends Controller
         }
 
         $this->quotationService->handleQuotationStatusChange($quotation, $validated['status'], $leadId);
+
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('crm.quotation.created', [
+            'quotation_no' => $quotation->quotation_number,
+            'customer_name' => $quotation->customer?->name ?? $quotation->lead?->company_name ?? $quotation->deal?->account?->name ?? 'Customer',
+            'amount' => number_format((float)($quotation->grand_total ?? $quotation->total_amount ?? 0), 2),
+            'created_by' => auth()->user()?->name ?? 'User',
+        ], route('crm.quotations.show', $quotation->id), $quotation);
 
         if ($dealId) {
             return redirect()->route('crm.deals.show', ['deal' => $dealId, 'quotation_id' => $quotation->id])->with('success', 'Quotation successfully created!');

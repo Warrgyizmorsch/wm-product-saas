@@ -46,6 +46,11 @@ class BroadcastService
             // Generate receipts for target audience
             $this->generateTargetReceipts($broadcast);
 
+            // Dispatch targeted emails if status is published and send_email is true
+            if ($broadcast->status === 'published' && !empty($broadcast->send_email)) {
+                $this->dispatchBroadcastEmails($broadcast);
+            }
+
             return $broadcast;
         });
     }
@@ -122,7 +127,125 @@ class BroadcastService
             ->whereNull('delivered_at')
             ->update(['delivered_at' => Carbon::now()]);
 
+        if (!empty($broadcast->send_email)) {
+            $this->dispatchBroadcastEmails($broadcast);
+        }
+
         return $broadcast->fresh();
+    }
+
+    /**
+     * Dispatch broadcast email notifications to targeted employees using EmailService with Mail fallback.
+     */
+    public function dispatchBroadcastEmails(Broadcast $broadcast): void
+    {
+        if (empty($broadcast->send_email)) {
+            return;
+        }
+
+        $receipts = BroadcastReceipt::where('broadcast_id', $broadcast->id)
+            ->with(['employee'])
+            ->get();
+
+        if ($receipts->isEmpty()) {
+            return;
+        }
+
+        $emailService = app(\App\Services\EmailService::class);
+        $actionUrl = route('hrms.broadcasts.show', $broadcast->id);
+        $companyName = tenant() ? tenant()->name : config('app.name');
+
+        $priorityBadgeColor = match($broadcast->priority) {
+            'urgent'    => '#ef4444',
+            'important' => '#f59e0b',
+            default     => '#3b82f6'
+        };
+        $priorityLabel = strtoupper($broadcast->priority);
+        $categoryLabel = ucwords(str_replace('_', ' ', $broadcast->category));
+
+        $attachments = [];
+        if (!empty($broadcast->attachment_path)) {
+            $fullPath = \Illuminate\Support\Facades\Storage::disk('public')->path($broadcast->attachment_path);
+            if (file_exists($fullPath)) {
+                $attachments[] = [
+                    'path' => $fullPath,
+                    'name' => basename($broadcast->attachment_path),
+                    'mime' => mime_content_type($fullPath) ?: 'application/octet-stream',
+                ];
+            }
+        }
+
+        foreach ($receipts as $receipt) {
+            $emp = $receipt->employee;
+            if (!$emp) {
+                continue;
+            }
+
+            $toEmail = $emp->office_email ?: $emp->personal_email;
+            if (empty($toEmail) || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+
+            $subject = "[{$categoryLabel}] {$broadcast->title}";
+
+            $bodyHtml = "
+                <div style='font-family: Arial, Helvetica, sans-serif; max-width: 650px; margin: 0 auto; padding: 24px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;'>
+                    <div style='border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 20px;'>
+                        <table width='100%' border='0' cellpadding='0' cellspacing='0'>
+                            <tr>
+                                <td align='left' style='font-weight: bold; color: #1e293b; font-size: 16px;'>" . e($companyName) . " Announcement</td>
+                                <td align='right'>
+                                    <span style='background-color: {$priorityBadgeColor}; color: #ffffff; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase;'>{$priorityLabel}</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <p style='font-size: 14px; color: #475569;'>Hello <strong>" . e($emp->full_name) . "</strong>,</p>
+
+                    <h2 style='color: #0f172a; font-size: 20px; margin-top: 15px; margin-bottom: 10px;'>" . e($broadcast->title) . "</h2>
+
+                    <div style='background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 15px; border-radius: 4px; margin: 20px 0; color: #334155; font-size: 14px; line-height: 1.6;'>
+                        " . nl2br(e($broadcast->content)) . "
+                    </div>
+
+                    <div style='margin-top: 25px; text-align: center;'>
+                        <a href='{$actionUrl}' style='display: inline-block; background-color: #2563eb; color: #ffffff; font-weight: bold; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 14px;'>View Announcement in Portal &rarr;</a>
+                    </div>
+
+                    <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 30px 0 15px 0;'>
+                    <p style='font-size: 11px; color: #94a3b8; text-align: center; margin: 0;'>
+                        This is an official company broadcast sent via HRMS portal. Please do not reply directly to this automated email.
+                    </p>
+                </div>
+            ";
+
+            try {
+                $emailService->sendEmail([
+                    'to'        => $toEmail,
+                    'subject'   => $subject,
+                    'body_html' => $bodyHtml,
+                ], $attachments);
+            } catch (\Throwable $e) {
+                // Fallback to default Laravel Mail if EmailService tenant SMTP fails or is unconfigured
+                try {
+                    \Illuminate\Support\Facades\Mail::send([], [], function ($msg) use ($toEmail, $subject, $bodyHtml, $attachments) {
+                        $msg->to($toEmail)
+                            ->subject($subject)
+                            ->html($bodyHtml);
+
+                        foreach ($attachments as $att) {
+                            $msg->attach($att['path'], [
+                                'as'   => $att['name'],
+                                'mime' => $att['mime'],
+                            ]);
+                        }
+                    });
+                } catch (\Throwable $ex) {
+                    \Illuminate\Support\Facades\Log::warning("Failed to send broadcast email to {$toEmail}: " . $ex->getMessage());
+                }
+            }
+        }
     }
 
     /**
@@ -200,8 +323,25 @@ class BroadcastService
 
         $nonResponders = BroadcastReceipt::where('broadcast_id', $broadcast->id)
             ->whereNull('acknowledged_at')
-            ->with(['employee.department', 'employee.designation'])
-            ->get();
+            ->with([
+                'employee:id,employee_id,full_name,office_email,department_id,designation_id',
+                'employee.department:id,name',
+                'employee.designation:id,name'
+            ])
+            ->get()
+            ->map(function ($receipt) {
+                return [
+                    'id'            => $receipt->id,
+                    'employee_id'   => $receipt->employee?->id,
+                    'code'          => $receipt->employee?->employee_id,
+                    'name'          => $receipt->employee?->full_name,
+                    'email'         => $receipt->employee?->office_email,
+                    'department'    => $receipt->employee?->department?->name,
+                    'designation'   => $receipt->employee?->designation?->name,
+                    'delivered_at'  => $receipt->delivered_at?->toIso8601String(),
+                    'read_at'       => $receipt->read_at?->toIso8601String(),
+                ];
+            });
 
         return [
             'total_targeted'    => $totalTargeted,

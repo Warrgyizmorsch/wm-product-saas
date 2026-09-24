@@ -111,6 +111,12 @@ class OvertimeRequestController extends Controller
     public function updateStatus(Request $request, OvertimeRequest $overtimeRequest, ?string $overrideAction = null): RedirectResponse
     {
         $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $overtimeRequest->employee_id) {
+            abort(403, 'Self-approval is prohibited. You cannot approve your own Overtime request.');
+        }
+
         $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
         abort_unless($isHrAdmin, 403);
 

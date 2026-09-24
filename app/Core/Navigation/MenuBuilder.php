@@ -21,6 +21,10 @@ use Illuminate\Support\Str;
  *
  * The module of an entry is its own `module`, else its parent's, else the
  * first segment of its route name when that is a plan-gated module.
+ *
+ * navigation() builds on that for the app-style sidebar: it works out which app
+ * (config/navigation.php `apps`) the current page belongs to and returns just
+ * that app's menu, plus the apps the user can open.
  */
 class MenuBuilder
 {
@@ -34,6 +38,9 @@ class MenuBuilder
 
     /** @var array<string, bool> */
     private array $permissionResults = [];
+
+    /** @var array<string, array<string, mixed>> */
+    private array $navigation = [];
 
     public function __construct(
         private readonly MenuRegistry $registry,
@@ -63,7 +70,7 @@ class MenuBuilder
         foreach ($entries as $entry) {
             $key = $entry['section'] ?? null;
 
-            if ($key !== null && isset($sections[$key]) && ($item = $this->resolve($entry, null)) !== null) {
+            if ($key !== null && isset($sections[$key]) && ($item = $this->resolve($entry, null, config("navigation.sections.$key.app"))) !== null) {
                 $sections[$key]['items'][] = $item;
             }
         }
@@ -78,9 +85,10 @@ class MenuBuilder
      * @param array<string, mixed> $entry
      * @return array{label: string, icon: string, route: ?string, url: string, active: bool, placeholder: bool, active_routes: list<string>, children: list<array>}|null
      */
-    private function resolve(array $entry, ?string $parentModule): ?array
+    private function resolve(array $entry, ?string $parentModule, ?string $parentApp = null): ?array
     {
         $module = $entry['module'] ?? $parentModule ?? $this->moduleOf($entry['route'] ?? null);
+        $app = $this->appOf($entry, $parentApp, $module);
 
         if (! $this->moduleAllowed($module)
             || ! $this->permitted($entry['permission'] ?? null)
@@ -96,14 +104,18 @@ class MenuBuilder
             'active' => false,
             'placeholder' => false,
             'active_routes' => $entry['active_routes'] ?? [],
+            'app' => $app,
             'children' => [],
         ];
 
         if (isset($entry['children'])) {
             $item['children'] = array_values(array_filter(array_map(
-                fn (array $child) => $this->resolve($child, $entry['module'] ?? $parentModule),
+                fn (array $child) => $this->resolve($child, $entry['module'] ?? $parentModule, $app),
                 $entry['children'],
             )));
+
+            // A group that names no app belongs to the app of its first child.
+            $item['app'] ??= collect($item['children'])->pluck('app')->filter()->first();
 
             return $item['children'] === [] ? null : $item;
         }
@@ -117,6 +129,24 @@ class MenuBuilder
         }
 
         return config('navigation.show_placeholders') ? ['placeholder' => true] + $item : null;
+    }
+
+    /**
+     * The app an entry belongs to: its own `app`, else its parent's (or its section's),
+     * else its module, else the app its route belongs to. Null = shown on the home page only.
+     */
+    private function appOf(array $entry, ?string $parentApp, ?string $module): ?string
+    {
+        $apps = config('navigation.apps', []);
+        $fromRoute = isset($entry['route']) ? config('navigation.route_apps.'.Str::before($entry['route'], '.')) : null;
+
+        foreach ([$entry['app'] ?? null, $parentApp, isset($apps[$module]) ? $module : null, $fromRoute] as $candidate) {
+            if ($candidate !== null && isset($apps[$candidate])) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     private function moduleOf(?string $routeName): ?string
@@ -191,6 +221,122 @@ class MenuBuilder
         $translated = __($label);
 
         return is_string($translated) && $translated !== $label ? $translated : ($entry['default'] ?? $label);
+    }
+
+    /**
+     * The sidebar for the page being viewed. On a page that belongs to an app, only that
+     * app's entries are returned in `items`; on any other page `app` is null and the
+     * caller shows every section.
+     *
+     * @return array{
+     *     sections: list<array>,
+     *     apps: array<string, array{key: string, label: string, icon: string, description: string, url: string, active: bool}>,
+     *     app: ?string,
+     *     items: list<array>
+     * }
+     */
+    public function navigation(?User $user, ?string $currentRoute = null): array
+    {
+        $cacheKey = ($user?->id ?? 0).'|'.$currentRoute;
+
+        if (isset($this->navigation[$cacheKey])) {
+            return $this->navigation[$cacheKey];
+        }
+
+        $sections = $this->build($user, $currentRoute);
+        $definitions = config('navigation.apps', []);
+
+        $itemsByApp = [];
+        foreach ($sections as $section) {
+            foreach ($section['items'] as $item) {
+                if (isset($definitions[$item['app'] ?? ''])) {
+                    $itemsByApp[$item['app']][] = $item;
+                }
+            }
+        }
+
+        $apps = [];
+        foreach ($definitions as $key => $definition) {
+            if (! empty($itemsByApp[$key])) {
+                $apps[$key] = ['key' => $key, 'active' => false, 'url' => $this->landingUrl($itemsByApp[$key])] + $definition;
+            }
+        }
+
+        $current = $this->currentApp($sections, $currentRoute);
+        $current = isset($apps[$current ?? '']) ? $current : null;
+
+        if ($current !== null) {
+            $apps[$current]['active'] = true;
+        }
+
+        return $this->navigation[$cacheKey] = [
+            'sections' => $sections,
+            'apps' => $apps,
+            'app' => $current,
+            'items' => $current === null ? [] : $this->withoutAppNameGroup($itemsByApp[$current], $apps[$current]['label']),
+        ];
+    }
+
+    /**
+     * Inside the Purchase app a group also called "Purchase" is noise — like Odoo, list its
+     * screens directly instead of repeating the app's name as a menu.
+     *
+     * @param list<array> $items
+     * @return list<array>
+     */
+    private function withoutAppNameGroup(array $items, string $appLabel): array
+    {
+        $flat = [];
+
+        foreach ($items as $item) {
+            if ($item['children'] !== [] && mb_strtolower(trim($item['label'])) === mb_strtolower(trim($appLabel))) {
+                array_push($flat, ...$item['children']);
+            } else {
+                $flat[] = $item;
+            }
+        }
+
+        return $flat;
+    }
+
+    /** The app of the highlighted entry, else of the page's route prefix. */
+    private function currentApp(array $sections, ?string $currentRoute): ?string
+    {
+        foreach ($sections as $section) {
+            foreach ($section['items'] as $item) {
+                if (! $item['active']) {
+                    continue;
+                }
+
+                foreach ($item['children'] as $child) {
+                    if ($child['active']) {
+                        return $child['app'] ?? $item['app'];
+                    }
+                }
+
+                return $item['app'];
+            }
+        }
+
+        return $currentRoute === null ? null : config('navigation.route_apps.'.Str::before($currentRoute, '.'));
+    }
+
+    /** Where opening an app lands: its first screen. */
+    private function landingUrl(array $items): string
+    {
+        foreach ($items as $item) {
+            if ($item['route'] !== null) {
+                return $item['url'];
+            }
+
+            foreach ($item['children'] as $child) {
+                if ($child['route'] !== null) {
+                    return $child['url'];
+                }
+            }
+        }
+
+        return '#';
     }
 
     /**

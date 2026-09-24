@@ -27,8 +27,9 @@
                 <div class="col-lg-6">
                     <h6 class="fw-bold text-primary mb-3"><i class="feather-briefcase me-2"></i>{{ __('crm.company_contact_info') }}</h6>
 
-                    <x-ui.odoo-form-ui type="select" :label="__('crm.customer_account') . ' *'" name="crm_account_id" id="crm_account_id" required="true">
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.customer_account')" name="crm_account_id" id="crm_account_id" required="true" data-master="account">
                         <option value="" disabled selected>{{ __('crm.select_an_option') }}</option>
+                        <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="account">+ Add New Account / Customer</option>
                         @foreach($accounts as $acc)
                             <option value="{{ $acc->id }}" {{ (string)old('crm_account_id', $selectedAccountId) === (string)$acc->id ? 'selected' : '' }}>
                                 {{ $acc->name }} ({{ $acc->account_number }})
@@ -73,16 +74,16 @@
 
                     <h6 class="fw-bold text-primary mb-3 mt-4"><i class="feather-file-text me-2"></i>{{ __('crm.overview') }}</h6>
 
-                    <x-ui.odoo-form-ui type="input" :label="__('crm.project_deal_title') . ' *'" name="title" :value="old('title')" required="true" placeholder="e.g. Project Name" />
+                    <x-ui.odoo-form-ui type="input" :label="__('crm.project_deal_title')" name="title" :value="old('title')" required="true" placeholder="e.g. Project Name" />
 
-                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.expected_revenue_label') . ' *'" name="estimated_value" :value="old('estimated_value', '0.00')" step="0.01" required="true" placeholder="0.00" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.expected_revenue_label')" name="estimated_value" :value="old('estimated_value', '0.00')" step="0.01" required="true" placeholder="0.00" />
                 </div>
 
                 <!-- Right Column: Classification, Notes & Products -->
                 <div class="col-lg-6">
                     <h6 class="fw-bold text-primary mb-3"><i class="feather-grid me-2"></i>{{ __('crm.lead_classification') }}</h6>
 
-                    <x-ui.odoo-form-ui type="select" :label="__('crm.pipeline_stage') . ' *'" name="stage" required="true">
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.pipeline_stage')" name="stage" required="true">
                         @foreach($dealStatuses as $st)
                             <option value="{{ $st->name }}" @selected(old('stage', $dealStatuses->first()?->name) == $st->name)>
                                 {{ $st->name }}
@@ -304,7 +305,7 @@
         </form>
     </div>
 
-    <x-ui.master-modals :masters="['product', 'contact']" />
+    <x-ui.master-modals :masters="['product', 'contact', 'account']" />
 @endsection
 
 @push('scripts')
@@ -313,7 +314,7 @@
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script>
         function loadAccountContacts(accountId, selectedContactId) {
-            if (!accountId) return;
+            if (!accountId || accountId === '__ADD_NEW__') return;
             let contactSelect = $('#crm_contact_id');
             $.ajax({
                 url: '/crm/accounts/' + accountId + '/contacts-list',
@@ -337,11 +338,29 @@
         }
 
         $(function () {
-            // Register change listener on Account dropdown
-            $(document).on('change select2:select', '#crm_account_id', function () {
-                let accId = $(this).val();
-                if (accId) {
-                    loadAccountContacts(accId);
+            // Direct explicit listener for opening Account Quick Create Modal
+            $(document).on('select2:select change', '#crm_account_id', function (e) {
+                var selectedVal = $(this).val();
+                if (e && e.params && e.params.data && e.params.data.id === '__ADD_NEW__') {
+                    selectedVal = '__ADD_NEW__';
+                }
+                if (selectedVal === '__ADD_NEW__') {
+                    $(this).val('').trigger('change.select2');
+                    var modalEl = $('#quickCreateModal_account');
+                    if (modalEl.length) {
+                        modalEl.data('trigger-select', $('#crm_account_id'));
+                        if (typeof modalEl.modal === 'function') {
+                            modalEl.modal('show');
+                        } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                            var bsModal = bootstrap.Modal.getOrCreateInstance(modalEl[0]);
+                            bsModal.show();
+                        }
+                    }
+                    return;
+                }
+
+                if (selectedVal) {
+                    loadAccountContacts(selectedVal);
                 } else {
                     let contactSelect = $('#crm_contact_id');
                     contactSelect.empty();

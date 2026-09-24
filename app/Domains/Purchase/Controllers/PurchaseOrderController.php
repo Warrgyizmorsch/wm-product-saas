@@ -14,6 +14,8 @@ use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\PurchaseOrderExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PurchaseOrderController extends Controller
 {
@@ -28,6 +30,20 @@ class PurchaseOrderController extends Controller
 
         $orders = $this->orderRepo->getPaginatedOrders($request->all(), 10);
         return view('modules.purchase.orders.index', compact('orders'));
+    }
+
+    /**
+     * Export Purchase Orders to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', PurchaseOrder::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new PurchaseOrderExport($tenantId, $request->all()),
+            'purchase_orders_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function poApprovals(Request $request)
@@ -256,6 +272,13 @@ class PurchaseOrderController extends Controller
 
         $po = $this->orderService->storeOrder($validated, $tenantId);
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.order.created', [
+            'po_no' => $po->purchase_order_number ?? $po->po_number ?? 'PO-NEW',
+            'vendor_name' => $po->vendor?->name ?? 'Vendor',
+            'amount' => number_format((float)($po->grand_total ?? $po->total_amount ?? 0), 2),
+            'created_by' => auth()->user()?->name ?? 'User',
+        ], route('purchase.orders.show', $po->id), $po);
+
         return redirect()->route('purchase.orders.show', $po->id)
             ->with('success', "Purchase Order {$po->po_number} created successfully.");
     }
@@ -330,6 +353,13 @@ class PurchaseOrderController extends Controller
         }
 
         $this->orderService->confirmOrder($order);
+
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.order.approved', [
+            'po_no' => $order->purchase_order_number ?? $order->po_number ?? 'PO',
+            'vendor_name' => $order->vendor?->name ?? 'Vendor',
+            'amount' => number_format((float)($order->grand_total ?? $order->total_amount ?? 0), 2),
+            'approved_by' => auth()->user()?->name ?? 'Approver',
+        ], route('purchase.orders.show', $order->id), $order);
 
         return redirect()->back()->with('success', "Purchase Order {$order->purchase_order_number} has been approved successfully.");
     }

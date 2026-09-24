@@ -76,7 +76,7 @@
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                    <a href="{{ route('production.calendars.index') }}" class="btn btn-light border">Cancel</a>
+                    <a href="{{ route('production.calendars.index') }}" class="btn btn-light border">{{ __('production.cancel') }}</a>
                     <button type="submit" class="btn btn-primary">Update Calendar</button>
                 </div>
             </x-ui.odoo-form-ui>
@@ -98,11 +98,11 @@
                     <thead>
                         <tr>
                             <th style="width: 25%">Holiday Name</th>
-                            <th style="width: 15%">Date</th>
-                            <th style="width: 15%">Type</th>
+                            <th style="width: 15%">{{ __('production.date') }}</th>
+                            <th style="width: 15%">{{ __('production.routing_type') }}</th>
                             <th style="width: 25%">Working Hours</th>
-                            <th style="width: 10%">Status</th>
-                            <th class="text-end" style="width: 10%">Actions</th>
+                            <th style="width: 10%">{{ __('production.status') }}</th>
+                            <th class="text-end" style="width: 10%">{{ __('production.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -141,9 +141,9 @@
                                 </td>
                                 <td>
                                     @if($holiday->active)
-                                        <span class="badge bg-soft-success text-success">Active</span>
+                                        <span class="badge bg-soft-success text-success">{{ __('production.status_active') }}</span>
                                     @else
-                                        <span class="badge bg-soft-light text-muted">Inactive</span>
+                                        <span class="badge bg-soft-light text-muted">{{ __('production.wc_status_inactive') }}</span>
                                     @endif
                                 </td>
                                 <td class="text-end">
@@ -216,7 +216,7 @@
             <div class="col-md-6">
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" name="active" id="create_active" value="1" checked>
-                    <label class="form-check-label fw-semibold" for="create_active">Active Status</label>
+                    <label class="form-check-label fw-semibold" for="create_active">{{ __('production.active_status') }}</label>
                 </div>
             </div>
         </div>
@@ -275,7 +275,7 @@
                 <div class="col-md-6">
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" name="active" id="edit_active_{{ $holiday->id }}" value="1" @checked($holiday->active)>
-                        <label class="form-check-label fw-semibold" for="edit_active_{{ $holiday->id }}">Active Status</label>
+                        <label class="form-check-label fw-semibold" for="edit_active_{{ $holiday->id }}">{{ __('production.active_status') }}</label>
                     </div>
                 </div>
             </div>

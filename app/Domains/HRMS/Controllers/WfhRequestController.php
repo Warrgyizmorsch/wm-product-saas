@@ -102,6 +102,12 @@ class WfhRequestController extends Controller
 
         $this->wfhRequestRepository->storeWfhRequest($validated, $request);
 
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.wfh.applied', [
+            'employee_name' => $employee->full_name,
+            'date'          => $startDate->format('d M Y') . ($duration > 1 ? ' to ' . $endDate->format('d M Y') : ''),
+            'reason'        => $validated['reason'] ?? '',
+        ]);
+
         \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'New WFH Request',
             message: "{$employee->full_name} applied for {$duration} day(s) WFH.",
@@ -126,6 +132,12 @@ class WfhRequestController extends Controller
     public function updateStatus(Request $request, WfhRequest $wfhRequest, ?string $overrideAction = null): RedirectResponse
     {
         $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $wfhRequest->employee_id) {
+            abort(403, 'Self-approval is prohibited. You cannot approve your own WFH request.');
+        }
+
         $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
         $authEmployee = Employee::resolveForUser($user);
         $emp = $wfhRequest->employee;
@@ -154,6 +166,16 @@ class WfhRequestController extends Controller
             'action'           => $action,
             'rejection_reason' => $reason,
         ], $request);
+
+        $wfhDateStr = $wfhRequest->start_date ? \Carbon\Carbon::parse($wfhRequest->start_date)->format('d M Y') : now()->format('d M Y');
+
+        if ($action === 'approved') {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.wfh.approved', [
+                'employee_name' => $wfhRequest->employee?->full_name ?? 'Employee',
+                'date'          => $wfhDateStr,
+                'approved_by'   => auth()->user()?->name ?? 'Manager',
+            ]);
+        }
 
         if ($wfhRequest->employee) {
             $statusText = ucfirst($action);

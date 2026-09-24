@@ -330,26 +330,21 @@
 @section('content')
 
     {{-- ── Shop Floor (MES) Workflow Guidance Component ── --}}
-    <x-ui.workflow-guide title="What's Next?">
+    <x-ui.workflow-guide :title="__('production.whats_next')">
         @if(isset($activeSchedules) && $activeSchedules->count() > 0)
-            @php $firstOrder = $activeSchedules->first()->order; @endphp
-            Shop floor operations execution is active. You can assign operators to specific operations from the
-            @if($firstOrder)
-                <a href="{{ route('production.orders.show', ['order' => $firstOrder->id, 'tab' => 'vtab-operations']) }}"
-                    class="fw-bold text-primary text-decoration-underline">Production Order Operations tab</a>
-            @else
-                <a href="{{ route('production.orders.index') }}" class="fw-bold text-primary text-decoration-underline">Production
-                    Order Operations tab</a>
-            @endif
-            to allocate operators for live tracking. Operators can also view assigned tasks in the <a
-                href="{{ route('production.mes.operator.dashboard') }}"
-                class="fw-bold text-primary text-decoration-underline">MES Operator Console</a>.
+            @php 
+                $firstOrder = $activeSchedules->first()->order; 
+                $opsUrl = $firstOrder ? route('production.orders.show', ['order' => $firstOrder->id, 'tab' => 'vtab-operations']) : route('production.orders.index');
+            @endphp
+            {!! __('production.mes_workflow_guide_active', [
+                'operations_link' => '<a href="' . $opsUrl . '" class="fw-bold text-primary text-decoration-underline">' . __('production.production_order_operations_tab') . '</a>',
+                'console_link' => '<a href="' . route('production.mes.operator.dashboard') . '" class="fw-bold text-primary text-decoration-underline">' . __('production.mes_operator_console') . '</a>'
+            ]) !!}
         @else
-            No active schedules on the shop floor. Release confirmed schedules from <a
-                href="{{ route('production.schedules.index') }}"
-                class="fw-bold text-primary text-decoration-underline">Production Schedules</a> and assign operators under the
-            <a href="{{ route('production.orders.index') }}" class="fw-bold text-primary text-decoration-underline">Production
-                Order Operations tab</a> to begin execution.
+            {!! __('production.mes_workflow_guide_empty', [
+                'schedules_link' => '<a href="' . route('production.schedules.index') . '" class="fw-bold text-primary text-decoration-underline">' . __('production.production_schedules') . '</a>',
+                'operations_link' => '<a href="' . route('production.orders.index') . '" class="fw-bold text-primary text-decoration-underline">' . __('production.production_order_operations_tab') . '</a>'
+            ]) !!}
         @endif
     </x-ui.workflow-guide>
 
@@ -377,9 +372,9 @@
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Production Order</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.production_order') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="order_id">
-                                        <option value="">All Production Orders</option>
+                                        <option value="">{{ __('production.all_production_orders') }}</option>
                                         @foreach($orders as $po)
                                             <option value="{{ $po->id }}" {{ request('order_id') == $po->id ? 'selected' : '' }}>
                                                 {{ $po->order_number }} - {{ $po->product->name ?? '' }}
@@ -401,9 +396,9 @@
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Workstation / Center</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.workstation_center') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="work_center_id">
-                                        <option value="">All Work Centers</option>
+                                        <option value="">{{ __('production.all_work_centers') }}</option>
                                         @foreach($workCenters as $wc)
                                             <option value="{{ $wc->id }}" {{ request('work_center_id') == $wc->id ? 'selected' : '' }}>
                                                 {{ $wc->name }}
@@ -429,14 +424,14 @@
                     <div class="alert alert-soft-info d-flex align-items-center justify-content-between p-2 px-3 mb-3 fs-11 rounded border border-info-subtle">
                         <div class="d-flex align-items-center gap-2">
                             <i class="feather-filter text-info fs-14"></i>
-                            <span><strong>Active Filters:</strong>
+                            <span><strong>{{ __('production.active_filters') }}</strong>
                                 @if(request('search')) Search: "{{ request('search') }}" &bull; @endif
                                 @if(request('order_id') && ($matchedPo = $orders->firstWhere('id', request('order_id')))) PO: {{ $matchedPo->order_number }} &bull; @endif
                                 @if(request('product_id') && ($matchedProd = $products->firstWhere('id', request('product_id')))) Product: {{ $matchedProd->name }} &bull; @endif
                                 @if(request('work_center_id') && ($matchedWc = $workCenters->firstWhere('id', request('work_center_id')))) Workstation: {{ $matchedWc->name }} &bull; @endif
                             </span>
                         </div>
-                        <a href="{{ route('production.mes.dashboard') }}" class="btn btn-xs btn-outline-info fw-bold py-0">Clear Filters</a>
+                        <a href="{{ route('production.mes.dashboard') }}" class="btn btn-xs btn-outline-info fw-bold py-0">{{ __('production.clear_filters') }}</a>
                     </div>
                 @endif
 
@@ -505,20 +500,20 @@
                             <x-ui.odoo-form-ui type="table" class="align-middle mb-0 fs-11" style="min-width: 1650px; width: 100%;">
                                 <thead class="bg-soft-primary text-primary fw-bold text-uppercase border-bottom">
                                     <tr>
-                                        <th class="ps-3 text-center" style="min-width: 55px; width: 55px;">S.No.</th>
-                                        <th style="min-width: 150px; width: 150px;">Action</th>
-                                        <th style="min-width: 220px; width: 220px;">Item Details</th>
-                                        <th style="min-width: 190px; width: 190px;">Process</th>
-                                        <th style="min-width: 190px; width: 190px;">Workstation</th>
-                                        <th style="min-width: 100px; width: 100px;">Shifts</th>
-                                        <th style="min-width: 110px; width: 110px;">Schedule Start</th>
-                                        <th style="min-width: 110px; width: 110px;">Schedule Finish</th>
-                                        <th class="text-center" style="min-width: 90px; width: 90px;">Target Qty</th>
-                                        <th style="min-width: 110px; width: 110px;">Actual Start</th>
-                                        <th style="min-width: 110px; width: 110px;">Actual Finish</th>
-                                        <th class="text-center" style="min-width: 90px; width: 90px;">Done Qty</th>
-                                        <th class="text-center" style="min-width: 90px; width: 90px;">Pending Qty</th>
-                                        <th class="pe-3" style="min-width: 110px; width: 110px;">Assign To</th>
+                                        <th class="ps-3 text-center" style="min-width: 55px; width: 55px;">{{ __('production.s_no') }}</th>
+                                        <th style="min-width: 150px; width: 150px;">{{ __('production.action') }}</th>
+                                        <th style="min-width: 220px; width: 220px;">{{ __('production.item_details') }}</th>
+                                        <th style="min-width: 190px; width: 190px;">{{ __('production.process') }}</th>
+                                        <th style="min-width: 190px; width: 190px;">{{ __('production.workstation') }}</th>
+                                        <th style="min-width: 100px; width: 100px;">{{ __('production.shifts_sidebar') }}</th>
+                                        <th style="min-width: 110px; width: 110px;">{{ __('production.schedule_start') }}</th>
+                                        <th style="min-width: 110px; width: 110px;">{{ __('production.schedule_finish') }}</th>
+                                        <th class="text-center" style="min-width: 90px; width: 90px;">{{ __('production.target_qty') }}</th>
+                                        <th style="min-width: 110px; width: 110px;">{{ __('production.actual_start') }}</th>
+                                        <th style="min-width: 110px; width: 110px;">{{ __('production.actual_finish') }}</th>
+                                        <th class="text-center" style="min-width: 90px; width: 90px;">{{ __('production.done_qty') }}</th>
+                                        <th class="text-center" style="min-width: 90px; width: 90px;">{{ __('production.pending_qty') }}</th>
+                                        <th class="pe-3" style="min-width: 110px; width: 110px;">{{ __('production.assign_to') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -619,40 +614,34 @@
                                                                     class="btn btn-sm btn-info fw-semibold px-2 py-1 fs-11 text-white shadow-sm d-inline-flex align-items-center gap-1 text-nowrap"
                                                                     data-bs-toggle="modal" data-bs-target="#completeModal{{ $op->id }}"
                                                                     title="Record Subcontract Receipt (Vendor Supplied - No Company Material Sent)">
-                                                                    <i class="feather-download-cloud fs-12"></i>Record Subcontract Receipt
-                                                                </button>
+                                                                    <i class="feather-download-cloud fs-12"></i>{{ __('production.record_subcontract_receipt') }}</button>
                                                             @else
                                                                 <button type="button"
                                                                     class="btn btn-sm btn-purple fw-semibold px-2 py-1 fs-11 text-white shadow-sm d-inline-flex align-items-center gap-1 text-nowrap"
                                                                     data-bs-toggle="modal" data-bs-target="#manageChallanModal{{ $op->id }}"
                                                                     title="Manage Subcontract Delivery Challans (Company Material Sent)">
-                                                                    <i class="feather-file-text fs-12"></i>Manage Challan
-                                                                </button>
+                                                                    <i class="feather-file-text fs-12"></i>{{ __('production.manage_challan') }}</button>
                                                             @endif
                                                         </div>
                                                         @if($isVendorSupplied)
                                                             <span class="badge bg-soft-info text-info border border-info-subtle fs-9">
-                                                                <i class="feather-box me-1"></i>Vendor Supplied Material
-                                                            </span>
+                                                                <i class="feather-box me-1"></i>{{ __('production.vendor_supplied_material') }}</span>
                                                         @elseif($latestChallan)
                                                             @if($latestChallan->status === 'draft')
                                                                 <a href="{{ route('production.subcontract.delivery-challans.show', $latestChallan->id) }}"
                                                                     class="badge bg-soft-warning text-dark border border-warning fs-9 text-decoration-none"
                                                                     title="Draft Gate Pass pending dispatch">
-                                                                    <i class="feather-clock me-1"></i>Draft Gate Pass
-                                                                </a>
+                                                                    <i class="feather-clock me-1"></i>{{ __('production.draft_gate_pass') }}</a>
                                                             @elseif($latestChallan->status === 'dispatched')
                                                                 <a href="{{ route('production.subcontract.delivery-challans.show', $latestChallan->id) }}"
                                                                     class="badge bg-soft-info text-info border border-info-subtle fs-9 text-decoration-none"
                                                                     title="Material Dispatched to Vendor">
-                                                                    <i class="feather-truck me-1"></i>Dispatched
-                                                                </a>
+                                                                    <i class="feather-truck me-1"></i>{{ __('production.dispatched') }}</a>
                                                             @elseif($latestChallan->status === 'completed')
                                                                 <a href="{{ route('production.subcontract.delivery-challans.show', $latestChallan->id) }}"
                                                                     class="badge bg-soft-success text-success border border-success-subtle fs-9 text-decoration-none"
                                                                     title="Subcontract Received & Completed">
-                                                                    <i class="feather-check-circle me-1"></i>Received
-                                                                </a>
+                                                                    <i class="feather-check-circle me-1"></i>{{ __('production.received') }}</a>
                                                             @endif
                                                         @endif
 
@@ -665,8 +654,7 @@
                                                                             class="btn btn-xs btn-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container"
                                                                             data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
                                                                             title="Run Quality Inspection on Received Subcontract Goods">
-                                                                            <i class="feather-shield-check fs-11"></i>Run QC
-                                                                            <span class="btn-badge-count">{{ number_format($pendingQcQty, 0) }}</span>
+                                                                            <i class="feather-shield-check fs-11"></i>{{ __('production.run_qc') }}<span class="btn-badge-count">{{ number_format($pendingQcQty, 0) }}</span>
                                                                         </button>
                                                                     @elseif($isCompleted)
                                                                         <span
@@ -678,8 +666,7 @@
                                                                             class="btn btn-xs btn-outline-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap"
                                                                             data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
                                                                             title="Run Quality Inspection on Received Subcontract Goods">
-                                                                            <i class="feather-shield-check fs-11"></i>Run QC
-                                                                        </button>
+                                                                            <i class="feather-shield-check fs-11"></i>{{ __('production.run_qc') }}</button>
                                                                     @endif
                                                                 @endif
                                                                 @if($rejectedQty > 0)
@@ -687,8 +674,7 @@
                                                                         class="btn btn-xs btn-danger text-white fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container"
                                                                         data-bs-toggle="modal" data-bs-target="#dispositionModal{{ $op->id }}"
                                                                         title="Disposition Rejected Qty">
-                                                                        <i class="feather-alert-triangle fs-11"></i>Rework / Scrap
-                                                                        <span class="btn-badge-count">{{ number_format($rejectedQty, 0) }}</span>
+                                                                        <i class="feather-alert-triangle fs-11"></i>{{ __('production.rework_scrap') }}<span class="btn-badge-count">{{ number_format($rejectedQty, 0) }}</span>
                                                                     </button>
                                                                 @endif
                                                             </div>
@@ -782,8 +768,7 @@
                                                                             class="btn btn-xs btn-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container"
                                                                             data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
                                                                             title="Run Quality Inspection">
-                                                                            <i class="feather-shield-check fs-11"></i>Run QC
-                                                                            <span class="btn-badge-count">{{ number_format($pendingQcQty, 0) }}</span>
+                                                                            <i class="feather-shield-check fs-11"></i>{{ __('production.run_qc') }}<span class="btn-badge-count">{{ number_format($pendingQcQty, 0) }}</span>
                                                                         </button>
                                                                     @elseif($isCompleted)
                                                                         <span
@@ -795,8 +780,7 @@
                                                                             class="btn btn-xs btn-outline-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap"
                                                                             data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
                                                                             title="Run Inline Quality Inspection">
-                                                                            <i class="feather-shield-check fs-11"></i>Run QC
-                                                                        </button>
+                                                                            <i class="feather-shield-check fs-11"></i>{{ __('production.run_qc') }}</button>
                                                                     @endif
                                                                 @endif
                                                                 @if($rejectedQty > 0)
@@ -804,8 +788,7 @@
                                                                         class="btn btn-xs btn-danger text-white fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container"
                                                                         data-bs-toggle="modal" data-bs-target="#dispositionModal{{ $op->id }}"
                                                                         title="Disposition Rejected Qty">
-                                                                        <i class="feather-alert-triangle fs-11"></i>Rework / Scrap
-                                                                        <span class="btn-badge-count">{{ number_format($rejectedQty, 0) }}</span>
+                                                                        <i class="feather-alert-triangle fs-11"></i>{{ __('production.rework_scrap') }}<span class="btn-badge-count">{{ number_format($rejectedQty, 0) }}</span>
                                                                     </button>
                                                                 @endif
                                                             </div>
@@ -877,8 +860,7 @@
                                                         <span
                                                             class="badge bg-soft-warning text-warning border font-monospace py-1 px-1.5 fs-10"
                                                             data-bs-toggle="tooltip" data-bs-placement="top" title="Operation Paused">
-                                                            <i class="feather-pause-circle me-1"></i>Paused
-                                                        </span>
+                                                            <i class="feather-pause-circle me-1"></i>{{ __('production.paused') }}</span>
                                                     </div>
                                                 @endif
                                             </td>
@@ -913,7 +895,7 @@
                                                         {{ $orderOp->subcontract_lead_time_days ?? 0 }}d</small>
                                                 @else
                                                     <span class="badge bg-soft-info text-info border fs-10" data-bs-toggle="tooltip"
-                                                        data-bs-placement="top" title="Active Shift: Day Shift">Day Shift</span>
+                                                        data-bs-placement="top" title="Active Shift: Day Shift">{{ __('production.day_shift') }}</span>
                                                     <small
                                                         class="text-muted d-block fs-9 mt-0.5">Target={{ number_format($moQty, 0) }}</small>
                                                 @endif
@@ -1041,7 +1023,7 @@
                                         <h6 class="fw-bold text-purple mb-1">
                                             <i class="feather-truck me-2"></i>Outsourced Subcontract Operation ({{ ($activeOrderOp?->isWipJobWork() ?? false) ? 'Previous Op WIP Job Work' : 'Company Supplied Material' }})
                                         </h6>
-                                        <span class="text-muted fs-11">Supplier / Vendor: <strong>{{ $activeVendorName }}</strong> |
+                                        <span class="text-muted fs-11">{{ __('production.supplier_vendor') }}<strong>{{ $activeVendorName }}</strong> |
                                             Production Order: <strong>{{ $activeOrder->order_number ?? '' }}</strong></span>
                                     </div>
                                     <a href="{{ route('production.subcontract.delivery-challans.create', ['production_order_id' => $activeOp->production_order_id ?? $activeOrder->id, 'operation_id' => $activeOrderOp->id]) }}"
@@ -1055,13 +1037,13 @@
                                         <table class="table table-hover align-middle fs-12 mb-0 border">
                                             <thead class="bg-light">
                                                 <tr>
-                                                    <th class="text-center" style="width: 5%;">S.No.</th>
-                                                    <th style="width: 12%;">Date</th>
-                                                    <th style="width: 16%;">Challan No#</th>
-                                                    <th style="width: 16%;">Reference#</th>
-                                                    <th style="width: 22%;">Supplier Name</th>
-                                                    <th style="width: 14%;">Receive Status</th>
-                                                    <th class="text-end" style="width: 15%;">Action Operation</th>
+                                                    <th class="text-center" style="width: 5%;">{{ __('production.s_no') }}</th>
+                                                    <th style="width: 12%;">{{ __('production.date') }}</th>
+                                                    <th style="width: 16%;">{{ __('production.challan_no') }}</th>
+                                                    <th style="width: 16%;">{{ __('production.reference_no') }}</th>
+                                                    <th style="width: 22%;">{{ __('production.supplier_name') }}</th>
+                                                    <th style="width: 14%;">{{ __('production.receive_status') }}</th>
+                                                    <th class="text-end" style="width: 15%;">{{ __('production.action_operation') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1097,8 +1079,7 @@
                                                         <td class="text-end">
                                                             <a href="{{ route('production.subcontract.delivery-challans.show', $ch->id) }}"
                                                                 class="btn btn-xs btn-purple fw-semibold px-2 py-1">
-                                                                <i class="feather-eye me-1"></i>Click To Receive Items
-                                                            </a>
+                                                                <i class="feather-eye me-1"></i>{{ __('production.click_to_receive_items') }}</a>
                                                         </td>
                                                     </tr>
                                                 @endforeach
@@ -1187,7 +1168,7 @@
                                         </div>
                                         <div class="col-md-4">
                                             <x-ui.odoo-form-ui type="select" label="Employee" name="operator_id">
-                                                <option value="">None selected</option>
+                                                <option value="">{{ __('production.none_selected') }}</option>
                                                 @foreach(\App\Models\User::pluck('name', 'id') as $uId => $uName)
                                                     <option value="{{ $uId }}" {{ (int) ($activeOp->assigned_operator_id ?? auth()->id()) === (int) $uId ? 'selected' : '' }}>{{ $uName }}</option>
                                                 @endforeach
@@ -1195,9 +1176,9 @@
                                         </div>
                                         <div class="col-md-4">
                                             <x-ui.odoo-form-ui type="select" label="Shift" name="shift_name">
-                                                <option value="Day Shift" selected>Day Shift (Standard)</option>
-                                                <option value="Night Shift">Night Shift</option>
-                                                <option value="Morning Shift">Morning Shift A</option>
+                                                <option value="Day Shift" selected>{{ __('production.day_shift_standard') }}</option>
+                                                <option value="Night Shift">{{ __('production.night_shift') }}</option>
+                                                <option value="Morning Shift">{{ __('production.morning_shift_a') }}</option>
                                             </x-ui.odoo-form-ui>
                                         </div>
 
@@ -1226,8 +1207,8 @@
                                             <div class="col-md-12">
                                                 <div class="alert alert-soft-warning mb-0 py-2 fs-11 border border-warning-subtle">
                                                     <i class="feather-shield text-warning me-1"></i> Quality Check is required for this
-                                                    process. Logged output enters <strong>QC Pending</strong> state. Quality rejection &
-                                                    scrap disposition are handled via <strong>Run QC</strong>.
+                                                    process. Logged output enters <strong>{{ __('production.qc_pending') }}</strong> state. Quality rejection &
+                                                    scrap disposition are handled via <strong>{{ __('production.run_qc') }}</strong>.
                                                 </div>
                                             </div>
                                         @endif
@@ -1274,11 +1255,10 @@
                                             placeholder="Provide shift remarks or operation requirements..." rows="3" />
                                     </form>
                                     <x-slot name="footer">
-                                        <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
+                                        <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
                                         <button type="button" class="btn btn-primary px-4"
                                             onclick="document.getElementById('assignOperatorForm{{ $activeOp->id }}').submit();">
-                                            <i class="feather-user-check me-1"></i>Assign Operator
-                                        </button>
+                                            <i class="feather-user-check me-1"></i>{{ __('production.assign_operator') }}</button>
                                     </x-slot>
                                 </x-ui.modal>
                             @endif
@@ -1299,8 +1279,7 @@
                                         class="bg-soft-warning p-3 rounded mb-3 border border-warning-subtle d-flex justify-content-between align-items-center">
                                         <div>
                                             <h6 class="fw-bold text-dark mb-1"><i
-                                                    class="feather-shield-check text-warning me-2"></i>In-Process Quality Inspection
-                                            </h6>
+                                                    class="feather-shield-check text-warning me-2"></i>{{ __('production.in_process_qc_inspection') }}</h6>
                                             <span class="fs-11 text-muted">Order: <strong>{{ $activeOrder->order_number }}</strong> |
                                                 Item:
                                                 <strong>{{ $activeOrderOp->sourceProduct->name ?? $activeOrder->product->name }}</strong></span>
@@ -1424,8 +1403,7 @@
                                                             @endif
                                                         @empty
                                                             <div class="text-muted fs-12 py-1">
-                                                                <i class="feather-info text-primary me-1"></i> Quality Plan <strong>{{ $qp->name }}</strong> has no custom checklist parameters configured.
-                                                            </div>
+                                                                <i class="feather-info text-primary me-1"></i>{{ __('production.quality_plan') }}<strong>{{ $qp->name }}</strong>{{ __('production.no_checklist_parameters') }}</div>
                                                         @endforelse
                                                     </div>
                                                 @endforeach
@@ -1444,13 +1422,10 @@
                                         <div class="col-md-4">
                                             <x-ui.odoo-form-ui type="select" label="Defect Reason (If Rejected)" name="defect_reason">
                                                 <option value="">-- None / Meets Quality Standard --</option>
-                                                <option value="Surface Scratch / Coating Damage">Surface Scratch / Coating Damage
-                                                </option>
-                                                <option value="Out of Dimension / Thickness Error">Out of Dimension / Thickness Error
-                                                </option>
-                                                <option value="Chipped Edge / Structural Defect">Chipped Edge / Structural Defect
-                                                </option>
-                                                <option value="Raw Material Defect">Raw Material Defect</option>
+                                                <option value="Surface Scratch / Coating Damage">{{ __('production.surface_scratch_defect') }}</option>
+                                                <option value="Out of Dimension / Thickness Error">{{ __('production.dimension_thickness_error') }}</option>
+                                                <option value="Chipped Edge / Structural Defect">{{ __('production.chipped_edge_defect') }}</option>
+                                                <option value="Raw Material Defect">{{ __('production.raw_material_defect') }}</option>
                                                 <option value="Machine Calibration Error">Machine Calibration Error</option>
                                                 <option value="Operator Assembly Error">Operator Assembly Error</option>
                                             </x-ui.odoo-form-ui>
@@ -1464,7 +1439,7 @@
                                     </div>
                                 </form>
                                 <x-slot name="footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
                                     <button type="button" class="btn btn-warning text-dark fw-bold px-4"
                                         onclick="document.getElementById('qcForm{{ $activeOp->id }}').submit();">
                                         <i class="feather-check-circle me-1"></i>Submit QC Inspection
@@ -1525,7 +1500,7 @@
                                     </div>
                                 </form>
                                 <x-slot name="footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
                                     <button type="button" class="btn btn-danger fw-bold px-4"
                                         onclick="document.getElementById('scrapForm{{ $activeOp->id }}').submit();">
                                         <i class="feather-trash-2 me-1"></i>Record Scrap
@@ -1665,7 +1640,7 @@
                                     @endif
                                 </form>
                                 <x-slot name="footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
                                     <button type="button" class="btn btn-danger fw-bold px-4"
                                         onclick="document.getElementById('dispositionForm{{ $activeOp->id }}').submit();">
                                         <i class="feather-check-circle me-1"></i>Submit Disposition

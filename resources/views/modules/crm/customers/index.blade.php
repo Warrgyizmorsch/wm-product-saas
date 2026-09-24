@@ -5,9 +5,16 @@
 @section('breadcrumb', __('crm.customers_sidebar'))
 
 @section('page-actions')
-    <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#quickCreateModal_customer">
-        {{ __('crm.new_customer') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="customers" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('crm.customers.export') }}" />
+        <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#quickCreateModal_customer">
+            {{ __('crm.new_customer') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')

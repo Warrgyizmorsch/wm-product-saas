@@ -15,7 +15,8 @@ class DealStatus extends Model
 
     protected $table = 'deal_statuses';
 
-    /** Default masters are seeded without a company/branch and shown in every one. */
+    /** Default masters are seeded without a tenant/company/branch and shown in every one. */
+    public bool $sharedAcrossTenants = true;
     public bool $sharedAcrossCompanies = true;
 
     protected $fillable = [
@@ -43,35 +44,22 @@ class DealStatus extends Model
     public const PROTECTED_STATUSES = ['Won', 'Lost', 'Closed Won', 'Closed Lost'];
 
     /**
-     * Helper method to retrieve ordered deal statuses for a tenant.
-     * Auto-seeds defaults if table is empty for the tenant.
+     * Helper method to retrieve ordered deal statuses for the active tenant context.
+     * System statuses (tenant_id IS NULL) and tenant custom statuses will both be returned.
      */
     public static function getOrderedStatuses(?int $tenantId = null): Collection
     {
-        $tenantId = $tenantId ?? (tenant_id() ?? 1);
-
-        $statuses = static::where('tenant_id', $tenantId)
+        return static::query()
             ->where('is_active', true)
             ->orderBy('sort_order', 'asc')
             ->orderBy('id', 'asc')
             ->get();
-
-        if ($statuses->isEmpty()) {
-            static::seedDefaultsForTenant($tenantId);
-            $statuses = static::where('tenant_id', $tenantId)
-                ->where('is_active', true)
-                ->orderBy('sort_order', 'asc')
-                ->orderBy('id', 'asc')
-                ->get();
-        }
-
-        return $statuses;
     }
 
     /**
-     * Seed default core deal statuses for a given tenant.
+     * Seed default core deal statuses for the whole system (tenant_id = null).
      */
-    public static function seedDefaultsForTenant(int $tenantId): void
+    public static function seedSystemDefaults(): void
     {
         $defaults = [
             ['name' => 'Qualification',  'sort_order' => 1, 'color' => 'bg-primary', 'probability' => 10,  'is_protected' => false],
@@ -83,9 +71,11 @@ class DealStatus extends Model
         ];
 
         foreach ($defaults as $def) {
-            static::firstOrCreate(
-                ['tenant_id' => $tenantId, 'name' => $def['name']],
+            static::withoutGlobalScopes()->firstOrCreate(
+                ['tenant_id' => null, 'name' => $def['name']],
                 [
+                    'company_id'   => null,
+                    'branch_id'    => null,
                     'sort_order'   => $def['sort_order'],
                     'color'        => $def['color'],
                     'probability'  => $def['probability'],
@@ -101,6 +91,6 @@ class DealStatus extends Model
      */
     public function isProtected(): bool
     {
-        return $this->is_protected || in_array(trim($this->name), self::PROTECTED_STATUSES, true);
+        return $this->tenant_id === null || $this->is_protected || in_array(trim($this->name), self::PROTECTED_STATUSES, true);
     }
 }

@@ -5,9 +5,16 @@
 @section('breadcrumb', __('inventory.inventory_stock_transfers'))
 
 @section('page-actions')
-    <x-ui.button href="{{ route('inventory.transfers.create') }}" variant="primary" icon="feather-plus">
-        {{ __('inventory.new_transfer') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="stock_transfers" 
+            :can-import="false" 
+            :can-download-template="false" 
+            export-route="{{ route('inventory.transfers.export') }}" />
+        <x-ui.button href="{{ route('inventory.transfers.create') }}" variant="primary" icon="feather-plus">
+            {{ __('inventory.new_transfer') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')

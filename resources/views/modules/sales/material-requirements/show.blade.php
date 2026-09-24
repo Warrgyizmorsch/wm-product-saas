@@ -2,11 +2,11 @@
 
 @section('title', __('crm.material_requirements') . ' ' . $delivery->requirement_number . ' | SaaS ERP')
 @section('page-title', __('crm.material_requirements') . ' ' . $delivery->requirement_number)
-@section('breadcrumb', __('ui.sales') . ' / ' . __('crm.material_requirements') . ' / ' . $delivery->requirement_number)
+@section('breadcrumb', __('ui.inventory') . ' / ' . __('crm.material_requirements') . ' / ' . $delivery->requirement_number)
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <x-ui.button href="{{ route('sales.material-requirements.index') }}" variant="light" class="border" icon="feather-arrow-left">
+        <x-ui.button href="{{ route('inventory.material-requirements.index') }}" variant="light" class="border" icon="feather-arrow-left">
             {{ __('crm.back') }}
         </x-ui.button>
         <x-ui.button href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" variant="light" class="border" icon="feather-external-link">
@@ -19,7 +19,7 @@
         @endif
 
         @if ($delivery->status === 'Dispatched')
-            <form action="{{ route('sales.material-requirements.deliver', $delivery->id) }}" method="POST" class="d-inline">
+            <form action="{{ route('inventory.material-requirements.deliver', $delivery->id) }}" method="POST" class="d-inline">
                 @csrf
                 <x-ui.button type="submit" variant="success" class="fw-bold px-3" icon="feather-check-circle">
                     {{ __('crm.mark_delivered') }}
@@ -495,7 +495,7 @@
                 id="reserveModal-{{ $item->id }}"
                 :title="__('crm.reserve_stock') . ' — ' . $item->product?->name"
                 :submitText="__('crm.confirm_reservation')"
-                formAction="{{ route('sales.material-requirements.reserve-qty', $item->id) }}"
+                formAction="{{ route('inventory.material-requirements.reserve-qty', $item->id) }}"
                 :centered="true"
             >
                 <div class="fs-13 text-dark">
@@ -591,7 +591,7 @@
                     id="indentModal-{{ $item->id }}"
                     :title="__('crm.create_purchase_indent') . ' — ' . $item->product?->name"
                     :submitText="__('crm.submit_indent_request')"
-                    formAction="{{ route('sales.material-requirements.mock-indent', $item->id) }}"
+                    formAction="{{ route('inventory.material-requirements.mock-indent', $item->id) }}"
                     :centered="true"
                     :showFooter="true"
                 >
@@ -682,7 +682,7 @@
                 id="generateMoModal-{{ $item->id }}"
                 :title="__('crm.generate_mo') . ' — ' . $item->product?->name"
                 :submitText="__('crm.raise_mo_request')"
-                formAction="{{ route('sales.material-requirements.mock-mo', $item->id) }}"
+                formAction="{{ route('inventory.material-requirements.mock-mo', $item->id) }}"
                 :centered="true"
             >
                 <div class="fs-13 text-dark">
@@ -742,7 +742,7 @@
         <x-ui.modal
             id="dispatchModal"
             title="Transporter & Shipment Details"
-            formAction="{{ route('sales.material-requirements.dispatch', $delivery->id) }}"
+            formAction="{{ route('inventory.material-requirements.dispatch', $delivery->id) }}"
             :submitText="__('crm.dispatch_order')"
             :centered="true"
         >
@@ -780,7 +780,7 @@
          */
         function changeWarehouse(itemId, select) {
             const warehouseId = select.value;
-            const url = `{{ url('sales/material-requirements/items') }}/${itemId}/warehouse`;
+            const url = `{{ url('inventory/material-requirements/items') }}/${itemId}/warehouse`;
 
             $.ajax({
                 url:    url,
@@ -813,7 +813,7 @@
             updateReserveAvailableFromQty(itemId, avail);
 
             $.ajax({
-                url:    `{{ url('sales/material-requirements/items') }}/${itemId}/warehouse`,
+                url:    `{{ url('inventory/material-requirements/items') }}/${itemId}/warehouse`,
                 method: 'POST',
                 data:   { _token: '{{ csrf_token() }}', warehouse_id: select.value },
                 success: function (response) {

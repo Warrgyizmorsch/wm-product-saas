@@ -70,7 +70,7 @@
                     <button type="submit" class="btn btn-primary px-4">
                         <i class="feather-check-circle me-2"></i>Initiate CAPA Action
                     </button>
-                    <a href="{{ route('production.capas.index') }}" class="btn btn-secondary px-4">Cancel</a>
+                    <a href="{{ route('production.capas.index') }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

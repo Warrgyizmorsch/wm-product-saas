@@ -20,9 +20,7 @@ class DealStatusRepository
     public function create(array $data): DealStatus
     {
         if (!isset($data['sort_order']) || $data['sort_order'] <= 0) {
-            $maxOrder = DealStatus::query()
-                ->where('tenant_id', $data['tenant_id'] ?? (tenant_id() ?? 1))
-                ->max('sort_order');
+            $maxOrder = DealStatus::query()->max('sort_order');
             $data['sort_order'] = ($maxOrder ?? 0) + 1;
         }
 

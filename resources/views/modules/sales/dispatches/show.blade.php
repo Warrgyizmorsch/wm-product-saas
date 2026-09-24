@@ -65,7 +65,7 @@
                             <span><strong class="text-dark">{{ __('crm.customer') }}:</strong> <strong class="text-dark">{{ $dispatch->customer?->name ?? 'Direct Customer' }}</strong></span>
                             @if($dispatch->material_requirement_id && $dispatch->materialRequirement)
                                 <span class="text-black-50">•</span>
-                                <span><strong class="text-dark">{{ __('crm.material_requirement') }}:</strong> <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-bold text-primary">{{ $dispatch->materialRequirement->requirement_number }}</a></span>
+                                <span><strong class="text-dark">{{ __('crm.material_requirement') }}:</strong> <a href="{{ route('inventory.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-bold text-primary">{{ $dispatch->materialRequirement->requirement_number }}</a></span>
                             @endif
                             @if($dispatch->sales_order_id && $dispatch->salesOrder)
                                 <span class="text-black-50">•</span>

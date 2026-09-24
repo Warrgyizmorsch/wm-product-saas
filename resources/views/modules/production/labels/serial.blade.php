@@ -88,7 +88,7 @@
 
     <div class="label-wrapper">
         <div class="label-header">
-            <span class="label-type">Serial Number</span>
+            <span class="label-type">{{ __('production.serial_number') }}</span>
             <span class="status-badge">{{ strtoupper($serial->status) }}</span>
         </div>
 

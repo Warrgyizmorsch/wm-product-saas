@@ -54,10 +54,10 @@
                     <thead>
                         <tr>
                             <th style="width: 25%">Deviation Number</th>
-                            <th style="width: 20%">Type</th>
-                            <th style="width: 15%">Status</th>
+                            <th style="width: 20%">{{ __('production.routing_type') }}</th>
+                            <th style="width: 15%">{{ __('production.status') }}</th>
                             <th style="width: 20%">Expiration</th>
-                            <th class="text-end" style="width: 20%">Action</th>
+                            <th class="text-end" style="width: 20%">{{ __('production.action') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -67,9 +67,9 @@
                                 <td class="text-capitalize text-dark fw-medium">{{ str_replace('_', ' ', $dev->type) }}</td>
                                 <td>
                                     @if($dev->status === 'approved')
-                                        <span class="erp-badge-active">Approved</span>
+                                        <span class="erp-badge-active">{{ __('production.approved') }}</span>
                                     @elseif($dev->status === 'submitted')
-                                        <span class="erp-badge-pending">Submitted</span>
+                                        <span class="erp-badge-pending">{{ __('production.submitted') }}</span>
                                     @else
                                         <span class="erp-badge-draft text-uppercase">{{ $dev->status }}</span>
                                     @endif
@@ -91,7 +91,7 @@
                                             <button type="submit" class="btn btn-xs btn-success py-1">Approve</button>
                                         </form>
                                     @else
-                                        <span class="text-success fs-11 fw-semibold"><i class="feather-check-circle me-1"></i>Approved</span>
+                                        <span class="text-success fs-11 fw-semibold"><i class="feather-check-circle me-1"></i>{{ __('production.approved') }}</span>
                                     @endif
                                 </td>
                             </tr>

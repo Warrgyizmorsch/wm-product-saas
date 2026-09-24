@@ -3,25 +3,25 @@
     <div class="row g-3 mb-4">
         <div class="col-md-3">
             <div class="p-3 bg-light rounded border">
-                <div class="text-muted small">Planned Qty</div>
+                <div class="text-muted small">{{ __('production.planned_qty') }}</div>
                 <div class="fs-4 fw-bold text-dark">{{ $analysis['planned_quantity'] }}</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="p-3 bg-light rounded border">
-                <div class="text-muted small">Actual Completed Qty</div>
+                <div class="text-muted small">{{ __('production.actual_completed_qty') }}</div>
                 <div class="fs-4 fw-bold text-primary">{{ $analysis['actual_completed_quantity'] }} (Yield: {{ $analysis['yield_percentage'] }}%)</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="p-3 bg-light rounded border">
-                <div class="text-muted small">Scrap / Rejected</div>
+                <div class="text-muted small">{{ __('production.scrap_rejected') }}</div>
                 <div class="fs-4 fw-bold text-danger">{{ $analysis['scrap_quantity'] }} / {{ $analysis['rejected_quantity'] }}</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="p-3 bg-light rounded border">
-                <div class="text-muted small">Overall Time Variance</div>
+                <div class="text-muted small">{{ __('production.overall_time_variance') }}</div>
                 <div class="fs-4 fw-bold {{ $analysis['total_time_variance'] > 0 ? 'text-danger' : 'text-success' }}">
                     {{ $analysis['total_time_variance'] > 0 ? '+' : '' }}{{ $analysis['total_time_variance'] }} min
                 </div>
@@ -31,16 +31,16 @@
     </div>
 
     <!-- Operation Variance Breakdown -->
-    <h6 class="fw-bold mb-3">Operation Breakdown</h6>
+    <h6 class="fw-bold mb-3">{{ __('production.operation_breakdown') }}</h6>
     <x-ui.odoo-form-ui type="table">
         <thead>
             <tr>
-                <th>Op #</th>
-                <th>Operation Name</th>
-                <th>Planned Duration</th>
-                <th>Actual Duration</th>
-                <th>Time Variance</th>
-                <th>Produced Qty</th>
+                <th>{{ __('production.op_hash') }}</th>
+                <th>{{ __('production.operation_name') }}</th>
+                <th>{{ __('production.planned_duration') }}</th>
+                <th>{{ __('production.actual_duration') }}</th>
+                <th>{{ __('production.time_variance') }}</th>
+                <th>{{ __('production.produced_qty') }}</th>
                 <th>Status</th>
             </tr>
         </thead>

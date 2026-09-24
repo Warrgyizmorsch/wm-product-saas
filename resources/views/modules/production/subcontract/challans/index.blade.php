@@ -43,7 +43,7 @@
             </div>
             <div class="col">
                 <div class="border rounded p-3 text-center bg-soft-info">
-                    <span class="fs-11 text-uppercase text-info fw-bold">Completed</span>
+                    <span class="fs-11 text-uppercase text-info fw-bold">{{ __('production.completed_schedules') }}</span>
                     <h4 class="fw-bold text-info-emphasis mb-0 mt-1 font-monospace">{{ number_format($statusCounts['completed']) }}</h4>
                 </div>
             </div>
@@ -53,7 +53,7 @@
         <div class="d-flex align-items-center justify-content-between mb-3">
             <form action="{{ route('production.subcontract.delivery-challans.index') }}" method="GET" class="d-flex gap-2">
                 <input type="text" name="search" class="form-control form-control-sm" placeholder="Search Challan # / Vehicle / LR #" value="{{ request('search') }}">
-                <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="feather-search"></i> Search</button>
+                <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="feather-search"></i>{{ __('production.search') }}</button>
             </form>
         </div>
 
@@ -63,13 +63,13 @@
                 <thead class="table-light fs-11 text-uppercase text-muted">
                     <tr>
                         <th>Challan #</th>
-                        <th>Date</th>
+                        <th>{{ __('production.date') }}</th>
                         <th>Subcontractor / Vendor</th>
                         <th>Source Warehouse</th>
                         <th>Linked Production Order</th>
                         <th>Vehicle & Transporter</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-end">Actions</th>
+                        <th class="text-center">{{ __('production.status') }}</th>
+                        <th class="text-end">{{ __('production.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -240,6 +240,8 @@ body.app-skin-dark .badge.erp-badge .rounded-circle.bg-secondary,
     display: flex;
     gap: 12px;
     min-height: 58px;
+    min-width: 0;
+    overflow: hidden;
     padding: 10px 12px;
 }
 
@@ -248,11 +250,55 @@ body.app-skin-dark .badge.erp-badge .rounded-circle.bg-secondary,
     background-color: #f8faff;
 }
 
+.erp-module-link .avatar-text,
+.erp-module-link > i {
+    flex-shrink: 0;
+}
+
+/* Odoo-style app icon: each app gets its own solid color tile (see config/navigation.php `color`),
+   instead of one uniform brand-color badge, so the launcher/switcher read at a glance. */
+.erp-app-icon {
+    align-items: center;
+    border-radius: 10px;
+    color: #fff;
+    display: inline-flex;
+    flex-shrink: 0;
+    height: 40px;
+    justify-content: center;
+    width: 40px;
+}
+
+.erp-app-icon i {
+    color: #fff;
+    /* !important: theme.min.css's ".dropdown .dropdown-menu .dropdown-item i"
+    (font-size 16px, margin-right 15px, for icon+label spacing) outranks a plain
+    ".erp-app-icon i" by specificity and throws off centering inside this tile. */
+    font-size: 18px !important;
+    margin: 0 !important;
+}
+
+.erp-app-icon-sm {
+    border-radius: 7px;
+    height: 26px;
+    width: 26px;
+}
+
+.erp-app-icon-sm i {
+    font-size: 13px;
+}
+
 .erp-module-link-copy {
     display: flex;
     flex-direction: column;
     line-height: 1.25;
     min-width: 0;
+    overflow: hidden;
+}
+
+.erp-module-link-copy span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .erp-module-link-copy small {
@@ -260,6 +306,9 @@ body.app-skin-dark .badge.erp-badge .rounded-circle.bg-secondary,
     font-size: 11px;
     font-weight: 500;
     margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .erp-module-footer {
@@ -286,6 +335,10 @@ body.app-skin-dark .badge.erp-badge .rounded-circle.bg-secondary,
     line-height: 1.15;
     min-width: 0;
     text-align: left;
+}
+
+.erp-tenant-copy strong {
+    color: var(--bs-primary, #3B82F6);
 }
 
 .erp-tenant-copy strong,
@@ -465,8 +518,8 @@ body.app-skin-dark .badge.erp-badge .rounded-circle.bg-secondary,
 }
 
 .btn-light-brand {
-    background-color: #f4f1de !important;
-    border-color: #f4f1de !important;
+    background-color: #919ab32b !important;
+    border-color: #e8e7e2 !important;
     color: #3d405b !important;
 }
 

@@ -12,9 +12,25 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use App\Exports\StockAdjustmentExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class StockAdjustmentController extends Controller
 {
+    /**
+     * Export Stock Adjustments to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', StockAdjustment::class);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new StockAdjustmentExport($tenantId, $request->all()),
+            'stock_adjustments_export_' . date('Y-m-d_His') . '.xlsx'
+        );
+    }
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', StockAdjustment::class);
@@ -92,7 +108,7 @@ class StockAdjustmentController extends Controller
             'items.*.unit_cost' => 'nullable|numeric|min:0',
         ]);
 
-        DB::transaction(function () use ($validated, $tenantId) {
+        $adjustment = DB::transaction(function () use ($validated, $tenantId) {
             $adjNumber = 'ADJ-' . strtoupper(uniqid());
 
             $adjustment = StockAdjustment::create([
@@ -124,7 +140,16 @@ class StockAdjustmentController extends Controller
                     'serial_numbers' => !empty($item['serial_numbers']) ? explode(',', $item['serial_numbers']) : null,
                 ]);
             }
+
+            return $adjustment;
         });
+
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('inventory.adjustment.pending', [
+            'doc_no' => $adjustment->adjustment_number,
+            'warehouse' => $adjustment->warehouse?->name ?? 'Warehouse',
+            'reason' => $adjustment->reason ?? 'Adjustment',
+            'created_by' => Auth::user()?->name ?? 'User',
+        ], route('inventory.adjustments.show', $adjustment->id), $adjustment);
 
         return redirect()->route('inventory.adjustments.index')->with('success', 'Stock Adjustment Created successfully.');
     }

@@ -55,13 +55,9 @@ if (! function_exists('tenant_allowed_modules')) {
      */
     function tenant_allowed_modules(): ?array
     {
-        $plan = tenant()?->planCatalog;
-
-        if ($plan === null || $plan->features === null) {
-            return null;
-        }
-
-        return $plan->features;
+        // Includes self-service module add-ons (see TenantModuleController) on top
+        // of the plan's own list — Tenant::planModules() merges them.
+        return tenant()?->planModules();
     }
 }
 

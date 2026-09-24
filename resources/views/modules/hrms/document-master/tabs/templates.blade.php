@@ -114,6 +114,40 @@
                         <tr>
                             <td class="text-start px-4" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
                                 <div class="fw-bold text-dark fs-13">{{ $tmpl->name }}</div>
+                                @php
+                                    $codeUpper = strtoupper($tmpl->code);
+                                    $catName = strtolower($tmpl->category->name ?? '');
+                                    $tmplNameLower = strtolower($tmpl->name);
+                                @endphp
+                                @if(in_array($codeUpper, ['PAYSLIP', 'SALARY_SLIP', 'SALARYSLIP']) || str_contains($catName, 'payroll') || str_contains($tmplNameLower, 'payslip') || str_contains($tmplNameLower, 'salary slip'))
+                                    <span class="badge bg-soft-success text-success border border-success-subtle fs-10 px-2 py-0.5 mt-1 d-inline-block">
+                                        <i class="feather-dollar-sign me-1"></i> Auto-linked: Monthly Payslip
+                                    </span>
+                                @elseif(in_array($codeUpper, ['RELIEVING_LT', 'RELIEVING_LETTER', 'RELIEVING']) || str_contains($tmplNameLower, 'relieving'))
+                                    <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 px-2 py-0.5 mt-1 d-inline-block">
+                                        <i class="feather-log-out me-1"></i> Auto-linked: Relieving Letter
+                                    </span>
+                                @elseif(in_array($codeUpper, ['EXPERIENCE_LT', 'EXPERIENCE_CERTIFICATE', 'EXPERIENCE']) || str_contains($tmplNameLower, 'experience'))
+                                    <span class="badge bg-soft-info text-info border border-info-subtle fs-10 px-2 py-0.5 mt-1 d-inline-block">
+                                        <i class="feather-award me-1"></i> Auto-linked: Experience Certificate
+                                    </span>
+                                @elseif(in_array($codeUpper, ['NOC_LT', 'NOC_CERTIFICATE', 'NOC', 'NO_DUES']) || str_contains($tmplNameLower, 'no objection') || str_contains($tmplNameLower, 'noc'))
+                                    <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle fs-10 px-2 py-0.5 mt-1 d-inline-block">
+                                        <i class="feather-check-circle me-1"></i> Auto-linked: NOC Certificate
+                                    </span>
+                                @elseif(in_array($codeUpper, ['FNF_STMT', 'FNF_STATEMENT', 'FNF_SETTLEMENT']) || str_contains($tmplNameLower, 'settlement') || str_contains($tmplNameLower, 'fnf'))
+                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-2 py-0.5 mt-1 d-inline-block">
+                                        <i class="feather-file-text me-1"></i> Auto-linked: F&F Settlement
+                                    </span>
+                                @elseif(in_array($codeUpper, ['OFFERLT', 'OFFER_LETTER']) || str_contains($tmplNameLower, 'offer letter'))
+                                    <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 px-2 py-0.5 mt-1 d-inline-block">
+                                        <i class="feather-user-check me-1"></i> Auto-linked: Offer Letter
+                                    </span>
+                                @elseif(in_array($codeUpper, ['SELECTLT', 'SELECTION_LETTER']) || str_contains($tmplNameLower, 'selection letter'))
+                                    <span class="badge bg-soft-info text-info border border-info-subtle fs-10 px-2 py-0.5 mt-1 d-inline-block">
+                                        <i class="feather-mail me-1"></i> Auto-linked: Selection Letter
+                                    </span>
+                                @endif
                             </td>
                             <td>
                                 <span class="badge bg-light text-dark border px-2.5 py-1 font-monospace fs-11">{{ $tmpl->code }}</span>
@@ -228,22 +262,45 @@
                 @csrf
                 <div class="modal-body p-4">
                     <div class="row g-3">
+                        <!-- Quick Preset Selector Banner -->
+                        <div class="col-12">
+                            <div class="p-3 bg-soft-primary rounded border border-primary-subtle d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                <div>
+                                    <div class="fw-bold text-dark fs-12 mb-0"><i class="feather-zap text-primary me-1"></i> Template System Purpose / Quick Preset</div>
+                                    <p class="fs-11 text-muted mb-0">Select a purpose to auto-link to system modules (Payroll, Exits, Recruitment) and load starter layouts.</p>
+                                </div>
+                                <div style="min-width: 280px;">
+                                    <select class="form-select form-select-sm fs-12" id="add_template_preset_select" onchange="applyTemplatePreset('add', this.value)">
+                                        <option value="">-- Choose System Purpose / Preset --</option>
+                                        <option value="payslip">💰 Monthly Payslip / Salary Slip (Auto-links to Payroll)</option>
+                                        <option value="relieving">🚪 Relieving Letter (Auto-links to Exits)</option>
+                                        <option value="experience">📜 Experience Certificate (Auto-links to Exits)</option>
+                                        <option value="noc">🛡️ No Objection / No Dues Certificate (NOC)</option>
+                                        <option value="fnf">📊 Full & Final (F&F) Settlement Statement</option>
+                                        <option value="offer">💼 Job Offer Letter (Recruitment)</option>
+                                        <option value="selection">✉️ Selection Letter (Recruitment)</option>
+                                        <option value="custom">✏️ Custom / General Employee Letter</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" label="Template Name" name="name" placeholder="e.g. Standard Offer Letter, Experience Certificate..." :required="true" />
+                            <x-ui.odoo-form-ui type="input" label="Template Name" name="name" id="add_tmpl_name" placeholder="e.g. Standard Offer Letter, Experience Certificate..." :required="true" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" label="Template Code" name="code" placeholder="e.g. TMPL_OFFER_01" :required="true" />
+                            <x-ui.odoo-form-ui type="input" label="Template Code" name="code" id="add_tmpl_code" placeholder="e.g. TMPL_OFFER_01" :required="true" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="select" label="Document Category" name="document_category_id">
+                            <x-ui.odoo-form-ui type="select" label="Document Category" name="document_category_id" id="add_tmpl_category_id">
                                 <option value="">Select Category (Optional)...</option>
                                 @foreach($allCategories as $cat)
-                                    <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                                    <option value="{{ $cat->id }}" data-name="{{ strtolower($cat->name) }}">{{ $cat->name }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="select" label="Status" name="status" :searchable="false" :required="true">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" id="add_tmpl_status" :searchable="false" :required="true">
                                 <option value="active" selected>Active</option>
                                 <option value="inactive">Inactive</option>
                             </x-ui.odoo-form-ui>
@@ -314,6 +371,36 @@
                                     <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('add', '@{{experience_table}}')">@{{experience_table}}</button>
                                     <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('add', '@{{skills_list}}')">@{{skills_list}}</button>
                                     <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('add', '@{{certifications_list}}')">@{{certifications_list}}</button>
+
+                                    <hr class="w-100 my-1">
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-dollar-sign me-1 text-success"></i> Payroll & Salary Data:</span>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{payslip_month}}')">@{{payslip_month}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{working_days}}')">@{{working_days}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{paid_days}}')">@{{paid_days}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{lop_days}}')">@{{lop_days}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{gross_earnings}}')">@{{gross_earnings}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{total_deductions}}')">@{{total_deductions}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-success border text-success tag-btn" onclick="insertTag('add', '@{{net_pay}}')">@{{net_pay}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{net_pay_in_words}}')">@{{net_pay_in_words}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{bank_name}}')">@{{bank_name}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{bank_account_number}}')">@{{bank_account_number}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{ifsc_code}}')">@{{ifsc_code}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{pan_number}}')">@{{pan_number}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{uan_number}}')">@{{uan_number}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-success border text-success tag-btn" onclick="insertTag('add', '@{{salary_breakdown_table}}')">@{{salary_breakdown_table}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-success border text-success tag-btn" onclick="insertTag('add', '@{{earnings_table}}')">@{{earnings_table}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-success border text-success tag-btn" onclick="insertTag('add', '@{{deductions_table}}')">@{{deductions_table}}</button>
+
+                                    <hr class="w-100 my-1">
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-log-out me-1 text-danger"></i> Exit & Separation:</span>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{separation_type}}')">@{{separation_type}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{resignation_date}}')">@{{resignation_date}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{tenure_string}}')">@{{tenure_string}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{conduct_statement}}')">@{{conduct_statement}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{clearance_status}}')">@{{clearance_status}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-danger border text-danger tag-btn" onclick="insertTag('add', '@{{fnf_settlement_table}}')">@{{fnf_settlement_table}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{fnf_net_payable}}')">@{{fnf_net_payable}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{fnf_net_payable_words}}')">@{{fnf_net_payable_words}}</button>
                                 </div>
                             </div>
                         </div>
@@ -424,6 +511,36 @@
                                     <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('edit', '@{{experience_table}}')">@{{experience_table}}</button>
                                     <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('edit', '@{{skills_list}}')">@{{skills_list}}</button>
                                     <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('edit', '@{{certifications_list}}')">@{{certifications_list}}</button>
+
+                                    <hr class="w-100 my-1">
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-dollar-sign me-1 text-success"></i> Payroll & Salary Data:</span>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{payslip_month}}')">@{{payslip_month}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{working_days}}')">@{{working_days}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{paid_days}}')">@{{paid_days}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{lop_days}}')">@{{lop_days}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{gross_earnings}}')">@{{gross_earnings}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{total_deductions}}')">@{{total_deductions}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-success border text-success tag-btn" onclick="insertTag('edit', '@{{net_pay}}')">@{{net_pay}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{net_pay_in_words}}')">@{{net_pay_in_words}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{bank_name}}')">@{{bank_name}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{bank_account_number}}')">@{{bank_account_number}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{ifsc_code}}')">@{{ifsc_code}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{pan_number}}')">@{{pan_number}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{uan_number}}')">@{{uan_number}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-success border text-success tag-btn" onclick="insertTag('edit', '@{{salary_breakdown_table}}')">@{{salary_breakdown_table}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-success border text-success tag-btn" onclick="insertTag('edit', '@{{earnings_table}}')">@{{earnings_table}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-success border text-success tag-btn" onclick="insertTag('edit', '@{{deductions_table}}')">@{{deductions_table}}</button>
+
+                                    <hr class="w-100 my-1">
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-log-out me-1 text-danger"></i> Exit & Separation:</span>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{separation_type}}')">@{{separation_type}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{resignation_date}}')">@{{resignation_date}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{tenure_string}}')">@{{tenure_string}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{conduct_statement}}')">@{{conduct_statement}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{clearance_status}}')">@{{clearance_status}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-danger border text-danger tag-btn" onclick="insertTag('edit', '@{{fnf_settlement_table}}')">@{{fnf_settlement_table}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{fnf_net_payable}}')">@{{fnf_net_payable}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{fnf_net_payable_words}}')">@{{fnf_net_payable_words}}</button>
                                 </div>
                             </div>
                         </div>
@@ -877,6 +994,82 @@
                 );
             };
             reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // System Preset Templates Dictionary
+    const TEMPLATE_PRESETS = {
+        payslip: {
+            name: 'Standard Salary Slip',
+            code: 'PAYSLIP',
+            categoryKeywords: ['payroll', 'salary'],
+            content: '<p><strong>@{{employee_name}}</strong> (@{{employee_id}}) - @{{designation}} | @{{department}}</p><p>Month: <strong>@{{payslip_month}}</strong> | Paid Days: @{{paid_days}} / @{{working_days}}</p><p>@{{salary_breakdown_table}}</p><p><strong>Net Salary:</strong> @{{net_pay}} (@{{net_pay_in_words}})</p>'
+        },
+        relieving: {
+            name: 'Relieving Letter',
+            code: 'RELIEVING_LT',
+            categoryKeywords: ['exit', 'separation', 'offboarding'],
+            content: '<p>To,<br><strong>@{{employee_name}}</strong> (@{{employee_id}})<br>@{{designation}} - @{{department}}</p><p><strong>Subject: Formal Relieving Letter & Acceptance of Resignation</strong></p><p>Dear @{{employee_name}},</p><p>With reference to your resignation, we hereby confirm that your resignation from <strong>@{{company_name}}</strong> has been accepted. You are officially relieved from your duties with effect from the close of business hours on <strong>@{{last_working_day}}</strong>.</p><p>We confirm that you served the organization from <strong>@{{joining_date}}</strong> to <strong>@{{last_working_day}}</strong> and completed all exit formalities and clearances.</p><p>We thank you for your service and wish you success in all future endeavors.</p><br><p>@{{hr_signature}}<br><strong>@{{hr_name}}</strong><br>@{{hr_designation}}<br>@{{company_name}}</p>'
+        },
+        experience: {
+            name: 'Experience Certificate',
+            code: 'EXPERIENCE_LT',
+            categoryKeywords: ['exit', 'separation', 'offboarding'],
+            content: '<div style="text-align: center; margin-bottom: 20px;"><h3 style="text-decoration: underline; letter-spacing: 1px;">TO WHOMSOEVER IT MAY CONCERN</h3></div><p>This is to certify that <strong>@{{employee_name}}</strong> (Employee ID: <strong>@{{employee_id}}</strong>) was employed with <strong>@{{company_name}}</strong> from <strong>@{{joining_date}}</strong> to <strong>@{{last_working_day}}</strong>.</p><p>During their tenure of <strong>@{{tenure_string}}</strong>, they served as <strong>@{{designation}}</strong> in the <strong>@{{department}}</strong> department.</p><p>@{{conduct_statement}}</p><p>We appreciate their contributions and wish them every success in their career.</p><br><p>@{{hr_signature}}<br><strong>@{{hr_name}}</strong><br>@{{hr_designation}}<br>@{{company_name}}</p>'
+        },
+        noc: {
+            name: 'No Objection & No Dues Certificate',
+            code: 'NOC_LT',
+            categoryKeywords: ['exit', 'separation', 'offboarding'],
+            content: '<div style="text-align: center; margin-bottom: 20px;"><h3 style="text-decoration: underline; letter-spacing: 1px;">NO OBJECTION & NO DUES CERTIFICATE</h3></div><p>This is to certify that <strong>@{{employee_name}}</strong> (Employee ID: <strong>@{{employee_id}}</strong>), formerly designated as <strong>@{{designation}}</strong> in <strong>@{{department}}</strong>, has completed their employment tenure ending on <strong>@{{last_working_day}}</strong>.</p><p>@{{clearance_status}}</p><p><strong>@{{company_name}}</strong> has no outstanding dues or claims against the employee and has no objection to their seeking employment elsewhere.</p><br><p>@{{hr_signature}}<br><strong>@{{hr_name}}</strong><br>@{{hr_designation}}<br>@{{company_name}}</p>'
+        },
+        fnf: {
+            name: 'Full & Final Settlement Statement',
+            code: 'FNF_STMT',
+            categoryKeywords: ['exit', 'separation', 'offboarding'],
+            content: '<div style="text-align: center; margin-bottom: 15px;"><h3>FULL & FINAL SETTLEMENT STATEMENT</h3></div><p><strong>Employee:</strong> @{{employee_name}} (@{{employee_id}}) | <strong>Designation:</strong> @{{designation}}</p><p><strong>Tenure:</strong> @{{joining_date}} to @{{last_working_day}} (@{{tenure_string}})</p><p>@{{fnf_settlement_table}}</p><p><strong>Net Payable Amount:</strong> @{{fnf_net_payable}} (@{{fnf_net_payable_words}})</p><br><p>Employee Acceptance Signature: ________________________ &nbsp;&nbsp; Date: @{{signature_date}}</p>'
+        },
+        offer: {
+            name: 'Offer Letter',
+            code: 'OFFERLT',
+            categoryKeywords: ['letters', 'offer', 'recruitment'],
+            content: '<p>Dear @{{employee_name}},</p><p>We are pleased to offer you the position of <strong>@{{designation}}</strong> in the <strong>@{{department}}</strong> department at @{{company_name}}, @{{branch}}.</p><p>Your date of joining will be <strong>@{{joining_date}}</strong>. Your terms of employment will be governed by company policy.</p><p>We look forward to welcoming you to the @{{company_name}} team.</p><br><p>@{{hr_signature}}<br><strong>@{{hr_name}}</strong><br>@{{hr_designation}}<br>@{{company_name}}</p>'
+        },
+        selection: {
+            name: 'Selection Letter',
+            code: 'SELECTLT',
+            categoryKeywords: ['letters', 'selection', 'recruitment'],
+            content: '<p>Dear @{{employee_name}},</p><p>Congratulations! Following your interview with @{{company_name}}, we are pleased to inform you that you have been <strong>selected</strong> for the role of <strong>@{{designation}}</strong> in the <strong>@{{department}}</strong> department, reporting to @{{reporting_manager}}.</p><p>A formal offer letter will follow shortly.</p><br><p>@{{hr_signature}}<br><strong>@{{hr_name}}</strong><br>@{{hr_designation}}<br>@{{company_name}}</p>'
+        }
+    };
+
+    function applyTemplatePreset(modalType, presetKey) {
+        if (!presetKey || presetKey === 'custom') return;
+        var preset = TEMPLATE_PRESETS[presetKey];
+        if (!preset) return;
+
+        if (modalType === 'add') {
+            $('#add_tmpl_name').val(preset.name);
+            $('#add_tmpl_code').val(preset.code);
+
+            // Auto-select category if matching
+            if (preset.categoryKeywords && preset.categoryKeywords.length) {
+                $('#add_tmpl_category_id option').each(function() {
+                    var catName = ($(this).data('name') || $(this).text()).toLowerCase();
+                    for (var i = 0; i < preset.categoryKeywords.length; i++) {
+                        if (catName.indexOf(preset.categoryKeywords[i]) !== -1) {
+                            $('#add_tmpl_category_id').val($(this).val());
+                            return false;
+                        }
+                    }
+                });
+            }
+
+            // Set content in Quill
+            if (addQuillInstance) {
+                addQuillInstance.root.innerHTML = preset.content;
+                $('#add_tmpl_body_input').val(preset.content);
+            }
         }
     }
 </script>

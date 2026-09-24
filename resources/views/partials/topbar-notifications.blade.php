@@ -79,9 +79,16 @@
                                     </a>
                                     <div class="d-flex justify-content-between align-items-center mt-1">
                                         <div class="notifications-date text-muted border-bottom border-bottom-dashed fs-11">${n.time_ago}</div>
-                                        <a href="javascript:void(0);" onclick="deleteNotificationItem(${n.id}, event)" class="text-danger ms-2" title="Dismiss">
-                                            <i class="feather-x fs-12"></i>
-                                        </a>
+                                        <div class="d-flex align-items-center gap-1 ms-auto">
+                                            ${!n.is_read ? `
+                                                <a href="javascript:void(0);" onclick="markNotificationRead(${n.id}, event)" class="text-success px-1 py-0.5 rounded" title="Mark as Read">
+                                                    <i class="feather-check fs-13 fw-bold"></i>
+                                                </a>
+                                            ` : ''}
+                                            <a href="javascript:void(0);" onclick="deleteNotificationItem(${n.id}, event)" class="text-danger px-1 py-0.5 rounded" title="Dismiss">
+                                                <i class="feather-x fs-13"></i>
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -93,13 +100,18 @@
             });
         }
 
-        window.markNotificationRead = function(id) {
+        window.markNotificationRead = function(id, event) {
+            if (event) event.stopPropagation();
             $.ajax({
                 url: "/notifications/" + id + "/read",
                 type: "POST",
                 data: { _token: "{{ csrf_token() }}" },
                 success: function() {
                     fetchSystemNotifications();
+                    if (typeof markSingleReadPage === 'function') {
+                        let row = document.getElementById('notification-row-' + id);
+                        if (row) row.classList.remove('table-primary-subtle');
+                    }
                 }
             });
         };

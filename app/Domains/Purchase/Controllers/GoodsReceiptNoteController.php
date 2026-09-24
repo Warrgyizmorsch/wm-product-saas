@@ -16,6 +16,8 @@ use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\GoodsReceiptNoteExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class GoodsReceiptNoteController extends Controller
 {
@@ -62,6 +64,20 @@ class GoodsReceiptNoteController extends Controller
 
         $grns = $this->grnRepo->getPaginatedGrns($request->all(), 15);
         return view('modules.purchase.grns.index', compact('grns'));
+    }
+
+    /**
+     * Export GRNs to Excel with custom columns and active query filters
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', GoodsReceiptNote::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        return Excel::download(
+            new GoodsReceiptNoteExport($tenantId, $request->all()),
+            'grns_export_' . date('Y-m-d_His') . '.xlsx'
+        );
     }
 
     public function create(Request $request)
@@ -225,6 +241,13 @@ class GoodsReceiptNoteController extends Controller
         ]);
 
         $grn = $this->grnService->storeGrn($validated, $tenantId);
+
+        \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.grn.received', [
+            'grn_no' => $grn->grn_number,
+            'vendor_name' => $grn->vendor?->name ?? 'Vendor',
+            'warehouse' => $grn->warehouse?->name ?? 'Main Warehouse',
+            'po_no' => $grn->purchaseOrder?->purchase_order_number ?? $grn->purchaseOrder?->po_number ?? 'Direct Inward',
+        ], route('purchase.grns.show', $grn->id), $grn);
 
         return redirect()->route('purchase.grns.show', $grn->id)
             ->with('success', "Goods Receipt Note {$grn->grn_number} created and approved successfully.");
