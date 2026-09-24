@@ -8,9 +8,13 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Guarded throughout: MySQL DDL isn't transactional, and this migration
+        // once failed half-way on a MyISAM host (1000-byte index cap), leaving
+        // some of these tables behind.
+
         // A tenant's recurring per-user subscription (Razorpay Subscriptions),
         // see TenantSubscriptionService. Amounts in paise.
-        Schema::create('tenant_subscriptions', function (Blueprint $table) {
+        if (! Schema::hasTable('tenant_subscriptions')) Schema::create('tenant_subscriptions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('plan_id')->constrained()->restrictOnDelete();
@@ -21,7 +25,7 @@ return new class extends Migration
             $table->unsignedBigInteger('gst');
             $table->unsignedBigInteger('total');           // what's charged each cycle
             $table->string('currency', 3)->default('INR');
-            $table->string('gateway');
+            $table->string('gateway', 32);
             $table->string('gateway_plan_id')->nullable();
             $table->string('gateway_subscription_id')->nullable()->unique();
             // created → active → (pending|halted → active) → cancelled|completed
@@ -37,10 +41,15 @@ return new class extends Migration
         });
 
         // Razorpay plans are immutable: one per (period, per-seat amount), reused.
-        Schema::create('gateway_plans', function (Blueprint $table) {
+        // Short key columns keep the unique index under MyISAM's 1000-byte cap.
+        // A leftover table from the failed run has no index and no rows; rebuild it.
+        if (Schema::hasTable('gateway_plans') && ! Schema::hasIndex('gateway_plans', ['gateway', 'period', 'amount', 'currency'], 'unique')) {
+            Schema::drop('gateway_plans');
+        }
+        if (! Schema::hasTable('gateway_plans')) Schema::create('gateway_plans', function (Blueprint $table) {
             $table->id();
-            $table->string('gateway');
-            $table->string('period');
+            $table->string('gateway', 32);
+            $table->string('period', 16);
             $table->unsignedBigInteger('amount');
             $table->string('currency', 3);
             $table->string('gateway_plan_id');
@@ -50,7 +59,7 @@ return new class extends Migration
         });
 
         // Subscription charges have no order of ours to key on.
-        Schema::table('subscription_payments', function (Blueprint $table) {
+        if (! Schema::hasColumn('subscription_payments', 'tenant_subscription_id')) Schema::table('subscription_payments', function (Blueprint $table) {
             $table->string('gateway_order_id')->nullable()->change();
             $table->foreignId('tenant_subscription_id')->nullable()->after('plan_id')
                 ->constrained('tenant_subscriptions')->nullOnDelete();
