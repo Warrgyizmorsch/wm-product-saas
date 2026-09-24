@@ -247,13 +247,185 @@ class SubscriptionLifecycleTest extends TestCase
         $this->assertSame(1, SubscriptionPayment::query()->count());
     }
 
-    public function test_a_tenant_with_a_live_subscription_cannot_start_another(): void
+    public function test_a_tenant_with_a_live_subscription_changes_it_instead_of_starting_another(): void
     {
-        $this->verify($this->startedSubscription());
+        $this->liveSubscription();
 
-        $this->subscribe(['seats' => 6])
-            ->assertStatus(422)
-            ->assertJson(['message' => 'You already have an active subscription. Changing users or add-ons on it is coming next — contact support meanwhile.']);
+        $this->subscribe(['seats' => 6])->assertOk()->assertJsonStructure(['order_id', 'amount']);
+
+        $this->assertSame(1, TenantSubscription::query()->count());
+    }
+
+    /** An active Pro (5 users, yearly, + Inventory) subscription, half-way through its year. */
+    private function liveSubscription(): TenantSubscription
+    {
+        Carbon::setTestNow(now()->startOfSecond());
+        $subscription = $this->startedSubscription();
+        $this->verify($subscription);
+        Carbon::setTestNow(now()->addDays((int) round(now()->diffInDays(now()->addYear()) / 2)));
+
+        // Back on the fake gateway so changes don't reach the network.
+        $subscription->update(['gateway' => 'fakesub']);
+        FakeSubscriptionGateway::$calls = [];
+
+        return $subscription->fresh();
+    }
+
+    private function quote(array $body = [])
+    {
+        return $this->actingAs($this->owner)->postJson(route('platform.billing.quote'), $body + [
+            'plan_id' => $this->pro->id, 'cycle' => 'yearly', 'seats' => 5, 'modules' => ['inventory'],
+        ]);
+    }
+
+    private function verifyChange(SubscriptionPayment $payment, string $paymentId = 'pay_upgrade', ?string $signature = null)
+    {
+        // Signature checked by the real Razorpay gateway.
+        $payment->update(['gateway' => 'razorpay']);
+        $signature ??= hash_hmac('sha256', $payment->gateway_order_id.'|'.$paymentId, self::KEY_SECRET);
+
+        return $this->actingAs($this->owner)->post(route('platform.billing.change.verify'), [
+            'gateway_order_id' => $payment->gateway_order_id,
+            'gateway_payment_id' => $paymentId,
+            'gateway_signature' => $signature,
+        ]);
+    }
+
+    public function test_quote_previews_what_a_change_costs(): void
+    {
+        $subscription = $this->liveSubscription();
+
+        $upgrade = $this->quote(['seats' => 7])->assertOk()->json('change');
+        $this->assertSame('now', $upgrade['effective']);
+        $this->assertNull($upgrade['error']);
+        $expected = app(\App\Domains\Platform\Services\SubscriptionPricing::class)->prorateSubtotals(
+            $subscription->subtotal, intdiv($subscription->subtotal, 5) * 7, $subscription->current_start, $subscription->current_end, now(),
+        );
+        $this->assertSame($expected, $upgrade['due_now']);
+        $this->assertGreaterThan(0, $upgrade['due_now']);
+        $this->assertLessThan(intdiv($subscription->total, 5) * 2, $upgrade['due_now'], 'only the rest of the period is charged');
+
+        $downgrade = $this->quote(['modules' => []])->json('change');
+        $this->assertSame('renewal', $downgrade['effective']);
+        $this->assertSame(0, $downgrade['due_now']);
+
+        $this->assertNotNull($this->quote()->json('change.error'), 'same as now');
+        $this->assertStringContainsString('monthly and yearly', $this->quote(['cycle' => 'monthly'])->json('change.error'));
+        Carbon::setTestNow();
+    }
+
+    public function test_an_upgrade_is_paid_pro_rata_then_applied_at_once(): void
+    {
+        $subscription = $this->liveSubscription();
+        $due = $this->quote(['plan_id' => $this->pro->id, 'seats' => 8])->json('change.due_now');
+
+        $this->subscribe(['seats' => 8])->assertOk()->assertJson(['amount' => $due]);
+
+        $payment = SubscriptionPayment::query()->where('purpose', SubscriptionPayment::PURPOSE_SUBSCRIPTION_CHANGE)->sole();
+        $this->assertSame($due, $payment->amount);
+        $this->assertSame($subscription->id, $payment->tenant_subscription_id);
+        $this->assertSame(5, $subscription->fresh()->seats, 'nothing changes before the payment');
+        $this->assertSame(5, $this->tenant->fresh()->max_users);
+
+        $this->verifyChange($payment)
+            ->assertRedirect(route('platform.billing.checkout'))
+            ->assertSessionHas('subscriptionChanged', fn ($m) => str_contains($m, 'Pro for 8 users'));
+
+        $subscription->refresh();
+        $this->assertSame(8, $subscription->seats);
+        $this->assertSame(intdiv($subscription->total, 8) * 8, $subscription->total);
+        $this->assertNull($subscription->pending_change);
+        $this->assertSame(8, $this->tenant->fresh()->max_users);
+        $this->assertSame(SubscriptionPayment::STATUS_PAID, $payment->fresh()->status);
+
+        // Renewals move to the new amount.
+        $this->assertSame([['schedule', $subscription->perSeatTotal(), 8]], FakeSubscriptionGateway::$calls);
+        $this->assertSame('plan_fake_'.$subscription->perSeatTotal(), $subscription->gateway_plan_id);
+        Carbon::setTestNow();
+    }
+
+    public function test_an_upgrade_to_another_plan_switches_the_tenants_plan_and_drops_unbilled_addons(): void
+    {
+        $this->pro->update(['features' => ['crm', 'sales', 'purchase']]);
+        $enterprise = Plan::create([
+            'name' => 'Enterprise', 'slug' => 'ent-sub', 'price' => 0, 'currency' => 'INR', 'billing_cycle' => 'monthly',
+            'features' => ['crm', 'sales', 'purchase', 'inventory'], 'is_active' => true, 'monthly_price_per_user' => 500, 'yearly_price_per_user' => 400,
+        ]);
+        $subscription = $this->liveSubscription();
+
+        $this->subscribe(['plan_id' => $enterprise->id, 'modules' => []])->assertOk();
+        $this->verifyChange(SubscriptionPayment::query()->where('purpose', SubscriptionPayment::PURPOSE_SUBSCRIPTION_CHANGE)->sole());
+
+        $this->assertSame($enterprise->id, $subscription->fresh()->plan_id);
+        $this->assertSame($enterprise->id, $this->tenant->fresh()->plan_id);
+        $this->assertSame([], $subscription->fresh()->modules);
+        $this->assertFalse(TenantModule::query()->where('module', 'inventory')->sole()->isActive(), 'the recurring add-on is no longer billed');
+        Carbon::setTestNow();
+    }
+
+    public function test_a_forged_upgrade_payment_changes_nothing(): void
+    {
+        $subscription = $this->liveSubscription();
+        $this->subscribe(['seats' => 8])->assertOk();
+        $payment = SubscriptionPayment::query()->where('purpose', SubscriptionPayment::PURPOSE_SUBSCRIPTION_CHANGE)->sole();
+
+        $this->verifyChange($payment, 'pay_upgrade', 'forged')->assertSessionHas('error');
+
+        $this->assertSame(5, $subscription->fresh()->seats);
+        $this->assertSame(SubscriptionPayment::STATUS_CREATED, $payment->fresh()->status);
+        Carbon::setTestNow();
+    }
+
+    public function test_a_downgrade_is_booked_for_renewal_and_applied_when_it_is_charged(): void
+    {
+        $subscription = $this->liveSubscription();
+
+        $this->subscribe(['modules' => []])->assertOk()->assertJson(['scheduled' => true]);
+
+        $subscription->refresh();
+        $this->assertSame(['inventory'], $subscription->modules, 'nothing changes until renewal');
+        $this->assertSame([], $subscription->scheduledChange()['modules']);
+        $newPerSeat = intdiv($subscription->scheduledChange()['total'], 5);
+        $this->assertSame([['schedule', $newPerSeat, 5]], FakeSubscriptionGateway::$calls);
+        $this->assertSame(0, SubscriptionPayment::query()->where('purpose', SubscriptionPayment::PURPOSE_SUBSCRIPTION_CHANGE)->count());
+        $this->assertTrue(TenantModule::query()->where('module', 'inventory')->sole()->isActive());
+
+        $this->actingAs($this->owner)->get(route('platform.billing.checkout'))
+            ->assertOk()->assertSee('Subscription updated')->assertSee('takes effect when your subscription renews');
+        $this->actingAs($this->owner)->get(route('platform.billing.checkout'))
+            ->assertOk()->assertSee('Booked for '.$subscription->current_end->format('d M Y'));
+
+        $this->webhook('charged', $subscription, ['id' => 'pay_renewal', 'amount' => $newPerSeat * 5], [
+            'current_start' => $subscription->current_end->getTimestamp(), 'current_end' => $subscription->current_end->addYear()->getTimestamp(),
+        ])->assertOk();
+
+        $subscription->refresh();
+        $this->assertSame([], $subscription->modules);
+        $this->assertSame($newPerSeat * 5, $subscription->total);
+        $this->assertNull($subscription->pending_change);
+        $this->assertFalse(TenantModule::query()->where('module', 'inventory')->sole()->isActive());
+        Carbon::setTestNow();
+    }
+
+    public function test_a_new_change_replaces_a_booked_downgrade(): void
+    {
+        $subscription = $this->liveSubscription();
+        $this->subscribe(['modules' => []])->assertOk();
+
+        $this->subscribe(['seats' => 8])->assertOk()->assertJsonStructure(['order_id']);
+
+        $this->assertSame('cancel', FakeSubscriptionGateway::$calls[1][0]);
+        $this->assertNull($subscription->fresh()->scheduledChange());
+        Carbon::setTestNow();
+    }
+
+    public function test_changes_are_refused_while_a_renewal_payment_is_failing(): void
+    {
+        $subscription = $this->liveSubscription();
+        $subscription->update(['status' => TenantSubscription::STATUS_PENDING]);
+
+        $this->subscribe(['seats' => 8])->assertStatus(422)->assertJson(['message' => 'Your last renewal payment failed — settle it before changing your subscription.']);
+        Carbon::setTestNow();
     }
 
     public function test_renewal_webhook_records_the_charge_and_extends_the_period(): void
@@ -357,6 +529,9 @@ class FakeSubscriptionGateway implements PaymentGateway
     /** When set, createSubscription() throws like the SDK does on an API error. */
     public static ?string $failWith = null;
 
+    /** Subscription changes sent to the gateway: ['schedule', perSeatTotal, seats] | ['cancel']. */
+    public static array $calls = [];
+
     public function identifier(): string
     {
         return 'fakesub';
@@ -418,5 +593,36 @@ class FakeSubscriptionGateway implements PaymentGateway
     public function resolveSubscriptionWebhook(Request $request): ?array
     {
         return null;
+    }
+
+    public function createChangeCheckout(Tenant $tenant, TenantSubscription $subscription, int $amountInSmallestUnit): array
+    {
+        $payment = SubscriptionPayment::create([
+            'tenant_id' => $tenant->id,
+            'plan_id' => $subscription->plan_id,
+            'tenant_subscription_id' => $subscription->id,
+            'purpose' => SubscriptionPayment::PURPOSE_SUBSCRIPTION_CHANGE,
+            'gateway' => $this->identifier(),
+            'gateway_order_id' => 'order_fake_'.uniqid(),
+            'amount' => $amountInSmallestUnit,
+            'currency' => $subscription->currency,
+            'status' => SubscriptionPayment::STATUS_CREATED,
+        ]);
+
+        return ['payment' => $payment, 'checkout' => [
+            'gateway' => $this->identifier(), 'order_id' => $payment->gateway_order_id, 'amount' => $payment->amount, 'currency' => $payment->currency,
+        ]];
+    }
+
+    public function scheduleSubscriptionChange(TenantSubscription $subscription, int $perSeatTotal, int $seats): string
+    {
+        self::$calls[] = ['schedule', $perSeatTotal, $seats];
+
+        return 'plan_fake_'.$perSeatTotal;
+    }
+
+    public function cancelScheduledSubscriptionChange(TenantSubscription $subscription): void
+    {
+        self::$calls[] = ['cancel'];
     }
 }

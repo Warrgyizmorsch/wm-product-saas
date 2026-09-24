@@ -28,6 +28,7 @@ class TenantSubscription extends BaseModel
         'cycle',
         'seats',
         'modules',
+        'pending_change',
         'subtotal',
         'gst',
         'total',
@@ -48,6 +49,7 @@ class TenantSubscription extends BaseModel
         return [
             'seats' => 'integer',
             'modules' => 'array',
+            'pending_change' => 'array',
             'subtotal' => 'integer',
             'gst' => 'integer',
             'total' => 'integer',
@@ -62,6 +64,14 @@ class TenantSubscription extends BaseModel
     public function isLive(): bool
     {
         return in_array($this->status, self::LIVE_STATUSES, true);
+    }
+
+    /** A downgrade booked for the next renewal (not an upgrade still awaiting payment). */
+    public function scheduledChange(): ?array
+    {
+        $change = $this->pending_change;
+
+        return $change !== null && empty($change['payment_id']) ? $change : null;
     }
 
     /** Per-seat amount the gateway charges each cycle, GST included (paise). */

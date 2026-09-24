@@ -151,7 +151,7 @@ class RazorpayGateway implements PaymentGateway
 
     public function createSubscription(Tenant $tenant, TenantSubscription $subscription): array
     {
-        $gatewayPlanId = $this->gatewayPlanFor($subscription);
+        $gatewayPlanId = $this->gatewayPlanFor($subscription->cycle, $subscription->perSeatTotal(), $subscription->currency);
 
         // Razorpay needs an end: 10 years of renewals either way.
         $totalCount = $subscription->cycle === 'yearly' ? 10 : 120;
@@ -229,19 +229,76 @@ class RazorpayGateway implements PaymentGateway
         ];
     }
 
+    public function createChangeCheckout(Tenant $tenant, TenantSubscription $subscription, int $amountInSmallestUnit): array
+    {
+        $razorpayOrder = $this->api()->order->create([
+            'amount' => $amountInSmallestUnit,
+            'currency' => $subscription->currency,
+            'receipt' => 'tenant-' . $tenant->id . '-sub-' . $subscription->id . '-change-' . now()->timestamp,
+            'notes' => [
+                'tenant_id' => (string) $tenant->id,
+                'tenant_subscription_id' => (string) $subscription->id,
+                'purpose' => SubscriptionPayment::PURPOSE_SUBSCRIPTION_CHANGE,
+            ],
+        ]);
+
+        $payment = SubscriptionPayment::create([
+            'tenant_id' => $tenant->id,
+            'plan_id' => $subscription->plan_id,
+            'tenant_subscription_id' => $subscription->id,
+            'purpose' => SubscriptionPayment::PURPOSE_SUBSCRIPTION_CHANGE,
+            'gateway' => $this->identifier(),
+            'gateway_order_id' => $razorpayOrder['id'],
+            'amount' => $amountInSmallestUnit,
+            'currency' => $subscription->currency,
+            'status' => SubscriptionPayment::STATUS_CREATED,
+        ]);
+
+        return [
+            'payment' => $payment,
+            'checkout' => [
+                'gateway' => $this->identifier(),
+                'order_id' => $payment->gateway_order_id,
+                'amount' => $payment->amount,
+                'currency' => $payment->currency,
+                'key' => config('services.razorpay.key'),
+                'tenant_name' => $tenant->billing_name ?? $tenant->name,
+                'tenant_email' => $tenant->billing_email,
+            ],
+        ];
+    }
+
+    public function scheduleSubscriptionChange(TenantSubscription $subscription, int $perSeatTotal, int $seats): string
+    {
+        $gatewayPlanId = $this->gatewayPlanFor($subscription->cycle, $perSeatTotal, $subscription->currency);
+
+        // Razorpay only allows this on card subscriptions (a UPI/eMandate one refuses).
+        $this->api()->subscription->fetch($subscription->gateway_subscription_id)->update([
+            'plan_id' => $gatewayPlanId,
+            'quantity' => $seats,
+            'schedule_change_at' => 'cycle_end',
+            'customer_notify' => 1,
+        ]);
+
+        return $gatewayPlanId;
+    }
+
+    public function cancelScheduledSubscriptionChange(TenantSubscription $subscription): void
+    {
+        $this->api()->subscription->fetch($subscription->gateway_subscription_id)->cancelScheduledChanges();
+    }
+
     /**
      * Razorpay plans are immutable, so one per (period, per-seat amount) is
      * created once and reused from gateway_plans.
      */
-    private function gatewayPlanFor(TenantSubscription $subscription): string
+    private function gatewayPlanFor(string $period, int $amount, string $currency): string
     {
-        $amount = $subscription->perSeatTotal();
-
         $cached = GatewayPlan::query()
             ->where('gateway', $this->identifier())
-            ->where('period', $subscription->cycle)
+            ->where('period', $period)
             ->where('amount', $amount)
-            ->where('currency', $subscription->currency)
+            ->where('currency', $currency)
             ->first();
 
         if ($cached !== null) {
@@ -249,20 +306,20 @@ class RazorpayGateway implements PaymentGateway
         }
 
         $razorpayPlan = $this->api()->plan->create([
-            'period' => $subscription->cycle,
+            'period' => $period,
             'interval' => 1,
             'item' => [
-                'name' => sprintf('Per user, %s (Rs %s incl. GST)', $subscription->cycle, number_format($amount / 100, 2)),
+                'name' => sprintf('Per user, %s (Rs %s incl. GST)', $period, number_format($amount / 100, 2)),
                 'amount' => $amount,
-                'currency' => $subscription->currency,
+                'currency' => $currency,
             ],
         ]);
 
         GatewayPlan::query()->create([
             'gateway' => $this->identifier(),
-            'period' => $subscription->cycle,
+            'period' => $period,
             'amount' => $amount,
-            'currency' => $subscription->currency,
+            'currency' => $currency,
             'gateway_plan_id' => $razorpayPlan['id'],
         ]);
 

@@ -23,10 +23,20 @@
         @if (session('error'))
             <div class="alert alert-danger fs-13">{{ session('error') }}</div>
         @endif
-        @if ($liveSubscription && ! $subscribed)
+        @if ($liveSubscription && ! $subscribed && ! $subscriptionChanged)
             <div class="alert alert-info fs-13">
-                You're subscribed to {{ $liveSubscription->plan?->name }} for {{ $liveSubscription->seats }} users, billed {{ $liveSubscription->cycle }}.
-                Changing users or add-ons on an active subscription is coming next.
+                You're subscribed to {{ $liveSubscription->plan?->name }} for {{ $liveSubscription->seats }} users, billed {{ $liveSubscription->cycle }}
+                @if ($liveSubscription->current_end)
+                    (renews {{ $liveSubscription->current_end->format('d M Y') }})
+                @endif.
+                Change the plan, users or add-ons below: an upgrade is charged pro rata for the rest of this period and applies right away;
+                a downgrade applies from your renewal.
+                @if ($scheduledChange)
+                    <div class="mt-1 fw-semibold">
+                        Booked for {{ $scheduledChange['on'] }}: {{ $scheduledChange['plan'] }} for {{ $scheduledChange['seats'] }} users.
+                        A new change replaces it.
+                    </div>
+                @endif
             </div>
         @endif
         <ol class="erp-checkout-steps mb-4">
@@ -187,9 +197,11 @@
                 <section data-step="4" class="d-none">
                     <x-ui.card class="mb-4 text-center py-5">
                         <span class="erp-app-icon erp-app-icon-lg mx-auto mb-3" style="background: #16A34A"><i class="feather-check"></i></span>
-                        <h5 class="mb-1">You're subscribed</h5>
+                        <h5 class="mb-1">@if ($subscriptionChanged) Subscription updated @else You're subscribed @endif</h5>
                         <p class="fs-13 text-muted mb-4" id="confirmationText">
-                            @if ($subscribed)
+                            @if ($subscriptionChanged)
+                                {{ $subscriptionChanged }}
+                            @elseif ($subscribed)
                                 {{ $subscribed['plan'] }} for {{ $subscribed['seats'] }} users, billed {{ $subscribed['cycle'] }}
                                 — ₹{{ number_format($subscribed['total'] / 100, 2) }} incl. GST.
                                 @if ($subscribed['renews'])
@@ -206,6 +218,13 @@
                     <input type="hidden" name="gateway_subscription_id" id="sv_subscription_id">
                     <input type="hidden" name="gateway_payment_id" id="sv_payment_id">
                     <input type="hidden" name="gateway_signature" id="sv_signature">
+                </form>
+
+                <form action="{{ route('platform.billing.change.verify') }}" method="POST" id="changeVerifyForm" class="d-none">
+                    @csrf
+                    <input type="hidden" name="gateway_order_id" id="cv_order_id">
+                    <input type="hidden" name="gateway_payment_id" id="cv_payment_id">
+                    <input type="hidden" name="gateway_signature" id="cv_signature">
                 </form>
 
                 <div class="d-flex justify-content-between {{ $plans->isEmpty() ? 'd-none' : '' }}" id="stepNav">
@@ -269,6 +288,7 @@
         quote: @json(route('platform.billing.quote')),
         details: @json(route('platform.billing.details')),
         subscribe: @json(route('platform.billing.subscribe')),
+        checkout: @json(route('platform.billing.checkout')),
     };
     var CSRF = @json(csrf_token());
 
@@ -446,6 +466,36 @@
         body.querySelector('[data-gst]').textContent = money(quote.gst);
         body.querySelector('[data-total]').textContent = money(quote.total);
         body.querySelector('[data-renews]').textContent = 'Billed ' + (quote.cycle === 'yearly' ? 'every year' : 'every month') + ' · renews automatically';
+
+        // Changing a live subscription: the total above is the new renewal amount.
+        var change = quote.change;
+        if (change && !change.error) {
+            body.querySelector('.erp-summary-total span').textContent = 'New renewal total';
+            var box = document.createElement('div');
+            box.className = 'erp-summary-total';
+            var label = document.createElement('span');
+            var amount = document.createElement('span');
+            var note = document.createElement('div');
+            note.className = 'fs-12 text-muted mt-1';
+            if (change.effective === 'now') {
+                label.textContent = 'Due now';
+                amount.textContent = money(change.due_now);
+                note.textContent = 'Prorated for the rest of this period (to ' + change.renews_on + '), incl. GST. Applies right away.';
+            } else {
+                label.textContent = 'Due now';
+                amount.textContent = money(0);
+                note.textContent = 'Nothing to pay now — this applies from your renewal on ' + change.renews_on + '.';
+            }
+            box.appendChild(label);
+            box.appendChild(amount);
+            body.appendChild(box);
+            body.appendChild(note);
+        }
+    }
+
+    // Why the current pick can't be bought as a change (same as now, other cycle…), or null.
+    function changeError() {
+        return lastQuote && lastQuote.change && lastQuote.change.error ? lastQuote.change.error : null;
     }
 
     function requestQuote() {
@@ -459,7 +509,8 @@
                     var err = document.getElementById('quoteError');
                     if (res.ok) {
                         lastQuote = res.data;
-                        err.classList.add('d-none');
+                        err.textContent = changeError() || '';
+                        err.classList.toggle('d-none', !changeError());
                         renderSummary(res.data);
                     } else {
                         lastQuote = null;
@@ -483,8 +534,17 @@
         var next = document.getElementById('stepNext');
         document.getElementById('stepNav').classList.toggle('d-none', step === 4 || PLANS.length === 0);
         back.classList.toggle('invisible', step === 1);
-        next.disabled = !lastQuote;
-        next.textContent = step === 3 ? (lastQuote ? 'Pay ' + money(lastQuote.total) : 'Pay') : 'Continue';
+        next.disabled = !lastQuote || (step === 3 && !!changeError());
+        next.textContent = step === 3 ? payLabel() : 'Continue';
+    }
+
+    function payLabel() {
+        if (!lastQuote) return 'Pay';
+        var change = lastQuote.change;
+        if (!change) return 'Pay ' + money(lastQuote.total);
+        if (change.error) return 'Pay';
+        if (change.effective === 'renewal') return 'Book change for ' + change.renews_on;
+        return change.due_now >= 100 ? 'Pay ' + money(change.due_now) + ' now' : 'Confirm change';
     }
 
     function refresh() {
@@ -557,6 +617,9 @@
             .then(function (res) {
                 if (!res.ok) { showPayError(firstError(res.data)); return; }
                 var order = res.data;
+                // Change booked for renewal, or applied with nothing to pay: show the confirmation.
+                if (order.scheduled || order.applied) { window.location.href = ROUTES.checkout; return; }
+                if (order.order_id) { payForChange(order); return; }
                 if (order.gateway !== 'razorpay' || typeof Razorpay === 'undefined') {
                     showPayError('The payment window could not be opened. Please refresh and try again.');
                     return;
@@ -582,6 +645,36 @@
                 rzp.open();
             })
             .catch(function () { showPayError('Something went wrong starting the payment.'); });
+    }
+
+    // An upgrade of a live subscription: a one-time payment of the prorated difference.
+    function payForChange(order) {
+        var next = document.getElementById('stepNext');
+        if (order.gateway !== 'razorpay' || typeof Razorpay === 'undefined') {
+            showPayError('The payment window could not be opened. Please refresh and try again.');
+            return;
+        }
+        var rzp = new Razorpay({
+            key: order.key,
+            order_id: order.order_id,
+            amount: order.amount,
+            currency: order.currency,
+            name: 'SaaS ERP Platform',
+            description: 'Subscription upgrade (prorated)',
+            prefill: { name: order.tenant_name || '', email: order.tenant_email || '' },
+            handler: function (response) {
+                document.getElementById('cv_order_id').value = response.razorpay_order_id;
+                document.getElementById('cv_payment_id').value = response.razorpay_payment_id;
+                document.getElementById('cv_signature').value = response.razorpay_signature;
+                next.textContent = 'Confirming payment…';
+                document.getElementById('changeVerifyForm').submit();
+            },
+            modal: { ondismiss: function () { next.disabled = false; renderNav(); } },
+        });
+        rzp.on('payment.failed', function (resp) {
+            showPayError((resp && resp.error && resp.error.description) || 'The payment failed. Please try again.');
+        });
+        rzp.open();
     }
 
     refresh();

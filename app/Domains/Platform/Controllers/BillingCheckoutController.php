@@ -3,13 +3,16 @@
 namespace App\Domains\Platform\Controllers;
 
 use App\Domains\Platform\Models\Plan;
+use App\Domains\Platform\Models\SubscriptionPayment;
 use App\Domains\Platform\Models\TenantSubscription;
 use App\Domains\Platform\Services\BillingCheckoutService;
 use App\Domains\Platform\Services\PaymentGatewayManager;
+use App\Domains\Platform\Services\SubscriptionPaymentService;
 use App\Domains\Platform\Services\SubscriptionPricing;
 use App\Domains\Platform\Services\TenantSubscriptionService;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureTenantModuleAccess;
+use App\Models\Tenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +24,9 @@ use RuntimeException;
  * Zoho-style checkout for recurring per-user billing: Plan → Add-ons → Pay →
  * Confirmation. Always the CURRENT tenant (tenant() from context, never a
  * route param), same as SubscriptionController. Totals shown on the page come
- * from quote(), so what the tenant sees is what the server will charge.
+ * from quote(), so what the tenant sees is what the server will charge. With a
+ * live subscription the same wizard changes it instead (TenantSubscriptionService
+ * ::change): upgrades charged pro rata now, downgrades from renewal.
  */
 class BillingCheckoutController extends Controller
 {
@@ -30,6 +35,7 @@ class BillingCheckoutController extends Controller
         private readonly SubscriptionPricing $pricing,
         private readonly TenantSubscriptionService $subscriptions,
         private readonly PaymentGatewayManager $gateways,
+        private readonly SubscriptionPaymentService $payments,
     ) {
     }
 
@@ -48,6 +54,9 @@ class BillingCheckoutController extends Controller
         $lifetime = $this->checkout->lifetimeModules($tenant);
         $minimumSeats = $this->checkout->minimumSeats($tenant);
         $currentPlan = $plans->firstWhere('id', $tenant->plan_id);
+        $live = $this->subscriptions->live($tenant);
+        $live?->load('plan');
+        $scheduled = $live?->scheduledChange();
 
         return view('modules.platform.subscription.checkout', [
             'tenant' => $tenant,
@@ -73,16 +82,22 @@ class BillingCheckoutController extends Controller
             'cycles' => collect(config('billing.cycles'))->map(fn (array $cycle, string $key) => ['key' => $key, 'label' => $cycle['label']])->values(),
             'selection' => [
                 'plan_id' => $plans->firstWhere('id', (int) $request->query('plan'))?->id ?? $currentPlan?->id ?? $plans->first()?->id,
-                'cycle' => in_array($request->query('cycle'), $this->pricing->cycles(), true) ? $request->query('cycle') : 'yearly',
-                'seats' => $minimumSeats,
+                'cycle' => in_array($request->query('cycle'), $this->pricing->cycles(), true) ? $request->query('cycle') : ($live?->cycle ?? 'yearly'),
+                'seats' => max($minimumSeats, $live?->seats ?? 0),
                 'modules' => array_values(array_unique([
                     ...$this->checkout->recurringModules($tenant),
                     ...array_intersect((array) $request->query('modules', []), EnsureTenantModuleAccess::GATED_MODULES),
                 ])),
             ],
-            'startStep' => session()->has('subscribed') ? 4 : ($request->filled('modules') ? 2 : 1),
+            'startStep' => session()->has('subscribed') || session()->has('subscriptionChanged') ? 4 : ($request->filled('modules') ? 2 : 1),
             'subscribed' => session('subscribed'),
-            'liveSubscription' => $this->subscriptions->live($tenant),
+            'subscriptionChanged' => session('subscriptionChanged'),
+            'liveSubscription' => $live,
+            'scheduledChange' => $scheduled === null ? null : [
+                'plan' => $plans->firstWhere('id', $scheduled['plan_id'])?->name,
+                'seats' => $scheduled['seats'],
+                'on' => $live->current_end?->format('d M Y'),
+            ],
             'canManagePrices' => $request->user()?->can('viewAny', Plan::class) ?? false,
             'minimumSeats' => $minimumSeats,
             'gstRate' => $this->pricing->gstRate(),
@@ -113,7 +128,11 @@ class BillingCheckoutController extends Controller
             array_values($validated['modules'] ?? []),
         );
 
-        return response()->json($this->checkout->describe($quote));
+        $live = $this->subscriptions->live($tenant);
+
+        return response()->json($this->checkout->describe($quote) + [
+            'change' => $live === null ? null : $this->subscriptions->previewChange($live, $quote),
+        ]);
     }
 
     /** Pay step: who the tax invoice is made out to. */
@@ -170,12 +189,77 @@ class BillingCheckoutController extends Controller
         );
 
         try {
-            $checkout = $this->subscriptions->start($tenant, $quote, $this->gateways->active());
+            if ($this->subscriptions->live($tenant) === null) {
+                return response()->json($this->subscriptions->start($tenant, $quote, $this->gateways->active()));
+            }
+
+            $result = $this->subscriptions->change($tenant, $quote);
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json($checkout);
+        // Nothing to pay: the page reloads onto the confirmation step.
+        if (! empty($result['scheduled'])) {
+            session()->flash('subscriptionChanged', "Your change is booked — it takes effect when your subscription renews on {$result['effective_on']}. Until then nothing changes.");
+        } elseif (! empty($result['applied'])) {
+            session()->flash('subscriptionChanged', $this->changedMessage($tenant));
+        }
+
+        return response()->json($result);
+    }
+
+    /** Browser callback after paying for an upgrade (a one-time order) — verified server-side. */
+    public function verifyChange(Request $request): RedirectResponse
+    {
+        $tenant = tenant();
+
+        $this->authorize('updateSubscription', $tenant);
+
+        $validated = $request->validate([
+            'gateway_order_id' => ['required', 'string'],
+            'gateway_payment_id' => ['required', 'string'],
+            'gateway_signature' => ['required', 'string'],
+        ]);
+
+        $failed = fn () => redirect()->route('platform.billing.checkout')
+            ->with('error', 'Payment verification failed — your subscription was not changed. If money was deducted, contact support.');
+
+        $payment = SubscriptionPayment::query()
+            ->where('gateway_order_id', $validated['gateway_order_id'])
+            ->where('purpose', SubscriptionPayment::PURPOSE_SUBSCRIPTION_CHANGE)
+            ->first();
+
+        $gateway = $payment === null ? null : $this->gateways->resolveByIdentifier($payment->gateway);
+
+        if ($gateway === null || ! $gateway->verifyCheckoutCallback($validated, $payment)) {
+            return $failed();
+        }
+
+        try {
+            $this->payments->markPaid($payment, $validated['gateway_payment_id'], $validated['gateway_signature'], $tenant);
+        } catch (RuntimeException $e) {
+            return $failed();
+        }
+
+        return redirect()->route('platform.billing.checkout')
+            ->with('subscriptionChanged', $this->changedMessage($tenant->fresh()));
+    }
+
+    private function changedMessage(Tenant $tenant): string
+    {
+        $live = $this->subscriptions->live($tenant)?->load('plan');
+
+        if ($live === null) {
+            return 'Your subscription was updated.';
+        }
+
+        return sprintf(
+            'You now have %s for %d users. Renews on %s at %s incl. GST.',
+            $live->plan->name,
+            $live->seats,
+            $live->current_end?->format('d M Y') ?? '—',
+            '₹'.number_format($live->total / 100, 2),
+        );
     }
 
     /** Browser callback after the first subscription payment — verified server-side. */
