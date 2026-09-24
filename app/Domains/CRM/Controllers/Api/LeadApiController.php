@@ -163,15 +163,16 @@ class LeadApiController extends Controller
         $sortOrder = strtolower((string) $request->input('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortBy, $sortOrder);
 
-        // 13. Pagination / Limit Handling
+        // 13. Pagination / Limit Handling (Supports both limit and per_page, plus page number)
         $totalCount = (clone $query)->count();
-        $limit = $request->filled('limit') ? min(max((int)$request->input('limit'), 1), 1000) : null;
-        
-        if ($request->filled('page') && $limit) {
-            $page = max((int)$request->input('page'), 1);
+        $limit = $request->filled('limit')
+            ? max((int)$request->input('limit'), 1)
+            : ($request->filled('per_page') ? max((int)$request->input('per_page'), 1) : null);
+
+        $page = $request->filled('page') ? max((int)$request->input('page'), 1) : 1;
+
+        if ($limit !== null) {
             $query->forPage($page, $limit);
-        } elseif ($limit !== null) {
-            $query->take($limit);
         }
 
         $leads = $query->get();
@@ -266,55 +267,10 @@ class LeadApiController extends Controller
                     'created_at'         => $lead->created_at ? $lead->created_at->toIso8601String() : null,
                     'updated_at'         => $lead->updated_at ? $lead->updated_at->toIso8601String() : null,
                 ],
-
-                // Complete Flat Raw Database Fields for 1-to-1 roundtrip synchronization
-                'raw' => [
-                    'id'                  => $lead->id,
-                    'tenant_id'           => $lead->tenant_id,
-                    'company_id'          => $lead->company_id,
-                    'branch_id'           => $lead->branch_id,
-                    'lead_number'         => $lead->lead_number,
-                    'lead_owner_id'       => $lead->lead_owner_id,
-                    'call_date'           => $lead->call_date ? $lead->call_date->format('Y-m-d H:i:s') : null,
-                    'company_name'        => $lead->company_name,
-                    'company_email'       => $lead->company_email,
-                    'company_phone'       => $lead->company_phone,
-                    'gstin'               => $lead->gstin,
-                    'lead_type'           => $lead->lead_type,
-                    'contact_person'      => $lead->contact_person,
-                    'designation'         => $lead->designation,
-                    'email'               => $lead->email,
-                    'phone'               => $lead->phone,
-                    'requirement'         => $lead->requirement,
-                    'crm_account_id'      => $lead->crm_account_id,
-                    'crm_contact_id'      => $lead->crm_contact_id,
-                    'crm_deal_id'         => $lead->crm_deal_id,
-                    'converted_at'        => $lead->converted_at,
-                    'expected_amount'     => $lead->expected_amount,
-                    'expected_sale_date'  => $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : null,
-                    'source'              => $lead->source,
-                    'utm_source'          => $lead->utm_source,
-                    'utm_medium'          => $lead->utm_medium,
-                    'utm_campaign'        => $lead->utm_campaign,
-                    'utm_term'            => $lead->utm_term,
-                    'utm_content'         => $lead->utm_content,
-                    'priority'            => $lead->priority,
-                    'segment'             => $lead->segment,
-                    'industry_type'       => $lead->industry_type,
-                    'country'             => $lead->country,
-                    'state'               => $lead->state,
-                    'city'                => $lead->city,
-                    'address'             => $lead->address,
-                    'product_ids'         => $lead->product_ids,
-                    'product_items'       => $lead->product_items,
-                    'status'              => $lead->status,
-                    'next_followup_date'  => $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d H:i:s') : null,
-                    'is_customer'         => (bool)$lead->is_customer,
-                    'created_at'          => $lead->created_at ? $lead->created_at->toIso8601String() : null,
-                    'updated_at'          => $lead->updated_at ? $lead->updated_at->toIso8601String() : null,
-                ],
             ];
         });
+
+        $totalPages = $limit ? (int)ceil($totalCount / $limit) : 1;
 
         return response()->json([
             'success'          => true,
@@ -322,9 +278,13 @@ class LeadApiController extends Controller
             'exported_at'      => now()->toIso8601String(),
             'total_records'    => $totalCount,
             'count'            => $exportedLeads->count(),
+            'current_page'     => $limit ? $page : 1,
+            'per_page'         => $limit ?: $totalCount,
+            'total_pages'      => $totalPages,
             'filters_applied'  => array_filter($request->only([
                 'status', 'lead_type', 'priority', 'source', 'segment', 'industry_type',
-                'lead_owner_id', 'country', 'state', 'city', 'is_customer', 'from_date', 'to_date', 'search', 'date_filter_by'
+                'lead_owner_id', 'country', 'state', 'city', 'is_customer', 'from_date', 'to_date', 'search', 'date_filter_by',
+                'limit', 'per_page', 'page', 'sort_by', 'sort_direction'
             ])),
             'data'             => $exportedLeads,
         ], 200);

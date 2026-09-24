@@ -37,9 +37,9 @@ class ProductService
                 'hsn_sac' => $validated['hsn_sac'] ?? null,
                 'gst_rate' => $validated['gst_rate'] ?? 18.00,
                 'preferred_vendor_id' => $isService ? null : ($validated['preferred_vendor_id'] ?? null),
-                'selling_price' => $validated['selling_price'],
-                'cost_price' => $validated['cost_price'],
-                'unit_cost' => $validated['cost_price'],
+                'selling_price' => (float)($validated['selling_price'] ?? 0),
+                'cost_price' => (float)($validated['cost_price'] ?? 0),
+                'unit_cost' => (float)($validated['cost_price'] ?? 0),
                 'sales_account' => $validated['sales_account'] ?? null,
                 'purchase_account' => $validated['purchase_account'] ?? null,
                 'inventory_account' => $isService ? null : ($validated['inventory_account'] ?? null),
@@ -182,13 +182,13 @@ class ProductService
                 'hsn_sac' => $validated['hsn_sac'] ?? null,
                 'gst_rate' => $validated['gst_rate'] ?? 18.00,
                 'preferred_vendor_id' => $isService ? null : ($validated['preferred_vendor_id'] ?? null),
-                'selling_price' => $validated['selling_price'],
-                'cost_price' => $validated['cost_price'],
-                'unit_cost' => $validated['cost_price'],
-                'sales_account' => $validated['sales_account'] ?? $product->sales_account ?? 'Sales Income',
+                'selling_price' => (float)($validated['selling_price'] ?? $product->selling_price ?? 0),
+                'cost_price' => (float)($validated['cost_price'] ?? $product->cost_price ?? 0),
+                'unit_cost' => (float)($validated['cost_price'] ?? $product->unit_cost ?? $product->cost_price ?? 0),
+                'sales_account' => $validated['sales_account'] ?? null,
                 'default_production_model' => $validated['default_production_model'] ?? $product->default_production_model ?? 'pure_manufacturing',
-                'purchase_account' => $validated['purchase_account'] ?? $product->purchase_account ?? 'Cost of Goods Sold',
-                'inventory_account' => $isService ? null : ($validated['inventory_account'] ?? $product->inventory_account ?? 'Inventory Asset'),
+                'purchase_account' => $validated['purchase_account'] ?? null,
+                'inventory_account' => $isService ? null : ($validated['inventory_account'] ?? null),
                 'reorder_point' => $isService ? 0 : ($validated['reorder_point'] ?? 0),
                 'description' => $validated['description'] ?? null,
                 'brand' => $isService ? null : ($validated['brand'] ?? null),
@@ -323,8 +323,9 @@ class ProductService
             }
 
             if ($product->variation_type === 'Single') {
-                if (!empty($validated['warehouse_stocks'])) {
-                    foreach ($validated['warehouse_stocks'] as $whId => $stockData) {
+                $stocksInput = $validated['warehouse_stocks'] ?? ($requestInput['warehouse_stocks'] ?? []);
+                if (!empty($stocksInput) && is_array($stocksInput)) {
+                    foreach ($stocksInput as $whId => $stockData) {
                         $qty = (float)($stockData['quantity'] ?? 0);
                         $cost = (float)($stockData['unit_cost'] ?? 0);
 
@@ -335,7 +336,12 @@ class ProductService
                             ->first();
 
                         $oldQty = $oldStock ? (float)$oldStock->quantity : 0.0;
-                        $rate = $cost > 0 ? $cost : $product->cost_price;
+                        $oldCost = $oldStock ? (float)$oldStock->unit_cost : 0.0;
+                        $rate = $cost > 0 ? $cost : ($product->cost_price > 0 ? (float)$product->cost_price : $oldCost);
+
+                        $oldTotalVal = $oldQty * $oldCost;
+                        $newTotalVal = $qty * $rate;
+                        $netValDiff = round($newTotalVal - $oldTotalVal, 2);
 
                         if ($qty != $oldQty) {
                             if ($qty > $oldQty) {
@@ -346,7 +352,7 @@ class ProductService
                                     $whId,
                                     $diff,
                                     $rate,
-                                    'Adjustment'
+                                    'Opening Stock'
                                 );
                             } else {
                                 $diff = $oldQty - $qty;
@@ -358,6 +364,30 @@ class ProductService
                                     'Adjustment'
                                 );
                             }
+                        }
+
+                        // Always update unit_cost on ProductWarehouseStock if cost was provided or changed
+                        $targetCost = $cost > 0 ? $cost : (float)$product->cost_price;
+                        if ($targetCost > 0) {
+                            if ($oldStock) {
+                                if ($targetCost != $oldCost) {
+                                    $oldStock->update(['unit_cost' => $targetCost]);
+                                }
+                            } elseif ($qty > 0) {
+                                ProductWarehouseStock::create([
+                                    'tenant_id' => $tenantId,
+                                    'product_id' => $product->id,
+                                    'warehouse_id' => $whId,
+                                    'quantity' => $qty,
+                                    'available_qty' => $qty,
+                                    'unit_cost' => $targetCost,
+                                ]);
+                            }
+                        }
+
+                        // If quantity was the same but unit rate was changed, post the net difference journal entry to accounting
+                        if ($qty == $oldQty && $qty > 0 && abs($netValDiff) > 0.005) {
+                            StockService::postOpeningStockAccountingJournal($tenantId, $product->id, $netValDiff);
                         }
                     }
                 }
@@ -414,7 +444,12 @@ class ProductService
                             ->first();
 
                         $oldQty = $stock ? (float)$stock->quantity : 0.0;
-                        $rate = $cost > 0 ? $cost : $variant->cost_price;
+                        $oldCost = $stock ? (float)$stock->unit_cost : 0.0;
+                        $rate = $cost > 0 ? $cost : ($variant->cost_price > 0 ? (float)$variant->cost_price : $oldCost);
+
+                        $oldTotalVal = $oldQty * $oldCost;
+                        $newTotalVal = $qty * $rate;
+                        $netValDiff = round($newTotalVal - $oldTotalVal, 2);
 
                         if ($qty != $oldQty) {
                             if ($qty > $oldQty) {
@@ -443,6 +478,30 @@ class ProductService
                                 );
                             }
                         }
+
+                        // Always update unit_cost on ProductWarehouseStock
+                        $targetCost = $cost > 0 ? $cost : (float)$variant->cost_price;
+                        if ($targetCost > 0) {
+                            if ($stock) {
+                                if ($targetCost != $oldCost) {
+                                    $stock->update(['unit_cost' => $targetCost]);
+                                }
+                            } elseif ($qty > 0) {
+                                ProductWarehouseStock::create([
+                                    'tenant_id' => $tenantId,
+                                    'product_id' => $variantId,
+                                    'warehouse_id' => $warehouseId,
+                                    'quantity' => $qty,
+                                    'available_qty' => $qty,
+                                    'unit_cost' => $targetCost,
+                                ]);
+                            }
+                        }
+
+                        // If quantity was the same but unit rate was changed, post accounting journal
+                        if ($qty == $oldQty && $qty > 0 && abs($netValDiff) > 0.005) {
+                            StockService::postOpeningStockAccountingJournal($tenantId, $variantId, $netValDiff);
+                        }
                     }
                 }
             } else {
@@ -461,7 +520,12 @@ class ProductService
                         ->first();
 
                     $oldQty = $stock ? (float)$stock->quantity : 0.0;
-                    $rate = $cost > 0 ? $cost : $product->cost_price;
+                    $oldCost = $stock ? (float)$stock->unit_cost : 0.0;
+                    $rate = $cost > 0 ? $cost : ($product->cost_price > 0 ? (float)$product->cost_price : $oldCost);
+
+                    $oldTotalVal = $oldQty * $oldCost;
+                    $newTotalVal = $qty * $rate;
+                    $netValDiff = round($newTotalVal - $oldTotalVal, 2);
 
                     if ($qty != $oldQty) {
                         if ($qty > $oldQty) {
@@ -489,6 +553,30 @@ class ProductService
                                 $serialNumbers
                             );
                         }
+                    }
+
+                    // Always update unit_cost on ProductWarehouseStock
+                    $targetCost = $cost > 0 ? $cost : (float)$product->cost_price;
+                    if ($targetCost > 0) {
+                        if ($stock) {
+                            if ($targetCost != $oldCost) {
+                                $stock->update(['unit_cost' => $targetCost]);
+                            }
+                        } elseif ($qty > 0) {
+                            ProductWarehouseStock::create([
+                                'tenant_id' => $tenantId,
+                                'product_id' => $product->id,
+                                'warehouse_id' => $warehouseId,
+                                'quantity' => $qty,
+                                'available_qty' => $qty,
+                                'unit_cost' => $targetCost,
+                            ]);
+                        }
+                    }
+
+                    // If quantity was the same but unit rate was changed, post accounting journal
+                    if ($qty == $oldQty && $qty > 0 && abs($netValDiff) > 0.005) {
+                        StockService::postOpeningStockAccountingJournal($tenantId, $product->id, $netValDiff);
                     }
                 }
             }

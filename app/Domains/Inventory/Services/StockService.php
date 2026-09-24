@@ -420,10 +420,33 @@ class StockService
     public static function postOpeningStockAccountingJournal(int $tenantId, int $productId, float $totalValue): void
     {
         try {
-            $inventoryAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
-                ->where(function ($q) {
-                    $q->where('code', '1200')->orWhere('name', 'like', '%Inventory%');
-                })->first();
+            if (abs($totalValue) < 0.005) {
+                return;
+            }
+
+            $product = Product::find($productId);
+            $productName = $product ? $product->name : "Product #{$productId}";
+
+            $inventoryAccountName = $product ? $product->inventory_account : null;
+            if (!$inventoryAccountName && $product && $product->parent_id) {
+                $inventoryAccountName = $product->parent?->inventory_account;
+            }
+
+            $inventoryAcc = null;
+            if ($inventoryAccountName) {
+                $inventoryAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($inventoryAccountName) {
+                        $q->where('name', $inventoryAccountName)
+                          ->orWhere('code', $inventoryAccountName);
+                    })->first();
+            }
+
+            if (!$inventoryAcc) {
+                $inventoryAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
+                    ->where(function ($q) {
+                        $q->where('code', '1200')->orWhere('name', 'like', '%Inventory%');
+                    })->first();
+            }
 
             $equityAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
                 ->where(function ($q) {
@@ -437,23 +460,38 @@ class StockService
             /** @var \App\Domains\Accounting\Services\JournalService $journalService */
             $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
 
-            $product = Product::find($productId);
-            $productName = $product ? $product->name : "Product #{$productId}";
-
-            $lines = [
-                [
-                    'chart_of_account_id' => $inventoryAcc->id,
-                    'debit' => round($totalValue, 2),
-                    'credit' => 0,
-                    'description' => "Opening Stock Valuation - Inventory Asset ({$productName})",
-                ],
-                [
-                    'chart_of_account_id' => $equityAcc->id,
-                    'debit' => 0,
-                    'credit' => round($totalValue, 2),
-                    'description' => "Opening Stock Valuation - Owner Equity / Capital ({$productName})",
-                ],
-            ];
+            $absVal = round(abs($totalValue), 2);
+            if ($totalValue >= 0) {
+                $lines = [
+                    [
+                        'chart_of_account_id' => $inventoryAcc->id,
+                        'debit' => $absVal,
+                        'credit' => 0,
+                        'description' => "Opening Stock Valuation - {$inventoryAcc->name} ({$productName})",
+                    ],
+                    [
+                        'chart_of_account_id' => $equityAcc->id,
+                        'debit' => 0,
+                        'credit' => $absVal,
+                        'description' => "Opening Stock Valuation - Owner Equity / Capital ({$productName})",
+                    ],
+                ];
+            } else {
+                $lines = [
+                    [
+                        'chart_of_account_id' => $equityAcc->id,
+                        'debit' => $absVal,
+                        'credit' => 0,
+                        'description' => "Opening Stock Revaluation - Owner Equity / Capital ({$productName})",
+                    ],
+                    [
+                        'chart_of_account_id' => $inventoryAcc->id,
+                        'debit' => 0,
+                        'credit' => $absVal,
+                        'description' => "Opening Stock Revaluation - {$inventoryAcc->name} ({$productName})",
+                    ],
+                ];
+            }
 
             $meta = [
                 'tenant_id' => $tenantId,
