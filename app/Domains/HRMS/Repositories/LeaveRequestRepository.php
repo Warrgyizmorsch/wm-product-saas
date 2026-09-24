@@ -365,22 +365,27 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         $adminEmployee = $user ? $approvalService->getEmployeeFromUser($user) : null;
 
         if ($action === 'approved' && $user && $leaveRequest->employee) {
-            $approvalService->authorizeApproval($user, $leaveRequest->employee);
+            $approvalService->authorizeApproval($user, $leaveRequest->employee, $leaveRequest);
         }
 
         $rules = $leaveRequest->leaveType->rules ?? [];
         $workflowLevel = $rules['approval']['workflow_level'] ?? '1_level';
 
         if ($action === 'approved') {
+            $isHrOrAdmin = $user && $approvalService->isHrOrAdminActor($user);
+
             // Check if 2-level approval policy is active and still at Level 1
             if ($workflowLevel === '2_level' && ((string) $leaveRequest->current_level === '1' || (string) $leaveRequest->current_level === '')) {
-                $leaveRequest->update([
-                    'current_level' => '2',
-                ]);
-                return true;
+                // If direct manager / non-admin is approving, advance to Level 2 for HR review
+                if (! $isHrOrAdmin) {
+                    $leaveRequest->update([
+                        'current_level' => '2',
+                    ]);
+                    return true;
+                }
             }
 
-            // Final Approval (Level 2 or 1_level)
+            // Final Approval (Level 2 or 1_level or Admin Master Override)
             $leaveRequest->update([
                 'status'           => 'approved',
                 'current_level'    => 'approved',

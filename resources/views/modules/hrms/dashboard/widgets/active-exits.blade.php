@@ -33,7 +33,7 @@
                                 <td class="py-2 text-muted">{{ $exit->employee?->department?->name ?? '—' }}</td>
                                 <td class="py-2"><span class="badge bg-soft-danger text-danger px-2 py-0.5 fs-11">{{ ucfirst($exit->status ?? 'Initiated') }}</span></td>
                                 <td class="text-end pe-3 py-2">
-                                    <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.offboarding.show') ? route('hrms.offboarding.show', $exit->id) : '#' }}" class="btn btn-xs btn-outline-danger rounded-pill">Clearance</a>
+                                    <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.exits.index') ? route('hrms.exits.index') : url('/hrms/exits') }}" class="btn btn-xs btn-outline-danger rounded-pill">Clearance</a>
                                 </td>
                             </tr>
                         @endforeach

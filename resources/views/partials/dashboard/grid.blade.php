@@ -102,6 +102,7 @@
             const CSRF = document.querySelector('meta[name="csrf-token"]').content;
             const catalogByKey = Object.fromEntries(CATALOG.map(w => [w.key, w]));
 
+            let currentSource = @json($source ?? 'starter');
             const root = document.getElementById('dash-root');
             const emptyEl = document.getElementById('dash-empty');
             const gallery = document.getElementById('dash-gallery');
@@ -189,6 +190,16 @@
                     // The block draws its own card; keep the edit tools that sit in front of it.
                     const tools = holder.querySelector('.dash-tools');
                     holder.innerHTML = (tools ? tools.outerHTML : '') + d.html;
+                    
+                    // Relocate embedded modals directly to document.body to prevent parent container stacking/blur issues
+                    holder.querySelectorAll('.modal').forEach(modal => {
+                        if (modal.id) {
+                            const existing = document.querySelectorAll(`body > #${CSS.escape(modal.id)}`);
+                            existing.forEach(el => el.remove());
+                        }
+                        document.body.appendChild(modal);
+                    });
+
                     const list = [];
                     (d.charts || []).forEach(spec => {
                         const target = holder.querySelector('#' + CSS.escape(spec.id));
@@ -236,8 +247,9 @@
                 }
             }
 
-            // A block that draws its own card grows until its content fits (except fixed KPI cards).
+            // A block that draws its own card grows until its content fits (except fixed KPI cards & saved user layouts).
             function fit(id) {
+                if (currentSource !== 'starter') return;
                 const node = grid.engine.nodes.find(n => n.id === id);
                 if (!node) return;
                 const key = meta.get(id)?.key || '';
@@ -363,7 +375,10 @@
                     const layout = current();
                     const s = scope ? scope.value : 'personal';
                     await send('PUT', {scope: s, role_id: s === 'role' ? el('dash-role').value : null, widgets: layout});
-                    if (s === 'personal') saved = layout;
+                    if (s === 'personal') {
+                        saved = layout;
+                        currentSource = 'personal';
+                    }
                     setEditing(false);
                 } catch (e) {
                     alert('Could not save the dashboard. Please try again.');
@@ -384,6 +399,30 @@
                     clockEls.forEach(el => { el.textContent = timeStr; });
                 }
             }, 1000);
+
+            // Universal Modal Backdrop & Stacking Context Handler for Dashboard Widgets
+            document.addEventListener('show.bs.modal', function (e) {
+                if (e.target && e.target.classList.contains('modal')) {
+                    if (e.target.parentElement !== document.body) {
+                        document.body.appendChild(e.target);
+                    }
+                    e.target.style.zIndex = '1060';
+                    setTimeout(function () {
+                        document.querySelectorAll('.modal-backdrop').forEach(b => {
+                            b.style.zIndex = '1050';
+                        });
+                    }, 10);
+                }
+            }, true);
+
+            document.addEventListener('hidden.bs.modal', function () {
+                if (!document.querySelector('.modal.show')) {
+                    document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                }
+            }, true);
 
             setEditing(false);
             build(saved, true);

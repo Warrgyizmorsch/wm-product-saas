@@ -201,13 +201,40 @@ class NotificationRuleController extends Controller
             'leave_type' => 'Casual Leave',
             'from_date' => now()->format('d M Y'),
             'to_date' => now()->addDays(2)->format('d M Y'),
+            'document_type' => 'Employment Agreement',
+            'status' => 'Approved',
+            'claim_no' => 'EXP-00101',
+            'ticket_no' => '#TICK-904',
+            'subject' => 'VPN Access Request',
+            'category' => 'IT Support',
+            'broadcast_no' => 'BC-2026-0001',
+            'title' => 'Quarterly Townhall Announcement',
+            'priority' => 'Urgent',
+            'payment_mode' => 'Bank Transfer',
+            'purpose' => 'Client Visit Travel Reimbursement',
+            'lwd' => now()->addDays(30)->format('d M Y'),
+            'published_by' => auth()->user()?->name ?? 'HR Management',
+            'resolved_by' => auth()->user()?->name ?? 'IT Support Agent',
         ];
+
+        $resolvedUrl = '#';
+        if (!empty($notificationRule->action_route)) {
+            if (\Illuminate\Support\Facades\Route::has($notificationRule->action_route)) {
+                try {
+                    $resolvedUrl = route($notificationRule->action_route);
+                } catch (\Throwable $e) {
+                    $resolvedUrl = '#';
+                }
+            } else {
+                $resolvedUrl = $notificationRule->action_route;
+            }
+        }
 
         \App\Services\Notification\NotificationService::send(
             user: auth()->user(),
             title: '[TEST BELL] ' . $notificationRule->renderTitle($sampleData),
             message: $notificationRule->renderBody($sampleData),
-            actionUrl: $notificationRule->action_route ? route($notificationRule->action_route) : '#',
+            actionUrl: $resolvedUrl,
             module: $notificationRule->module,
             type: 'alert',
             iconClass: $notificationRule->icon_class ?: 'feather-bell'

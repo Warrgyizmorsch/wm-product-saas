@@ -600,12 +600,45 @@ class EmployeeExitController extends Controller
             ]);
         }
 
+        try {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.exit_cleared', [
+                'tenant_id'     => $exit->tenant_id,
+                'employee_name' => $employee->full_name,
+                'lwd'           => $exit->approved_lwd ?? $exit->preferred_lwd ?? date('Y-m-d'),
+                'action_url'    => route('hrms.exits.index', ['tab' => 'documents']),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
+        }
+
         return redirect()->route('hrms.exits.index', ['tab' => 'fnf'])->with('success', "Full & Final Settlement completed for {$employee->full_name}. Relieving & Experience certificates generated, and user account deactivated.");
     }
 
     public function viewDocument(Request $request, EmployeeExitDocument $document): View
     {
         $document->load(['employee.company', 'exit']);
+        $exit = $document->exit;
+        
+        if ($exit) {
+            try {
+                $template = $this->findExitTemplate($document->document_type);
+                if ($template && !empty($template->body_content)) {
+                    $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+                    $renderedHtml = $templateService->renderExitDocument($template, $exit, $document->document_type, [
+                        'reference_number' => $document->reference_number,
+                        'issue_date' => $document->issue_date,
+                    ]);
+                    $docTitle = ucwords(str_replace('_', ' ', $document->document_type));
+                    return view('modules.hrms.employees.exits.documents.custom_template_preview', [
+                        'renderedContent' => $renderedHtml,
+                        'title' => $docTitle,
+                        'employeeName' => $document->employee?->full_name,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Custom exit document template rendering failed, falling back to default: " . $e->getMessage());
+            }
+        }
         
         if ($document->document_type === 'relieving_letter') {
             return view('modules.hrms.employees.exits.documents.relieving-letter', compact('document'));
@@ -622,6 +655,21 @@ class EmployeeExitController extends Controller
     {
         $exit->load(['employee.company', 'employee.designation', 'employee.department', 'fnfSettlement']);
         $settlement = $exit->fnfSettlement;
+
+        try {
+            $template = $this->findExitTemplate('fnf_statement');
+            if ($template && !empty($template->body_content)) {
+                $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+                $renderedHtml = $templateService->renderExitDocument($template, $exit, 'fnf_statement');
+                return view('modules.hrms.employees.exits.documents.custom_template_preview', [
+                    'renderedContent' => $renderedHtml,
+                    'title' => 'F&F Settlement Statement',
+                    'employeeName' => $exit->employee?->full_name,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Custom FnF template rendering failed, falling back to default: " . $e->getMessage());
+        }
         
         return view('modules.hrms.employees.exits.documents.fnf-statement', compact('exit', 'settlement'));
     }
@@ -633,6 +681,25 @@ class EmployeeExitController extends Controller
         if (!$document) {
             $document = $this->docService->generateRelievingLetter($exit);
         }
+
+        try {
+            $template = $this->findExitTemplate('relieving_letter');
+            if ($template && !empty($template->body_content)) {
+                $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+                $renderedHtml = $templateService->renderExitDocument($template, $exit, 'relieving_letter', [
+                    'reference_number' => $document->reference_number,
+                    'issue_date' => $document->issue_date,
+                ]);
+                return view('modules.hrms.employees.exits.documents.custom_template_preview', [
+                    'renderedContent' => $renderedHtml,
+                    'title' => 'Relieving Letter',
+                    'employeeName' => $exit->employee?->full_name,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Custom Relieving template rendering failed, falling back to default: " . $e->getMessage());
+        }
+
         return view('modules.hrms.employees.exits.documents.relieving-letter', compact('document', 'exit'));
     }
 
@@ -643,6 +710,25 @@ class EmployeeExitController extends Controller
         if (!$document) {
             $document = $this->docService->generateExperienceCertificate($exit);
         }
+
+        try {
+            $template = $this->findExitTemplate('experience_certificate');
+            if ($template && !empty($template->body_content)) {
+                $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+                $renderedHtml = $templateService->renderExitDocument($template, $exit, 'experience_certificate', [
+                    'reference_number' => $document->reference_number,
+                    'issue_date' => $document->issue_date,
+                ]);
+                return view('modules.hrms.employees.exits.documents.custom_template_preview', [
+                    'renderedContent' => $renderedHtml,
+                    'title' => 'Experience Certificate',
+                    'employeeName' => $exit->employee?->full_name,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Custom Experience template rendering failed, falling back to default: " . $e->getMessage());
+        }
+
         return view('modules.hrms.employees.exits.documents.experience-certificate', compact('document', 'exit'));
     }
 
@@ -653,6 +739,54 @@ class EmployeeExitController extends Controller
         if (!$document) {
             $document = $this->docService->generateNocCertificate($exit);
         }
+
+        try {
+            $template = $this->findExitTemplate('noc_certificate');
+            if ($template && !empty($template->body_content)) {
+                $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+                $renderedHtml = $templateService->renderExitDocument($template, $exit, 'noc_certificate', [
+                    'reference_number' => $document->reference_number,
+                    'issue_date' => $document->issue_date,
+                ]);
+                return view('modules.hrms.employees.exits.documents.custom_template_preview', [
+                    'renderedContent' => $renderedHtml,
+                    'title' => 'No Objection Certificate',
+                    'employeeName' => $exit->employee?->full_name,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Custom NOC template rendering failed, falling back to default: " . $e->getMessage());
+        }
+
         return view('modules.hrms.employees.exits.documents.noc-certificate', compact('document', 'exit'));
+    }
+
+    private function findExitTemplate(string $docType): ?\App\Domains\HRMS\Models\DocumentTemplate
+    {
+        $codeAliases = match($docType) {
+            'relieving_letter' => ['RELIEVING_LETTER', 'RELIEVING_LT', 'RELIEVING', 'REL_LTR'],
+            'experience_certificate' => ['EXPERIENCE_CERTIFICATE', 'EXPERIENCE_LT', 'EXPERIENCE', 'EXP_CERT'],
+            'noc_certificate' => ['NOC_CERTIFICATE', 'NOC_LT', 'NOC', 'NO_DUES'],
+            'fnf_statement' => ['FNF_STATEMENT', 'FNF_STMT', 'FNF_SETTLEMENT'],
+            default => [$docType],
+        };
+
+        $nameSearch = match($docType) {
+            'relieving_letter' => 'relieving',
+            'experience_certificate' => 'experience',
+            'noc_certificate' => 'noc',
+            'fnf_statement' => 'fnf',
+            default => $docType,
+        };
+
+        return \App\Domains\HRMS\Models\DocumentTemplate::query()
+            ->where('status', 'active')
+            ->where(function ($q) use ($codeAliases, $nameSearch) {
+                $q->whereIn('code', $codeAliases)
+                  ->orWhere('name', 'like', '%' . $nameSearch . '%')
+                  ->orWhere('code', 'like', '%' . $nameSearch . '%');
+            })
+            ->orderBy('is_default', 'desc')
+            ->first();
     }
 }

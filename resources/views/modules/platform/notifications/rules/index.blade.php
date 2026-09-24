@@ -77,6 +77,9 @@
                 <a href="{{ route('platform.notification-rules.index') }}" class="btn btn-sm {{ !request('module') || request('module') === 'all' ? 'btn-primary' : 'btn-light border' }}">
                     {{ __('notifications.all_modules') }}
                 </a>
+                <a href="{{ route('platform.notification-rules.index', ['module' => 'crm']) }}" class="btn btn-sm {{ request('module') === 'crm' ? 'btn-primary' : 'btn-light border' }}">
+                    CRM
+                </a>
                 <a href="{{ route('platform.notification-rules.index', ['module' => 'sales']) }}" class="btn btn-sm {{ request('module') === 'sales' ? 'btn-primary' : 'btn-light border' }}">
                     {{ __('ui.sales') }}
                 </a>
@@ -91,6 +94,9 @@
                 </a>
                 <a href="{{ route('platform.notification-rules.index', ['module' => 'hrms']) }}" class="btn btn-sm {{ request('module') === 'hrms' ? 'btn-primary' : 'btn-light border' }}">
                     {{ __('ui.hrms') }}
+                </a>
+                <a href="{{ route('platform.notification-rules.index', ['module' => 'document']) }}" class="btn btn-sm {{ request('module') === 'document' ? 'btn-primary' : 'btn-light border' }}">
+                    Documents
                 </a>
             </div>
 
@@ -144,11 +150,13 @@
                             <td>
                                 @php
                                     $modColor = match($rule->module) {
+                                        'crm' => 'purple',
                                         'sales' => 'success',
                                         'inventory' => 'info',
                                         'purchase' => 'warning',
                                         'production' => 'danger',
                                         'hrms' => 'primary',
+                                        'document' => 'secondary',
                                         default => 'secondary'
                                     };
                                 @endphp

@@ -308,6 +308,27 @@
             // Trigger employee change logic on load if pre-selected
             $('#shift_employee_id').trigger('change');
 
+            // Auto open modal if action query param is passed
+            var urlParams = new URLSearchParams(window.location.search);
+            var actionParam = urlParams.get('action');
+            if (actionParam === 'apply_shift' || actionParam === 'shift') {
+                setTimeout(function() {
+                    var modalEl = document.getElementById('applyShiftChangeModal');
+                    if (modalEl) {
+                        var m = new bootstrap.Modal(modalEl);
+                        m.show();
+                    }
+                }, 150);
+            } else if (actionParam === 'apply_overtime' || actionParam === 'overtime') {
+                setTimeout(function() {
+                    var modalEl = document.getElementById('applyOvertimeModal');
+                    if (modalEl) {
+                        var m = new bootstrap.Modal(modalEl);
+                        m.show();
+                    }
+                }, 150);
+            }
+
         });
 
         // Sync apply button state with the selected tab

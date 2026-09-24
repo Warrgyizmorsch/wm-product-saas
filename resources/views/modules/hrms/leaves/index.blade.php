@@ -456,8 +456,11 @@
                 window.history.pushState({ path: newUrl }, '', newUrl);
             });
 
-            var activeTabParam = new URLSearchParams(window.location.search).get('tab');
-            if (activeTabParam === 'encashments') {
+            var urlParams = new URLSearchParams(window.location.search);
+            var activeTabParam = urlParams.get('tab');
+            var actionParam = urlParams.get('action');
+
+            if (activeTabParam === 'encashments' || actionParam === 'encash') {
                 var encashTab = document.querySelector('#tab-encashments');
                 if (encashTab) {
                     var tabObj = new bootstrap.Tab(encashTab);
@@ -470,6 +473,24 @@
                 $('#btnApplyEncashmentHeader').addClass('d-none');
                 $('#btnApplyLeaveHeader').removeClass('d-none');
                 $('#btnExportHeader').attr('href', leavesExportUrl);
+            }
+
+            if (actionParam === 'apply') {
+                setTimeout(function() {
+                    var applyModalEl = document.getElementById('applyLeaveModal');
+                    if (applyModalEl) {
+                        var applyModal = new bootstrap.Modal(applyModalEl);
+                        applyModal.show();
+                    }
+                }, 150);
+            } else if (actionParam === 'encash') {
+                setTimeout(function() {
+                    var encashModalEl = document.getElementById('applyEncashmentModal');
+                    if (encashModalEl) {
+                        var encashModal = new bootstrap.Modal(encashModalEl);
+                        encashModal.show();
+                    }
+                }, 150);
             }
 
             // Initialize custom Select2 dropdowns parented inside modal-content
