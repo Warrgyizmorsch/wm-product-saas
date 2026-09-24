@@ -1558,29 +1558,53 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach($order->operations as $op)
+                                        @php
+                                            $activeSchedule = $existingSchedule ?? $order->schedules->whereNotIn('status', ['cancelled'])->first();
+                                            $schedOpsMap = ($activeSchedule && $activeSchedule->relationLoaded('operations'))
+                                                ? $activeSchedule->operations->keyBy('production_order_operation_id')
+                                                : ($activeSchedule ? $activeSchedule->operations()->get()->keyBy('production_order_operation_id') : collect());
+
+                                            $sortedRoutingOps = $order->operations->sort(function ($a, $b) use ($schedOpsMap, $order) {
+                                                $aStart = $schedOpsMap->get($a->id)?->planned_start;
+                                                $bStart = $schedOpsMap->get($b->id)?->planned_start;
+                                                if ($aStart && $bStart && !$aStart->equalTo($bStart)) {
+                                                    return $aStart <=> $bStart;
+                                                }
+                                                if ($aStart && !$bStart) return -1;
+                                                if (!$aStart && $bStart) return 1;
+
+                                                $aIsSfg = ($a->source_product_id && (int) $a->source_product_id !== (int) $order->product_id) || ($a->is_intermediate ?? false);
+                                                $bIsSfg = ($b->source_product_id && (int) $b->source_product_id !== (int) $order->product_id) || ($b->is_intermediate ?? false);
+
+                                                if ($aIsSfg !== $bIsSfg) {
+                                                    return $aIsSfg ? -1 : 1;
+                                                }
+
+                                                return $a->sequence <=> $b->sequence;
+                                            });
+                                        @endphp
+                                        @foreach($sortedRoutingOps as $op)
                                             <tr>
-                                                <td class="text-center fw-semibold text-muted">#{{ $op->sequence }}</td>
+                                                <td class="text-center fw-semibold text-muted">{{ $loop->iteration }}</td>
                                                 <td>
-                                                    <div class="fw-bold text-dark">{{ $op->operation_number }}</div>
-                                                    <small
-                                                        class="text-muted">{{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}</small>
+                                                    @if($op->sourceProduct && (int) $op->source_product_id !== (int) $order->product_id)
+                                                        <span class="badge bg-soft-info text-info border border-info-subtle font-monospace mb-1" style="font-size: 10px;"><i
+                                                                class="feather-box me-1"></i>{{ $op->sourceProduct->name }} ({{ __('production.level') }}
+                                                            {{ $op->bom_level ?? 1 }})</span><br>
+                                                    @elseif(($op->bom_level ?? 1) > 1)
+                                                        <span class="badge bg-soft-secondary text-secondary font-monospace mb-1" style="font-size: 10px;">{{ __('production.level') }}
+                                                            {{ $op->bom_level }}</span><br>
+                                                    @endif
+                                                    <span class="fw-semibold text-dark">{{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}</span>
+                                                    <br><small class="text-muted font-monospace">{{ $op->operation_number }}</small>
                                                     @php
                                                         $opIsQcRequired = (bool) ($op->quality_required || ($op->routingOperation?->quality_required ?? false));
                                                     @endphp
                                                     @if($opIsQcRequired)
-                                                        <span class="badge bg-soft-info text-info border border-info-subtle ms-1"
+                                                        <span class="badge bg-soft-info text-info border border-info-subtle font-monospace ms-1"
                                                             title="Quality Check Required for this operation">
                                                             <i class="feather-shield me-1"></i>{{ __('production.qc_required') }}
                                                         </span>
-                                                    @endif
-                                                    @if($op->sourceProduct && $op->source_product_id !== $order->product_id)
-                                                        <span class="badge bg-soft-info text-info border border-info-subtle ms-1"><i
-                                                                class="feather-box me-1"></i>{{ $op->sourceProduct->name }} ({{ __('production.level') }}
-                                                            {{ $op->bom_level ?? 1 }})</span>
-                                                    @elseif($op->bom_level > 1)
-                                                        <span class="badge bg-soft-secondary text-secondary ms-1">{{ __('production.level') }}
-                                                            {{ $op->bom_level }}</span>
                                                     @endif
                                                     @if($op->is_external)
                                                         <span class="badge bg-soft-warning text-dark border border-warning ms-1"><i

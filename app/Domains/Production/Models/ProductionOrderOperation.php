@@ -149,6 +149,28 @@ class ProductionOrderOperation extends BaseModel
         )->withPivot('dependency_type')->withTimestamps();
     }
 
+    public function isEntryOperation(): bool
+    {
+        if ($this->previous_operation_id) {
+            return false;
+        }
+
+        if ($this->relationLoaded('routingOperation') && $this->routingOperation?->previous_operation_id) {
+            return false;
+        }
+
+        $hasInterPred = \App\Domains\Production\Models\ProductionOrderOperationDependency::where('tenant_id', $this->tenant_id)
+            ->where('production_order_id', $this->production_order_id)
+            ->where('operation_id', $this->id)
+            ->exists();
+
+        if ($hasInterPred) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function getOverlapEnabledAttribute(): bool
     {
         return (bool) ($this->attributes['queue_threshold_enabled'] ?? $this->attributes['overlap_enabled'] ?? false);

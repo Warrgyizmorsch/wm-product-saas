@@ -2264,12 +2264,13 @@ class SchedulingService
 
                 if ($isFrozen) {
                     $frozenOpIds[] = $op->id;
-                    $scheduledData[$op->sequence] = [
+                    $scheduledData[$op->id] = [
                         'sequence' => $op->sequence,
                         'parallel_group' => $op->orderOperation?->parallel_group,
                         'is_parallel' => $op->orderOperation?->is_parallel,
                         'planned_start' => $op->planned_start,
                         'planned_finish' => $op->planned_finish,
+                        'order_op' => $op->orderOperation,
                     ];
                 }
             }
@@ -2289,7 +2290,8 @@ class SchedulingService
                         $op->orderOperation?->parallel_group,
                         (bool) $op->orderOperation?->is_parallel,
                         $startDate,
-                        (float) ($order->quantity_ordered ?? 1)
+                        (float) ($order->quantity_ordered ?? 1),
+                        $op->orderOperation
                     );
 
                     $opTarget = (float) ($op->orderOperation?->target_produced_qty > 0 ? $op->orderOperation->target_produced_qty : ($order->quantity_ordered ?? 1.0));
@@ -2335,7 +2337,7 @@ class SchedulingService
 
                     $isFirstPending = false;
 
-                    $scheduledData[$op->sequence] = [
+                    $scheduledData[$op->id] = [
                         'sequence' => $op->sequence,
                         'parallel_group' => $op->orderOperation?->parallel_group,
                         'is_parallel' => $op->orderOperation?->is_parallel,
@@ -2421,12 +2423,15 @@ class SchedulingService
                         'status' => ProductionScheduleOperation::STATUS_WAITING,
                     ]);
 
-                    $scheduledData[$op->sequence] = [
+                    $scheduledData[$op->id] = [
                         'sequence' => $op->sequence,
                         'parallel_group' => $op->orderOperation?->parallel_group,
                         'is_parallel' => $op->orderOperation?->is_parallel,
                         'planned_start' => $plannedStart,
                         'planned_finish' => $plannedFinish,
+                        'work_center_id' => $op->work_center_id,
+                        'machine_id' => $machineId,
+                        'order_op' => $op->orderOperation,
                     ];
 
                     app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($tenantId, [

@@ -439,6 +439,10 @@
                     @php
                         $order = $schedule->order;
                         $ops = $schedule->operations->sort(function ($a, $b) use ($order) {
+                            if ($a->planned_start && $b->planned_start && !$a->planned_start->equalTo($b->planned_start)) {
+                                return $a->planned_start <=> $b->planned_start;
+                            }
+
                             $aOrderOp = $a->orderOperation ?? $a;
                             $bOrderOp = $b->orderOperation ?? $b;
 

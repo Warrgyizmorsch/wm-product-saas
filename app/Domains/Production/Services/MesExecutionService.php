@@ -153,16 +153,30 @@ class MesExecutionService
                 }
             }
 
-            $blockedByQuality = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
-                ->where('sequence', '<', $schedOp->sequence)
-                ->where('status', ProductionScheduleOperation::STATUS_COMPLETED)
-                ->get()
-                ->contains(function (ProductionScheduleOperation $predecessor): bool {
-                    $orderOp = $predecessor->orderOperation;
+            $blockedByQuality = false;
+            if (!empty($predOrderOpIds)) {
+                $blockedByQuality = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                    ->whereIn('production_order_operation_id', $predOrderOpIds)
+                    ->where('status', ProductionScheduleOperation::STATUS_COMPLETED)
+                    ->get()
+                    ->contains(function (ProductionScheduleOperation $predecessor): bool {
+                        $orderOp = $predecessor->orderOperation;
 
-                    return $orderOp instanceof ProductionOrderOperation
-                        && $this->qualityGateIsPendingOrFailed($orderOp);
-                });
+                        return $orderOp instanceof ProductionOrderOperation
+                            && $this->qualityGateIsPendingOrFailed($orderOp);
+                    });
+            } else {
+                $blockedByQuality = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                    ->where('sequence', '<', $schedOp->sequence)
+                    ->where('status', ProductionScheduleOperation::STATUS_COMPLETED)
+                    ->get()
+                    ->contains(function (ProductionScheduleOperation $predecessor): bool {
+                        $orderOp = $predecessor->orderOperation;
+
+                        return $orderOp instanceof ProductionOrderOperation
+                            && $this->qualityGateIsPendingOrFailed($orderOp);
+                    });
+            }
 
             if ($blockedByQuality) {
                 throw new InvalidArgumentException('Cannot start next operation until predecessor quality gates have passed.');
@@ -513,17 +527,14 @@ class MesExecutionService
                 }
 
                 // Prevent processing beyond available transferred input WIP
-                $isFirstOp = !ProductionOrderOperation::where('tenant_id', $orderOp->tenant_id)
-                    ->where('production_order_id', $orderOp->production_order_id)
-                    ->where('sequence', '<', $orderOp->sequence)
-                    ->exists();
+                $isFirstOp = $orderOp->isEntryOperation();
 
                 $batchId = !empty($data['production_batch_id']) ? (int) $data['production_batch_id'] : (!empty($data['batch_id']) ? (int) $data['batch_id'] : null);
 
                 $availableWip = app(ProductionWipService::class)->getAvailableInputWip($orderOp, $batchId);
                 $newConsumed = $isFirstOp ? (float) ($produced + $rejected) : (float) ($produced + $rejected + $scrapped);
 
-                if ($newConsumed > $availableWip) {
+                if ($newConsumed > ($availableWip + 0.0001)) {
                     throw new InvalidArgumentException("Cannot process {$newConsumed} units: Exceeds available transferred input WIP of {$availableWip} units.");
                 }
 
