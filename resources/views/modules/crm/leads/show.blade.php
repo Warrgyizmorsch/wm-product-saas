@@ -149,6 +149,7 @@
                 @endif
 
                 <!-- More Actions 3-Dot Dropdown using common component -->
+                @if (!in_array(strtolower($lead->status ?? ''), ['dealing', 'won']))
                 <x-ui.action-dropdown id="leadProfileActionsDropdown">
                     <li>
                         <a class="dropdown-item py-2" href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}">
@@ -156,6 +157,7 @@
                         </a>
                     </li>
                 </x-ui.action-dropdown>
+                @endif
                 
                 <!-- Pagination Arrows -->
                 <div class="d-flex align-items-center ms-1 border rounded px-1 py-0.5 bg-white">
@@ -261,7 +263,7 @@
                     <!-- ==================== TAB 1: OVERVIEW PANE ==================== -->
                     <div class="tab-pane fade show {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') && old('form_type') !== 'quotation_create' && old('form_type') !== 'quotation_edit' ? 'active' : '' }}" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab">
                         
-                        @if (request()->has('edit_lead') || old('form_type') === 'lead_edit')
+                        @if ((request()->has('edit_lead') || old('form_type') === 'lead_edit') && !in_array(strtolower($lead->status ?? ''), ['dealing', 'won']))
                             <!-- ==================== STATE: EDIT LEAD FORM ==================== -->
                             <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
                                 <div class="card-body p-3">

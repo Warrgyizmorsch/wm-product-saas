@@ -178,7 +178,7 @@
 <script>
     function markSingleReadPage(id) {
         $.ajax({
-            url: "/notifications/" + id + "/read",
+            url: "{{ url('notifications') }}/" + id + "/read",
             type: "POST",
             data: { _token: "{{ csrf_token() }}" },
             success: function() {
@@ -201,7 +201,7 @@
     function deleteNotificationPage(id) {
         if (!confirm('Are you sure you want to delete this notification?')) return;
         $.ajax({
-            url: "/notifications/" + id,
+            url: "{{ url('notifications') }}/" + id,
             type: "DELETE",
             data: { _token: "{{ csrf_token() }}" },
             success: function() {

@@ -324,7 +324,7 @@
             if (!accountId || accountId === '__ADD_NEW__') return;
             let contactSelect = $('#crm_contact_id');
             $.ajax({
-                url: '/crm/accounts/' + accountId + '/contacts-list',
+                url: '{{ url("crm/accounts") }}/' + accountId + '/contacts-list',
                 method: 'GET',
                 success: function (res) {
                     if (res.success) {

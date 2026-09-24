@@ -455,6 +455,9 @@ class LeadController extends Controller
     public function edit(Lead $lead)
     {
         $this->authorize('update', $lead);
+        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+            return redirect()->route('crm.leads.show', $lead)->with('info', "This lead is in '{$lead->status}' stage and is locked in read-only mode.");
+        }
         $users = User::orderBy('name')->get();
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
         $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses();
@@ -464,6 +467,9 @@ class LeadController extends Controller
     public function update(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
+        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+            return redirect()->route('crm.leads.show', $lead)->withErrors(['lead' => "Leads in '{$lead->status}' stage cannot be modified."]);
+        }
         $validated = $request->validate($this->getLeadValidationRules($request), $this->getLeadValidationMessages());
 
         $this->leadService->updateLead($lead, $validated, $request->input('items', []), $request->input('product_ids', []));
@@ -473,6 +479,12 @@ class LeadController extends Controller
     public function updateStatus(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
+        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+            if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                return response()->json(['success' => false, 'message' => "Lead status in '{$lead->status}' stage is locked."], 422);
+            }
+            return redirect()->back()->withErrors(['status' => "Lead status in '{$lead->status}' stage is locked."]);
+        }
         $dbStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses()->pluck('name')->toArray();
         $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost'], $dbStatuses)));
         $validated = $request->validate(['status' => 'required|string|in:' . $allowedStatuses]);
