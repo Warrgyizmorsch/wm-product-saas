@@ -97,6 +97,7 @@ class ProductionOrderApiController extends ApiBaseController
                 'routing:id,routing_number,name',
                 'operations.workCenter:id,name,code',
                 'operations.machine:id,name,code,current_state',
+                'reservations.product:id,name,sku',
             ])
             ->findOrFail($id);
 
@@ -119,16 +120,17 @@ class ProductionOrderApiController extends ApiBaseController
         $tenantId = $this->getTenantId();
 
         try {
-            $payload = array_merge($request->validated(), [
-                'tenant_id'  => $tenantId,
-                'created_by' => auth()->id(),
-                'status'     => $request->input('status', ProductionOrder::STATUS_DRAFT),
-            ]);
-
-            $order = $orderService->create($payload);
+            $order = $orderService->createDirect($request->validated(), $tenantId, auth()->id());
 
             return $this->createdResponse(
-                new ProductionOrderDetailResource($order->load('product')),
+                new ProductionOrderDetailResource($order->load([
+                    'product.uom',
+                    'bom',
+                    'routing',
+                    'operations.workCenter',
+                    'operations.machine',
+                    'reservations.product',
+                ])),
                 'Production order created successfully.'
             );
         } catch (\Throwable $e) {

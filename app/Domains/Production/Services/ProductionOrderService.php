@@ -489,6 +489,15 @@ class ProductionOrderService
                     $hasIssuedMaterial = in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
 
                     if (!$hasIssuedMaterial) {
+                        $hasIssuedReservation = $order->reservations()->where('quantity_issued', '>', 0)->exists();
+                        if ($hasIssuedReservation) {
+                            $latestSlip->status = 'partially issued';
+                            $latestSlip->save();
+                            $hasIssuedMaterial = true;
+                        }
+                    }
+
+                    if (!$hasIssuedMaterial) {
                         throw new InvalidArgumentException('Cannot release order: Raw materials must be fully or partially issued by the store department first.');
                     }
                 }
@@ -521,7 +530,8 @@ class ProductionOrderService
                 'triggered_by' => $userId,
             ]);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Production order release event failed: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Production order release failed: ' . $e->getMessage());
+            throw $e;
         }
     }
 

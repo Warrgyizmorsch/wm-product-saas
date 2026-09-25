@@ -103,6 +103,15 @@ Route::middleware([
         Route::put('/{routing}', [RoutingApiController::class, 'update'])
             ->middleware('throttle:production-api-write')
             ->name('api.v1.production.routings.update');
+        Route::post('/{routing}/submit', [RoutingApiController::class, 'submitApproval'])
+            ->middleware('throttle:production-api-write')
+            ->name('api.v1.production.routings.submit');
+        Route::post('/{routing}/approve', [RoutingApiController::class, 'approve'])
+            ->middleware('throttle:production-api-write')
+            ->name('api.v1.production.routings.approve');
+        Route::post('/{routing}/duplicate', [RoutingApiController::class, 'duplicate'])
+            ->middleware('throttle:production-api-write')
+            ->name('api.v1.production.routings.duplicate');
     });
 
     // --- Production Plans ---
@@ -176,10 +185,16 @@ Route::middleware([
     // --- Quality Inspections ---
     Route::prefix('quality')->group(function () {
         Route::get('/inspections', [QualityInspectionApiController::class, 'index'])->name('api.v1.production.quality.index');
+        Route::post('/inspections', [QualityInspectionApiController::class, 'store'])
+            ->middleware('throttle:production-api-write')
+            ->name('api.v1.production.quality.store');
         Route::get('/inspections/{inspection}', [QualityInspectionApiController::class, 'show'])->name('api.v1.production.quality.show');
         Route::post('/inspections/{inspection}/submit', [QualityInspectionApiController::class, 'submitResults'])
             ->middleware(['production.api.idempotency', 'throttle:production-api-write'])
             ->name('api.v1.production.quality.submit');
+        Route::post('/inspections/{inspection}/approve', [QualityInspectionApiController::class, 'approve'])
+            ->middleware(['production.api.idempotency', 'throttle:production-api-write'])
+            ->name('api.v1.production.quality.approve');
         Route::post('/orders/{order}/quick-check', [QualityInspectionApiController::class, 'quickCheck'])
             ->middleware(['production.api.idempotency', 'throttle:production-api-write'])
             ->name('api.v1.production.quality.quick_check');

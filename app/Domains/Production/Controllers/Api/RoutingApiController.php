@@ -186,15 +186,26 @@ class RoutingApiController extends ApiBaseController
      * POST /api/v1/production/routings/{id}/duplicate
      * Duplicate a routing to create a new revision.
      */
-    public function duplicate(int $id): JsonResponse
+    public function duplicate(Request $request, int $id): JsonResponse
     {
         Gate::authorize('create', Routing::class);
 
         $tenantId = $this->getTenantId();
         $routing = Routing::where('tenant_id', $tenantId)->findOrFail($id);
 
+        $newVersion = $request->input('version');
+        if (empty($newVersion)) {
+            $currentVer = $routing->version ?: '1.0';
+            $nextRev = (int) $routing->revision + 1;
+            $newVersion = $currentVer . '.' . $nextRev;
+            while (Routing::where('tenant_id', $tenantId)->where('product_id', $routing->product_id)->where('version', $newVersion)->exists()) {
+                $nextRev++;
+                $newVersion = $currentVer . '.' . $nextRev;
+            }
+        }
+
         try {
-            $newRouting = $this->routingService->duplicateVersion($id, auth()->id() ?: 1);
+            $newRouting = $this->routingService->duplicateVersion($id, $newVersion, auth()->id() ?: 1);
 
             return $this->createdResponse(
                 new RoutingDetailResource($newRouting->load(['product', 'operations.workCenter'])),

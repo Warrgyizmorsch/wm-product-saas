@@ -162,7 +162,7 @@ class QualityInspectionService
 
                 // Evaluate parameter specific rules
                 if ($param->type === 'numeric') {
-                    $val = (float) $res['value_numeric'];
+                    $val = isset($res['value_numeric']) ? (float) $res['value_numeric'] : (float) ($res['value'] ?? 0);
                     if (($param->min_value !== null && $val < $param->min_value) ||
                         ($param->max_value !== null && $val > $param->max_value)) {
                         $passed = false;
@@ -172,14 +172,14 @@ class QualityInspectionService
                         'result' => $passed ? 'passed' : 'failed',
                     ]);
                 } elseif ($param->type === 'pass_fail') {
-                    $passed = (bool) $res['value_pass'];
+                    $passed = isset($res['value_pass']) ? (bool) $res['value_pass'] : (bool) ($res['value'] ?? true);
                     $resultRow->update([
                         'recorded_value_pass' => $passed,
                         'result' => $passed ? 'passed' : 'failed',
                     ]);
                 } else {
                     $resultRow->update([
-                        'recorded_value_text' => $res['value_text'],
+                        'recorded_value_text' => $res['value_text'] ?? ($res['value'] ?? null),
                         'result' => 'passed',
                     ]);
                 }

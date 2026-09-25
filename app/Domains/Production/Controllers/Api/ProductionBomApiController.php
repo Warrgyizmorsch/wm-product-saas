@@ -86,7 +86,7 @@ class ProductionBomApiController extends ApiBaseController
         $tenantId = $this->getTenantId();
 
         $bom = ProductionBom::where('tenant_id', $tenantId)
-            ->with(['product.uom', 'baseUom', 'items.product'])
+            ->with(['product.uom', 'baseUom', 'routing', 'items.material.uom', 'items.product'])
             ->findOrFail($id);
 
         Gate::authorize('view', $bom);
@@ -110,7 +110,7 @@ class ProductionBomApiController extends ApiBaseController
             $bom = $this->bomService->create($dto, auth()->id() ?: 1);
 
             return $this->createdResponse(
-                new ProductionBomDetailResource($bom->load(['product', 'items.product'])),
+                new ProductionBomDetailResource($bom->load(['product', 'routing', 'items.material.uom', 'items.product'])),
                 'BOM created successfully in draft mode.'
             );
         } catch (\Throwable $e) {
