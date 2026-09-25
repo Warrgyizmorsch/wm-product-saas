@@ -35,6 +35,21 @@
         font-weight: 700;
         font-size: 12px;
     }
+    .broadcast-body-content {
+        line-height: 1.65;
+        color: #1e293b;
+        font-size: 13.5px;
+    }
+    .broadcast-body-content p {
+        margin-bottom: 0.65rem;
+    }
+    .broadcast-body-content p:last-child {
+        margin-bottom: 0;
+    }
+    .broadcast-body-content ul, .broadcast-body-content ol {
+        padding-left: 1.25rem;
+        margin-bottom: 0.65rem;
+    }
 </style>
 @endpush
 
@@ -42,26 +57,26 @@
 <div class="container-fluid p-0">
 
     @if(session('success'))
-        <x-ui.alert variant="success" dismissible class="mb-4">
+        <x-ui.alert variant="success" dismissible class="mb-3">
             <i class="feather-check-circle me-2"></i>{{ session('success') }}
         </x-ui.alert>
     @endif
 
     @if(session('error'))
-        <x-ui.alert variant="danger" dismissible class="mb-4">
+        <x-ui.alert variant="danger" dismissible class="mb-3">
             <i class="feather-alert-triangle me-2"></i>{{ session('error') }}
         </x-ui.alert>
     @endif
 
     <!-- ERP Single Panel Workspace -->
-    <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+    <div class="erp-single-panel bg-white p-3 p-md-4 shadow-sm rounded-3 border-0 text-dark">
 
         <!-- HEADER BANNER CARD -->
-        <div class="p-4 bg-light rounded border mb-4 position-relative">
+        <div class="p-3 p-md-3.5 bg-light rounded-3 border mb-3 position-relative">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
                 <div>
-                    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
-                        <span class="fw-bold text-primary fs-14">{{ $broadcast->broadcast_number }}</span>
+                    <div class="d-flex align-items-center gap-2 flex-wrap mb-1.5">
+                        <span class="fw-bold text-primary fs-13">{{ $broadcast->broadcast_number }}</span>
                         @php
                             $prioVariant = match($broadcast->priority) {
                                 'urgent' => 'danger',
@@ -69,18 +84,18 @@
                                 default => 'info'
                             };
                         @endphp
-                        <x-ui.badge soft variant="{{ $prioVariant }}" class="text-capitalize">
+                        <x-ui.badge soft variant="{{ $prioVariant }}" class="text-capitalize fs-11">
                             {{ $broadcast->priority }} Priority
                         </x-ui.badge>
-                        <x-ui.badge soft variant="secondary" class="text-capitalize">
+                        <x-ui.badge soft variant="secondary" class="text-capitalize fs-11">
                             <i class="feather-tag me-1"></i> {{ str_replace('_', ' ', $broadcast->category) }}
                         </x-ui.badge>
-                        <x-ui.badge soft variant="success" class="text-capitalize">
+                        <x-ui.badge soft variant="success" class="text-capitalize fs-11">
                             {{ $broadcast->status }}
                         </x-ui.badge>
                     </div>
-                    <h3 class="fw-bold text-dark mb-1">{{ $broadcast->title }}</h3>
-                    <div class="text-muted fs-12 mt-1">
+                    <h4 class="fw-bold text-dark mb-1 fs-18">{{ $broadcast->title }}</h4>
+                    <div class="text-muted fs-12 mt-0.5">
                         Published by <strong class="text-dark">{{ $broadcast->creator?->name ?? 'HR Department' }}</strong> &bull;
                         {{ $broadcast->published_at ? $broadcast->published_at->format('M d, Y h:i A') : 'N/A' }}
                     </div>
@@ -92,10 +107,10 @@
                         $userReceipt = $broadcast->receipts->where('employee_id', $employee->id)->first();
                         $isAck = $userReceipt && $userReceipt->acknowledged_at;
                     @endphp
-                    <div class="p-3 bg-white rounded border text-end">
-                        <span class="fs-11 text-muted fw-bold text-uppercase d-block mb-1">Compliance Acknowledgement</span>
+                    <div class="p-2.5 bg-white rounded border text-end">
+                        <span class="fs-10 text-muted fw-bold text-uppercase d-block mb-1">Compliance Acknowledgement</span>
                         @if($isAck)
-                            <x-ui.badge soft variant="success" class="fs-12 py-1.5 px-3">
+                            <x-ui.badge soft variant="success" class="fs-11 py-1.5 px-3">
                                 <i class="feather-check-circle me-1"></i> Acknowledged on {{ $userReceipt->acknowledged_at->format('M d, Y') }}
                             </x-ui.badge>
                         @else
@@ -112,22 +127,22 @@
         </div>
 
         <!-- BROADCAST ANNOUNCEMENT CONTENT -->
-        <div class="p-4 bg-white rounded border mb-4">
-            <h6 class="fw-bold text-dark mb-3 fs-14 border-bottom pb-2"><i class="feather-align-left me-1.5 text-primary"></i> Announcement Details</h6>
-            <div class="fs-13 text-secondary mb-3 leading-relaxed" style="white-space: pre-line;">
-                {{ $broadcast->content }}
+        <div class="p-3 p-md-3.5 bg-white rounded-3 border mb-3">
+            <h6 class="fw-bold text-dark mb-2.5 fs-13 border-bottom pb-2"><i class="feather-align-left me-1.5 text-primary"></i> Announcement Details</h6>
+            <div class="broadcast-body-content text-secondary mb-2">
+                {!! $broadcast->content !!}
             </div>
 
             @if($broadcast->attachment_path)
-                <div class="mt-4 pt-3 border-top d-flex align-items-center justify-content-between bg-light p-3 rounded">
+                <div class="mt-3 pt-2.5 border-top d-flex align-items-center justify-content-between bg-light p-2.5 rounded">
                     <div class="d-flex align-items-center gap-2">
-                        <i class="feather-paperclip fs-18 text-primary"></i>
+                        <i class="feather-paperclip fs-16 text-primary"></i>
                         <div>
-                            <div class="fw-semibold text-dark fs-13">Attached Document</div>
+                            <div class="fw-semibold text-dark fs-12">Attached Document</div>
                             <small class="text-muted fs-11">Download official document for review</small>
                         </div>
                     </div>
-                    <x-ui.button href="{{ asset('storage/' . $broadcast->attachment_path) }}" target="_blank" variant="outline-primary" icon="feather-download" size="sm" class="fw-bold">
+                    <x-ui.button href="{{ asset('storage/' . $broadcast->attachment_path) }}" target="_blank" variant="outline-primary" icon="feather-download" size="sm" class="fw-bold fs-11">
                         Download Attachment
                     </x-ui.button>
                 </div>
@@ -136,8 +151,8 @@
 
         @if($isHrAdmin)
         <!-- DELIVERY & ACKNOWLEDGEMENT ANALYTICS SUMMARY -->
-        <div class="p-3 bg-light rounded border mb-4">
-            <h6 class="fw-bold text-dark mb-3 fs-13"><i class="feather-pie-chart me-1.5 text-primary"></i> Read & Acknowledgement Delivery Metrics</h6>
+        <div class="p-3 bg-light rounded-3 border mb-3">
+            <h6 class="fw-bold text-dark mb-2.5 fs-13"><i class="feather-pie-chart me-1.5 text-primary"></i> Read & Acknowledgement Delivery Metrics</h6>
             <div class="row g-3">
                 <div class="col-md-3 col-6">
                     <div class="p-3 bg-white rounded border">
@@ -169,13 +184,13 @@
 
         <!-- COMMENTS & Q&A THREAD SECTION -->
         @if($broadcast->allow_comments)
-            <div class="p-4 bg-white rounded border mb-4">
-                <h6 class="fw-bold text-dark mb-3 fs-14 border-bottom pb-2">
+            <div class="p-3 p-md-3.5 bg-white rounded-3 border mb-3">
+                <h6 class="fw-bold text-dark mb-2.5 fs-13 border-bottom pb-2">
                     <i class="feather-message-square me-1.5 text-primary"></i> Comments & Clarifications ({{ $broadcast->comments->count() }})
                 </h6>
 
                 <!-- ADD COMMENT FORM -->
-                <form action="{{ route('hrms.broadcasts.comment.store', $broadcast->id) }}" method="POST" class="mb-4">
+                <form action="{{ route('hrms.broadcasts.comment.store', $broadcast->id) }}" method="POST" class="mb-3">
                     @csrf
                     <div class="d-flex gap-2">
                         <x-ui.odoo-form-ui type="textarea" name="comment_text" rows="2" placeholder="Write a comment or ask a question..." :required="true" class="flex-grow-1 mb-0" />
@@ -186,7 +201,7 @@
                 </form>
 
                 <!-- COMMENTS LIST -->
-                <div class="d-flex flex-column gap-3">
+                <div class="d-flex flex-column gap-2.5">
                     @forelse($broadcast->comments->where('parent_id', null) as $comm)
                         <div class="p-3 rounded border bg-light position-relative {{ $comm->is_pinned ? 'border-primary' : '' }}">
                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -222,7 +237,7 @@
 
                             <!-- REPLIES LIST -->
                             @if($comm->replies && $comm->replies->count() > 0)
-                                <div class="mt-3 pt-2 border-top ps-4 d-flex flex-column gap-2">
+                                <div class="mt-2.5 pt-2 border-top ps-4 d-flex flex-column gap-2">
                                     @foreach($comm->replies as $reply)
                                         <div class="p-2 rounded bg-white border">
                                             <div class="d-flex align-items-center gap-2 mb-1">
@@ -244,8 +259,8 @@
 
         @if($isHrAdmin)
         <!-- AUDIT TRAIL RECEIPT TABLE -->
-        <div class="p-3 bg-light rounded border">
-            <h6 class="fw-bold text-dark mb-3 fs-13"><i class="feather-shield me-1.5 text-primary"></i> Read & Acknowledgement Audit Trail Log</h6>
+        <div class="p-3 bg-light rounded-3 border">
+            <h6 class="fw-bold text-dark mb-2.5 fs-13"><i class="feather-shield me-1.5 text-primary"></i> Read & Acknowledgement Audit Trail Log</h6>
             <div class="table-responsive bg-white rounded border">
                 <table class="table table-hover align-middle mb-0 fs-12">
                     <thead class="bg-light">

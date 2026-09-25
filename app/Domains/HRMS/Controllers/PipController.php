@@ -36,10 +36,14 @@ class PipController extends Controller
         $departmentId = $request->input('department_id');
         $categoryId = $request->input('category_id');
 
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $user = auth()->user();
+
         // Query Plans
         $plansQuery = PerformanceImprovementPlan::query()
-            ->where('tenant_id', $tenantId)
-            ->with(['employee.department', 'employee.designation', 'manager', 'hrRepresentative', 'category', 'objectives', 'checkins']);
+            ->where('tenant_id', $tenantId);
+        $scopeService->applyRelatedScope($plansQuery, $user);
+        $plansQuery->with(['employee.department', 'employee.designation', 'manager', 'hrRepresentative', 'category', 'objectives', 'checkins']);
 
         if ($search) {
             $plansQuery->where(function ($q) use ($search) {
@@ -77,6 +81,7 @@ class PipController extends Controller
 
         // Stats Computation
         $baseStats = PerformanceImprovementPlan::where('tenant_id', $tenantId);
+        $scopeService->applyRelatedScope($baseStats, $user);
         $totalActive = (clone $baseStats)->whereIn('status', ['active', 'under_review', 'extended'])->count();
         $onTrackCount = (clone $baseStats)->where('status', 'active')->count();
         $atRiskCount = (clone $baseStats)->where('status', 'under_review')->count();

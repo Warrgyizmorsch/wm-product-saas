@@ -77,9 +77,6 @@ class AttendanceCorrectionController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $employee = Employee::where('user_id', $user?->id)->first();
-        $isAdmin = $user && (method_exists($user, 'hasAnyRole') ? $user->hasAnyRole(['admin', 'hr', 'super-admin']) : true);
-
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $query = AttendanceCorrection::where('tenant_id', $tenantId)
@@ -88,14 +85,10 @@ class AttendanceCorrectionController extends Controller
                 'attendance:id,check_in,check_out,status,total_work_hours',
             ]);
 
+        \App\Domains\HRMS\Services\HrmsScopeService::applyEmployeeScope($query, $user, 'employee_id');
+
         if ($request->filled('employee_id')) {
-            if ($isAdmin || ($employee && (int)$request->employee_id === (int)$employee->id)) {
-                $query->where('employee_id', $request->employee_id);
-            } else {
-                $query->where('employee_id', $employee?->id ?? 0);
-            }
-        } elseif (!$isAdmin && $employee) {
-            $query->where('employee_id', $employee->id);
+            $query->where('employee_id', $request->employee_id);
         }
 
         if ($request->filled('status')) {
@@ -143,30 +136,23 @@ class AttendanceCorrectionController extends Controller
     public function show(mixed $id)
     {
         $user = auth()->user();
-        $employee = Employee::where('user_id', $user?->id)->first();
-        $isAdmin = $user && (method_exists($user, 'hasAnyRole') ? $user->hasAnyRole(['admin', 'hr', 'super-admin']) : true);
-
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
-        $correction = AttendanceCorrection::where('tenant_id', $tenantId)
+        $query = AttendanceCorrection::where('tenant_id', $tenantId)
             ->with([
                 'employee:id,employee_id,full_name,office_email,personal_email,photo',
                 'attendance:id,date,check_in,check_out,status,total_work_hours,total_break_hours',
-            ])
-            ->find($id);
+            ]);
+
+        \App\Domains\HRMS\Services\HrmsScopeService::applyEmployeeScope($query, $user, 'employee_id');
+
+        $correction = $query->find($id);
 
         if (!$correction) {
             return response()->json([
                 'success' => false,
                 'message' => "Attendance correction request with ID '{$id}' not found."
             ], 404);
-        }
-
-        if (!$isAdmin && $employee && (int)$correction->employee_id !== (int)$employee->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized access to this attendance correction request.'
-            ], 403);
         }
 
         return response()->json([

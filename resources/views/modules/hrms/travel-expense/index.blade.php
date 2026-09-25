@@ -116,11 +116,18 @@
             border-color: #94a3b8 !important;
             color: #1e293b !important;
         }
-        .odoo-table-file-label i {
-            font-size: 13px !important;
-            color: #64748b !important;
+        /* Travel & Expense Tables: Prevent horizontal scrollbar & wrap long content to next line */
+        .travel-expense-table {
+            width: 100% !important;
+            table-layout: fixed !important;
         }
-
+        .travel-expense-table th,
+        .travel-expense-table td {
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            white-space: normal !important;
+        }
     </style>
 @endpush
 
@@ -214,22 +221,22 @@
                     </div>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                    <table class="table table-hover align-middle mb-0 travel-expense-table" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr>
-                                <th>Employee</th>
-                                <th>Purpose</th>
-                                <th>Destination</th>
-                                <th>Dates</th>
-                                <th>Budget</th>
-                                <th>Status</th>
-                                <th class="text-end">Actions</th>
+                                <th class="ps-3" style="width: 16%;">Employee</th>
+                                <th style="width: 18%;">Purpose</th>
+                                <th style="width: 13%;">Destination</th>
+                                <th style="width: 13%;">Dates</th>
+                                <th style="width: 12%;">Budget</th>
+                                <th class="text-center" style="width: 13%;">Status</th>
+                                <th class="text-end pe-3" style="width: 15%;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="travelTableBody">
                             @forelse($travelRequests as $req)
                                 <tr>
-                                    <td>
+                                    <td class="ps-3">
                                         <div class="fw-semibold text-dark">{{ $req->employee->full_name }}</div>
                                         <div class="text-muted fs-11">Emp ID: {{ $req->employee->employee_id }}</div>
                                     </td>
@@ -260,7 +267,7 @@
                                             </div>
                                         @endif
                                     </td>
-                                    <td>
+                                    <td class="text-center">
                                         @if($req->status === 'approved')
                                             <span class="badge bg-soft-success text-success px-2 py-1 fs-11 rounded-pill">Approved</span>
                                         @elseif($req->status === 'l1_approved')
@@ -275,7 +282,7 @@
                                             $linkedAdv = $req->cashAdvances->first();
                                         @endphp
                                         @if($linkedAdv)
-                                            <div class="mt-1">
+                                            <div class="mt-1 d-flex justify-content-center">
                                                 @if($linkedAdv->status === 'pending')
                                                     <span class="badge bg-soft-warning text-dark px-1.5 py-0.5 fs-10" title="Cash Advance Requested"><i class="feather-dollar-sign me-0.5"></i>Advance: {{ $currencySymbol }}{{ number_format($linkedAdv->amount, 2) }}</span>
                                                 @elseif($linkedAdv->status === 'l1_approved')
@@ -288,7 +295,7 @@
                                             </div>
                                         @endif
                                     </td>
-                                    <td class="text-end">
+                                    <td class="text-end pe-3">
                                         @if(in_array($req->status, ['pending', 'l1_approved']))
                                             @if($isAdmin)
                                                 <div class="d-flex justify-content-end gap-1">
@@ -482,20 +489,20 @@
                     </div>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                    <table class="table table-hover align-middle mb-0 travel-expense-table" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr>
-                                <th>Employee</th>
-                                <th>Amount</th>
-                                <th>Purpose / Trip</th>
-                                <th>Status</th>
-                                <th class="text-end">Actions</th>
+                                <th class="ps-3" style="width: 20%;">Employee</th>
+                                <th style="width: 15%;">Amount</th>
+                                <th style="width: 38%;">Purpose / Trip</th>
+                                <th class="text-center" style="width: 12%;">Status</th>
+                                <th class="text-end pe-3" style="width: 15%;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="advanceTableBody">
                             @forelse($cashAdvances as $adv)
                                 <tr>
-                                    <td>
+                                    <td class="ps-3">
                                         <div class="fw-semibold text-dark">{{ $adv->employee->full_name }}</div>
                                     </td>
                                     <td class="fw-bold text-dark">
@@ -516,7 +523,7 @@
                                             <div class="text-muted fs-11"><i class="feather-map me-1"></i>Trip to {{ $adv->travelRequest->destination }} ({{ $adv->travelRequest->purpose }})</div>
                                         @endif
                                     </td>
-                                    <td>
+                                    <td class="text-center">
                                         @if($adv->status === 'disbursed')
                                             <span class="badge bg-soft-info text-info px-2 py-1 fs-11 rounded-pill">Disbursed</span>
                                         @elseif($adv->status === 'l1_approved')
@@ -531,7 +538,7 @@
                                             <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill">{{ ($adv->approval_levels ?? 1) == 2 ? 'Pending L1' : 'Pending' }}</span>
                                         @endif
                                     </td>
-                                    <td class="text-end text-nowrap">
+                                    <td class="text-end pe-3">
                                         @if(in_array($adv->status, ['pending', 'l1_approved']))
                                             @if($isAdmin)
                                                 <div class="d-flex justify-content-end gap-1">
@@ -655,20 +662,20 @@
                     </div>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                    <table class="table table-hover align-middle mb-0 travel-expense-table" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr>
-                                <th>Employee / Title</th>
-                                <th>Claim Items</th>
-                                <th>Totals</th>
-                                <th>Status</th>
-                                <th class="text-end">Actions</th>
+                                <th class="ps-3" style="width: 22%;">Employee / Title</th>
+                                <th style="width: 28%;">Claim Items</th>
+                                <th style="width: 24%;">Totals</th>
+                                <th class="text-center" style="width: 12%;">Status</th>
+                                <th class="text-end pe-3" style="width: 14%;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="reportTableBody">
                             @forelse($expenseReports as $rep)
                                 <tr>
-                                    <td>
+                                    <td class="ps-3">
                                         <div class="fw-bold text-dark">{{ $rep->title }}</div>
                                         <div class="text-muted fs-11">Submitted by: {{ $rep->employee->full_name }}</div>
                                         @if($rep->travelRequest)
@@ -767,7 +774,7 @@
                                             <div class="badge bg-soft-warning text-warning mt-1.5 fs-10 px-2 py-1 rounded-pill d-inline-flex align-items-center"><i class="feather-alert-triangle me-1"></i>Refund due: {{ $currencySymbol }}{{ number_format($surplus, 2) }}</div>
                                         @endif
                                     </td>
-                                    <td>
+                                    <td class="text-center">
                                         @if($rep->status === 'draft')
                                             <span class="badge bg-secondary text-white px-2 py-1 fs-11 rounded-pill">Draft</span>
                                         @elseif($rep->status === 'submitted' || $rep->status === 'pending')
@@ -794,7 +801,7 @@
                                             </div>
                                         @endif
                                     </td>
-                                    <td class="text-end">
+                                    <td class="text-end pe-3">
                                         <div class="d-flex justify-content-end gap-1">
                                             <x-ui.icon-btn type="button" variant="soft-info" size="sm" class="btn-view-report"
                                                 icon="feather-eye"

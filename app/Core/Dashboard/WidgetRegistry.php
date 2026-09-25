@@ -51,7 +51,7 @@ class WidgetRegistry
 
             foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Dashboard/widgets.php'))) ?: [] as $file) {
                 foreach (require $file as $definition) {
-                    $this->widgets[$definition['key']] = $definition + ['w' => 3, 'h' => 2, 'icon' => 'feather-bar-chart-2', 'description' => '', 'settings' => [], 'dashboards' => ['common'], 'chrome' => true, 'cache' => true];
+                    $this->widgets[$definition['key']] = $definition + ['w' => 3, 'h' => 2, 'min_w' => $definition['min_w'] ?? 2, 'min_h' => $definition['min_h'] ?? 1, 'icon' => 'feather-bar-chart-2', 'description' => '', 'settings' => [], 'dashboards' => ['common'], 'chrome' => true, 'cache' => true];
                 }
             }
         }

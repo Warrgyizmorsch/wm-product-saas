@@ -8,10 +8,10 @@
 @endphp
 
 <div class="card border-0 mb-0 h-100 shadow-sm" style="border-radius: 16px; background: #ffffff;">
-    <div class="card-body p-4 d-flex flex-column">
+    <div class="card-body p-3.5 p-md-4 d-flex flex-column justify-content-between h-100">
         <div>
             <!-- Header: Assigned Leave Plan -->
-            <div class="d-flex align-items-center gap-2.5 mb-3" style="gap: 10px;">
+            <div class="d-flex align-items-center gap-2.5 mb-2.5" style="gap: 10px;">
                 <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px; background: #eef2ff; border-radius: 8px; color: #4f46e5;">
                     <i class="feather-calendar fs-14"></i>
                 </div>
@@ -19,31 +19,31 @@
             </div>
 
             <!-- Standard Leave Plan Banner -->
-            <div class="p-3 rounded-3 mb-3" style="background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 12px; padding: 14px 16px;">
+            <div class="p-2.5 p-md-3 rounded-3 mb-2.5" style="background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 12px;">
                 <div class="d-flex align-items-center justify-content-between mb-1">
-                    <span class="fw-bold text-dark" style="font-size: 15px; color: #1e293b !important; font-weight: 700;">{{ $myAssignedPlan->name ?? 'Standard Leave Plan' }}</span>
+                    <span class="fw-bold text-dark" style="font-size: 14.5px; color: #1e293b !important; font-weight: 700;">{{ $myAssignedPlan->name ?? 'Standard Leave Plan' }}</span>
                     <span class="badge px-2.5 py-1 fs-11 fw-bold rounded-2" style="background: #dcfce7; color: #15803d;">Active</span>
                 </div>
-                <span class="fs-12 text-muted d-block" style="color: #64748b !important; font-weight: 400; margin-top: 4px;">{{ $myAssignedPlan->description ?? 'Regular corporate leave plan' }}</span>
+                <span class="fs-12 text-muted d-block" style="color: #64748b !important; font-weight: 400;">{{ $myAssignedPlan->description ?? 'Regular corporate leave plan' }}</span>
             </div>
 
             <!-- Effective From Header -->
-            <div class="d-flex align-items-center justify-content-between fs-11 text-muted fw-bold mt-3.5 mb-3">
+            <div class="d-flex align-items-center justify-content-between fs-11 text-muted fw-bold mt-2.5 mb-2">
                 <span class="text-uppercase" style="letter-spacing: 0.05em; color: #64748b !important; font-weight: 700; font-size: 11px;">EFFECTIVE FROM</span>
-                <span class="text-dark fw-bold" style="color: #1e293b !important; font-weight: 700; font-size: 13px;">{{ date('d M, Y') }}</span>
+                <span class="text-dark fw-bold" style="color: #1e293b !important; font-weight: 700; font-size: 12.5px;">{{ date('d M, Y') }}</span>
             </div>
 
             <!-- Table Header & List -->
             <div class="mb-2">
                 <!-- Header row -->
-                <div class="d-flex align-items-center justify-content-between text-uppercase fs-11 text-muted fw-bold pb-2 mb-2 border-bottom" style="color: #64748b !important; font-weight: 700; letter-spacing: 0.05em; font-size: 11px; border-color: #f1f5f9 !important;">
+                <div class="d-flex align-items-center justify-content-between text-uppercase fs-11 text-muted fw-bold pb-1.5 mb-1.5 border-bottom" style="color: #64748b !important; font-weight: 700; letter-spacing: 0.05em; font-size: 11px; border-color: #f1f5f9 !important;">
                     <div style="flex: 2;">TYPE NAME</div>
                     <div class="text-center" style="flex: 1;">BALANCE</div>
                     <div class="text-end" style="width: 48px;">RULES</div>
                 </div>
 
                 <!-- Rows -->
-                <div class="d-flex flex-column gap-2 pt-1">
+                <div class="d-flex flex-column gap-1.5 pt-0.5">
                     @foreach($leaveTypes as $index => $lt)
                         @php
                             $ltName = is_array($lt) ? ($lt['name'] ?? 'Leave Type') : ($lt->name ?? 'Leave Type');
@@ -53,28 +53,28 @@
                             $ltColor = is_array($lt) ? ($lt['color'] ?? '#3b82f6') : ($lt->color ?? '#3b82f6');
                             $modalId = "leaveRulesModal_" . $index;
                         @endphp
-                        <div class="d-flex align-items-center justify-content-between py-1.5 border-bottom" style="border-color: #f8fafc;">
+                        <div class="d-flex align-items-center justify-content-between py-1 border-bottom" style="border-color: #f8fafc;">
                             <!-- Type Name & Code -->
                             <div class="d-flex align-items-center" style="flex: 2;">
                                 <span class="d-inline-block rounded-circle me-2 flex-shrink-0" style="width: 8px; height: 8px; background-color: {{ $ltColor }};"></span>
-                                <span class="fw-bold text-dark fs-14" style="color: #1e293b !important; font-weight: 700;">{{ $ltName }}</span>
+                                <span class="fw-bold text-dark fs-13" style="color: #1e293b !important; font-weight: 700;">{{ $ltName }}</span>
                                 <span class="fs-11 text-muted fw-normal ms-1" style="color: #94a3b8 !important; font-weight: 400;">{{ $ltCode }}</span>
                             </div>
 
                             <!-- Balance -->
-                            <div class="text-center fw-bold text-dark fs-14" style="flex: 1; color: #1e293b !important; font-weight: 700;">
+                            <div class="text-center fw-bold text-dark fs-13" style="flex: 1; color: #1e293b !important; font-weight: 700;">
                                 {{ $ltRem }} / {{ $ltAlloc }}
                             </div>
 
                             <!-- Rules Button -->
                             <div class="text-end" style="width: 48px;">
                                 <button type="button" class="btn border-0 p-0 d-inline-flex align-items-center justify-content-center shadow-2xs" 
-                                        style="width: 30px; height: 30px; background: #f1f5f9; color: #475569; border-radius: 8px;" 
+                                        style="width: 28px; height: 28px; background: #f1f5f9; color: #475569; border-radius: 8px;" 
                                         data-bs-toggle="modal" 
                                         data-bs-target="#{{ $modalId }}" 
                                         onclick="var m=document.getElementById('{{ $modalId }}'); if(m && m.parentElement!==document.body){document.body.appendChild(m);}"
                                         title="View {{ $ltName }} Rules">
-                                    <i class="feather-sliders fs-13"></i>
+                                    <i class="feather-sliders fs-12"></i>
                                 </button>
                             </div>
                         </div>
@@ -84,12 +84,12 @@
         </div>
 
         <!-- Action Buttons -->
-        <div class="d-flex mt-3 pt-2" style="gap: 16px !important;">
-            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leaves.index') ? route('hrms.leaves.index', ['action' => 'apply']) : url('/hrms/leaves?action=apply') }}" class="btn text-white fw-bold py-2.5 flex-fill text-uppercase fs-12 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: #4a3838 !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 12px !important; letter-spacing: 0.03em !important;">
-                <i class="feather-plus fs-13"></i> APPLY LEAVE
+        <div class="d-flex mt-auto pt-2" style="gap: 12px !important;">
+            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leaves.index') ? route('hrms.leaves.index', ['action' => 'apply']) : url('/hrms/leaves?action=apply') }}" class="btn text-white fw-bold py-2 flex-fill text-uppercase fs-11 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: #4a3838 !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 11px !important; letter-spacing: 0.03em !important;">
+                <i class="feather-plus fs-12"></i> APPLY LEAVE
             </a>
-            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leaves.index') ? route('hrms.leaves.index', ['tab' => 'encashments', 'action' => 'encash']) : url('/hrms/leaves?tab=encashments&action=encash') }}" class="btn text-white fw-bold py-2.5 flex-fill text-uppercase fs-12 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: #4a3838 !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 12px !important; letter-spacing: 0.03em !important;">
-                <span class="fw-bold fs-13 me-1">$</span> ENCASHMENT
+            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leaves.index') ? route('hrms.leaves.index', ['tab' => 'encashments', 'action' => 'encash']) : url('/hrms/leaves?tab=encashments&action=encash') }}" class="btn text-white fw-bold py-2 flex-fill text-uppercase fs-11 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: #4a3838 !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 11px !important; letter-spacing: 0.03em !important;">
+                <span class="fw-bold fs-12 me-1">$</span> ENCASHMENT
             </a>
         </div>
     </div>

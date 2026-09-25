@@ -342,12 +342,12 @@
                         <h6 class="modal-section-title mb-3"><i class="feather-eye text-primary me-1"></i> Employee Access Settings</h6>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="checkbox" label="Employee Can View" name="employee_can_view">
+                                <x-ui.odoo-form-ui type="checkbox" label="Employee Can View" name="employee_can_view" checked>
                                     Allow employees to view uploaded copy
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="checkbox" label="Employee Can Download" name="employee_can_download">
+                                <x-ui.odoo-form-ui type="checkbox" label="Employee Can Download" name="employee_can_download" checked>
                                     Allow employees to download document
                                 </x-ui.odoo-form-ui>
                             </div>

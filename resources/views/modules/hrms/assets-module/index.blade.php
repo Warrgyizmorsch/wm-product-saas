@@ -277,83 +277,101 @@
                                             </div>
                                         </td>
                                         <td class="text-end px-4">
-                                            <div class="d-flex justify-content-end align-items-center gap-2">
-                                                @php
-                                                    $allocatedUnitsData = [];
-                                                    if (in_array($req->status, ['allocated', 'partially_allocated'])) {
-                                                        $unitsList = $req->allocatedAssets;
-                                                        if (($unitsList->isEmpty() || !$req->relationLoaded('allocatedAssets')) && \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id')) {
-                                                            $unitsList = \App\Domains\HRMS\Models\Asset::where('asset_request_id', $req->id)->get();
-                                                        }
-                                                        if ($unitsList->isNotEmpty()) {
-                                                            foreach ($unitsList as $aUnit) {
-                                                                $allocatedUnitsData[] = [
-                                                                    'code' => $aUnit->asset_code,
-                                                                    'serial' => $aUnit->serial_number ?: 'N/A',
-                                                                    'name' => $aUnit->name ?: ($req->item->name ?? $req->category->name),
-                                                                    'date' => $aUnit->allocated_at ? $aUnit->allocated_at->format('d M, Y') : ($req->updated_at ? $req->updated_at->format('d M, Y') : '-')
-                                                                ];
-                                                            }
-                                                        } elseif ($req->allocatedAsset) {
+                                            @php
+                                                $allocatedUnitsData = [];
+                                                if (in_array($req->status, ['allocated', 'partially_allocated'])) {
+                                                    $unitsList = $req->allocatedAssets;
+                                                    if (($unitsList->isEmpty() || !$req->relationLoaded('allocatedAssets')) && \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id')) {
+                                                        $unitsList = \App\Domains\HRMS\Models\Asset::where('asset_request_id', $req->id)->get();
+                                                    }
+                                                    if ($unitsList->isNotEmpty()) {
+                                                        foreach ($unitsList as $aUnit) {
                                                             $allocatedUnitsData[] = [
-                                                                'code' => $req->allocatedAsset->asset_code,
-                                                                'serial' => $req->allocatedAsset->serial_number ?: 'N/A',
-                                                                'name' => $req->allocatedAsset->name ?: ($req->item->name ?? $req->category->name),
-                                                                'date' => $req->allocatedAsset->allocated_at ? $req->allocatedAsset->allocated_at->format('d M, Y') : ($req->updated_at ? $req->updated_at->format('d M, Y') : '-')
+                                                                'code' => $aUnit->asset_code,
+                                                                'serial' => $aUnit->serial_number ?: 'N/A',
+                                                                'name' => $aUnit->name ?: ($req->item->name ?? $req->category->name),
+                                                                'date' => $aUnit->allocated_at ? $aUnit->allocated_at->format('d M, Y') : ($req->updated_at ? $req->updated_at->format('d M, Y') : '-')
                                                             ];
                                                         }
+                                                    } elseif ($req->allocatedAsset) {
+                                                        $allocatedUnitsData[] = [
+                                                            'code' => $req->allocatedAsset->asset_code,
+                                                            'serial' => $req->allocatedAsset->serial_number ?: 'N/A',
+                                                            'name' => $req->allocatedAsset->name ?: ($req->item->name ?? $req->category->name),
+                                                            'date' => $req->allocatedAsset->allocated_at ? $req->allocatedAsset->allocated_at->format('d M, Y') : ($req->updated_at ? $req->updated_at->format('d M, Y') : '-')
+                                                        ];
                                                     }
-                                                @endphp
-                                                <button type="button" class="btn btn-sm btn-icon btn-light view-req-details-btn" 
-                                                    style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;"
-                                                    title="View Details"
-                                                    data-emp-name="{{ $req->employee->display_name }}"
-                                                    data-emp-id="{{ $req->employee->employee_id }}"
-                                                    data-company="{{ $req->company->company_name ?? '' }}"
-                                                    data-asset-name="{{ $req->item->name ?? $req->category->name }}"
-                                                    data-category="{{ $req->category->name }}"
-                                                    data-req-qty="{{ $req->quantity }}"
-                                                    data-alloc-qty="{{ $allocatedCount }}"
-                                                    data-rem-qty="{{ $remainingQty }}"
-                                                    data-status-raw="{{ $req->status }}"
-                                                    data-status="{{ ucfirst(str_replace('_', ' ', $req->status)) }}"
-                                                    data-date="{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}"
-                                                    data-action-date="{{ $req->updated_at ? $req->updated_at->format('d M, Y') : '-' }}"
-                                                    data-reason="{{ $req->reason ?: 'No reason provided.' }}"
-                                                    data-admin-notes="{{ $req->formatted_admin_notes ?: ($req->admin_notes ?: '') }}"
-                                                    data-allocated-units="{{ base64_encode(json_encode($allocatedUnitsData)) }}">
-                                                    <i class="feather-eye"></i>
-                                                </button>
-
-                                                @if(in_array($req->status, ['pending', 'partially_allocated']))
-                                                    <button type="button" class="btn btn-sm btn-primary fw-bold allocate-request-trigger-btn px-3" 
-                                                        style="font-size: 11px; height: 32px; letter-spacing: 0.5px; border-radius: 6px;"
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#allocateAssetModal"
-                                                        data-request-id="{{ $req->id }}"
-                                                        data-employee-id="{{ $req->employee_id }}"
-                                                        data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})"
-                                                        data-asset-item-id="{{ $req->asset_item_id }}"
-                                                        data-item-name="{{ $req->item->name ?? 'N/A' }}"
-                                                        data-quantity="{{ $req->quantity }}"
-                                                        data-allocated-count="{{ $allocatedCount }}"
-                                                        data-remaining-qty="{{ $remainingQty }}">
-                                                        Fulfill
+                                                }
+                                            @endphp
+                                            <x-ui.action-dropdown align="end">
+                                                <x-slot:extraActions>
+                                                    <button type="button" class="action-dropdown-btn view-req-details-btn" title="View Details"
+                                                        data-emp-name="{{ $req->employee->display_name }}"
+                                                        data-emp-id="{{ $req->employee->employee_id }}"
+                                                        data-company="{{ $req->company->company_name ?? '' }}"
+                                                        data-asset-name="{{ $req->item->name ?? $req->category->name }}"
+                                                        data-category="{{ $req->category->name }}"
+                                                        data-req-qty="{{ $req->quantity }}"
+                                                        data-alloc-qty="{{ $allocatedCount }}"
+                                                        data-rem-qty="{{ $remainingQty }}"
+                                                        data-status-raw="{{ $req->status }}"
+                                                        data-status="{{ ucfirst(str_replace('_', ' ', $req->status)) }}"
+                                                        data-date="{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}"
+                                                        data-action-date="{{ $req->updated_at ? $req->updated_at->format('d M, Y') : '-' }}"
+                                                        data-reason="{{ $req->reason ?: 'No reason provided.' }}"
+                                                        data-admin-notes="{{ $req->formatted_admin_notes ?: ($req->admin_notes ?: '') }}"
+                                                        data-allocated-units="{{ base64_encode(json_encode($allocatedUnitsData)) }}">
+                                                        <i class="feather feather-eye"></i>
                                                     </button>
+                                                </x-slot:extraActions>
 
-                                                    <button type="button" class="btn btn-sm btn-soft-danger fw-bold reject-request-btn px-3"
-                                                        style="font-size: 11px; height: 32px; letter-spacing: 0.5px;"
-                                                        data-request-id="{{ $req->id }}">
-                                                        Reject
-                                                    </button>
-                                                @elseif($req->status === 'allocated')
-                                                    <span class="text-success fs-12 fw-semibold ms-1"><i class="feather-check-circle me-1"></i>Allocated</span>
-                                                @elseif($req->status === 'rejected')
-                                                    <span class="text-danger fs-12 fw-semibold ms-1" title="{{ $req->admin_notes }}"><i class="feather-x-circle me-1"></i>Rejected</span>
-                                                @else
-                                                    <span class="text-muted fs-12 ms-1">-</span>
+                                                <li>
+                                                    <a class="dropdown-item view-req-details-btn d-flex align-items-center" href="javascript:void(0)"
+                                                        data-emp-name="{{ $req->employee->display_name }}"
+                                                        data-emp-id="{{ $req->employee->employee_id }}"
+                                                        data-company="{{ $req->company->company_name ?? '' }}"
+                                                        data-asset-name="{{ $req->item->name ?? $req->category->name }}"
+                                                        data-category="{{ $req->category->name }}"
+                                                        data-req-qty="{{ $req->quantity }}"
+                                                        data-alloc-qty="{{ $allocatedCount }}"
+                                                        data-rem-qty="{{ $remainingQty }}"
+                                                        data-status-raw="{{ $req->status }}"
+                                                        data-status="{{ ucfirst(str_replace('_', ' ', $req->status)) }}"
+                                                        data-date="{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}"
+                                                        data-action-date="{{ $req->updated_at ? $req->updated_at->format('d M, Y') : '-' }}"
+                                                        data-reason="{{ $req->reason ?: 'No reason provided.' }}"
+                                                        data-admin-notes="{{ $req->formatted_admin_notes ?: ($req->admin_notes ?: '') }}"
+                                                        data-allocated-units="{{ base64_encode(json_encode($allocatedUnitsData)) }}">
+                                                        <i class="feather feather-eye me-2 text-primary"></i>
+                                                        <span>View Details</span>
+                                                    </a>
+                                                </li>
+                                                @if(in_array($req->status, ['pending', 'approved', 'partially_allocated']))
+                                                    <li>
+                                                        <a class="dropdown-item allocate-request-trigger-btn d-flex align-items-center text-success" href="javascript:void(0)"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#allocateAssetModal"
+                                                            data-request-id="{{ $req->id }}"
+                                                            data-employee-id="{{ $req->employee_id }}"
+                                                            data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})"
+                                                            data-asset-item-id="{{ $req->asset_item_id }}"
+                                                            data-item-name="{{ $req->item->name ?? 'N/A' }}"
+                                                            data-quantity="{{ $req->quantity }}"
+                                                            data-allocated-count="{{ $allocatedCount }}"
+                                                            data-remaining-qty="{{ $remainingQty }}">
+                                                            <i class="feather feather-check-circle me-2 text-success"></i>
+                                                            <span>Fulfill / Allocate</span>
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item reject-request-btn d-flex align-items-center text-danger" href="javascript:void(0)"
+                                                            data-request-id="{{ $req->id }}">
+                                                            <i class="feather feather-x-circle me-2 text-danger"></i>
+                                                            <span>Reject Request</span>
+                                                        </a>
+                                                    </li>
                                                 @endif
-                                            </div>
+                                            </x-ui.action-dropdown>
                                         </td>
                                     </tr>
                                 @empty
@@ -513,13 +531,17 @@
                                             <span class="badge bg-soft-primary text-primary fw-bold fs-12 px-2.5 py-1">{{ $empAlloc->allocations->count() }}</span>
                                         </td>
                                         <td class="text-center">
-                                            <button type="button" class="btn btn-sm btn-soft-danger fw-bold return-direct-multi-trigger-btn px-3" 
-                                                style="font-size: 11px; height: 30px; border-radius: 6px;"
-                                                data-employee-id="{{ $empAlloc->id }}"
-                                                data-employee-name="{{ $empAlloc->display_name }} ({{ $empAlloc->employee_id }})"
-                                                data-allocated-assets="{{ $encodedUnits }}">
-                                                Return
-                                            </button>
+                                            <x-ui.action-dropdown align="center">
+                                                <li>
+                                                    <a class="dropdown-item return-direct-multi-trigger-btn d-flex align-items-center text-danger" href="javascript:void(0)"
+                                                        data-employee-id="{{ $empAlloc->id }}"
+                                                        data-employee-name="{{ $empAlloc->display_name }} ({{ $empAlloc->employee_id }})"
+                                                        data-allocated-assets="{{ $encodedUnits }}">
+                                                        <i class="feather-corner-up-left me-2 text-danger"></i>
+                                                        <span>Return Asset</span>
+                                                    </a>
+                                                </li>
+                                            </x-ui.action-dropdown>
                                         </td>
                                     </tr>
                                 @empty

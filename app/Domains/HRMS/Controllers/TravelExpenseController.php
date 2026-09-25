@@ -61,8 +61,7 @@ class TravelExpenseController extends Controller
         $travelQuery = TravelRequest::where('tenant_id', $tenantId)->with(['employee', 'expenseReports', 'cashAdvances']);
         // 🔒 Scoping for non-HR employees
         if (!$isHrAdmin) {
-            $empId = $employee ? $employee->id : 0;
-            $travelQuery->where('employee_id', $empId);
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyRelatedScope($travelQuery, $user);
         }
         if ($travelSearch) {
             $travelQuery->where(function($q) use ($travelSearch) {
@@ -86,8 +85,7 @@ class TravelExpenseController extends Controller
         $advanceQuery = CashAdvance::where('tenant_id', $tenantId)->with(['employee', 'travelRequest']);
         // 🔒 Scoping for non-HR employees
         if (!$isHrAdmin) {
-            $empId = $employee ? $employee->id : 0;
-            $advanceQuery->where('employee_id', $empId);
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyRelatedScope($advanceQuery, $user);
         }
         if ($advanceSearch) {
             $advanceQuery->where(function($q) use ($advanceSearch) {
@@ -110,8 +108,7 @@ class TravelExpenseController extends Controller
         $reportQuery = ExpenseReport::where('tenant_id', $tenantId)->with(['employee', 'claims.category', 'travelRequest.cashAdvances', 'travelRequest.expenseReports', 'cashAdvance']);
         // 🔒 Scoping for non-HR employees
         if (!$isHrAdmin) {
-            $empId = $employee ? $employee->id : 0;
-            $reportQuery->where('employee_id', $empId);
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyRelatedScope($reportQuery, $user);
         }
         if ($reportSearch) {
             $reportQuery->where(function($q) use ($reportSearch) {

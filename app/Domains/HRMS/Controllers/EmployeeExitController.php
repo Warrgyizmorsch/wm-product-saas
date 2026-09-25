@@ -39,7 +39,11 @@ class EmployeeExitController extends Controller
         $statusFilter = $request->input('status');
 
         // 1. Stats
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $user = auth()->user();
+
         $baseQuery = EmployeeExit::query()->where('tenant_id', $tenantId);
+        $scopeService->applyRelatedScope($baseQuery, $user);
 
         $activeExitsCount = (clone $baseQuery)->whereIn('status', ['pending_manager', 'pending_hr', 'approved', 'in_clearance'])->count();
         $inClearanceCount = (clone $baseQuery)->where('status', 'in_clearance')->count();
@@ -55,8 +59,9 @@ class EmployeeExitController extends Controller
 
         // 2. Query Exits
         $exitsQuery = EmployeeExit::query()
-            ->where('tenant_id', $tenantId)
-            ->with([
+            ->where('tenant_id', $tenantId);
+        $scopeService->applyRelatedScope($exitsQuery, $user);
+        $exitsQuery->with([
                 'employee.department',
                 'employee.designation',
                 'employee.company',

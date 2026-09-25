@@ -97,6 +97,7 @@ class RosterRepository implements RosterRepositoryInterface
         $endDate = $dates[6];
 
         $employeesQuery = Employee::with(['company', 'department', 'designation']);
+        app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($employeesQuery, auth()->user());
 
         if ($selectedCompanyId) {
             $employeesQuery->where('company_id', $selectedCompanyId);

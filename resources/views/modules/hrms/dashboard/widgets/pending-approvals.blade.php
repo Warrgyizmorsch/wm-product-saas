@@ -175,23 +175,14 @@
     }
 
     .pending-approvals-widget {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
+        border-radius: 16px;
+        background: #ffffff;
     }
     .pending-approvals-widget .card-body {
-        flex: 1;
-        min-height: 0;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-    }
-    .pending-approvals-widget .tab-content,
-    .pending-approvals-widget .tab-pane {
-        height: 100%;
+        min-height: 280px;
     }
     .pending-approvals-widget .table-responsive {
-        overflow-x: hidden !important;
-        overflow-y: visible !important;
+        overflow: visible !important;
     }
     .pending-approvals-widget .table tbody tr {
         transition: background-color 0.15s ease;
@@ -200,196 +191,71 @@
         background-color: #f8fafc !important;
     }
 
-    /* Common ERP Dropdown Menu */
-    .approval-dropdown-menu {
-        min-width: 190px !important;
-        border-radius: 10px !important;
-        border: 1px solid #e2e8f0 !important;
-        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.05) !important;
+    /* Action Status Dropdown Styling (matching Shift & Overtime and Leaves module) */
+    .btn-status-dropdown {
+        background-color: #7c6f6c !important;
+        color: #ffffff !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        height: 32px !important;
+        border-radius: 8px !important;
+        min-width: 105px !important;
+        border: none !important;
+        padding: 0 10px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+    }
+    .btn-status-dropdown:hover,
+    .btn-status-dropdown:focus,
+    .btn-status-dropdown:active {
+        background-color: #6a5e5a !important;
+        color: #ffffff !important;
+    }
+    .btn-status-dropdown::after {
+        display: inline-block;
+        margin-left: 6px;
+        vertical-align: 0.255em;
+        content: "";
+        border-top: 0.3em solid;
+        border-right: 0.3em solid transparent;
+        border-bottom: 0;
+        border-left: 0.3em solid transparent;
+        color: #ffffff !important;
+    }
+
+    .status-dropdown-menu {
+        min-width: 145px !important;
+        border-radius: 8px !important;
+        border: none !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.12) !important;
         padding: 6px !important;
         background: #ffffff !important;
-        z-index: 1060 !important;
     }
-    .approval-dropdown-menu li {
-        list-style: none;
-        margin-bottom: 2px;
-    }
-    .approval-dropdown-menu li:last-child {
-        margin-bottom: 0;
-    }
-    .approval-dropdown-item {
-        width: 100%;
-        border: none;
-        background: transparent;
+    .status-dropdown-menu .dropdown-item {
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        padding: 7px 10px !important;
+        border-radius: 6px !important;
+        color: #1e293b !important;
+        background: transparent !important;
+        transition: all 0.15s ease;
         display: flex;
         align-items: center;
-        gap: 9px;
-        padding: 6px 10px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 600;
-        text-align: left;
-        transition: all 0.15s ease-in-out;
-        color: #334155;
-        cursor: pointer;
+        gap: 6px;
     }
-    .approval-dropdown-item .item-icon {
-        width: 22px;
-        height: 22px;
-        border-radius: 5px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        font-size: 11px;
-        transition: all 0.15s ease-in-out;
+    .status-dropdown-menu .dropdown-item:hover {
+        background-color: #f8fafc !important;
+        color: #1e293b !important;
     }
-    .approval-dropdown-item .item-label {
-        flex: 1;
-        white-space: nowrap;
-    }
-
-    /* Approve */
-    .approval-dropdown-item.item-approve {
-        color: #15803d;
-    }
-    .approval-dropdown-item.item-approve .item-icon {
-        background: #dcfce7;
-        color: #16a34a;
-    }
-    .approval-dropdown-item.item-approve:hover {
-        background: #f0fdf4;
-        color: #166534;
-    }
-    .approval-dropdown-item.item-approve:hover .item-icon {
-        background: #16a34a;
-        color: #ffffff;
-    }
-
-    /* Reject */
-    .approval-dropdown-item.item-reject {
-        color: #b91c1c;
-    }
-    .approval-dropdown-item.item-reject .item-icon {
-        background: #fee2e2;
-        color: #dc2626;
-    }
-    .approval-dropdown-item.item-reject:hover {
-        background: #fef2f2;
-        color: #991b1b;
-    }
-    .approval-dropdown-item.item-reject:hover .item-icon {
-        background: #dc2626;
-        color: #ffffff;
-    }
-
-    /* Warning / Unauthorized */
-    .approval-dropdown-item.item-warning {
-        color: #c2410c;
-    }
-    .approval-dropdown-item.item-warning .item-icon {
-        background: #ffedd5;
-        color: #ea580c;
-    }
-    .approval-dropdown-item.item-warning:hover {
-        background: #fff7ed;
-        color: #9a3412;
-    }
-    .approval-dropdown-item.item-warning:hover .item-icon {
-        background: #ea580c;
-        color: #ffffff;
-    }
-
-    /* Purple / Unpaid */
-    .approval-dropdown-item.item-purple {
-        color: #7e22ce;
-    }
-    .approval-dropdown-item.item-purple .item-icon {
-        background: #f3e8ff;
-        color: #9333ea;
-    }
-    .approval-dropdown-item.item-purple:hover {
-        background: #faf5ff;
-        color: #6b21a8;
-    }
-    .approval-dropdown-item.item-purple:hover .item-icon {
-        background: #9333ea;
-        color: #ffffff;
-    }
-
-    /* Primary / Payout */
-    .approval-dropdown-item.item-primary {
-        color: #4338ca;
-    }
-    .approval-dropdown-item.item-primary .item-icon {
-        background: #e0e7ff;
-        color: #4f46e5;
-    }
-    .approval-dropdown-item.item-primary:hover {
-        background: #eef2ff;
-        color: #3730a3;
-    }
-    .approval-dropdown-item.item-primary:hover .item-icon {
-        background: #4f46e5;
-        color: #ffffff;
-    }
-
-    /* Pending / Neutral */
-    .approval-dropdown-item.item-pending {
-        color: #475569;
-    }
-    .approval-dropdown-item.item-pending .item-icon {
-        background: #f1f5f9;
-        color: #64748b;
-    }
-    .approval-dropdown-item.item-pending:hover {
-        background: #f8fafc;
-        color: #1e293b;
-    }
-    .approval-dropdown-item.item-pending:hover .item-icon {
-        background: #64748b;
-        color: #ffffff;
-    }
-
-    /* Common Status Badge & Action Controls */
-    .status-badge-btn {
-        font-size: 10.5px;
-        font-weight: 700;
-        letter-spacing: 0.02em;
-        text-transform: uppercase;
-        padding: 4.5px 9px;
-        border-radius: 6px;
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        border: 1px solid transparent;
-        transition: all 0.15s ease;
-        line-height: 1;
-    }
-    .status-badge-btn:hover {
-        filter: brightness(0.96);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-    .table-action-icon-btn {
-        width: 28px;
-        height: 28px;
-        border-radius: 6px;
-        background: #f1f5f9;
-        color: #64748b;
-        border: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.15s ease;
-        text-decoration: none;
-    }
-    .table-action-icon-btn:hover {
-        background: #e2e8f0;
-        color: #1e293b;
+    .status-dropdown-menu .dropdown-item.active-status {
+        background-color: #f1f5f9 !important;
+        color: #1e293b !important;
+        font-weight: 700 !important;
     }
 </style>
 
-<div class="card border-0 mb-0 h-100 shadow-sm pending-approvals-widget" style="border-radius: 16px; background: #ffffff; overflow: hidden;">
+<div class="card border-0 mb-0 shadow-sm pending-approvals-widget">
     <div class="card-header bg-white pt-3 pb-2 px-3 d-flex align-items-center justify-content-between border-bottom-0 flex-wrap gap-2">
         <!-- Title with Avatar Icon -->
         <div class="d-flex align-items-center gap-2" style="gap: 8px;">
@@ -424,21 +290,20 @@
         </ul>
     </div>
 
-    <!-- Table Container with Single Overflow -->
+    <!-- Table Container -->
     <div class="card-body p-0">
         <div class="tab-content" id="pills-approval-tabContent">
             <!-- 1. LEAVES TAB -->
             <div class="tab-pane fade show active" id="pills-leaves" role="tabpanel" aria-labelledby="pills-leaves-tab">
-                <div class="table-responsive">
+                <div class="table-responsive" style="overflow: visible;">
                     <table class="table table-hover align-middle mb-0 fs-12" style="table-layout: fixed; width: 100%;">
                         <thead>
                             <tr style="background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
-                                <th class="py-2.5 ps-3 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 18%;">EMPLOYEE</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 17%;">LEAVE TYPE</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 23%;">DURATION & TIMELINE</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-center text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 8%;">DAYS</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 15%;">REASON</th>
-                                <th class="py-2.5 pe-3 border-0 fs-11 text-uppercase fw-bold text-muted text-end text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 19%;">ACTION</th>
+                                <th class="py-2.5 ps-3 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 22%;">EMPLOYEE</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 18%;">LEAVE TYPE</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 22%;">TIMELINE & DAYS</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 14%;">STATUS</th>
+                                <th class="py-2.5 pe-3 border-0 fs-11 text-uppercase fw-bold text-muted text-end text-nowrap" style="letter-spacing: 0.04em; width: 24%;">ACTION</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -452,181 +317,163 @@
                                     $leaveTypeName = is_object($leave->leaveType) ? ($leave->leaveType->name ?? 'Casual Leave') : 'Casual Leave';
                                     $leaveId = is_object($leave) && isset($leave->id) ? $leave->id : null;
                                     $leaveStatus = strtolower(is_object($leave) && isset($leave->status) ? $leave->status : 'pending');
-
-                                    $badgeBg = match($leaveStatus) {
-                                        'approved' => '#dcfce7',
-                                        'rejected' => '#fee2e2',
-                                        'unauthorized' => '#ffedd5',
-                                        'unpaid' => '#f3e8ff',
-                                        default => '#fef3c7',
-                                    };
-                                    $badgeColor = match($leaveStatus) {
-                                        'approved' => '#15803d',
-                                        'rejected' => '#b91c1c',
-                                        'unauthorized' => '#c2410c',
-                                        'unpaid' => '#7e22ce',
-                                        default => '#d97706',
-                                    };
-                                    $badgeIcon = match($leaveStatus) {
-                                        'approved' => 'feather-check-circle',
-                                        'rejected' => 'feather-x-circle',
-                                        'unauthorized' => 'feather-alert-triangle',
-                                        'unpaid' => 'feather-dollar-sign',
-                                        default => 'feather-clock',
-                                    };
-                                    $isDropup = $loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1);
                                 @endphp
                                 <tr>
                                     <!-- EMPLOYEE -->
                                     <td class="py-2.5 ps-3 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <div class="fw-bold text-dark fs-13 text-truncate" style="color: #1e293b !important; font-weight: 700;">{{ $empName }}</div>
-                                        <div class="fs-11 text-muted text-truncate" style="color: #94a3b8 !important; margin-top: 1px;">{{ $empCode }}</div>
+                                        <div class="fw-bold text-dark fs-13 text-truncate">{{ $empName }}</div>
+                                        <div class="fs-11 text-muted text-truncate mt-0.5">{{ $empCode }}</div>
                                     </td>
 
                                     <!-- LEAVE TYPE -->
                                     <td class="py-2.5 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <div class="d-flex align-items-center text-truncate" style="gap: 5px;">
+                                        <div class="d-flex align-items-center text-truncate gap-1.5">
                                             <span class="d-inline-block rounded-circle me-1 flex-shrink-0" style="width: 6px; height: 6px; background-color: #3b82f6;"></span>
-                                            <span class="fw-bold text-dark fs-13 text-truncate" style="color: #1e293b !important; font-weight: 700;">{{ $leaveTypeName }}</span>
+                                            <span class="fw-bold text-dark fs-13 text-truncate">{{ $leaveTypeName }}</span>
                                         </div>
-                                        <div class="fs-11 text-muted text-truncate" style="color: #94a3b8 !important; margin-top: 1px; padding-left: 11px;">Rem: 12 / 12 Days</div>
+                                        <div class="fs-11 text-muted text-truncate mt-0.5 ps-2.5" title="{{ $leave->reason ?? '' }}">{{ $leave->reason ?? 'Personal reason' }}</div>
                                     </td>
 
-                                    <!-- DURATION & TIMELINE -->
+                                    <!-- TIMELINE & DAYS -->
                                     <td class="py-2.5 align-middle border-bottom text-nowrap" style="border-color: #f1f5f9;">
-                                        <span class="fw-bold text-dark fs-12 text-nowrap" style="color: #1e293b !important; font-weight: 700;">
+                                        <div class="fw-bold text-dark fs-12 text-nowrap">
                                             {{ $startDate->format('d M') }} &ndash; {{ $endDate->format('d M Y') }}
-                                        </span>
+                                        </div>
+                                        <div class="fs-11 text-muted mt-0.5">
+                                            <span class="badge px-1.5 py-0.5 fs-10 fw-bold rounded-2" style="background: #eff6ff; color: #3b82f6;">{{ $daysCount }} {{ Str::plural('Day', $daysCount) }}</span>
+                                        </div>
                                     </td>
 
-                                    <!-- DAYS -->
-                                    <td class="py-2.5 align-middle text-center border-bottom" style="border-color: #f1f5f9;">
-                                        <span class="badge px-1.5 py-0.5 fs-10 fw-bold rounded-2" style="background: #eff6ff; color: #3b82f6;">{{ $daysCount }}</span>
-                                    </td>
-
-                                    <!-- REASON -->
-                                    <td class="py-2.5 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <span class="fs-12 text-secondary d-block text-truncate" style="max-width: 100%; color: #64748b !important;" title="{{ $leave->reason ?? '' }}">
-                                            {{ $leave->reason ?? 'due to some work' }}
-                                        </span>
+                                    <!-- STATUS -->
+                                    <td class="py-2.5 align-middle border-bottom" style="border-color: #f1f5f9;">
+                                        @if($leaveStatus === 'approved')
+                                            <span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11 text-capitalize">Approved</span>
+                                        @elseif($leaveStatus === 'rejected')
+                                            <span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded-pill fs-11 text-capitalize">Rejected</span>
+                                        @elseif($leaveStatus === 'unauthorized')
+                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11 text-capitalize">Unauthorized</span>
+                                        @elseif($leaveStatus === 'unpaid')
+                                            <span class="badge bg-soft-info text-info px-2.5 py-1 rounded-pill fs-11 text-capitalize">Unpaid</span>
+                                        @else
+                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11 text-capitalize">Pending</span>
+                                        @endif
                                     </td>
 
                                     <!-- ACTION DROPDOWN -->
-                                    <td class="py-2.5 pe-3 align-middle text-end border-bottom" style="border-color: #f1f5f9;">
-                                        <div class="d-inline-flex align-items-center justify-content-end gap-1 flex-nowrap" style="max-width: 100%;">
-                                            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leaves.index') ? route('hrms.leaves.index') : '#' }}" class="table-action-icon-btn" title="View Details">
-                                                <i class="feather-eye fs-12"></i>
+                                    <td class="py-2.5 pe-3 align-middle text-end border-bottom" style="border-color: #f1f5f9; white-space: nowrap;">
+                                        <div class="d-flex align-items-center justify-content-end gap-2 flex-nowrap" style="gap: 8px;">
+                                            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leaves.index') ? route('hrms.leaves.index') : '#' }}"
+                                               class="btn btn-sm btn-soft-primary"
+                                               title="View Details"
+                                               style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                <i class="feather-eye fs-14"></i>
                                             </a>
 
-                                            <div class="dropdown {{ $isDropup ? 'dropup' : '' }} d-inline-block flex-shrink-0 position-relative">
-                                                <button class="status-badge-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background: {{ $badgeBg }}; color: {{ $badgeColor }};">
-                                                    <i class="{{ $badgeIcon }} fs-11"></i> {{ strtoupper($leaveStatus) }}
+                                            <div class="dropdown d-inline-block position-relative">
+                                                <button class="btn btn-sm dropdown-toggle py-1 px-2.5 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Change Status">
+                                                    <span>{{ ucfirst($leaveStatus) }}</span>
                                                 </button>
-                                                <ul class="dropdown-menu dropdown-menu-end approval-dropdown-menu shadow">
-                                                    <!-- 1. Approve Request -->
+                                                <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu shadow" style="z-index: 1060;">
                                                     <li>
                                                         @if($leaveId && \Illuminate\Support\Facades\Route::has('hrms.leaves.update-status'))
                                                             <form action="{{ route('hrms.leaves.update-status', $leaveId) }}" method="POST" class="m-0">
                                                                 @csrf
                                                                 <input type="hidden" name="action" value="approved">
-                                                                <button type="submit" class="approval-dropdown-item item-approve">
-                                                                    <span class="item-icon"><i class="feather-check-circle"></i></span>
-                                                                    <span class="item-label">Approve Request</span>
+                                                                <button type="submit" class="dropdown-item text-success {{ $leaveStatus === 'approved' ? 'active-status' : '' }}">
+                                                                    <i class="feather-check-circle fs-12 text-success"></i>
+                                                                    <span>Approve Request</span>
                                                                 </button>
                                                             </form>
                                                         @elseif($leaveId && \Illuminate\Support\Facades\Route::has('hrms.leaves.approve'))
                                                             <form action="{{ route('hrms.leaves.approve', $leaveId) }}" method="POST" class="m-0">
                                                                 @csrf
-                                                                <button type="submit" class="approval-dropdown-item item-approve">
-                                                                    <span class="item-icon"><i class="feather-check-circle"></i></span>
-                                                                    <span class="item-label">Approve Request</span>
+                                                                <button type="submit" class="dropdown-item text-success {{ $leaveStatus === 'approved' ? 'active-status' : '' }}">
+                                                                    <i class="feather-check-circle fs-12 text-success"></i>
+                                                                    <span>Approve Request</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-approve" onclick="alert('Leave request approved successfully!')">
-                                                                <span class="item-icon"><i class="feather-check-circle"></i></span>
-                                                                <span class="item-label">Approve Request</span>
-                                                            </button>
+                                                            <a class="dropdown-item text-success" href="javascript:void(0)" onclick="alert('Leave request approved!')">
+                                                                <i class="feather-check-circle fs-12 text-success"></i>
+                                                                <span>Approve Request</span>
+                                                            </a>
                                                         @endif
                                                     </li>
-                                                    <!-- 2. Reject Request -->
                                                     <li>
                                                         @if($leaveId && \Illuminate\Support\Facades\Route::has('hrms.leaves.update-status'))
                                                             <form action="{{ route('hrms.leaves.update-status', $leaveId) }}" method="POST" class="m-0">
                                                                 @csrf
                                                                 <input type="hidden" name="action" value="rejected">
-                                                                <button type="submit" class="approval-dropdown-item item-reject">
-                                                                    <span class="item-icon"><i class="feather-x-circle"></i></span>
-                                                                    <span class="item-label">Reject Request</span>
+                                                                <button type="submit" class="dropdown-item text-danger {{ $leaveStatus === 'rejected' ? 'active-status' : '' }}">
+                                                                    <i class="feather-x-circle fs-12 text-danger"></i>
+                                                                    <span>Reject Request</span>
                                                                 </button>
                                                             </form>
                                                         @elseif($leaveId && \Illuminate\Support\Facades\Route::has('hrms.leaves.reject'))
                                                             <form action="{{ route('hrms.leaves.reject', $leaveId) }}" method="POST" class="m-0">
                                                                 @csrf
-                                                                <button type="submit" class="approval-dropdown-item item-reject">
-                                                                    <span class="item-icon"><i class="feather-x-circle"></i></span>
-                                                                    <span class="item-label">Reject Request</span>
+                                                                <button type="submit" class="dropdown-item text-danger {{ $leaveStatus === 'rejected' ? 'active-status' : '' }}">
+                                                                    <i class="feather-x-circle fs-12 text-danger"></i>
+                                                                    <span>Reject Request</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-reject" onclick="alert('Leave request rejected!')">
-                                                                <span class="item-icon"><i class="feather-x-circle"></i></span>
-                                                                <span class="item-label">Reject Request</span>
-                                                            </button>
+                                                            <a class="dropdown-item text-danger" href="javascript:void(0)" onclick="alert('Leave request rejected!')">
+                                                                <i class="feather-x-circle fs-12 text-danger"></i>
+                                                                <span>Reject Request</span>
+                                                            </a>
                                                         @endif
                                                     </li>
-                                                    <!-- 3. Mark as Unauthorized -->
+                                                    <li><hr class="dropdown-divider my-1"></li>
                                                     <li>
                                                         @if($leaveId && \Illuminate\Support\Facades\Route::has('hrms.leaves.update-status'))
                                                             <form action="{{ route('hrms.leaves.update-status', $leaveId) }}" method="POST" class="m-0">
                                                                 @csrf
                                                                 <input type="hidden" name="action" value="unauthorized">
-                                                                <button type="submit" class="approval-dropdown-item item-warning">
-                                                                    <span class="item-icon"><i class="feather-alert-triangle"></i></span>
-                                                                    <span class="item-label">Mark Unauthorized</span>
+                                                                <button type="submit" class="dropdown-item {{ $leaveStatus === 'unauthorized' ? 'active-status' : '' }}">
+                                                                    <i class="feather-alert-triangle fs-12 text-warning"></i>
+                                                                    <span>Unauthorized</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-warning" onclick="alert('Marked as unauthorized!')">
-                                                                <span class="item-icon"><i class="feather-alert-triangle"></i></span>
-                                                                <span class="item-label">Mark Unauthorized</span>
-                                                            </button>
+                                                            <a class="dropdown-item" href="javascript:void(0)" onclick="alert('Marked as unauthorized!')">
+                                                                <i class="feather-alert-triangle fs-12 text-warning"></i>
+                                                                <span>Unauthorized</span>
+                                                            </a>
                                                         @endif
                                                     </li>
-                                                    <!-- 4. Mark as Unpaid -->
                                                     <li>
                                                         @if($leaveId && \Illuminate\Support\Facades\Route::has('hrms.leaves.update-status'))
                                                             <form action="{{ route('hrms.leaves.update-status', $leaveId) }}" method="POST" class="m-0">
                                                                 @csrf
                                                                 <input type="hidden" name="action" value="unpaid">
-                                                                <button type="submit" class="approval-dropdown-item item-purple">
-                                                                    <span class="item-icon"><i class="feather-dollar-sign"></i></span>
-                                                                    <span class="item-label">Mark as Unpaid</span>
+                                                                <button type="submit" class="dropdown-item {{ $leaveStatus === 'unpaid' ? 'active-status' : '' }}">
+                                                                    <i class="feather-dollar-sign fs-12 text-info"></i>
+                                                                    <span>Unpaid</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-purple" onclick="alert('Marked as unpaid!')">
-                                                                <span class="item-icon"><i class="feather-dollar-sign"></i></span>
-                                                                <span class="item-label">Mark as Unpaid</span>
-                                                            </button>
+                                                            <a class="dropdown-item" href="javascript:void(0)" onclick="alert('Marked as unpaid!')">
+                                                                <i class="feather-dollar-sign fs-12 text-info"></i>
+                                                                <span>Unpaid</span>
+                                                            </a>
                                                         @endif
                                                     </li>
-                                                    <!-- 5. Set to Pending -->
                                                     <li>
                                                         @if($leaveId && \Illuminate\Support\Facades\Route::has('hrms.leaves.update-status'))
                                                             <form action="{{ route('hrms.leaves.update-status', $leaveId) }}" method="POST" class="m-0">
                                                                 @csrf
                                                                 <input type="hidden" name="action" value="pending">
-                                                                <button type="submit" class="approval-dropdown-item item-pending">
-                                                                    <span class="item-icon"><i class="feather-clock"></i></span>
-                                                                    <span class="item-label">Set to Pending</span>
+                                                                <button type="submit" class="dropdown-item {{ $leaveStatus === 'pending' ? 'active-status' : '' }}">
+                                                                    <i class="feather-clock fs-12 text-muted"></i>
+                                                                    <span>Pending</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-pending" onclick="alert('Status reset to pending!')">
-                                                                <span class="item-icon"><i class="feather-clock"></i></span>
-                                                                <span class="item-label">Set to Pending</span>
-                                                            </button>
+                                                            <a class="dropdown-item" href="javascript:void(0)" onclick="alert('Reset to pending!')">
+                                                                <i class="feather-clock fs-12 text-muted"></i>
+                                                                <span>Pending</span>
+                                                            </a>
                                                         @endif
                                                     </li>
                                                 </ul>
@@ -642,16 +489,15 @@
 
             <!-- 2. WFH TAB -->
             <div class="tab-pane fade" id="pills-wfh" role="tabpanel" aria-labelledby="pills-wfh-tab">
-                <div class="table-responsive">
+                <div class="table-responsive" style="overflow: visible;">
                     <table class="table table-hover align-middle mb-0 fs-12" style="table-layout: fixed; width: 100%;">
                         <thead>
                             <tr style="background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
-                                <th class="py-2.5 ps-3 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 18%;">EMPLOYEE</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 17%;">REQUEST TYPE</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 23%;">DURATION & TIMELINE</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-center text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 8%;">DAYS</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 15%;">REASON</th>
-                                <th class="py-2.5 pe-3 border-0 fs-11 text-uppercase fw-bold text-muted text-end text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 19%;">ACTION</th>
+                                <th class="py-2.5 ps-3 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 22%;">EMPLOYEE</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 18%;">REQUEST TYPE</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 22%;">TIMELINE & DAYS</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 14%;">STATUS</th>
+                                <th class="py-2.5 pe-3 border-0 fs-11 text-uppercase fw-bold text-muted text-end text-nowrap" style="letter-spacing: 0.04em; width: 24%;">ACTION</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -665,139 +511,125 @@
                                     $wfhTypeName = $wfh->type ?? 'Work From Home';
                                     $wfhId = is_object($wfh) && isset($wfh->id) ? $wfh->id : null;
                                     $wfhStatus = strtolower(is_object($wfh) && isset($wfh->status) ? $wfh->status : 'pending');
-
-                                    $badgeBg = match($wfhStatus) {
-                                        'approved' => '#dcfce7',
-                                        'rejected' => '#fee2e2',
-                                        default => '#fef3c7',
-                                    };
-                                    $badgeColor = match($wfhStatus) {
-                                        'approved' => '#15803d',
-                                        'rejected' => '#b91c1c',
-                                        default => '#d97706',
-                                    };
-                                    $badgeIcon = match($wfhStatus) {
-                                        'approved' => 'feather-check-circle',
-                                        'rejected' => 'feather-x-circle',
-                                        default => 'feather-clock',
-                                    };
-                                    $isDropup = $loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1);
                                 @endphp
                                 <tr>
                                     <!-- EMPLOYEE -->
                                     <td class="py-2.5 ps-3 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <div class="fw-bold text-dark fs-13 text-truncate" style="color: #1e293b !important; font-weight: 700;">{{ $empName }}</div>
-                                        <div class="fs-11 text-muted text-truncate" style="color: #94a3b8 !important; margin-top: 1px;">{{ $empCode }}</div>
+                                        <div class="fw-bold text-dark fs-13 text-truncate">{{ $empName }}</div>
+                                        <div class="fs-11 text-muted text-truncate mt-0.5">{{ $empCode }}</div>
                                     </td>
 
                                     <!-- REQUEST TYPE -->
                                     <td class="py-2.5 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <div class="d-flex align-items-center text-truncate" style="gap: 5px;">
+                                        <div class="d-flex align-items-center text-truncate gap-1.5">
                                             <span class="d-inline-block rounded-circle me-1 flex-shrink-0" style="width: 6px; height: 6px; background-color: #0d9488;"></span>
-                                            <span class="fw-bold text-dark fs-13 text-truncate" style="color: #1e293b !important; font-weight: 700;">{{ $wfhTypeName }}</span>
+                                            <span class="fw-bold text-dark fs-13 text-truncate">{{ $wfhTypeName }}</span>
                                         </div>
-                                        <div class="fs-11 text-muted text-truncate" style="color: #94a3b8 !important; margin-top: 1px; padding-left: 11px;">Remote Office</div>
+                                        <div class="fs-11 text-muted text-truncate mt-0.5 ps-2.5" title="{{ $wfh->reason ?? '' }}">{{ $wfh->reason ?? 'Remote work' }}</div>
                                     </td>
 
-                                    <!-- DURATION & TIMELINE -->
+                                    <!-- TIMELINE & DAYS -->
                                     <td class="py-2.5 align-middle border-bottom text-nowrap" style="border-color: #f1f5f9;">
-                                        <span class="fw-bold text-dark fs-12 text-nowrap" style="color: #1e293b !important; font-weight: 700;">
+                                        <div class="fw-bold text-dark fs-12 text-nowrap">
                                             {{ $wfhStart->format('d M') }} &ndash; {{ $wfhEnd->format('d M Y') }}
-                                        </span>
+                                        </div>
+                                        <div class="fs-11 text-muted mt-0.5">
+                                            <span class="badge px-1.5 py-0.5 fs-10 fw-bold rounded-2" style="background: #ccfbf1; color: #0d9488;">{{ $wfhDays }} {{ Str::plural('Day', $wfhDays) }}</span>
+                                        </div>
                                     </td>
 
-                                    <!-- DAYS -->
-                                    <td class="py-2.5 align-middle text-center border-bottom" style="border-color: #f1f5f9;">
-                                        <span class="badge px-1.5 py-0.5 fs-10 fw-bold rounded-2" style="background: #ccfbf1; color: #0d9488;">{{ $wfhDays }}</span>
-                                    </td>
-
-                                    <!-- REASON -->
-                                    <td class="py-2.5 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <span class="fs-12 text-secondary d-block text-truncate" style="max-width: 100%; color: #64748b !important;" title="{{ $wfh->reason ?? '' }}">
-                                            {{ $wfh->reason ?? 'WFH required' }}
-                                        </span>
+                                    <!-- STATUS -->
+                                    <td class="py-2.5 align-middle border-bottom" style="border-color: #f1f5f9;">
+                                        @if($wfhStatus === 'approved')
+                                            <span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11 text-capitalize">Approved</span>
+                                        @elseif($wfhStatus === 'rejected')
+                                            <span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded-pill fs-11 text-capitalize">Rejected</span>
+                                        @else
+                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11 text-capitalize">Pending</span>
+                                        @endif
                                     </td>
 
                                     <!-- ACTION DROPDOWN -->
-                                    <td class="py-2.5 pe-3 align-middle text-end border-bottom" style="border-color: #f1f5f9;">
-                                        <div class="d-inline-flex align-items-center justify-content-end gap-1 flex-nowrap" style="max-width: 100%;">
-                                            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.wfh.index') ? route('hrms.wfh.index') : '#' }}" class="table-action-icon-btn" title="View WFH Applications">
-                                                <i class="feather-eye fs-12"></i>
+                                    <td class="py-2.5 pe-3 align-middle text-end border-bottom" style="border-color: #f1f5f9; white-space: nowrap;">
+                                        <div class="d-flex align-items-center justify-content-end gap-2 flex-nowrap" style="gap: 8px;">
+                                            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.wfh.index') ? route('hrms.wfh.index') : '#' }}"
+                                               class="btn btn-sm btn-soft-primary"
+                                               title="View Details"
+                                               style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                <i class="feather-eye fs-14"></i>
                                             </a>
 
-                                            <div class="dropdown {{ $isDropup ? 'dropup' : '' }} d-inline-block flex-shrink-0 position-relative">
-                                                <button class="status-badge-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background: {{ $badgeBg }}; color: {{ $badgeColor }};">
-                                                    <i class="{{ $badgeIcon }} fs-11"></i> {{ strtoupper($wfhStatus) }}
+                                            <div class="dropdown d-inline-block position-relative">
+                                                <button class="btn btn-sm dropdown-toggle py-1 px-2.5 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Change Status">
+                                                    <span>{{ ucfirst($wfhStatus) }}</span>
                                                 </button>
-                                                <ul class="dropdown-menu dropdown-menu-end approval-dropdown-menu shadow">
-                                                    <!-- Approve WFH -->
+                                                <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu shadow" style="z-index: 1060;">
                                                     <li>
                                                         @if($wfhId && \Illuminate\Support\Facades\Route::has('hrms.wfh.update-status'))
                                                             <form action="{{ route('hrms.wfh.update-status', $wfhId) }}" method="POST" class="m-0">
                                                                 @csrf
                                                                 <input type="hidden" name="action" value="approved">
-                                                                <button type="submit" class="approval-dropdown-item item-approve">
-                                                                    <span class="item-icon"><i class="feather-check-circle"></i></span>
-                                                                    <span class="item-label">Approve WFH</span>
+                                                                <button type="submit" class="dropdown-item text-success {{ $wfhStatus === 'approved' ? 'active-status' : '' }}">
+                                                                    <i class="feather-check-circle fs-12 text-success"></i>
+                                                                    <span>Approve WFH</span>
                                                                 </button>
                                                             </form>
                                                         @elseif($wfhId && \Illuminate\Support\Facades\Route::has('hrms.wfh.approve'))
                                                             <form action="{{ route('hrms.wfh.approve', $wfhId) }}" method="POST" class="m-0">
                                                                 @csrf
-                                                                <button type="submit" class="approval-dropdown-item item-approve">
-                                                                    <span class="item-icon"><i class="feather-check-circle"></i></span>
-                                                                    <span class="item-label">Approve WFH</span>
+                                                                <button type="submit" class="dropdown-item text-success {{ $wfhStatus === 'approved' ? 'active-status' : '' }}">
+                                                                    <i class="feather-check-circle fs-12 text-success"></i>
+                                                                    <span>Approve WFH</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-approve" onclick="alert('WFH request approved!')">
-                                                                <span class="item-icon"><i class="feather-check-circle"></i></span>
-                                                                <span class="item-label">Approve WFH</span>
-                                                            </button>
+                                                            <a class="dropdown-item text-success" href="javascript:void(0)" onclick="alert('WFH request approved!')">
+                                                                <i class="feather-check-circle fs-12 text-success"></i>
+                                                                <span>Approve WFH</span>
+                                                            </a>
                                                         @endif
                                                     </li>
-                                                    <!-- Reject WFH -->
                                                     <li>
                                                         @if($wfhId && \Illuminate\Support\Facades\Route::has('hrms.wfh.update-status'))
                                                             <form action="{{ route('hrms.wfh.update-status', $wfhId) }}" method="POST" class="m-0">
                                                                 @csrf
                                                                 <input type="hidden" name="action" value="rejected">
-                                                                <button type="submit" class="approval-dropdown-item item-reject">
-                                                                    <span class="item-icon"><i class="feather-x-circle"></i></span>
-                                                                    <span class="item-label">Reject WFH</span>
+                                                                <button type="submit" class="dropdown-item text-danger {{ $wfhStatus === 'rejected' ? 'active-status' : '' }}">
+                                                                    <i class="feather-x-circle fs-12 text-danger"></i>
+                                                                    <span>Reject WFH</span>
                                                                 </button>
                                                             </form>
                                                         @elseif($wfhId && \Illuminate\Support\Facades\Route::has('hrms.wfh.reject'))
                                                             <form action="{{ route('hrms.wfh.reject', $wfhId) }}" method="POST" class="m-0">
                                                                 @csrf
-                                                                <button type="submit" class="approval-dropdown-item item-reject">
-                                                                    <span class="item-icon"><i class="feather-x-circle"></i></span>
-                                                                    <span class="item-label">Reject WFH</span>
+                                                                <button type="submit" class="dropdown-item text-danger {{ $wfhStatus === 'rejected' ? 'active-status' : '' }}">
+                                                                    <i class="feather-x-circle fs-12 text-danger"></i>
+                                                                    <span>Reject WFH</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-reject" onclick="alert('WFH request rejected!')">
-                                                                <span class="item-icon"><i class="feather-x-circle"></i></span>
-                                                                <span class="item-label">Reject WFH</span>
-                                                            </button>
+                                                            <a class="dropdown-item text-danger" href="javascript:void(0)" onclick="alert('WFH request rejected!')">
+                                                                <i class="feather-x-circle fs-12 text-danger"></i>
+                                                                <span>Reject WFH</span>
+                                                            </a>
                                                         @endif
                                                     </li>
-                                                    <!-- Set to Pending -->
+                                                    <li><hr class="dropdown-divider my-1"></li>
                                                     <li>
                                                         @if($wfhId && \Illuminate\Support\Facades\Route::has('hrms.wfh.update-status'))
                                                             <form action="{{ route('hrms.wfh.update-status', $wfhId) }}" method="POST" class="m-0">
                                                                 @csrf
                                                                 <input type="hidden" name="action" value="pending">
-                                                                <button type="submit" class="approval-dropdown-item item-pending">
-                                                                    <span class="item-icon"><i class="feather-clock"></i></span>
-                                                                    <span class="item-label">Set to Pending</span>
+                                                                <button type="submit" class="dropdown-item {{ $wfhStatus === 'pending' ? 'active-status' : '' }}">
+                                                                    <i class="feather-clock fs-12 text-muted"></i>
+                                                                    <span>Pending</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-pending" onclick="alert('WFH set to pending!')">
-                                                                <span class="item-icon"><i class="feather-clock"></i></span>
-                                                                <span class="item-label">Set to Pending</span>
-                                                            </button>
+                                                            <a class="dropdown-item" href="javascript:void(0)" onclick="alert('WFH set to pending!')">
+                                                                <i class="feather-clock fs-12 text-muted"></i>
+                                                                <span>Pending</span>
+                                                            </a>
                                                         @endif
                                                     </li>
                                                 </ul>
@@ -813,15 +645,15 @@
 
             <!-- 3. PUNCHES TAB -->
             <div class="tab-pane fade" id="pills-punches" role="tabpanel" aria-labelledby="pills-punches-tab">
-                <div class="table-responsive">
+                <div class="table-responsive" style="overflow: visible;">
                     <table class="table table-hover align-middle mb-0 fs-12" style="table-layout: fixed; width: 100%;">
                         <thead>
                             <tr style="background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
-                                <th class="py-2.5 ps-3 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 20%;">EMPLOYEE</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 18%;">TYPE</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 22%;">PUNCH DATE & TIME</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 21%;">REASON / NOTE</th>
-                                <th class="py-2.5 pe-3 border-0 fs-11 text-uppercase fw-bold text-muted text-end text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 19%;">ACTION</th>
+                                <th class="py-2.5 ps-3 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 22%;">EMPLOYEE</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 18%;">TYPE</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 22%;">PUNCH DATE & TIME</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 14%;">STATUS</th>
+                                <th class="py-2.5 pe-3 border-0 fs-11 text-uppercase fw-bold text-muted text-end text-nowrap" style="letter-spacing: 0.04em; width: 24%;">ACTION</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -834,99 +666,87 @@
                                     $corrTime = $corr->time ?? '09:30 AM';
                                     $corrId = is_object($corr) && isset($corr->id) ? $corr->id : null;
                                     $corrStatus = strtolower(is_object($corr) && isset($corr->status) ? $corr->status : 'pending');
-
-                                    $badgeBg = match($corrStatus) {
-                                        'approved' => '#dcfce7',
-                                        'rejected' => '#fee2e2',
-                                        default => '#fef3c7',
-                                    };
-                                    $badgeColor = match($corrStatus) {
-                                        'approved' => '#15803d',
-                                        'rejected' => '#b91c1c',
-                                        default => '#d97706',
-                                    };
-                                    $badgeIcon = match($corrStatus) {
-                                        'approved' => 'feather-check-circle',
-                                        'rejected' => 'feather-x-circle',
-                                        default => 'feather-clock',
-                                    };
-                                    $isDropup = $loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1);
                                 @endphp
                                 <tr>
                                     <!-- EMPLOYEE -->
                                     <td class="py-2.5 ps-3 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <div class="fw-bold text-dark fs-13 text-truncate" style="color: #1e293b !important; font-weight: 700;">{{ $empName }}</div>
-                                        <div class="fs-11 text-muted text-truncate" style="color: #94a3b8 !important; margin-top: 1px;">{{ $empCode }}</div>
+                                        <div class="fw-bold text-dark fs-13 text-truncate">{{ $empName }}</div>
+                                        <div class="fs-11 text-muted text-truncate mt-0.5">{{ $empCode }}</div>
                                     </td>
 
                                     <!-- CORRECTION TYPE -->
                                     <td class="py-2.5 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <div class="d-flex align-items-center text-truncate" style="gap: 5px;">
+                                        <div class="d-flex align-items-center text-truncate gap-1.5">
                                             <span class="d-inline-block rounded-circle me-1 flex-shrink-0" style="width: 6px; height: 6px; background-color: #f59e0b;"></span>
-                                            <span class="fw-bold text-dark fs-13 text-truncate" style="color: #1e293b !important; font-weight: 700;">{{ $corrTypeName }}</span>
+                                            <span class="fw-bold text-dark fs-13 text-truncate">{{ $corrTypeName }}</span>
                                         </div>
-                                        <div class="fs-11 text-muted text-truncate" style="color: #94a3b8 !important; margin-top: 1px; padding-left: 11px;">Attendance Fix</div>
+                                        <div class="fs-11 text-muted text-truncate mt-0.5 ps-2.5" title="{{ $corr->reason ?? '' }}">{{ $corr->reason ?? 'Attendance regularize' }}</div>
                                     </td>
 
                                     <!-- DATE & TIME -->
                                     <td class="py-2.5 align-middle border-bottom text-nowrap" style="border-color: #f1f5f9;">
-                                        <span class="fw-bold text-dark fs-12 text-nowrap" style="color: #1e293b !important; font-weight: 700;">
+                                        <div class="fw-bold text-dark fs-12 text-nowrap">
                                             {{ $corrDate->format('d M Y') }}
-                                        </span>
-                                        <div class="fs-11 text-muted text-truncate" style="color: #94a3b8 !important; margin-top: 1px;">{{ $corrTime }}</div>
+                                        </div>
+                                        <div class="fs-11 text-muted mt-0.5">{{ $corrTime }}</div>
                                     </td>
 
-                                    <!-- REASON -->
-                                    <td class="py-2.5 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <span class="fs-12 text-secondary d-block text-truncate" style="max-width: 100%; color: #64748b !important;" title="{{ $corr->reason ?? '' }}">
-                                            {{ $corr->reason ?? 'Punch regularization requested' }}
-                                        </span>
+                                    <!-- STATUS -->
+                                    <td class="py-2.5 align-middle border-bottom" style="border-color: #f1f5f9;">
+                                        @if($corrStatus === 'approved')
+                                            <span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11 text-capitalize">Approved</span>
+                                        @elseif($corrStatus === 'rejected')
+                                            <span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded-pill fs-11 text-capitalize">Rejected</span>
+                                        @else
+                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11 text-capitalize">Pending</span>
+                                        @endif
                                     </td>
 
                                     <!-- ACTION DROPDOWN -->
-                                    <td class="py-2.5 pe-3 align-middle text-end border-bottom" style="border-color: #f1f5f9;">
-                                        <div class="d-inline-flex align-items-center justify-content-end gap-1 flex-nowrap" style="max-width: 100%;">
-                                            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.attendance.index') ? route('hrms.attendance.index') : '#' }}" class="table-action-icon-btn" title="View Attendance Logs">
-                                                <i class="feather-eye fs-12"></i>
+                                    <td class="py-2.5 pe-3 align-middle text-end border-bottom" style="border-color: #f1f5f9; white-space: nowrap;">
+                                        <div class="d-flex align-items-center justify-content-end gap-2 flex-nowrap" style="gap: 8px;">
+                                            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.attendance.index') ? route('hrms.attendance.index') : '#' }}"
+                                               class="btn btn-sm btn-soft-primary"
+                                               title="View Details"
+                                               style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                <i class="feather-eye fs-14"></i>
                                             </a>
 
-                                            <div class="dropdown {{ $isDropup ? 'dropup' : '' }} d-inline-block flex-shrink-0 position-relative">
-                                                <button class="status-badge-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background: {{ $badgeBg }}; color: {{ $badgeColor }};">
-                                                    <i class="{{ $badgeIcon }} fs-11"></i> {{ strtoupper($corrStatus) }}
+                                            <div class="dropdown d-inline-block position-relative">
+                                                <button class="btn btn-sm dropdown-toggle py-1 px-2.5 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Change Status">
+                                                    <span>{{ ucfirst($corrStatus) }}</span>
                                                 </button>
-                                                <ul class="dropdown-menu dropdown-menu-end approval-dropdown-menu shadow">
-                                                    <!-- Approve Punch -->
+                                                <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu shadow" style="z-index: 1060;">
                                                     <li>
                                                         @if($corrId && \Illuminate\Support\Facades\Route::has('hrms.attendance.corrections.approve'))
                                                             <form action="{{ route('hrms.attendance.corrections.approve', $corrId) }}" method="POST" class="m-0">
                                                                 @csrf
-                                                                <button type="submit" class="approval-dropdown-item item-approve">
-                                                                    <span class="item-icon"><i class="feather-check-circle"></i></span>
-                                                                    <span class="item-label">Approve Punch</span>
+                                                                <button type="submit" class="dropdown-item text-success {{ $corrStatus === 'approved' ? 'active-status' : '' }}">
+                                                                    <i class="feather-check-circle fs-12 text-success"></i>
+                                                                    <span>Approve Punch</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-approve" onclick="alert('Punch regularization approved!')">
-                                                                <span class="item-icon"><i class="feather-check-circle"></i></span>
-                                                                <span class="item-label">Approve Punch</span>
-                                                            </button>
+                                                            <a class="dropdown-item text-success" href="javascript:void(0)" onclick="alert('Punch regularization approved!')">
+                                                                <i class="feather-check-circle fs-12 text-success"></i>
+                                                                <span>Approve Punch</span>
+                                                            </a>
                                                         @endif
                                                     </li>
-                                                    <!-- Reject Punch -->
                                                     <li>
                                                         @if($corrId && \Illuminate\Support\Facades\Route::has('hrms.attendance.corrections.reject'))
                                                             <form action="{{ route('hrms.attendance.corrections.reject', $corrId) }}" method="POST" class="m-0">
                                                                 @csrf
-                                                                <button type="submit" class="approval-dropdown-item item-reject">
-                                                                    <span class="item-icon"><i class="feather-x-circle"></i></span>
-                                                                    <span class="item-label">Reject Punch</span>
+                                                                <button type="submit" class="dropdown-item text-danger {{ $corrStatus === 'rejected' ? 'active-status' : '' }}">
+                                                                    <i class="feather-x-circle fs-12 text-danger"></i>
+                                                                    <span>Reject Punch</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-reject" onclick="alert('Punch regularization rejected!')">
-                                                                <span class="item-icon"><i class="feather-x-circle"></i></span>
-                                                                <span class="item-label">Reject Punch</span>
-                                                            </button>
+                                                            <a class="dropdown-item text-danger" href="javascript:void(0)" onclick="alert('Punch regularization rejected!')">
+                                                                <i class="feather-x-circle fs-12 text-danger"></i>
+                                                                <span>Reject Punch</span>
+                                                            </a>
                                                         @endif
                                                     </li>
                                                 </ul>
@@ -942,15 +762,15 @@
 
             <!-- 4. EXPENSES TAB -->
             <div class="tab-pane fade" id="pills-expenses" role="tabpanel" aria-labelledby="pills-expenses-tab">
-                <div class="table-responsive">
+                <div class="table-responsive" style="overflow: visible;">
                     <table class="table table-hover align-middle mb-0 fs-12" style="table-layout: fixed; width: 100%;">
                         <thead>
                             <tr style="background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
-                                <th class="py-2.5 ps-3 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 20%;">EMPLOYEE</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 18%;">CATEGORY</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 18%;">CLAIM AMOUNT</th>
-                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 25%;">PURPOSE / REASON</th>
-                                <th class="py-2.5 pe-3 border-0 fs-11 text-uppercase fw-bold text-muted text-end text-nowrap" style="letter-spacing: 0.04em; color: #64748b !important; width: 19%;">ACTION</th>
+                                <th class="py-2.5 ps-3 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 22%;">EMPLOYEE</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 18%;">CATEGORY</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 22%;">CLAIM AMOUNT</th>
+                                <th class="py-2.5 border-0 fs-11 text-uppercase fw-bold text-muted text-nowrap" style="letter-spacing: 0.04em; width: 14%;">STATUS</th>
+                                <th class="py-2.5 pe-3 border-0 fs-11 text-uppercase fw-bold text-muted text-end text-nowrap" style="letter-spacing: 0.04em; width: 24%;">ACTION</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -962,118 +782,105 @@
                                     $expAmount = number_format($exp->total_amount ?? 0, 2);
                                     $expId = is_object($exp) && isset($exp->id) ? $exp->id : null;
                                     $expStatus = strtolower(is_object($exp) && isset($exp->status) ? $exp->status : 'pending');
-
-                                    $badgeBg = match($expStatus) {
-                                        'approved' => '#dcfce7',
-                                        'rejected' => '#fee2e2',
-                                        'paid' => '#e0e7ff',
-                                        default => '#fef3c7',
-                                    };
-                                    $badgeColor = match($expStatus) {
-                                        'approved' => '#15803d',
-                                        'rejected' => '#b91c1c',
-                                        'paid' => '#4338ca',
-                                        default => '#d97706',
-                                    };
-                                    $badgeIcon = match($expStatus) {
-                                        'approved' => 'feather-check-circle',
-                                        'rejected' => 'feather-x-circle',
-                                        'paid' => 'feather-dollar-sign',
-                                        default => 'feather-clock',
-                                    };
-                                    $isDropup = $loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1);
                                 @endphp
                                 <tr>
                                     <!-- EMPLOYEE -->
                                     <td class="py-2.5 ps-3 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <div class="fw-bold text-dark fs-13 text-truncate" style="color: #1e293b !important; font-weight: 700;">{{ $empName }}</div>
-                                        <div class="fs-11 text-muted text-truncate" style="color: #94a3b8 !important; margin-top: 1px;">{{ $empCode }}</div>
+                                        <div class="fw-bold text-dark fs-13 text-truncate">{{ $empName }}</div>
+                                        <div class="fs-11 text-muted text-truncate mt-0.5">{{ $empCode }}</div>
                                     </td>
 
                                     <!-- CATEGORY -->
                                     <td class="py-2.5 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <div class="d-flex align-items-center text-truncate" style="gap: 5px;">
+                                        <div class="d-flex align-items-center text-truncate gap-1.5">
                                             <span class="d-inline-block rounded-circle me-1 flex-shrink-0" style="width: 6px; height: 6px; background-color: #10b981;"></span>
-                                            <span class="fw-bold text-dark fs-13 text-truncate" style="color: #1e293b !important; font-weight: 700;">{{ $expCategory }}</span>
+                                            <span class="fw-bold text-dark fs-13 text-truncate">{{ $expCategory }}</span>
                                         </div>
-                                        <div class="fs-11 text-muted text-truncate" style="color: #94a3b8 !important; margin-top: 1px; padding-left: 11px;">Reimbursement</div>
+                                        <div class="fs-11 text-muted text-truncate mt-0.5 ps-2.5" title="{{ $exp->reason ?? '' }}">{{ $exp->reason ?? 'Claim request' }}</div>
                                     </td>
 
                                     <!-- CLAIM AMOUNT -->
                                     <td class="py-2.5 align-middle border-bottom text-nowrap" style="border-color: #f1f5f9;">
-                                        <span class="fw-bold text-dark fs-13 text-nowrap" style="color: #1e293b !important; font-weight: 700;">
+                                        <span class="fw-bold text-dark fs-13 text-nowrap">
                                             ₹{{ $expAmount }}
                                         </span>
                                     </td>
 
-                                    <!-- REASON -->
-                                    <td class="py-2.5 align-middle border-bottom text-truncate" style="border-color: #f1f5f9;">
-                                        <span class="fs-12 text-secondary d-block text-truncate" style="max-width: 100%; color: #64748b !important;" title="{{ $exp->reason ?? '' }}">
-                                            {{ $exp->reason ?? 'Official expense claim' }}
-                                        </span>
+                                    <!-- STATUS -->
+                                    <td class="py-2.5 align-middle border-bottom" style="border-color: #f1f5f9;">
+                                        @if($expStatus === 'approved')
+                                            <span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11 text-capitalize">Approved</span>
+                                        @elseif($expStatus === 'rejected')
+                                            <span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded-pill fs-11 text-capitalize">Rejected</span>
+                                        @elseif($expStatus === 'paid')
+                                            <span class="badge bg-soft-primary text-primary px-2.5 py-1 rounded-pill fs-11 text-capitalize">Paid</span>
+                                        @else
+                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11 text-capitalize">Pending</span>
+                                        @endif
                                     </td>
 
                                     <!-- ACTION DROPDOWN -->
-                                    <td class="py-2.5 pe-3 align-middle text-end border-bottom" style="border-color: #f1f5f9;">
-                                        <div class="d-inline-flex align-items-center justify-content-end gap-1 flex-nowrap" style="max-width: 100%;">
-                                            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.travel-expense.index') ? route('hrms.travel-expense.index', ['tab' => 'report']) : '#' }}" class="table-action-icon-btn" title="View Expense Reports">
-                                                <i class="feather-eye fs-12"></i>
+                                    <td class="py-2.5 pe-3 align-middle text-end border-bottom" style="border-color: #f1f5f9; white-space: nowrap;">
+                                        <div class="d-flex align-items-center justify-content-end gap-2 flex-nowrap" style="gap: 8px;">
+                                            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.travel-expense.index') ? route('hrms.travel-expense.index', ['tab' => 'report']) : '#' }}"
+                                               class="btn btn-sm btn-soft-primary"
+                                               title="View Details"
+                                               style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                <i class="feather-eye fs-14"></i>
                                             </a>
 
-                                            <div class="dropdown {{ $isDropup ? 'dropup' : '' }} d-inline-block flex-shrink-0 position-relative">
-                                                <button class="status-badge-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background: {{ $badgeBg }}; color: {{ $badgeColor }};">
-                                                    <i class="{{ $badgeIcon }} fs-11"></i> {{ strtoupper($expStatus) }}
+                                            <div class="dropdown d-inline-block position-relative">
+                                                <button class="btn btn-sm dropdown-toggle py-1 px-2.5 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Change Status">
+                                                    <span>{{ ucfirst($expStatus) }}</span>
                                                 </button>
-                                                <ul class="dropdown-menu dropdown-menu-end approval-dropdown-menu shadow">
-                                                    <!-- Approve Expense -->
+                                                <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu shadow" style="z-index: 1060;">
                                                     <li>
                                                         @if($expId && \Illuminate\Support\Facades\Route::has('hrms.travel-expense.report.approve'))
                                                             <form action="{{ route('hrms.travel-expense.report.approve', $expId) }}" method="POST" class="m-0">
                                                                 @csrf
-                                                                <button type="submit" class="approval-dropdown-item item-approve">
-                                                                    <span class="item-icon"><i class="feather-check-circle"></i></span>
-                                                                    <span class="item-label">Approve Expense</span>
+                                                                <button type="submit" class="dropdown-item text-success {{ $expStatus === 'approved' ? 'active-status' : '' }}">
+                                                                    <i class="feather-check-circle fs-12 text-success"></i>
+                                                                    <span>Approve Expense</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-approve" onclick="alert('Expense report approved!')">
-                                                                <span class="item-icon"><i class="feather-check-circle"></i></span>
-                                                                <span class="item-label">Approve Expense</span>
-                                                            </button>
+                                                            <a class="dropdown-item text-success" href="javascript:void(0)" onclick="alert('Expense report approved!')">
+                                                                <i class="feather-check-circle fs-12 text-success"></i>
+                                                                <span>Approve Expense</span>
+                                                            </a>
                                                         @endif
                                                     </li>
-                                                    <!-- Reject Expense -->
                                                     <li>
                                                         @if($expId && \Illuminate\Support\Facades\Route::has('hrms.travel-expense.report.reject'))
                                                             <form action="{{ route('hrms.travel-expense.report.reject', $expId) }}" method="POST" class="m-0">
                                                                 @csrf
-                                                                <button type="submit" class="approval-dropdown-item item-reject">
-                                                                    <span class="item-icon"><i class="feather-x-circle"></i></span>
-                                                                    <span class="item-label">Reject Expense</span>
+                                                                <button type="submit" class="dropdown-item text-danger {{ $expStatus === 'rejected' ? 'active-status' : '' }}">
+                                                                    <i class="feather-x-circle fs-12 text-danger"></i>
+                                                                    <span>Reject Expense</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-reject" onclick="alert('Expense report rejected!')">
-                                                                <span class="item-icon"><i class="feather-x-circle"></i></span>
-                                                                <span class="item-label">Reject Expense</span>
-                                                            </button>
+                                                            <a class="dropdown-item text-danger" href="javascript:void(0)" onclick="alert('Expense report rejected!')">
+                                                                <i class="feather-x-circle fs-12 text-danger"></i>
+                                                                <span>Reject Expense</span>
+                                                            </a>
                                                         @endif
                                                     </li>
-                                                    <!-- Process Payout -->
+                                                    <li><hr class="dropdown-divider my-1"></li>
                                                     <li>
                                                         @if($expId && \Illuminate\Support\Facades\Route::has('hrms.travel-expense.report.pay'))
                                                             <form action="{{ route('hrms.travel-expense.report.pay', $expId) }}" method="POST" class="m-0">
                                                                 @csrf
-                                                                <button type="submit" class="approval-dropdown-item item-primary">
-                                                                    <span class="item-icon"><i class="feather-dollar-sign"></i></span>
-                                                                    <span class="item-label">Process Payout</span>
+                                                                <button type="submit" class="dropdown-item text-primary {{ $expStatus === 'paid' ? 'active-status' : '' }}">
+                                                                    <i class="feather-dollar-sign fs-12 text-primary"></i>
+                                                                    <span>Process Payout</span>
                                                                 </button>
                                                             </form>
                                                         @else
-                                                            <button type="button" class="approval-dropdown-item item-primary" onclick="alert('Expense payout processed!')">
-                                                                <span class="item-icon"><i class="feather-dollar-sign"></i></span>
-                                                                <span class="item-label">Process Payout</span>
-                                                            </button>
+                                                            <a class="dropdown-item text-primary" href="javascript:void(0)" onclick="alert('Expense payout processed!')">
+                                                                <i class="feather-dollar-sign fs-12 text-primary"></i>
+                                                                <span>Process Payout</span>
+                                                            </a>
                                                         @endif
                                                     </li>
                                                 </ul>

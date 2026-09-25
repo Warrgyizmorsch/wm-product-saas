@@ -35,11 +35,10 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         $query = OvertimeRequest::query()->with(['employee', 'approvedByEmployee']);
         $summaryQuery = OvertimeRequest::query();
 
-        // 🔒 Restrict ordinary employees to their OWN records only
+        // 🔒 Apply Enterprise Scoping (Company Admin, Unit Head, Branch Manager, Dept Head, Reporting Manager, Employee)
         if (!$isHrAdmin) {
-            $empId = $employee ? $employee->id : 0;
-            $query->where('employee_id', $empId);
-            $summaryQuery->where('employee_id', $empId);
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyRelatedScope($query, $user);
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyRelatedScope($summaryQuery, $user);
         }
 
         $overtimeSearch = $inputs['overtime_search'] ?? $inputs['search'] ?? '';

@@ -185,6 +185,94 @@ class OvertimeRequestController extends Controller
         return redirect()->back()->with('success', __('hrms.overtime.policies_updated'));
     }
 
+    public function withdraw(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
+    {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $overtimeRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
+
+        if (!$overtimeRequest->canWithdraw()) {
+            return redirect()->back()->with('error', 'Only pending requests can be withdrawn.');
+        }
+
+        $overtimeRequest->delete();
+
+        return redirect()->back()->with('success', 'Overtime request withdrawn successfully.');
+    }
+
+    public function requestCancellation(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
+    {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $overtimeRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
+
+        if (!$overtimeRequest->canRequestCancellation()) {
+            return redirect()->back()->with('error', 'Only approved requests can have a cancellation requested.');
+        }
+
+        $validated = $request->validate([
+            'cancellation_reason' => 'required|string|max:1000',
+        ]);
+
+        $updateData = ['status' => 'cancellation_requested'];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('overtime_requests', 'cancellation_reason')) {
+            $updateData['cancellation_reason'] = $validated['cancellation_reason'];
+        } else {
+            $updateData['rejection_reason'] = $validated['cancellation_reason'];
+        }
+
+        $overtimeRequest->update($updateData);
+
+        return redirect()->back()->with('success', 'Cancellation request submitted. Awaiting admin approval.');
+    }
+
+    public function approveCancellation(OvertimeRequest $overtimeRequest): RedirectResponse
+    {
+        $user = auth()->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        abort_unless($isHrAdmin, 403);
+
+        if ($overtimeRequest->status !== 'cancellation_requested') {
+            return redirect()->back()->with('error', 'This request does not have a pending cancellation request.');
+        }
+
+        $this->revertCompOffIfApplicable($overtimeRequest);
+
+        $overtimeRequest->update(['status' => 'cancelled']);
+
+        return redirect()->back()->with('success', 'Overtime cancellation approved.');
+    }
+
+    public function denyCancellation(OvertimeRequest $overtimeRequest): RedirectResponse
+    {
+        $user = auth()->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        abort_unless($isHrAdmin, 403);
+
+        if ($overtimeRequest->status !== 'cancellation_requested') {
+            return redirect()->back()->with('error', 'This request does not have a pending cancellation request.');
+        }
+
+        $updateData = ['status' => 'approved'];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('overtime_requests', 'cancellation_reason')) {
+            $updateData['cancellation_reason'] = null;
+        }
+
+        $overtimeRequest->update($updateData);
+
+        return redirect()->back()->with('success', 'Cancellation request denied. Request remains approved.');
+    }
+
     public function destroy(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
     {
         $user = $request->user();
@@ -199,12 +287,33 @@ class OvertimeRequestController extends Controller
             }
         }
 
-        if ($overtimeRequest->status === 'approved') {
-            return redirect()->back()->with('error', __('hrms.overtime.approved_no_delete'));
+        // If approved and was comp_off, revert comp off credit
+        if (in_array($overtimeRequest->status, ['approved', 'cancellation_requested'])) {
+            $this->revertCompOffIfApplicable($overtimeRequest);
         }
 
         $overtimeRequest->delete();
 
         return redirect()->back()->with('success', __('hrms.overtime.deleted_successfully'));
+    }
+
+    private function revertCompOffIfApplicable(OvertimeRequest $overtimeRequest): void
+    {
+        if ($overtimeRequest->compensation_type === 'comp_off' && $overtimeRequest->employee) {
+            $approvedHours = (float) ($overtimeRequest->approved_duration_hours ?? $overtimeRequest->duration_hours);
+            $creditDays = round($approvedHours / 8, 1);
+            if ($creditDays > 0) {
+                $compOffType = \App\Domains\HRMS\Models\LeaveType::where('code', 'COMP_OFF')->first();
+                if ($compOffType) {
+                    $balance = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $overtimeRequest->employee_id)
+                        ->where('leave_type_id', $compOffType->id)
+                        ->first();
+                    if ($balance) {
+                        $newAllocated = max(0, floatval($balance->allocated) - $creditDays);
+                        $balance->update(['allocated' => $newAllocated]);
+                    }
+                }
+            }
+        }
     }
 }

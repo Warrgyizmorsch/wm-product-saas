@@ -124,6 +124,16 @@ class ApprovalWorkflowService
             return true;
         }
 
+        // Rule 7: Branch Manager
+        if ($actorEmployeeId && $requester->branch && (int) $actorEmployeeId === (int) $requester->branch->manager_employee_id) {
+            return true;
+        }
+
+        // Rule 8: Business Unit Head
+        if ($actorEmployeeId && $requester->businessUnit && (int) $actorEmployeeId === (int) $requester->businessUnit->head_employee_id) {
+            return true;
+        }
+
         return false;
     }
 

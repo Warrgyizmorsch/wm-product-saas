@@ -26,7 +26,11 @@ class ProbationController extends Controller
         $in15Days = Carbon::today()->addDays(15);
 
         // 1. Compute Stats
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $user = auth()->user();
+
         $baseQuery = Employee::query()->where('tenant_id', $tenantId);
+        $scopeService->applyEmployeeScope($baseQuery, $user);
 
         $totalInProbation = (clone $baseQuery)->where('employee_stage', 'Probation')->count();
         $dueSoonCount = (clone $baseQuery)->where('employee_stage', 'Probation')
@@ -46,8 +50,9 @@ class ProbationController extends Controller
         $departmentId = $request->input('department_id');
 
         $query = Employee::query()
-            ->where('tenant_id', $tenantId)
-            ->with(['department', 'designation', 'reportingManager', 'probationEvaluations.reviewer']);
+            ->where('tenant_id', $tenantId);
+        $scopeService->applyEmployeeScope($query, $user);
+        $query->with(['department', 'designation', 'reportingManager', 'probationEvaluations.reviewer']);
 
         if ($search) {
             $query->where(function ($q) use ($search) {

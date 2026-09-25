@@ -27,8 +27,11 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             'sort' => !empty($inputs['sort']) ? (string) $inputs['sort'] : 'name_asc',
         ];
 
-        $employees = Employee::query()
-            ->with(['company', 'businessUnit', 'branch', 'department', 'designation', 'payGroup', 'salaryStructure', 'leavePlan', 'attendancePenalty'])
+        $employeesQuery = Employee::query()
+            ->with(['company', 'businessUnit', 'branch', 'department', 'designation', 'payGroup', 'salaryStructure', 'leavePlan', 'attendancePenalty']);
+        app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($employeesQuery, auth()->user());
+
+        $employees = $employeesQuery
             ->when($filters['search'], function ($query, string $search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('full_name', 'like', "%{$search}%")
