@@ -336,8 +336,7 @@ class TableManufacturingProductionSeeder extends Seeder
     private function seedShifts(int $tenantId, array $workCenters): void
     {
         $companyId = Company::where('tenant_id', $tenantId)->value('id')
-            ?? Company::value('id')
-            ?? 1;
+            ?? Company::value('id');
 
         $shifts = [
             [
