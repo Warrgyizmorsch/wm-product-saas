@@ -87,26 +87,36 @@ class GoogleCalendarController extends Controller
         if (\Schema::hasColumn('lead_followups', 'crm_deal_id')) {
             $followup->crm_deal_id = $validated['deal_id'] ?? null;
         }
+        $isGoogleSuccess = !empty($result['success']);
+        $realMeetLink = $isGoogleSuccess ? ($result['meet_link'] ?? null) : null;
+
         $followup->followup_date = $startTime;
         $followup->type = $followupType;
         $followup->status = 'Pending';
-        $followup->notes = ($validated['description'] ?? '') . ($result['meet_link'] ? "\nGoogle Meet: " . $result['meet_link'] : '');
+        $followup->notes = ($validated['description'] ?? '') . ($realMeetLink ? "\nGoogle Meet: " . $realMeetLink : '');
         if (\Schema::hasColumn('lead_followups', 'google_event_id')) {
-            $followup->google_event_id = $result['google_event_id'] ?? null;
+            $followup->google_event_id = $isGoogleSuccess ? ($result['google_event_id'] ?? null) : null;
         }
         if (\Schema::hasColumn('lead_followups', 'google_meet_link')) {
-            $followup->google_meet_link = $result['meet_link'] ?? null;
+            $followup->google_meet_link = $realMeetLink;
         }
         if (\Schema::hasColumn('lead_followups', 'is_google_meet')) {
-            $followup->is_google_meet = $createMeetLink;
+            $followup->is_google_meet = $createMeetLink && !empty($realMeetLink);
         }
         $followup->save();
 
+        if (!$isGoogleSuccess) {
+            session()->flash('google_sync_warning', $result['message'] ?? 'Google Calendar & Meet could not be synced.');
+            if (!empty($result['auth_url'])) {
+                session()->flash('google_auth_url', $result['auth_url']);
+            }
+        }
+
         // Log History Event if linked to Lead
         if (!empty($validated['lead_id']) && ($lead = Lead::find($validated['lead_id']))) {
-            $eventDesc = $createMeetLink 
-                ? "Scheduled Google Meet Video Call on " . $startTime->format('d/m/Y h:i A') . " (Link: {$result['meet_link']})"
-                : "Scheduled Call Reminder on " . $startTime->format('d/m/Y h:i A') . " (Google Calendar Event Synced)";
+            $eventDesc = ($createMeetLink && $realMeetLink)
+                ? "Scheduled Google Meet Video Call on " . $startTime->format('d/m/Y h:i A') . " (Link: {$realMeetLink})"
+                : "Scheduled {$followupType} on " . $startTime->format('d/m/Y h:i A');
 
             LeadHistory::logEvent(
                 $lead,
@@ -120,8 +130,12 @@ class GoogleCalendarController extends Controller
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => $createMeetLink ? 'Google Meet Video Call scheduled & link generated!' : 'Google Calendar Call Reminder scheduled successfully!',
-                'meet_link' => $result['meet_link'] ?? null,
+                'google_synced' => $isGoogleSuccess,
+                'message' => $isGoogleSuccess 
+                    ? ($createMeetLink ? 'Google Meet Video Call scheduled & link generated!' : 'Google Calendar Call Reminder scheduled successfully!')
+                    : 'Activity scheduled in CRM. Note: Google Calendar sync failed.',
+                'warning' => !$isGoogleSuccess ? ($result['message'] ?? 'Google Account not connected') : null,
+                'meet_link' => $realMeetLink,
                 'followup' => $followup
             ]);
         }
