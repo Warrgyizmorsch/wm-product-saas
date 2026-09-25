@@ -77,21 +77,7 @@ class ProductionExecutionService
             }
 
             // Prevent logging total processed quantity beyond available input WIP
-            $isFirstOp = !ProductionOrderOperation::where('tenant_id', $op->tenant_id)
-                ->where('production_order_id', $op->production_order_id)
-                ->where(function ($q) use ($op) {
-                    if ($op->previous_operation_id) {
-                        $q->where('id', $op->previous_operation_id);
-                    } else {
-                        $q->where('sequence', '<', $op->sequence)
-                          ->where(function ($w) use ($op) {
-                              if ($op->source_product_id && (int) $op->source_product_id !== (int) ($op->order?->product_id ?? 0)) {
-                                  $w->where('source_product_id', $op->source_product_id);
-                              }
-                          });
-                    }
-                })
-                ->exists();
+            $isFirstOp = $op->isEntryOperation();
 
             $isFinalOp = !ProductionOrderOperation::where('tenant_id', $op->tenant_id)
                 ->where('production_order_id', $op->production_order_id)

@@ -1521,13 +1521,19 @@ class SchedulingService
             }
         }
 
-        $successors = collect($scheduledData)->filter(function ($succ) use ($opSequence, $parallelGroup, $isParallel, $successorOpIds) {
+        $successors = collect($scheduledData)->filter(function ($succ) use ($opSequence, $parallelGroup, $isParallel, $successorOpIds, $currentOp) {
             if (!empty($successorOpIds)) {
                 $succOpId = $succ['order_op']?->id ?? $succ['production_order_operation_id'] ?? null;
                 if (!$succOpId || !in_array($succOpId, $successorOpIds)) {
                     return false;
                 }
             } else {
+                if ($currentOp && $currentOp->source_product_id) {
+                    $succProduct = $succ['order_op']?->source_product_id ?? null;
+                    if ($succProduct !== $currentOp->source_product_id) {
+                        return false;
+                    }
+                }
                 if ($succ['sequence'] <= $opSequence) {
                     return false;
                 }
@@ -1621,13 +1627,19 @@ class SchedulingService
         }
         $predecessorOpIds = array_values(array_unique(array_filter($predecessorOpIds)));
 
-        $predecessors = collect($scheduledData)->filter(function ($prev) use ($opSequence, $parallelGroup, $isParallel, $predecessorOpIds) {
+        $predecessors = collect($scheduledData)->filter(function ($prev) use ($opSequence, $parallelGroup, $isParallel, $predecessorOpIds, $currentOp) {
             if (!empty($predecessorOpIds)) {
                 $prevOpId = $prev['order_op']?->id ?? $prev['production_order_operation_id'] ?? null;
                 if (!$prevOpId || !in_array($prevOpId, $predecessorOpIds)) {
                     return false;
                 }
             } else {
+                if ($currentOp && $currentOp->source_product_id) {
+                    $prevProduct = $prev['order_op']?->source_product_id ?? null;
+                    if ($prevProduct !== $currentOp->source_product_id) {
+                        return false;
+                    }
+                }
                 if ($prev['sequence'] >= $opSequence) {
                     return false;
                 }
@@ -2264,12 +2276,13 @@ class SchedulingService
 
                 if ($isFrozen) {
                     $frozenOpIds[] = $op->id;
-                    $scheduledData[$op->sequence] = [
+                    $scheduledData[$op->id] = [
                         'sequence' => $op->sequence,
                         'parallel_group' => $op->orderOperation?->parallel_group,
                         'is_parallel' => $op->orderOperation?->is_parallel,
                         'planned_start' => $op->planned_start,
                         'planned_finish' => $op->planned_finish,
+                        'order_op' => $op->orderOperation,
                     ];
                 }
             }
@@ -2289,7 +2302,8 @@ class SchedulingService
                         $op->orderOperation?->parallel_group,
                         (bool) $op->orderOperation?->is_parallel,
                         $startDate,
-                        (float) ($order->quantity_ordered ?? 1)
+                        (float) ($order->quantity_ordered ?? 1),
+                        $op->orderOperation
                     );
 
                     $opTarget = (float) ($op->orderOperation?->target_produced_qty > 0 ? $op->orderOperation->target_produced_qty : ($order->quantity_ordered ?? 1.0));
@@ -2335,7 +2349,7 @@ class SchedulingService
 
                     $isFirstPending = false;
 
-                    $scheduledData[$op->sequence] = [
+                    $scheduledData[$op->id] = [
                         'sequence' => $op->sequence,
                         'parallel_group' => $op->orderOperation?->parallel_group,
                         'is_parallel' => $op->orderOperation?->is_parallel,
@@ -2421,12 +2435,15 @@ class SchedulingService
                         'status' => ProductionScheduleOperation::STATUS_WAITING,
                     ]);
 
-                    $scheduledData[$op->sequence] = [
+                    $scheduledData[$op->id] = [
                         'sequence' => $op->sequence,
                         'parallel_group' => $op->orderOperation?->parallel_group,
                         'is_parallel' => $op->orderOperation?->is_parallel,
                         'planned_start' => $plannedStart,
                         'planned_finish' => $plannedFinish,
+                        'work_center_id' => $op->work_center_id,
+                        'machine_id' => $machineId,
+                        'order_op' => $op->orderOperation,
                     ];
 
                     app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($tenantId, [

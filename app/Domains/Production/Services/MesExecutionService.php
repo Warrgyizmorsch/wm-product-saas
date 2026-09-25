@@ -101,13 +101,23 @@ class MesExecutionService
                 || ($orderOp->relationLoaded('routingOperation') && $orderOp->routingOperation?->previous_operation_id === null)
             );
 
-            if (empty($predOrderOpIds) && !$isExplicitlyIndependentOrParallel && $orderOp && $schedOp->sequence > 10) {
-                $prevSched = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
-                    ->where('sequence', '<', $schedOp->sequence)
+            if (empty($predOrderOpIds) && !$isExplicitlyIndependentOrParallel && $orderOp && !$orderOp->isEntryOperation()) {
+                // Scope fallback to preceding operation within the same product/routing chain
+                $prevOrderOp = ProductionOrderOperation::where('tenant_id', $orderOp->tenant_id)
+                    ->where('production_order_id', $orderOp->production_order_id)
+                    ->where(function ($q) use ($orderOp) {
+                        if ($orderOp->source_product_id) {
+                            $q->where('source_product_id', $orderOp->source_product_id);
+                        } else {
+                            $q->whereNull('source_product_id');
+                        }
+                    })
+                    ->where('sequence', '<', $orderOp->sequence)
                     ->orderBy('sequence', 'desc')
                     ->first();
-                if ($prevSched && $prevSched->production_order_operation_id) {
-                    $predOrderOpIds[] = (int) $prevSched->production_order_operation_id;
+
+                if ($prevOrderOp) {
+                    $predOrderOpIds[] = (int) $prevOrderOp->id;
                 }
             }
 
@@ -153,16 +163,19 @@ class MesExecutionService
                 }
             }
 
-            $blockedByQuality = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
-                ->where('sequence', '<', $schedOp->sequence)
-                ->where('status', ProductionScheduleOperation::STATUS_COMPLETED)
-                ->get()
-                ->contains(function (ProductionScheduleOperation $predecessor): bool {
-                    $orderOp = $predecessor->orderOperation;
+            $blockedByQuality = false;
+            if (!empty($predOrderOpIds)) {
+                $blockedByQuality = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                    ->whereIn('production_order_operation_id', $predOrderOpIds)
+                    ->where('status', ProductionScheduleOperation::STATUS_COMPLETED)
+                    ->get()
+                    ->contains(function (ProductionScheduleOperation $predecessor): bool {
+                        $orderOp = $predecessor->orderOperation;
 
-                    return $orderOp instanceof ProductionOrderOperation
-                        && $this->qualityGateIsPendingOrFailed($orderOp);
-                });
+                        return $orderOp instanceof ProductionOrderOperation
+                            && $this->qualityGateIsPendingOrFailed($orderOp);
+                    });
+            }
 
             if ($blockedByQuality) {
                 throw new InvalidArgumentException('Cannot start next operation until predecessor quality gates have passed.');
@@ -513,17 +526,14 @@ class MesExecutionService
                 }
 
                 // Prevent processing beyond available transferred input WIP
-                $isFirstOp = !ProductionOrderOperation::where('tenant_id', $orderOp->tenant_id)
-                    ->where('production_order_id', $orderOp->production_order_id)
-                    ->where('sequence', '<', $orderOp->sequence)
-                    ->exists();
+                $isFirstOp = $orderOp->isEntryOperation();
 
                 $batchId = !empty($data['production_batch_id']) ? (int) $data['production_batch_id'] : (!empty($data['batch_id']) ? (int) $data['batch_id'] : null);
 
                 $availableWip = app(ProductionWipService::class)->getAvailableInputWip($orderOp, $batchId);
                 $newConsumed = $isFirstOp ? (float) ($produced + $rejected) : (float) ($produced + $rejected + $scrapped);
 
-                if ($newConsumed > $availableWip) {
+                if ($newConsumed > ($availableWip + 0.0001)) {
                     throw new InvalidArgumentException("Cannot process {$newConsumed} units: Exceeds available transferred input WIP of {$availableWip} units.");
                 }
 
@@ -584,10 +594,16 @@ class MesExecutionService
 
                 $order = $schedOp->order ?? $schedOp->schedule->order ?? null;
                 if ($order) {
-                    $isFinalFgOp = !ProductionOrderOperation::where('tenant_id', $orderOp->tenant_id)
-                        ->where('production_order_id', $orderOp->production_order_id)
-                        ->where('sequence', '>', $orderOp->sequence)
-                        ->exists() && (!$orderOp->is_intermediate && ($orderOp->source_product_id === null || (int) $orderOp->source_product_id === (int) $order->product_id));
+                    $isFinalFgOp = (!$orderOp->is_intermediate && ($orderOp->source_product_id === null || (int) $orderOp->source_product_id === (int) $order->product_id))
+                        && !ProductionOrderOperation::where('tenant_id', $orderOp->tenant_id)
+                            ->where('production_order_id', $orderOp->production_order_id)
+                            ->where(function ($q) use ($order) {
+                                $q->whereNull('source_product_id')
+                                  ->orWhere('source_product_id', $order->product_id);
+                            })
+                            ->where('is_intermediate', false)
+                            ->where('sequence', '>', $orderOp->sequence)
+                            ->exists();
 
                     if ($isFinalFgOp) {
                         $order->quantity_produced += $produced;
@@ -1052,7 +1068,7 @@ class MesExecutionService
                     ->orWhereNull('production_order_operation_id');
             })
             ->where('status', 'approved')
-            ->where('result', 'passed')
+            ->whereIn('result', ['passed', 'partially_passed'])
             ->exists();
     }
 

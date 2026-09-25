@@ -266,8 +266,11 @@
                         <tbody>
                             @forelse($schedule->operations->sortBy('planned_start') as $op)
                                 <tr class="{{ $op->locked ? 'bg-light' : '' }}">
-                                    <td class="fw-bold text-center align-middle">{{ $op->sequence }}</td>
+                                    <td class="fw-bold text-center align-middle text-muted">{{ $loop->iteration }}</td>
                                     <td class="align-middle">
+                                        @if($op->orderOperation?->sourceProduct && $op->orderOperation->source_product_id !== $schedule->order?->product_id)
+                                            <span class="badge bg-soft-secondary text-dark border font-monospace mb-1" style="font-size: 10px;">{{ $op->orderOperation->sourceProduct->name }}</span><br>
+                                        @endif
                                         <span class="fw-semibold text-dark">{{ $op->orderOperation->name ?? '—' }}</span>
                                         <br><small class="text-muted font-monospace">{{ $op->orderOperation->operation_number ?? '' }}</small>
                                         @php

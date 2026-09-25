@@ -154,19 +154,22 @@ class SchedulePreReleaseValidationService
                     $predOrderOp = $predSchedOp->orderOperation;
 
                     $earliestNextStart = $predSchedOp->planned_finish;
-                    if ($predOrderOp) {
+                    if ($predOrderOp && (bool) $predOrderOp->overlap_enabled) {
+                        $predQty = (float) ($predOrderOp->target_produced_qty > 0 ? $predOrderOp->target_produced_qty : $orderQty);
                         $earliestNextStart = $this->schedulingService->calculateTransferReadyAt(
                             $predOrderOp,
                             $predSchedOp->planned_start,
-                            $orderQty
+                            $predQty
                         );
                     }
 
-                    if ($op->planned_start && $op->planned_start->lt($earliestNextStart)) {
+                    if ($op->planned_start && $op->planned_start->lt($earliestNextStart->copy()->subSeconds(10))) {
+                        $opName = $op->operation_name ?? $orderOp->name ?? "Sequence {$op->sequence}";
+                        $predName = $predSchedOp->operation_name ?? $predOrderOp?->name ?? "Sequence {$predSchedOp->sequence}";
                         $errors[] = [
                             'code'         => 'DEPENDENCY_VIOLATION',
                             'severity'     => 'error',
-                            'message'      => "Sequence {$op->sequence} starts at {$op->planned_start->toDateTimeString()}, before predecessor transfer-ready time {$earliestNextStart->toDateTimeString()}.",
+                            'message'      => "Operation '{$opName}' (Seq {$op->sequence}) starts at {$op->planned_start->toDateTimeString()}, before predecessor '{$predName}' (Seq {$predSchedOp->sequence}) transfer-ready time {$earliestNextStart->toDateTimeString()}.",
                             'operation_id' => $op->id,
                         ];
                     }
