@@ -73,6 +73,7 @@ class ReportsController extends Controller
             'material-consumption' => 'Material Consumption & Variance Report',
             'cost-variance'        => 'Production Cost & Variance Report',
             'order-detail'         => 'Production Order Detail Report',
+            'daily-production'     => 'Daily Production Report',
             'sales-order-tracking' => 'Sales Order Tracking Report (Order-to-Delivery Pipeline)',
         ];
         $displayTitle = $reportTitles[$type] ?? ucwords(str_replace('-', ' ', $type)) . ' Report';
@@ -263,6 +264,38 @@ class ReportsController extends Controller
                         $row['pending_qty'],
                     ]);
                 }
+            } elseif ($type === 'daily-production') {
+                fputcsv($file, [
+                    'Date', 'Time', 'Order Number', 'Output Type', 'Stage Role', 'Product SKU', 'Product Name', 'UOM',
+                    'Operation Stage', 'Work Center', 'Machine', 'Batch',
+                    'Processed Qty', 'Rejected Qty', 'Scrapped Qty', 'Stage Yield (%)',
+                    'Run Time (min)', 'Run Time (hrs)', 'Setup Time (min)', 'Operator', 'Remarks'
+                ]);
+                foreach ($reportData['detailed_logs'] as $row) {
+                    fputcsv($file, [
+                        $row['date'],
+                        $row['time'],
+                        $row['order_number'],
+                        $row['output_type_label'] ?? strtoupper($row['output_type'] ?? 'FG'),
+                        $row['stage_role'] ?? 'Process Stage',
+                        $row['product_sku'],
+                        $row['product_name'],
+                        $row['uom'],
+                        $row['operation_name'],
+                        $row['work_center'],
+                        $row['machine'],
+                        $row['batch_number'],
+                        $row['good_qty'],
+                        $row['rejected_qty'],
+                        $row['scrapped_qty'],
+                        $row['yield_pct'] . '%',
+                        $row['run_minutes'],
+                        $row['run_hours'],
+                        $row['setup_minutes'],
+                        $row['operator'],
+                        $row['remarks'],
+                    ]);
+                }
             }
             fclose($file);
         };
@@ -403,6 +436,7 @@ class ReportsController extends Controller
             'material-consumption'=> 'Material Consumption & Variance Report',
             'cost-variance'       => 'Production Cost & Variance Report',
             'order-detail'        => 'Production Order Detail Report',
+            'daily-production'    => 'Daily Production Report',
             'sales-order-tracking'=> 'Sales Order Tracking Report (Order-to-Delivery Pipeline)',
         ];
         $displayTitle = $reportTitles[$type] ?? ucwords(str_replace('-', ' ', $type)) . ' Report';
@@ -433,6 +467,7 @@ class ReportsController extends Controller
             'production-orders'    => $this->reportService->generateProductionOrderReport($tenantId, $filters),
             'material-consumption' => $this->reportService->generateMaterialConsumptionReport($tenantId, $filters),
             'cost-variance'        => $this->reportService->generateCostVarianceReport($tenantId, $filters),
+            'daily-production'     => $this->reportService->generateDailyProductionReport($tenantId, $filters),
             'sales-order-tracking' => $this->reportService->generateSalesOrderTrackingReport($tenantId, $filters),
             default                => abort(404),
         };

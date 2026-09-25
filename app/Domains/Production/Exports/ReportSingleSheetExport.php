@@ -78,6 +78,38 @@ class ReportSingleSheetExport extends ReportSheetExport
                 ])->toArray(),
                 'Sales Order Tracking',
             ],
+            'daily-production' => [
+                [
+                    'Date', 'Time', 'Order Number', 'Output Type', 'Stage Role', 'Product SKU', 'Product Name', 'UOM',
+                    'Operation Stage', 'Work Center', 'Machine', 'Batch',
+                    'Processed Qty', 'Rejected Qty', 'Scrapped Qty', 'Yield (%)',
+                    'Run Time (min)', 'Run Time (hrs)', 'Setup Time (min)', 'Operator', 'Remarks'
+                ],
+                collect($reportData['detailed_logs'] ?? $reportData['data'] ?? [])->map(fn($r) => [
+                    $r['date'],
+                    $r['time'],
+                    $r['order_number'],
+                    $r['output_type_label'] ?? strtoupper($r['output_type'] ?? 'FG'),
+                    $r['stage_role'] ?? 'Process Stage',
+                    $r['product_sku'],
+                    $r['product_name'],
+                    $r['uom'],
+                    $r['operation_name'],
+                    $r['work_center'],
+                    $r['machine'],
+                    $r['batch_number'],
+                    $r['good_qty'],
+                    $r['rejected_qty'],
+                    $r['scrapped_qty'],
+                    $r['yield_pct'] . '%',
+                    $r['run_minutes'],
+                    $r['run_hours'],
+                    $r['setup_minutes'],
+                    $r['operator'],
+                    $r['remarks'],
+                ])->toArray(),
+                'Daily Production Report',
+            ],
             default => [['Type', 'Value'], [], 'Report'],
         };
 

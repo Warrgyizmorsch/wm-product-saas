@@ -7,6 +7,7 @@
         'material-consumption' => 'Material Consumption & Variance Report',
         'cost-variance'        => 'Production Cost & Variance Report',
         'order-detail'         => 'Production Order Detail Report',
+        'daily-production'     => __('production.daily_production_report') ?? 'Daily Production Report',
         'sales-order-tracking' => 'Sales Order Tracking Report (Order-to-Delivery Pipeline)',
     ];
     $displayTitle = $reportTitles[$type] ?? ($displayTitle ?? (ucwords(str_replace('-', ' ', $type)) . ' Report'));
@@ -227,27 +228,57 @@
                                 <x-ui.odoo-form-ui type="input" inputType="date" name="date_end" :value="request('date_end', $reportData['period_end'])" />
                             </div>
 
-                            {{-- Preserve existing active filters --}}
-                            @if(request('order_id'))
-                                <input type="hidden" name="order_id" value="{{ request('order_id') }}">
-                            @endif
-                            @if(request('product_id'))
-                                <input type="hidden" name="product_id" value="{{ request('product_id') }}">
-                            @endif
-                            @if(request('material_id'))
-                                <input type="hidden" name="material_id" value="{{ request('material_id') }}">
-                            @endif
-                            @if(request('machine_id'))
-                                <input type="hidden" name="machine_id" value="{{ request('machine_id') }}">
-                            @endif
-                            @if(request('work_center_id'))
-                                <input type="hidden" name="work_center_id" value="{{ request('work_center_id') }}">
-                            @endif
-                            @if(request('status'))
-                                <input type="hidden" name="status" value="{{ request('status') }}">
-                            @endif
-                            @if(request('customer_id'))
-                                <input type="hidden" name="customer_id" value="{{ request('customer_id') }}">
+                            @if($type === 'daily-production')
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.col_work_center') }}</label>
+                                    <x-ui.odoo-form-ui type="select" name="work_center_id">
+                                        <option value="">{{ __('production.all_work_centers') }}</option>
+                                        @foreach(\App\Domains\Production\Models\WorkCenter::where('tenant_id', require_tenant_id())->get() as $wc)
+                                            <option value="{{ $wc->id }}" {{ request('work_center_id') == $wc->id ? 'selected' : '' }}>{{ $wc->name }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.col_machine') ?? 'Machine' }}</label>
+                                    <x-ui.odoo-form-ui type="select" name="machine_id">
+                                        <option value="">{{ __('production.all_machines') }}</option>
+                                        @foreach(\App\Domains\Production\Models\Machine::where('tenant_id', require_tenant_id())->get() as $m)
+                                            <option value="{{ $m->id }}" {{ request('machine_id') == $m->id ? 'selected' : '' }}>{{ $m->name }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Production Order</label>
+                                    <x-ui.odoo-form-ui type="select" name="order_id">
+                                        <option value="">All Orders</option>
+                                        @foreach(\App\Domains\Production\Models\ProductionOrder::withoutGlobalScopes()->where('tenant_id', require_tenant_id())->orderBy('order_number', 'desc')->take(100)->get() as $ord)
+                                            <option value="{{ $ord->id }}" {{ request('order_id') == $ord->id ? 'selected' : '' }}>{{ $ord->order_number }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                            @else
+                                {{-- Preserve existing active filters --}}
+                                @if(request('order_id'))
+                                    <input type="hidden" name="order_id" value="{{ request('order_id') }}">
+                                @endif
+                                @if(request('product_id'))
+                                    <input type="hidden" name="product_id" value="{{ request('product_id') }}">
+                                @endif
+                                @if(request('material_id'))
+                                    <input type="hidden" name="material_id" value="{{ request('material_id') }}">
+                                @endif
+                                @if(request('machine_id'))
+                                    <input type="hidden" name="machine_id" value="{{ request('machine_id') }}">
+                                @endif
+                                @if(request('work_center_id'))
+                                    <input type="hidden" name="work_center_id" value="{{ request('work_center_id') }}">
+                                @endif
+                                @if(request('status'))
+                                    <input type="hidden" name="status" value="{{ request('status') }}">
+                                @endif
+                                @if(request('customer_id'))
+                                    <input type="hidden" name="customer_id" value="{{ request('customer_id') }}">
+                                @endif
                             @endif
 
                             <div class="d-flex gap-2 justify-content-end mt-4">
@@ -645,7 +676,14 @@
                                     </td>
                                     <td><span class="badge bg-light text-dark border">{{ $row['uom'] }}</span></td>
                                     <td class="text-end fw-semibold">{{ number_format($row['planned_qty'], 2) }}</td>
-                                    <td class="text-end text-primary fw-bold">{{ number_format($row['issued_qty'], 2) }}</td>
+                                    <td class="text-end text-primary fw-bold">
+                                        {{ number_format($row['issued_qty'], 2) }}
+                                        @if(!empty($row['variance_qty']) && $row['variance_qty'] != 0)
+                                            <small class="{{ $row['variance_qty'] > 0 ? 'text-danger' : 'text-success' }} fs-11 d-block font-monospace">
+                                                {{ ($row['variance_qty'] > 0 ? '+' : '') . number_format($row['variance_qty'], 2) }}
+                                            </small>
+                                        @endif
+                                    </td>
                                     <td class="text-end text-success fw-bold">{{ number_format($row['consumed_qty'], 2) }}</td>
                                     <td class="text-end fw-semibold {{ $row['floor_balance'] > 0 ? 'text-warning' : 'text-muted' }}">
                                         {{ number_format($row['floor_balance'], 2) }}
@@ -1381,6 +1419,417 @@
                         </tbody>
                     </table>
                 </div>
+
+            @elseif($type === 'daily-production')
+                {{-- Executive KPI Ribbon --}}
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3 col-6">
+                        <div class="kpi-box text-center h-100 border-start border-3 border-success">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.finished_goods_produced') ?? 'Finished Goods (FG) Produced' }}</div>
+                            <div class="fs-22 fw-bold text-success mt-1">{{ number_format($reportData['summary']['fg_produced'] ?? 0, 0) }}</div>
+                            <small class="text-muted fs-11">Terminal FG Output</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="kpi-box text-center h-100 border-start border-3 border-primary">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.sfg_intermediate_output') ?? 'SFG / Intermediate Output' }}</div>
+                            <div class="fs-22 fw-bold text-primary mt-1">{{ number_format($reportData['summary']['sfg_produced'] ?? 0, 0) }}</div>
+                            <small class="text-muted fs-11">Sub-assemblies Completed</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="kpi-box text-center h-100 border-start border-3 border-info">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.component_output') ?? 'Component Output' }}</div>
+                            <div class="fs-22 fw-bold text-info mt-1">{{ number_format($reportData['summary']['component_produced'] ?? 0, 0) }}</div>
+                            <small class="text-muted fs-11">Fabricated Components</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="kpi-box text-center h-100 border-start border-3 border-secondary">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.finished_goods_yield') ?? 'Finished Goods Yield %' }}</div>
+                            <div class="fs-22 fw-bold {{ ($reportData['summary']['fg_yield_pct'] ?? 100) >= 95 ? 'text-success' : (($reportData['summary']['fg_yield_pct'] ?? 100) >= 80 ? 'text-warning' : 'text-danger') }} mt-1">
+                                {{ number_format($reportData['summary']['fg_yield_pct'] ?? 100, 1) }}%
+                            </div>
+                            <small class="text-muted fs-11">FG Good / Attempted</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center h-100">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.total_rejected') ?? 'Total Rejected' }}</div>
+                            <div class="fs-18 fw-bold {{ ($reportData['summary']['total_rejected'] ?? 0) > 0 ? 'text-warning' : 'text-muted' }} mt-1">{{ number_format($reportData['summary']['total_rejected'] ?? 0, 0) }}</div>
+                            <small class="text-muted fs-11">All Stages</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center h-100">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.total_scrapped') ?? 'Total Scrapped' }}</div>
+                            <div class="fs-18 fw-bold {{ ($reportData['summary']['total_scrapped'] ?? 0) > 0 ? 'text-danger' : 'text-muted' }} mt-1">{{ number_format($reportData['summary']['total_scrapped'] ?? 0, 0) }}</div>
+                            <small class="text-muted fs-11">All Stages</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center h-100">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.total_run_hours') ?? 'Total Run Time' }}</div>
+                            <div class="fs-18 fw-bold text-dark mt-1">{{ number_format($reportData['summary']['total_run_hours'] ?? 0, 1) }} hrs</div>
+                            <small class="text-muted fs-11">{{ number_format($reportData['summary']['total_run_minutes'] ?? 0, 0) }} mins</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="kpi-box text-center h-100">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.total_setup_hours') ?? 'Total Setup Time' }}</div>
+                            <div class="fs-18 fw-bold text-dark mt-1">{{ number_format($reportData['summary']['total_setup_hours'] ?? 0, 1) }} hrs</div>
+                            <small class="text-muted fs-11">{{ number_format($reportData['summary']['total_setup_minutes'] ?? 0, 0) }} mins</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-12">
+                        <div class="kpi-box text-center h-100">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.operation_events') ?? 'Operation Events Logged' }}</div>
+                            <div class="fs-18 fw-bold text-dark mt-1">{{ number_format($reportData['summary']['total_events_count'] ?? 0, 0) }} events</div>
+                            <small class="text-muted fs-11">Throughput: {{ number_format($reportData['summary']['total_event_quantity_processed'] ?? 0, 0) }} stage units processed</small>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Active Filter Context Indicator --}}
+                @if(request('work_center_id') || request('machine_id') || request('order_id') || request('product_id'))
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-3 py-2 px-3 bg-light rounded border">
+                        <span class="fs-12 fw-semibold text-muted"><i class="feather-filter me-1 text-primary"></i> Applied Scope:</span>
+                        @if(request('work_center_id'))
+                            @php $activeWc = \App\Domains\Production\Models\WorkCenter::find(request('work_center_id')); @endphp
+                            <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-12">
+                                Work Center: {{ $activeWc->name ?? ('ID #' . request('work_center_id')) }}
+                            </span>
+                        @endif
+                        @if(request('machine_id'))
+                            @php $activeM = \App\Domains\Production\Models\Machine::find(request('machine_id')); @endphp
+                            <span class="badge bg-soft-info text-info border border-info-subtle fs-12">
+                                Machine: {{ $activeM->name ?? ('ID #' . request('machine_id')) }}
+                            </span>
+                        @endif
+                        @if(request('order_id'))
+                            @php $activeOrd = \App\Domains\Production\Models\ProductionOrder::withoutGlobalScopes()->find(request('order_id')); @endphp
+                            <span class="badge bg-soft-dark text-dark border fs-12">
+                                Order: {{ $activeOrd->order_number ?? ('ID #' . request('order_id')) }}
+                            </span>
+                        @endif
+                        <a href="{{ route('production.intelligence.reports.show', ['type' => 'daily-production', 'date_start' => request('date_start', $reportData['period_start']), 'date_end' => request('date_end', $reportData['period_end'])]) }}" class="btn btn-sm btn-link text-muted p-0 ms-auto fs-12 text-decoration-none">
+                            <i class="feather-x me-1"></i> Clear scope filters
+                        </a>
+                    </div>
+                @endif
+
+                @if(!$reportData['has_data'])
+                    <div class="text-center py-5 my-3 border rounded bg-light">
+                        <div class="avatar-text avatar-lg bg-soft-secondary text-secondary rounded-circle mx-auto mb-3">
+                            <i class="feather-calendar fs-24"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark">{{ __('production.no_daily_production_records') ?? 'No production activity found for the selected filters and date range.' }}</h6>
+                        <p class="text-muted fs-12 mb-0">Try selecting a wider date range or clearing the Work Center / Machine / Order filter.</p>
+                    </div>
+                @else
+                    {{-- Section 1: Product Output by Category --}}
+                    @if(!empty($reportData['product_outputs']))
+                        <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
+                            <h5 class="fw-bold text-dark mb-0">
+                                <i class="feather-package text-primary me-2"></i>{{ __('production.product_output_summary') ?? 'Product Output by Stage' }}
+                            </h5>
+                            <span class="text-muted fs-12">{{ count($reportData['product_outputs']) }} distinct products produced</span>
+                        </div>
+                        <div class="table-responsive mb-4">
+                            <table class="report-table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Output Type</th>
+                                        <th>Product Name</th>
+                                        <th>SKU</th>
+                                        <th class="text-end">Completed Output</th>
+                                        <th class="text-center">UOM</th>
+                                        <th class="text-end">In-Process WIP</th>
+                                        <th class="text-end">Rejected</th>
+                                        <th class="text-end">Scrapped</th>
+                                        <th class="text-center">Yield %</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($reportData['product_outputs'] as $pOut)
+                                        @php
+                                            $typeBadgeClass = match($pOut['output_type']) {
+                                                'fg' => 'bg-soft-success text-success border border-success-subtle',
+                                                'sfg' => 'bg-soft-primary text-primary border border-primary-subtle',
+                                                'component' => 'bg-soft-info text-info border border-info-subtle',
+                                                default => 'bg-soft-secondary text-secondary border',
+                                            };
+                                        @endphp
+                                        <tr>
+                                            <td>
+                                                <span class="badge {{ $typeBadgeClass }} px-2 py-1 fs-11 fw-semibold">
+                                                    {{ $pOut['output_type_label'] }}
+                                                </span>
+                                            </td>
+                                            <td class="fw-semibold text-dark">{{ $pOut['product_name'] }}</td>
+                                            <td class="font-monospace text-muted fs-12">{{ $pOut['product_sku'] }}</td>
+                                            <td class="text-end fw-bold text-success">{{ number_format($pOut['output_qty'], 2) }}</td>
+                                            <td class="text-center text-muted fs-12">{{ $pOut['uom'] }}</td>
+                                            <td class="text-end text-muted">{{ number_format($pOut['in_process_qty'], 2) }}</td>
+                                            <td class="text-end {{ $pOut['rejected_qty'] > 0 ? 'text-warning fw-semibold' : 'text-muted' }}">
+                                                {{ number_format($pOut['rejected_qty'], 2) }}
+                                            </td>
+                                            <td class="text-end {{ $pOut['scrapped_qty'] > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">
+                                                {{ number_format($pOut['scrapped_qty'], 2) }}
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge {{ $pOut['yield_pct'] >= 95 ? 'bg-soft-success text-success' : 'bg-soft-warning text-warning' }} border px-2 py-1 fs-11">
+                                                    {{ number_format($pOut['yield_pct'], 1) }}%
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+
+                    {{-- Section 2: Date-wise Daily Production Breakdown --}}
+                    <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
+                        <h5 class="fw-bold text-dark mb-0">
+                            <i class="feather-calendar text-primary me-2"></i>{{ __('production.daily_output_summary') ?? 'Daily Output Summary' }}
+                        </h5>
+                        <span class="text-muted fs-12">{{ count($reportData['daily_breakdown']) }} active days recorded</span>
+                    </div>
+                    <div class="table-responsive mb-4">
+                        <table class="report-table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th class="text-center">Active Orders</th>
+                                    <th class="text-end text-success">FG Output</th>
+                                    <th class="text-end text-primary">SFG Output</th>
+                                    <th class="text-end text-info">Component Output</th>
+                                    <th class="text-center">Events</th>
+                                    <th class="text-end">Rejected</th>
+                                    <th class="text-end">Scrapped</th>
+                                    <th class="text-center">FG Yield %</th>
+                                    <th class="text-end">Run (hrs)</th>
+                                    <th class="text-end">Setup (hrs)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($reportData['daily_breakdown'] as $day)
+                                    <tr>
+                                        <td class="fw-bold text-dark">
+                                            <i class="feather-clock text-muted me-1 fs-12"></i>
+                                            {{ \Carbon\Carbon::parse($day['date'])->format('d M Y, D') }}
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2">
+                                                {{ $day['active_orders_count'] }} orders
+                                            </span>
+                                        </td>
+                                        <td class="text-end fw-bold text-success">{{ number_format($day['fg_output'], 2) }}</td>
+                                        <td class="text-end fw-semibold text-primary">{{ number_format($day['sfg_output'], 2) }}</td>
+                                        <td class="text-end fw-semibold text-info">{{ number_format($day['component_output'], 2) }}</td>
+                                        <td class="text-center text-muted fs-12">{{ $day['operation_events_count'] }}</td>
+                                        <td class="text-end {{ $day['rejected_qty'] > 0 ? 'text-warning fw-semibold' : 'text-muted' }}">
+                                            {{ number_format($day['rejected_qty'], 2) }}
+                                        </td>
+                                        <td class="text-end {{ $day['scrapped_qty'] > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">
+                                            {{ number_format($day['scrapped_qty'], 2) }}
+                                        </td>
+                                        <td class="text-center">
+                                            @php
+                                                $yClass = $day['fg_yield_pct'] >= 95 ? 'bg-soft-success text-success' : ($day['fg_yield_pct'] >= 80 ? 'bg-soft-primary text-primary' : 'bg-soft-danger text-danger');
+                                            @endphp
+                                            <span class="badge {{ $yClass }} border px-2 py-1 fs-12">
+                                                {{ number_format($day['fg_yield_pct'], 1) }}%
+                                            </span>
+                                        </td>
+                                        <td class="text-end fw-semibold text-dark">{{ number_format($day['run_hours'], 2) }}</td>
+                                        <td class="text-end text-muted">{{ number_format($day['setup_hours'], 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot class="table-light fw-bold">
+                                <tr class="border-top border-2">
+                                    <td class="fw-bold text-uppercase fs-12">Total / Period Aggregate</td>
+                                    <td class="text-center">{{ $reportData['summary']['active_orders_count'] ?? 0 }} total orders</td>
+                                    <td class="text-end text-success fw-bold">{{ number_format($reportData['summary']['fg_produced'], 2) }}</td>
+                                    <td class="text-end text-primary fw-bold">{{ number_format($reportData['summary']['sfg_produced'], 2) }}</td>
+                                    <td class="text-end text-info fw-bold">{{ number_format($reportData['summary']['component_produced'], 2) }}</td>
+                                    <td class="text-center text-muted">{{ $reportData['summary']['total_events_count'] ?? 0 }}</td>
+                                    <td class="text-end text-warning">{{ number_format($reportData['summary']['total_rejected'], 2) }}</td>
+                                    <td class="text-end text-danger">{{ number_format($reportData['summary']['total_scrapped'], 2) }}</td>
+                                    <td class="text-center text-primary">{{ number_format($reportData['summary']['fg_yield_pct'], 1) }}%</td>
+                                    <td class="text-end">{{ number_format($reportData['summary']['total_run_hours'], 2) }}</td>
+                                    <td class="text-end">{{ number_format($reportData['summary']['total_setup_hours'], 2) }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    {{-- Section 3: Work Center & Machine Performance Breakdown --}}
+                    <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
+                        <h5 class="fw-bold text-dark mb-0">
+                            <i class="feather-cpu text-primary me-2"></i>{{ __('production.work_center_machine_breakdown') ?? 'Work Center & Machine Breakdown' }}
+                        </h5>
+                        <span class="text-muted fs-12">{{ count($reportData['work_center_breakdown']) }} work center/machine cells</span>
+                    </div>
+                    <div class="table-responsive mb-4">
+                        <table class="report-table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Work Center</th>
+                                    <th>Machine</th>
+                                    <th class="text-end">Units Processed</th>
+                                    <th class="text-end">Rejected</th>
+                                    <th class="text-end">Scrapped</th>
+                                    <th class="text-center">Stage Yield %</th>
+                                    <th class="text-end">Run Time (hrs)</th>
+                                    <th class="text-end">Setup Time (hrs)</th>
+                                    <th class="text-center">Events</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($reportData['work_center_breakdown'] as $wcRow)
+                                    <tr>
+                                        <td class="fw-semibold text-dark">
+                                            <i class="feather-settings text-muted me-1 fs-12"></i>
+                                            {{ $wcRow['work_center_name'] }}
+                                            @if($wcRow['work_center_code'] !== '—')
+                                                <small class="text-muted font-monospace ms-1">({{ $wcRow['work_center_code'] }})</small>
+                                            @endif
+                                        </td>
+                                        <td class="fw-semibold text-dark">
+                                            <i class="feather-cpu text-muted me-1 fs-12"></i>
+                                            {{ $wcRow['machine_name'] }}
+                                            @if($wcRow['machine_code'] !== '—')
+                                                <small class="text-muted font-monospace ms-1">({{ $wcRow['machine_code'] }})</small>
+                                            @endif
+                                        </td>
+                                        <td class="text-end fw-bold text-dark">{{ number_format($wcRow['good_qty'], 2) }}</td>
+                                        <td class="text-end {{ $wcRow['rejected_qty'] > 0 ? 'text-warning fw-semibold' : 'text-muted' }}">
+                                            {{ number_format($wcRow['rejected_qty'], 2) }}
+                                        </td>
+                                        <td class="text-end {{ $wcRow['scrapped_qty'] > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">
+                                            {{ number_format($wcRow['scrapped_qty'], 2) }}
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-soft-primary text-primary border px-2 py-1 fs-12">
+                                                {{ number_format($wcRow['yield_pct'], 1) }}%
+                                            </span>
+                                        </td>
+                                        <td class="text-end fw-semibold text-dark">{{ number_format($wcRow['run_hours'], 2) }}</td>
+                                        <td class="text-end text-muted">{{ number_format($wcRow['setup_hours'], 2) }}</td>
+                                        <td class="text-center text-muted fs-12">{{ $wcRow['events_count'] ?? 1 }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot class="table-light fw-bold">
+                                <tr class="border-top border-2">
+                                    <td colspan="2" class="fw-bold text-uppercase fs-12">Total Processed Across Machines</td>
+                                    <td class="text-end text-dark fw-bold">{{ number_format($reportData['summary']['total_event_quantity_processed'] ?? 0, 2) }}</td>
+                                    <td class="text-end text-warning">{{ number_format($reportData['summary']['total_rejected'], 2) }}</td>
+                                    <td class="text-end text-danger">{{ number_format($reportData['summary']['total_scrapped'], 2) }}</td>
+                                    <td class="text-center text-primary">{{ number_format($reportData['summary']['overall_yield_pct'], 1) }}%</td>
+                                    <td class="text-end">{{ number_format($reportData['summary']['total_run_hours'], 2) }}</td>
+                                    <td class="text-end">{{ number_format($reportData['summary']['total_setup_hours'], 2) }}</td>
+                                    <td class="text-center">{{ $reportData['summary']['total_events_count'] ?? 0 }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    {{-- Section 4: Detailed Production Events Log --}}
+                    <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
+                        <h5 class="fw-bold text-dark mb-0">
+                            <i class="feather-list text-primary me-2"></i>{{ __('production.detailed_production_events') ?? 'Operation / Production Event Log' }}
+                        </h5>
+                        <span class="text-muted fs-12">{{ count($reportData['detailed_logs']) }} events logged</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="report-table align-middle">
+                            <thead>
+                                <tr class="text-nowrap">
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                    <th>Order #</th>
+                                    <th>Type</th>
+                                    <th>Stage Role</th>
+                                    <th>Product</th>
+                                    <th>Operation Stage</th>
+                                    <th>Work Center</th>
+                                    <th>Machine</th>
+                                    <th class="text-end">Good Processed</th>
+                                    <th class="text-end">Rej</th>
+                                    <th class="text-end">Scrap</th>
+                                    <th class="text-center">Yield</th>
+                                    <th class="text-end">Run (min)</th>
+                                    <th class="text-end">Setup (min)</th>
+                                    <th>Operator</th>
+                                    <th>Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($reportData['detailed_logs'] as $log)
+                                    @php
+                                        $typeBadge = match($log['output_type'] ?? 'fg') {
+                                            'fg' => 'bg-soft-success text-success border border-success-subtle',
+                                            'sfg' => 'bg-soft-primary text-primary border border-primary-subtle',
+                                            'component' => 'bg-soft-info text-info border border-info-subtle',
+                                            default => 'bg-soft-secondary text-secondary border',
+                                        };
+                                        $roleBadge = ($log['is_terminal'] ?? false)
+                                            ? 'bg-soft-success text-success border border-success-subtle'
+                                            : 'bg-soft-secondary text-muted border border-secondary-subtle';
+                                    @endphp
+                                    <tr>
+                                        <td class="fw-bold text-dark font-monospace fs-12 text-nowrap">{{ $log['date'] }}</td>
+                                        <td class="text-muted fs-12 font-monospace">{{ $log['time'] }}</td>
+                                        <td class="fw-bold font-monospace text-nowrap">
+                                            @if($log['order_id'])
+                                                <a href="{{ route('production.intelligence.reports.show', ['type' => 'order-detail', 'order_id' => $log['order_id']]) }}" class="text-primary text-decoration-none" target="_blank" title="View Order Job Card">
+                                                    {{ $log['order_number'] }}
+                                                </a>
+                                            @else
+                                                {{ $log['order_number'] }}
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <span class="badge {{ $typeBadge }} fs-10 px-1 py-0">{{ $log['output_type_label'] ?? 'FG' }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge {{ $roleBadge }} fs-10 px-1 py-0">{{ $log['stage_role'] ?? 'Process Stage' }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold text-dark">{{ $log['product_name'] }}</div>
+                                            <small class="text-muted font-monospace">{{ $log['product_sku'] }}</small>
+                                        </td>
+                                        <td class="text-dark fs-12">{{ $log['operation_name'] }}</td>
+                                        <td class="text-dark fs-12">{{ $log['work_center'] }}</td>
+                                        <td class="text-dark fs-12 font-monospace">{{ $log['machine'] }}</td>
+                                        <td class="text-end fw-bold text-dark">{{ number_format($log['good_qty'], 2) }} {{ $log['uom'] }}</td>
+                                        <td class="text-end {{ $log['rejected_qty'] > 0 ? 'text-warning fw-semibold' : 'text-muted' }}">
+                                            {{ number_format($log['rejected_qty'], 2) }}
+                                        </td>
+                                        <td class="text-end {{ $log['scrapped_qty'] > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">
+                                            {{ number_format($log['scrapped_qty'], 2) }}
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="fs-12 fw-semibold {{ $log['yield_pct'] >= 98 ? 'text-success' : ($log['yield_pct'] >= 90 ? 'text-primary' : 'text-danger') }}">
+                                                {{ number_format($log['yield_pct'], 1) }}%
+                                            </span>
+                                        </td>
+                                        <td class="text-end fw-semibold text-dark">{{ number_format($log['run_minutes'], 0) }}</td>
+                                        <td class="text-end text-muted">{{ number_format($log['setup_minutes'], 0) }}</td>
+                                        <td class="fs-12 text-muted text-nowrap">{{ $log['operator'] }}</td>
+                                        <td class="fs-12 text-muted" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ $log['remarks'] }}">
+                                            {{ $log['remarks'] }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
 
             @endif
         </div>

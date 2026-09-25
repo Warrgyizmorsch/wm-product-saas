@@ -727,6 +727,234 @@
             @endforelse
         </tbody>
     </table>
+
+{{-- ════════════════════════════════════════════════════════
+     DAILY PRODUCTION REPORT (DPR)
+     ════════════════════════════════════════════════════════ --}}
+@elseif($type === 'daily-production')
+    {{-- KPI strip --}}
+    <table class="kpi-strip">
+        <tr>
+            <td>
+                <div class="kpi-label">{{ __('production.finished_goods_produced') ?? 'FG Produced' }}</div>
+                <div class="kpi-value success">{{ number_format($reportData['summary']['fg_produced'] ?? 0, 0) }}</div>
+            </td>
+            <td>
+                <div class="kpi-label">{{ __('production.sfg_intermediate_output') ?? 'SFG Output' }}</div>
+                <div class="kpi-value primary">{{ number_format($reportData['summary']['sfg_produced'] ?? 0, 0) }}</div>
+            </td>
+            <td>
+                <div class="kpi-label">{{ __('production.component_output') ?? 'Component' }}</div>
+                <div class="kpi-value" style="color:#0284c7;">{{ number_format($reportData['summary']['component_produced'] ?? 0, 0) }}</div>
+            </td>
+            <td>
+                <div class="kpi-label">{{ __('production.finished_goods_yield') ?? 'FG Yield' }}</div>
+                <div class="kpi-value primary">{{ number_format($reportData['summary']['fg_yield_pct'] ?? 100, 1) }}%</div>
+            </td>
+            <td>
+                <div class="kpi-label">{{ __('production.total_rejected') ?? 'Rejected' }}</div>
+                <div class="kpi-value warning">{{ number_format($reportData['summary']['total_rejected'] ?? 0, 0) }}</div>
+            </td>
+            <td>
+                <div class="kpi-label">{{ __('production.total_scrapped') ?? 'Scrapped' }}</div>
+                <div class="kpi-value danger">{{ number_format($reportData['summary']['total_scrapped'] ?? 0, 0) }}</div>
+            </td>
+            <td>
+                <div class="kpi-label">{{ __('production.total_run_hours') ?? 'Run Time' }}</div>
+                <div class="kpi-value">{{ number_format($reportData['summary']['total_run_hours'] ?? 0, 1) }}h</div>
+            </td>
+            <td>
+                <div class="kpi-label">{{ __('production.operation_events') ?? 'Events Logged' }}</div>
+                <div class="kpi-value">{{ number_format($reportData['summary']['total_events_count'] ?? 0, 0) }}</div>
+            </td>
+        </tr>
+    </table>
+
+    {{-- Section 1: Product Output by Category --}}
+    @if(!empty($reportData['product_outputs']))
+        <div class="section-title">{{ __('production.product_output_summary') ?? 'Product Output by Stage' }}</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Output Type</th>
+                    <th>Product Name</th>
+                    <th>SKU</th>
+                    <th class="text-right">Completed Output</th>
+                    <th class="text-center">UOM</th>
+                    <th class="text-right">In-Process WIP</th>
+                    <th class="text-right">Rejected</th>
+                    <th class="text-right">Scrapped</th>
+                    <th class="text-center">Yield %</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($reportData['product_outputs'] as $pOut)
+                    <tr>
+                        <td style="font-weight:bold;">{{ $pOut['output_type_label'] }}</td>
+                        <td>{{ $pOut['product_name'] }}</td>
+                        <td style="font-family:monospace; font-size:7pt;">{{ $pOut['product_sku'] }}</td>
+                        <td class="text-right" style="font-weight:bold; color:#16a34a;">{{ number_format($pOut['output_qty'], 2) }}</td>
+                        <td class="text-center">{{ $pOut['uom'] }}</td>
+                        <td class="text-right" style="color:#64748b;">{{ number_format($pOut['in_process_qty'], 2) }}</td>
+                        <td class="text-right" style="{{ $pOut['rejected_qty'] > 0 ? 'color:#d97706;' : 'color:#94a3b8;' }}">{{ number_format($pOut['rejected_qty'], 2) }}</td>
+                        <td class="text-right" style="{{ $pOut['scrapped_qty'] > 0 ? 'color:#dc2626;' : 'color:#94a3b8;' }}">{{ number_format($pOut['scrapped_qty'], 2) }}</td>
+                        <td class="text-center">{{ number_format($pOut['yield_pct'], 1) }}%</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    {{-- Section 2: Date-wise Daily Output Summary --}}
+    <div class="section-title">{{ __('production.daily_output_summary') ?? 'Daily Output Summary' }}</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th class="text-center">Active Orders</th>
+                <th class="text-right">FG Output</th>
+                <th class="text-right">SFG Output</th>
+                <th class="text-right">Component</th>
+                <th class="text-center">Events</th>
+                <th class="text-right">Rejected</th>
+                <th class="text-right">Scrapped</th>
+                <th class="text-center">FG Yield %</th>
+                <th class="text-right">Run (hrs)</th>
+                <th class="text-right">Setup (hrs)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($reportData['daily_breakdown'] as $day)
+                <tr>
+                    <td style="font-weight:bold;">{{ \Carbon\Carbon::parse($day['date'])->format('d M Y, D') }}</td>
+                    <td class="text-center">{{ $day['active_orders_count'] }}</td>
+                    <td class="text-right" style="font-weight:bold; color:#16a34a;">{{ number_format($day['fg_output'], 2) }}</td>
+                    <td class="text-right" style="font-weight:600; color:#2563eb;">{{ number_format($day['sfg_output'], 2) }}</td>
+                    <td class="text-right" style="font-weight:600; color:#0284c7;">{{ number_format($day['component_output'], 2) }}</td>
+                    <td class="text-center" style="color:#64748b;">{{ $day['operation_events_count'] }}</td>
+                    <td class="text-right" style="{{ $day['rejected_qty'] > 0 ? 'color:#d97706;' : 'color:#94a3b8;' }}">{{ number_format($day['rejected_qty'], 2) }}</td>
+                    <td class="text-right" style="{{ $day['scrapped_qty'] > 0 ? 'color:#dc2626;' : 'color:#94a3b8;' }}">{{ number_format($day['scrapped_qty'], 2) }}</td>
+                    <td class="text-center">{{ number_format($day['fg_yield_pct'], 1) }}%</td>
+                    <td class="text-right">{{ number_format($day['run_hours'], 2) }}</td>
+                    <td class="text-right" style="color:#64748b;">{{ number_format($day['setup_hours'], 2) }}</td>
+                </tr>
+            @empty
+                <tr><td colspan="11" class="text-center" style="color:#94a3b8; padding:8px;">{{ __('production.no_daily_production_records') ?? 'No production activity found for the selected filters.' }}</td></tr>
+            @endforelse
+        </tbody>
+        @if(!empty($reportData['daily_breakdown']))
+            <tfoot>
+                <tr style="background:#f1f5f9; font-weight:bold;">
+                    <td>Total / Period Aggregate</td>
+                    <td class="text-center">{{ $reportData['summary']['active_orders_count'] ?? 0 }} orders</td>
+                    <td class="text-right" style="color:#16a34a;">{{ number_format($reportData['summary']['fg_produced'], 2) }}</td>
+                    <td class="text-right" style="color:#2563eb;">{{ number_format($reportData['summary']['sfg_produced'], 2) }}</td>
+                    <td class="text-right" style="color:#0284c7;">{{ number_format($reportData['summary']['component_produced'], 2) }}</td>
+                    <td class="text-center">{{ $reportData['summary']['total_events_count'] ?? 0 }}</td>
+                    <td class="text-right" style="color:#d97706;">{{ number_format($reportData['summary']['total_rejected'], 2) }}</td>
+                    <td class="text-right" style="color:#dc2626;">{{ number_format($reportData['summary']['total_scrapped'], 2) }}</td>
+                    <td class="text-center" style="color:#2563eb;">{{ number_format($reportData['summary']['fg_yield_pct'], 1) }}%</td>
+                    <td class="text-right">{{ number_format($reportData['summary']['total_run_hours'], 2) }}</td>
+                    <td class="text-right">{{ number_format($reportData['summary']['total_setup_hours'], 2) }}</td>
+                </tr>
+            </tfoot>
+        @endif
+    </table>
+
+    {{-- Section 3: Work Center & Machine Performance Breakdown --}}
+    <div class="section-title">{{ __('production.work_center_machine_breakdown') ?? 'Work Center & Machine Breakdown' }}</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Work Center</th>
+                <th>Machine</th>
+                <th class="text-right">Units Processed</th>
+                <th class="text-right">Rejected</th>
+                <th class="text-right">Scrapped</th>
+                <th class="text-center">Stage Yield %</th>
+                <th class="text-right">Run Time (hrs)</th>
+                <th class="text-right">Setup Time (hrs)</th>
+                <th class="text-center">Events</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($reportData['work_center_breakdown'] as $wcRow)
+                <tr>
+                    <td style="font-weight:600;">{{ $wcRow['work_center_name'] }}</td>
+                    <td style="font-weight:600;">{{ $wcRow['machine_name'] }}</td>
+                    <td class="text-right" style="font-weight:bold;">{{ number_format($wcRow['good_qty'], 2) }}</td>
+                    <td class="text-right" style="{{ $wcRow['rejected_qty'] > 0 ? 'color:#d97706;' : 'color:#94a3b8;' }}">{{ number_format($wcRow['rejected_qty'], 2) }}</td>
+                    <td class="text-right" style="{{ $wcRow['scrapped_qty'] > 0 ? 'color:#dc2626;' : 'color:#94a3b8;' }}">{{ number_format($wcRow['scrapped_qty'], 2) }}</td>
+                    <td class="text-center">{{ number_format($wcRow['yield_pct'], 1) }}%</td>
+                    <td class="text-right">{{ number_format($wcRow['run_hours'], 2) }}</td>
+                    <td class="text-right" style="color:#64748b;">{{ number_format($wcRow['setup_hours'], 2) }}</td>
+                    <td class="text-center" style="color:#64748b;">{{ $wcRow['events_count'] ?? 1 }}</td>
+                </tr>
+            @empty
+                <tr><td colspan="9" class="text-center" style="color:#94a3b8; padding:8px;">{{ __('production.no_daily_production_records') ?? 'No production activity found for the selected filters.' }}</td></tr>
+            @endforelse
+        </tbody>
+        @if(!empty($reportData['work_center_breakdown']))
+            <tfoot>
+                <tr style="background:#f1f5f9; font-weight:bold;">
+                    <td colspan="2">Total Processed Across Machines</td>
+                    <td class="text-right">{{ number_format($reportData['summary']['total_event_quantity_processed'] ?? 0, 2) }}</td>
+                    <td class="text-right" style="color:#d97706;">{{ number_format($reportData['summary']['total_rejected'], 2) }}</td>
+                    <td class="text-right" style="color:#dc2626;">{{ number_format($reportData['summary']['total_scrapped'], 2) }}</td>
+                    <td class="text-center" style="color:#2563eb;">{{ number_format($reportData['summary']['overall_yield_pct'], 1) }}%</td>
+                    <td class="text-right">{{ number_format($reportData['summary']['total_run_hours'], 2) }}</td>
+                    <td class="text-right">{{ number_format($reportData['summary']['total_setup_hours'], 2) }}</td>
+                    <td class="text-center">{{ $reportData['summary']['total_events_count'] ?? 0 }}</td>
+                </tr>
+            </tfoot>
+        @endif
+    </table>
+
+    {{-- Section 4: Detailed Events Log --}}
+    <div class="section-title">{{ __('production.detailed_production_events') ?? 'Operation / Production Event Log' }}</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date / Time</th>
+                <th>Order #</th>
+                <th>Type</th>
+                <th>Stage Role</th>
+                <th>Product</th>
+                <th>Operation</th>
+                <th>Work Center</th>
+                <th>Machine</th>
+                <th class="text-right">Processed</th>
+                <th class="text-right">Rej</th>
+                <th class="text-right">Scrap</th>
+                <th class="text-right">Run (m)</th>
+                <th>Operator</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($reportData['detailed_logs'] as $log)
+                <tr>
+                    <td style="font-size:7pt; white-space:nowrap;">{{ $log['date'] }} {{ $log['time'] }}</td>
+                    <td style="font-weight:bold; font-family:monospace;">{{ $log['order_number'] }}</td>
+                    <td style="font-size:7pt; font-weight:bold;">{{ $log['output_type_label'] ?? 'FG' }}</td>
+                    <td style="font-size:6pt; color:{{ ($log['is_terminal'] ?? false) ? '#16a34a' : '#64748b' }};">{{ $log['stage_role'] ?? 'Process Stage' }}</td>
+                    <td>
+                        {{ $log['product_name'] }}<br>
+                        <span style="font-size:6pt; color:#64748b; font-family:monospace;">{{ $log['product_sku'] }}</span>
+                    </td>
+                    <td style="font-size:7pt;">{{ $log['operation_name'] }}</td>
+                    <td style="font-size:7pt;">{{ $log['work_center'] }}</td>
+                    <td style="font-size:7pt; font-family:monospace;">{{ $log['machine'] }}</td>
+                    <td class="text-right" style="font-weight:bold;">{{ number_format($log['good_qty'], 1) }}</td>
+                    <td class="text-right" style="{{ $log['rejected_qty'] > 0 ? 'color:#d97706;' : 'color:#94a3b8;' }}">{{ number_format($log['rejected_qty'], 1) }}</td>
+                    <td class="text-right" style="{{ $log['scrapped_qty'] > 0 ? 'color:#dc2626;' : 'color:#94a3b8;' }}">{{ number_format($log['scrapped_qty'], 1) }}</td>
+                    <td class="text-right">{{ number_format($log['run_minutes'], 0) }}</td>
+                    <td style="font-size:7pt; color:#64748b;">{{ $log['operator'] }}</td>
+                </tr>
+            @empty
+                <tr><td colspan="13" class="text-center" style="color:#94a3b8; padding:8px;">{{ __('production.no_daily_production_records') ?? 'No production activity found for the selected filters.' }}</td></tr>
+            @endforelse
+        </tbody>
+    </table>
 @endif
 
 </body>
