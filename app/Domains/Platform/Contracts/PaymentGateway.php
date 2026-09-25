@@ -111,4 +111,24 @@ interface PaymentGateway
      * @return array{event: string, subscription_id: string, payment_id: ?string, amount: ?int, current_start: ?int, current_end: ?int}|null
      */
     public function resolveSubscriptionWebhook(Request $request): ?array;
+
+    /**
+     * One-time charge for a prorated mid-cycle upgrade of a live subscription
+     * ($amount is server-computed, GST included). Creates the SubscriptionPayment
+     * (purpose subscription_change, linked to $subscription); the browser callback
+     * is then checked with verifyCheckoutCallback() like any order payment.
+     *
+     * @return array{payment: SubscriptionPayment, checkout: array<string, mixed>}
+     */
+    public function createChangeCheckout(Tenant $tenant, TenantSubscription $subscription, int $amountInSmallestUnit): array;
+
+    /**
+     * Makes the subscription's renewals charge $perSeatTotal (GST included) ×
+     * $seats from the next cycle on — the current cycle is left as paid.
+     * Returns the gateway plan id now billed.
+     */
+    public function scheduleSubscriptionChange(TenantSubscription $subscription, int $perSeatTotal, int $seats): string;
+
+    /** Drops a change booked with scheduleSubscriptionChange() that hasn't taken effect yet. */
+    public function cancelScheduledSubscriptionChange(TenantSubscription $subscription): void;
 }

@@ -56,6 +56,8 @@ Route::prefix('platform')
             ->name('billing.subscribe');
         Route::post('subscription/subscribe/verify', [BillingCheckoutController::class, 'verify'])
             ->name('billing.verify');
+        Route::post('subscription/change/verify', [BillingCheckoutController::class, 'verifyChange'])
+            ->name('billing.change.verify');
 
         Route::post('modules/checkout', [TenantModuleController::class, 'checkout'])
             ->name('modules.checkout');
