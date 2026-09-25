@@ -405,10 +405,19 @@
                                                         <label class="fw-semibold text-secondary mb-1 fs-11"><i class="feather-credit-card me-1"></i>{{ __('purchase.payment_type') }}</label>
                                                         <select class="odoo-table-select matrix-sync-input" data-sync="#dt_payment_{{ $rv->id }}">
                                                             <option value="">{{ __('purchase.select') }}</option>
-                                                            <option value="Cash" @selected($rv->payment_type === 'Cash')>{{ __('purchase.cash') }}</option>
-                                                            <option value="Net 30" @selected($rv->payment_type === 'Net 30')>{{ __('purchase.net_30_days') }}</option>
-                                                            <option value="Net 60" @selected($rv->payment_type === 'Net 60')>{{ __('purchase.net_60_days') }}</option>
-                                                            <option value="50% Advance, 50% Delivery" @selected($rv->payment_type === '50% Advance, 50% Delivery')>{{ __('purchase.payment_50_50') }}</option>
+                                                            @if(isset($paymentTerms) && $paymentTerms->isNotEmpty())
+                                                                @foreach($paymentTerms as $term)
+                                                                    <option value="{{ $term->name }}" @selected($rv->payment_type === $term->name || $rv->payment_type === $term->code)>{{ $term->name }}</option>
+                                                                @endforeach
+                                                            @else
+                                                                <option value="Cash" @selected($rv->payment_type === 'Cash')>{{ __('purchase.cash') }}</option>
+                                                                <option value="Net 30" @selected($rv->payment_type === 'Net 30')>{{ __('purchase.net_30_days') }}</option>
+                                                                <option value="Net 60" @selected($rv->payment_type === 'Net 60')>{{ __('purchase.net_60_days') }}</option>
+                                                                <option value="50% Advance, 50% Delivery" @selected($rv->payment_type === '50% Advance, 50% Delivery')>{{ __('purchase.payment_50_50') }}</option>
+                                                            @endif
+                                                            @if($rv->payment_type && !in_array($rv->payment_type, ($paymentTerms ?? collect())->pluck('name')->toArray(), true) && !in_array($rv->payment_type, ($paymentTerms ?? collect())->pluck('code')->toArray(), true) && !in_array($rv->payment_type, ['Cash', 'Net 30', 'Net 60', '50% Advance, 50% Delivery']))
+                                                                <option value="{{ $rv->payment_type }}" selected>{{ $rv->payment_type }}</option>
+                                                            @endif
                                                         </select>
                                                     </div>
                                                     <div class="col-12 mt-2">
@@ -680,10 +689,19 @@
                                                 <input type="hidden" name="vendors[{{ $rv->id }}][id]" value="{{ $rv->id }}">
                                                 <select name="vendors[{{ $rv->id }}][payment_type]" id="dt_payment_{{ $rv->id }}" class="odoo-table-select py-0.5" style="font-size: 11px; background-color: transparent;">
                                                     <option value="">{{ __('purchase.select') }}</option>
-                                                    <option value="Cash" @selected($rv->payment_type === 'Cash')>{{ __('purchase.cash') }}</option>
-                                                    <option value="Net 30" @selected($rv->payment_type === 'Net 30')>{{ __('purchase.net_30_days') }}</option>
-                                                    <option value="Net 60" @selected($rv->payment_type === 'Net 60')>{{ __('purchase.net_60_days') }}</option>
-                                                    <option value="50% Advance, 50% Delivery" @selected($rv->payment_type === '50% Advance, 50% Delivery')>{{ __('purchase.payment_50_50') }}</option>
+                                                    @if(isset($paymentTerms) && $paymentTerms->isNotEmpty())
+                                                        @foreach($paymentTerms as $term)
+                                                            <option value="{{ $term->name }}" @selected($rv->payment_type === $term->name || $rv->payment_type === $term->code)>{{ $term->name }}</option>
+                                                        @endforeach
+                                                    @else
+                                                        <option value="Cash" @selected($rv->payment_type === 'Cash')>{{ __('purchase.cash') }}</option>
+                                                        <option value="Net 30" @selected($rv->payment_type === 'Net 30')>{{ __('purchase.net_30_days') }}</option>
+                                                        <option value="Net 60" @selected($rv->payment_type === 'Net 60')>{{ __('purchase.net_60_days') }}</option>
+                                                        <option value="50% Advance, 50% Delivery" @selected($rv->payment_type === '50% Advance, 50% Delivery')>{{ __('purchase.payment_50_50') }}</option>
+                                                    @endif
+                                                    @if($rv->payment_type && !in_array($rv->payment_type, ($paymentTerms ?? collect())->pluck('name')->toArray(), true) && !in_array($rv->payment_type, ($paymentTerms ?? collect())->pluck('code')->toArray(), true) && !in_array($rv->payment_type, ['Cash', 'Net 30', 'Net 60', '50% Advance, 50% Delivery']))
+                                                        <option value="{{ $rv->payment_type }}" selected>{{ $rv->payment_type }}</option>
+                                                    @endif
                                                 </select>
                                             </td>
                                         @endforeach

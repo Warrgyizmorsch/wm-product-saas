@@ -19,9 +19,9 @@
 @php
 $uomOptions = [];
 $vendorOptions = [];
-$salesAccountOptions = ['' => 'Select Sales Account'];
-$purchaseAccountOptions = ['' => 'Select Purchase Account'];
-$inventoryAccountOptions = ['' => 'Select Inventory Account'];
+$salesAccountOptions = [];
+$purchaseAccountOptions = [];
+$inventoryAccountOptions = [];
 
 try {
     if (class_exists(\App\Domains\Inventory\Models\Uom::class)) {
@@ -33,7 +33,7 @@ try {
         $vendorOptions = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->pluck('name', 'id')->toArray();
     }
     if (class_exists(\App\Domains\Accounting\Models\ChartOfAccount::class)) {
-        $tenantId = tenant_id() ?? (auth()->user()?->tenant_id ?? 1);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? (auth()->user()?->tenant_id ?? 1);
         $coas = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
             ->where(function($q) use ($tenantId) {
                 $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
@@ -42,18 +42,56 @@ try {
             ->orderBy('code', 'asc')
             ->get();
 
-        foreach ($coas as $coa) {
+        $incomeCoas = $coas->where('type', 'income');
+        if ($incomeCoas->isEmpty()) {
+            $incomeCoas = $coas;
+        }
+        foreach ($incomeCoas as $coa) {
             $label = ($coa->code ? $coa->code . ' - ' : '') . $coa->name;
-            if ($coa->type === 'income') {
-                $salesAccountOptions[$coa->id] = $label;
-            } elseif ($coa->type === 'expense') {
-                $purchaseAccountOptions[$coa->id] = $label;
-            } elseif ($coa->type === 'asset') {
-                $inventoryAccountOptions[$coa->id] = $label;
-            }
+            $salesAccountOptions[$coa->id] = $label;
+        }
+
+        $expenseCoas = $coas->where('type', 'expense');
+        if ($expenseCoas->isEmpty()) {
+            $expenseCoas = $coas;
+        }
+        foreach ($expenseCoas as $coa) {
+            $label = ($coa->code ? $coa->code . ' - ' : '') . $coa->name;
+            $purchaseAccountOptions[$coa->id] = $label;
+        }
+
+        $assetCoas = $coas->where('type', 'asset');
+        if ($assetCoas->isEmpty()) {
+            $assetCoas = $coas;
+        }
+        foreach ($assetCoas as $coa) {
+            $label = ($coa->code ? $coa->code . ' - ' : '') . $coa->name;
+            $inventoryAccountOptions[$coa->id] = $label;
         }
     }
 } catch (\Exception $e) {}
+
+if (empty($salesAccountOptions)) {
+    $salesAccountOptions = [
+        '4010' => '4010 - Sales Income Account',
+        '4020' => '4020 - General Income Account',
+        '4030' => '4030 - Interest Income Account',
+    ];
+}
+if (empty($purchaseAccountOptions)) {
+    $purchaseAccountOptions = [
+        '5010' => '5010 - Cost of Goods Sold (COGS)',
+        '5900' => '5900 - Purchases Expense Account',
+        '5020' => '5020 - Job Costs Expense Account',
+    ];
+}
+if (empty($inventoryAccountOptions)) {
+    $inventoryAccountOptions = [
+        '1200' => '1200 - Inventory Asset Account',
+        '1210' => '1210 - Raw Materials Stock',
+        '1220' => '1220 - Finished Goods Stock',
+    ];
+}
 
 $masterDefinitions = [
     'product' => [
@@ -272,9 +310,9 @@ $masterDefinitions = [
                                 name="sales_account"
                             >
                                 <option value="" selected>Select Sales Account</option>
-                                <option value="Sales Income">Sales Income Account</option>
-                                <option value="General Income">General Income Account</option>
-                                <option value="Interest Income">Interest Income Account</option>
+                                @foreach($salesAccountOptions as $val => $lbl)
+                                    <option value="{{ $val }}">{{ $lbl }}</option>
+                                @endforeach
                             </x-ui.odoo-form-ui>
 
                             <x-ui.odoo-form-ui
@@ -283,9 +321,9 @@ $masterDefinitions = [
                                 name="purchase_account"
                             >
                                 <option value="" selected>Select Purchase Account</option>
-                                <option value="Cost of Goods Sold">Cost of Goods Sold (COGS)</option>
-                                <option value="Purchases">Purchases Expense Account</option>
-                                <option value="Job Costs">Job Costs Expense Account</option>
+                                @foreach($purchaseAccountOptions as $val => $lbl)
+                                    <option value="{{ $val }}">{{ $lbl }}</option>
+                                @endforeach
                             </x-ui.odoo-form-ui>
 
                             <x-ui.odoo-form-ui
@@ -294,9 +332,9 @@ $masterDefinitions = [
                                 name="inventory_account"
                             >
                                 <option value="" selected>Select Inventory Account</option>
-                                <option value="Inventory Asset">Inventory Asset Account</option>
-                                <option value="Raw Materials Stock">Raw Materials Stock</option>
-                                <option value="Finished Goods Stock">Finished Goods Stock</option>
+                                @foreach($inventoryAccountOptions as $val => $lbl)
+                                    <option value="{{ $val }}">{{ $lbl }}</option>
+                                @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
                     </div>

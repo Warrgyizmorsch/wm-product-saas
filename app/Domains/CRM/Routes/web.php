@@ -95,6 +95,10 @@ Route::prefix('crm')
             ->name('leads.trackStatus');
         Route::get('leads/download-sample', [LeadController::class, 'downloadSample'])
             ->name('leads.downloadSample');
+        Route::post('leads/import/parse', [LeadController::class, 'parseImportFile'])
+            ->name('leads.import.parse');
+        Route::post('leads/import/process', [LeadController::class, 'processMappedImport'])
+            ->name('leads.import.process');
         Route::post('leads/import', [LeadController::class, 'import'])
             ->name('leads.import');
         Route::get('leads/export', [LeadController::class, 'export'])

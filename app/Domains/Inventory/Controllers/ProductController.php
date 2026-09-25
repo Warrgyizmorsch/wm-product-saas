@@ -59,6 +59,66 @@ class ProductController extends Controller
         }
     }
 
+    public function parseImportFile(Request $request): JsonResponse
+    {
+        $this->authorize('create', Product::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:20480',
+        ]);
+
+        try {
+            $service = app(\App\Domains\Inventory\Services\ProductImportMapperService::class);
+            $result = $service->parseFile($request->file('file'), $tenantId);
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function processMappedImport(Request $request): JsonResponse
+    {
+        $this->authorize('create', Product::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $companyId = company_id() ?? auth()->user()?->company_id ?? null;
+        $branchId = branch_id() ?? auth()->user()?->branch_id ?? null;
+        $userId = auth()->id() ?: 1;
+
+        $request->validate([
+            'file_token' => 'required|string',
+            'mapping' => 'required|array',
+            'options' => 'nullable|array',
+        ]);
+
+        try {
+            $service = app(\App\Domains\Inventory\Services\ProductImportMapperService::class);
+            $result = $service->processImport(
+                fileToken: (string)$request->input('file_token'),
+                mapping: (array)$request->input('mapping', []),
+                options: (array)$request->input('options', []),
+                tenantId: $tenantId,
+                userId: $userId,
+                companyId: $companyId,
+                branchId: $branchId
+            );
+
+            return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
     public function export(Request $request)
     {
         $this->authorize('viewAny', Product::class);
@@ -73,7 +133,8 @@ class ProductController extends Controller
     {
         $this->authorize('viewAny', Product::class);
         $products = $this->productRepo->getPaginatedProducts($request->all(), 10);
-        return view('modules.inventory.products.index', compact('products'));
+        $accountsData = $this->productRepo->getAccountsData();
+        return view('modules.inventory.products.index', array_merge(compact('products'), $accountsData));
     }
 
     public function create(): View
@@ -618,5 +679,26 @@ class ProductController extends Controller
             'item_reserved_qty' => $itemReservedQty,
             'available_qty' => $availableQty,
         ]);
+    }
+
+    public function toggleStatus(Request $request, Product $product): RedirectResponse
+    {
+        $this->authorize('update', $product);
+
+        if ($request->filled('status')) {
+            $newStatus = in_array(strtolower((string)$request->input('status')), ['active', 'inactive'], true)
+                ? strtolower((string)$request->input('status'))
+                : 'active';
+        } else {
+            $newStatus = strtolower((string)$product->status) === 'active' ? 'inactive' : 'active';
+        }
+
+        $product->update(['status' => $newStatus]);
+
+        $statusLabel = ucfirst($newStatus);
+
+        return redirect()
+            ->back()
+            ->with('success', "Item '{$product->name}' marked as {$statusLabel} successfully.");
     }
 }

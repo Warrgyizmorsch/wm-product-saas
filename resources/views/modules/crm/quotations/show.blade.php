@@ -582,7 +582,7 @@
 
 <!-- SEND QUOTATION WHATSAPP MODAL -->
 <x-ui.modal id="sendQuotationWhatsAppModal" title="<i class='feather-message-circle text-success me-1.5'></i>Send Quotation PDF via WhatsApp" size="lg" :centered="true" :showFooter="false">
-    <form id="sendQuotationWhatsAppForm" action="" method="POST">
+    <form id="sendQuotationWhatsAppForm" action="" method="POST" enctype="multipart/form-data">
         @csrf
         
         <!-- WhatsApp Connection Status Banner -->
@@ -607,13 +607,44 @@
             <x-ui.modal-form-ui type="input" label="Recipient Mobile / WhatsApp Number" name="phone" id="sendWaPhone" placeholder="9876543210 (Country code 91 auto-added)" :required="true" />
         </div>
 
-        <div class="p-2.5 rounded border bg-light-subtle mb-3 d-flex align-items-center justify-content-between">
-            <div class="d-flex align-items-center gap-2">
-                <i class="feather-paperclip text-success fs-16"></i>
-                <span class="fs-12 fw-bold text-dark" id="sendWaPdfBadge">Quotation.pdf</span>
-                <span class="badge bg-soft-success text-success border px-1.5 py-0.5 fs-10">PDF Attached</span>
+        <!-- Enhanced PDF Attachment Box -->
+        <div class="card border mb-3 bg-light-subtle shadow-2xs">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2.5">
+                        <div class="avatar avatar-sm bg-soft-success text-success rounded d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                            <i class="feather-file-text fs-16"></i>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="fs-12 fw-bold text-dark text-break" id="sendWaPdfBadge">Quotation.pdf</span>
+                                <span class="badge bg-soft-success text-success border px-2 py-0.5 fs-10" id="sendWaPdfStatusBadge">Auto Generated PDF</span>
+                            </div>
+                            <span class="fs-11 text-muted d-block mt-0.5" id="sendWaPdfSubText">Base64 PDF Attachment generated from ERP System</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- View PDF Button -->
+                        <button type="button" class="btn btn-xs btn-outline-primary fw-bold d-inline-flex align-items-center px-2.5 py-1" id="btnPreviewWaPdf" title="View / Preview attached PDF">
+                            <i class="feather-eye me-1"></i>View PDF
+                        </button>
+                        
+                        <!-- Change / Upload Custom PDF Button -->
+                        <button type="button" class="btn btn-xs btn-outline-secondary fw-bold d-inline-flex align-items-center px-2.5 py-1" id="btnTriggerCustomWaPdf" title="Upload a custom PDF from your system">
+                            <i class="feather-upload me-1"></i>Change PDF
+                        </button>
+
+                        <!-- Reset to default ERP PDF Button -->
+                        <button type="button" class="btn btn-xs btn-outline-danger fw-bold d-none align-items-center px-2 py-1" id="btnResetCustomWaPdf" title="Reset to default ERP Generated PDF">
+                            <i class="feather-x me-1"></i>Reset
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Hidden file input for custom PDF upload -->
+                <input type="file" name="custom_pdf" id="inputCustomWaPdf" class="d-none" accept="application/pdf">
             </div>
-            <span class="fs-11 text-muted">Base64 PDF Attachment</span>
         </div>
 
         <div class="mb-3">
@@ -646,6 +677,10 @@
 
 @push('scripts')
 <script>
+    let defaultQuotationPdfName = 'Quotation.pdf';
+    let defaultQuotationPdfUrl = '';
+    let customWaPdfFile = null;
+
     function showNotificationModal(isSuccess, title, message) {
         const iconHtml = isSuccess 
             ? '<div class="avatar avatar-xl bg-soft-success text-success rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(34, 197, 94, 0.2);"><i class="feather-check-circle fs-32"></i></div>'
@@ -714,15 +749,61 @@
         });
     });
 
+    function resetWaPdfToDefault() {
+        customWaPdfFile = null;
+        $('#inputCustomWaPdf').val('');
+        $('#sendWaPdfBadge').text(defaultQuotationPdfName);
+        $('#sendWaPdfStatusBadge').attr('class', 'badge bg-soft-success text-success border px-2 py-0.5 fs-10').text('Auto Generated PDF');
+        $('#sendWaPdfSubText').text('Base64 PDF Attachment generated from ERP System');
+        $('#btnResetCustomWaPdf').addClass('d-none').removeClass('d-inline-flex');
+    }
+
+    $(document).on('click', '#btnTriggerCustomWaPdf', function() {
+        $('#inputCustomWaPdf').click();
+    });
+
+    $(document).on('change', '#inputCustomWaPdf', function(e) {
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+            if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+                alert('Please select a valid PDF file.');
+                resetWaPdfToDefault();
+                return;
+            }
+            customWaPdfFile = file;
+            const sizeKb = (file.size / 1024).toFixed(1);
+            $('#sendWaPdfBadge').text(file.name + ' (' + sizeKb + ' KB)');
+            $('#sendWaPdfStatusBadge').attr('class', 'badge bg-soft-primary text-primary border px-2 py-0.5 fs-10').text('Custom PDF Selected');
+            $('#sendWaPdfSubText').text('Custom document attached from your system');
+            $('#btnResetCustomWaPdf').removeClass('d-none').addClass('d-inline-flex');
+        }
+    });
+
+    $(document).on('click', '#btnResetCustomWaPdf', function() {
+        resetWaPdfToDefault();
+    });
+
+    $(document).on('click', '#btnPreviewWaPdf', function() {
+        if (customWaPdfFile) {
+            const fileUrl = URL.createObjectURL(customWaPdfFile);
+            window.open(fileUrl, '_blank');
+        } else if (defaultQuotationPdfUrl) {
+            window.open(defaultQuotationPdfUrl, '_blank');
+        }
+    });
+
     $(document).on('click', '.btn-open-send-quote-wa-modal', function () {
         const qId = $(this).attr('data-quotation-id');
         const qNum = $(this).attr('data-quotation-num');
         const cPhone = $(this).attr('data-client-phone') || '';
         const dTitle = $(this).attr('data-deal-title') || 'Quotation';
 
+        defaultQuotationPdfName = 'Quotation_' + qNum + '.pdf';
+        defaultQuotationPdfUrl = '/crm/quotations/' + qId + '/download?preview=1';
+
         $('#sendQuotationWhatsAppForm').attr('action', '/crm/quotations/' + qId + '/send-whatsapp');
         $('#sendWaPhone').val(cPhone);
-        $('#sendWaPdfBadge').text('Quotation_' + qNum + '.pdf');
+        resetWaPdfToDefault();
 
         const defaultCaption = "Dear Valued Client,\n\nPlease find attached Quotation *" + qNum + "* for your review regarding " + dTitle + ".\n\n👉 *Please respond with one of the options below:*\n1️⃣ Reply *1* or *ACCEPT* to Accept Quotation\n2️⃣ Reply *2* or *REJECT [reason]* to Reject Quotation\n\nThank you,\nSales Team";
         $('#sendWaCaption').val(defaultCaption);
@@ -740,10 +821,15 @@
 
         btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Sending WhatsApp...');
 
+        const formData = new FormData(this);
+
         $.ajax({
             url: form.attr('action'),
             method: "POST",
-            data: form.serialize(),
+            data: formData,
+            processData: false,
+            contentType: false,
+            cache: false,
             success: function (res) {
                 btn.prop('disabled', false).html(origHtml);
                 const modalEl = document.getElementById('sendQuotationWhatsAppModal');

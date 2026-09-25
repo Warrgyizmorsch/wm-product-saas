@@ -8,21 +8,21 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{{ route('sales.invoices.index') }}" class="action-dropdown-btn" title="{{ __('crm.back_to_invoices') }}" data-bs-toggle="tooltip">
+        <a href="{{ route('sales.invoices.index') }}" class="btn btn-sm btn-light border d-inline-flex align-items-center justify-content-center px-2.5" title="{{ __('crm.back_to_invoices') }}" data-bs-toggle="tooltip">
             <i class="feather feather-arrow-left"></i>
         </a>
 
         @if ($invoice->status === 'Draft')
-            <form action="{{ route('sales.invoices.post', $invoice->id) }}" method="POST" class="d-inline">
+            <form action="{{ route('sales.invoices.post', $invoice->id) }}" method="POST" class="d-inline-flex align-items-center m-0">
                 @csrf
-                <button type="submit" class="btn btn-sm btn-primary fw-bold px-3">
+                <button type="submit" class="btn btn-sm btn-primary fw-bold px-3 d-inline-flex align-items-center">
                     <i class="feather-check-circle me-1.5"></i>{{ __('crm.mark_as_post') }}
                 </button>
             </form>
         @endif
 
         @if (in_array($invoice->status, ['Posted', 'Partially Paid']) && $invoice->balance_due > 0)
-            <a href="{{ route('sales.payments.create', ['invoice_id' => $invoice->id, 'customer_id' => $invoice->customer_id ?: $invoice->salesOrder?->customer_id]) }}" class="btn btn-sm btn-success fw-bold px-3">
+            <a href="{{ route('sales.payments.create', ['invoice_id' => $invoice->id, 'customer_id' => $invoice->customer_id ?: $invoice->salesOrder?->customer_id]) }}" class="btn btn-sm btn-success fw-bold px-3 d-inline-flex align-items-center">
                 <i class="feather-dollar-sign me-1.5"></i>{{ __('crm.register_payment') }}
             </a>
         @endif
@@ -30,7 +30,7 @@
         @if ($invoice->status !== 'Draft')
             <!-- E-Invoice Action Buttons -->
             @if ($invoice->einvoice_status === 'Generated')
-                <div class="dropdown">
+                <div class="dropdown d-inline-flex align-items-center">
                     <button class="btn btn-sm btn-soft-success text-success border border-success-subtle fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="feather-check-circle me-1.5 text-success"></i>E-Invoice (IRN)
                     </button>
@@ -60,9 +60,9 @@
                     </ul>
                 </div>
             @else
-                <form action="{{ route('sales.invoices.einvoice.generate', $invoice->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Generate Government GST E-Invoice (IRN)?');">
+                <form action="{{ route('sales.invoices.einvoice.generate', $invoice->id) }}" method="POST" class="d-inline-flex align-items-center m-0" onsubmit="return confirm('Generate Government GST E-Invoice (IRN)?');">
                     @csrf
-                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-3">
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-3 d-inline-flex align-items-center">
                         <i class="feather-zap me-1.5"></i>Generate E-Invoice
                     </button>
                 </form>
@@ -70,7 +70,7 @@
 
             <!-- E-Way Bill Action Buttons -->
             @if ($invoice->eway_bill_status === 'Generated')
-                <div class="dropdown">
+                <div class="dropdown d-inline-flex align-items-center">
                     <button class="btn btn-sm btn-soft-info text-info border border-info-subtle fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="feather-truck me-1.5 text-info"></i>EWB: {{ $invoice->eway_bill_no }}
                     </button>
@@ -90,17 +90,17 @@
                     </ul>
                 </div>
             @else
-                <button type="button" class="btn btn-sm btn-outline-info fw-bold px-3" data-bs-toggle="modal" data-bs-target="#generateEWayBillModal">
+                <button type="button" class="btn btn-sm btn-outline-info fw-bold px-3 d-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#generateEWayBillModal">
                     <i class="feather-truck me-1.5"></i>Generate E-Way Bill
                 </button>
             @endif
 
-            <a href="{{ route('sales.invoices.einvoice.export-json', $invoice->id) }}" class="btn btn-sm btn-outline-success fw-bold px-3" title="Download Official Government GEPP JSON">
+            <a href="{{ route('sales.invoices.einvoice.export-json', $invoice->id) }}" class="btn btn-sm btn-outline-success fw-bold px-3 d-inline-flex align-items-center" title="Download Official Government GEPP JSON">
                 <i class="feather-code me-1.5"></i>Export JSON
             </a>
         @endif
 
-        <a href="{{ route('sales.invoices.download', $invoice->id) }}" class="btn btn-sm btn-outline-danger fw-bold px-3" title="Download PDF Document">
+        <a href="{{ route('sales.invoices.download', $invoice->id) }}" class="btn btn-sm btn-outline-danger fw-bold px-3 d-inline-flex align-items-center" title="Download PDF Document">
             <i class="feather-download me-1.5"></i>PDF
         </a>
 
@@ -110,8 +110,8 @@
         @endphp
 
         <!-- MORE Dropdown Button -->
-        <div class="dropdown">
-            <button class="btn btn-sm btn-light border fw-bold px-3 py-1.5 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More Invoice Actions">
+        <div class="dropdown d-inline-flex align-items-center">
+            <button class="btn btn-sm btn-light border fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More Invoice Actions">
                 <i class="feather-more-horizontal me-1"></i>MORE
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 290px;">

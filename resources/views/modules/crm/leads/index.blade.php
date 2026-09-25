@@ -4,10 +4,29 @@
 @section('page-title', __('crm.crm_leads'))
 @section('breadcrumb', __('crm.crm_leads'))
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+@endpush
+
+@push('scripts')
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+@endpush
+
 @section('page-actions')
-    <x-ui.button href="{{ route('crm.leads.create') }}" variant="primary" icon="feather-plus">
-        {{ __('crm.add_new_call_lead') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="leads" 
+            :can-import="true" 
+            :can-download-template="true" 
+            download-template-route="{{ route('crm.leads.downloadSample') }}" 
+            import-modal-target="#importLeadsModal" 
+            export-route="{{ route('crm.leads.export') }}" />
+        <x-ui.button href="{{ route('crm.leads.create') }}" variant="primary" icon="feather-plus">
+            {{ __('crm.add_new_call_lead') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @section('content')
@@ -136,30 +155,6 @@
                             </div>
                         </x-ui.filter>
                     </form>
-
-                    <div class="dropdown d-inline-block">
-                        <a href="javascript:void(0)" class="action-dropdown-btn" data-bs-toggle="dropdown" aria-expanded="false" title="{{ __('crm.import_export_options') }}">
-                            <i class="feather-paperclip"></i>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end fs-13 shadow-lg">
-                            <li>
-                                <a href="{{ route('crm.leads.export') }}" class="dropdown-item">
-                                    <i class="feather-download me-2 text-muted fs-12"></i>{{ __('crm.export_excel') }}
-                                </a>
-                            </li>
-                            <li>
-                                <a href="{{ route('crm.leads.downloadSample') }}" class="dropdown-item">
-                                    <i class="feather-file-text me-2 text-muted fs-12"></i>{{ __('crm.download_sample') }}
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a href="javascript:void(0);" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importLeadsModal">
-                                    <i class="feather-upload me-2 text-muted fs-12"></i>{{ __('crm.import') }}
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
                 </div>
             </div>
 
@@ -514,117 +509,8 @@
         </div>
     </div>
 
-    {{-- Import Leads Modal --}}
-    <x-ui.modal id="importLeadsModal" :title="__('crm.import_leads_modal_title')" :submitText="__('crm.import_file')" :centered="true">
-        <form method="POST" action="{{ route('crm.leads.import') }}" enctype="multipart/form-data" id="importLeadsForm">
-            @csrf
-            <p class="fs-13 text-muted mb-3">{{ __('crm.import_leads_help_text') }}</p>
-            <x-ui.odoo-form-ui type="file" name="file" :label="__('crm.excel_csv_file')" required :placeholder="__('crm.choose_file')" />
-        </form>
-        <x-slot name="footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('crm.cancel') }}</button>
-            <button type="submit" form="importLeadsForm" class="btn btn-primary">{{ __('crm.import_file') }}</button>
-        </x-slot>
-    </x-ui.modal>
-
-    {{-- Import Result Summary Modal using common <x-ui.modal> component --}}
-    @if (session('import_summary'))
-        @php
-            $summary = session('import_summary');
-            $modalTitle = '<i class="feather-file-text text-primary me-2 fs-18"></i> Lead Import Results';
-        @endphp
-        <x-ui.modal 
-            id="importResultModal" 
-            :title="$modalTitle" 
-            size="lg" 
-            :centered="true" 
-            :static="true"
-            closeText="OK / Done"
-            :showFooter="true"
-        >
-            {{-- Stat Cards Row --}}
-            <div class="row g-3 mb-4">
-                <div class="col-4">
-                    <div class="p-3 bg-light rounded-3 text-center border">
-                        <div class="fs-12 text-muted fw-bold text-uppercase letter-spacing-1">Total Processed</div>
-                        <div class="fs-20 fw-bolder text-dark mt-1 font-monospace">{{ $summary['total'] }}</div>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="p-3 rounded-3 text-center border" style="background-color: #f0fdf4; border-color: #bbf7d0 !important;">
-                        <div class="fs-12 text-success fw-bold text-uppercase letter-spacing-1">Successfully Imported</div>
-                        <div class="fs-20 fw-bolder text-success mt-1 font-monospace">✓ {{ $summary['success'] }}</div>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="p-3 rounded-3 text-center border" style="background-color: #fef2f2; border-color: #fecaca !important;">
-                        <div class="fs-12 text-danger fw-bold text-uppercase letter-spacing-1">Failed Rows</div>
-                        <div class="fs-20 fw-bolder text-danger mt-1 font-monospace">✗ {{ $summary['failed'] }}</div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Failure Details List --}}
-            @if ($summary['failed'] > 0)
-                <div class="border rounded-3 p-3 bg-white" style="border-color: #fee2e2 !important;">
-                    <div class="d-flex align-items-center mb-2 text-danger fw-bold fs-13">
-                        <i class="feather-alert-triangle me-2 fs-15"></i>
-                        Failed Rows & Reason Details:
-                    </div>
-                    <div class="table-responsive" style="max-height: 240px; overflow-y: auto;">
-                        <table class="table table-sm table-striped table-hover mb-0 fs-12">
-                            <thead class="bg-light sticky-top">
-                                <tr>
-                                    <th class="ps-2 py-1.5" style="width: 80px;">Row #</th>
-                                    <th class="py-1.5">Company / Contact Name</th>
-                                    <th class="py-1.5 text-danger">Validation Failure Reason</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($summary['failed_rows'] as $fail)
-                                    <tr>
-                                        <td class="ps-2 py-1.5 fw-bold text-muted font-monospace">Row {{ $fail['row'] }}</td>
-                                        <td class="py-1.5 text-dark fw-semibold">
-                                            {{ $fail['data']['company_name'] ?? ($fail['data']['contact_person'] ?? 'N/A') }}
-                                        </td>
-                                        <td class="py-1.5 text-danger fw-medium">
-                                            {{ implode(' | ', $fail['errors']) }}
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            @else
-                <div class="alert alert-success border-0 shadow-2xs d-flex align-items-center mb-0 py-3 px-3 fs-13 rounded-3">
-                    <i class="feather-check-circle fs-18 text-success me-2.5"></i>
-                    <div>
-                        <strong class="d-block text-success">All leads imported successfully!</strong>
-                        <span class="text-muted fs-12">No errors encountered during import.</span>
-                    </div>
-                </div>
-            @endif
-
-            <x-slot name="footer">
-                <button type="button" class="btn btn-primary px-4 fw-bold shadow-2xs" data-bs-dismiss="modal">
-                    <i class="feather-check me-1"></i> OK / Done
-                </button>
-            </x-slot>
-        </x-ui.modal>
-
-        @push('scripts')
-            <script>
-                document.addEventListener('DOMContentLoaded', function () {
-                    var importResultModalEl = document.getElementById('importResultModal');
-                    if (importResultModalEl) {
-                        var modal = new bootstrap.Modal(importResultModalEl);
-                        modal.show();
-                    }
-                });
-            </script>
-        @endpush
-    @endif
+    {{-- Smart Visual Column Mapping Import Modal (IndiaMart / Tally / Excel) --}}
+    @include('modules.crm.leads.partials.smart-import-modal')
 @endsection
 
 @push('styles')
@@ -1248,3 +1134,4 @@
         </div>
     </div>
 @endpush
+

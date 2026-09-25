@@ -47,8 +47,8 @@
             type="products" 
             :can-import="true" 
             :can-download-template="true" 
-            template-route="{{ route('inventory.products.downloadSample') }}" 
-            import-route="{{ route('inventory.products.import') }}" 
+            download-template-route="{{ route('inventory.products.downloadSample') }}" 
+            import-modal-target="#importProductsModal" 
             export-route="{{ route('inventory.products.export') }}" />
         <x-ui.button href="{{ route('inventory.products.create') }}" variant="primary" icon="feather-plus">
             {{ __('inventory.new_item') }}
@@ -141,21 +141,21 @@
             <x-ui.odoo-form-ui type="table" id="productsTable">
                 <thead>
                     <tr>
-                        <th>{{ __('inventory.item_name_sku') }}</th>
-                        <th>{{ __('inventory.type') }}</th>
-                        <th>{{ __('inventory.material_type') }}</th>
-                        <th>{{ __('inventory.variation') }}</th>
-                        <th class="text-end">{{ __('inventory.selling_price') }}</th>
-                        <th class="text-end">{{ __('inventory.cost_price') }}</th>
-                        <th class="text-end">{{ __('inventory.stock_on_hand') }}</th>
-                        <th>{{ __('inventory.status') }}</th>
-                        <th class="text-end pe-4">{{ __('inventory.action') }}</th>
+                        <th style="min-width: 260px; max-width: 360px; width: 32%;">{{ __('inventory.item_name_sku') }}</th>
+                        <th style="width: 100px; white-space: nowrap;">{{ __('inventory.type') }}</th>
+                        <th style="width: 130px; white-space: nowrap;">{{ __('inventory.material_type') }}</th>
+                        <th style="width: 100px; white-space: nowrap;">{{ __('inventory.variation') }}</th>
+                        <th class="text-end" style="width: 120px; white-space: nowrap;">{{ __('inventory.selling_price') }}</th>
+                        <th class="text-end" style="width: 120px; white-space: nowrap;">{{ __('inventory.cost_price') }}</th>
+                        <th class="text-end" style="width: 130px; white-space: nowrap;">{{ __('inventory.stock_on_hand') }}</th>
+                        <th style="width: 100px; white-space: nowrap;">{{ __('inventory.status') }}</th>
+                        <th class="text-end pe-4" style="width: 80px; white-space: nowrap;">{{ __('inventory.action') }}</th>
                     </tr>
                 </thead>
                 <tbody class="fs-13 text-dark">
                     @forelse ($products as $product)
                         <tr>
-                            <td>
+                            <td style="max-width: 360px; min-width: 260px;">
                                 @php
                                     $mainImg = $product->main_image_url;
                                     $words = preg_split('/\s+/', trim($product->name));
@@ -170,7 +170,7 @@
                                     $photoCount = ($product->relationLoaded('images') ? $product->images->count() : 0) + 
                                                   ($product->relationLoaded('variants') ? $product->variants->sum(fn($v) => $v->images->count()) : 0);
                                 @endphp
-                                <div class="d-flex align-items-center gap-3">
+                                <div class="d-flex align-items-center gap-3" style="max-width: 100%;">
                                     <div class="product-thumb-wrapper position-relative flex-shrink-0">
                                         <a href="{{ route('inventory.products.show', $product) }}" class="product-thumb-link d-block rounded-3 border bg-white overflow-hidden shadow-2xs position-relative">
                                             @if($mainImg)
@@ -194,12 +194,12 @@
                                             </span>
                                         @endif
                                     </div>
-                                    <div class="d-flex flex-column min-w-0">
-                                        <a href="{{ route('inventory.products.show', $product) }}" class="fw-bold text-dark hover-primary fs-13 text-truncate" title="{{ $product->name }}">
+                                    <div class="d-flex flex-column min-w-0 flex-grow-1" style="overflow: hidden;">
+                                        <a href="{{ route('inventory.products.show', $product) }}" class="fw-bold text-dark hover-primary fs-13 text-truncate d-block" title="{{ $product->name }}" style="max-width: 100%;">
                                             {{ $product->name }}
                                         </a>
-                                        <div class="d-flex align-items-center gap-2 mt-0.5">
-                                            <span class="text-muted font-monospace fs-11">{{ $product->sku ?: '—' }}</span>
+                                        <div class="d-flex align-items-center gap-2 mt-0.5 text-truncate">
+                                            <span class="text-muted font-monospace fs-11 text-truncate">{{ $product->sku ?: '—' }}</span>
                                             @if($product->barcode)
                                                 <span class="text-muted fs-11 font-monospace d-none d-md-inline" title="Barcode: {{ $product->barcode }}"><i class="feather-maximize-2 fs-10 me-1"></i>{{ $product->barcode }}</span>
                                             @endif
@@ -207,14 +207,14 @@
                                     </div>
                                 </div>
                             </td>
-                            <td>
+                            <td class="text-nowrap" style="white-space: nowrap;">
                                 @if($product->item_type === 'Goods')
                                     <span class="badge bg-soft-info text-info px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.goods') }}</span>
                                 @else
                                     <span class="badge bg-soft-warning text-warning px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.service') }}</span>
                                 @endif
                             </td>
-                            <td>
+                            <td class="text-nowrap" style="white-space: nowrap;">
                                 @php
                                     $mtMap = [
                                         'raw_material'  => ['label' => __('inventory.raw_material'),  'color' => 'warning'],
@@ -230,7 +230,7 @@
                                     {{ $mt['label'] }}
                                 </span>
                             </td>
-                            <td>
+                            <td class="text-nowrap" style="white-space: nowrap;">
                                 @if($product->variation_type === 'Variant')
                                     <span class="badge bg-soft-primary text-primary px-2 py-0.5 fs-11 fw-semibold">
                                         {{ $product->variants->count() }} {{ __('inventory.variants') }}
@@ -239,13 +239,13 @@
                                     <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.single') }}</span>
                                 @endif
                             </td>
-                            <td class="text-end fw-bold">
+                            <td class="text-end fw-bold text-nowrap" style="white-space: nowrap;">
                                 {{ format_currency($product->selling_price) }}
                             </td>
-                            <td class="text-end text-muted">
+                            <td class="text-end text-muted text-nowrap" style="white-space: nowrap;">
                                 {{ format_currency($product->cost_price) }}
                             </td>
-                            <td class="text-end">
+                            <td class="text-end text-nowrap" style="white-space: nowrap;">
                                 @if($product->item_type === 'Service')
                                     <span class="text-muted">N/A</span>
                                 @else
@@ -258,7 +258,7 @@
                                     @endif
                                 @endif
                             </td>
-                            <td>
+                            <td class="text-nowrap" style="white-space: nowrap;">
                                 @if ($product->status === 'active')
                                     <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.active') }}</span>
                                 @else
@@ -271,6 +271,22 @@
                                         <a href="{{ route('inventory.products.edit', $product) }}" class="dropdown-item">
                                             <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('inventory.edit_item') }}
                                         </a>
+                                    </li>
+                                    <li>
+                                        <form action="{{ route('inventory.products.toggle-status', $product) }}" method="POST" class="d-inline">
+                                            @csrf
+                                            @if (strtolower((string)$product->status) === 'active')
+                                                <input type="hidden" name="status" value="inactive">
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="feather-pause-circle me-2 text-warning fs-12"></i>{{ __('inventory.mark_inactive') }}
+                                                </button>
+                                            @else
+                                                <input type="hidden" name="status" value="active">
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="feather-check-circle me-2 text-success fs-12"></i>{{ __('inventory.mark_active') }}
+                                                </button>
+                                            @endif
+                                        </form>
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
@@ -306,16 +322,6 @@
         </div>
     </div>
 
-    {{-- Import Products Modal --}}
-    <x-ui.modal id="importProductsModal" :title="__('inventory.import_items_products')" :submitText="__('inventory.import_file')" :centered="true">
-        <form method="POST" action="{{ route('inventory.products.import') }}" enctype="multipart/form-data" id="importProductsForm">
-            @csrf
-            <p class="fs-13 text-muted mb-3">{{ __('inventory.upload_file_help') }}</p>
-            <x-ui.odoo-form-ui type="file" name="file" :label="__('inventory.excel_csv_file')" required :placeholder="__('inventory.choose_file')" />
-        </form>
-        <x-slot name="footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('inventory.cancel') }}</button>
-            <button type="submit" form="importProductsForm" class="btn btn-primary">{{ __('inventory.import_file') }}</button>
-        </x-slot>
-    </x-ui.modal>
+    {{-- Smart Visual Column Mapping Import Modal (Odoo / Zoho Style) --}}
+    @include('modules.inventory.products.partials.smart-import-modal')
 @endsection
