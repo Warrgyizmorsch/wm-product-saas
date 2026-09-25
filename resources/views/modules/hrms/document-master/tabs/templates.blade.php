@@ -860,7 +860,7 @@
         function fetchGenPreview(tmplId, empId) {
             $('#genModalPreviewBox').html('<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2 text-primary" role="status"></div>Rendering document preview...</div>');
             $.ajax({
-                url: '/hrms/documents-master/templates/' + tmplId + '/preview?employee_id=' + empId,
+                url: '{{ url("hrms/documents-master/templates") }}/' + tmplId + '/preview?employee_id=' + empId,
                 type: 'GET',
                 success: function(res) {
                     if (res && res.html) {
@@ -884,7 +884,7 @@
             $('#previewTemplateContainer').html('<div class="text-center py-5 text-muted"><div class="spinner-border spinner-border-sm me-2 text-primary" role="status"></div>Loading live template preview...</div>');
 
             $.ajax({
-                url: '/hrms/documents-master/templates/' + tmplId + '/preview',
+                url: '{{ url("hrms/documents-master/templates") }}/' + tmplId + '/preview',
                 type: 'GET',
                 success: function(res) {
                     if (res && res.html) {

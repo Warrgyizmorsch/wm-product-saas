@@ -93,6 +93,8 @@ class QuotationController extends Controller
         $users = User::orderBy('name')->get();
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
 
+        $nextQuotationNumber = $this->quotationService->getNextQuotationNumber();
+
         $prefilledItems = [];
         $rawItems = [];
         if ($selectedDeal) {

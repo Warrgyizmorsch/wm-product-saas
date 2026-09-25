@@ -4,6 +4,7 @@ namespace App\Domains\Accounting\Listeners;
 
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
+use App\Domains\Accounting\Services\AccountResolverService;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Inventory\Events\StockOutflowRecorded;
@@ -15,6 +16,7 @@ class PostCogsJournal
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
         private readonly PostingFailureRecorder $failures,
+        private readonly AccountResolverService $accountResolver,
     ) {
     }
 
@@ -37,8 +39,9 @@ class PostCogsJournal
         }
 
         try {
-            $cogs = $this->accounts->findByCode('5010', $transaction->tenant_id);
-            $inventory = $this->accounts->findByCode('1200', $transaction->tenant_id);
+            $product = $transaction->product ?? \App\Domains\Inventory\Models\Product::find($transaction->product_id);
+            $cogs = $this->accountResolver->resolveCogsAccount($product, $transaction->tenant_id);
+            $inventory = $this->accountResolver->resolveInventoryAccount($product, $transaction->tenant_id);
 
             if (!$cogs || !$inventory) {
                 $message = 'Missing chart of accounts (COGS/Inventory), skipping auto-post';

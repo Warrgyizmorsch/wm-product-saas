@@ -442,7 +442,7 @@
         btn.prop('disabled', true).html('<i class="feather-loader spin"></i>');
 
         $.ajax({
-            url: '/platform/gst-settings/' + id + '/test',
+            url: '{{ url("platform/gst-settings") }}/' + id + '/test',
             method: 'POST',
             data: { _token: '{{ csrf_token() }}' },
             success: function(res) {

@@ -327,11 +327,11 @@
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" :errorText="$errors->first('sales_account')">
                                 <option value="" {{ old('sales_account') ? '' : 'selected' }}>{{ __('inventory.select_sales_account') }}</option>
                                 @forelse($salesAccounts as $acc)
-                                    <option value="{{ $acc->name }}" {{ old('sales_account') === $acc->name ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
+                                    <option value="{{ $acc->id }}" {{ (old('sales_account') == $acc->id || old('sales_account') == $acc->code || old('sales_account') === $acc->name) ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
                                 @empty
-                                    <option value="Sales Income" {{ old('sales_account') === 'Sales Income' ? 'selected' : '' }}>{{ __('inventory.sales_income_account') }}</option>
-                                    <option value="General Income" {{ old('sales_account') === 'General Income' ? 'selected' : '' }}>{{ __('inventory.general_income_account') }}</option>
-                                    <option value="Interest Income" {{ old('sales_account') === 'Interest Income' ? 'selected' : '' }}>{{ __('inventory.interest_income_account') }}</option>
+                                    <option value="4010" {{ old('sales_account') === '4010' ? 'selected' : '' }}>4010 - {{ __('inventory.sales_income_account') }}</option>
+                                    <option value="4020" {{ old('sales_account') === '4020' ? 'selected' : '' }}>4020 - {{ __('inventory.general_income_account') }}</option>
+                                    <option value="4030" {{ old('sales_account') === '4030' ? 'selected' : '' }}>4030 - {{ __('inventory.interest_income_account') }}</option>
                                 @endforelse
                             </x-ui.odoo-form-ui>
 
@@ -340,11 +340,11 @@
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" :errorText="$errors->first('purchase_account')">
                                 <option value="" {{ old('purchase_account') ? '' : 'selected' }}>{{ __('inventory.select_purchase_account') }}</option>
                                 @forelse($purchaseAccounts as $acc)
-                                    <option value="{{ $acc->name }}" {{ old('purchase_account') === $acc->name ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
+                                    <option value="{{ $acc->id }}" {{ (old('purchase_account') == $acc->id || old('purchase_account') == $acc->code || old('purchase_account') === $acc->name) ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
                                 @empty
-                                    <option value="Cost of Goods Sold" {{ old('purchase_account') === 'Cost of Goods Sold' ? 'selected' : '' }}>{{ __('inventory.cogs_account') }}</option>
-                                    <option value="Purchases" {{ old('purchase_account') === 'Purchases' ? 'selected' : '' }}>{{ __('inventory.purchases_expense_account') }}</option>
-                                    <option value="Job Costs" {{ old('purchase_account') === 'Job Costs' ? 'selected' : '' }}>{{ __('inventory.job_costs_account') }}</option>
+                                    <option value="5010" {{ old('purchase_account') === '5010' ? 'selected' : '' }}>5010 - {{ __('inventory.cogs_account') }}</option>
+                                    <option value="5900" {{ old('purchase_account') === '5900' ? 'selected' : '' }}>5900 - {{ __('inventory.purchases_expense_account') }}</option>
+                                    <option value="5020" {{ old('purchase_account') === '5020' ? 'selected' : '' }}>5020 - {{ __('inventory.job_costs_account') }}</option>
                                 @endforelse
                             </x-ui.odoo-form-ui>
 
@@ -410,14 +410,14 @@
                                     @forelse($inventoryAccounts as $acc)
                                         @php
                                             $isDefault = old('inventory_account') 
-                                                ? (old('inventory_account') === $acc->name) 
-                                                : ($acc->code == '1200' || strtolower($acc->name) === 'inventory'  || $loop->first);
+                                                ? (old('inventory_account') == $acc->id || old('inventory_account') == $acc->code || old('inventory_account') === $acc->name) 
+                                                : ($acc->code == '1200' || strtolower($acc->name) === 'inventory' || $loop->first);
                                         @endphp
-                                        <option value="{{ $acc->name }}" {{ $isDefault ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
+                                        <option value="{{ $acc->id }}" {{ $isDefault ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
                                     @empty
-                                        <option value="Inventory Asset" {{ old('inventory_account', 'Inventory Asset') === 'Inventory Asset' ? 'selected' : '' }}>1200 - {{ __('inventory.inventory_asset_account') }}</option>
-                                        <option value="Raw Materials Stock" {{ old('inventory_account') === 'Raw Materials Stock' ? 'selected' : '' }}>{{ __('inventory.raw_materials_stock') }}</option>
-                                        <option value="Finished Goods Stock" {{ old('inventory_account') === 'Finished Goods Stock' ? 'selected' : '' }}>{{ __('inventory.finished_goods_stock') }}</option>
+                                        <option value="1200" {{ old('inventory_account', '1200') === '1200' ? 'selected' : '' }}>1200 - {{ __('inventory.inventory_asset_account') }}</option>
+                                        <option value="1210" {{ old('inventory_account') === '1210' ? 'selected' : '' }}>1210 - {{ __('inventory.raw_materials_stock') }}</option>
+                                        <option value="1220" {{ old('inventory_account') === '1220' ? 'selected' : '' }}>1220 - {{ __('inventory.finished_goods_stock') }}</option>
                                     @endforelse
                                 </x-ui.odoo-form-ui>
 
