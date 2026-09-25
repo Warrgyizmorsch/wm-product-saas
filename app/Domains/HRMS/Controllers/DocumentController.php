@@ -22,6 +22,8 @@ class DocumentController extends Controller
         $query = Document::with(['documentable', 'documentMaster', 'requestedBy'])
             ->where('documentable_type', Employee::class);
 
+        \App\Domains\HRMS\Services\HrmsScopeService::applyEmployeeScope($query, auth()->user(), 'documentable_id');
+
         // Separate by tab (Employee vs HR Uploads)
         if ($activeTab === 'employee') {
             $query->whereHasMorph('documentable', [Employee::class], function ($q) {

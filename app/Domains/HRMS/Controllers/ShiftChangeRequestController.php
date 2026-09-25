@@ -141,6 +141,92 @@ class ShiftChangeRequestController extends Controller
         return redirect()->back()->with('success', __('hrms.shift_change.status_updated'));
     }
 
+    public function withdraw(Request $request, ShiftChangeRequest $shiftChangeRequest): RedirectResponse
+    {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $shiftChangeRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
+
+        if (!$shiftChangeRequest->canWithdraw()) {
+            return redirect()->back()->with('error', 'Only pending requests can be withdrawn.');
+        }
+
+        $shiftChangeRequest->delete();
+
+        return redirect()->back()->with('success', 'Shift change request withdrawn successfully.');
+    }
+
+    public function requestCancellation(Request $request, ShiftChangeRequest $shiftChangeRequest): RedirectResponse
+    {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $shiftChangeRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
+
+        if (!$shiftChangeRequest->canRequestCancellation()) {
+            return redirect()->back()->with('error', 'Only approved requests can have a cancellation requested.');
+        }
+
+        $validated = $request->validate([
+            'cancellation_reason' => 'required|string|max:1000',
+        ]);
+
+        $updateData = ['status' => 'cancellation_requested'];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('shift_change_requests', 'cancellation_reason')) {
+            $updateData['cancellation_reason'] = $validated['cancellation_reason'];
+        } else {
+            $updateData['rejection_reason'] = $validated['cancellation_reason'];
+        }
+
+        $shiftChangeRequest->update($updateData);
+
+        return redirect()->back()->with('success', 'Cancellation request submitted. Awaiting admin approval.');
+    }
+
+    public function approveCancellation(ShiftChangeRequest $shiftChangeRequest): RedirectResponse
+    {
+        $user = auth()->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        abort_unless($isHrAdmin, 403);
+
+        if ($shiftChangeRequest->status !== 'cancellation_requested') {
+            return redirect()->back()->with('error', 'This request does not have a pending cancellation request.');
+        }
+
+        $shiftChangeRequest->update(['status' => 'cancelled']);
+
+        return redirect()->back()->with('success', 'Shift change cancellation approved.');
+    }
+
+    public function denyCancellation(ShiftChangeRequest $shiftChangeRequest): RedirectResponse
+    {
+        $user = auth()->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        abort_unless($isHrAdmin, 403);
+
+        if ($shiftChangeRequest->status !== 'cancellation_requested') {
+            return redirect()->back()->with('error', 'This request does not have a pending cancellation request.');
+        }
+
+        $updateData = ['status' => 'approved'];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('shift_change_requests', 'cancellation_reason')) {
+            $updateData['cancellation_reason'] = null;
+        }
+
+        $shiftChangeRequest->update($updateData);
+
+        return redirect()->back()->with('success', 'Cancellation request denied. Request remains approved.');
+    }
+
     public function destroy(Request $request, ShiftChangeRequest $shiftChangeRequest): RedirectResponse
     {
         $user = $request->user();
@@ -153,10 +239,6 @@ class ShiftChangeRequestController extends Controller
             if ($shiftChangeRequest->status !== 'pending') {
                 return redirect()->back()->with('error', 'Only pending requests can be deleted.');
             }
-        }
-
-        if ($shiftChangeRequest->status === 'approved') {
-            return redirect()->back()->with('error', __('hrms.shift_change.approved_no_delete'));
         }
 
         $shiftChangeRequest->delete();

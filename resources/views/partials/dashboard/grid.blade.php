@@ -15,7 +15,8 @@
         .dash-widget-title { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--bs-secondary-color, #6c757d); }
         .dash-kpi { height: 100%; display: flex; flex-direction: column; justify-content: center; }
         .dash-kpi-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
-        .dash-bare { position: relative; height: 100%; overflow: auto; }
+        .dash-bare { position: relative; height: 100%; overflow: hidden; }
+        .dash-bare:hover { overflow-y: auto; overflow-x: hidden; }
         .dash-bare > .card, .dash-bare > .row > [class*="col"] > .card { height: 100%; margin-bottom: 0 !important; }
         .dash-tools { position: absolute; top: 6px; right: 6px; z-index: 5; display: none; gap: 4px; background: #fffc; border-radius: 6px; padding: 2px; }
         .dash-editing .dash-tools { display: flex; }
@@ -162,7 +163,9 @@
                 const def = catalogByKey[item.key];
                 if (!def) return;
                 meta.set(item.id, {key: item.key, config: item.config || {}});
-                const node = {id: item.id, x: item.x, y: item.y, w: item.w, h: item.h, minW: 2, minH: 1, content: itemHtml(item.id, def, item.config || {})};
+                const minW = def.min_w || def.minW || 2;
+                const minH = def.min_h || def.minH || 1;
+                const node = {id: item.id, x: item.x, y: item.y, w: item.w, h: item.h, minW: minW, minH: minH, content: itemHtml(item.id, def, item.config || {})};
                 if (item.x === undefined) { delete node.x; delete node.y; }
                 grid.addWidget(node);
 

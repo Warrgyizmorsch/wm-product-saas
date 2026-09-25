@@ -593,7 +593,7 @@
                                             <div>
                                                 <div class="fw-bold text-dark">{{ $employee->display_name }}</div>
                                                 <div class="mt-1" style="font-size: 11px;"><code>{{ $employee->employee_id }}</code></div>
-                                                <div class="text-muted fs-12">{{ $employee->personal_email ?: 'No personal email' }}</div>
+                                                <div class="text-muted fs-12">{{ $employee->office_email ?: ($employee->user?->email ?: ($employee->personal_email ?: 'No email')) }}</div>
                                             </div>
                                         </div>
                                     </td>

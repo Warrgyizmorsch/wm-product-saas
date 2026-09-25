@@ -35,21 +35,28 @@ class AttendanceController extends Controller
         $sort = $request->input('sort', 'name_asc');
         $view = $request->input('view', 'date');
 
-        // Calculate simple stats for today
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $user = auth()->user();
+
+        // Calculate simple stats for today scoped to user's organizational boundary
         $today = \Carbon\Carbon::today()->format('Y-m-d');
+        $todayAttQuery = Attendance::where('date', $today);
+        $scopeService->applyRelatedScope($todayAttQuery, $user);
+
         $stats = [
-            'total_present' => Attendance::where('date', $today)->count(),
-            'total_on_break' => Attendance::where('date', $today)
+            'total_present' => (clone $todayAttQuery)->count(),
+            'total_on_break' => (clone $todayAttQuery)
                 ->whereHas('breaks', function($q) {
                     $q->whereNull('break_out');
                 })->count(),
-            'total_late' => Attendance::where('date', $today)->where('status', 'late')->count(),
-            'total_wfh' => Attendance::where('date', $today)->where('location_type', 'wfh')->count(),
+            'total_late' => (clone $todayAttQuery)->where('status', 'late')->count(),
+            'total_wfh' => (clone $todayAttQuery)->where('location_type', 'wfh')->count(),
         ];
         $departments = Department::where('status', true)->orderBy('name')->get();
 
         if ($view === 'corrections') {
             $query = \App\Domains\HRMS\Models\AttendanceCorrection::with(['employee', 'attendance']);
+            $scopeService->applyRelatedScope($query, $user);
 
             $correctionsStatus = $request->get('corrections_status');
             if (!empty($correctionsStatus)) {
@@ -168,11 +175,12 @@ class AttendanceController extends Controller
             if ($dates->isNotEmpty()) {
                 $dateStrings = $dates->pluck('date')->map(fn($d) => $d->format('Y-m-d'))->toArray();
                 
-                // Fetch active employees
-                $allEmployees = \App\Domains\HRMS\Models\Employee::where('status', true)->get();
+                // Fetch active employees scoped to user's organizational boundary
+                $allEmployees = \App\Domains\HRMS\Models\Employee::where('status', true)->forUserScope($user)->get();
                 
                 // Fetch attendances for these dates
                 $allAttendances = Attendance::whereIn('date', $dateStrings)
+                    ->forUserScope($user)
                     ->get()
                     ->groupBy(fn($a) => $a->date->format('Y-m-d'));
                 
@@ -244,6 +252,7 @@ class AttendanceController extends Controller
         // view === 'employee'
         $queryDate = $date ?? \Carbon\Carbon::today()->format('Y-m-d');
         $query = \App\Domains\HRMS\Models\Employee::where('status', true)
+            ->forUserScope($user)
             ->with(['department', 'designation', 'attendances' => function($q) use ($queryDate) {
                 $q->where('date', $queryDate)->with('breaks');
             }]);

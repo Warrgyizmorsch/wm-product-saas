@@ -986,7 +986,7 @@
                     <p class="text-muted fs-14 mb-2">{{ $employee->job_title ?: 'No Job Title' }} &bull; {{ $employee->department?->name ?? 'No Department' }}</p>
                     <div class="d-flex flex-wrap justify-content-center justify-content-md-start gap-3 text-muted fs-12">
                         <span><i class="feather-tag me-1"></i><code class="fs-13 fw-bold">{{ $employee->employee_id }}</code></span>
-                        <span><i class="feather-mail me-1"></i>{{ $employee->personal_email ?: 'No Email' }}</span>
+                        <span><i class="feather-mail me-1"></i>{{ $employee->office_email ?: ($employee->user?->email ?: ($employee->personal_email ?: 'No Email')) }}</span>
                         <span><i class="feather-phone me-1"></i>{{ $employee->personal_mobile_number ?: 'No Mobile' }}</span>
                     </div>
                 </div>

@@ -338,4 +338,24 @@ class WfhRequestController extends Controller
 
         return XlsxHelper::export($headers, $data, $filename);
     }
+
+    public function destroy(Request $request, WfhRequest $wfhRequest): RedirectResponse
+    {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $wfhRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+            if ($wfhRequest->status !== 'pending') {
+                return redirect()->back()->with('error', 'Only pending applications can be deleted.');
+            }
+        }
+
+        $wfhRequest->delete();
+
+        return redirect()->back()->with('success', 'WFH application deleted successfully.');
+    }
 }

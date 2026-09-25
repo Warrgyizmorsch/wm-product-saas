@@ -396,17 +396,16 @@
                                         @if($isAdmin)
                                             @if($req->status === 'cancellation_requested')
                                                 {{-- Cancellation dropdown: Accept / Deny --}}
-                                                <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                <div class="dropdown d-inline-block position-relative">
                                                     <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
                                                             type="button" 
                                                             data-bs-toggle="dropdown" 
-                                                            data-bs-display="static"
                                                             aria-expanded="false"
                                                             style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;"
                                                             title="{{ __('hrms.wfh.status') }}">
                                                         <span>{{ __('hrms.wfh.status') }}</span>
                                                     </button>
-                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1050; background: #ffffff;">
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1060; background: #ffffff;">
                                                         <li>
                                                             <form method="POST" action="{{ route('hrms.wfh.approve-cancellation', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Approve this WFH cancellation?', { title: 'Approve Cancellation', variant: 'success', confirmButtonText: 'Approve' })" class="m-0">
                                                                 @csrf
@@ -430,17 +429,16 @@
 
                                             @elseif(!in_array($req->status, ['cancelled']))
                                                 {{-- Normal status dropdown: Approved / Rejected / Pending --}}
-                                                <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                <div class="dropdown d-inline-block position-relative">
                                                     <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
                                                             type="button" 
                                                             data-bs-toggle="dropdown" 
-                                                            data-bs-display="static"
                                                             aria-expanded="false"
                                                             style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;"
                                                             title="Change Status">
                                                         <span>{{ $statusBadge['lbl'] }}</span>
                                                     </button>
-                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1050; background: #ffffff;">
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1060; background: #ffffff;">
                                                         <li>
                                                             <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}"
                                                                href="#"
@@ -470,29 +468,16 @@
                                                 </div>
                                             @endif
 
-                                            {{-- Unified Withdraw / Cancellation Delete button --}}
-                                            @if($req->canWithdraw())
-                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Withdraw this WFH application?', { title: 'Withdraw WFH Application', variant: 'warning', confirmButtonText: 'Withdraw' })" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger border" 
-                                                            title="Withdraw Application"
-                                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                        <i class="feather-trash-2 fs-14"></i>
-                                                    </button>
-                                                </form>
-                                            @elseif($req->canRequestCancellation())
-                                                <button type="button" class="btn btn-sm btn-soft-danger border" 
-                                                        title="Request Cancellation"
-                                                        onclick="openWfhCancellationModal({{ $req->id }}, '{{ route('hrms.wfh.request-cancellation', $req->id) }}')"
+                                            {{-- Admin Delete button --}}
+                                            <form method="POST" action="{{ route('hrms.wfh.destroy', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this WFH application?', { title: 'Delete WFH Application', variant: 'danger', confirmButtonText: 'Delete' })" class="d-inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-soft-danger border" 
+                                                        title="Delete Application"
                                                         style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
                                                     <i class="feather-trash-2 fs-14"></i>
                                                 </button>
-                                            @else
-                                                <button type="button" class="btn btn-sm btn-light border disabled" 
-                                                        style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled>
-                                                    <i class="feather-trash-2 fs-14"></i>
-                                                </button>
-                                            @endif
+                                            </form>
 
                                         @else
                                             {{-- Non-admin actions --}}

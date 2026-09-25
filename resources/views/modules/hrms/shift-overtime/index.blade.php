@@ -245,9 +245,9 @@
     @endif
 
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
-        <div class="row">
+        <div class="row mx-0">
             {{-- Tabs Header (matching Leave Module styling) --}}
-            <div class="col-12 mb-2">
+            <div class="col-12 px-0 mb-2">
                 <ul class="nav gap-2 border-bottom pb-2" id="shiftOvertimeTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link @if($activeTab === 'shift') active @endif" id="tab-shift" data-bs-toggle="tab" data-bs-target="#shift-pane" type="button" role="tab" aria-controls="shift-pane" aria-selected="@if($activeTab === 'shift') true @else false @endif">
@@ -263,7 +263,7 @@
             </div>
 
             {{-- Tab Content --}}
-            <div class="col-12">
+            <div class="col-12 px-0">
                 <div class="tab-content" id="shiftOvertimeTabContent">
                     
                     @include('modules.hrms.shift-overtime.tabs.shift')
@@ -648,6 +648,38 @@
             bootstrap.Modal.getInstance(document.getElementById('rejectOvertimeTabModal')).hide();
             form.submit();
         });
+
+        window.openShiftCancellationModal = function (id, url) {
+            var form = document.getElementById('shiftCancellationForm');
+            if (form) {
+                form.action = url;
+            }
+            var reasonInput = document.getElementById('shift_cancellation_reason');
+            if (reasonInput) {
+                reasonInput.value = '';
+            }
+            var modalEl = document.getElementById('shiftCancellationModal');
+            if (modalEl) {
+                var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            }
+        };
+
+        window.openOvertimeCancellationModal = function (id, url) {
+            var form = document.getElementById('overtimeCancellationForm');
+            if (form) {
+                form.action = url;
+            }
+            var reasonInput = document.getElementById('overtime_cancellation_reason');
+            if (reasonInput) {
+                reasonInput.value = '';
+            }
+            var modalEl = document.getElementById('overtimeCancellationModal');
+            if (modalEl) {
+                var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            }
+        };
 
         // Maintain active tab in query parameters upon tab click and toggle button views
         const tabElList = [].slice.call(document.querySelectorAll('#shiftOvertimeTabs button[data-bs-toggle="tab"]'));
