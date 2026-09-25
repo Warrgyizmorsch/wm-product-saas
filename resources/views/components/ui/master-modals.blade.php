@@ -19,6 +19,10 @@
 @php
 $uomOptions = [];
 $vendorOptions = [];
+$salesAccountOptions = ['' => 'Select Sales Account'];
+$purchaseAccountOptions = ['' => 'Select Purchase Account'];
+$inventoryAccountOptions = ['' => 'Select Inventory Account'];
+
 try {
     if (class_exists(\App\Domains\Inventory\Models\Uom::class)) {
         $uomOptions = \App\Domains\Inventory\Models\Uom::all()->mapWithKeys(function($uom) {
@@ -27,6 +31,27 @@ try {
     }
     if (class_exists(\App\Domains\Inventory\Models\Vendor::class)) {
         $vendorOptions = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->pluck('name', 'id')->toArray();
+    }
+    if (class_exists(\App\Domains\Accounting\Models\ChartOfAccount::class)) {
+        $tenantId = tenant_id() ?? (auth()->user()?->tenant_id ?? 1);
+        $coas = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+            ->where(function($q) use ($tenantId) {
+                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            })
+            ->where('is_active', true)
+            ->orderBy('code', 'asc')
+            ->get();
+
+        foreach ($coas as $coa) {
+            $label = ($coa->code ? $coa->code . ' - ' : '') . $coa->name;
+            if ($coa->type === 'income') {
+                $salesAccountOptions[$coa->id] = $label;
+            } elseif ($coa->type === 'expense') {
+                $purchaseAccountOptions[$coa->id] = $label;
+            } elseif ($coa->type === 'asset') {
+                $inventoryAccountOptions[$coa->id] = $label;
+            }
+        }
     }
 } catch (\Exception $e) {}
 
@@ -55,21 +80,9 @@ $masterDefinitions = [
             ]]],
             ['component' => 'input',  'props' => ['label' => 'Standard Unit Cost',    'name' => 'unit_cost', 'type' => 'number', 'step' => 'any', 'placeholder' => '0.00', 'value' => '0.00']],
             ['component' => 'input',  'props' => ['label' => 'Selling Price',         'name' => 'selling_price', 'type' => 'number', 'step' => 'any', 'placeholder' => '0.00', 'value' => '0.00']],
-            ['component' => 'select', 'props' => ['label' => 'Sales Account',          'name' => 'sales_account', 'required' => true, 'selected' => 'Sales Income', 'options' => [
-                'Sales Income'    => 'Sales Income Account',
-                'General Income'  => 'General Income Account',
-                'Interest Income' => 'Interest Income Account',
-            ]]],
-            ['component' => 'select', 'props' => ['label' => 'Purchase Account',       'name' => 'purchase_account', 'required' => true, 'selected' => 'Cost of Goods Sold', 'options' => [
-                'Cost of Goods Sold' => 'Cost of Goods Sold (COGS)',
-                'Purchases'          => 'Purchases Expense Account',
-                'Job Costs'          => 'Job Costs Expense Account',
-            ]]],
-            ['component' => 'select', 'props' => ['label' => 'Inventory Account',      'name' => 'inventory_account', 'required' => true, 'selected' => 'Inventory Asset', 'options' => [
-                'Inventory Asset'      => 'Inventory Asset Account',
-                'Raw Materials Stock'  => 'Raw Materials Stock',
-                'Finished Goods Stock' => 'Finished Goods Stock',
-            ]]],
+            ['component' => 'select', 'props' => ['label' => 'Sales Account',          'name' => 'sales_account', 'options' => $salesAccountOptions]],
+            ['component' => 'select', 'props' => ['label' => 'Purchase Account',       'name' => 'purchase_account', 'options' => $purchaseAccountOptions]],
+            ['component' => 'select', 'props' => ['label' => 'Inventory Account',      'name' => 'inventory_account', 'options' => $inventoryAccountOptions]],
         ],
     ],
     'uom' => [
@@ -257,9 +270,9 @@ $masterDefinitions = [
                                 type="select"
                                 label="Sales Account"
                                 name="sales_account"
-                                :required="true"
                             >
-                                <option value="Sales Income" selected>Sales Income Account</option>
+                                <option value="" selected>Select Sales Account</option>
+                                <option value="Sales Income">Sales Income Account</option>
                                 <option value="General Income">General Income Account</option>
                                 <option value="Interest Income">Interest Income Account</option>
                             </x-ui.odoo-form-ui>
@@ -268,9 +281,9 @@ $masterDefinitions = [
                                 type="select"
                                 label="Purchase Acc."
                                 name="purchase_account"
-                                :required="true"
                             >
-                                <option value="Cost of Goods Sold" selected>Cost of Goods Sold (COGS)</option>
+                                <option value="" selected>Select Purchase Account</option>
+                                <option value="Cost of Goods Sold">Cost of Goods Sold (COGS)</option>
                                 <option value="Purchases">Purchases Expense Account</option>
                                 <option value="Job Costs">Job Costs Expense Account</option>
                             </x-ui.odoo-form-ui>
@@ -279,9 +292,9 @@ $masterDefinitions = [
                                 type="select"
                                 label="Inventory Acc."
                                 name="inventory_account"
-                                :required="true"
                             >
-                                <option value="Inventory Asset" selected>Inventory Asset Account</option>
+                                <option value="" selected>Select Inventory Account</option>
+                                <option value="Inventory Asset">Inventory Asset Account</option>
                                 <option value="Raw Materials Stock">Raw Materials Stock</option>
                                 <option value="Finished Goods Stock">Finished Goods Stock</option>
                             </x-ui.odoo-form-ui>

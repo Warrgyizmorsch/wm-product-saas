@@ -5,6 +5,13 @@
 @section('breadcrumb', 'Tenant Console / Subscription')
 
 @section('content')
+    @php
+        // "₹1,250 /user/month billed yearly" (or month-to-month when only monthly is sold).
+        $perUser = fn (array $prices) => $prices['yearly'] !== null
+            ? '₹'.number_format($prices['yearly']).' /user/month billed yearly'
+            : '₹'.number_format($prices['monthly']).' /user/month';
+        $checkoutAvailable = collect($planPrices)->contains(fn ($p) => $p['monthly'] !== null || $p['yearly'] !== null);
+    @endphp
 
     <x-ui.card class="mb-4">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
@@ -12,15 +19,31 @@
                 <span class="text-muted fs-12 text-uppercase">Current Plan</span>
                 <h3 class="mb-0 mt-1">{{ $currentPlan?->name ?? ucfirst($tenant->plan ?? 'Starter') }}</h3>
                 @if ($currentPlan)
+                    @php $current = $planPrices[$currentPlan->id] ?? ['monthly' => null, 'yearly' => null]; @endphp
                     <span class="fs-13 text-muted">
-                        {{ $currentPlan->price > 0 ? $currentPlan->currency.' '.number_format($currentPlan->price).' / '.$currentPlan->billing_cycle : 'Free' }}
+                        @if ($liveSubscription)
+                            {{ $liveSubscription->seats }} users &middot; billed {{ $liveSubscription->cycle }}
+                            &middot; ₹{{ number_format($liveSubscription->total / 100, 2) }} incl. GST
+                            @if ($liveSubscription->current_end)
+                                &middot; renews {{ $liveSubscription->current_end->format('d M Y') }}
+                            @endif
+                            @if ($liveSubscription->grace_ends_at)
+                                <span class="d-block text-danger">Renewal payment failed — please update your payment method before {{ $liveSubscription->grace_ends_at->format('d M Y') }}.</span>
+                            @endif
+                        @elseif ($current['yearly'] !== null || $current['monthly'] !== null)
+                            {{ $perUser($current) }} &middot; no paid subscription yet
+                        @else
+                            {{ $currentPlan->price > 0 ? $currentPlan->currency.' '.number_format($currentPlan->price).' / '.$currentPlan->billing_cycle : 'Free' }}
+                        @endif
                     </span>
                 @endif
             </div>
             <div class="text-end fs-13 text-muted">
-                @can('updateSubscription', $tenant)
-                    <a href="{{ route('platform.billing.checkout') }}" class="btn btn-primary btn-sm mb-2">Choose plan, users &amp; add-ons</a>
-                @endcan
+                @if ($checkoutAvailable)
+                    @can('updateSubscription', $tenant)
+                        <a href="{{ route('platform.billing.checkout') }}" class="btn btn-primary btn-sm mb-2">Choose plan, users &amp; add-ons</a>
+                    @endcan
+                @endif
                 <div>Status: <x-ui.badge variant="{{ $tenant->subscription_status === 'active' ? 'success' : 'warning' }}" soft>{{ ucfirst($tenant->subscription_status ?? 'trial') }}</x-ui.badge></div>
                 @if ($tenant->plan_started_at)
                     <div class="mt-1">Since {{ $tenant->plan_started_at->format('d M Y') }}</div>
@@ -33,7 +56,9 @@
     </x-ui.card>
 
     @php
-        $installableModules = collect($modules)->where('state', 'available');
+        $isRecurring = fn (array $module) => $module['prices']['monthly'] !== null || $module['prices']['yearly'] !== null;
+        // Only modules without per-user pricing can still be bought with the old one-time fee.
+        $installableModules = collect($modules)->where('state', 'available')->reject($isRecurring);
         $canManageModules = auth()->user()?->can('updateSubscription', $tenant) ?? false;
     @endphp
 
@@ -45,11 +70,14 @@
 
         <div class="row g-3 erp-apps-grid">
             @foreach ($modules as $module)
-                @php $tag = $module['state'] === 'available' ? 'label' : 'div'; @endphp
+                @php
+                    $legacyBuy = $module['state'] === 'available' && ! $isRecurring($module);
+                    $tag = $legacyBuy ? 'label' : 'div';
+                @endphp
                 <div class="col-sm-6 col-lg-3">
-                    <{{ $tag }} class="card h-100 erp-app-tile {{ $module['installed'] ? 'installed' : ($module['state'] === 'available' ? 'selectable' : 'uninstalled') }}">
+                    <{{ $tag }} class="card h-100 erp-app-tile {{ $module['installed'] ? 'installed' : ($module['state'] === 'available' ? ($legacyBuy ? 'selectable' : '') : 'uninstalled') }}">
                         <div class="card-body d-flex flex-column align-items-center text-center gap-3 py-4 position-relative">
-                            @if ($module['state'] === 'available')
+                            @if ($legacyBuy)
                                 <input type="checkbox" name="modules[]" value="{{ $module['key'] }}" class="form-check-input erp-app-tile-check">
                             @endif
 
@@ -90,7 +118,14 @@
                                     @endif
                                     @break
                                 @default
-                                    <span class="fs-13 fw-bolder text-dark">{{ $moduleCurrency }} {{ number_format($modulePrice) }}</span>
+                                    @if ($isRecurring($module))
+                                        <span class="fs-13 fw-bolder text-dark">{{ $perUser($module['prices']) }}</span>
+                                        @if ($canManageModules && $checkoutAvailable)
+                                            <a href="{{ route('platform.billing.checkout', ['modules' => [$module['key']]]) }}" class="btn btn-sm btn-primary">Add to subscription</a>
+                                        @endif
+                                    @else
+                                        <span class="fs-13 fw-bolder text-dark">{{ $moduleCurrency }} {{ number_format($modulePrice) }} one-time</span>
+                                    @endif
                             @endswitch
                         </div>
                     </{{ $tag }}>
@@ -120,12 +155,24 @@
                             <x-ui.badge variant="primary" soft>Current</x-ui.badge>
                         @endif
                     </div>
+                    @php
+                        $prices = $planPrices[$plan->id];
+                        $perUserPlan = $prices['monthly'] !== null || $prices['yearly'] !== null;
+                    @endphp
                     <div class="mb-3">
-                        <span class="fs-24 fw-bold text-dark">
-                            {{ $plan->price > 0 ? $plan->currency.' '.number_format($plan->price) : 'Free' }}
-                        </span>
-                        @if ($plan->price > 0)
-                            <span class="fs-12 text-muted">/ {{ $plan->billing_cycle }}</span>
+                        @if ($perUserPlan)
+                            <span class="fs-24 fw-bold text-dark">₹{{ number_format($prices['yearly'] ?? $prices['monthly']) }}</span>
+                            <span class="fs-12 text-muted">/user/month{{ $prices['yearly'] !== null ? ' billed yearly' : '' }}</span>
+                            @if ($prices['yearly'] !== null && $prices['monthly'] !== null)
+                                <span class="d-block fs-12 text-muted">₹{{ number_format($prices['monthly']) }} /user month-to-month</span>
+                            @endif
+                        @else
+                            <span class="fs-24 fw-bold text-dark">
+                                {{ $plan->price > 0 ? $plan->currency.' '.number_format($plan->price) : 'Free' }}
+                            </span>
+                            @if ($plan->price > 0)
+                                <span class="fs-12 text-muted">/ {{ $plan->billing_cycle }}</span>
+                            @endif
                         @endif
                     </div>
                     @if ($plan->description)
@@ -141,7 +188,13 @@
                         @endif
                     </ul>
 
-                    @if ($isCurrent)
+                    @if ($perUserPlan)
+                        @can('updateSubscription', $tenant)
+                            <a href="{{ route('platform.billing.checkout', ['plan' => $plan->id]) }}" class="btn btn-sm w-100 {{ $isCurrent ? 'btn-light border' : 'btn-primary' }}">
+                                {{ $isCurrent ? 'Subscribe — choose users & add-ons' : 'Choose '.$plan->name }}
+                            </a>
+                        @endcan
+                    @elseif ($isCurrent)
                         <x-ui.button variant="light" size="sm" class="w-100 border" disabled>Current Plan</x-ui.button>
                     @elseif ($plan->price > 0)
                         <x-ui.button type="button" variant="primary" size="sm" class="w-100 js-razorpay-checkout"
@@ -194,7 +247,9 @@
                             <tr>
                                 <td class="fs-13">{{ $payment->created_at->format('d M Y, h:i A') }}</td>
                                 <td class="fs-13">
-                                    @if ($payment->purpose === \App\Domains\Platform\Models\SubscriptionPayment::PURPOSE_MODULE_ADDON)
+                                    @if ($payment->purpose === \App\Domains\Platform\Models\SubscriptionPayment::PURPOSE_SUBSCRIPTION)
+                                        Subscription: {{ $payment->plan?->name ?? '—' }}
+                                    @elseif ($payment->purpose === \App\Domains\Platform\Models\SubscriptionPayment::PURPOSE_MODULE_ADDON)
                                         Module add-on:
                                         {{ collect($payment->modules)->map(fn ($m) => config("navigation.apps.$m.label", ucfirst($m)))->implode(', ') }}
                                     @else

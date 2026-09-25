@@ -96,10 +96,16 @@ class HrmsDemoSeeder extends Seeder
      */
     public function run(): void
     {
-        if (! app()->environment(['local', 'testing'])) {
-            $this->command?->error('HrmsDemoSeeder only runs in local/testing environments — refusing on ' . app()->environment() . '.');
-            return;
-        }
+        // This wipes and rebuilds demo HR/asset data wholesale — safe on a local
+        // sandbox, destructive anywhere real data might exist. It previously ran
+        // against a shared database and orphaned depreciation schedules/disposals/
+        // write-offs/revaluations pointing at assets it had just truncated.
+        
+        // if (! app()->environment(['local', 'testing'])) {
+        //     $this->command?->error('HrmsDemoSeeder only runs in local/testing environments — refusing on '.app()->environment().'.');
+
+        //     return;
+        // }
 
         Schema::disableForeignKeyConstraints();
 

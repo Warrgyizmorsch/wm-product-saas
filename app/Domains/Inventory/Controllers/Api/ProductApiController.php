@@ -708,9 +708,9 @@ class ProductApiController extends Controller
             $valuation      = $data['inventory_valuation_method'] ?? ($data['inventory_and_stock']['inventory_valuation_method'] ?? 'FIFO');
 
             // Accounting
-            $salesAccount     = $data['sales_account'] ?? ($data['accounting']['sales_account'] ?? 'Sales - Goods');
-            $purchaseAccount  = $data['purchase_account'] ?? ($data['accounting']['purchase_account'] ?? 'Cost of Goods Sold');
-            $inventoryAccount = $data['inventory_account'] ?? ($data['accounting']['inventory_account'] ?? ($itemType === 'Goods' ? 'Inventory Asset' : null));
+            $salesAccount     = $data['sales_account'] ?? ($data['accounting']['sales_account'] ?? null);
+            $purchaseAccount  = $data['purchase_account'] ?? ($data['accounting']['purchase_account'] ?? null);
+            $inventoryAccount = $data['inventory_account'] ?? ($data['accounting']['inventory_account'] ?? null);
 
             // Tracking
             $trackSerial = !empty($data['track_serial_number']) || !empty($data['tracking']['track_serial_number']);

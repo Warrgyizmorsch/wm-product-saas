@@ -213,6 +213,16 @@ class ProductController extends Controller
         $this->authorize('update', $product);
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
+        if ($product->stockTransactions()->exists() && $request->filled('inventory_valuation_method')) {
+            $existingVal = $product->inventory_valuation_method ?: ($product->valuation_method ?: 'FIFO');
+            $requestedVal = $request->input('inventory_valuation_method');
+            if (strtolower(str_replace(' ', '_', $existingVal)) !== strtolower(str_replace(' ', '_', $requestedVal))) {
+                return back()->withInput()->withErrors([
+                    'inventory_valuation_method' => 'Valuation method cannot be changed once stock transactions (GRN/Dispatch/Opening Stock) exist for this product.'
+                ]);
+            }
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'type' => 'nullable|in:finished_good,semi_finished,raw_material,component,service',
@@ -353,9 +363,6 @@ class ProductController extends Controller
             'supplier_method' => $request->input('supplier_method', 'buy'),
             'uom_id' => $defaultUomId,
             'inventory_valuation_method' => $request->input('inventory_valuation_method', 'FIFO'),
-            'sales_account' => $request->input('sales_account', '4000 Sales'),
-            'purchase_account' => $request->input('purchase_account', '5000 COGS'),
-            'inventory_account' => $request->input('inventory_account', '1400 Inventory'),
         ]);
 
         $validated = $request->validate([
@@ -376,9 +383,9 @@ class ProductController extends Controller
             'inventory_valuation_method' => 'required|in:FIFO,Weighted Average',
             'unit_cost' => 'nullable|numeric|min:0',
             'selling_price' => 'nullable|numeric|min:0',
-            'sales_account' => 'required|string|max:255',
-            'purchase_account' => 'required|string|max:255',
-            'inventory_account' => 'required|string|max:255',
+            'sales_account' => 'nullable|string|max:255',
+            'purchase_account' => 'nullable|string|max:255',
+            'inventory_account' => 'nullable|string|max:255',
             'preferred_vendor_id' => 'nullable|exists:vendors,id',
         ]);
 

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PlanController extends Controller
@@ -95,6 +96,11 @@ class PlanController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        $mistake = ModulePriceController::yearlyTotalMistake($validated['monthly_price_per_user'] ?? null, $validated['yearly_price_per_user'] ?? null);
+        if ($mistake !== null) {
+            throw ValidationException::withMessages(['yearly_price_per_user' => ucfirst($mistake)]);
+        }
 
         $validated['is_demo'] = $request->boolean('is_demo');
         $validated['is_active'] = $request->boolean('is_active');

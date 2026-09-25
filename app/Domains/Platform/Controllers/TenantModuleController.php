@@ -5,6 +5,7 @@ namespace App\Domains\Platform\Controllers;
 use App\Domains\Platform\Models\SubscriptionPayment;
 use App\Domains\Platform\Services\PaymentGatewayManager;
 use App\Domains\Platform\Services\SubscriptionPaymentService;
+use App\Domains\Platform\Services\SubscriptionPricing;
 use App\Domains\Platform\Services\TenantModuleService;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureTenantModuleAccess;
@@ -34,6 +35,7 @@ class TenantModuleController extends Controller
         private readonly PaymentGatewayManager $gateways,
         private readonly SubscriptionPaymentService $payments,
         private readonly TenantModuleService $modules,
+        private readonly SubscriptionPricing $pricing,
     ) {
     }
 
@@ -58,6 +60,17 @@ class TenantModuleController extends Controller
 
         if ($toBuy === []) {
             return response()->json(['message' => 'The selected modules are already installed.'], 422);
+        }
+
+        // Modules sold per user are recurring add-ons now — bought in the plan
+        // checkout, never with the old one-time fee.
+        $recurring = array_values(array_filter($toBuy, fn (string $m) => $this->pricing->modulePricePerUser($m, 'monthly') !== null
+            || $this->pricing->modulePricePerUser($m, 'yearly') !== null));
+
+        if ($recurring !== []) {
+            return response()->json([
+                'message' => "{$this->modules->labels($recurring)} is billed per user — add it in the plan checkout.",
+            ], 422);
         }
 
         $states = $this->modules->states($tenant);

@@ -427,30 +427,13 @@ class StockService
             $product = Product::find($productId);
             $productName = $product ? $product->name : "Product #{$productId}";
 
-            $inventoryAccountName = $product ? $product->inventory_account : null;
-            if (!$inventoryAccountName && $product && $product->parent_id) {
-                $inventoryAccountName = $product->parent?->inventory_account;
-            }
-
-            $inventoryAcc = null;
-            if ($inventoryAccountName) {
-                $inventoryAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
-                    ->where(function ($q) use ($inventoryAccountName) {
-                        $q->where('name', $inventoryAccountName)
-                          ->orWhere('code', $inventoryAccountName);
-                    })->first();
-            }
-
-            if (!$inventoryAcc) {
-                $inventoryAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
-                    ->where(function ($q) {
-                        $q->where('code', '1200')->orWhere('name', 'like', '%Inventory%');
-                    })->first();
-            }
+            /** @var \App\Domains\Accounting\Services\AccountResolverService $accountResolver */
+            $accountResolver = app(\App\Domains\Accounting\Services\AccountResolverService::class);
+            $inventoryAcc = $accountResolver->resolveInventoryAccount($product, $tenantId);
 
             $equityAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
                 ->where(function ($q) {
-                    $q->where('code', '3010')->orWhere('code', '3020');
+                    $q->where('code', '3010')->orWhere('code', '3020')->orWhere('subtype', 'capital')->orWhere('type', 'equity');
                 })->first();
 
             if (!$inventoryAcc || !$equityAcc) {

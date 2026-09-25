@@ -36,6 +36,10 @@ class SalesOrderPolicy
 
     public function update(User $user, SalesOrder $order): bool
     {
+        if ($order->status !== 'Draft') {
+            return false;
+        }
+
         return $this->access->allows($user, 'sales.orders.update', [
             'tenant_id' => $order->tenant_id,
             'owner_id' => $order->sales_person_id,

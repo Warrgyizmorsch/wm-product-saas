@@ -145,16 +145,22 @@ class SalesOrderController extends Controller
         return redirect()->route('sales.orders.show', $order->id)->with('success', 'Sales Order successfully created!');
     }
 
-    public function show(int $id): View
+    public function show(int|string $id): View
     {
+        $id = (int) $id;
+        if ($id <= 0) abort(404, 'Sales Order not found.');
+
         $order = $this->orderRepo->findWithDetails($id);
         $this->authorize('view', $order);
 
         return view('modules.sales.orders.show', compact('order'));
     }
 
-    public function downloadPdf(int $id)
+    public function downloadPdf(int|string $id)
     {
+        $id = (int) $id;
+        if ($id <= 0) abort(404, 'Sales Order not found.');
+
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404, 'Sales Order not found.');
         $this->authorize('view', $order);
@@ -163,12 +169,21 @@ class SalesOrderController extends Controller
         return $pdf->download("SalesOrder_{$order->sales_order_number}.pdf");
     }
 
-    public function edit(int $id): View
+    public function edit(int|string $id): View|RedirectResponse
     {
+        $id = (int) $id;
+        if ($id <= 0) abort(404, 'Sales Order not found.');
+
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404, 'Sales Order not found.');
-        $this->authorize('update', $order);
 
+        if ($order->status !== 'Draft') {
+            return redirect()->route('sales.orders.show', $order->id)
+                ->with('error', 'Confirmed and processed Sales Orders cannot be modified.');
+        }
+
+        $this->authorize('update', $order);
+          
         $customers = Customer::query()->orderBy('name')->get();
         $products = Product::query()->where('status', 'active')->get();
         $salesReps = User::query()->orderBy('name')->get();
@@ -179,10 +194,19 @@ class SalesOrderController extends Controller
         return view('modules.sales.orders.edit', compact('order', 'customers', 'products', 'warehouses', 'salesReps', 'quotations', 'paymentTerms'));
     }
 
-    public function update(Request $request, int $id): RedirectResponse
+    public function update(Request $request, int|string $id): RedirectResponse
     {
+        $id = (int) $id;
+        if ($id <= 0) abort(404, 'Sales Order not found.');
+
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404, 'Sales Order not found.');
+
+        if ($order->status !== 'Draft') {
+            return redirect()->route('sales.orders.show', $order->id)
+                ->with('error', 'Confirmed and processed Sales Orders cannot be modified.');
+        }
+
         $this->authorize('update', $order);
 
         $validated = $request->validate([
@@ -225,8 +249,11 @@ class SalesOrderController extends Controller
         return redirect()->route('sales.orders.show', $order->id)->with('success', 'Sales Order successfully updated!');
     }
 
-    public function confirm(int $id): RedirectResponse
+    public function confirm(int|string $id): RedirectResponse
     {
+        $id = (int) $id;
+        if ($id <= 0) abort(404, 'Sales Order not found.');
+
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404, 'Sales Order not found.');
         $this->authorize('confirm', $order);
@@ -252,8 +279,11 @@ class SalesOrderController extends Controller
         return redirect()->route('sales.orders.show', $order->id)->with('success', 'Sales Order confirmed and Material Requirement generated successfully!');
     }
 
-    public function cancel(int $id): RedirectResponse
+    public function cancel(int|string $id): RedirectResponse
     {
+        $id = (int) $id;
+        if ($id <= 0) abort(404, 'Sales Order not found.');
+
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404, 'Sales Order not found.');
         $this->authorize('cancel', $order);
@@ -267,8 +297,11 @@ class SalesOrderController extends Controller
         return back()->with('success', 'Sales Order cancelled successfully.');
     }
 
-    public function destroy(int $id): RedirectResponse
+    public function destroy(int|string $id): RedirectResponse
     {
+        $id = (int) $id;
+        if ($id <= 0) abort(404, 'Sales Order not found.');
+
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404, 'Sales Order not found.');
         $this->authorize('delete', $order);

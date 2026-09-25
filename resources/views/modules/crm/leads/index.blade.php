@@ -417,11 +417,13 @@
                                         </x-slot:extraActions>
 
                                         {{-- Edit --}}
-                                        <li>
-                                            <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" class="dropdown-item">
-                                                <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('crm.edit_lead') }}
-                                            </a>
-                                        </li>
+                                        @if (!in_array(strtolower($lead->status ?? ''), ['dealing', 'won']))
+                                            <li>
+                                                <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" class="dropdown-item">
+                                                    <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('crm.edit_lead') }}
+                                                </a>
+                                            </li>
+                                        @endif
 
                                         {{-- Deal & Account options --}}
                                         @if ($lead->crm_deal_id)

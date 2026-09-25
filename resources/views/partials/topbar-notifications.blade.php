@@ -103,7 +103,7 @@
         window.markNotificationRead = function(id, event) {
             if (event) event.stopPropagation();
             $.ajax({
-                url: "/notifications/" + id + "/read",
+                url: "{{ url('notifications') }}/" + id + "/read",
                 type: "POST",
                 data: { _token: "{{ csrf_token() }}" },
                 success: function() {
@@ -121,7 +121,7 @@
         window.deleteNotificationItem = function(id, event) {
             if (event) event.stopPropagation();
             $.ajax({
-                url: "/notifications/" + id,
+                url: "{{ url('notifications') }}/" + id,
                 type: "DELETE",
                 data: { _token: "{{ csrf_token() }}" },
                 success: function() {
