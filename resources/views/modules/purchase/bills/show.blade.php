@@ -223,8 +223,8 @@
                             $taxRate = (float)($item->tax_percentage ?? 0);
                             $lineTax = $lineTaxableBase * ($taxRate / 100);
                             $lineTotal = (float)$item->total_amount;
-                            if ($lineTotal <= 0) {
-                                $lineTotal = $lineTaxableBase + $lineTax;
+                            if ($lineTotal <= 0 || ($isProRata && $lineTotal <= $lineSub)) {
+                                $lineTotal = round($lineTaxableBase + $lineTax, 2);
                             }
                         @endphp
                         <tr>

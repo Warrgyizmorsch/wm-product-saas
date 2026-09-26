@@ -13,6 +13,9 @@ use App\Domains\Purchase\Repositories\VendorBillRepository;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\ProductWarehouseStock;
+use App\Domains\Inventory\Models\StockTransaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -166,29 +169,57 @@ class VendorBillService
             $adjustment = (float) ($validated['adjustment'] ?? 0);
             $grandTotal = max(0, $grossBeforeTax + $freightAmount + $taxAmount + $adjustment);
 
-            // Calculate Landed Cost Revaluation Data for "to_be_billed" mode
+            // Calculate Landed Cost Revaluation Data and update Stock Valuation
             $revaluationData = null;
             $isCapitalizeAllocation = !in_array($freightAllocationMethod, ['none', 'direct_expense']);
-            if ($isFreightBilledOnInvoice && $freightAmount > 0 && $isCapitalizeAllocation) {
-                $revaluationItems = [];
-                foreach ($itemsData as $row) {
-                    $item = $row['item'];
-                    $poItem = $po ? $po->items->firstWhere('id', $item['purchase_order_item_id'] ?? null) : null;
-                    $productId = $item['product_id'] ?? $poItem?->product_id;
-                    $product = $productId ? \App\Domains\Inventory\Models\Product::find($productId) : null;
+            $hasFreightRevaluation = $isFreightBilledOnInvoice && $freightAmount > 0 && $isCapitalizeAllocation;
 
-                    $itemNetSub = max(0, $row['line_subtotal'] - $row['disc_amt']);
+            $revaluationItems = [];
+            $affectedProductWarehouse = [];
+            $processedTxnIds = [];
+
+            // Pre-load all products in a single batch query to prevent N+1 queries for large bills (100-300 items)
+            $allProductIds = array_filter(array_map(function ($row) use ($po) {
+                $item = $row['item'];
+                $poItem = $po ? $po->items->firstWhere('id', $item['purchase_order_item_id'] ?? null) : null;
+                return $item['product_id'] ?? $poItem?->product_id;
+            }, $itemsData));
+            $productsById = !empty($allProductIds) ? Product::whereIn('id', $allProductIds)->get()->keyBy('id') : collect();
+
+            // Pre-load all GRN transactions in 1 query if linked to GRN
+            $grnTxnsByProduct = collect();
+            if ($grn) {
+                $grnTxnsByProduct = StockTransaction::where('tenant_id', $tenantId)
+                    ->where('warehouse_id', $grn->warehouse_id)
+                    ->where('type', 'IN')
+                    ->where('reference_type', 'Purchase Receipt')
+                    ->where('reference_id', $grn->id)
+                    ->get()
+                    ->groupBy('product_id');
+            }
+
+            foreach ($itemsData as $row) {
+                $item = $row['item'];
+                $poItem = $po ? $po->items->firstWhere('id', $item['purchase_order_item_id'] ?? null) : null;
+                $productId = $item['product_id'] ?? $poItem?->product_id;
+                $product = $productId ? ($productsById[$productId] ?? null) : null;
+
+                $itemNetSub = max(0, $row['line_subtotal'] - $row['disc_amt']);
+                $freightShare = 0.0;
+                if ($hasFreightRevaluation) {
                     if ($freightAllocationMethod === 'by_quantity' && $totalQtySum > 0) {
                         $freightShare = round($freightAmount * ($row['qty'] / $totalQtySum), 2);
                     } else {
                         // by_amount (default)
                         $freightShare = ($grossBeforeTax > 0) ? round($freightAmount * ($itemNetSub / $grossBeforeTax), 2) : 0;
                     }
+                }
 
-                    $freightPerUnit = ($row['qty'] > 0) ? round($freightShare / $row['qty'], 2) : 0;
-                    $baseUnitCost = $row['price'];
-                    $newLandedCost = round($baseUnitCost + $freightPerUnit, 2);
+                $freightPerUnit = ($row['qty'] > 0 && $hasFreightRevaluation) ? round($freightShare / $row['qty'], 2) : 0;
+                $baseUnitCost = $row['price'];
+                $newLandedCost = round($baseUnitCost + $freightPerUnit, 2);
 
+                if ($hasFreightRevaluation) {
                     $revaluationItems[] = [
                         'product_id' => $productId,
                         'product_name' => $product?->name ?? 'Item #' . $productId,
@@ -199,20 +230,79 @@ class VendorBillService
                         'freight_per_unit' => $freightPerUnit,
                         'new_landed_cost' => $newLandedCost,
                     ];
+                }
 
-                    // Perform Stock Valuation Revaluation in warehouse stock ONLY
-                    if ($product && $grn) {
-                        $whStock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('product_id', $product->id)
-                            ->where('warehouse_id', $grn->warehouse_id)
-                            ->first();
+                // 1. Update matching StockTransaction for this GRN and product only if cost changed or freight applied
+                if ($product && $grn && isset($grnTxnsByProduct[$productId])) {
+                    $availableTxns = $grnTxnsByProduct[$productId]->reject(fn($t) => in_array($t->id, $processedTxnIds));
+                    
+                    $matchedTxn = null;
+                    if ($availableTxns->count() === 1) {
+                        $matchedTxn = $availableTxns->first();
+                    } else {
+                        $matchedTxn = $availableTxns->first(fn($t) => abs((float)$t->quantity - (float)$row['qty']) < 0.001) ?? $availableTxns->first();
+                    }
 
-                        if ($whStock) {
-                            $whStock->unit_cost = $newLandedCost;
-                            $whStock->save();
+                    if ($matchedTxn) {
+                        $processedTxnIds[] = $matchedTxn->id;
+                        // Only perform update and queue for avg cost recalculation if the cost actually changed!
+                        if (abs((float)$matchedTxn->unit_cost - $newLandedCost) > 0.001) {
+                            $matchedTxn->unit_cost = $newLandedCost;
+                            $matchedTxn->total_value = round($newLandedCost * (float)$matchedTxn->quantity, 2);
+                            $matchedTxn->save();
+
+                            $key = "{$productId}_{$grn->warehouse_id}";
+                            $affectedProductWarehouse[$key] = [
+                                'product_id'   => $productId,
+                                'warehouse_id' => $grn->warehouse_id,
+                            ];
                         }
                     }
                 }
+            }
 
+            // 2. Recalculate warehouse stock unit_cost only for products whose cost actually changed
+            if (!empty($affectedProductWarehouse)) {
+                $affectedProductIds = array_column($affectedProductWarehouse, 'product_id');
+                
+                $activeInTxns = StockTransaction::where('tenant_id', $tenantId)
+                    ->whereIn('product_id', $affectedProductIds)
+                    ->where('warehouse_id', $grn->warehouse_id)
+                    ->where('type', 'IN')
+                    ->where('balance_qty', '>', 0)
+                    ->get()
+                    ->groupBy('product_id');
+
+                $warehouseStocks = ProductWarehouseStock::where('tenant_id', $tenantId)
+                    ->whereIn('product_id', $affectedProductIds)
+                    ->where('warehouse_id', $grn->warehouse_id)
+                    ->get()
+                    ->keyBy('product_id');
+
+                foreach ($affectedProductWarehouse as $pair) {
+                    $pId = $pair['product_id'];
+                    $wId = $pair['warehouse_id'];
+
+                    $inTxns = $activeInTxns[$pId] ?? collect();
+                    $totalVal = $inTxns->sum(fn($t) => (float)$t->unit_cost * (float)$t->balance_qty);
+                    $totalQty = $inTxns->sum(fn($t) => (float)$t->balance_qty);
+                    $newAvgCost = ($totalQty > 0) ? round($totalVal / $totalQty, 2) : 0.0;
+
+                    if (isset($warehouseStocks[$pId])) {
+                        $whStock = $warehouseStocks[$pId];
+                        $whStock->unit_cost = $newAvgCost;
+                        $whStock->save();
+                    }
+
+                    $prod = $productsById[$pId] ?? null;
+                    if ($prod && !$prod->cost_price) {
+                        $prod->cost_price = $newAvgCost;
+                        $prod->save();
+                    }
+                }
+            }
+
+            if ($hasFreightRevaluation) {
                 $revaluationData = [
                     'mode' => $freightTerms,
                     'allocation_method' => $freightAllocationMethod,
@@ -262,13 +352,18 @@ class VendorBillService
                 $itemNetSub = max(0, $row['line_subtotal'] - $row['disc_amt']);
                 $itemTaxRate = ($taxType === 'order_wise_tax') ? $orderTaxPercent : $row['tax_rate'];
 
-                $finalLineTotal = $row['line_total'];
-                if ($freightTaxMethod === 'pro_rata' && $isFreightBilledOnInvoice && $freightAmount > 0 && $grossBeforeTax > 0) {
-                    $ratio = $itemNetSub / $grossBeforeTax;
-                    $itemFreightShare = $freightAmount * $ratio;
-                    $lineTaxWithFreight = ($itemNetSub + $itemFreightShare) * ($itemTaxRate / 100);
-                    $finalLineTotal = round($itemNetSub + $itemFreightShare + $lineTaxWithFreight, 2);
+                $itemFreightShare = 0.0;
+                if ($isFreightBilledOnInvoice && $freightAmount > 0) {
+                    if ($freightAllocationMethod === 'by_quantity' && $totalQtySum > 0) {
+                        $itemFreightShare = round($freightAmount * ($row['qty'] / $totalQtySum), 2);
+                    } else {
+                        $itemFreightShare = ($grossBeforeTax > 0) ? round($freightAmount * ($itemNetSub / $grossBeforeTax), 2) : 0;
+                    }
                 }
+
+                $lineTaxableBase = $itemNetSub + $itemFreightShare;
+                $lineTax = $lineTaxableBase * ($itemTaxRate / 100);
+                $finalLineTotal = round($lineTaxableBase + $lineTax, 2);
 
                 VendorBillItem::create([
                     'tenant_id'                  => $tenantId,
