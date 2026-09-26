@@ -95,6 +95,56 @@
             "key": "idempotency_key",
             "value": "",
             "type": "string"
+        },
+        {
+            "key": "product_id",
+            "value": "130",
+            "type": "string"
+        },
+        {
+            "key": "raw_material_id",
+            "value": "123",
+            "type": "string"
+        },
+        {
+            "key": "uom_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "base_uom_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "warehouse_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "supplier_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "vendor_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "reservation_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "quality_plan_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "dynamic_idempotency_key",
+            "value": "",
+            "type": "string"
         }
     ],
     "auth": {
@@ -849,7 +899,7 @@
                         "description": "**Purpose**: Create a new Bill of Materials in `draft` status.\n\n- **Validation**: `StoreBomApiRequest`\n- **Authorization**: Policy `create` (`production.bom.create`)\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"product_id\": 1,\n    \"bom_type\": \"manufacturing\",\n    \"base_quantity\": 1,\n    \"version\": \"1.0\",\n    \"effective_date\": \"2026-09-22\",\n    \"items\": [\n        {\n            \"material_id\": 2,\n            \"quantity\": 4,\n            \"scrap_factor\": 2.5\n        },\n        {\n            \"material_id\": 3,\n            \"quantity\": 1,\n            \"scrap_factor\": 0\n        }\n    ]\n}",
+                            "raw": "{\n    \"product_id\": \"{{product_id}}\",\n    \"base_uom_id\": \"{{uom_id}}\",\n    \"bom_name\": \"Standard Hydraulic Pump Assembly BOM\",\n    \"bom_type\": \"manufacturing\",\n    \"usage_context\": \"manufacturing\",\n    \"base_quantity\": 1,\n    \"routing_id\": \"{{routing_id}}\",\n    \"version\": \"1.0\",\n    \"effective_date\": \"2026-09-25\",\n    \"notes\": \"Primary production BOM specification with components and scrap rates.\",\n    \"items\": [\n        {\n            \"material_id\": \"{{raw_material_id}}\",\n            \"quantity\": 4,\n            \"uom_id\": \"{{uom_id}}\",\n            \"material_scrap_percentage\": 2.5,\n            \"sequence\": 1,\n            \"is_critical\": true,\n            \"notes\": \"Main structural housing component\"\n        },\n        {\n            \"material_id\": \"{{raw_material_id}}\",\n            \"quantity\": 2,\n            \"uom_id\": \"{{uom_id}}\",\n            \"material_scrap_percentage\": 1,\n            \"sequence\": 2,\n            \"is_critical\": false,\n            \"notes\": \"Secondary shaft seal\"\n        }\n    ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -1086,7 +1136,7 @@
                         "description": "**Purpose**: Update an existing draft BOM's base quantity, effective date, or item lines.\n\n- **Validation**: `UpdateBomApiRequest`\n- **Authorization**: Policy `update` (`production.bom.update`)\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"base_quantity\": 2,\n    \"effective_date\": \"2026-10-01\",\n    \"items\": [\n        {\n            \"material_id\": 2,\n            \"quantity\": 8,\n            \"scrap_factor\": 2\n        }\n    ]\n}",
+                            "raw": "{\n    \"bom_name\": \"Standard Hydraulic Pump Assembly BOM (Revised)\",\n    \"base_quantity\": 2,\n    \"routing_id\": \"{{routing_id}}\",\n    \"effective_date\": \"2026-10-01\",\n    \"notes\": \"Revised base lot quantity and material allowances.\",\n    \"items\": [\n        {\n            \"material_id\": \"{{raw_material_id}}\",\n            \"quantity\": 8,\n            \"uom_id\": \"{{uom_id}}\",\n            \"material_scrap_percentage\": 2,\n            \"sequence\": 1,\n            \"is_critical\": true\n        }\n    ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -1430,7 +1480,7 @@
                         "description": "**Purpose**: Clones an approved BOM into a new draft revision with all component lines copied.\n\n- **Authorization**: Policy `create` (`production.bom.create`)\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"version\": \"1.1\"\n}",
+                            "raw": "{\n    \"version_type\": \"patch\",\n    \"version\": \"1.1\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -1737,7 +1787,7 @@
                         "description": "**Purpose**: Create a new routing with operation step sequences.\n\n- **Validation**: `StoreRoutingApiRequest`\n- **Authorization**: Policy `create`\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"name\": \"Precision Lathe & Quality Check\",\n    \"product_id\": 1,\n    \"description\": \"Standard two-stage machining and quality verification routing.\",\n    \"operations\": [\n        {\n            \"sequence\": 1,\n            \"name\": \"CNC Lathe Roughing\",\n            \"work_center_id\": 1,\n            \"setup_time_minutes\": 15,\n            \"run_time_per_unit_minutes\": 4.5,\n            \"operation_type\": \"manufacturing\"\n        },\n        {\n            \"sequence\": 2,\n            \"name\": \"Dimensional QC Inspection\",\n            \"work_center_id\": 1,\n            \"setup_time_minutes\": 5,\n            \"run_time_per_unit_minutes\": 2,\n            \"operation_type\": \"inspection\"\n        }\n    ]\n}",
+                            "raw": "{\n    \"name\": \"Precision Lathe & Quality Check\",\n    \"routing_number\": \"RTG-PUMP-001\",\n    \"product_id\": \"{{product_id}}\",\n    \"version\": \"1.0\",\n    \"is_default\": true,\n    \"effective_from\": \"2026-09-25\",\n    \"description\": \"Standard two-stage machining and quality verification routing.\",\n    \"operations\": [\n        {\n            \"sequence\": 1,\n            \"operation_number\": \"OP-010\",\n            \"name\": \"CNC Lathe Roughing\",\n            \"operation_type\": \"manufacturing\",\n            \"work_center_id\": \"{{work_center_id}}\",\n            \"machine_id\": \"{{machine_id}}\",\n            \"setup_time_minutes\": 15,\n            \"processing_time_minutes\": 4.5,\n            \"wait_time_minutes\": 5,\n            \"expected_yield_percentage\": 98.5,\n            \"labor_cost_rate\": 25,\n            \"machine_cost_rate\": 45,\n            \"quality_required\": true,\n            \"description\": \"Rough turning and facing on CNC lathe.\",\n            \"instructions\": \"Verify outer diameter tolerance (+/- 0.02mm).\"\n        },\n        {\n            \"sequence\": 2,\n            \"operation_number\": \"OP-020\",\n            \"name\": \"Dimensional QC Inspection\",\n            \"operation_type\": \"inspection\",\n            \"work_center_id\": \"{{work_center_id}}\",\n            \"machine_id\": \"{{machine_id}}\",\n            \"setup_time_minutes\": 5,\n            \"processing_time_minutes\": 2,\n            \"wait_time_minutes\": 0,\n            \"expected_yield_percentage\": 100,\n            \"labor_cost_rate\": 30,\n            \"machine_cost_rate\": 0,\n            \"quality_required\": true,\n            \"description\": \"Final stage dimensional audit and gauge verification.\",\n            \"instructions\": \"Record bore and concentricity on QA inspection sheet.\"\n        }\n    ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -1973,7 +2023,7 @@
                         "description": "**Purpose**: Update routing name, description, or operation list.\n\n- **Validation**: `UpdateRoutingApiRequest`\n- **Authorization**: Policy `update`\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"name\": \"Machining Flow Updated\",\n    \"description\": \"Optimized cycle time setup.\"\n}",
+                            "raw": "{\n    \"name\": \"Machining Flow (Optimized)\",\n    \"description\": \"Optimized cycle time setup with streamlined staging.\",\n    \"version\": \"1.1\",\n    \"operations\": [\n        {\n            \"sequence\": 1,\n            \"name\": \"CNC Lathe High Speed Turning\",\n            \"operation_type\": \"manufacturing\",\n            \"work_center_id\": \"{{work_center_id}}\",\n            \"machine_id\": \"{{machine_id}}\",\n            \"setup_time_minutes\": 10,\n            \"processing_time_minutes\": 3.8\n        }\n    ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -2061,6 +2111,93 @@
                             }
                         }
                     ]
+                },
+                {
+                    "name": "Submit Routing for Approval",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/{{api_version}}/production/routings/{{routing_id}}/submit",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "{{api_version}}",
+                                "production",
+                                "routings",
+                                "{{routing_id}}",
+                                "submit"
+                            ]
+                        },
+                        "description": "Submit a draft routing for technical validation and managerial approval."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Approve Routing",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/{{api_version}}/production/routings/{{routing_id}}/approve",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "{{api_version}}",
+                                "production",
+                                "routings",
+                                "{{routing_id}}",
+                                "approve"
+                            ]
+                        },
+                        "description": "Approve a submitted routing to activate it for production order exploding."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Clone Routing Revision",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/{{api_version}}/production/routings/{{routing_id}}/duplicate",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "{{api_version}}",
+                                "production",
+                                "routings",
+                                "{{routing_id}}",
+                                "duplicate"
+                            ]
+                        },
+                        "description": "Clone an approved routing to create a new draft revision."
+                    },
+                    "response": []
                 }
             ]
         },
@@ -2253,7 +2390,7 @@
                         "description": "**Purpose**: Create a new production work center.\n\n- **Validation**: `StoreWorkCenterApiRequest`\n- **Authorization**: Policy `create`\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"name\": \"Automated Assembly Station\",\n    \"code\": \"WC-ASM-02\",\n    \"status\": \"active\",\n    \"capacity_per_hour\": 25,\n    \"cost_per_hour\": 60\n}",
+                            "raw": "{\n    \"name\": \"Automated Assembly Station\",\n    \"code\": \"WC-ASM-{{$timestamp}}\",\n    \"status\": \"active\",\n    \"type\": \"work_center\",\n    \"department_name\": \"Assembly & Packing\",\n    \"location\": \"Bay 4 Floor B\",\n    \"capacity_per_hour\": 25,\n    \"efficiency_percentage\": 95,\n    \"cost_per_hour\": 60,\n    \"overhead_rate\": 15,\n    \"description\": \"High-throughput modular automated assembly cell.\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -2489,7 +2626,7 @@
                         "description": "**Purpose**: Update work center name, code, capacity, or hourly cost.\n\n- **Validation**: `UpdateWorkCenterApiRequest`\n- **Authorization**: Policy `update`\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"name\": \"CNC Milling Cell (High Speed)\",\n    \"code\": \"WC-CNC-01\",\n    \"status\": \"active\",\n    \"capacity_per_hour\": 12.5,\n    \"cost_per_hour\": 50\n}",
+                            "raw": "{\n    \"name\": \"CNC Milling Cell (High Speed)\",\n    \"status\": \"active\",\n    \"capacity_per_hour\": 15,\n    \"cost_per_hour\": 55,\n    \"efficiency_percentage\": 92,\n    \"overhead_rate\": 18\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -2781,7 +2918,7 @@
                         "description": "**Purpose**: Register a new machine in a work center.\n\n- **Validation**: `StoreMachineApiRequest`\n- **Authorization**: Policy `create`\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"work_center_id\": 1,\n    \"name\": \"Mazak Quick Turn 250\",\n    \"code\": \"MCH-LATHE-02\",\n    \"status\": \"active\"\n}",
+                            "raw": "{\n    \"work_center_id\": \"{{work_center_id}}\",\n    \"name\": \"Mazak Quick Turn 250\",\n    \"code\": \"MCH-LATHE-{{$timestamp}}\",\n    \"status\": \"active\",\n    \"machine_type\": \"cnc_lathe\",\n    \"model_number\": \"QT-250-MSY\",\n    \"serial_number\": \"SN-MZK-2026\",\n    \"hourly_rate\": 75,\n    \"efficiency_percentage\": 96,\n    \"location\": \"Shopfloor Sector 2\",\n    \"notes\": \"Dual-spindle CNC turning center with live milling capability.\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -3017,7 +3154,7 @@
                         "description": "**Purpose**: Update machine details or operational status.\n\n- **Validation**: `UpdateMachineApiRequest`\n- **Authorization**: Policy `update`\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"name\": \"Haas VF-2 CNC Mill (Cell A)\",\n    \"status\": \"active\"\n}",
+                            "raw": "{\n    \"name\": \"Haas VF-2 CNC Mill (Cell A)\",\n    \"status\": \"active\",\n    \"hourly_rate\": 65,\n    \"efficiency_percentage\": 94\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -3321,7 +3458,7 @@
                         "description": "**Purpose**: Create a new production plan in `draft` status.\n\n- **Validation**: `StorePlanApiRequest`\n- **Authorization**: Policy `create`\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"name\": \"Q4 Restock Plan\",\n    \"product_id\": 1,\n    \"quantity\": 1000,\n    \"start_date\": \"2026-10-01\",\n    \"end_date\": \"2026-10-31\"\n}",
+                            "raw": "{\n    \"name\": \"Q4 Hydraulic Pump Production Plan\",\n    \"product_id\": \"{{product_id}}\",\n    \"bom_id\": \"{{bom_id}}\",\n    \"routing_id\": \"{{routing_id}}\",\n    \"quantity\": 1000,\n    \"start_date\": \"2026-10-01\",\n    \"end_date\": \"2026-10-31\",\n    \"description\": \"Master manufacturing schedule for Q4 replenishment.\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -3557,7 +3694,7 @@
                         "description": "**Purpose**: Update dates or target quantity of an unreleased production plan.\n\n- **Validation**: `UpdatePlanApiRequest`\n- **Authorization**: Policy `update`\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"name\": \"September Hydraulic Pump Run (Adjusted)\",\n    \"quantity\": 600,\n    \"start_date\": \"2026-09-15\",\n    \"end_date\": \"2026-10-05\"\n}",
+                            "raw": "{\n    \"name\": \"September Hydraulic Pump Run (Adjusted)\",\n    \"quantity\": 600,\n    \"start_date\": \"2026-09-15\",\n    \"end_date\": \"2026-10-05\",\n    \"description\": \"Adjusted delivery schedule for expedited customer order.\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -4108,7 +4245,7 @@
                         "description": "**Purpose**: Create a new production work order.\n\n- **Validation**: `StoreProductionOrderApiRequest`\n- **Authorization**: Policy `create` (`production.order.create`)\n- **Business Behavior**: Validates product, BOM, routing, allocates initial reservation draft, and defaults to `draft`.\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"product_id\": 1,\n    \"quantity_ordered\": 50,\n    \"start_date\": \"2026-09-25\",\n    \"end_date\": \"2026-09-30\",\n    \"production_mode\": \"discrete\",\n    \"production_model\": \"make_to_stock\",\n    \"bom_id\": 1,\n    \"routing_id\": 1,\n    \"description\": \"Urgent replenishment batch.\"\n}",
+                            "raw": "{\n    \"product_id\": \"{{product_id}}\",\n    \"bom_id\": \"{{bom_id}}\",\n    \"routing_id\": \"{{routing_id}}\",\n    \"quantity_ordered\": 50,\n    \"start_date\": \"2026-09-25\",\n    \"end_date\": \"2026-09-30\",\n    \"production_mode\": \"standard\",\n    \"production_model\": \"pure_manufacturing\",\n    \"description\": \"Urgent replenishment batch spawned directly.\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -4344,7 +4481,7 @@
                         "description": "**Purpose**: Update draft/unfrozen order quantities or scheduling dates.\n\n- **Validation**: `UpdateProductionOrderApiRequest`\n- **Authorization**: Policy `update`\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"quantity_ordered\": 60,\n    \"start_date\": \"2026-09-25\",\n    \"end_date\": \"2026-10-02\",\n    \"description\": \"Updated quantity requirements.\"\n}",
+                            "raw": "{\n    \"quantity_ordered\": 60,\n    \"start_date\": \"2026-09-25\",\n    \"end_date\": \"2026-10-02\",\n    \"description\": \"Updated quantity and revised delivery target.\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -4587,7 +4724,7 @@
                         "description": "**Purpose**: Issue raw materials or subassemblies against the order's BOM reservations.\n\n- **Validation**: `IssueMaterialApiRequest`\n- **Authorization**: Policy `issue`\n- **Idempotency**: Supports `Idempotency-Key` header against network retries.\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"reservation_id\": 1,\n    \"quantity\": 10,\n    \"warehouse_id\": 1,\n    \"remarks\": \"Batch issue from Main Stores.\"\n}",
+                            "raw": "{\n    \"reservation_id\": \"{{reservation_id}}\",\n    \"quantity\": 10,\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"remarks\": \"Batch issue from Central Raw Material Stores.\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -4731,7 +4868,7 @@
                         "description": "**Purpose**: Log partial or stage production output and run times against an order operation.\n\n- **Validation**: `LogProgressApiRequest`\n- **Authorization**: Policy `logProgress`\n- **Idempotency**: Supports `Idempotency-Key` header.\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"operation_id\": 101,\n    \"quantity_produced\": 25,\n    \"quantity_rejected\": 1,\n    \"quantity_scrapped\": 0,\n    \"setup_minutes_logged\": 15,\n    \"run_minutes_logged\": 90,\n    \"complete_operation\": false\n}",
+                            "raw": "{\n    \"operation_id\": \"{{operation_id}}\",\n    \"machine_id\": \"{{machine_id}}\",\n    \"quantity_produced\": 25,\n    \"quantity_rejected\": 1,\n    \"quantity_scrapped\": 0,\n    \"setup_minutes_logged\": 15,\n    \"run_minutes_logged\": 90,\n    \"complete_operation\": false,\n    \"remarks\": \"Shift 1 machining run completed with nominal tolerances.\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -4874,7 +5011,7 @@
                         "description": "**Purpose**: Receipt completed manufactured goods into finished goods inventory.\n\n- **Validation**: `ReceiveFgApiRequest`\n- **Authorization**: Policy `receiveFg`\n- **Idempotency**: Supports `Idempotency-Key` header.\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"quantity_received\": 20,\n    \"quality_status\": \"passed\",\n    \"warehouse_id\": 1\n}",
+                            "raw": "{\n    \"quantity_received\": 20,\n    \"quality_status\": \"passed\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"remarks\": \"Inspected and transferred to Finished Goods Warehouse.\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -5134,7 +5271,7 @@
                         "description": "**Purpose**: Record damaged, scrapped, or non-recoverable material against an order.\n\n- **Validation**: `LogScrapApiRequest`\n- **Authorization**: Policy `logProgress`\n- **Idempotency**: Supports `Idempotency-Key` header.\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"quantity\": 2,\n    \"reason\": \"Defective casting porosity detected on bore.\",\n    \"product_id\": 1,\n    \"operation_id\": 101\n}",
+                            "raw": "{\n    \"quantity\": 2,\n    \"reason\": \"Defective casting porosity detected on bore.\",\n    \"product_id\": \"{{raw_material_id}}\",\n    \"operation_id\": \"{{operation_id}}\",\n    \"create_ncr\": false\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -5436,7 +5573,7 @@
                                 "description": "**Purpose**: Start or claim an operation on a designated machine.\n\n- **Authorization**: `production.mes.execute`\n- **Rate Limit**: 180 req/min (`throttle:production-api-mes`)",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"machine_id\": 1\n}",
+                                    "raw": "{\n    \"machine_id\": \"{{machine_id}}\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -5964,7 +6101,7 @@
                                 "description": "**Purpose**: Begin recording downtime on a machine.\n\n- **Validation**: `StartDowntimeApiRequest`\n- **Authorization**: `production.mes.execute`\n- **Rate Limit**: 180 req/min (`throttle:production-api-mes`)",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"machine_id\": 1,\n    \"category\": \"mechanical_breakdown\",\n    \"reason\": \"Spindle overheating alarm #402\",\n    \"production_order_id\": 1,\n    \"remarks\": \"Maintenance technician notified.\"\n}",
+                                    "raw": "{\n    \"machine_id\": \"{{machine_id}}\",\n    \"category\": \"mechanical_breakdown\",\n    \"reason\": \"Spindle overheating alarm #402\",\n    \"production_order_id\": \"{{order_id}}\",\n    \"production_order_operation_id\": \"{{operation_id}}\",\n    \"remarks\": \"Maintenance technician dispatched to machine.\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -6372,6 +6509,43 @@
                             ]
                         },
                         {
+                            "name": "Create Quality Inspection",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"quality_plan_id\": \"{{quality_plan_id}}\",\n    \"stage\": \"in_process\",\n    \"production_order_id\": \"{{order_id}}\",\n    \"production_order_operation_id\": \"{{operation_id}}\",\n    \"machine_id\": \"{{machine_id}}\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/{{api_version}}/production/quality/inspections",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "{{api_version}}",
+                                        "production",
+                                        "quality",
+                                        "inspections"
+                                    ]
+                                },
+                                "description": "Instantiate a quality checklist/inspection for a production order or operation."
+                            },
+                            "response": []
+                        },
+                        {
                             "name": "Get Quality Inspection Detail",
                             "request": {
                                 "method": "GET",
@@ -6526,7 +6700,7 @@
                                 "description": "**Purpose**: Record measured QC values and evaluate checklist disposition.\n\n- **Validation**: `QualityInspectionResultsApiRequest`\n- **Authorization**: Policy `manage` (`production.quality.inspect` or `manage`)\n- **Idempotency**: Supports `Idempotency-Key` header.\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"results\": [\n        {\n            \"parameter_id\": 1,\n            \"value_numeric\": 25.02,\n            \"result\": \"pass\"\n        },\n        {\n            \"parameter_id\": 2,\n            \"value_numeric\": 0.04,\n            \"result\": \"pass\"\n        }\n    ]\n}",
+                                    "raw": "{\n    \"results\": [\n        {\n            \"parameter_id\": 1,\n            \"value_numeric\": 25.02,\n            \"value_pass\": true\n        },\n        {\n            \"parameter_id\": 2,\n            \"value_numeric\": 0.04,\n            \"value_pass\": true\n        }\n    ],\n    \"passed\": true,\n    \"remarks\": \"All inspection parameters within acceptable tolerance limits.\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -6622,6 +6796,45 @@
                                     }
                                 }
                             ]
+                        },
+                        {
+                            "name": "Approve Quality Inspection",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"esignature\": \"SIG-QA-INSPECTOR-01\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/{{api_version}}/production/quality/inspections/{{inspection_id}}/approve",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "{{api_version}}",
+                                        "production",
+                                        "quality",
+                                        "inspections",
+                                        "{{inspection_id}}",
+                                        "approve"
+                                    ]
+                                },
+                                "description": "Approve and finalize inspection with auditor electronic signature."
+                            },
+                            "response": []
                         }
                     ]
                 },
@@ -6678,7 +6891,7 @@
                                 "description": "**Purpose**: Fast inline operator quality check directly from shopfloor tablet without creating heavy paperwork.\n\n- **Authorization**: Allows `admin`, `super_admin`, or users with `production.quality.manage`, `production.mes.execute`, or `production.order.update`.\n- **Idempotency**: Supports `Idempotency-Key` header.\n- **Rate Limit**: 60 req/min (`throttle:production-api-write`)",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"result\": \"passed\",\n    \"stage\": \"first_piece\",\n    \"remarks\": \"First piece dimensions verified with digital micrometer.\"\n}",
+                                    "raw": "{\n    \"production_order_id\": \"{{order_id}}\",\n    \"production_order_operation_id\": \"{{operation_id}}\",\n    \"stage\": \"in_process\",\n    \"result\": \"passed\",\n    \"remarks\": \"First piece dimensions verified with digital micrometer.\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"

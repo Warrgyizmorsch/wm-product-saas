@@ -42,17 +42,23 @@ class RoutingOperationDTO
 
     public static function fromArray(array $data): self
     {
-        $sequence = (int) ($data['sequence'] ?? 10);
+        $sequence = (int) ($data['sequence'] ?? $data['operation_sequence'] ?? 10);
         $queueEnabled = filter_var($data['queue_threshold_enabled'] ?? $data['overlap_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $processingMinutes = isset($data['processing_time_minutes'])
+            ? (float) $data['processing_time_minutes']
+            : (isset($data['run_time_per_unit_minutes'])
+                ? (float) $data['run_time_per_unit_minutes']
+                : (isset($data['run_time_minutes']) ? (float) $data['run_time_minutes'] : 0.0));
+
         return new self(
             sequence:                       $sequence,
             operation_number:               $data['operation_number'] ?? 'OP-' . str_pad((string) $sequence, 3, '0', STR_PAD_LEFT),
-            name:                           $data['name'],
+            name:                           $data['name'] ?? $data['operation_name'] ?? 'Operation',
             operation_type:                 $data['operation_type'] ?? 'manufacturing',
             work_center_id:                 !empty($data['work_center_id']) ? (int) $data['work_center_id'] : null,
             machine_id:                     !empty($data['machine_id']) ? (int) $data['machine_id'] : null,
             setup_time_minutes:             isset($data['setup_time_minutes']) ? (float) $data['setup_time_minutes'] : 0.0,
-            processing_time_minutes:        isset($data['processing_time_minutes']) ? (float) $data['processing_time_minutes'] : 0.0,
+            processing_time_minutes:        $processingMinutes,
             wait_time_minutes:              isset($data['wait_time_minutes']) ? (float) $data['wait_time_minutes'] : 0.0,
             expected_yield_percentage:      isset($data['expected_yield_percentage']) ? (float) $data['expected_yield_percentage'] : 100.0,
             labor_cost_rate:                isset($data['labor_cost_rate']) ? (float) $data['labor_cost_rate'] : 0.0,

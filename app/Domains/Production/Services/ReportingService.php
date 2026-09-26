@@ -2,9 +2,12 @@
 
 namespace App\Domains\Production\Services;
 
+use App\Domains\Inventory\Models\Product;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionMachineDowntime;
 use App\Domains\Production\Models\ProductionOrder;
+use App\Domains\Production\Models\ProductionOrderOperation;
+use App\Domains\Production\Models\ProductionOrderProgressLog;
 use App\Domains\Production\Models\ProductionOrderReservation;
 use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Services\ProductionCostVarianceService;
@@ -1022,4 +1025,510 @@ class ReportingService
             'data'                 => $rows,
         ];
     }
+
+    /**
+     * Generate Daily Production Report (DPR).
+     *
+     * Authoritative source: production_order_progress_logs
+     * Timezone: Uses tenant-configured timezone or fallback to app.timezone.
+     * Semantics:
+     *   - Distinguishes Finished Goods (FG), Semi-Finished Goods (SFG), Components, and in-process stages.
+     *   - Never sums intermediate operation progress as Finished Goods output.
+     *   - Yield is calculated at the proper product/stage level.
+     *
+     * @param int $tenantId
+     * @param array $filters
+     * @return array
+     */
+    public function generateDailyProductionReport(int $tenantId, array $filters = []): array
+    {
+        $tz = tenant()?->timezone ?: config('app.timezone', 'UTC');
+
+        $start = empty($filters['date_start'])
+            ? Carbon::now($tz)->subMonth()->startOfDay()
+            : Carbon::parse($filters['date_start'], $tz)->startOfDay();
+
+        $end = empty($filters['date_end'])
+            ? Carbon::now($tz)->endOfDay()
+            : Carbon::parse($filters['date_end'], $tz)->endOfDay();
+
+        // Query production_order_progress_logs as authoritative event source
+        $query = ProductionOrderProgressLog::where('tenant_id', $tenantId)
+            ->whereBetween('recorded_at', [
+                $start->copy()->setTimezone(config('app.timezone', 'UTC')),
+                $end->copy()->setTimezone(config('app.timezone', 'UTC'))
+            ]);
+
+        // Filter: Specific Production Order
+        if (!empty($filters['order_id'])) {
+            $query->where('production_order_id', $filters['order_id']);
+        }
+
+        // Filter: Production Order Number substring
+        if (!empty($filters['order_number'])) {
+            $query->whereHas('order', function ($q) use ($filters) {
+                $q->where('order_number', 'like', '%' . trim($filters['order_number']) . '%');
+            });
+        }
+
+        // Filter: Specific Product / Finished Good
+        if (!empty($filters['product_id'])) {
+            $query->whereHas('order', function ($q) use ($filters) {
+                $q->where('product_id', $filters['product_id']);
+            });
+        }
+
+        // Filter: Specific Machine (direct on log or via operation)
+        if (!empty($filters['machine_id'])) {
+            $machineId = (int) $filters['machine_id'];
+            $query->where(function ($q) use ($machineId) {
+                $q->where('machine_id', $machineId)
+                    ->orWhereHas('operation', function ($opQ) use ($machineId) {
+                        $opQ->where('machine_id', $machineId)
+                            ->orWhere('machine_used_id', $machineId);
+                    });
+            });
+        }
+
+        // Filter: Specific Work Center (via operation or machine)
+        if (!empty($filters['work_center_id'])) {
+            $wcId = (int) $filters['work_center_id'];
+            $query->where(function ($q) use ($wcId) {
+                $q->whereHas('operation', fn($opQ) => $opQ->where('work_center_id', $wcId))
+                    ->orWhereHas('machine', fn($mQ) => $mQ->where('work_center_id', $wcId));
+            });
+        }
+
+        // Eager load necessary relationships including order operations for hierarchy resolution
+        $logs = $query->with([
+            'order' => fn($q) => $q->withoutGlobalScopes()->with(['product.uom', 'operations']),
+            'operation.workCenter',
+            'operation.machine',
+            'operation.machineUsed',
+            'operation.sourceProduct.uom',
+            'machine.workCenter',
+            'user',
+            'batch',
+        ])
+        ->orderBy('recorded_at', 'asc')
+        ->get();
+
+        $fgProduced = 0.0;
+        $sfgProduced = 0.0;
+        $componentProduced = 0.0;
+        $totalEventProcessedQty = 0.0;
+
+        $fgRejected = 0.0;
+        $fgScrapped = 0.0;
+        $totalRejectedAll = 0.0;
+        $totalScrappedAll = 0.0;
+
+        $totalRunMinutes = 0.0;
+        $totalSetupMinutes = 0.0;
+        $distinctOrders = [];
+        $distinctWorkCenters = [];
+        $distinctMachines = [];
+
+        $dailyGroups = [];
+        $wcMachineGroups = [];
+        $productOutputGroups = [];
+        $detailedLogs = [];
+
+        foreach ($logs as $log) {
+            $carbonRecorded = $log->recorded_at ? Carbon::parse($log->recorded_at)->setTimezone($tz) : null;
+            $dateStr = $carbonRecorded ? $carbonRecorded->toDateString() : 'Unknown';
+            $timeStr = $carbonRecorded ? $carbonRecorded->format('H:i') : '—';
+
+            $goodQty  = (float) $log->quantity_produced;
+            $rejQty   = (float) $log->quantity_rejected;
+            $scrapQty = (float) $log->quantity_scrapped;
+            $runMin   = (float) $log->run_minutes_logged;
+            $setupMin = (float) $log->setup_minutes_logged;
+
+            $totalEventProcessedQty += $goodQty;
+            $totalRejectedAll += $rejQty;
+            $totalScrappedAll += $scrapQty;
+            $totalRunMinutes += $runMin;
+            $totalSetupMinutes += $setupMin;
+
+            if ($log->production_order_id) {
+                $distinctOrders[$log->production_order_id] = true;
+            }
+
+            // Resolve target product and semantic output classification
+            $order = $log->order;
+            $op = $log->operation;
+            $product = $this->resolveProductForLog($log);
+            $outputType = $this->resolveOutputType($product, $op, $order);
+            $isTerminal = $op ? $this->isTerminalOperationForProduct($op, $order) : true;
+
+            // Attribute physical output: only terminal operations yield net product output
+            if ($outputType === 'fg') {
+                $fgRejected += $rejQty;
+                $fgScrapped += $scrapQty;
+                if ($isTerminal) {
+                    $fgProduced += $goodQty;
+                }
+            } elseif ($outputType === 'sfg') {
+                if ($isTerminal) {
+                    $sfgProduced += $goodQty;
+                }
+            } elseif ($outputType === 'component') {
+                if ($isTerminal) {
+                    $componentProduced += $goodQty;
+                }
+            }
+
+            // Resolve Machine
+            $machine = $log->machine ?? $op?->machine ?? $op?->machineUsed;
+            $machineId = $machine?->id;
+            $machineName = $machine?->name ?? 'Unassigned Machine';
+            $machineCode = $machine?->code ?? '—';
+            if ($machineId) {
+                $distinctMachines[$machineId] = true;
+            }
+
+            // Resolve Work Center (from operation or machine)
+            $workCenter = $op?->workCenter ?? $machine?->workCenter;
+            $wcId = $workCenter?->id;
+            $wcName = $workCenter?->name ?? 'Unassigned Work Center';
+            $wcCode = $workCenter?->code ?? '—';
+            if ($wcId) {
+                $distinctWorkCenters[$wcId] = true;
+            }
+
+            // 1. Group by Operational Date
+            if (!isset($dailyGroups[$dateStr])) {
+                $dailyGroups[$dateStr] = [
+                    'date'                    => $dateStr,
+                    'active_orders'           => [],
+                    'fg_output'               => 0.0,
+                    'sfg_output'              => 0.0,
+                    'component_output'        => 0.0,
+                    'operation_events_count'  => 0,
+                    'good_qty_processed'      => 0.0,
+                    'fg_rejected'             => 0.0,
+                    'fg_scrapped'             => 0.0,
+                    'rejected_qty'            => 0.0,
+                    'scrapped_qty'            => 0.0,
+                    'run_minutes'             => 0.0,
+                    'setup_minutes'           => 0.0,
+                ];
+            }
+            if ($log->production_order_id) {
+                $dailyGroups[$dateStr]['active_orders'][$log->production_order_id] = true;
+            }
+            $dailyGroups[$dateStr]['operation_events_count']++;
+            $dailyGroups[$dateStr]['good_qty_processed'] += $goodQty;
+            $dailyGroups[$dateStr]['rejected_qty'] += $rejQty;
+            $dailyGroups[$dateStr]['scrapped_qty'] += $scrapQty;
+            $dailyGroups[$dateStr]['run_minutes'] += $runMin;
+            $dailyGroups[$dateStr]['setup_minutes'] += $setupMin;
+
+            if ($outputType === 'fg') {
+                $dailyGroups[$dateStr]['fg_rejected'] += $rejQty;
+                $dailyGroups[$dateStr]['fg_scrapped'] += $scrapQty;
+                if ($isTerminal) {
+                    $dailyGroups[$dateStr]['fg_output'] += $goodQty;
+                }
+            } elseif ($outputType === 'sfg' && $isTerminal) {
+                $dailyGroups[$dateStr]['sfg_output'] += $goodQty;
+            } elseif ($outputType === 'component' && $isTerminal) {
+                $dailyGroups[$dateStr]['component_output'] += $goodQty;
+            }
+
+            // 2. Product-Level Output Grouping (for terminal output gates)
+            $productIdKey = ($outputType) . '_' . ($product?->id ?? 'unknown');
+            if (!isset($productOutputGroups[$productIdKey])) {
+                $typeLabels = [
+                    'fg'        => 'Finished Good',
+                    'sfg'       => 'Semi-Finished (SFG)',
+                    'component' => 'Component',
+                ];
+                $productOutputGroups[$productIdKey] = [
+                    'output_type'       => $outputType,
+                    'output_type_label' => $typeLabels[$outputType] ?? 'Finished Good',
+                    'product_id'        => $product?->id,
+                    'product_name'      => $product?->name ?? '—',
+                    'product_sku'       => $product?->sku ?? '—',
+                    'uom'               => $product?->uom?->code ?? 'Units',
+                    'output_qty'        => 0.0,
+                    'in_process_qty'    => 0.0,
+                    'rejected_qty'      => 0.0,
+                    'scrapped_qty'      => 0.0,
+                    'events_count'      => 0,
+                ];
+            }
+            $productOutputGroups[$productIdKey]['events_count']++;
+            $productOutputGroups[$productIdKey]['rejected_qty'] += $rejQty;
+            $productOutputGroups[$productIdKey]['scrapped_qty'] += $scrapQty;
+            if ($isTerminal) {
+                $productOutputGroups[$productIdKey]['output_qty'] += $goodQty;
+            } else {
+                $productOutputGroups[$productIdKey]['in_process_qty'] += $goodQty;
+            }
+
+            // 3. Group by Work Center & Machine
+            $groupKey = ($wcId ?? 'none') . '_' . ($machineId ?? 'none');
+            if (!isset($wcMachineGroups[$groupKey])) {
+                $wcMachineGroups[$groupKey] = [
+                    'work_center_id'   => $wcId,
+                    'work_center_name' => $wcName,
+                    'work_center_code' => $wcCode,
+                    'machine_id'       => $machineId,
+                    'machine_name'     => $machineName,
+                    'machine_code'     => $machineCode,
+                    'good_qty'         => 0.0,
+                    'rejected_qty'     => 0.0,
+                    'scrapped_qty'     => 0.0,
+                    'run_minutes'      => 0.0,
+                    'setup_minutes'    => 0.0,
+                    'events_count'     => 0,
+                ];
+            }
+            $wcMachineGroups[$groupKey]['good_qty'] += $goodQty;
+            $wcMachineGroups[$groupKey]['rejected_qty'] += $rejQty;
+            $wcMachineGroups[$groupKey]['scrapped_qty'] += $scrapQty;
+            $wcMachineGroups[$groupKey]['run_minutes'] += $runMin;
+            $wcMachineGroups[$groupKey]['setup_minutes'] += $setupMin;
+            $wcMachineGroups[$groupKey]['events_count']++;
+
+            // 4. Detailed Operation / Production Event row
+            $opDesc = $op ? ("Op #{$op->sequence}: {$op->name}") : '—';
+            $logAttempted = $goodQty + $rejQty + $scrapQty;
+            $logYield = $logAttempted > 0 ? round(($goodQty / $logAttempted) * 100, 1) : 100.0;
+            $stageRole = $isTerminal ? 'Terminal Output' : 'Process Stage';
+
+            $detailedLogs[] = [
+                'id'                => $log->id,
+                'date'              => $dateStr,
+                'time'              => $timeStr,
+                'recorded_at'       => $log->recorded_at,
+                'order_id'          => $order?->id,
+                'order_number'      => $order?->order_number ?? '—',
+                'product_name'      => $product?->name ?? '—',
+                'product_sku'       => $product?->sku ?? '—',
+                'uom'               => $product?->uom?->code ?? 'Units',
+                'output_type'       => $outputType,
+                'output_type_label' => strtoupper($outputType),
+                'stage_role'        => $stageRole,
+                'is_terminal'       => $isTerminal,
+                'operation_name'    => $opDesc,
+                'work_center'       => $wcName,
+                'work_center_code'  => $wcCode,
+                'machine'           => $machineName,
+                'machine_code'      => $machineCode,
+                'batch_number'      => $log->batch?->batch_number ?? '—',
+                'good_qty'          => $goodQty,
+                'rejected_qty'      => $rejQty,
+                'scrapped_qty'      => $scrapQty,
+                'yield_pct'         => $logYield,
+                'run_minutes'       => $runMin,
+                'run_hours'         => round($runMin / 60, 2),
+                'setup_minutes'     => $setupMin,
+                'setup_hours'       => round($setupMin / 60, 2),
+                'operator'          => $log->user?->name ?? 'Operator',
+                'remarks'           => $log->remarks ?: '—',
+            ];
+        }
+
+        // Format Daily Breakdown table rows
+        $dailyBreakdown = [];
+        foreach ($dailyGroups as $date => $d) {
+            $fgAttempted = $d['fg_output'] + $d['fg_rejected'] + $d['fg_scrapped'];
+            $fgYield = $fgAttempted > 0 ? round(($d['fg_output'] / $fgAttempted) * 100, 1) : 100.0;
+
+            $dailyBreakdown[] = [
+                'date'                   => $date,
+                'active_orders_count'    => count($d['active_orders']),
+                'fg_output'              => $d['fg_output'],
+                'sfg_output'             => $d['sfg_output'],
+                'component_output'       => $d['component_output'],
+                'operation_events_count' => $d['operation_events_count'],
+                'good_qty'               => $d['fg_output'], // Alias for backward compatibility
+                'good_qty_processed'     => $d['good_qty_processed'],
+                'rejected_qty'           => $d['rejected_qty'],
+                'scrapped_qty'           => $d['scrapped_qty'],
+                'yield_pct'              => $fgYield,
+                'fg_yield_pct'           => $fgYield,
+                'run_minutes'            => $d['run_minutes'],
+                'run_hours'              => round($d['run_minutes'] / 60, 2),
+                'setup_minutes'          => $d['setup_minutes'],
+                'setup_hours'            => round($d['setup_minutes'] / 60, 2),
+            ];
+        }
+        usort($dailyBreakdown, fn($a, $b) => strcmp($a['date'], $b['date']));
+
+        // Format Product Output breakdown
+        $productOutputs = [];
+        foreach ($productOutputGroups as $p) {
+            $att = $p['output_qty'] + $p['rejected_qty'] + $p['scrapped_qty'];
+            $p['yield_pct'] = $att > 0 ? round(($p['output_qty'] / $att) * 100, 1) : 100.0;
+            $productOutputs[] = $p;
+        }
+        usort($productOutputs, function ($a, $b) {
+            $typeOrder = ['fg' => 1, 'sfg' => 2, 'component' => 3];
+            $cmp = ($typeOrder[$a['output_type']] ?? 9) <=> ($typeOrder[$b['output_type']] ?? 9);
+            return $cmp !== 0 ? $cmp : strcmp($a['product_name'], $b['product_name']);
+        });
+
+        // Format Work Center & Machine Breakdown rows
+        $wcBreakdown = [];
+        foreach ($wcMachineGroups as $g) {
+            $attempted = $g['good_qty'] + $g['rejected_qty'] + $g['scrapped_qty'];
+            $yield = $attempted > 0 ? round(($g['good_qty'] / $attempted) * 100, 1) : 100.0;
+
+            $wcBreakdown[] = [
+                'work_center_id'   => $g['work_center_id'],
+                'work_center_name' => $g['work_center_name'],
+                'work_center_code' => $g['work_center_code'],
+                'machine_id'       => $g['machine_id'],
+                'machine_name'     => $g['machine_name'],
+                'machine_code'     => $g['machine_code'],
+                'good_qty'         => $g['good_qty'],
+                'rejected_qty'     => $g['rejected_qty'],
+                'scrapped_qty'     => $g['scrapped_qty'],
+                'yield_pct'        => $yield,
+                'run_minutes'      => $g['run_minutes'],
+                'run_hours'        => round($g['run_minutes'] / 60, 2),
+                'setup_minutes'    => $g['setup_minutes'],
+                'setup_hours'      => round($g['setup_minutes'] / 60, 2),
+                'events_count'     => $g['events_count'],
+            ];
+        }
+        usort($wcBreakdown, function ($a, $b) {
+            $cmp = strcmp($a['work_center_name'], $b['work_center_name']);
+            return $cmp !== 0 ? $cmp : strcmp($a['machine_name'], $b['machine_name']);
+        });
+
+        // Compute overall FG yield & period metrics
+        $fgAttempted = $fgProduced + $fgRejected + $fgScrapped;
+        $fgYieldPct = $fgAttempted > 0 ? round(($fgProduced / $fgAttempted) * 100, 1) : 100.0;
+        $activeDaysCount = count($dailyBreakdown);
+        $avgDailyFgOutput = $activeDaysCount > 0 ? round($fgProduced / $activeDaysCount, 1) : 0.0;
+
+        $kpiSummary = [
+            'fg_produced'               => $fgProduced,
+            'sfg_produced'              => $sfgProduced,
+            'component_produced'        => $componentProduced,
+            'total_good_units'          => $fgProduced, // Backward compatibility alias for FG Produced
+            'total_rejected'            => $totalRejectedAll,
+            'total_scrapped'            => $totalScrappedAll,
+            'fg_rejected'               => $fgRejected,
+            'fg_scrapped'               => $fgScrapped,
+            'fg_attempted'              => $fgAttempted,
+            'overall_yield_pct'         => $fgYieldPct,
+            'fg_yield_pct'              => $fgYieldPct,
+            'total_run_minutes'         => $totalRunMinutes,
+            'total_run_hours'           => round($totalRunMinutes / 60, 2),
+            'total_setup_minutes'       => $totalSetupMinutes,
+            'total_setup_hours'         => round($totalSetupMinutes / 60, 2),
+            'active_days_count'         => $activeDaysCount,
+            'avg_daily_output'          => $avgDailyFgOutput,
+            'avg_daily_fg_output'       => $avgDailyFgOutput,
+            'active_orders_count'       => count($distinctOrders),
+            'active_work_centers_count' => count($distinctWorkCenters),
+            'active_machines_count'     => count($distinctMachines),
+            'total_events_count'        => count($detailedLogs),
+            'total_event_quantity_processed' => $totalEventProcessedQty,
+        ];
+
+        return [
+            'period_start'          => $start->toDateString(),
+            'period_end'            => $end->toDateString(),
+            'has_data'              => count($detailedLogs) > 0,
+            'summary'               => $kpiSummary,
+            'product_outputs'       => $productOutputs,
+            'daily_breakdown'       => $dailyBreakdown,
+            'work_center_breakdown' => $wcBreakdown,
+            'detailed_logs'         => $detailedLogs,
+            'data'                  => $detailedLogs, // For generic data access in exports/wrappers
+        ];
+    }
+
+    /**
+     * Resolve the target product for an operation progress event.
+     */
+    protected function resolveProductForLog(ProductionOrderProgressLog $log): ?Product
+    {
+        return $log->operation?->sourceProduct ?: $log->order?->product;
+    }
+
+    /**
+     * Resolve output category: 'fg' (Finished Good), 'sfg' (Semi-Finished), 'component' (Component).
+     */
+    protected function resolveOutputType(?Product $product, ?ProductionOrderOperation $op, ?ProductionOrder $order): string
+    {
+        $prodType = $product?->type;
+
+        // 1. Explicit product type classification
+        if ($prodType && in_array($prodType, ['component', 'raw_material', 'raw_materials'], true)) {
+            return 'component';
+        }
+        if ($prodType && in_array($prodType, ['semi_finished', 'semi_finished_goods', 'sfg'], true)) {
+            return 'sfg';
+        }
+
+        // 2. Operation BOM level / intermediate indicator
+        if ($op?->is_intermediate) {
+            if ($op->bom_level > 2 || $prodType === 'component') {
+                return 'component';
+            }
+            return 'sfg';
+        }
+
+        // 3. Top-level finished good (matching parent order or explicitly finished_good)
+        if ($order && $product && (int) $product->id === (int) $order->product_id) {
+            return 'fg';
+        }
+
+        if ($prodType && in_array($prodType, ['finished_good', 'finished_goods', 'fg'], true)) {
+            return 'fg';
+        }
+
+        return $op?->is_intermediate ? 'sfg' : 'fg';
+    }
+
+    /**
+     * Determine if an operation is the terminal / completion gate for its product within the order.
+     * Non-terminal operations represent in-process stage events (e.g. welding -> finishing -> packaging).
+     */
+    protected function isTerminalOperationForProduct(ProductionOrderOperation $op, ?ProductionOrder $order): bool
+    {
+        if (!$order) {
+            return true;
+        }
+
+        $allOps = $order->operations;
+        if (!$allOps || $allOps->isEmpty()) {
+            return true;
+        }
+
+        $sourceProductId = $op->source_product_id;
+
+        foreach ($allOps as $other) {
+            if ((int) $other->id === (int) $op->id) {
+                continue;
+            }
+
+            // Same product stream match
+            $isSameStream = false;
+            if ($sourceProductId) {
+                $isSameStream = ((int) $other->source_product_id === (int) $sourceProductId);
+            } else {
+                // Master FG stream: non-intermediate operations where source_product_id is null or matches order product
+                $isSameStream = !$other->is_intermediate && ($other->source_product_id === null || (int) $other->source_product_id === (int) $order->product_id);
+            }
+
+            if ($isSameStream) {
+                // If there's an operation with a higher sequence, or it has $op as predecessor/previous_operation_id
+                if ((int) $other->sequence > (int) $op->sequence || (int) $other->previous_operation_id === (int) $op->id) {
+                    return false; // $op is followed by $other in the same product stream -> in-process stage!
+                }
+            }
+        }
+
+        return true;
+    }
 }
+

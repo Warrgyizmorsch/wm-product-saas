@@ -11,10 +11,12 @@ use App\Domains\Production\Models\ProductionMachineDowntime;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderIssue;
 use App\Domains\Production\Models\ProductionOrderOperation;
+use App\Domains\Production\Models\ProductionOrderProgressLog;
 use App\Domains\Production\Models\ProductionOrderReservation;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Services\ReportingService;
 use App\Models\Tenant;
 use App\Models\User;
 use Carbon\Carbon;
@@ -36,6 +38,10 @@ class ProductionMisReportsTest extends TestCase
     private ProductionOrder $order1;
     private ProductionOrder $order2;
     private ProductionOrder $tenant2Order;
+    private WorkCenter $workCenter;
+    private Machine $machine;
+    private ProductionOrderOperation $op1;
+    private ProductionOrderOperation $tenant2Op;
 
     protected function setUp(): void
     {
@@ -90,7 +96,7 @@ class ProductionMisReportsTest extends TestCase
             'uom_id'     => $this->uom->id,
         ]);
 
-        $workCenter = WorkCenter::create([
+        $this->workCenter = WorkCenter::create([
             'tenant_id'     => $this->tenantId,
             'name'          => 'Assembly Cell A',
             'code'          => 'WC-ASM-01',
@@ -99,9 +105,9 @@ class ProductionMisReportsTest extends TestCase
             'status'        => 'active',
         ]);
 
-        $machine = Machine::create([
+        $this->machine = Machine::create([
             'tenant_id'      => $this->tenantId,
-            'work_center_id' => $workCenter->id,
+            'work_center_id' => $this->workCenter->id,
             'name'           => 'Assembly Press 01',
             'code'           => 'MC-ASM-01',
             'status'         => 'active',
@@ -135,7 +141,7 @@ class ProductionMisReportsTest extends TestCase
             'sequence'             => 10,
             'operation_number'     => 'OP10',
             'name'                 => 'Main Assembly',
-            'work_center_id'       => $workCenter->id,
+            'work_center_id'       => $this->workCenter->id,
             'labor_cost_rate'      => 2.00, // per min
             'machine_cost_rate'    => 1.50, // per min
             'setup_time_minutes'   => 10,
@@ -178,15 +184,15 @@ class ProductionMisReportsTest extends TestCase
         ]);
 
         // Order 1 Operations & Cost Setup
-        $op1 = ProductionOrderOperation::create([
+        $this->op1 = ProductionOrderOperation::create([
             'tenant_id'               => $this->tenantId,
             'production_order_id'     => $this->order1->id,
             'routing_operation_id'    => $routingOp->id,
             'sequence'                => 10,
             'operation_number'        => 'OP10',
             'name'                    => 'Main Assembly',
-            'work_center_id'          => $workCenter->id,
-            'machine_id'              => $machine->id,
+            'work_center_id'          => $this->workCenter->id,
+            'machine_id'              => $this->machine->id,
             'status'                  => ProductionOrderOperation::STATUS_COMPLETED,
             'setup_time_planned'      => 10,
             'processing_time_planned' => 50,
@@ -238,6 +244,15 @@ class ProductionMisReportsTest extends TestCase
             'status'           => ProductionOrder::STATUS_COMPLETED,
             'start_date'       => now()->toDateString(),
             'end_date'         => now()->toDateString(),
+        ]);
+
+        $this->tenant2Op = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenant2Id,
+            'production_order_id' => $this->tenant2Order->id,
+            'sequence'            => 10,
+            'operation_number'    => 'OP10',
+            'name'                => 'T2 Main Op',
+            'status'              => ProductionOrderOperation::STATUS_COMPLETED,
         ]);
     }
 
@@ -449,4 +464,595 @@ class ProductionMisReportsTest extends TestCase
         $this->get(route('production.intelligence.reports.show', 'downtime'))->assertStatus(200);
         $this->get(route('production.intelligence.reports.export', 'downtime'))->assertStatus(200);
     }
+
+    /**
+     * Daily Production Report (DPR): Correctly aggregates day-wise output, yield, and tenant isolation.
+     */
+    public function test_daily_production_report_renders_and_computes_aggregates(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        // Day 1 (yesterday)
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $this->order1->id,
+            'operation_id'        => $this->op1->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 5.0,
+            'quantity_rejected'   => 1.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 120.0,
+            'setup_minutes_logged'=> 15.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now()->subDay()->setTime(10, 0, 0),
+            'remarks'             => 'Shift 1 batch A',
+        ]);
+
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $this->order1->id,
+            'operation_id'        => $this->op1->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 5.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 1.0,
+            'run_minutes_logged'  => 60.0,
+            'setup_minutes_logged'=> 10.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now()->subDay()->setTime(14, 30, 0),
+            'remarks'             => 'Shift 2 batch B',
+        ]);
+
+        // Day 2 (today)
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $this->order2->id,
+            'operation_id'        => $this->op1->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 8.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 180.0,
+            'setup_minutes_logged'=> 20.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now()->setTime(11, 0, 0),
+            'remarks'             => 'Order 2 day run',
+        ]);
+
+        // Tenant 2 log (Isolation test)
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenant2Id,
+            'production_order_id' => $this->tenant2Order->id,
+            'operation_id'        => $this->tenant2Op->id,
+            'quantity_produced'   => 999.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 500.0,
+            'setup_minutes_logged'=> 60.0,
+            'recorded_by'         => $this->tenant2User->id,
+            'recorded_at'         => now(),
+            'remarks'             => 'TENANT2_SECRET_PRODUCTION',
+        ]);
+
+        // 1. Reports Index shows Daily Production Report card
+        $indexResponse = $this->get(route('production.intelligence.reports.index'));
+        $indexResponse->assertStatus(200);
+        $indexResponse->assertSee('Daily Production Report');
+
+        // 2. View Daily Production Report
+        $response = $this->get(route('production.intelligence.reports.show', [
+            'type'       => 'daily-production',
+            'date_start' => now()->subDays(2)->toDateString(),
+            'date_end'   => now()->toDateString(),
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee('Daily Production Report');
+        // Total Good Units: 5 + 5 + 8 = 18
+        $response->assertSee('18');
+        // Total Attempted: 18 + 1 + 1 = 20 -> Yield 18/20 = 90.0%
+        $response->assertSee('90.0%');
+        // Total Run Time: 360 min = 6.0 hrs
+        $response->assertSee('6.0 hrs');
+        // Work Center and Machine names
+        $response->assertSee('Assembly Cell A');
+        $response->assertSee('Assembly Press 01');
+        // Production Order numbers
+        $response->assertSee('PO-2026-0001');
+        $response->assertSee('PO-2026-0002');
+        // Tenant isolation: Tenant 2 secret remarks should never be seen
+        $response->assertDontSee('TENANT2_SECRET_PRODUCTION');
+        $response->assertDontSee('PO-T2-9999');
+    }
+
+    /**
+     * Daily Production Report respects filters (date range, order, work center, machine).
+     */
+    public function test_daily_production_report_filters(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        // Progress log for Order 1
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $this->order1->id,
+            'operation_id'        => $this->op1->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 10.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 60.0,
+            'setup_minutes_logged'=> 10.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now()->subDays(10),
+            'remarks'             => 'Ten days ago production',
+        ]);
+
+        // Progress log for Order 2 (today)
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $this->order2->id,
+            'operation_id'        => $this->op1->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 20.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 120.0,
+            'setup_minutes_logged'=> 15.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now(),
+            'remarks'             => 'Today production',
+        ]);
+
+        // Filter: Date range strictly covering today
+        $responseDateFilter = $this->get(route('production.intelligence.reports.show', [
+            'type'       => 'daily-production',
+            'date_start' => now()->startOfDay()->toDateString(),
+            'date_end'   => now()->endOfDay()->toDateString(),
+        ]));
+        $responseDateFilter->assertStatus(200);
+        $responseDateFilter->assertSee('Today production');
+        $responseDateFilter->assertDontSee('Ten days ago production');
+
+        // Filter: Order ID for Order 1 with date range covering 15 days ago to now
+        $responseOrderFilter = $this->get(route('production.intelligence.reports.show', [
+            'type'       => 'daily-production',
+            'date_start' => now()->subDays(15)->toDateString(),
+            'date_end'   => now()->toDateString(),
+            'order_id'   => $this->order1->id,
+        ]));
+        $responseOrderFilter->assertStatus(200);
+        $responseOrderFilter->assertSee('Ten days ago production');
+        $responseOrderFilter->assertDontSee('Today production');
+
+        // Filter: Non-existent work center ID -> should show empty state
+        $responseEmpty = $this->get(route('production.intelligence.reports.show', [
+            'type'           => 'daily-production',
+            'work_center_id' => 99999,
+        ]));
+        $responseEmpty->assertStatus(200);
+        $responseEmpty->assertSee('No production activity found');
+    }
+
+    /**
+     * Daily Production Report exports (CSV, Excel, PDF).
+     */
+    public function test_daily_production_report_exports(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $this->order1->id,
+            'operation_id'        => $this->op1->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 15.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 90.0,
+            'setup_minutes_logged'=> 15.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now(),
+            'remarks'             => 'Export testing row',
+        ]);
+
+        // CSV Export
+        $csvResponse = $this->get(route('production.intelligence.reports.export', [
+            'type'       => 'daily-production',
+            'date_start' => now()->subDays(2)->toDateString(),
+            'date_end'   => now()->toDateString(),
+        ]));
+        $csvResponse->assertStatus(200);
+        $csvContent = $csvResponse->streamedContent();
+        $this->assertStringContainsString('Date', $csvContent);
+        $this->assertStringContainsString('Order Number', $csvContent);
+        $this->assertStringContainsString('PO-2026-0001', $csvContent);
+        $this->assertStringContainsString('Export testing row', $csvContent);
+
+        // Excel Export
+        $excelResponse = $this->get(route('production.intelligence.reports.export-excel', [
+            'type'       => 'daily-production',
+            'date_start' => now()->subDays(2)->toDateString(),
+            'date_end'   => now()->toDateString(),
+        ]));
+        $excelResponse->assertStatus(200);
+
+        // PDF Export
+        $pdfResponse = $this->get(route('production.intelligence.reports.export-pdf', [
+            'type'       => 'daily-production',
+            'date_start' => now()->subDays(2)->toDateString(),
+            'date_end'   => now()->toDateString(),
+        ]));
+        $pdfResponse->assertStatus(200);
+    }
+
+    /**
+     * DPR correctly distinguishes FG output, SFG output, component output, and in-process stages.
+     * Never combines 20 legs + 10 compB + 5 tops + 5 weld + 5 finish + 5 assy + 5 QC + 5 pack into "60 FG units".
+     */
+    public function test_daily_production_report_multi_level_and_multi_operation_output_semantics(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        // 1. Create realistic multi-level products
+        $fgTable = Product::create([
+            'tenant_id' => $this->tenantId,
+            'name'      => 'Industrial Dining Table',
+            'sku'       => 'FG-TBL-100',
+            'type'      => 'finished_good',
+            'uom_id'    => $this->uom->id,
+            'status'    => 'active',
+        ]);
+
+        $sfgFrame = Product::create([
+            'tenant_id' => $this->tenantId,
+            'name'      => 'Welded Metal Frame SFG',
+            'sku'       => 'SFG-FRM-100',
+            'type'      => 'semi_finished',
+            'uom_id'    => $this->uom->id,
+            'status'    => 'active',
+        ]);
+
+        $cmpLeg = Product::create([
+            'tenant_id' => $this->tenantId,
+            'name'      => 'Steel Tube Leg',
+            'sku'       => 'CMP-LEG-100',
+            'type'      => 'component',
+            'uom_id'    => $this->uom->id,
+            'status'    => 'active',
+        ]);
+
+        $cmpCompB = Product::create([
+            'tenant_id' => $this->tenantId,
+            'name'      => 'Corner Bracket Component B',
+            'sku'       => 'CMP-BRK-100',
+            'type'      => 'component',
+            'uom_id'    => $this->uom->id,
+            'status'    => 'active',
+        ]);
+
+        $cmpTop = Product::create([
+            'tenant_id' => $this->tenantId,
+            'name'      => 'Solid Oak Table Top',
+            'sku'       => 'CMP-TOP-100',
+            'type'      => 'component',
+            'uom_id'    => $this->uom->id,
+            'status'    => 'active',
+        ]);
+
+        // 2. Multi-level Production Order for 5 Tables
+        $multiOrder = ProductionOrder::create([
+            'tenant_id'        => $this->tenantId,
+            'order_number'     => 'PO-MULTI-005',
+            'product_id'       => $fgTable->id,
+            'quantity_ordered' => 5.0,
+            'quantity_produced'=> 5.0,
+            'status'           => ProductionOrder::STATUS_IN_PROGRESS,
+            'start_date'       => now()->toDateString(),
+            'end_date'         => now()->addDays(2)->toDateString(),
+        ]);
+
+        // 3. Component Operations (1-stage each)
+        $opLeg = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'source_product_id'   => $cmpLeg->id,
+            'bom_level'           => 2,
+            'is_intermediate'     => true,
+            'sequence'            => 10,
+            'operation_number'    => 'OP-LEG-10',
+            'name'                => 'Tube & Component Cutting',
+            'work_center_id'      => $this->workCenter->id,
+            'machine_id'          => $this->machine->id,
+            'status'              => ProductionOrderOperation::STATUS_COMPLETED,
+        ]);
+
+        $opCompB = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'source_product_id'   => $cmpCompB->id,
+            'bom_level'           => 2,
+            'is_intermediate'     => true,
+            'sequence'            => 10,
+            'operation_number'    => 'OP-BRK-10',
+            'name'                => 'Cutting Bracket B',
+            'work_center_id'      => $this->workCenter->id,
+            'machine_id'          => $this->machine->id,
+            'status'              => ProductionOrderOperation::STATUS_COMPLETED,
+        ]);
+
+        $opTop = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'source_product_id'   => $cmpTop->id,
+            'bom_level'           => 2,
+            'is_intermediate'     => true,
+            'sequence'            => 10,
+            'operation_number'    => 'OP-TOP-10',
+            'name'                => 'Table Top Processing',
+            'work_center_id'      => $this->workCenter->id,
+            'machine_id'          => $this->machine->id,
+            'status'              => ProductionOrderOperation::STATUS_COMPLETED,
+        ]);
+
+        // 4. SFG Frame Operations (2 sequential stages: Weld -> Finish)
+        $opFrameWeld = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'source_product_id'   => $sfgFrame->id,
+            'bom_level'           => 2,
+            'is_intermediate'     => true,
+            'sequence'            => 10,
+            'operation_number'    => 'OP-FRM-10',
+            'name'                => 'Welding / Frame Assembly',
+            'work_center_id'      => $this->workCenter->id,
+            'machine_id'          => $this->machine->id,
+            'status'              => ProductionOrderOperation::STATUS_COMPLETED,
+        ]);
+
+        $opFrameFinish = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'source_product_id'   => $sfgFrame->id,
+            'previous_operation_id' => $opFrameWeld->id,
+            'bom_level'           => 2,
+            'is_intermediate'     => true,
+            'sequence'            => 20,
+            'operation_number'    => 'OP-FRM-20',
+            'name'                => 'Finishing & Coating',
+            'work_center_id'      => $this->workCenter->id,
+            'machine_id'          => $this->machine->id,
+            'status'              => ProductionOrderOperation::STATUS_COMPLETED,
+        ]);
+
+        // 5. Master FG Table Operations (3 sequential stages: Final Assembly -> Quality Inspection -> Packaging)
+        $opFinalAssy = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'source_product_id'   => $fgTable->id,
+            'bom_level'           => 1,
+            'is_intermediate'     => false,
+            'sequence'            => 10,
+            'operation_number'    => 'OP-FG-10',
+            'name'                => 'Final Assembly',
+            'work_center_id'      => $this->workCenter->id,
+            'machine_id'          => $this->machine->id,
+            'status'              => ProductionOrderOperation::STATUS_COMPLETED,
+        ]);
+
+        $opQuality = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'source_product_id'   => $fgTable->id,
+            'previous_operation_id' => $opFinalAssy->id,
+            'bom_level'           => 1,
+            'is_intermediate'     => false,
+            'sequence'            => 20,
+            'operation_number'    => 'OP-FG-20',
+            'name'                => 'Quality Inspection',
+            'work_center_id'      => $this->workCenter->id,
+            'machine_id'          => $this->machine->id,
+            'status'              => ProductionOrderOperation::STATUS_COMPLETED,
+        ]);
+
+        $opPackaging = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'source_product_id'   => $fgTable->id,
+            'previous_operation_id' => $opQuality->id,
+            'bom_level'           => 1,
+            'is_intermediate'     => false,
+            'sequence'            => 30,
+            'operation_number'    => 'OP-FG-30',
+            'name'                => 'Packaging',
+            'work_center_id'      => $this->workCenter->id,
+            'machine_id'          => $this->machine->id,
+            'status'              => ProductionOrderOperation::STATUS_COMPLETED,
+        ]);
+
+        // 6. Record progress events corresponding exactly to the scenario:
+        // Tube & Component Cutting -> 20 legs
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'operation_id'        => $opLeg->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 20.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 60.0,
+            'setup_minutes_logged'=> 10.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now(),
+            'remarks'             => 'Leg cutting complete',
+        ]);
+
+        // Cutting -> 10 component units
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'operation_id'        => $opCompB->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 10.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 30.0,
+            'setup_minutes_logged'=> 10.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now(),
+            'remarks'             => 'Bracket cutting complete',
+        ]);
+
+        // Table Top Processing -> 5 table tops
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'operation_id'        => $opTop->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 5.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 40.0,
+            'setup_minutes_logged'=> 10.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now(),
+            'remarks'             => 'Table top edge banding complete',
+        ]);
+
+        // Welding / Assembly -> 5 units (in-process stage)
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'operation_id'        => $opFrameWeld->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 5.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 50.0,
+            'setup_minutes_logged'=> 10.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now(),
+            'remarks'             => 'Frame welding complete',
+        ]);
+
+        // Finishing & Coating -> 5 units (terminal for SFG frame)
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'operation_id'        => $opFrameFinish->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 5.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 45.0,
+            'setup_minutes_logged'=> 10.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now(),
+            'remarks'             => 'Frame powder coating complete',
+        ]);
+
+        // Final Assembly -> 5 units (in-process stage for FG)
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'operation_id'        => $opFinalAssy->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 5.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 60.0,
+            'setup_minutes_logged'=> 10.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now(),
+            'remarks'             => 'Table final assembly complete',
+        ]);
+
+        // Quality Inspection -> 5 units (in-process stage for FG)
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'operation_id'        => $opQuality->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 5.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 20.0,
+            'setup_minutes_logged'=> 5.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now(),
+            'remarks'             => 'Table 100% QA check passed',
+        ]);
+
+        // Packaging -> 5 units (terminal for FG Table)
+        ProductionOrderProgressLog::create([
+            'tenant_id'           => $this->tenantId,
+            'production_order_id' => $multiOrder->id,
+            'operation_id'        => $opPackaging->id,
+            'machine_id'          => $this->machine->id,
+            'quantity_produced'   => 5.0,
+            'quantity_rejected'   => 0.0,
+            'quantity_scrapped'   => 0.0,
+            'run_minutes_logged'  => 25.0,
+            'setup_minutes_logged'=> 5.0,
+            'recorded_by'         => $this->adminUser->id,
+            'recorded_at'         => now(),
+            'remarks'             => 'Table packaged and labeled',
+        ]);
+
+        // 7. Execute DPR query via ReportingService
+        $service = app(ReportingService::class);
+        $reportData = $service->generateDailyProductionReport($this->tenantId, [
+            'order_id'   => $multiOrder->id,
+            'date_start' => now()->subDay()->toDateString(),
+            'date_end'   => now()->addDay()->toDateString(),
+        ]);
+
+        // 8. CRITICAL VERIFICATION:
+        // - FG Produced MUST be 5.0 (NEVER 60.0! NEVER 25.0!)
+        $this->assertEquals(5.0, $reportData['summary']['fg_produced'], 'Finished Goods Produced must equal 5, not the sum of all progress logs');
+        $this->assertEquals(5.0, $reportData['summary']['total_good_units'], 'total_good_units must equal 5');
+
+        // - SFG Produced MUST be 5.0 (Frame Finished, not 10.0 from weld + finish)
+        $this->assertEquals(5.0, $reportData['summary']['sfg_produced'], 'SFG Produced must equal 5 (Welded Frame), not 10');
+
+        // - Component Output MUST be 35.0 (20 legs + 10 compB + 5 tops)
+        $this->assertEquals(35.0, $reportData['summary']['component_produced'], 'Component output must equal 35 (20 legs + 10 brackets + 5 tops)');
+
+        // - Events count must be 8
+        $this->assertEquals(8, $reportData['summary']['total_events_count']);
+
+        // - Total event quantity processed across stages is 60.0
+        $this->assertEquals(60.0, $reportData['summary']['total_event_quantity_processed']);
+
+        // 9. Verify Product Output breakdown
+        $productOutputs = collect($reportData['product_outputs']);
+        $fgRow = $productOutputs->firstWhere('output_type', 'fg');
+        $this->assertNotNull($fgRow);
+        $this->assertEquals('Industrial Dining Table', $fgRow['product_name']);
+        $this->assertEquals(5.0, $fgRow['output_qty']);
+
+        $sfgRow = $productOutputs->firstWhere('output_type', 'sfg');
+        $this->assertNotNull($sfgRow);
+        $this->assertEquals('Welded Metal Frame SFG', $sfgRow['product_name']);
+        $this->assertEquals(5.0, $sfgRow['output_qty']);
+
+        $legRow = $productOutputs->firstWhere('product_sku', 'CMP-LEG-100');
+        $this->assertNotNull($legRow);
+        $this->assertEquals(20.0, $legRow['output_qty']);
+
+        // 10. Verify HTTP response renders with correct semantics
+        $response = $this->get(route('production.intelligence.reports.show', [
+            'type'       => 'daily-production',
+            'order_id'   => $multiOrder->id,
+            'date_start' => now()->subDay()->toDateString(),
+            'date_end'   => now()->addDay()->toDateString(),
+        ]));
+        $response->assertStatus(200);
+        $response->assertSee('Finished Goods (FG) Produced');
+        $response->assertSee('SFG / Intermediate Output');
+        $response->assertSee('Component Output');
+        $response->assertSee('Industrial Dining Table');
+        $response->assertSee('PO-MULTI-005');
+    }
 }
+

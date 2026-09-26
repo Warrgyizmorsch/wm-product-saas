@@ -179,6 +179,51 @@
                 </x-ui.card>
             </div>
 
+            {{-- Daily Production Report (DPR) --}}
+            <div class="col-md-4">
+                <x-ui.card class="border border-light shadow-sm h-100 touch-card">
+                    <div class="avatar-text avatar-lg bg-soft-primary text-primary rounded mb-3">
+                        <i class="feather-calendar"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark">{{ __('production.daily_production_report') ?? 'Daily Production Report' }}</h5>
+                    <p class="text-muted fs-13">{{ __('production.daily_production_report_desc') ?? 'Date-wise shopfloor production logs across orders, work centers, and machines with good, reject, and scrap quantities.' }}</p>
+                    
+                    <form method="GET" action="{{ route('production.intelligence.reports.show', 'daily-production') }}" target="_blank" class="mt-3 fs-13 text-dark report-form">
+                        <input type="hidden" name="date_start" value="{{ request('date_start', now()->subMonth()->toDateString()) }}">
+                        <input type="hidden" name="date_end" value="{{ request('date_end', now()->toDateString()) }}">
+                        <div class="mb-2">
+                            <x-ui.odoo-form-ui type="select" :label="__('production.col_work_center')" name="work_center_id">
+                                <option value="">{{ __('production.all_work_centers') }}</option>
+                                @foreach($workCenters as $wc)
+                                    <option value="{{ $wc->id }}">{{ $wc->name }}</option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="mb-2">
+                            <x-ui.odoo-form-ui type="select" :label="__('production.col_machine') ?? 'Machine'" name="machine_id">
+                                <option value="">{{ __('production.all_machines') }}</option>
+                                @foreach($machines as $m)
+                                    <option value="{{ $m->id }}">{{ $m->name }}</option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="select" label="Production Order" name="order_id">
+                                <option value="">All Orders</option>
+                                @foreach($orders as $ord)
+                                    <option value="{{ $ord->id }}">{{ $ord->order_number }}</option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="d-flex gap-2 mt-4">
+                            <x-ui.button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.show', 'daily-production') }}'; this.form.target='_blank';" variant="primary" class="flex-fill">{{ __('production.view_report') }}</x-ui.button>
+                            <x-ui.button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.show', 'daily-production') }}'; this.form.target='_blank';" name="print" value="1" variant="light" class="border" title="{{ __('production.print') }}"><i class="feather-printer"></i></x-ui.button>
+                            <x-ui.button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.export', 'daily-production') }}'; this.form.target='_self';" variant="light" class="border" title="{{ __('production.export_csv') }}"><i class="feather-download"></i></x-ui.button>
+                        </div>
+                    </form>
+                </x-ui.card>
+            </div>
+
             {{-- Material Consumption & Variance --}}
             <div class="col-md-4">
                 <x-ui.card class="border border-light shadow-sm h-100 touch-card">
