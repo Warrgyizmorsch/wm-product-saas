@@ -421,13 +421,15 @@
                     </div>
                     
                     <!-- Subhead Details -->
-                    <div class="mt-1 d-flex align-items-center gap-3 fs-11 text-muted">
+                    <div class="mt-1 d-flex align-items-center gap-3 fs-11 text-muted flex-wrap">
                         <span><strong class="text-dark">{{ __('crm.deal_no') }}:</strong> <span class="font-monospace text-primary fw-bold">{{ $deal->deal_number }}</span></span>
                         <span><strong class="text-dark">{{ __('crm.deal_owner') }}:</strong> {{ $deal->owner?->name ?: ($deal->user?->name ?: __('crm.unassigned')) }}</span>
                         @if($deal->contact)
                             <span><strong class="text-dark">{{ __('crm.contact_person') }}:</strong> {{ $deal->contact->name }}</span>
                         @endif
                     </div>
+
+
                 </div>
             </div>
             
@@ -806,6 +808,8 @@
                                 </div>
                             </div>
                         </div>
+
+
 
                         <!-- Deal Information Card -->
                         <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionDealInfo">
@@ -2950,37 +2954,98 @@
             initDealTagUserSelect2();
         });
 
-        // Auto-check Google Auth Status on Page Load
+        // Auto-check Google Auth Status on Page Load (Direct browser cookie check + backend sync)
         function checkGoogleAuthStatus() {
-            $.ajax({
-                url: "{{ route('crm.deals.googleAuthStatus') }}",
+            const badge = $('#googleAuthBadge');
+            const hfAuthUrl = "https://love14-deal-health-scoring.hf.space/auth/me";
+            const fallbackLoginUrl = "https://love14-deal-health-scoring.hf.space/auth/login?user_id={{ auth()->id() ?? 1 }}&next=" + encodeURIComponent(window.location.href);
+
+            // Attempt direct browser fetch with credentials (sends SameSite=None / cross-origin cookie)
+            fetch(hfAuthUrl, {
                 method: "GET",
-                data: {
-                    user_id: "{{ request('user_id', auth()->id() ?? 1) }}"
-                },
-                success: function (res) {
-                    const badge = $('#googleAuthBadge');
-                    if (res && res.is_connected) {
-                        const emailLabel = res.connected_email ? ' (' + res.connected_email + ')' : '';
-                        badge.attr('class', 'badge bg-success text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
-                             .attr('href', (res && res.login_url) ? res.login_url : '#')
-                             .attr('title', 'Connected Email: ' + (res.connected_email || 'Google Workspace') + ' (Click to Re-connect or Manage)')
-                             .html('<i class="feather-check-circle me-1"></i>Gmail Connected' + emailLabel);
-                    } else {
+                credentials: "include",
+                headers: {
+                    "Accept": "application/json"
+                }
+            })
+            .then(res => {
+                if (res.ok) {
+                    return res.json();
+                }
+                throw new Error("Direct auth returned " + res.status);
+            })
+            .then(data => {
+                if (data && (data.email || data.id || data.authenticated || (data.user && data.user.email))) {
+                    const email = data.email || (data.user ? data.user.email : 'Connected');
+                    const emailLabel = email ? ' (' + email + ')' : '';
+                    badge.attr('class', 'badge bg-success text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                         .attr('href', fallbackLoginUrl)
+                         .attr('title', 'Connected Email: ' + email + ' (Click to Re-connect or Manage)')
+                         .html('<i class="feather-check-circle me-1"></i>Gmail Connected' + emailLabel);
+
+                    // Sync state with Laravel session
+                    $.post("{{ route('crm.deals.googleAuthSync') }}", {
+                        _token: "{{ csrf_token() }}",
+                        is_connected: 1,
+                        email: email
+                    });
+                    return;
+                }
+                throw new Error("User data missing");
+            })
+            .catch(err => {
+                // Fallback to Laravel backend check
+                $.ajax({
+                    url: "{{ route('crm.deals.googleAuthStatus') }}",
+                    method: "GET",
+                    data: {
+                        user_id: "{{ request('user_id', auth()->id() ?? 1) }}"
+                    },
+                    success: function (res) {
+                        if (res && res.is_connected) {
+                            const emailLabel = res.connected_email ? ' (' + res.connected_email + ')' : '';
+                            badge.attr('class', 'badge bg-success text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                                 .attr('href', (res && res.login_url) ? res.login_url : fallbackLoginUrl)
+                                 .attr('title', 'Connected Email: ' + (res.connected_email || 'Google Workspace') + ' (Click to Re-connect or Manage)')
+                                 .html('<i class="feather-check-circle me-1"></i>Gmail Connected' + emailLabel);
+                        } else {
+                            badge.attr('class', 'badge bg-danger text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                                 .attr('href', (res && res.login_url) ? res.login_url : fallbackLoginUrl)
+                                 .attr('title', 'Click to authenticate Google Account')
+                                 .html('<i class="feather-alert-triangle me-1"></i>Gmail Disconnected (Click to Connect)');
+                        }
+                    },
+                    error: function () {
                         badge.attr('class', 'badge bg-danger text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
-                             .attr('href', (res && res.login_url) ? res.login_url : '#')
+                             .attr('href', fallbackLoginUrl)
                              .attr('title', 'Click to authenticate Google Account')
                              .html('<i class="feather-alert-triangle me-1"></i>Gmail Disconnected (Click to Connect)');
                     }
-                },
-                error: function () {
-                    const badge = $('#googleAuthBadge');
-                    badge.attr('class', 'badge bg-warning text-dark text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
-                         .html('<i class="feather-alert-circle me-1"></i>Auth Check Error');
-                }
+                });
             });
         }
         checkGoogleAuthStatus();
+
+        function applySyncSuccess(res) {
+            if (res.message) {
+                $('#syncDiagnosticText').html('<strong>Sync Diagnostic:</strong> ' + res.message);
+                $('#syncDiagnosticNotice').removeClass('d-none');
+            }
+
+            if (res.success) {
+                $('#healthScoreDisplay').text(res.health_score);
+                $('#sentimentDisplay').html('<i class="feather-smile text-success me-1"></i>' + res.sentiment_score);
+                $('#nextActionDisplay').text(res.next_best_action);
+                $('#syncedAtDisplay').html('<i class="feather-clock me-1"></i>' + res.health_synced_at);
+
+                const risk = (res.risk_level || 'Low').toLowerCase();
+                let badgeClass = 'bg-success text-white';
+                if (risk === 'high') badgeClass = 'bg-danger text-white';
+                else if (risk === 'medium') badgeClass = 'bg-warning text-dark';
+
+                $('#riskLevelDisplay').attr('class', 'badge px-2.5 py-1 fs-11 fw-bold ' + badgeClass).text(res.risk_level + ' Risk');
+            }
+        }
 
         // Handle AI Health Sync
         $('#btnSyncHealth').on('click', function () {
@@ -2996,73 +3061,72 @@
                 },
                 success: function (res) {
                     btn.prop('disabled', false).html(origHtml);
-
-                    if (res.message) {
-                        $('#syncDiagnosticText').html('<strong>Sync Diagnostic:</strong> ' + res.message);
-                        $('#syncDiagnosticNotice').removeClass('d-none');
-                    }
-
-                    if (res.success) {
-                        $('#healthScoreDisplay').text(res.health_score);
-                        $('#sentimentDisplay').html('<i class="feather-smile text-success me-1"></i>' + res.sentiment_score);
-                        $('#nextActionDisplay').text(res.next_best_action);
-                        $('#syncedAtDisplay').html('<i class="feather-clock me-1"></i>' + res.health_synced_at);
-
-                        const risk = (res.risk_level || 'Low').toLowerCase();
-                        let badgeClass = 'bg-success text-white';
-                        if (risk === 'high') badgeClass = 'bg-danger text-white';
-                        else if (risk === 'medium') badgeClass = 'bg-warning text-dark';
-
-                        $('#riskLevelDisplay').attr('class', 'badge px-2.5 py-1 fs-11 fw-bold ' + badgeClass).text(res.risk_level + ' Risk');
-
-                        // Silent update on success without opening modal popup
+                    if (res && res.success) {
+                        applySyncSuccess(res);
                     } else {
-                        if (res.auth_connected === false) {
-                            const badge = $('#googleAuthBadge');
-                            badge.attr('class', 'badge bg-danger text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
-                                 .attr('href', res.login_url || '#')
-                                 .attr('target', '_blank')
-                                 .attr('title', 'Token Expired - Click to Re-authenticate Google Account')
-                                 .html('<i class="feather-alert-triangle me-1"></i>Gmail Expired (Click to Re-connect)');
-                        }
-                        showNotificationModal(false, 'AI Sync Notification', res.message || 'API Sync Failed.');
+                        showNotificationModal(false, 'AI Sync Notification', (res && res.message) ? res.message : 'Could not analyze deal health.');
                     }
                 },
                 error: function () {
                     btn.prop('disabled', false).html(origHtml);
-                    showNotificationModal(false, 'Connection Error', 'API Server Error: Could not connect to Deal Health Engine.');
+                    showNotificationModal(false, 'Connection Error', 'Error syncing Deal Health.');
                 }
             });
         });
 
         // Handle AI Email Draft Generation
-        $('#btnGenerateDraft').on('click', function () {
-            const btn = $(this);
+        function fetchAndDisplayDraft(tone = 'professional') {
+            const btn = $('#btnGenerateDraft');
             const origHtml = btn.html();
             btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Generating Draft...');
+            $('#aiDraftLoadingOverlay').removeClass('d-none');
+
+            function openDraftModal(subject, body, currentTone) {
+                $('#aiDraftToneSelect').val(currentTone || 'professional');
+                $('#aiDraftSubject').val(subject || "Follow up regarding Deal #{{ $deal->deal_number }}");
+                $('#aiDraftBody').val(body || "");
+                $('#aiDraftLoadingOverlay').addClass('d-none');
+                btn.prop('disabled', false).html(origHtml);
+                const draftModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('aiDraftModal'));
+                draftModal.show();
+            }
 
             $.ajax({
                 url: "{{ route('crm.deals.generateDraftReply', $deal->id) }}",
                 method: "POST",
                 data: {
-                    _token: "{{ csrf_token() }}"
+                    _token: "{{ csrf_token() }}",
+                    tone: tone
                 },
                 success: function (res) {
-                    btn.prop('disabled', false).html(origHtml);
                     if (res.success) {
-                        $('#aiDraftSubject').val(res.subject);
-                        $('#aiDraftBody').val(res.body);
-                        const draftModal = new bootstrap.Modal(document.getElementById('aiDraftModal'));
-                        draftModal.show();
+                        openDraftModal(res.subject, res.body, res.tone || tone);
                     }
                 },
                 error: function () {
                     btn.prop('disabled', false).html(origHtml);
+                    $('#aiDraftLoadingOverlay').addClass('d-none');
                     if (typeof toastr !== 'undefined') {
                         toastr.error('Failed to generate AI Draft Reply.');
                     }
                 }
             });
+        }
+
+        function getSelectedAiTone() {
+            return $('input[name="ai_tone"]:checked').val() || 'professional';
+        }
+
+        $('#btnGenerateDraft').on('click', function () {
+            fetchAndDisplayDraft(getSelectedAiTone());
+        });
+
+        $(document).on('change', 'input[name="ai_tone"]', function () {
+            fetchAndDisplayDraft($(this).val());
+        });
+
+        $('#btnRegenerateToneDraft').on('click', function () {
+            fetchAndDisplayDraft(getSelectedAiTone());
         });
 
         // Handle Copy to Clipboard
@@ -3076,23 +3140,45 @@
                 }
             });
         });
+
     </script>
 
-    <!-- AI EMAIL DRAFT MODAL -->
-    <x-ui.modal id="aiDraftModal" title="<i class='feather-mail text-primary me-1.5'></i>AI Generated Email Reply Draft" size="lg" :centered="true" :showFooter="false">
-        <div class="mb-3">
-            <x-ui.modal-form-ui type="input" label="Subject" id="aiDraftSubject" readonly="true" />
+    <!-- AI EMAIL DRAFT MODAL WITH COMMON RADIO COMPONENT TONE SELECTOR -->
+    <x-ui.modal id="aiDraftModal" title="AI Generated Email Reply Draft" size="lg" :centered="true" :showFooter="false">
+        <div class="d-flex align-items-center justify-content-between mb-3 p-2.5 rounded bg-light border flex-wrap gap-2">
+            <label class="fs-12 fw-bold text-dark mb-0">Tone:</label>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <x-ui.radio name="ai_tone" id="aiTone_professional" value="professional" label="Professional" :checked="true" />
+                <x-ui.radio name="ai_tone" id="aiTone_persuasive" value="persuasive" label="Persuasive" />
+                <x-ui.radio name="ai_tone" id="aiTone_urgent" value="urgent" label="Urgent" />
+                <x-ui.radio name="ai_tone" id="aiTone_friendly" value="friendly" label="Friendly" />
+                <x-ui.radio name="ai_tone" id="aiTone_concise" value="concise" label="Concise" />
+            </div>
+            <x-ui.button variant="outline-primary" size="sm" id="btnRegenerateToneDraft">
+                Regenerate
+            </x-ui.button>
         </div>
-        <div class="mb-3">
-            <x-ui.modal-form-ui type="textarea" label="Message Body" id="aiDraftBody" rows="10" />
+
+        <div class="position-relative">
+            <div id="aiDraftLoadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex align-items-center justify-content-center d-none" style="z-index: 10;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <x-ui.modal-form-ui type="input" label="Subject" id="aiDraftSubject" readonly="true" />
+            </div>
+            <div class="mb-3">
+                <x-ui.modal-form-ui type="textarea" label="Message Body" id="aiDraftBody" rows="10" />
+            </div>
         </div>
+
         <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-            <span class="fs-11 text-muted"><i class="feather-info me-1"></i>You can edit the message before sending or copying.</span>
+            <span class="fs-11 text-muted">You can edit the message before sending or copying.</span>
             <div class="d-flex gap-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">Close</button>
-                <button type="button" id="btnCopyDraft" class="btn btn-sm btn-primary fw-bold">
-                    <i class="feather-copy me-1"></i>Copy to Clipboard
-                </button>
+                <x-ui.button variant="outline-secondary" size="sm" data-bs-dismiss="modal">Close</x-ui.button>
+                <x-ui.button variant="primary" size="sm" id="btnCopyDraft">Copy to Clipboard</x-ui.button>
             </div>
         </div>
     </x-ui.modal>
