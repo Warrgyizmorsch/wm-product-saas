@@ -169,7 +169,7 @@
     }
     .pending-approval-pills .nav-link.active {
         background: #ffffff !important;
-        color: #4f46e5 !important;
+        color: var(--bs-primary, #6337fa) !important;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
         font-weight: 700;
     }
@@ -193,7 +193,7 @@
 
     /* Action Status Dropdown Styling (matching Shift & Overtime and Leaves module) */
     .btn-status-dropdown {
-        background-color: #7c6f6c !important;
+        background-color: var(--bs-primary, #6337fa) !important;
         color: #ffffff !important;
         font-size: 12px !important;
         font-weight: 600 !important;
@@ -209,7 +209,8 @@
     .btn-status-dropdown:hover,
     .btn-status-dropdown:focus,
     .btn-status-dropdown:active {
-        background-color: #6a5e5a !important;
+        filter: brightness(0.9) !important;
+        background-color: var(--bs-primary, #6337fa) !important;
         color: #ffffff !important;
     }
     .btn-status-dropdown::after {
@@ -259,7 +260,7 @@
     <div class="card-header bg-white pt-3 pb-2 px-3 d-flex align-items-center justify-content-between border-bottom-0 flex-wrap gap-2">
         <!-- Title with Avatar Icon -->
         <div class="d-flex align-items-center gap-2" style="gap: 8px;">
-            <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 30px; height: 30px; background: #eef2ff; border-radius: 8px; color: #4f46e5;">
+            <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 30px; height: 30px; background: rgba(var(--bs-primary-rgb, 99, 55, 250), 0.1); border-radius: 8px; color: var(--bs-primary, #6337fa);">
                 <i class="feather-inbox fs-14"></i>
             </div>
             <h6 class="fw-bold mb-0 text-dark" style="font-size: 15px; color: #1e293b !important; font-weight: 700;">Pending Approvals Action Center</h6>
@@ -269,7 +270,7 @@
         <ul class="nav nav-pills border-0 p-1 rounded-3 pending-approval-pills d-inline-flex align-items-center gap-1" id="pills-approval-tab" role="tablist" style="background: #f1f5f9; border-radius: 10px;">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active d-inline-flex align-items-center gap-1" id="pills-leaves-tab" data-bs-toggle="pill" data-bs-target="#pills-leaves" type="button" role="tab" aria-controls="pills-leaves" aria-selected="true">
-                    Leaves <span class="badge rounded-pill px-1.5 py-0.5 fs-10 fw-bold ms-1" style="background: #eef2ff; color: #4f46e5;">{{ count($leavesList) }}</span>
+                    Leaves <span class="badge rounded-pill px-1.5 py-0.5 fs-10 fw-bold ms-1" style="background: rgba(var(--bs-primary-rgb, 99, 55, 250), 0.1); color: var(--bs-primary, #6337fa);">{{ count($leavesList) }}</span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">

@@ -157,6 +157,23 @@ class HrmsDashboardController extends Controller
                 }
             }
 
+            // Calculate Profile & KYC Completion %
+            $fields = [
+                $currentEmployee->full_name,
+                $currentEmployee->office_email,
+                $currentEmployee->phone_number,
+                $currentEmployee->date_of_birth,
+                $currentEmployee->pan_card_number,
+                $currentEmployee->aadhaar_card_number,
+                $currentEmployee->bank_name,
+                $currentEmployee->account_number,
+                $currentEmployee->ifsc_code,
+                $currentEmployee->emergency_contact_phone ?? $currentEmployee->phone_number,
+            ];
+            $filled = count(array_filter($fields));
+            $profileCompletion = count($fields) > 0 ? round(($filled / count($fields)) * 100) : 100;
+        }
+
         // Resolve Assigned Leave Plan & Detailed Leave Types List
         $myAssignedPlan = null;
         if ($currentEmployee && $currentEmployee->leave_plan_id) {
@@ -276,23 +293,6 @@ class HrmsDashboardController extends Controller
                     ];
                 }
             }
-        }
-
-            // Calculate Profile & KYC Completion %
-            $fields = [
-                $currentEmployee->full_name,
-                $currentEmployee->office_email,
-                $currentEmployee->phone_number,
-                $currentEmployee->date_of_birth,
-                $currentEmployee->pan_card_number,
-                $currentEmployee->aadhaar_card_number,
-                $currentEmployee->bank_name,
-                $currentEmployee->account_number,
-                $currentEmployee->ifsc_code,
-                $currentEmployee->emergency_contact_phone ?? $currentEmployee->phone_number,
-            ];
-            $filled = count(array_filter($fields));
-            $profileCompletion = count($fields) > 0 ? round(($filled / count($fields)) * 100) : 100;
         }
 
         // 5. Unified Action Center / Pending Inboxes (Leaves, WFH, Regularizations, Expenses)

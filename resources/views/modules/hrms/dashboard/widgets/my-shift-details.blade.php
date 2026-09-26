@@ -16,7 +16,7 @@
         <div>
             <!-- Header: Current Shift Details -->
             <div class="d-flex align-items-center gap-2 mb-2.5">
-                <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 28px; height: 28px; background: #eef2ff; border-radius: 8px; color: #4f46e5;">
+                <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 28px; height: 28px; background: rgba(var(--bs-primary-rgb, 99, 55, 250), 0.1); border-radius: 8px; color: var(--bs-primary, #6337fa);">
                     <i class="feather-clock fs-13"></i>
                 </div>
                 <h6 class="fw-bold mb-0 text-dark fs-14" style="color: #0f172a !important;">Current Shift Details</h6>
@@ -60,10 +60,10 @@
 
         <!-- Action Buttons -->
         <div class="d-flex mt-auto pt-2" style="gap: 12px !important;">
-            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'shift', 'action' => 'apply_shift']) : url('/hrms/shift-overtime?tab=shift&action=apply_shift') }}" class="btn text-white fw-bold py-2 flex-fill text-uppercase fs-11 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: #4a3838 !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 11px !important; letter-spacing: 0.03em !important;">
+            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'shift', 'action' => 'apply_shift']) : url('/hrms/shift-overtime?tab=shift&action=apply_shift') }}" class="btn text-white fw-bold py-2 flex-fill text-uppercase fs-11 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: var(--bs-primary, #6337fa) !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 11px !important; letter-spacing: 0.03em !important;">
                 <i class="feather-plus fs-12"></i> SHIFT CHANGE
             </a>
-            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'overtime', 'action' => 'apply_overtime']) : url('/hrms/shift-overtime?tab=overtime&action=apply_overtime') }}" class="btn text-white fw-bold py-2 flex-fill text-uppercase fs-11 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: #4a3838 !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 11px !important; letter-spacing: 0.03em !important;">
+            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'overtime', 'action' => 'apply_overtime']) : url('/hrms/shift-overtime?tab=overtime&action=apply_overtime') }}" class="btn text-white fw-bold py-2 flex-fill text-uppercase fs-11 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: var(--bs-primary, #6337fa) !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 11px !important; letter-spacing: 0.03em !important;">
                 <i class="feather-plus fs-12"></i> OVERTIME
             </a>
         </div>
