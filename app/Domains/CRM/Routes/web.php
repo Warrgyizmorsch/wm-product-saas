@@ -64,6 +64,7 @@ Route::prefix('crm')
         Route::get('deals/activities', [DealActivityController::class, 'index'])->name('deals.activities');
         Route::get('deals/create', [CrmDealController::class, 'create'])->name('deals.create');
         Route::get('deals/google-auth-status', [CrmDealController::class, 'checkGoogleAuth'])->name('deals.googleAuthStatus');
+        Route::post('deals/google-auth-sync', [CrmDealController::class, 'syncGoogleAuth'])->name('deals.googleAuthSync');
         Route::post('deals', [CrmDealController::class, 'store'])->name('deals.store');
         Route::get('deals/{deal}', [CrmDealController::class, 'show'])->name('deals.show');
         Route::get('deals/{deal}/convert-customer', [CrmDealController::class, 'showConvertForm'])->name('deals.showConvertForm');
@@ -76,6 +77,7 @@ Route::prefix('crm')
         Route::post('deals/{deal}/documents', [CrmDealController::class, 'uploadDocuments'])->name('deals.documents.upload');
         Route::post('deals/{deal}/followups', [LeadFollowupController::class, 'storeDealFollowup'])->name('deals.followups.store');
         Route::post('deals/{deal}/sync-health', [CrmDealController::class, 'syncHealth'])->name('deals.syncHealth');
+        Route::post('deals/{deal}/save-health-evaluation', [CrmDealController::class, 'saveHealthEvaluation'])->name('deals.saveHealthEvaluation');
         Route::post('deals/{deal}/generate-draft-reply', [CrmDealController::class, 'generateDraftReply'])->name('deals.generateDraftReply');
         Route::get('leads/create', [LeadController::class, 'create'])
             ->name('leads.create');
@@ -95,6 +97,10 @@ Route::prefix('crm')
             ->name('leads.trackStatus');
         Route::get('leads/download-sample', [LeadController::class, 'downloadSample'])
             ->name('leads.downloadSample');
+        Route::post('leads/import/parse', [LeadController::class, 'parseImportFile'])
+            ->name('leads.import.parse');
+        Route::post('leads/import/process', [LeadController::class, 'processMappedImport'])
+            ->name('leads.import.process');
         Route::post('leads/import', [LeadController::class, 'import'])
             ->name('leads.import');
         Route::get('leads/export', [LeadController::class, 'export'])

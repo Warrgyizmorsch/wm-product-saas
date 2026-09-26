@@ -247,23 +247,38 @@ class LeadFollowupController extends Controller
                         'deal_id'          => $deal->id,
                     ]);
 
-                    if (\Schema::hasColumn('lead_followups', 'google_event_id')) {
-                        $followup->google_event_id = $res['google_event_id'] ?? null;
-                    }
-                    if (\Schema::hasColumn('lead_followups', 'google_meet_link')) {
-                        // Sirf Meet select kiya ho to meet link store karo
-                        $followup->google_meet_link = $createMeet ? ($res['meet_link'] ?? null) : null;
-                    }
-                    if (\Schema::hasColumn('lead_followups', 'is_google_meet')) {
-                        $followup->is_google_meet = $createMeet;
-                    }
-                    // Notes mein Meet URL sirf tab append karo jab Meet select tha
-                    if ($createMeet && !empty($res['meet_link'])) {
-                        $followup->notes = ($followup->notes ? $followup->notes . "\n" : '') . "Google Meet: " . $res['meet_link'];
+                    if (!empty($res['success'])) {
+                        if (\Schema::hasColumn('lead_followups', 'google_event_id')) {
+                            $followup->google_event_id = $res['google_event_id'] ?? null;
+                        }
+                        if (\Schema::hasColumn('lead_followups', 'google_meet_link')) {
+                            $followup->google_meet_link = $createMeet ? ($res['meet_link'] ?? null) : null;
+                        }
+                        if (\Schema::hasColumn('lead_followups', 'is_google_meet')) {
+                            $followup->is_google_meet = $createMeet && !empty($res['meet_link']);
+                        }
+                        if ($createMeet && !empty($res['meet_link'])) {
+                            $followup->notes = ($followup->notes ? $followup->notes . "\n" : '') . "Google Meet: " . $res['meet_link'];
+                        }
+                    } else {
+                        if (\Schema::hasColumn('lead_followups', 'google_event_id')) {
+                            $followup->google_event_id = null;
+                        }
+                        if (\Schema::hasColumn('lead_followups', 'google_meet_link')) {
+                            $followup->google_meet_link = null;
+                        }
+                        if (\Schema::hasColumn('lead_followups', 'is_google_meet')) {
+                            $followup->is_google_meet = false;
+                        }
+                        session()->flash('google_sync_warning', $res['message'] ?? 'Google Calendar / Meet could not be synchronized.');
+                        if (!empty($res['auth_url'])) {
+                            session()->flash('google_auth_url', $res['auth_url']);
+                        }
                     }
                     $followup->save();
                 } catch (\Throwable $ex) {
                     \Illuminate\Support\Facades\Log::warning('Google Calendar auto-sync notice for deal: ' . $ex->getMessage());
+                    session()->flash('google_sync_warning', 'Google Calendar auto-sync failed: ' . $ex->getMessage());
                 }
             }
         } else {

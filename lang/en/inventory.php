@@ -51,6 +51,8 @@ return [
     'stock_on_hand' => 'Stock on Hand',
     'edit_item' => 'Edit Item',
     'delete_item' => 'Delete Item',
+    'mark_active' => 'Mark as Active',
+    'mark_inactive' => 'Mark as Inactive',
     'confirm_delete_product' => 'Are you sure you want to delete this product?',
     'no_items_found' => 'No items or products found in this workspace.',
 

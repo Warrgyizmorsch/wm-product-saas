@@ -379,6 +379,66 @@ class LeadController extends Controller
         return Excel::download(new LeadSampleExport, 'lead_sample.xlsx');
     }
 
+    public function parseImportFile(Request $request): JsonResponse
+    {
+        $this->authorize('create', Lead::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:20480',
+        ]);
+
+        try {
+            $service = app(\App\Domains\CRM\Services\LeadImportMapperService::class);
+            $result = $service->parseFile($request->file('file'), $tenantId);
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function processMappedImport(Request $request): JsonResponse
+    {
+        $this->authorize('create', Lead::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $companyId = company_id() ?? auth()->user()?->company_id ?? null;
+        $branchId = branch_id() ?? auth()->user()?->branch_id ?? null;
+        $userId = auth()->id() ?: 1;
+
+        $request->validate([
+            'file_token' => 'required|string',
+            'mapping' => 'required|array',
+            'options' => 'nullable|array',
+        ]);
+
+        try {
+            $service = app(\App\Domains\CRM\Services\LeadImportMapperService::class);
+            $result = $service->processImport(
+                fileToken: (string)$request->input('file_token'),
+                mapping: (array)$request->input('mapping', []),
+                options: (array)$request->input('options', []),
+                tenantId: $tenantId,
+                userId: $userId,
+                companyId: $companyId,
+                branchId: $branchId
+            );
+
+            return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
     public function import(Request $request)
     {
         $this->authorize('create', Lead::class);
