@@ -394,6 +394,125 @@ class EmployeeController extends Controller
             }
         }
 
+        if ($isOwnProfile && !$isHrOrAdmin) {
+            $fieldLabels = [
+                'nick_name'                   => 'Nick Name',
+                'date_of_birth'               => 'Date of Birth',
+                'marital_status'              => 'Marital Status',
+                'blood_group'                 => 'Blood Group',
+                'diet_preference'             => 'Diet Preference',
+                'personal_mobile_number'      => 'Personal Mobile',
+                'personal_email'              => 'Personal Email',
+                'home_phone'                  => 'Home Phone',
+                'emergency_contact_name'      => 'Emergency Contact Name',
+                'emergency_contact_number'    => 'Emergency Contact Number',
+                'emergency_contact_relation'  => 'Emergency Contact Relation',
+                'city'                        => 'City',
+                'postal_code'                 => 'Postal Code',
+                'present_address'             => 'Present Address',
+                'permanent_address'           => 'Permanent Address',
+                'aadhaar_card_number'         => 'Aadhaar Card Number',
+                'pan_card_number'             => 'PAN Card Number',
+                'bank_name'                   => 'Bank Name',
+                'account_number'              => 'Account Number',
+                'ifsc_code'                   => 'IFSC Code',
+                'qualification'               => 'Qualification',
+                'source_of_hire'              => 'Source of Hire',
+                'skill_set'                   => 'Skill Set',
+            ];
+
+            $changes = [];
+            foreach ($fieldLabels as $field => $label) {
+                if (!$request->has($field)) {
+                    continue;
+                }
+
+                $oldVal = $employee->$field;
+                if ($field === 'date_of_birth' && $oldVal instanceof \Carbon\CarbonInterface) {
+                    $oldVal = $oldVal->format('Y-m-d');
+                }
+                $newVal = $request->input($field);
+                if ($field === 'date_of_birth' && $newVal) {
+                    try {
+                        $newVal = \Carbon\Carbon::parse($newVal)->format('Y-m-d');
+                    } catch (\Exception $e) {
+                        // Keep raw string if parsing fails
+                    }
+                }
+
+                $cleanOld = trim((string) $oldVal);
+                $cleanNew = trim((string) $newVal);
+
+                // Date normalization
+                if ($field === 'date_of_birth') {
+                    $oldDate = ($cleanOld !== '' && $cleanOld !== '—') ? date('Y-m-d', strtotime($cleanOld)) : '';
+                    $newDate = ($cleanNew !== '' && $cleanNew !== '—') ? date('Y-m-d', strtotime($cleanNew)) : '';
+                    if ($oldDate === $newDate) {
+                        continue;
+                    }
+                }
+
+                // Diet preference normalization (e.g., 'Veg' vs 'veg' vs 'Vegetarian')
+                if ($field === 'diet_preference') {
+                    if (strcasecmp($cleanOld, $cleanNew) === 0) {
+                        continue;
+                    }
+                    if ((in_array(strtolower($cleanOld), ['veg', 'vegetarian']) && in_array(strtolower($cleanNew), ['veg', 'vegetarian'])) ||
+                        (in_array(strtolower($cleanOld), ['non_veg', 'non-vegetarian']) && in_array(strtolower($cleanNew), ['non_veg', 'non-vegetarian']))) {
+                        continue;
+                    }
+                }
+
+                // Case-insensitive comparison for marital_status and blood_group
+                if (in_array($field, ['marital_status', 'blood_group'], true)) {
+                    if (strcasecmp($cleanOld, $cleanNew) === 0) {
+                        continue;
+                    }
+                }
+
+                if ($cleanOld !== $cleanNew) {
+                    $changes[$field] = [
+                        'label' => $label,
+                        'old'   => $cleanOld !== '' ? $cleanOld : '—',
+                        'new'   => $cleanNew !== '' ? $cleanNew : '—',
+                    ];
+                }
+            }
+
+            if ($request->hasFile('photo')) {
+                $tempPath = $request->file('photo')->store('employees/temp_requests', 'public');
+                $changes['photo'] = [
+                    'label'    => 'Profile Photo',
+                    'old'      => $employee->photo ?: '—',
+                    'new'      => $tempPath,
+                    'is_image' => true,
+                ];
+            }
+
+            if (empty($changes)) {
+                return redirect()->back()->with('info', 'No changes were detected in your profile details.');
+            }
+
+            $tenantId = tenant_id() ?? $authUser->tenant_id ?? $employee->tenant_id;
+
+            \App\Domains\HRMS\Models\EmployeeProfileUpdateRequest::updateOrCreate(
+                [
+                    'tenant_id'   => $tenantId,
+                    'employee_id' => $employee->id,
+                    'status'      => 'pending',
+                ],
+                [
+                    'user_id'          => $authUser->id,
+                    'changes'          => $changes,
+                    'rejection_reason' => null,
+                    'reviewed_by'      => null,
+                    'reviewed_at'      => null,
+                ]
+            );
+
+            return redirect()->back()->with('success', 'Your profile update request has been submitted to HR for review and approval.');
+        }
+
         $this->employeeRepository->updateEmployee($employee, $validated, $request);
 
         return redirect()
@@ -479,6 +598,23 @@ class EmployeeController extends Controller
             'blood_group' => ['nullable', 'string', 'max:20'],
             'personal_mobile_number' => ['nullable', 'string', 'max:50'],
             'home_phone' => ['nullable', 'string', 'max:50'],
+            'nick_name' => ['nullable', 'string', 'max:255'],
+            'diet_preference' => ['nullable', 'string', 'max:100'],
+            'emergency_contact_name' => ['nullable', 'string', 'max:255'],
+            'emergency_contact_number' => ['nullable', 'string', 'max:50'],
+            'emergency_contact_relation' => ['nullable', 'string', 'max:100'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'postal_code' => ['nullable', 'string', 'max:20'],
+            'present_address' => ['nullable', 'string', 'max:500'],
+            'permanent_address' => ['nullable', 'string', 'max:500'],
+            'aadhaar_card_number' => ['nullable', 'string', 'max:50'],
+            'pan_card_number' => ['nullable', 'string', 'max:50'],
+            'bank_name' => ['nullable', 'string', 'max:150'],
+            'account_number' => ['nullable', 'string', 'max:50'],
+            'ifsc_code' => ['nullable', 'string', 'max:50'],
+            'qualification' => ['nullable', 'string', 'max:255'],
+            'source_of_hire' => ['nullable', 'string', 'max:255'],
+            'skill_set' => ['nullable', 'string', 'max:1000'],
             'current_salary' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
         ]);
@@ -685,7 +821,7 @@ class EmployeeController extends Controller
 
     public function destroyDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
     {
-        $this->authorizeHrms('hrms.employees.update');
+        $this->authorizeHrms(['hrms.documents.manage', 'hrms.employees.update']);
 
         $user = auth()->user();
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
@@ -705,7 +841,7 @@ class EmployeeController extends Controller
 
     public function approveDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
     {
-        $this->authorizeHrms('hrms.employees.update');
+        $this->authorizeHrms(['hrms.documents.manage', 'hrms.employees.update']);
 
         $document->update([
             'status' => 'approved',
@@ -724,7 +860,7 @@ class EmployeeController extends Controller
 
     public function rejectDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
     {
-        $this->authorizeHrms('hrms.employees.update');
+        $this->authorizeHrms(['hrms.documents.manage', 'hrms.employees.update']);
 
         $document->update([
             'status' => 'rejected',

@@ -58,14 +58,20 @@ class ApprovalWorkflowService
 
     /**
      * Determine if an actor (User or Employee) is authorized to approve a request for a requester.
-     * Enforces the strict NO SELF-APPROVAL rule and standard enterprise escalation policies.
+     * Enforces the self-approval rule (permitted if 'OWN' scope is explicitly granted to the role in matrix)
+     * and standard enterprise escalation policies.
      */
-    public function canApprove(User|Employee $actor, Employee $requester, mixed $requestModel = null): bool
+    public function canApprove(User|Employee $actor, Employee $requester, mixed $requestModel = null, ?string $permission = null): bool
     {
         $actorEmployeeId = $this->getEmployeeIdForActor($actor);
 
-        // Rule 1: Anti Self-Approval (STRICT & UNIVERSAL: Requester cannot approve their own request)
+        // Self-Approval Evaluation:
         if ($actorEmployeeId && (int) $actorEmployeeId === (int) $requester->id) {
+            // Permitted if role explicitly has 'OWN' scope checked in Roles & Permissions matrix
+            if ($this->allowsSelfApproval($actor, $requestModel, $permission)) {
+                return true;
+            }
+            // Otherwise, block self-approval and enforce reporting line routing
             return false;
         }
 
@@ -138,6 +144,91 @@ class ApprovalWorkflowService
     }
 
     /**
+     * Check if actor has explicit 'OWN' scope approval permission granted for this request domain.
+     */
+    public function allowsSelfApproval(User|Employee $actor, mixed $requestModel = null, ?string $permission = null): bool
+    {
+        $user = $actor instanceof User ? $actor : ($actor->user ?? null);
+        if (!$user && $actor instanceof Employee) {
+            $user = $this->getUserFromEmployee($actor);
+        }
+
+        if (!$user) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+
+        $permissionName = $permission ?? $this->resolveApprovalPermissionName($requestModel);
+        if (!$permissionName) {
+            return false;
+        }
+
+        return app(\App\Services\Access\AccessService::class)->hasExplicitScope(
+            $user,
+            $permissionName,
+            \App\Models\Access\RolePermission::SCOPE_OWN,
+            $user->tenant_id
+        );
+    }
+
+    /**
+     * Resolve corresponding HRMS approval permission name based on the request model.
+     */
+    public function resolveApprovalPermissionName(mixed $requestModel): ?string
+    {
+        if (is_string($requestModel)) {
+            return str_starts_with($requestModel, 'hrms.') ? $requestModel : 'hrms.' . $requestModel;
+        }
+
+        if ($requestModel instanceof \App\Domains\HRMS\Models\LeaveRequest) {
+            return 'hrms.leave_requests.approve';
+        }
+
+        if ($requestModel instanceof \App\Domains\HRMS\Models\WfhRequest) {
+            return 'hrms.leave_requests.approve';
+        }
+
+        if ($requestModel instanceof \App\Domains\HRMS\Models\ShiftChangeRequest) {
+            return 'hrms.shift_changes.approve';
+        }
+
+        if ($requestModel instanceof \App\Domains\HRMS\Models\OvertimeRequest) {
+            return 'hrms.overtime.approve';
+        }
+
+        if ($requestModel instanceof \App\Domains\HRMS\Models\LeaveEncashment) {
+            return 'hrms.leave_encashments.approve';
+        }
+
+        if ($requestModel instanceof \App\Domains\HRMS\Models\EmployeeExit) {
+            return 'hrms.employee_exits.approve';
+        }
+
+        if ($requestModel instanceof \App\Domains\HRMS\Models\AttendanceCorrection) {
+            return 'hrms.attendance.approve';
+        }
+
+        if ($requestModel instanceof \App\Domains\HRMS\Models\TravelRequest
+            || $requestModel instanceof \App\Domains\HRMS\Models\CashAdvance
+            || $requestModel instanceof \App\Domains\HRMS\Models\ExpenseReport) {
+            return 'hrms.travel_expenses.approve';
+        }
+
+        if ($requestModel instanceof \App\Domains\HRMS\Models\Asset) {
+            return 'hrms.assets.approve';
+        }
+
+        if ($requestModel instanceof \App\Domains\HRMS\Models\PayrollRun) {
+            return 'hrms.payroll_runs.approve';
+        }
+
+        return 'hrms.leave_requests.approve';
+    }
+
+    /**
      * Check if actor possesses HR or Administrator authority.
      */
     public function isHrOrAdminActor(User|Employee $actor): bool
@@ -172,17 +263,19 @@ class ApprovalWorkflowService
      *
      * @throws ValidationException
      */
-    public function authorizeApproval(User|Employee $actor, Employee $requester, mixed $requestModel = null): void
+    public function authorizeApproval(User|Employee $actor, Employee $requester, mixed $requestModel = null, ?string $permission = null): void
     {
         $actorEmployeeId = $this->getEmployeeIdForActor($actor);
 
         if ($actorEmployeeId && (int) $actorEmployeeId === (int) $requester->id) {
-            throw ValidationException::withMessages([
-                'approval' => 'Self-approval is prohibited. You cannot approve your own request.',
-            ]);
+            if (! $this->allowsSelfApproval($actor, $requestModel, $permission)) {
+                throw ValidationException::withMessages([
+                    'approval' => 'Self-approval is prohibited for your role. This request must be approved by your manager.',
+                ]);
+            }
         }
 
-        if (! $this->canApprove($actor, $requester, $requestModel)) {
+        if (! $this->canApprove($actor, $requester, $requestModel, $permission)) {
             throw ValidationException::withMessages([
                 'approval' => 'You are not authorized to approve this request.',
             ]);
@@ -316,6 +409,24 @@ class ApprovalWorkflowService
                       ->orWhere('office_email', $user->email);
                 }
             })
+            ->first();
+    }
+
+    /**
+     * Find the User model corresponding to an Employee record.
+     */
+    public function getUserFromEmployee(Employee $employee): ?User
+    {
+        if ($employee->user) {
+            return $employee->user;
+        }
+
+        if ($employee->user_id) {
+            return User::find($employee->user_id);
+        }
+
+        return User::where('email', $employee->office_email)
+            ->orWhere('email', $employee->personal_email)
             ->first();
     }
 

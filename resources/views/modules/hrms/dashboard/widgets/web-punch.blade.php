@@ -3,8 +3,8 @@
         <!-- Header row: Web Punch Pill + Shift details + Top Right Action Pills -->
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 flex-shrink-0">
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span class="badge px-2.5 py-1 fs-11 fw-semibold rounded-pill d-inline-flex align-items-center gap-1.5" style="background: #eef2ff; color: #4f46e5; border: 1px solid #e0e7ff; font-weight: 600;">
-                    <i class="feather-clock fs-12" style="color: #6366f1;"></i> Web Punch Station
+                <span class="badge px-2.5 py-1 fs-11 fw-semibold rounded-pill d-inline-flex align-items-center" style="background: #eef2ff; color: #4f46e5; border: 1px solid #e0e7ff; font-weight: 600; gap: 6px;">
+                    <i class="feather-clock fs-12" style="color: #6366f1; margin-bottom: 2px; margin-right: 2px;"></i> Web Punch Station
                 </span>
                 @php
                     $shiftRawName = $myShiftDetails['name'] ?? 'General Day Shift';
@@ -16,11 +16,11 @@
                 </span>
             </div>
             <div class="d-flex align-items-center gap-2 ms-auto">
-                <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.wfh.index') ? route('hrms.wfh.index') : url('/hrms/wfh') }}" class="btn fw-bold text-uppercase fs-11 px-2.5 py-1 rounded-pill d-inline-flex align-items-center gap-1.5 text-nowrap" style="background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">
-                    <i class="feather-home fs-12" style="color: #0d9488;"></i> REQUEST WFH
+                <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.wfh.index') ? route('hrms.wfh.index') : url('/hrms/wfh') }}" class="btn fw-bold text-uppercase fs-11 px-2.5 py-1 rounded-pill d-inline-flex align-items-center text-nowrap" style="background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; gap: 6px;">
+                    <i class="feather-home fs-12" style="color: #0d9488; margin-bottom: 2px; margin-right: 2px;"></i> REQUEST WFH
                 </a>
-                <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.attendance.myAttendance') ? route('hrms.attendance.myAttendance') : url('/hrms/attendance/my-attendance') }}" class="btn fw-bold text-uppercase fs-11 px-2.5 py-1 rounded-pill d-inline-flex align-items-center gap-1.5 text-nowrap" style="background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">
-                    <i class="feather-clock fs-12" style="color: #f59e0b;"></i> REGULARIZE PUNCH
+                <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.attendance.myAttendance') ? route('hrms.attendance.myAttendance') : url('/hrms/attendance/my-attendance') }}" class="btn fw-bold text-uppercase fs-11 px-2.5 py-1 rounded-pill d-inline-flex align-items-center text-nowrap" style="background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; gap: 6px;">
+                    <i class="feather-clock fs-12" style="color: #f59e0b; margin-bottom: 2px; margin-right: 2px;"></i> REGULARIZE PUNCH
                 </a>
             </div>
         </div>
@@ -32,8 +32,8 @@
                     <h1 class="fw-semibold mb-0 live-web-clock" style="font-size: 28px; font-weight: 900; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; letter-spacing: -0.02em; line-height: 1.1;">
                         {{ date('h:i:s A') }}
                     </h1>
-                    <span class="badge px-2 py-1 fs-11 fw-normal rounded-2 d-inline-flex align-items-center gap-1.5 ms-1" style="background: #edf2f7; color: #64748b; font-weight: 500;">
-                        <i class="feather-calendar fs-11" style="color: #6366f1;"></i> {{ date('l, d F Y') }}
+                    <span class="badge px-2 py-1 fs-11 fw-normal rounded-2 d-inline-flex align-items-center ms-1" style="background: #edf2f7; color: #64748b; font-weight: 500; gap: 5px;">
+                        <i class="feather-calendar fs-11 me-1" style="color: #6366f1;"></i> {{ date('l, d F Y') }}
                     </span>
                 </div>
 
@@ -45,8 +45,8 @@
 
                 @if($isClockedIn && !$activeBreak)
                     <div class="mt-1 d-flex align-items-center gap-2">
-                        <span class="badge px-2 py-0.5 fs-11 fw-bold rounded-pill d-inline-flex align-items-center gap-1" style="background: #dcfce7; color: #16a34a; font-weight: 700;">
-                            <i class="feather-check-circle fs-12"></i> Clocked In
+                        <span class="badge px-2 py-0.5 fs-11 fw-bold rounded-pill d-inline-flex align-items-center" style="background: #dcfce7; color: #16a34a; font-weight: 700; gap: 4px;">
+                            <i class="feather-check-circle fs-12 me-1"></i> Clocked In
                         </span>
                         <span class="fs-12 fw-normal" style="color: #64748b;">
                             In at <strong class="fw-bold" style="color: #0f172a;">{{ \Carbon\Carbon::parse($myTodayAttendance->check_in)->format('h:i A') }}</strong>
@@ -54,8 +54,8 @@
                     </div>
                 @elseif($isClockedIn && $activeBreak)
                     <div class="mt-1 d-flex align-items-center gap-2">
-                        <span class="badge px-2 py-0.5 fs-11 fw-bold rounded-pill d-inline-flex align-items-center gap-1" style="background: #fef3c7; color: #d97706; font-weight: 700;">
-                            <i class="feather-coffee fs-12"></i> On Break
+                        <span class="badge px-2 py-0.5 fs-11 fw-bold rounded-pill d-inline-flex align-items-center" style="background: #fef3c7; color: #d97706; font-weight: 700; gap: 4px;">
+                            <i class="feather-coffee fs-12 me-1"></i> On Break
                         </span>
                         <span class="fs-12 fw-normal" style="color: #64748b;">
                             In at <strong class="fw-bold" style="color: #0f172a;">{{ \Carbon\Carbon::parse($myTodayAttendance->check_in)->format('h:i A') }}</strong>
@@ -63,8 +63,8 @@
                     </div>
                 @elseif($isCompleted)
                     <div class="mt-1 d-flex align-items-center gap-2">
-                        <span class="badge px-2 py-0.5 fs-11 fw-bold rounded-pill d-inline-flex align-items-center gap-1" style="background: #f1f5f9; color: #64748b; font-weight: 700;">
-                            <i class="feather-check fs-12"></i> Shift Completed
+                        <span class="badge px-2 py-0.5 fs-11 fw-bold rounded-pill d-inline-flex align-items-center" style="background: #f1f5f9; color: #64748b; font-weight: 700; gap: 4px;">
+                            <i class="feather-check fs-12 me-1"></i> Shift Completed
                         </span>
                         <span class="fs-12 fw-normal" style="color: #64748b;">
                             In: <strong class="fw-bold" style="color: #0f172a;">{{ \Carbon\Carbon::parse($myTodayAttendance->check_in)->format('h:i A') }}</strong> • Out: <strong class="fw-bold" style="color: #0f172a;">{{ \Carbon\Carbon::parse($myTodayAttendance->check_out)->format('h:i A') }}</strong>
@@ -72,8 +72,8 @@
                     </div>
                 @else
                     <div class="mt-1 d-flex align-items-center gap-2">
-                        <span class="badge px-2 py-0.5 fs-11 fw-bold rounded-pill d-inline-flex align-items-center gap-1" style="background: #fee2e2; color: #ef4444; font-weight: 700;">
-                            <i class="feather-alert-circle fs-12"></i> Not Clocked In
+                        <span class="badge px-2 py-0.5 fs-11 fw-bold rounded-pill d-inline-flex align-items-center" style="background: #fee2e2; color: #ef4444; font-weight: 700; gap: 4px;">
+                            <i class="feather-alert-circle fs-12 me-1"></i> Not Clocked In
                         </span>
                         <span class="fs-11 text-muted">You have not clocked in yet today.</span>
                     </div>
@@ -90,26 +90,26 @@
                     <div class="d-flex align-items-center gap-2">
                         @if(!$isClockedIn && !$isCompleted)
                             <input type="hidden" name="action" value="in">
-                            <button type="submit" class="btn text-white fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center gap-2" style="background: #10b981; border: none; font-size: 11px; font-weight: 800; letter-spacing: 0.03em; border-radius: 8px;">
-                                <i class="feather-log-in fs-13"></i> CLOCK-IN
+                            <button type="submit" class="btn text-white fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center" style="background: #10b981; border: none; font-size: 11px; font-weight: 800; letter-spacing: 0.03em; border-radius: 8px; gap: 6px;">
+                                <i class="feather-log-in fs-13 me-1"></i> CLOCK-IN
                             </button>
                         @elseif($isClockedIn)
                             @if(!$activeBreak)
-                                <button type="submit" name="action" value="break_out" class="btn fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center gap-2" style="background: #ffffff; border: 1px solid #e2e8f0; color: #1e293b; font-size: 11px; font-weight: 800; letter-spacing: 0.03em; border-radius: 8px;">
-                                    <i class="feather-coffee fs-13" style="color: #f97316;"></i> TAKE BREAK
+                                <button type="submit" name="action" value="break_out" class="btn fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center" style="background: #ffffff; border: 1px solid #e2e8f0; color: #1e293b; font-size: 11px; font-weight: 800; letter-spacing: 0.03em; border-radius: 8px; gap: 6px;">
+                                    <i class="feather-coffee fs-13 me-1" style="color: #f97316;"></i> TAKE BREAK
                                 </button>
                             @else
-                                <button type="submit" name="action" value="break_in" class="btn fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center gap-2" style="background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca; font-size: 11px; font-weight: 800; border-radius: 8px;">
-                                    <i class="feather-play fs-13" style="color: #6366f1;"></i> END BREAK
+                                <button type="submit" name="action" value="break_in" class="btn fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center" style="background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca; font-size: 11px; font-weight: 800; border-radius: 8px; gap: 6px;">
+                                    <i class="feather-play fs-13 me-1" style="color: #6366f1;"></i> END BREAK
                                 </button>
                             @endif
 
-                            <button type="submit" name="action" value="out" class="btn text-white fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center gap-2" style="background: #df4e2e; border: none; font-size: 11px; font-weight: 800; letter-spacing: 0.03em; border-radius: 8px;">
-                                <i class="feather-log-out fs-13"></i> CLOCK-OUT
+                            <button type="submit" name="action" value="out" class="btn text-white fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center" style="background: #df4e2e; border: none; font-size: 11px; font-weight: 800; letter-spacing: 0.03em; border-radius: 8px; gap: 6px;">
+                                <i class="feather-log-out fs-13 me-1"></i> CLOCK-OUT
                             </button>
                         @else
-                            <button type="button" class="btn btn-secondary disabled fw-bold px-3 py-1.5 rounded-3 text-uppercase opacity-75" style="font-size: 11px; font-weight: 800; border-radius: 8px;">
-                                <i class="feather-check fs-13"></i> COMPLETED
+                            <button type="button" class="btn btn-secondary disabled fw-bold px-3 py-1.5 rounded-3 text-uppercase opacity-75 d-inline-flex align-items-center" style="font-size: 11px; font-weight: 800; border-radius: 8px; gap: 6px;">
+                                <i class="feather-check fs-13 me-1"></i> COMPLETED
                             </button>
                         @endif
                     </div>
@@ -121,7 +121,7 @@
         <div class="pt-2 border-top flex-shrink-0 mt-auto" style="border-color: #f1f5f9 !important;">
             <div class="d-flex align-items-center justify-content-between mb-1.5">
                 <span class="fs-11 text-uppercase fw-bold" style="color: #475569 !important; letter-spacing: 0.04em; font-weight: 800;">RECENT 7 DAYS ATTENDANCE LOG</span>
-                <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.attendance.index') ? route('hrms.attendance.index') : '#' }}" class="fs-11 fw-bold text-decoration-none" style="color: #3b82f6;">Full Attendance Log &rarr;</a>
+                <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.attendance.myAttendance') ? route('hrms.attendance.myAttendance') : url('/hrms/attendance/my-attendance') }}" class="fs-11 fw-bold text-decoration-none" style="color: #3b82f6;">Full Attendance Log &rarr;</a>
             </div>
             <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">
                 @foreach(($recentPunches ?? []) as $punch)

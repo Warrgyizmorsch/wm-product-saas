@@ -20,21 +20,31 @@ class HrmsScopeService
     /**
      * Resolve the employee instance for a given user or employee actor.
      */
-    public function resolveEmployee(User|Employee|null $actor): ?Employee
+    public function resolveEmployee(User|Employee|null $actor, ?int $tenantId = null): ?Employee
     {
         if ($actor instanceof Employee) {
             return $actor;
         }
 
-        if ($actor instanceof User) {
-            return Employee::where('user_id', $actor->id)->first();
+        $user = $actor instanceof User ? $actor : (auth()->check() ? auth()->user() : null);
+        if (!$user) {
+            return null;
         }
 
-        if (auth()->check()) {
-            return Employee::where('user_id', auth()->id())->first();
+        $query = Employee::query();
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
         }
 
-        return null;
+        $emp = (clone $query)->where('user_id', $user->id)->first();
+        if (!$emp && !empty($user->email)) {
+            $emp = (clone $query)->where(function ($q) use ($user) {
+                $q->where('office_email', $user->email)
+                  ->orWhere('personal_email', $user->email);
+            })->first();
+        }
+
+        return $emp;
     }
 
     /**

@@ -15,7 +15,7 @@ class DocumentController extends Controller
 {
     public function index(Request $request): View
     {
-        $this->authorize('viewAny', \App\Domains\HRMS\Models\DocumentType::class);
+        $this->authorize('viewAny', \App\Domains\HRMS\Models\Document::class);
 
         $activeTab = $request->query('tab', 'employee');
 
@@ -113,7 +113,7 @@ class DocumentController extends Controller
 
     public function bulkUpload(Request $request): RedirectResponse
     {
-        $this->authorize('create', \App\Domains\HRMS\Models\DocumentType::class);
+        $this->authorize('create', \App\Domains\HRMS\Models\Document::class);
 
         $uploadMode = $request->input('upload_mode', 'file');
 
@@ -368,7 +368,7 @@ class DocumentController extends Controller
 
     public function updateDocumentStatus(Request $request, Document $document): RedirectResponse
     {
-        $this->authorize('update', \App\Domains\HRMS\Models\DocumentType::class);
+        $this->authorize('update', \App\Domains\HRMS\Models\Document::class);
         $validated = $request->validate([
             'status' => 'required|string|in:approved,rejected,uploaded,expired,pending_signature',
         ]);
