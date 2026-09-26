@@ -3,8 +3,8 @@
         <!-- Header row: Web Punch Pill + Shift details + Top Right Action Pills -->
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 flex-shrink-0">
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span class="badge px-2.5 py-1 fs-11 fw-semibold rounded-pill d-inline-flex align-items-center" style="background: #eef2ff; color: #4f46e5; border: 1px solid #e0e7ff; font-weight: 600; gap: 6px;">
-                    <i class="feather-clock fs-12" style="color: #6366f1; margin-bottom: 2px; margin-right: 2px;"></i> Web Punch Station
+                <span class="badge px-2.5 py-1 fs-11 fw-semibold rounded-pill d-inline-flex align-items-center" style="background: rgba(var(--bs-primary-rgb, 99, 55, 250), 0.1); color: var(--bs-primary, #6337fa); border: 1px solid rgba(var(--bs-primary-rgb, 99, 55, 250), 0.2); font-weight: 600; gap: 6px;">
+                    <i class="feather-clock fs-12" style="color: var(--bs-primary, #6337fa); margin-bottom: 2px; margin-right: 2px;"></i> Web Punch Station
                 </span>
                 @php
                     $shiftRawName = $myShiftDetails['name'] ?? 'General Day Shift';
@@ -121,7 +121,7 @@
         <div class="pt-2 border-top flex-shrink-0 mt-auto" style="border-color: #f1f5f9 !important;">
             <div class="d-flex align-items-center justify-content-between mb-1.5">
                 <span class="fs-11 text-uppercase fw-bold" style="color: #475569 !important; letter-spacing: 0.04em; font-weight: 800;">RECENT 7 DAYS ATTENDANCE LOG</span>
-                <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.attendance.myAttendance') ? route('hrms.attendance.myAttendance') : url('/hrms/attendance/my-attendance') }}" class="fs-11 fw-bold text-decoration-none" style="color: #3b82f6;">Full Attendance Log &rarr;</a>
+                <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.attendance.myAttendance') ? route('hrms.attendance.myAttendance') : url('/hrms/attendance/my-attendance') }}" class="fs-11 fw-bold text-decoration-none" style="color: var(--bs-primary, #6337fa);">Full Attendance Log &rarr;</a>
             </div>
             <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">
                 @foreach(($recentPunches ?? []) as $punch)
@@ -175,7 +175,7 @@
                         }
                     @endphp
                     <div class="h-100">
-                        <div class="p-1.5 p-md-2 text-center d-flex flex-column justify-content-between h-100" style="background: #ffffff; border: {{ $isToday ? '2px solid #818cf8' : '1px solid #eaeff5' }}; border-radius: 8px !important;">
+                        <div class="p-1.5 p-md-2 text-center d-flex flex-column justify-content-between h-100" style="background: #ffffff; border: {{ $isToday ? '2px solid var(--bs-primary, #6337fa)' : '1px solid #eaeff5' }}; border-radius: 8px !important;">
                             <div class="text-uppercase mb-0.5" style="color: #475569; font-size: 10px; font-weight: 700; letter-spacing: 0.02em;">
                                 {{ $punch['day_name'] ?? '—' }}
                             </div>

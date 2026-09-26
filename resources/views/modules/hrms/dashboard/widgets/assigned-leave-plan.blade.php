@@ -12,7 +12,7 @@
         <div>
             <!-- Header: Assigned Leave Plan -->
             <div class="d-flex align-items-center gap-2.5 mb-2.5" style="gap: 10px;">
-                <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px; background: #eef2ff; border-radius: 8px; color: #4f46e5;">
+                <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px; background: rgba(var(--bs-primary-rgb, 99, 55, 250), 0.1); border-radius: 8px; color: var(--bs-primary, #6337fa);">
                     <i class="feather-calendar fs-14"></i>
                 </div>
                 <h6 class="fw-bold mb-0 text-dark" style="font-size: 16px; color: #1e293b !important; font-weight: 700;">Assigned Leave Plan</h6>
@@ -85,10 +85,10 @@
 
         <!-- Action Buttons -->
         <div class="d-flex mt-auto pt-2" style="gap: 12px !important;">
-            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leaves.index') ? route('hrms.leaves.index', ['action' => 'apply']) : url('/hrms/leaves?action=apply') }}" class="btn text-white fw-bold py-2 flex-fill text-uppercase fs-11 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: #4a3838 !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 11px !important; letter-spacing: 0.03em !important;">
+            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leaves.index') ? route('hrms.leaves.index', ['action' => 'apply']) : url('/hrms/leaves?action=apply') }}" class="btn text-white fw-bold py-2 flex-fill text-uppercase fs-11 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: var(--bs-primary, #6337fa) !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 11px !important; letter-spacing: 0.03em !important;">
                 <i class="feather-plus fs-12"></i> APPLY LEAVE
             </a>
-            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leaves.index') ? route('hrms.leaves.index', ['tab' => 'encashments', 'action' => 'encash']) : url('/hrms/leaves?tab=encashments&action=encash') }}" class="btn text-white fw-bold py-2 flex-fill text-uppercase fs-11 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: #4a3838 !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 11px !important; letter-spacing: 0.03em !important;">
+            <a href="{{ \Illuminate\Support\Facades\Route::has('hrms.leaves.index') ? route('hrms.leaves.index', ['tab' => 'encashments', 'action' => 'encash']) : url('/hrms/leaves?tab=encashments&action=encash') }}" class="btn text-white fw-bold py-2 flex-fill text-uppercase fs-11 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-2xs" style="background: var(--bs-primary, #6337fa) !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 11px !important; letter-spacing: 0.03em !important;">
                 <span class="fw-bold fs-12 me-1">$</span> ENCASHMENT
             </a>
         </div>
@@ -141,7 +141,7 @@
                 <!-- Modal Header -->
                 <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
                     <div class="d-flex align-items-center gap-3">
-                        <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px; background: #eef2ff; border-radius: 10px; color: #4f46e5;">
+                        <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px; background: rgba(var(--bs-primary-rgb, 99, 55, 250), 0.1); border-radius: 10px; color: var(--bs-primary, #6337fa);">
                             <i class="feather-sliders fs-16"></i>
                         </div>
                         <div>
