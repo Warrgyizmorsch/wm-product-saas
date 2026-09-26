@@ -251,6 +251,16 @@ class Employee extends BaseModel
         return $this->hasMany(EmployeeProbationEvaluation::class, 'employee_id')->orderBy('evaluation_date', 'desc');
     }
 
+    public function profileUpdateRequests(): HasMany
+    {
+        return $this->hasMany(EmployeeProfileUpdateRequest::class, 'employee_id')->latest('id');
+    }
+
+    public function pendingProfileUpdateRequest(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(EmployeeProfileUpdateRequest::class, 'employee_id')->where('status', 'pending')->latest('id');
+    }
+
     public function exits(): HasMany
     {
         return $this->hasMany(EmployeeExit::class, 'employee_id')->orderBy('created_at', 'desc');

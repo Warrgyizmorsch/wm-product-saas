@@ -231,9 +231,6 @@ class HrmsDemoSeeder extends Seeder
             ['slug' => 'inventory_manager', 'name' => 'Inventory Manager', 'level' => 40],
             ['slug' => 'purchase_manager', 'name' => 'Purchase Manager', 'level' => 40],
             ['slug' => 'hr_manager', 'name' => 'HR Manager', 'level' => 40],
-            ['slug' => 'hr_executive', 'name' => 'HR Executive', 'level' => 50],
-            ['slug' => 'tech_lead', 'name' => 'Tech Lead', 'level' => 40],
-            ['slug' => 'software_engineer', 'name' => 'Software Engineer', 'level' => 50],
             ['slug' => 'accountant', 'name' => 'Accountant', 'level' => 40],
             ['slug' => 'auditor', 'name' => 'Auditor', 'level' => 80],
             ['slug' => 'read_only', 'name' => 'Read Only User', 'level' => 90],
@@ -1240,7 +1237,7 @@ class HrmsDemoSeeder extends Seeder
             // 14. Tech Lead & Architect (Bangalore Tech Center - Engineering)
             [
                 'first' => 'Priya', 'last' => 'Nair', 'email' => 'priya@warrg.com',
-                'role_slug' => 'tech_lead', 'job_title' => 'Tech Lead & Architect',
+                'role_slug' => 'read_only', 'job_title' => 'Tech Lead & Architect',
                 'dept' => $deptEng->id, 'desig' => $desigTechLead->id, 'branch' => $branchBlr->id, 'bu' => $buTech->id,
                 'struct' => $structTech->id, 'pay_group' => $payGroupTech->id, 'leave_plan' => $leavePlanStandard->id,
                 'salary' => 1600000, 'gender' => 'Female', 'marital' => 'Married', 'blood' => 'O+', 'diet' => 'Non Veg',
@@ -1251,7 +1248,7 @@ class HrmsDemoSeeder extends Seeder
             // 15. Senior Software Engineer (Bangalore Tech Center - Engineering)
             [
                 'first' => 'Rahul', 'last' => 'Sharma', 'email' => 'rahul@warrg.com',
-                'role_slug' => 'software_engineer', 'job_title' => 'Senior Software Engineer',
+                'role_slug' => 'read_only', 'job_title' => 'Senior Software Engineer',
                 'dept' => $deptEng->id, 'desig' => $desigSrSwe->id, 'branch' => $branchBlr->id, 'bu' => $buTech->id,
                 'struct' => $structTech->id, 'pay_group' => $payGroupTech->id, 'leave_plan' => $leavePlanStandard->id,
                 'salary' => 1150000, 'gender' => 'Male', 'marital' => 'Single', 'blood' => 'A+', 'diet' => 'Veg',
@@ -1262,7 +1259,7 @@ class HrmsDemoSeeder extends Seeder
             // 16. HR Operations Specialist (Corporate HQ - Human Resources)
             [
                 'first' => 'Pooja', 'last' => 'Bhatt', 'email' => 'pooja@warrg.com',
-                'role_slug' => 'hr_executive', 'job_title' => 'HR Operations Specialist',
+                'role_slug' => 'hr_manager', 'job_title' => 'HR Operations Specialist',
                 'dept' => $deptHr->id, 'desig' => $desigHrOps->id, 'branch' => $branchHq->id, 'bu' => $buCorporate->id,
                 'struct' => $structStaff->id, 'pay_group' => $payGroupStaff->id, 'leave_plan' => $leavePlanStandard->id,
                 'salary' => 500000, 'gender' => 'Female', 'marital' => 'Single', 'blood' => 'B-', 'diet' => 'Veg',

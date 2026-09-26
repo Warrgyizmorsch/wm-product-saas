@@ -100,6 +100,29 @@ class AccessService
     }
 
     /**
+     * Check if a user holds an explicit scope grant (e.g. 'own') on a permission.
+     */
+    public function hasExplicitScope(User $user, string $permissionName, string $scope = RolePermission::SCOPE_OWN, ?int $tenantId = null): bool
+    {
+        $tenantId = $tenantId ?? $user->tenant_id;
+        $roleIds = $this->roleIdsFor($user, $tenantId);
+        if ($roleIds->isEmpty()) {
+            return false;
+        }
+
+        $permission = Permission::query()->where('name', $permissionName)->first();
+        if ($permission === null) {
+            return false;
+        }
+
+        return RolePermission::query()
+            ->whereIn('role_id', $roleIds)
+            ->where('permission_id', $permission->id)
+            ->where('scope', $scope)
+            ->exists();
+    }
+
+    /**
      * Effective role IDs for a user in a tenant context — the same
      * legacy-role_id + UserRole merge that allows() uses internally,
      * exposed so admin screens can show which concrete roles are actually

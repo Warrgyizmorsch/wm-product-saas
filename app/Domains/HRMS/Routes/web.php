@@ -2,6 +2,7 @@
 
 use App\Domains\HRMS\Controllers\OrgController;
 use App\Domains\HRMS\Controllers\EmployeeController;
+use App\Domains\HRMS\Controllers\EmployeeProfileRequestController;
 use App\Domains\HRMS\Controllers\SalaryStructureController;
 use App\Domains\HRMS\Controllers\LeaveStructureController;
 use App\Domains\HRMS\Controllers\PenalizationPolicyController;
@@ -124,6 +125,12 @@ Route::prefix('hrms')
             Route::post('/import', [EmployeeController::class, 'import'])->name('employees.import');
             Route::get('/export', [EmployeeController::class, 'export'])->name('employees.export');
             Route::get('/import/template', [EmployeeController::class, 'downloadTemplate'])->name('employees.import.template');
+            
+            // Profile Update Requests
+            Route::get('/profile-requests', [EmployeeProfileRequestController::class, 'index'])->name('employees.profile-requests.index');
+            Route::post('/profile-requests/{profileRequest}/approve', [EmployeeProfileRequestController::class, 'approve'])->name('employees.profile-requests.approve');
+            Route::post('/profile-requests/{profileRequest}/reject', [EmployeeProfileRequestController::class, 'reject'])->name('employees.profile-requests.reject');
+
             Route::post('/store', [EmployeeController::class, 'store'])->name('employees.store');
             Route::post('/update/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
             Route::post('/{employee}/update-status', [EmployeeController::class, 'updateStatus'])->name('employees.update-status');

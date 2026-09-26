@@ -993,6 +993,37 @@
             </div>
         </div>
 
+        @if($pendingRequest = $employee->pendingProfileUpdateRequest)
+            <div class="alert alert-warning border-0 shadow-sm rounded-3 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3 mb-4 p-3" style="background-color: #fffbeb; border-left: 4px solid #f59e0b !important;">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px; background-color: #fef3c7; color: #b45309;">
+                        <i class="feather-clock fs-18"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-1" style="color: #92400e;">Pending Profile Edit Request</h6>
+                        <p class="mb-0 fs-13" style="color: #b45309;">
+                            @if($isHrOrAdmin)
+                                This employee submitted a profile edit request on <strong>{{ $pendingRequest->created_at->format('M d, Y h:i A') }}</strong> awaiting HR review and approval.
+                            @else
+                                You have submitted a profile edit request on <strong>{{ $pendingRequest->created_at->format('M d, Y h:i A') }}</strong>. Changes are awaiting HR review.
+                            @endif
+                        </p>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                    @if($isHrOrAdmin)
+                        <x-ui.button href="{{ route('hrms.employees.profile-requests.index', ['search' => $employee->employee_id]) }}" variant="warning" size="sm" icon="feather-check-square" class="fw-bold shadow-none text-dark">
+                            Review Edit Request
+                        </x-ui.button>
+                    @else
+                        <x-ui.button type="button" variant="outline-warning" size="sm" icon="feather-eye" data-bs-toggle="modal" data-bs-target="#viewPendingRequestModal" class="fw-bold text-dark">
+                            View Requested Changes
+                        </x-ui.button>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         @php
             $rawTab = request('tab', request('active_tab', session('active_tab')));
             $activeTabName = $rawTab ? str_replace(['#', '-pane'], '', $rawTab) : 'overview';
@@ -2353,6 +2384,74 @@
             };
         </script>
     @endpush
+
+    @if($pendingRequest = $employee->pendingProfileUpdateRequest)
+        <div class="modal fade" id="viewPendingRequestModal" tabindex="-1" aria-labelledby="viewPendingRequestModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                    <div class="modal-header bg-light border-bottom px-4 py-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: #fef3c7; color: #b45309;">
+                                <i class="feather-clock"></i>
+                            </div>
+                            <div>
+                                <h6 class="modal-title fw-bold mb-0 text-dark">Profile Edit Request Details</h6>
+                                <small class="text-muted">Submitted on {{ $pendingRequest->created_at->format('M d, Y h:i A') }}</small>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="alert alert-info border-0 rounded-3 mb-4 py-2 px-3 fs-13 d-flex align-items-center gap-2">
+                            <i class="feather-info"></i>
+                            <span>These changes have been submitted to HR. They will reflect on your profile once reviewed and approved.</span>
+                        </div>
+                        <div class="table-responsive rounded-3 border">
+                            <table class="table align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-3 text-muted text-uppercase fs-11 fw-bold" style="width: 30%;">Field</th>
+                                        <th class="text-muted text-uppercase fs-11 fw-bold" style="width: 35%;">Current Value</th>
+                                        <th class="pe-3 text-muted text-uppercase fs-11 fw-bold text-success" style="width: 35%;">Requested New Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($pendingRequest->changes ?? [] as $fieldKey => $change)
+                                        <tr>
+                                            <td class="ps-3 fw-semibold text-dark">{{ $change['label'] ?? ucwords(str_replace('_', ' ', $fieldKey)) }}</td>
+                                            <td class="text-muted fs-13">
+                                                @if(!empty($change['is_image']))
+                                                    @if($change['old'] && $change['old'] !== '—')
+                                                        <img src="{{ asset('storage/' . $change['old']) }}" class="rounded-circle" style="width: 38px; height: 38px; object-fit: cover;">
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                @else
+                                                    {{ $change['old'] ?? '—' }}
+                                                @endif
+                                            </td>
+                                            <td class="pe-3 fw-semibold text-success fs-13">
+                                                @if(!empty($change['is_image']))
+                                                    <img src="{{ asset('storage/' . $change['new']) }}" class="rounded-circle border border-success border-2" style="width: 38px; height: 38px; object-fit: cover;">
+                                                @else
+                                                    {{ $change['new'] ?? '—' }}
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light border-top px-4 py-3">
+                        <x-ui.button type="button" variant="light" class="border px-4" data-bs-dismiss="modal">
+                            Close
+                        </x-ui.button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
 @endsection
 
