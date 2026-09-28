@@ -257,7 +257,7 @@ class OperatorScreenExecutionTest extends TestCase
 
         // Aligned Toolbar Buttons
         $response->assertSee('LOG PROGRESS');
-        $response->assertSee('LOG SCRAP');
+        $response->assertSee('MATERIAL DISPOSITION');
         $response->assertSee('QC CHECK');
 
         // Operation Output & Completion Progress Card & Autofill

@@ -2,6 +2,7 @@
 
 namespace App\Domains\Production\Services;
 
+use App\Domains\Inventory\Models\InventoryRemnant;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionMachineDowntime;
@@ -9,6 +10,7 @@ use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderOperation;
 use App\Domains\Production\Models\ProductionOrderProgressLog;
 use App\Domains\Production\Models\ProductionOrderReservation;
+use App\Domains\Production\Models\ProductionOrderScrap;
 use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Services\ProductionCostVarianceService;
 use App\Domains\Production\Services\ProductionCostAdjustmentService;
@@ -712,14 +714,64 @@ class ReportingService
         $scrapEvents = [];
         foreach ($order->scraps as $scrap) {
             $scrapEvents[] = [
-                'id'            => $scrap->id,
-                'product'       => $scrap->product?->name ?? $order->product?->name ?? '—',
-                'product_sku'   => $scrap->product?->sku ?? '—',
-                'operation'     => $scrap->operation?->name ?? '—',
-                'quantity'      => (float) $scrap->quantity,
-                'reason'        => $scrap->reason ?? '—',
-                'recorded_at'   => $scrap->recorded_at?->toDateTimeString() ?? '—',
-                'stock_posted'  => $scrap->isStockPosted(),
+                'id'               => $scrap->id,
+                'product'          => $scrap->product?->name ?? $order->product?->name ?? '—',
+                'product_sku'      => $scrap->product?->sku ?? '—',
+                'operation'        => $scrap->operation?->name ?? '—',
+                'quantity'         => (float) $scrap->quantity,
+                'measurement_type' => $scrap->measurement_type,
+                'length'           => (float) $scrap->length,
+                'width'            => (float) $scrap->width,
+                'thickness'        => (float) $scrap->thickness,
+                'pieces'           => (int) ($scrap->pieces ?? 1),
+                'weight'           => (float) $scrap->weight,
+                'weight_unit'      => $scrap->weight_unit,
+                'scrap_type'       => $scrap->scrap_type,
+                'reason'           => $scrap->reason ?? '—',
+                'recorded_at'      => $scrap->recorded_at?->toDateTimeString() ?? '—',
+                'stock_posted'     => $scrap->isStockPosted(),
+                'disposal_status'  => $scrap->disposal?->status ?? ($scrap->isStockPosted() ? 'approved' : 'pending_approval'),
+            ];
+        }
+
+        // ── 4b. Reusable Offcuts & Remnants Generated ─────────────────────────
+        $orderRemnants = InventoryRemnant::where('tenant_id', $tenantId)
+            ->where('source_production_order_id', $orderId)
+            ->with(['product.uom', 'warehouse'])
+            ->latest()
+            ->get();
+
+        $remnantsData = [];
+        foreach ($orderRemnants as $rem) {
+            $dimensions = match($rem->measurement_type) {
+                'linear' => number_format($rem->current_length, 1) . ' mm' . ($rem->pieces > 1 ? " ({$rem->pieces} pcs)" : ''),
+                'sheet'  => number_format($rem->current_length, 0) . ' × ' . number_format($rem->current_width, 0) . ' mm' . ($rem->thickness ? " ({$rem->thickness}mm)" : ''),
+                'weight' => number_format($rem->weight, 3) . ' ' . ($rem->weight_unit ?? 'kg'),
+                default  => ($rem->pieces ?? 1) . ' pcs',
+            };
+            $avail = match($rem->measurement_type) {
+                'linear' => number_format($rem->available_length, 1) . ' mm',
+                default  => number_format($rem->available_quantity, 3) . ' ' . ($rem->product?->uom?->code ?? ''),
+            };
+            $remnantsData[] = [
+                'id'                 => $rem->id,
+                'remnant_code'       => $rem->remnant_code,
+                'product_name'       => $rem->product?->name ?? '—',
+                'product_sku'        => $rem->product?->sku ?? '—',
+                'measurement_type'   => $rem->measurement_type,
+                'dimensions'         => $dimensions,
+                'available_display'  => $avail,
+                'current_length'     => (float) $rem->current_length,
+                'available_length'   => (float) $rem->available_length,
+                'current_quantity'   => (float) $rem->current_quantity,
+                'available_quantity' => (float) $rem->available_quantity,
+                'uom'                => $rem->product?->uom?->code ?? 'Units',
+                'warehouse'          => $rem->warehouse?->name ?? 'Default Store',
+                'location'           => $rem->warehouse_location ?? '—',
+                'valuation'          => (float) $rem->total_valuation,
+                'status'             => $rem->status,
+                'is_available'       => $rem->isAvailable(),
+                'created_at'         => $rem->created_at?->format('Y-m-d H:i') ?? '—',
             ];
         }
 
@@ -794,6 +846,7 @@ class ReportingService
             'materials'       => $materials,
             'material_summary'=> $materialSummary,
             'scrap_events'    => $scrapEvents,
+            'remnants'        => $remnantsData,
             'wip_locations'   => $wipLocations,
             'cost_estimation' => $costEstimation,
         ];
@@ -1407,13 +1460,150 @@ class ReportingService
         $activeDaysCount = count($dailyBreakdown);
         $avgDailyFgOutput = $activeDaysCount > 0 ? round($fgProduced / $activeDaysCount, 1) : 0.0;
 
+        // Query Operational Scrap Events logged in the reporting period
+        $scrapQuery = ProductionOrderScrap::where('tenant_id', $tenantId)
+            ->where(function ($q) use ($start, $end) {
+                $q->whereBetween('recorded_at', [
+                    $start->copy()->setTimezone(config('app.timezone', 'UTC')),
+                    $end->copy()->setTimezone(config('app.timezone', 'UTC'))
+                ])->orWhere(function ($sub) use ($start, $end) {
+                    $sub->whereNull('recorded_at')
+                        ->whereBetween('created_at', [
+                            $start->copy()->setTimezone(config('app.timezone', 'UTC')),
+                            $end->copy()->setTimezone(config('app.timezone', 'UTC'))
+                        ]);
+                });
+            });
+
+        if (!empty($filters['order_id'])) {
+            $scrapQuery->where('production_order_id', $filters['order_id']);
+        }
+        if (!empty($filters['product_id'])) {
+            $scrapQuery->where('product_id', $filters['product_id']);
+        }
+        if (!empty($filters['order_number'])) {
+            $scrapQuery->whereHas('order', function ($q) use ($filters) {
+                $q->where('order_number', 'like', '%' . trim($filters['order_number']) . '%');
+            });
+        }
+        if (!empty($filters['work_center_id'])) {
+            $wcId = (int) $filters['work_center_id'];
+            $scrapQuery->whereHas('operation', fn($opQ) => $opQ->where('work_center_id', $wcId));
+        }
+        if (!empty($filters['machine_id'])) {
+            $machineId = (int) $filters['machine_id'];
+            $scrapQuery->whereHas('operation', function ($opQ) use ($machineId) {
+                $opQ->where('machine_id', $machineId)->orWhere('machine_used_id', $machineId);
+            });
+        }
+
+        $dailyScraps = $scrapQuery->with([
+            'product.uom',
+            'order',
+            'operation.workCenter',
+            'scrapWarehouse',
+            'user'
+        ])->latest('recorded_at')->get();
+
+        $scrapList = [];
+        $totalOperationalScrapQty = 0.0;
+        foreach ($dailyScraps as $scr) {
+            $totalOperationalScrapQty += (float) $scr->quantity;
+            $dim = match($scr->measurement_type) {
+                'linear' => !empty($scr->length) ? number_format($scr->length, 1) . ' mm' . (($scr->pieces ?? 1) > 0 ? " ({$scr->pieces} pcs)" : '') : '',
+                'sheet'  => !empty($scr->length) ? number_format($scr->length, 0) . ' × ' . number_format($scr->width, 0) . ' mm' . ($scr->thickness ? " ({$scr->thickness}mm)" : '') . (($scr->pieces ?? 1) > 0 ? " ({$scr->pieces} pcs)" : '') : '',
+                'weight' => !empty($scr->weight) ? number_format($scr->weight, 3) . ' ' . ($scr->weight_unit ?? 'kg') : '',
+                default  => ($scr->pieces ? "{$scr->pieces} pcs" : ''),
+            };
+
+            $scrapList[] = [
+                'id'               => $scr->id,
+                'order_id'         => $scr->production_order_id,
+                'order_number'     => $scr->order?->order_number ?? '—',
+                'product_name'     => $scr->product?->name ?? '—',
+                'product_sku'      => $scr->product?->sku ?? '—',
+                'uom'              => $scr->product?->uom?->code ?? 'Units',
+                'operation'        => $scr->operation ? ("Op #{$scr->operation->sequence}: {$scr->operation->name}") : '—',
+                'work_center'      => $scr->operation?->workCenter?->name ?? '—',
+                'quantity'         => (float) $scr->quantity,
+                'measurement_type' => $scr->measurement_type ?? 'direct',
+                'dimensions'       => $dim,
+                'pieces'           => (int) ($scr->pieces ?? 1),
+                'reason'           => $scr->reason ?? '—',
+                'scrap_type'       => $scr->scrap_type ?? 'operational',
+                'warehouse'        => $scr->scrapWarehouse?->name ?? 'Default Scrap Location',
+                'storage_location' => $scr->storage_location ?? '—',
+                'operator'         => $scr->user?->name ?? '—',
+                'stock_posted'     => $scr->isStockPosted(),
+                'disposal_status'  => $scr->disposal?->status ?? ($scr->isStockPosted() ? 'approved' : 'pending_approval'),
+                'recorded_at'      => $scr->recorded_at?->format('Y-m-d H:i') ?? $scr->created_at?->format('Y-m-d H:i') ?? '—',
+            ];
+        }
+
+        // Query Reusable Offcut Remnants created in the reporting period
+        $remnantQuery = InventoryRemnant::where('tenant_id', $tenantId)
+            ->whereBetween('created_at', [
+                $start->copy()->setTimezone(config('app.timezone', 'UTC')),
+                $end->copy()->setTimezone(config('app.timezone', 'UTC'))
+            ]);
+
+        if (!empty($filters['order_id'])) {
+            $remnantQuery->where('source_production_order_id', $filters['order_id']);
+        }
+        if (!empty($filters['product_id'])) {
+            $remnantQuery->where('product_id', $filters['product_id']);
+        }
+        if (!empty($filters['order_number'])) {
+            $remnantQuery->whereHas('sourceOrder', function ($q) use ($filters) {
+                $q->where('order_number', 'like', '%' . trim($filters['order_number']) . '%');
+            });
+        }
+
+        $dailyRemnants = $remnantQuery->with(['product.uom', 'warehouse', 'sourceOrder'])->latest()->get();
+
+        $offcutsList = [];
+        foreach ($dailyRemnants as $rem) {
+            $dimensions = match($rem->measurement_type) {
+                'linear' => number_format($rem->current_length, 1) . ' mm' . ($rem->pieces > 1 ? " ({$rem->pieces} pcs)" : ''),
+                'sheet'  => number_format($rem->current_length, 0) . ' × ' . number_format($rem->current_width, 0) . ' mm' . ($rem->thickness ? " ({$rem->thickness}mm)" : ''),
+                'weight' => number_format($rem->weight, 3) . ' ' . ($rem->weight_unit ?? 'kg'),
+                default  => ($rem->pieces ?? 1) . ' pcs',
+            };
+            $avail = match($rem->measurement_type) {
+                'linear' => number_format($rem->available_length, 1) . ' mm',
+                default  => number_format($rem->available_quantity, 3) . ' ' . ($rem->product?->uom?->code ?? ''),
+            };
+            $offcutsList[] = [
+                'id'                 => $rem->id,
+                'remnant_code'       => $rem->remnant_code,
+                'order_number'       => $rem->sourceOrder?->order_number ?? '—',
+                'order_id'           => $rem->source_production_order_id,
+                'product_name'       => $rem->product?->name ?? '—',
+                'product_sku'        => $rem->product?->sku ?? '—',
+                'measurement_type'   => $rem->measurement_type,
+                'dimensions'         => $dimensions,
+                'available_display'  => $avail,
+                'available_quantity' => (float) $rem->available_quantity,
+                'uom'                => $rem->product?->uom?->code ?? 'Units',
+                'warehouse'          => $rem->warehouse?->name ?? 'Default Store',
+                'location'           => $rem->warehouse_location ?? '—',
+                'valuation'          => (float) $rem->total_valuation,
+                'status'             => $rem->status,
+                'is_available'       => $rem->isAvailable(),
+                'created_at'         => $rem->created_at?->format('Y-m-d H:i') ?? '—',
+            ];
+        }
+
         $kpiSummary = [
             'fg_produced'               => $fgProduced,
             'sfg_produced'              => $sfgProduced,
             'component_produced'        => $componentProduced,
             'total_good_units'          => $fgProduced, // Backward compatibility alias for FG Produced
             'total_rejected'            => $totalRejectedAll,
-            'total_scrapped'            => $totalScrappedAll,
+            'total_scrapped'            => round($totalScrappedAll + $totalOperationalScrapQty, 2),
+            'total_progress_scrapped'   => round($totalScrappedAll, 2),
+            'total_operational_scrapped'=> round($totalOperationalScrapQty, 2),
+            'operational_scraps_count'  => count($dailyScraps),
             'fg_rejected'               => $fgRejected,
             'fg_scrapped'               => $fgScrapped,
             'fg_attempted'              => $fgAttempted,
@@ -1431,17 +1621,22 @@ class ReportingService
             'active_machines_count'     => count($distinctMachines),
             'total_events_count'        => count($detailedLogs),
             'total_event_quantity_processed' => $totalEventProcessedQty,
+            'total_offcuts_count'        => count($dailyRemnants),
+            'available_offcuts_count'    => $dailyRemnants->whereIn('status', ['available', 'partially_reserved'])->count(),
+            'total_offcuts_valuation'    => round($dailyRemnants->sum(fn($r) => $r->total_valuation), 2),
         ];
 
         return [
             'period_start'          => $start->toDateString(),
             'period_end'            => $end->toDateString(),
-            'has_data'              => count($detailedLogs) > 0,
+            'has_data'              => count($detailedLogs) > 0 || count($offcutsList) > 0 || count($scrapList) > 0,
             'summary'               => $kpiSummary,
             'product_outputs'       => $productOutputs,
             'daily_breakdown'       => $dailyBreakdown,
             'work_center_breakdown' => $wcBreakdown,
             'detailed_logs'         => $detailedLogs,
+            'scraps'                => $scrapList,
+            'offcuts'               => $offcutsList,
             'data'                  => $detailedLogs, // For generic data access in exports/wrappers
         ];
     }

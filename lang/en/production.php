@@ -757,6 +757,7 @@ return array (
   'target_product' => 'Target Product',
   'target_product_so' => 'Target Product (from Sales Order)',
   'ordered_qty' => 'Ordered Qty',
+  'scrap_quantity' => 'Scrap Qty',
   'qty_to_manufacture' => 'Qty to Manufacture',
   'quantity_ordered' => 'Quantity Ordered',
   'quantity_produced' => 'Quantity Produced',

@@ -16,6 +16,7 @@ use App\Domains\Production\Models\ProductionOrderScrap;
 use App\Domains\Production\Models\ProductionQualityInspection;
 use App\Domains\Production\Models\ProductionQualityPlan;
 use App\Domains\Production\Models\ProductionSerialNumber;
+use App\Domains\Inventory\Models\Product;
 use App\Domains\Production\Models\ProductionNcr;
 use App\Domains\Production\Models\ProductionWip;
 use Illuminate\Support\Facades\DB;
@@ -490,17 +491,67 @@ class ProductionExecutionService
         ?int $warehouseId = null,
         bool $createNcr = false,
         array $ncrParams = [],
-        ?int $batchId = null
+        ?int $batchId = null,
+        array $extra = []
     ): ProductionOrderScrap {
-        if ($quantity <= 0) {
-            throw new InvalidArgumentException('Scrap quantity must be greater than zero.');
-        }
-
-        return DB::transaction(function () use ($orderId, $operationId, $productId, $quantity, $reason, $userId, $warehouseId, $createNcr, $ncrParams, $batchId) {
+        return DB::transaction(function () use ($orderId, $operationId, $productId, $quantity, $reason, $userId, $warehouseId, $createNcr, $ncrParams, $batchId, $extra) {
             $order = ProductionOrder::findOrFail($orderId);
             $orderOp = $operationId ? ProductionOrderOperation::find($operationId) : null;
             $outputPid = $orderOp?->product_id ?? $orderOp?->source_product_id ?? $order->product_id;
             $scrapProductId = $productId ?? $outputPid;
+
+            $measurementType = $extra['measurement_type'] ?? null;
+            $length = isset($extra['length']) ? (float) $extra['length'] : null;
+            $width = isset($extra['width']) ? (float) $extra['width'] : null;
+            $thickness = isset($extra['thickness']) ? (float) $extra['thickness'] : null;
+            $pieces = isset($extra['pieces']) ? (int) $extra['pieces'] : ($measurementType === 'count' ? (int) $quantity : 1);
+            $weight = isset($extra['weight']) ? (float) $extra['weight'] : null;
+            $weightUnit = $extra['weight_unit'] ?? null;
+            $scrapType = $extra['scrap_type'] ?? 'operational_loss';
+            $scrapWarehouseId = $extra['scrap_warehouse_id'] ?? null;
+            $storageLocation = $extra['storage_location'] ?? null;
+
+            if ($productId) {
+                $prodCheck = \App\Domains\Inventory\Models\Product::withoutGlobalScopes()
+                    ->where('tenant_id', $order->tenant_id)
+                    ->find($productId);
+                if (!$prodCheck) {
+                    throw new InvalidArgumentException("Product does not belong to this tenant or does not exist.");
+                }
+            }
+
+            if ($scrapWarehouseId) {
+                $whCheck = \App\Domains\Inventory\Models\Warehouse::withoutGlobalScopes()
+                    ->where('tenant_id', $order->tenant_id)
+                    ->find($scrapWarehouseId);
+                if (!$whCheck) {
+                    throw new InvalidArgumentException("Scrap warehouse does not belong to this tenant or does not exist.");
+                }
+            }
+
+            if ($measurementType && $quantity <= 0) {
+                $product = \App\Domains\Inventory\Models\Product::withoutGlobalScopes()->where('tenant_id', $order->tenant_id)->find($scrapProductId);
+                if ($product) {
+                    $measService = app(\App\Domains\Inventory\Services\MaterialMeasurementService::class);
+                    $quantity = $measService->calculateCanonicalQuantity($product, $measurementType, $extra);
+                }
+            }
+
+            if ($quantity <= 0) {
+                throw new InvalidArgumentException('Scrap quantity must be greater than zero.');
+            }
+
+            // Remaining Quantity Protection
+            if ($orderOp) {
+                $balance = $orderOp->getMaterialBalance((int) $scrapProductId);
+                if ($balance['has_reservation'] && $balance['issued_qty'] > 0) {
+                    if ($quantity > ($balance['remaining_qty'] + 0.0001)) {
+                        throw new InvalidArgumentException(
+                            "Cannot log scrap of " . number_format($quantity, 4) . ": Exceeds remaining disposable material quantity of " . number_format($balance['remaining_qty'], 4) . "."
+                        );
+                    }
+                }
+            }
 
             // Create the scrap record (stock_transaction_id null = not yet posted)
             $scrap = ProductionOrderScrap::create([
@@ -511,6 +562,16 @@ class ProductionExecutionService
                 'product_id' => $scrapProductId,
                 'quantity' => $quantity,
                 'reason' => $reason,
+                'scrap_type' => $scrapType,
+                'measurement_type' => $measurementType,
+                'length' => $length,
+                'width' => $width,
+                'thickness' => $thickness,
+                'pieces' => $pieces,
+                'weight' => $weight,
+                'weight_unit' => $weightUnit,
+                'scrap_warehouse_id' => $scrapWarehouseId,
+                'storage_location' => $storageLocation,
                 'recorded_by' => $userId,
                 'recorded_at' => now(),
                 'stock_transaction_id' => null,
@@ -521,17 +582,42 @@ class ProductionExecutionService
                 $orderOp->save();
             }
 
-            // Optional Quality NCR creation
-            if ($createNcr) {
-                app(NcrService::class)->createNcr($order->tenant_id, array_merge([
-                    'production_order_id' => $order->id,
-                    'production_order_operation_id' => $operationId,
-                    'operator_id' => $userId,
-                    'category' => $ncrParams['category'] ?? 'Material Scrap',
-                    'description' => $reason ?: "Scrap logged: {$quantity} units of product #{$scrapProductId}",
-                    'disposition_type' => 'scrap',
-                ], $ncrParams));
+            // Register Quality NCR & Scrap Disposal entry so it enters Quality -> Scrap Disposals Queue
+            $productModel = Product::find($scrapProductId);
+            $productCost = (float) ($productModel?->unit_cost ?? $productModel?->standard_cost ?? 0.0);
+            $scrapCost = round($quantity * $productCost, 2);
+
+            $category = ((int) $scrapProductId === (int) $order->product_id) ? 'finished_good' : 'raw_material';
+            $reasonLower = strtolower($reason ?? '');
+            $reasonCode = 'defect';
+            if (str_contains($reasonLower, 'damage') || str_contains($reasonLower, 'bent')) {
+                $reasonCode = 'damage';
+            } elseif (str_contains($reasonLower, 'swarf') || str_contains($reasonLower, 'excess') || str_contains($reasonLower, 'offcut')) {
+                $reasonCode = 'excess';
             }
+
+            $ncr = ProductionNcr::create([
+                'tenant_id' => $order->tenant_id,
+                'ncr_number' => 'NCR-SCRAP-' . strtoupper(uniqid()),
+                'category' => $category,
+                'status' => 'open',
+                'disposition_type' => 'scrap',
+                'production_order_id' => $order->id,
+                'production_order_operation_id' => $operationId,
+                'batch_id' => $batchId,
+                'operator_id' => $userId,
+                'description' => "Operational scrap: {$quantity} of " . ($productModel?->name ?? 'Material') . ". Reason: {$reason}",
+            ]);
+
+            app(ScrapService::class)->createScrapDisposal($order->tenant_id, [
+                'ncr_id' => $ncr->id,
+                'category' => $category,
+                'reason_code' => $reasonCode,
+                'quantity' => $quantity,
+                'cost' => $scrapCost,
+            ]);
+
+            $scrap->update(['ncr_id' => $ncr->id]);
 
             // ── Idempotent stock outflow posting ──────────────────────────────
             // If stock_transaction_id is already set, the posting has occurred.

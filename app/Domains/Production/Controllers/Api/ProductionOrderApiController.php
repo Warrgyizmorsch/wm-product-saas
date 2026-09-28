@@ -279,15 +279,158 @@ class ProductionOrderApiController extends ApiBaseController
                 $id,
                 $request->validated('operation_id'),
                 $request->validated('product_id'),
-                (float) $request->validated('quantity'),
+                (float) ($request->validated('quantity') ?? 0),
                 $request->validated('reason'),
                 auth()->id(),
                 null,
                 (bool) $request->boolean('create_ncr'),
-                $request->filled('ncr_category') ? ['category' => $request->validated('ncr_category')] : []
+                $request->filled('ncr_category') ? ['category' => $request->validated('ncr_category')] : [],
+                null,
+                $request->validated()
             );
 
             return $this->successResponse(null, 'Production scrap logged successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/orders/{id}/remnants
+     * Register a reusable remnant / offcut from this production order.
+     */
+    public function registerRemnant(Request $request, int $id, \App\Domains\Inventory\Services\RemnantInventoryService $remnantService): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $order = ProductionOrder::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('issue', $order);
+
+        $validated = $request->validate([
+            'product_id' => 'required|integer|exists:products,id',
+            'measurement_type' => 'required|string|in:linear,sheet,weight,count',
+            'length' => 'nullable|numeric|min:0.01',
+            'width' => 'nullable|numeric|min:0.01',
+            'thickness' => 'nullable|numeric|min:0.01',
+            'weight' => 'nullable|numeric|min:0.01',
+            'weight_unit' => 'nullable|string|in:kg,g',
+            'pieces' => 'nullable|integer|min:1',
+            'warehouse_id' => 'nullable|integer|exists:warehouses,id',
+            'warehouse_location' => 'nullable|string|max:100',
+            'operation_id' => 'nullable|integer|exists:production_order_operations,id',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $remnant = $remnantService->registerRemnant($tenantId, [
+                'product_id' => (int) $validated['product_id'],
+                'measurement_type' => $validated['measurement_type'],
+                'length' => isset($validated['length']) ? (float) $validated['length'] : null,
+                'width' => isset($validated['width']) ? (float) $validated['width'] : null,
+                'thickness' => isset($validated['thickness']) ? (float) $validated['thickness'] : null,
+                'weight' => isset($validated['weight']) ? (float) $validated['weight'] : null,
+                'weight_unit' => $validated['weight_unit'] ?? null,
+                'pieces' => (int) ($validated['pieces'] ?? 1),
+                'warehouse_id' => $validated['warehouse_id'] ?? null,
+                'warehouse_location' => $validated['warehouse_location'] ?? null,
+                'source_production_order_id' => $order->id,
+                'source_production_order_operation_id' => $validated['operation_id'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ], auth()->id());
+
+            return $this->successResponse([
+                'id' => $remnant->id,
+                'remnant_code' => $remnant->remnant_code,
+                'status' => $remnant->status,
+                'measurement_type' => $remnant->measurement_type,
+                'canonical_quantity' => $remnant->current_quantity,
+                'total_valuation' => $remnant->total_valuation,
+            ], 'Reusable remnant registered successfully.', 201);
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/orders/{id}/allocate-remnant
+     * Allocate one or more remnants to a production order requirement.
+     */
+    public function allocateRemnant(Request $request, int $id, \App\Domains\Production\Services\RemnantAllocationService $allocationService): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $order = ProductionOrder::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('issue', $order);
+
+        $validated = $request->validate([
+            'reservation_id' => 'required|integer|exists:production_order_reservations,id',
+            'allocations' => 'required|array|min:1',
+            'allocations.*.remnant_id' => 'required|integer|exists:inventory_remnants,id',
+            'allocations.*.allocated_length' => 'nullable|numeric|min:0.01',
+            'allocations.*.allocated_quantity' => 'nullable|numeric|min:0.0001',
+        ]);
+
+        try {
+            $allocations = $allocationService->allocateRemnants(
+                $tenantId,
+                $order->id,
+                (int) $validated['reservation_id'],
+                $validated['allocations'],
+                auth()->id()
+            );
+
+            return $this->successResponse(
+                collect($allocations)->map(fn($a) => [
+                    'id' => $a->id,
+                    'remnant_id' => $a->remnant_id,
+                    'allocated_quantity' => $a->allocated_quantity,
+                    'allocated_length' => $a->allocated_length,
+                    'status' => $a->status,
+                ])->toArray(),
+                'Remnants allocated successfully.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/orders/{id}/consume-remnant/{allocation}
+     * Physically consume an allocated remnant for this production order.
+     */
+    public function consumeRemnant(Request $request, int $id, int $allocationId, \App\Domains\Production\Services\RemnantAllocationService $allocationService): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $order = ProductionOrder::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('issue', $order);
+
+        $validated = $request->validate([
+            'consumed_length' => 'nullable|numeric|min:0.01',
+            'consumed_quantity' => 'nullable|numeric|min:0.0001',
+        ]);
+
+        try {
+            $allocation = \App\Domains\Production\Models\ProductionOrderRemnantAllocation::where('tenant_id', $tenantId)
+                ->where('production_order_id', $order->id)
+                ->findOrFail($allocationId);
+
+            $consumption = $allocationService->consumeAllocatedRemnant(
+                $allocation->id,
+                isset($validated['consumed_length']) ? (float) $validated['consumed_length'] : null,
+                isset($validated['consumed_quantity']) ? (float) $validated['consumed_quantity'] : null,
+                auth()->id()
+            );
+
+            return $this->successResponse([
+                'consumption_id' => $consumption->id,
+                'remnant_id' => $consumption->remnant_id,
+                'consumed_quantity' => $consumption->consumed_quantity,
+                'consumed_length' => $consumption->consumed_length,
+                'remaining_quantity' => $consumption->remaining_quantity,
+                'remaining_length' => $consumption->remaining_length,
+                'event_type' => $consumption->event_type,
+            ], 'Allocated remnant consumed successfully.');
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);
         }

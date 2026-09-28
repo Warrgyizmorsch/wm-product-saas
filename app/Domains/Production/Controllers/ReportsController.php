@@ -296,6 +296,56 @@ class ReportsController extends Controller
                         $row['remarks'],
                     ]);
                 }
+
+                // Section: Operational Scrap Log Entries
+                if (!empty($reportData['scraps'])) {
+                    fputcsv($file, []);
+                    fputcsv($file, ['=== OPERATIONAL SCRAP LOG ENTRIES ===']);
+                    fputcsv($file, ['Date / Time', 'Order Number', 'Product', 'SKU', 'Operation', 'Work Center', 'Quantity', 'UOM', 'Measurement Type', 'Dimensions', 'Pieces', 'Reason', 'Warehouse', 'Storage Location', 'Operator', 'Stock Posted']);
+                    foreach ($reportData['scraps'] as $s) {
+                        fputcsv($file, [
+                            $s['recorded_at'],
+                            $s['order_number'],
+                            $s['product_name'],
+                            $s['product_sku'],
+                            $s['operation'],
+                            $s['work_center'],
+                            $s['quantity'],
+                            $s['uom'],
+                            $s['measurement_type'],
+                            $s['dimensions'],
+                            $s['pieces'],
+                            $s['reason'],
+                            $s['warehouse'],
+                            $s['storage_location'],
+                            $s['operator'],
+                            $s['stock_posted'] ? 'Yes' : 'No',
+                        ]);
+                    }
+                }
+
+                // Section: Reusable Offcut Remnants
+                if (!empty($reportData['offcuts'])) {
+                    fputcsv($file, []);
+                    fputcsv($file, ['=== REUSABLE OFFCUT REMNANTS ===']);
+                    fputcsv($file, ['Remnant Code', 'Source Order', 'Product', 'SKU', 'Type', 'Dimensions', 'Available for Reuse', 'Warehouse', 'Location', 'Valuation', 'Status', 'Recorded At']);
+                    foreach ($reportData['offcuts'] as $r) {
+                        fputcsv($file, [
+                            $r['remnant_code'],
+                            $r['order_number'],
+                            $r['product_name'],
+                            $r['product_sku'],
+                            $r['measurement_type'],
+                            $r['dimensions'],
+                            $r['available_display'],
+                            $r['warehouse'],
+                            $r['location'],
+                            number_format($r['valuation'], 2, '.', ''),
+                            $r['status'],
+                            $r['created_at'],
+                        ]);
+                    }
+                }
             }
             fclose($file);
         };
@@ -382,12 +432,34 @@ class ReportsController extends Controller
             // Section 4: Scrap Events
             fputcsv($f, []);
             fputcsv($f, ['=== SCRAP EVENTS ===']);
-            fputcsv($f, ['Product', 'SKU', 'Operation', 'Quantity', 'Reason', 'Recorded At', 'Stock Posted']);
+            fputcsv($f, ['Product', 'SKU', 'Operation', 'Quantity', 'Measurement Type', 'Dimensions / Length (mm)', 'Pieces', 'Reason', 'Recorded At', 'Stock Posted']);
             foreach ($data['scrap_events'] as $s) {
+                $dim = match($s['measurement_type'] ?? '') {
+                    'linear' => !empty($s['length']) ? $s['length'] . ' mm' : '',
+                    'sheet'  => !empty($s['length']) ? $s['length'] . 'x' . $s['width'] . ' mm' : '',
+                    'weight' => !empty($s['weight']) ? $s['weight'] . ' ' . ($s['weight_unit'] ?? 'kg') : '',
+                    default  => '',
+                };
                 fputcsv($f, [
                     $s['product'], $s['product_sku'], $s['operation'],
-                    $s['quantity'], $s['reason'], $s['recorded_at'],
+                    $s['quantity'], $s['measurement_type'] ?? 'direct',
+                    $dim, $s['pieces'] ?? 1,
+                    $s['reason'], $s['recorded_at'],
                     $s['stock_posted'] ? 'Yes' : 'No',
+                ]);
+            }
+
+            // Section 5: Reusable Offcuts & Remnants
+            fputcsv($f, []);
+            fputcsv($f, ['=== REUSABLE OFFCUTS & REMNANTS ===']);
+            fputcsv($f, ['Remnant Code', 'Product', 'SKU', 'Type', 'Dimensions', 'Available for Reuse', 'Warehouse', 'Location', 'Valuation', 'Status', 'Recorded At']);
+            foreach ($data['remnants'] ?? [] as $rem) {
+                fputcsv($f, [
+                    $rem['remnant_code'], $rem['product_name'], $rem['product_sku'],
+                    $rem['measurement_type'], $rem['dimensions'], $rem['available_display'],
+                    $rem['warehouse'], $rem['location'],
+                    number_format($rem['valuation'], 2, '.', ''),
+                    $rem['status'], $rem['created_at'],
                 ]);
             }
 

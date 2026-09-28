@@ -18,6 +18,7 @@ use App\Domains\Production\Models\ProductionShift;
 use App\Domains\Production\Models\ProductionOrderScrap;
 use App\Domains\Production\Models\ProductionNcr;
 use App\Domains\Production\Models\ProductionReworkOrder;
+use App\Domains\Production\Models\ProductionOrderReservation;
 use Illuminate\Support\Facades\DB;
 
 class MesController extends Controller
@@ -172,6 +173,7 @@ class MesController extends Controller
             ->get();
         $workCenters = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->where(function($q) { $q->where('status', 'active')->orWhereNull('status'); })->get();
         $machines = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->get();
+        $warehouses = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get();
 
         return view('modules.production.mes.dashboard', compact(
             'activeSchedules',
@@ -185,10 +187,12 @@ class MesController extends Controller
             'qualityPlans',
             'workCenters',
             'machines',
+            'warehouses',
             'orders',
             'products'
         ));
     }
+
 
     public function start(Request $request, int $op)
     {
@@ -343,24 +347,82 @@ class MesController extends Controller
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
         $request->validate([
-            'quantity' => 'required|numeric|min:0.01',
+            'quantity' => 'nullable|numeric|min:0.0001',
             'reason' => 'required|string|max:255',
             'product_id' => 'nullable|integer',
             'batch_id' => 'nullable|integer',
+            'measurement_type' => 'nullable|string|in:linear,sheet,weight,count,direct',
+            'length' => 'nullable|numeric|min:0.01',
+            'width' => 'nullable|numeric|min:0.01',
+            'thickness' => 'nullable|numeric|min:0.01',
+            'pieces' => 'nullable|integer|min:1',
+            'weight' => 'nullable|numeric|min:0.01',
+            'weight_unit' => 'nullable|string|in:kg,g',
+            'scrap_type' => 'nullable|string|max:40',
+            'scrap_warehouse_id' => 'nullable|integer',
+            'storage_location' => 'nullable|string|max:100',
+            'remarks' => 'nullable|string|max:500',
         ]);
 
         try {
             $tenantId = require_tenant_id();
             $userId = auth()->id();
             $orderOp = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($op);
-            $qty = (float) $request->input('quantity');
             $reason = $request->input('reason');
             $batchId = $request->input('batch_id');
             $outputPid = $orderOp->product_id ?? $orderOp->source_product_id ?? $orderOp->order?->product_id;
             $productId = $request->input('product_id') ?? $outputPid;
             $isOutputProduct = ((int) $productId === (int) $outputPid);
 
-            DB::transaction(function () use ($tenantId, $orderOp, $qty, $reason, $batchId, $productId, $userId, $isOutputProduct) {
+            $measurementType = $request->input('measurement_type');
+            if ($measurementType === 'direct') {
+                $measurementType = null;
+            }
+
+            $product = \App\Domains\Inventory\Models\Product::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->find($productId);
+
+            if (!$product) {
+                throw new InvalidArgumentException("Product does not belong to this tenant or does not exist.");
+            }
+
+            $scrapWarehouseId = $request->input('scrap_warehouse_id');
+            if ($scrapWarehouseId) {
+                $wh = \App\Domains\Inventory\Models\Warehouse::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->find($scrapWarehouseId);
+                if (!$wh) {
+                    throw new InvalidArgumentException("Warehouse does not belong to this tenant or does not exist.");
+                }
+            }
+
+            if ($measurementType) {
+                $measService = app(\App\Domains\Inventory\Services\MaterialMeasurementService::class);
+                $qty = $measService->calculateCanonicalQuantity($product, $measurementType, $request->all());
+            } else {
+                $qty = (float) $request->input('quantity', 0);
+            }
+
+            if ($qty <= 0) {
+                throw new InvalidArgumentException('Scrap quantity or measurement must be greater than zero.');
+            }
+
+            // Remaining Quantity Protection
+            $balance = $orderOp->getMaterialBalance((int) $productId);
+            if ($balance['has_reservation'] && $balance['issued_qty'] > 0) {
+                if ($qty > ($balance['remaining_qty'] + 0.0001)) {
+                    throw new InvalidArgumentException(
+                        "Cannot log scrap of " . number_format($qty, 4) . ": Exceeds remaining disposable material quantity of " . number_format($balance['remaining_qty'], 4) . "."
+                    );
+                }
+            }
+
+            $scrapType = $request->input('scrap_type', 'operational_loss');
+            $storageLocation = $request->input('storage_location');
+            $remarks = $request->input('remarks');
+
+            DB::transaction(function () use ($tenantId, $orderOp, $qty, $reason, $batchId, $productId, $userId, $isOutputProduct, $scrapType, $scrapWarehouseId, $storageLocation, $measurementType, $request) {
                 ProductionOrderScrap::create([
                     'tenant_id' => $tenantId,
                     'production_order_id' => $orderOp->production_order_id,
@@ -369,6 +431,16 @@ class MesController extends Controller
                     'product_id' => $productId,
                     'quantity' => $qty,
                     'reason' => $reason,
+                    'scrap_type' => $scrapType,
+                    'measurement_type' => $measurementType,
+                    'length' => $request->filled('length') ? (float) $request->input('length') : null,
+                    'width' => $request->filled('width') ? (float) $request->input('width') : null,
+                    'thickness' => $request->filled('thickness') ? (float) $request->input('thickness') : null,
+                    'pieces' => $request->filled('pieces') ? (int) $request->input('pieces') : ($measurementType === 'count' ? (int) $qty : 1),
+                    'weight' => $request->filled('weight') ? (float) $request->input('weight') : null,
+                    'weight_unit' => $request->input('weight_unit'),
+                    'scrap_warehouse_id' => $scrapWarehouseId,
+                    'storage_location' => $storageLocation,
                     'recorded_by' => $userId,
                     'recorded_at' => now(),
                 ]);
@@ -379,11 +451,19 @@ class MesController extends Controller
                     $orderOp->save();
                 }
 
-                app(\App\Domains\Production\Services\ProductionMaterialService::class)
-                    ->evaluateAndIssueReplacementMaterial($tenantId, $orderOp->production_order_id, $productId, $qty, $reason, $userId);
+                // NOTE: Scrap is strictly decoupled from procurement.
+                // Genuine scrap never automatically creates Requisition Slips or Purchase Requisitions.
             });
 
-            return redirect()->back()->with('success', "Operational scrap of {$qty} units recorded successfully.");
+            $uomCode = $product?->uom?->code ?? 'units';
+            $dimInfo = '';
+            if ($measurementType === 'linear' && $request->filled('length')) {
+                $dimInfo = " ({$request->input('length')} mm)";
+            } elseif ($measurementType === 'sheet' && $request->filled('length') && $request->filled('width')) {
+                $dimInfo = " ({$request->input('length')}×{$request->input('width')} mm)";
+            }
+
+            return redirect()->back()->with('success', "Operational scrap of {$qty} {$uomCode}{$dimInfo} recorded successfully.");
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -498,9 +578,7 @@ class MesController extends Controller
                         $ncr->update(['disposition_type' => 'scrap', 'status' => 'closed', 'closed_at' => now(), 'closed_by' => $userId]);
                     }
 
-                    $scrapProductId = $orderOp->source_product_id ?? $orderOp->order?->product_id;
-                    app(\App\Domains\Production\Services\ProductionMaterialService::class)
-                        ->evaluateAndIssueReplacementMaterial($tenantId, $orderOp->production_order_id, $scrapProductId, $qty, $reason, $userId);
+                    // Scrap decoupled: does not automatically generate replacement PR
                 }
             });
 
@@ -508,10 +586,109 @@ class MesController extends Controller
                 ? ($isVendorRework
                     ? "Subcontract Rework Gate Pass created. {$qty} rejected unit(s) ready for dispatch back to vendor."
                     : "Rework recorded for {$qty} units. Ready for Re-QC upon completion.")
-                : "Scrap recorded and material replacement evaluated for {$qty} units.";
+                : "Scrap recorded successfully for {$qty} units.";
 
             return redirect()->back()->with('success', $msg);
         } catch (InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Save an offcut / reusable remnant from the MES shopfloor.
+     */
+    public function saveRemnant(Request $request, int $op)
+    {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
+        $request->validate([
+            'product_id' => 'required|integer',
+            'measurement_type' => 'required|string|in:linear,sheet,weight,count',
+            'length' => 'nullable|numeric|min:0.01',
+            'width' => 'nullable|numeric|min:0.01',
+            'thickness' => 'nullable|numeric|min:0.01',
+            'weight' => 'nullable|numeric|min:0.01',
+            'weight_unit' => 'nullable|string|in:kg,g',
+            'pieces' => 'nullable|integer|min:1',
+            'warehouse_id' => 'nullable|integer',
+            'warehouse_location' => 'nullable|string|max:100',
+            'batch_id' => 'nullable|integer',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $tenantId = require_tenant_id();
+            $userId = auth()->id();
+            $orderOp = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($op);
+
+            $remnantService = app(\App\Domains\Inventory\Services\RemnantInventoryService::class);
+            $remnant = $remnantService->registerRemnant($tenantId, [
+                'product_id' => (int) $request->input('product_id'),
+                'measurement_type' => $request->input('measurement_type'),
+                'length' => $request->filled('length') ? (float) $request->input('length') : null,
+                'width' => $request->filled('width') ? (float) $request->input('width') : null,
+                'thickness' => $request->filled('thickness') ? (float) $request->input('thickness') : null,
+                'weight' => $request->filled('weight') ? (float) $request->input('weight') : null,
+                'weight_unit' => $request->input('weight_unit'),
+                'pieces' => (int) ($request->input('pieces') ?? 1),
+                'warehouse_id' => $request->input('warehouse_id'),
+                'warehouse_location' => $request->input('warehouse_location'),
+                'parent_batch_id' => $request->input('batch_id'),
+                'source_production_order_id' => $orderOp->production_order_id,
+                'source_production_order_operation_id' => $orderOp->id,
+                'notes' => $request->input('notes'),
+            ], $userId);
+
+            return redirect()->back()->with('success', "Reusable remnant saved successfully: [{$remnant->remnant_code}].");
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Return unused intact raw material back to warehouse from MES.
+     */
+    public function returnUnusedMaterial(Request $request, int $op)
+    {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
+        $request->validate([
+            'reservation_id' => 'required|integer',
+            'quantity' => 'required|numeric|min:0.01',
+            'warehouse_id' => 'nullable|integer',
+            'remarks' => 'nullable|string|max:255',
+        ]);
+
+        try {
+            $tenantId = require_tenant_id();
+            $userId = auth()->id();
+            $orderOp = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($op);
+
+            $reservation = ProductionOrderReservation::where('tenant_id', $tenantId)
+                ->where('production_order_id', $orderOp->production_order_id)
+                ->findOrFail($request->input('reservation_id'));
+
+            $returnQty = (float) $request->input('quantity');
+            $balance = $orderOp->getMaterialBalance((int) $reservation->product_id);
+            if ($balance['has_reservation'] && $balance['issued_qty'] > 0) {
+                if ($returnQty > ($balance['remaining_qty'] + 0.0001)) {
+                    throw new InvalidArgumentException(
+                        "Cannot return " . number_format($returnQty, 4) . ": Exceeds remaining unconsumed material quantity of " . number_format($balance['remaining_qty'], 4) . "."
+                    );
+                }
+            }
+
+            $materialService = app(\App\Domains\Production\Services\ProductionMaterialService::class);
+            $materialService->returnMaterial(
+                $reservation->id,
+                $returnQty,
+                $request->input('remarks'),
+                $userId,
+                $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null
+            );
+
+            return redirect()->back()->with('success', "Unused material returned to store successfully.");
+        } catch (\Throwable $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -705,6 +882,7 @@ class MesController extends Controller
             ->get();
         $workCenters = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->where(function($q) { $q->where('status', 'active')->orWhereNull('status'); })->get();
         $machines = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->get();
+        $warehouses = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get();
         $pendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($opId);
 
         // Unified production execution progress metrics (identical to Shopfloor dashboard calculations)
@@ -751,6 +929,7 @@ class MesController extends Controller
             'qualityPlans',
             'workCenters',
             'machines',
+            'warehouses',
             'pendingQcQty',
             'targetQty',
             'doneQty',

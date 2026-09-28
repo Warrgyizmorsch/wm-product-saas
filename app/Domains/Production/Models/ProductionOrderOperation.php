@@ -337,22 +337,157 @@ class ProductionOrderOperation extends BaseModel
         return (float) ($order->quantity_ordered ?? 1.0);
     }
 
+    /**
+     * Compute current material balance for an issued raw material or component on this operation/order.
+     * Enforces strict material-balance protection:
+     *   Remaining = max(0, Issued - Consumed - AlreadyDisposed)
+     */
+    public function getMaterialBalance(int $productId): array
+    {
+        $order = $this->order;
+        $res = $order ? $order->reservations()->where('product_id', $productId)->first() : null;
+        $issuedQty = (float) ($res?->quantity_issued ?? 0.0);
+        $plannedQty = (float) ($res?->quantity_planned ?? 0.0);
+
+        // 1. Calculate consumed quantity from BOM and operation progress
+        $consumedQty = 0.0;
+        if ((float) ($this->quantity_consumed ?? 0) > 0) {
+            $consumedQty = (float) $this->quantity_consumed;
+        } elseif ($order && $order->bom_id) {
+            $bomItem = ProductionBomItem::where('tenant_id', $this->tenant_id)
+                ->where('bom_id', $order->bom_id)
+                ->where('material_id', $productId)
+                ->first();
+            if ($bomItem && (float) $bomItem->quantity > 0) {
+                $baseQty = max(1.0, (float) ($order->bom?->base_quantity ?? 1.0));
+                $ratio = (float) $bomItem->quantity / $baseQty;
+                $consumedQty = (float) $this->quantity_produced * $ratio;
+            }
+        }
+        if ($consumedQty == 0 && (float) $this->quantity_produced > 0 && (float) ($order->quantity_ordered ?? 0) > 0 && (int) $this->source_product_id !== $productId && (int) ($order->product_id ?? 0) !== $productId) {
+            $consumedRatio = min(1.0, (float) $this->quantity_produced / (float) $order->quantity_ordered);
+            $consumedQty = $issuedQty * $consumedRatio;
+        }
+        $consumedQty = min($issuedQty, max(0.0, $consumedQty));
+
+        // 2. Already disposed Scrap for this product on this production order
+        $scrappedQty = (float) ProductionOrderScrap::where('tenant_id', $this->tenant_id)
+            ->where('production_order_id', $this->production_order_id)
+            ->where('product_id', $productId)
+            ->sum('quantity');
+
+        // 3. Already saved Remnants for this product on this production order
+        $remnantedQty = (float) \App\Domains\Inventory\Models\InventoryRemnant::where('tenant_id', $this->tenant_id)
+            ->where('source_production_order_id', $this->production_order_id)
+            ->where('product_id', $productId)
+            ->sum('initial_quantity');
+
+        $alreadyDisposedQty = $scrappedQty + $remnantedQty;
+        $remainingQty = max(0.0, round($issuedQty - $consumedQty - $alreadyDisposedQty, 4));
+
+        return [
+            'has_reservation' => ($res !== null),
+            'issued_qty' => $issuedQty,
+            'planned_qty' => $plannedQty,
+            'consumed_qty' => round($consumedQty, 4),
+            'already_disposed_qty' => round($alreadyDisposedQty, 4),
+            'scrapped_qty' => round($scrappedQty, 4),
+            'remnanted_qty' => round($remnantedQty, 4),
+            'remaining_qty' => $remainingQty,
+            'reservation' => $res,
+        ];
+    }
+
     public function getScrappableMaterialsAttribute(): \Illuminate\Support\Collection
     {
         $materials = collect();
+        $measService = app(\App\Domains\Inventory\Services\MaterialMeasurementService::class);
+        $order = $this->order;
+
+        $formatMaterial = function ($product, string $typeLabel) use ($measService) {
+            if (!$product) {
+                return null;
+            }
+            $product->loadMissing('uom');
+            $uomCode = $product->uom?->code ?? $product->uom?->name ?? 'Pcs';
+            $inferredType = $measService->inferMeasurementType($product);
+
+            $balance = $this->getMaterialBalance($product->id);
+            $issuedQty = $balance['issued_qty'];
+            $consumedQty = $balance['consumed_qty'];
+            $remainingQty = $balance['remaining_qty'];
+            $warehouseId = $balance['reservation']?->warehouse_id;
+
+            $stdLen = (float) ($product->length ?? 0);
+            $isLinearMeter = ($inferredType === 'linear' && in_array(strtolower($uomCode), ['mtr', 'm', 'meter', 'meters']));
+            $isLinearPiece = ($inferredType === 'linear' && $stdLen > 0);
+
+            if ($issuedQty > 0) {
+                if ($isLinearMeter) {
+                    $issMm = round($issuedQty * 1000);
+                    $conMm = round($consumedQty * 1000);
+                    $remMm = round($remainingQty * 1000);
+                    if ($consumedQty > 0) {
+                        $balanceText = "Issued: {$issMm} mm • Consumed: {$conMm} mm • Remaining: {$remMm} mm";
+                    } else {
+                        $balanceText = "Issued: {$issMm} mm • Remaining: {$remMm} mm";
+                    }
+                    $issuedDisplay = "Issued: " . number_format($issuedQty, 2) . " {$uomCode} ({$issMm} mm)";
+                } elseif ($isLinearPiece) {
+                    $issMm = round($issuedQty * $stdLen);
+                    $conMm = round($consumedQty * $stdLen);
+                    $remMm = round($remainingQty * $stdLen);
+                    if ($consumedQty > 0) {
+                        $balanceText = "Issued: {$issMm} mm • Consumed: {$conMm} mm • Remaining: {$remMm} mm";
+                    } else {
+                        $balanceText = "Issued: {$issMm} mm • Remaining: {$remMm} mm";
+                    }
+                    $issuedDisplay = "Issued: " . number_format($issuedQty, 2) . " {$uomCode} ({$issMm} mm)";
+                } else {
+                    if ($consumedQty > 0) {
+                        $balanceText = "Issued: " . number_format($issuedQty, 2) . " {$uomCode} • Consumed: " . number_format($consumedQty, 2) . " {$uomCode} • Remaining: " . number_format($remainingQty, 2) . " {$uomCode}";
+                    } else {
+                        $balanceText = "Issued: " . number_format($issuedQty, 2) . " {$uomCode} • Remaining: " . number_format($remainingQty, 2) . " {$uomCode}";
+                    }
+                    $issuedDisplay = "Issued: " . number_format($issuedQty, 2) . " {$uomCode}";
+                }
+            } elseif ($balance['planned_qty'] > 0) {
+                $balanceText = "Planned: " . number_format($balance['planned_qty'], 2) . " {$uomCode}";
+                $issuedDisplay = $balanceText;
+            } else {
+                $balanceText = "UOM: {$uomCode}";
+                $issuedDisplay = $balanceText;
+            }
+
+            return [
+                'id' => $product->id,
+                'name' => $product->name . ($product->sku ? " ({$product->sku})" : ''),
+                'type_label' => $typeLabel,
+                'uom_code' => $uomCode,
+                'measurement_type' => $inferredType,
+                'issued_qty' => $issuedQty,
+                'consumed_qty' => $consumedQty,
+                'remaining_qty' => $remainingQty,
+                'balance_text' => $balanceText,
+                'issued_display' => $issuedDisplay,
+                'standard_length' => $stdLen,
+                'standard_width' => (float) ($product->width ?? 0),
+                'standard_thickness' => (float) ($product->thickness ?? $product->height ?? 0),
+                'warehouse_id' => $warehouseId,
+            ];
+        };
 
         // 1. Explicit RoutingOperationMaterial entries for this operation
         if ($this->routing_operation_id) {
             $opMaterials = RoutingOperationMaterial::where('routing_operation_id', $this->routing_operation_id)
-                ->with('material')
+                ->with(['material.uom'])
                 ->get();
             foreach ($opMaterials as $opMat) {
                 if ($opMat->material) {
-                    $materials->push([
-                        'id' => $opMat->material->id,
-                        'name' => $opMat->material->name . ($opMat->material->sku ? " ({$opMat->material->sku})" : ''),
-                        'type_label' => 'Operation Input Raw Material',
-                    ]);
+                    $formatted = $formatMaterial($opMat->material, 'Operation Input Raw Material');
+                    if ($formatted) {
+                        $materials->push($formatted);
+                    }
                 }
             }
         }
@@ -360,34 +495,31 @@ class ProductionOrderOperation extends BaseModel
         // 2. Items from the source BOM or order BOM
         $bomId = $this->source_bom_id ?: $this->order?->bom_id;
         if ($bomId) {
-            $bomItems = ProductionBomItem::where('bom_id', $bomId)->with('material')->get();
+            $bomItems = ProductionBomItem::where('bom_id', $bomId)->with(['material.uom'])->get();
             foreach ($bomItems as $item) {
                 if ($item->material) {
-                    $materials->push([
-                        'id' => $item->material->id,
-                        'name' => $item->material->name . ($item->material->sku ? " ({$item->material->sku})" : ''),
-                        'type_label' => 'BOM Component / Input',
-                    ]);
+                    $formatted = $formatMaterial($item->material, 'BOM Component / Input');
+                    if ($formatted) {
+                        $materials->push($formatted);
+                    }
                 }
             }
         }
 
         // 3. Operation target product (SFG component)
         if ($this->sourceProduct) {
-            $materials->push([
-                'id' => $this->sourceProduct->id,
-                'name' => $this->sourceProduct->name . ($this->sourceProduct->sku ? " ({$this->sourceProduct->sku})" : ''),
-                'type_label' => 'Operation Output Component',
-            ]);
+            $formatted = $formatMaterial($this->sourceProduct, 'Operation Output Component');
+            if ($formatted) {
+                $materials->push($formatted);
+            }
         }
 
         // 4. Master Production Order Product (FG)
         if ($this->order && $this->order->product) {
-            $materials->push([
-                'id' => $this->order->product->id,
-                'name' => $this->order->product->name . ($this->order->product->sku ? " ({$this->order->product->sku})" : ''),
-                'type_label' => 'Finished Product Assembly',
-            ]);
+            $formatted = $formatMaterial($this->order->product, 'Finished Product Assembly');
+            if ($formatted) {
+                $materials->push($formatted);
+            }
         }
 
         return $materials->unique('id')->values();

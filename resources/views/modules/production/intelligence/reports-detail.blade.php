@@ -1301,7 +1301,7 @@
                                     <th>{{ __('production.scrapped_item') }}</th>
                                     <th>SKU</th>
                                     <th>Operation</th>
-                                    <th class="text-end">Quantity</th>
+                                    <th class="text-end">Scrap Qty / Dimensions</th>
                                     <th>Reason</th>
                                     <th>{{ __('production.recorded_at') }}</th>
                                     <th>{{ __('production.stock_posted') }}</th>
@@ -1313,15 +1313,101 @@
                                         <td class="fw-semibold text-dark">{{ $scrap['product'] }}</td>
                                         <td class="font-monospace text-muted" style="font-size:11px;">{{ $scrap['product_sku'] }}</td>
                                         <td class="text-muted">{{ $scrap['operation'] }}</td>
-                                        <td class="text-end text-danger fw-bold">{{ number_format($scrap['quantity'], 2) }}</td>
+                                        <td class="text-end">
+                                            @if(($scrap['measurement_type'] ?? '') === 'linear' && !empty($scrap['length']))
+                                                <div class="text-danger fw-bold">{{ number_format($scrap['length'], 1) }} mm</div>
+                                                @if(($scrap['pieces'] ?? 1) > 1)
+                                                    <small class="text-muted">({{ $scrap['pieces'] }} pcs)</small>
+                                                @endif
+                                                <div class="text-muted font-monospace" style="font-size:10.5px;">{{ number_format($scrap['quantity'], 3) }} canonical</div>
+                                            @elseif(($scrap['measurement_type'] ?? '') === 'sheet' && !empty($scrap['length']))
+                                                <div class="text-danger fw-bold">{{ number_format($scrap['length'], 0) }} &times; {{ number_format($scrap['width'], 0) }} mm</div>
+                                                <div class="text-muted font-monospace" style="font-size:10.5px;">{{ number_format($scrap['quantity'], 3) }} canonical</div>
+                                            @elseif(($scrap['measurement_type'] ?? '') === 'weight' && !empty($scrap['weight']))
+                                                <div class="text-danger fw-bold">{{ number_format($scrap['weight'], 3) }} {{ $scrap['weight_unit'] ?? 'kg' }}</div>
+                                                <div class="text-muted font-monospace" style="font-size:10.5px;">{{ number_format($scrap['quantity'], 3) }} canonical</div>
+                                            @else
+                                                <span class="text-danger fw-bold">{{ number_format($scrap['quantity'], 2) }}</span>
+                                                @if(!empty($scrap['pieces']) && $scrap['pieces'] > 1)
+                                                    <small class="text-muted">({{ $scrap['pieces'] }} pcs)</small>
+                                                @endif
+                                            @endif
+                                        </td>
                                         <td>{{ $scrap['reason'] }}</td>
                                         <td class="text-muted" style="font-size:11.5px;">{{ $scrap['recorded_at'] }}</td>
                                         <td class="text-center">
-                                            @if($scrap['stock_posted'])
-                                                <span class="badge badge-success">{{ __('production.posted') }}</span>
+                                            @if(($scrap['disposal_status'] ?? '') === 'approved' || !empty($scrap['stock_posted']))
+                                                <span class="badge badge-success">{{ __('production.approved') ?? 'Approved' }}</span>
+                                            @elseif(($scrap['disposal_status'] ?? '') === 'pending_approval')
+                                                <span class="badge badge-warning">Pending Approval</span>
                                             @else
-                                                <span class="badge badge-warning">Pending</span>
+                                                <span class="badge badge-secondary">Recorded</span>
                                             @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
+                {{-- ── SECTION 7: REUSABLE OFFCUTS & REMNANTS ─────────────────────── --}}
+                <div class="section-title">Reusable Offcuts & Remnants ({{ count($reportData['remnants'] ?? []) }})</div>
+                @if(empty($reportData['remnants']))
+                    <p class="text-muted fst-italic py-2" style="font-size:12.5px;">
+                        <i class="feather-info text-muted me-1"></i> No reusable offcuts or remnants recorded for this order.
+                    </p>
+                @else
+                    <div class="table-responsive mb-3">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Remnant Code</th>
+                                    <th>Product / Material</th>
+                                    <th>Type</th>
+                                    <th>Physical Measurements</th>
+                                    <th class="text-end">Available for Reuse</th>
+                                    <th>Warehouse / Location</th>
+                                    <th class="text-end">Valuation</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($reportData['remnants'] as $rem)
+                                    <tr>
+                                        <td class="font-monospace fw-bold">
+                                            <a href="{{ route('inventory.remnants.show', $rem['id']) }}" class="text-primary text-decoration-none" target="_blank">
+                                                {{ $rem['remnant_code'] }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold text-dark">{{ $rem['product_name'] }}</div>
+                                            <div class="font-monospace text-muted" style="font-size:11px;">{{ $rem['product_sku'] }}</div>
+                                        </td>
+                                        <td><span class="badge badge-dark text-uppercase" style="font-size:10px;">{{ $rem['measurement_type'] }}</span></td>
+                                        <td class="fw-semibold text-dark">{{ $rem['dimensions'] }}</td>
+                                        <td class="text-end text-success fw-bold">{{ $rem['available_display'] }}</td>
+                                        <td>
+                                            <div>{{ $rem['warehouse'] }}</div>
+                                            @if($rem['location'] !== '—')
+                                                <small class="text-muted"><i class="feather-map-pin me-1"></i>{{ $rem['location'] }}</small>
+                                            @endif
+                                        </td>
+                                        <td class="text-end">{{ number_format($rem['valuation'], 2) }}</td>
+                                        <td class="text-center">
+                                            @php
+                                                $rClass = match($rem['status']) {
+                                                    'available'          => 'badge-success',
+                                                    'partially_reserved' => 'badge-warning',
+                                                    'fully_reserved'     => 'badge-primary',
+                                                    'consumed'           => 'badge-dark',
+                                                    'scrapped'           => 'badge-danger',
+                                                    default              => 'badge-dark',
+                                                };
+                                            @endphp
+                                            <span class="badge {{ $rClass }} text-uppercase" style="font-size:10px;">
+                                                {{ str_replace('_', ' ', $rem['status']) }}
+                                            </span>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -1546,18 +1632,23 @@
                             </td>
                             <td>
                                 <div class="kpi-label">{{ __('production.total_scrapped') ?? 'Scrapped' }}</div>
-                                <div class="kpi-value danger">{{ number_format($reportData['summary']['total_scrapped'] ?? 0, 0) }}</div>
-                                <div class="kpi-uom">All Stages</div>
+                                <div class="kpi-value danger">{{ number_format($reportData['summary']['total_scrapped'] ?? 0, 2) }}</div>
+                                <div class="kpi-uom">{{ $reportData['summary']['operational_scraps_count'] ?? 0 }} scrap events</div>
                             </td>
                             <td>
                                 <div class="kpi-label">{{ __('production.total_run_hours') ?? 'Run Time' }}</div>
-                                <div class="kpi-value">{{ number_format($reportData['summary']['total_run_hours'] ?? 0, 1) }}h</div>
+                                <div class="kpi-value">{{ number_format($reportData['summary']['total_run_hours'] ?? 0, 1) }} hrs</div>
                                 <div class="kpi-uom">{{ number_format($reportData['summary']['total_run_minutes'] ?? 0, 0) }}m</div>
                             </td>
                             <td>
                                 <div class="kpi-label">{{ __('production.operation_events') ?? 'Events Logged' }}</div>
                                 <div class="kpi-value">{{ number_format($reportData['summary']['total_events_count'] ?? 0, 0) }}</div>
                                 <div class="kpi-uom">{{ number_format($reportData['summary']['total_event_quantity_processed'] ?? 0, 0) }} units</div>
+                            </td>
+                            <td>
+                                <div class="kpi-label">Reusable Offcuts</div>
+                                <div class="kpi-value" style="color:#059669;">{{ number_format($reportData['summary']['total_offcuts_count'] ?? 0, 0) }}</div>
+                                <div class="kpi-uom">{{ $reportData['summary']['available_offcuts_count'] ?? 0 }} available</div>
                             </td>
                         </tr>
                     </table>
@@ -1890,6 +1981,160 @@
                         </table>
                     </div>
                 @endif
+
+                    {{-- ── SECTION 6: OPERATIONAL SCRAP LOG ENTRIES ─────────────── --}}
+                    @if(!empty($reportData['scraps']))
+                        <div class="section-title">
+                            <span>Operational Scrap Log Entries (Defective / Unusable Material)</span>
+                            <span class="badge badge-danger" style="font-size:11px;">{{ count($reportData['scraps']) }} Records ({{ number_format($reportData['summary']['total_operational_scrapped'] ?? 0, 2) }} Total Scrap Qty)</span>
+                        </div>
+                        <div class="table-responsive mb-3">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date / Time</th>
+                                        <th>Order #</th>
+                                        <th>Item / Component</th>
+                                        <th>Operation</th>
+                                        <th>Work Center</th>
+                                        <th class="text-end">Scrap Qty / Dimensions</th>
+                                        <th>Reason</th>
+                                        <th>Scrap Storage Location</th>
+                                        <th>Operator</th>
+                                        <th class="text-center">Disposal / Stock Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($reportData['scraps'] as $scr)
+                                        <tr>
+                                            <td class="font-monospace text-nowrap" style="font-size:11.5px;">{{ $scr['recorded_at'] }}</td>
+                                            <td class="font-monospace fw-bold">
+                                                @if(!empty($scr['order_id']))
+                                                    <a href="{{ route('production.intelligence.reports.show', ['type' => 'order-detail', 'order_id' => $scr['order_id']]) }}" class="text-primary text-decoration-none" target="_blank">
+                                                        {{ $scr['order_number'] }}
+                                                    </a>
+                                                @else
+                                                    {{ $scr['order_number'] }}
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold text-dark">{{ $scr['product_name'] }}</div>
+                                                <div class="font-monospace text-muted" style="font-size:11px;">{{ $scr['product_sku'] }}</div>
+                                            </td>
+                                            <td>{{ $scr['operation'] }}</td>
+                                            <td>{{ $scr['work_center'] }}</td>
+                                            <td class="text-end">
+                                                @if(!empty($scr['dimensions']))
+                                                    <div class="fw-bold text-danger">{{ $scr['dimensions'] }}</div>
+                                                    <div class="font-monospace text-muted" style="font-size:10px;">{{ number_format($scr['quantity'], 3) }} {{ $scr['uom'] }}</div>
+                                                @else
+                                                    <div class="fw-bold text-danger">{{ number_format($scr['quantity'], 2) }} {{ $scr['uom'] }}</div>
+                                                    @if(($scr['pieces'] ?? 1) > 1)
+                                                        <div class="text-muted" style="font-size:10px;">({{ $scr['pieces'] }} pcs)</div>
+                                                    @endif
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-soft-danger text-danger border border-danger-subtle">{{ $scr['reason'] }}</span>
+                                            </td>
+                                            <td>
+                                                <div>{{ $scr['warehouse'] }}</div>
+                                                @if($scr['storage_location'] !== '—')
+                                                    <small class="text-muted"><i class="feather-map-pin me-1"></i>{{ $scr['storage_location'] }}</small>
+                                                @endif
+                                            </td>
+                                            <td class="text-muted" style="font-size:11.5px;">{{ $scr['operator'] }}</td>
+                                            <td class="text-center">
+                                                @if(($scr['disposal_status'] ?? '') === 'approved' || !empty($scr['stock_posted']))
+                                                    <span class="badge badge-success text-uppercase" style="font-size:10px;">Approved</span>
+                                                @elseif(($scr['disposal_status'] ?? '') === 'pending_approval')
+                                                    <span class="badge badge-warning text-uppercase" style="font-size:10px;">Pending Approval</span>
+                                                @else
+                                                    <span class="badge badge-secondary text-uppercase" style="font-size:10px;">Recorded</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+
+                    {{-- ── SECTION 7: REUSABLE OFFCUTS / REMNANTS GENERATED ──────── --}}
+                    @if(!empty($reportData['offcuts']))
+                        <div class="section-title">
+                            <span>Reusable Offcut Remnants Placed in Storage</span>
+                            <span class="badge badge-success" style="font-size:11px;">{{ count($reportData['offcuts']) }} Offcuts ({{ $reportData['summary']['available_offcuts_count'] ?? 0 }} Available for reuse)</span>
+                        </div>
+                        <div class="table-responsive mb-3">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Remnant Code</th>
+                                        <th>Source Order #</th>
+                                        <th>Product / Material</th>
+                                        <th>Type</th>
+                                        <th>Dimensions</th>
+                                        <th class="text-end">Available</th>
+                                        <th>Warehouse / Location</th>
+                                        <th class="text-end">Valuation</th>
+                                        <th class="text-center">Status</th>
+                                        <th>Recorded At</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($reportData['offcuts'] as $off)
+                                        <tr>
+                                            <td class="font-monospace fw-bold">
+                                                <a href="{{ route('inventory.remnants.show', $off['id']) }}" class="text-primary text-decoration-none" target="_blank">
+                                                    {{ $off['remnant_code'] }}
+                                                </a>
+                                            </td>
+                                            <td class="font-monospace">
+                                                @if(!empty($off['order_id']))
+                                                    <a href="{{ route('production.intelligence.reports.show', ['type' => 'order-detail', 'order_id' => $off['order_id']]) }}" class="text-primary text-decoration-none" target="_blank">
+                                                        {{ $off['order_number'] }}
+                                                    </a>
+                                                @else
+                                                    {{ $off['order_number'] }}
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold text-dark">{{ $off['product_name'] }}</div>
+                                                <div class="font-monospace text-muted" style="font-size:11px;">{{ $off['product_sku'] }}</div>
+                                            </td>
+                                            <td><span class="badge badge-dark text-uppercase" style="font-size:10px;">{{ $off['measurement_type'] }}</span></td>
+                                            <td class="fw-semibold text-dark">{{ $off['dimensions'] }}</td>
+                                            <td class="text-end text-success fw-bold">{{ $off['available_display'] }}</td>
+                                            <td>
+                                                <div>{{ $off['warehouse'] }}</div>
+                                                @if($off['location'] !== '—')
+                                                    <small class="text-muted"><i class="feather-map-pin me-1"></i>{{ $off['location'] }}</small>
+                                                @endif
+                                            </td>
+                                            <td class="text-end">{{ number_format($off['valuation'], 2) }}</td>
+                                            <td class="text-center">
+                                                @php
+                                                    $oClass = match($off['status']) {
+                                                        'available'          => 'badge-success',
+                                                        'partially_reserved' => 'badge-warning',
+                                                        'fully_reserved'     => 'badge-primary',
+                                                        'consumed'           => 'badge-dark',
+                                                        'scrapped'           => 'badge-danger',
+                                                        default              => 'badge-dark',
+                                                    };
+                                                @endphp
+                                                <span class="badge {{ $oClass }} text-uppercase" style="font-size:10px;">
+                                                    {{ str_replace('_', ' ', $off['status']) }}
+                                                </span>
+                                            </td>
+                                            <td class="text-muted" style="font-size:11.5px;">{{ $off['created_at'] }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
 
             @endif
         </div>

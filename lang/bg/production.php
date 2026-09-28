@@ -817,6 +817,7 @@ return [
     'target_product' => 'Целеви продукт',
     'target_product_so' => 'Целеви продукт (от Поръчка за продажба)',
     'ordered_qty' => 'Поръчано количество',
+    'scrap_quantity' => 'Количество скрап',
     'qty_to_manufacture' => 'Количество за производство',
     'quantity_ordered' => 'Поръчано количество',
     'quantity_produced' => 'Произведено количество',

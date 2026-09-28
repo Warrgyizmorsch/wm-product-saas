@@ -230,6 +230,16 @@ class ProductionOrder extends BaseModel
         return $this->hasMany(ProductionOrderScrap::class, 'production_order_id');
     }
 
+    public function remnants(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Inventory\Models\InventoryRemnant::class, 'source_production_order_id');
+    }
+
+    public function remnantAllocations(): HasMany
+    {
+        return $this->hasMany(ProductionOrderRemnantAllocation::class, 'production_order_id');
+    }
+
     public function reworks(): HasMany
     {
         return $this->hasMany(ProductionOrderRework::class, 'production_order_id');
