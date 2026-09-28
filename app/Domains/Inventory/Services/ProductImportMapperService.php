@@ -398,7 +398,7 @@ class ProductImportMapperService
         };
 
         // Multi-indexed Vendor cache
-        $allVendors = \App\Domains\Purchase\Models\Vendor::withoutGlobalScopes()
+        $allVendors = \App\Domains\Inventory\Models\Vendor::withoutGlobalScopes()
             ->where(function ($q) use ($tenantId) {
                 $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
             })

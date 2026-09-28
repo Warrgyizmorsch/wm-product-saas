@@ -33,16 +33,19 @@ class LeadFollowupService
         $titleInput = !empty($validated['title']) ? trim($validated['title']) : (($validated['type'] ?? 'Scheduled Call') . " with " . ($lead->company_name ?: $lead->contact_person));
 
         $followup = $this->followupRepo->create([
-            'lead_id' => $lead->id,
-            'followup_date' => $followupDateTime,
-            'type' => $validated['type'],
-            'title' => $titleInput,
+            'tenant_id'        => $lead->tenant_id ?? (tenant_id() ?? (auth()->user()?->tenant_id ?? 1)),
+            'company_id'       => $lead->company_id ?? (company_id() ?? (auth()->user()?->company_id ?? 1)),
+            'branch_id'        => $lead->branch_id ?? (branch_id() ?? (auth()->user()?->branch_id ?? null)),
+            'lead_id'          => $lead->id,
+            'followup_date'    => $followupDateTime,
+            'type'             => $validated['type'],
+            'title'            => $titleInput,
             'duration_minutes' => $durationMinutes,
-            'guest_emails' => $guestEmailsInput,
-            'status' => $validated['status'],
-            'notes' => $validated['notes'] ?? null,
-            'tagged_user_id' => $primaryTaggedId,
-            'tagged_user_ids' => $taggedUserIds,
+            'guest_emails'     => $guestEmailsInput,
+            'status'           => $validated['status'],
+            'notes'            => $validated['notes'] ?? null,
+            'tagged_user_id'   => $primaryTaggedId,
+            'tagged_user_ids'  => $taggedUserIds,
         ]);
 
         $eventType = $followup->status === 'Pending' ? 'activity_scheduled' : 'activity_completed';

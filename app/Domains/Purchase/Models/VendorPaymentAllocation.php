@@ -42,4 +42,9 @@ class VendorPaymentAllocation extends BaseModel
     {
         return $this->belongsTo(VendorBill::class, 'vendor_bill_id');
     }
+
+    public function vendorBill(): BelongsTo
+    {
+        return $this->belongsTo(VendorBill::class, 'vendor_bill_id');
+    }
 }

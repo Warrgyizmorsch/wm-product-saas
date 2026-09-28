@@ -274,6 +274,105 @@ class QuotationService
         }
     }
 
+    public function createFromLead(Lead $lead): Quotation
+    {
+        return DB::transaction(function () use ($lead) {
+            $items = [];
+            $subtotal = 0;
+            $tax = 0;
+
+            $rawItems = $lead->product_items ?: [];
+            if (empty($rawItems) && !empty($lead->product_ids) && is_array($lead->product_ids)) {
+                foreach ($lead->product_ids as $pid) {
+                    $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1];
+                }
+            }
+
+            if (!empty($rawItems)) {
+                foreach ($rawItems as $it) {
+                    $productId = !empty($it['product_id']) ? (int)$it['product_id'] : null;
+                    $qty = floatval($it['quantity'] ?? 1);
+                    $price = 0;
+                    $taxRate = 18;
+                    $itemName = 'Product/Service';
+
+                    if ($productId) {
+                        $p = Product::find($productId);
+                        if ($p) {
+                            $itemName = $p->name;
+                            $price = floatval($p->selling_price ?: ($p->unit_cost ?: 0));
+                            $taxRate = floatval($p->gst_rate ?: 18);
+                        }
+                    }
+
+                    if ($price == 0 && !empty($lead->expected_amount)) {
+                        $price = floatval($lead->expected_amount);
+                    }
+
+                    $amount = $qty * $price;
+                    $itemTax = $amount * ($taxRate / 100);
+                    $subtotal += $amount;
+                    $tax += $itemTax;
+
+                    $items[] = [
+                        'product_id'  => $productId,
+                        'item_name'   => $itemName,
+                        'description' => $lead->requirement ?? null,
+                        'quantity'    => $qty,
+                        'unit_price'  => $price,
+                        'tax_rate'    => $taxRate,
+                        'amount'      => $amount,
+                    ];
+                }
+            }
+
+            if (empty($items)) {
+                $price = floatval($lead->expected_amount ?: 0);
+                $taxRate = 18;
+                $amount = $price;
+                $itemTax = $amount * ($taxRate / 100);
+                $subtotal += $amount;
+                $tax += $itemTax;
+
+                $items[] = [
+                    'product_id'  => null,
+                    'item_name'   => $lead->requirement ? substr($lead->requirement, 0, 100) : 'Lead Requirement Service',
+                    'description' => $lead->requirement ?? null,
+                    'quantity'    => 1,
+                    'unit_price'  => $price,
+                    'tax_rate'    => $taxRate,
+                    'amount'      => $amount,
+                ];
+            }
+
+            $quotation = $this->quotations->create([
+                'tenant_id'        => $lead->tenant_id,
+                'company_id'       => $lead->company_id,
+                'branch_id'        => $lead->branch_id,
+                'lead_id'          => $lead->id,
+                'crm_account_id'   => $lead->crm_account_id,
+                'crm_deal_id'      => $lead->crm_deal_id,
+                'sales_person_id'  => $lead->lead_owner_id ?: (auth()->id() ?? 1),
+                'quotation_number' => $this->getNextQuotationNumber(),
+                'quotation_date'   => now()->toDateString(),
+                'expiry_date'      => now()->addDays(30)->toDateString(),
+                'status'           => 'Draft',
+                'subtotal'         => $subtotal,
+                'tax'              => $tax,
+                'discount'         => 0,
+                'total_amount'     => $subtotal + $tax,
+                'terms_conditions' => 'Standard payment terms apply within 30 days of issuance.',
+                'notes'            => $lead->requirement ?? null,
+                'is_current'       => true,
+                'revision_number'  => 0,
+            ]);
+
+            $quotation->items()->createMany($items);
+
+            return $quotation;
+        });
+    }
+
     public function delete(Quotation $quotation): bool
     {
         return $this->quotations->delete($quotation);

@@ -102,9 +102,19 @@ class PurchaseOrder extends BaseModel
         return $this->hasMany(GoodsReceiptNote::class, 'purchase_order_id');
     }
 
+    public function grns(): HasMany
+    {
+        return $this->goodsReceiptNotes();
+    }
+
     public function vendorBills(): HasMany
     {
         return $this->hasMany(VendorBill::class, 'purchase_order_id');
+    }
+
+    public function bills(): HasMany
+    {
+        return $this->vendorBills();
     }
 
     public function payments(): HasMany

@@ -276,7 +276,7 @@ class StockService
             $mfgDate,
             $expiryDate
         ) {
-            $product = Product::findOrFail($productId);
+            $product = Product::withoutGlobalScopes()->findOrFail($productId);
 
             // 1. Manage batch details if batch tracking is active
             $batchId = null;
@@ -424,7 +424,7 @@ class StockService
                 return;
             }
 
-            $product = Product::find($productId);
+            $product = Product::withoutGlobalScopes()->find($productId);
             $productName = $product ? $product->name : "Product #{$productId}";
 
             /** @var \App\Domains\Accounting\Services\AccountResolverService $accountResolver */
@@ -513,7 +513,7 @@ class StockService
             $referenceId,
             $serialNumbers
         ) {
-            $product = Product::findOrFail($productId);
+            $product = Product::withoutGlobalScopes()->findOrFail($productId);
 
             // 1. Consume reservation if one existed for this document
             if ($referenceId) {
