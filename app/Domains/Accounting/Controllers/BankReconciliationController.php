@@ -87,14 +87,31 @@ class BankReconciliationController extends Controller
     {
         $this->authorize('view', $reconciliation);
 
+        $reconciliation->load([
+            'chartOfAccount',
+            'statementLines.matchedJournalEntry',
+            'statementUploads' => fn ($q) => $q->latest(),
+        ]);
+
+        // Best-effort suggestion for the "Create & Match" picker, keyed by
+        // statement line id — never authoritative, just a default the user
+        // can override before anything posts.
+        $suggestedAccounts = $reconciliation->statementLines
+            ->reject(fn ($line) => $line->is_matched || !$line->suggested_ledger)
+            ->mapWithKeys(fn ($line) => [
+                $line->id => $this->reconciliations->resolveLedgerByName($reconciliation->tenant_id, $line->suggested_ledger)?->id,
+            ]);
+
         return view('modules.accounting.bank-reconciliation.show', [
-            'reconciliation' => $reconciliation->load('chartOfAccount', 'statementLines.matchedJournalEntry'),
+            'reconciliation' => $reconciliation,
             'unreconciledEntries' => JournalEntry::where('chart_of_account_id', $reconciliation->chart_of_account_id)
                 ->where('is_reconciled', false)
                 ->whereHas('journal', fn ($query) => $query->where('status', 'posted'))
                 ->with('journal')
                 ->orderBy('created_at')
                 ->get(),
+            'allAccounts' => $this->accounts->active(),
+            'suggestedAccounts' => $suggestedAccounts,
             'canComplete' => $this->authorizeOptional('complete', $reconciliation),
         ]);
     }
@@ -125,11 +142,20 @@ class BankReconciliationController extends Controller
         $this->authorize('create', BankReconciliation::class);
 
         $validated = $request->validate([
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt'],
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt,pdf'],
         ]);
 
+        /** @var \Illuminate\Http\UploadedFile $file */
+        $file = $validated['file'];
+
         try {
-            $count = $this->reconciliations->importStatementLines($reconciliation, $validated['file']);
+            if ($file->getClientMimeType() === 'application/pdf' || $file->getClientOriginalExtension() === 'pdf') {
+                $upload = $this->reconciliations->extractStatementLines($reconciliation, $file, auth()->id());
+
+                return back()->with('success', "Extracted {$upload->extracted_count} statement line(s) from the PDF.");
+            }
+
+            $count = $this->reconciliations->importStatementLines($reconciliation, $file);
         } catch (InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -166,6 +192,29 @@ class BankReconciliationController extends Controller
         }
 
         return back()->with('success', 'Line matched.');
+    }
+
+    public function createAndMatch(Request $request, BankReconciliation $reconciliation): RedirectResponse
+    {
+        $this->authorize('create', BankReconciliation::class);
+
+        $validated = $request->validate([
+            'statement_line_id' => ['required', 'integer'],
+            'chart_of_account_id' => ['required', 'integer', 'exists:chart_of_accounts,id'],
+        ]);
+
+        try {
+            $this->reconciliations->createAndMatch(
+                $reconciliation,
+                $validated['statement_line_id'],
+                $validated['chart_of_account_id'],
+                auth()->id()
+            );
+        } catch (InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Journal entry created and matched.');
     }
 
     public function complete(BankReconciliation $reconciliation): RedirectResponse

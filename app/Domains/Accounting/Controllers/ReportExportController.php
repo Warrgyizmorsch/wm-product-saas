@@ -21,6 +21,8 @@ class ReportExportController extends Controller
 {
     private const CONTROLLERS = [
         'day-book' => DayBookController::class,
+        'cash-book' => CashBookController::class,
+        'bank-book' => BankBookController::class,
         'trial-balance' => TrialBalanceController::class,
         'general-ledger' => GeneralLedgerController::class,
         'party-ledger' => PartyLedgerController::class,

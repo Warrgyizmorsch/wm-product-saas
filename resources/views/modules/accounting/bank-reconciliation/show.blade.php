@@ -51,10 +51,11 @@
                 <form action="{{ route('accounting.bank-reconciliation.import', $reconciliation) }}" method="POST" enctype="multipart/form-data" class="d-flex gap-2 align-items-end">
                     @csrf
                     <div>
-                        <label class="form-label fw-semibold fs-12 text-uppercase mb-0 text-dark">Import Statement (CSV/XLSX)</label>
-                        <input type="file" name="file" class="form-control form-control-sm" required accept=".csv,.xlsx,.xls,.txt">
+                        <label class="form-label fw-semibold fs-12 text-uppercase mb-0 text-dark">Upload Statement</label>
+                        <input type="file" name="file" class="form-control form-control-sm" required accept=".csv,.xlsx,.xls,.txt,.pdf">
+                        <div class="fs-11 text-muted mt-1">CSV/Excel imports directly · PDF is sent to the configured extraction API</div>
                     </div>
-                    <x-ui.button type="submit" variant="light" size="sm" class="border">Import</x-ui.button>
+                    <x-ui.button type="submit" variant="light" size="sm" class="border">Upload</x-ui.button>
                     <a href="{{ route('accounting.bank-reconciliation.template') }}" class="fs-12 text-muted text-decoration-none d-inline-flex align-items-center gap-1" style="height: 31px;" title="Download a sample CSV with the expected columns">
                         <i class="feather-download"></i> Download template
                     </a>
@@ -75,22 +76,82 @@
         </x-ui.card>
     @endunless
 
+    @if ($reconciliation->statementUploads->isNotEmpty())
+        <x-ui.card title="Statement Uploads" bodyClass="p-0" class="accounting-dense mb-3">
+            <x-ui.table hoverable>
+                <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+                    <tr>
+                        <th class="ps-4">File</th>
+                        <th>Uploaded</th>
+                        <th>Status</th>
+                        <th>Lines Extracted</th>
+                        <th>Detected Account</th>
+                        <th class="pe-4">Error</th>
+                    </tr>
+                </thead>
+                <tbody class="fs-13 text-dark">
+                    @foreach ($reconciliation->statementUploads as $upload)
+                        @php $accountInfo = array_filter($upload->raw_response['account_info'] ?? []); @endphp
+                        <tr>
+                            <td class="ps-4">{{ $upload->original_filename }}</td>
+                            <td class="text-muted">{{ $upload->created_at->format('d M Y H:i') }}</td>
+                            <td>
+                                @if ($upload->status === 'completed')
+                                    <x-ui.badge variant="success" soft>Completed</x-ui.badge>
+                                @elseif ($upload->status === 'failed')
+                                    <x-ui.badge variant="danger" soft>Failed</x-ui.badge>
+                                @else
+                                    <x-ui.badge variant="warning" soft>Pending</x-ui.badge>
+                                @endif
+                            </td>
+                            <td>{{ $upload->extracted_count }}</td>
+                            <td class="text-muted fs-12">
+                                @if (empty($accountInfo))
+                                    —
+                                @else
+                                    @if (!empty($accountInfo['bank']))
+                                        {{ $accountInfo['bank'] }}<br>
+                                    @endif
+                                    @if (!empty($accountInfo['account_no']))
+                                        A/C {{ $accountInfo['account_no'] }}<br>
+                                    @endif
+                                    @if (!empty($accountInfo['branch']))
+                                        {{ $accountInfo['branch'] }}
+                                    @endif
+                                @endif
+                            </td>
+                            <td class="pe-4 text-muted fs-12">{{ $upload->error_message ?: '—' }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </x-ui.table>
+        </x-ui.card>
+    @endif
+
     <x-ui.card bodyClass="p-0" class="accounting-dense">
         <x-ui.table hoverable>
             <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                 <tr>
-                    <th class="ps-4">Date</th>
-                    <th>Description</th>
-                    <th class="text-end">Amount</th>
-                    <th>Status</th>
-                    <th class="pe-4">Matched Journal Entry</th>
+                    <th class="ps-4" style="width: 90px;">Date</th>
+                    <th style="max-width: 260px;">Description</th>
+                    <th class="text-end" style="width: 110px;">Amount</th>
+                    <th style="width: 90px;">Status</th>
+                    <th class="pe-4" style="width: 260px;">Matched Journal Entry</th>
                 </tr>
             </thead>
             <tbody class="fs-13 text-dark">
                 @forelse ($reconciliation->statementLines as $line)
                     <tr>
                         <td class="ps-4">{{ $line->transaction_date->format('d M Y') }}</td>
-                        <td class="text-muted">{{ $line->description ?: '—' }}</td>
+                        <td class="text-muted" style="max-width: 260px;">
+                            <div class="desc-clamp" id="desc-{{ $line->id }}" style="max-width: 260px;">{{ $line->description ?: '—' }}</div>
+                            @if ($line->description && strlen($line->description) > 70)
+                                <button type="button" class="btn btn-link p-0 fs-11 desc-toggle-btn" data-target="desc-{{ $line->id }}">Read more</button>
+                            @endif
+                            @if ($line->suggested_ledger && !$line->is_matched)
+                                <div class="fs-11 text-primary"><i class="feather-zap"></i> {{ $line->suggested_ledger }}</div>
+                            @endif
+                        </td>
                         <td class="text-end">{{ number_format($line->amount, 2) }}</td>
                         <td>
                             @if ($line->is_matched)
@@ -99,26 +160,52 @@
                                 <x-ui.badge variant="secondary" soft>Unmatched</x-ui.badge>
                             @endif
                         </td>
-                        <td class="pe-4">
+                        <td class="pe-4" style="width: 260px;">
                             @if ($line->is_matched)
                                 <span class="text-muted fs-12">
                                     {{ $line->matchedJournalEntry?->journal?->journal_number }} &mdash;
                                     {{ number_format($line->matchedJournalEntry?->signedAmount() ?? 0, 2) }}
                                 </span>
                             @elseif (!$reconciliation->isCompleted())
-                                <form action="{{ route('accounting.bank-reconciliation.match', $reconciliation) }}" method="POST" class="d-flex gap-2">
-                                    @csrf
-                                    <input type="hidden" name="statement_line_id" value="{{ $line->id }}">
-                                    <select name="journal_entry_id" class="form-select form-select-sm" style="max-width: 260px;" required>
-                                        <option value="">Select journal entry...</option>
-                                        @foreach ($unreconciledEntries as $entry)
-                                            <option value="{{ $entry->id }}">
-                                                {{ $entry->journal?->journal_number }} &mdash; {{ $entry->journal?->journal_date?->format('d M Y') }} &mdash; {{ number_format($entry->signedAmount(), 2) }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                    <x-ui.button type="submit" variant="light" size="sm" class="border">Match</x-ui.button>
-                                </form>
+                                <div class="d-flex flex-column gap-2" style="width: 260px;">
+                                    <div>
+                                        <div class="fs-10 text-uppercase text-muted fw-semibold mb-1">Match existing</div>
+                                        <form action="{{ route('accounting.bank-reconciliation.match', $reconciliation) }}" method="POST" class="d-flex gap-1">
+                                            @csrf
+                                            <input type="hidden" name="statement_line_id" value="{{ $line->id }}">
+                                            <select name="journal_entry_id" class="form-select form-select-sm flex-grow-1" style="min-width: 0; font-size: 11px;" required>
+                                                <option value="">Select journal entry...</option>
+                                                @foreach ($unreconciledEntries as $entry)
+                                                    <option value="{{ $entry->id }}">
+                                                        {{ $entry->journal?->journal_number }} &mdash; {{ $entry->journal?->journal_date?->format('d M Y') }} &mdash; {{ number_format($entry->signedAmount(), 2) }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <x-ui.button type="submit" variant="light" size="sm" class="border flex-shrink-0 px-2">Match</x-ui.button>
+                                        </form>
+                                    </div>
+
+                                    {{-- No journal entry exists yet for this line (the normal case for a
+                                         freshly-uploaded statement) — post one directly against a ledger,
+                                         defaulted to the provider's suggested_ledger guess when it resolves. --}}
+                                    <div>
+                                        <div class="fs-10 text-uppercase text-muted fw-semibold mb-1">Or post new</div>
+                                        <form action="{{ route('accounting.bank-reconciliation.create-and-match', $reconciliation) }}" method="POST" class="d-flex gap-1">
+                                            @csrf
+                                            <input type="hidden" name="statement_line_id" value="{{ $line->id }}">
+                                            <select name="chart_of_account_id" class="form-select form-select-sm flex-grow-1" style="min-width: 0; font-size: 11px;" required>
+                                                <option value="">Select ledger account...</option>
+                                                @foreach ($allAccounts as $account)
+                                                    @continue($account->id === $reconciliation->chart_of_account_id)
+                                                    <option value="{{ $account->id }}" @selected(($suggestedAccounts[$line->id] ?? null) === $account->id)>
+                                                        {{ $account->code }} &mdash; {{ $account->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <x-ui.button type="submit" variant="primary" size="sm" class="flex-shrink-0 px-2" title="Post a new journal entry against this ledger and match it">Create</x-ui.button>
+                                        </form>
+                                    </div>
+                                </div>
                             @else
                                 &mdash;
                             @endif
@@ -144,5 +231,28 @@
             padding: 6px 10px !important;
             font-size: 12px !important;
         }
+        .desc-clamp {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            overflow: hidden;
+            white-space: normal;
+        }
+        .desc-clamp.desc-expanded {
+            -webkit-line-clamp: unset;
+            overflow: visible;
+        }
     </style>
+@endpush
+
+@push('scripts')
+    <script>
+        document.querySelectorAll('.desc-toggle-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var target = document.getElementById(btn.getAttribute('data-target'));
+                var expanded = target.classList.toggle('desc-expanded');
+                btn.textContent = expanded ? 'Read less' : 'Read more';
+            });
+        });
+    </script>
 @endpush

@@ -341,6 +341,8 @@
                 receipt: [cashBankAccountsList, allAccountsList],
                 credit_note: [allAccountsList, allAccountsList],
                 debit_note: [allAccountsList, allAccountsList],
+                purchase: [allAccountsList, allAccountsList],
+                sales: [allAccountsList, allAccountsList],
             };
             const rowLabelsByType = {
                 contra: ['Cash / Bank Account', 'Cash / Bank Account'],
@@ -348,6 +350,8 @@
                 receipt: ['Received Into (Cash / Bank)', 'Received From'],
                 credit_note: ['Account', 'Account'],
                 debit_note: ['Account', 'Account'],
+                purchase: ['Expense / Asset Account', 'Accounts Payable / Party'],
+                sales: ['Accounts Receivable / Party', 'Income Account'],
             };
 
             const type = @json($type);

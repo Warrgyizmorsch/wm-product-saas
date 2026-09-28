@@ -260,6 +260,19 @@ class JournalRepository implements JournalRepositoryInterface
             ->get();
     }
 
+    public function entriesForAccount(int $chartOfAccountId, \DateTimeInterface $from, \DateTimeInterface $to): Collection
+    {
+        return JournalEntry::query()
+            ->where('chart_of_account_id', $chartOfAccountId)
+            ->whereHas('journal', fn ($q) => $q
+                ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->whereBetween('journal_date', [$from, $to]))
+            ->with(['journal.voucherDetail', 'account'])
+            ->get()
+            ->sortBy(fn ($entry) => $entry->journal->journal_date)
+            ->values();
+    }
+
     public function dailyMovements(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to, ?int $costCenterId = null): Collection
     {
         return JournalEntry::query()

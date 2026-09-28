@@ -36,6 +36,8 @@ class Journal extends BaseModel
     public const VOUCHER_TYPE_CONTRA = 'contra';
     public const VOUCHER_TYPE_CREDIT_NOTE = 'credit_note';
     public const VOUCHER_TYPE_DEBIT_NOTE = 'debit_note';
+    public const VOUCHER_TYPE_PURCHASE = 'purchase';
+    public const VOUCHER_TYPE_SALES = 'sales';
 
     protected $table = 'journals';
 

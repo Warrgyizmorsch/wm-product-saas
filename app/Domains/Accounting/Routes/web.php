@@ -7,6 +7,9 @@ use App\Domains\Accounting\Controllers\AccountingPostingFailureController;
 use App\Domains\Accounting\Controllers\ApAgingController;
 use App\Domains\Accounting\Controllers\ArAgingController;
 use App\Domains\Accounting\Controllers\BalanceSheetController;
+use App\Domains\Accounting\Controllers\BankBookController;
+use App\Domains\Accounting\Controllers\CashBookController;
+use App\Domains\Accounting\Controllers\LedgerGroupController;
 use App\Domains\Accounting\Controllers\BankReconciliationController;
 use App\Domains\Accounting\Controllers\BudgetController;
 use App\Domains\Accounting\Controllers\BudgetVsActualController;
@@ -55,6 +58,11 @@ Route::prefix('accounting')
         Route::put('cost-centers/{costCenter}', [CostCenterController::class, 'update'])->name('cost-centers.update');
         Route::delete('cost-centers/{costCenter}', [CostCenterController::class, 'destroy'])->name('cost-centers.destroy');
 
+        Route::get('ledger-groups', [LedgerGroupController::class, 'index'])->name('ledger-groups.index');
+        Route::post('ledger-groups', [LedgerGroupController::class, 'store'])->name('ledger-groups.store');
+        Route::put('ledger-groups/{ledgerGroup}', [LedgerGroupController::class, 'update'])->name('ledger-groups.update');
+        Route::delete('ledger-groups/{ledgerGroup}', [LedgerGroupController::class, 'destroy'])->name('ledger-groups.destroy');
+
         Route::get('fiscal-years', [FiscalYearController::class, 'index'])->name('fiscal-years.index');
         Route::post('fiscal-years', [FiscalYearController::class, 'store'])->name('fiscal-years.store');
         Route::post('fiscal-years/{fiscalYear}/close', [FiscalYearController::class, 'close'])->name('fiscal-years.close');
@@ -85,6 +93,7 @@ Route::prefix('accounting')
         Route::post('bank-reconciliation/{reconciliation}/import', [BankReconciliationController::class, 'import'])->name('bank-reconciliation.import');
         Route::post('bank-reconciliation/{reconciliation}/auto-match', [BankReconciliationController::class, 'autoMatch'])->name('bank-reconciliation.auto-match');
         Route::post('bank-reconciliation/{reconciliation}/match', [BankReconciliationController::class, 'match'])->name('bank-reconciliation.match');
+        Route::post('bank-reconciliation/{reconciliation}/create-and-match', [BankReconciliationController::class, 'createAndMatch'])->name('bank-reconciliation.create-and-match');
         Route::post('bank-reconciliation/{reconciliation}/complete', [BankReconciliationController::class, 'complete'])->name('bank-reconciliation.complete');
 
         Route::get('budgets', [BudgetController::class, 'index'])->name('budgets.index');
@@ -102,6 +111,8 @@ Route::prefix('accounting')
         Route::post('journals/{journal}/reverse', [JournalController::class, 'reverse'])->name('journals.reverse');
 
         Route::get('reports/day-book', [DayBookController::class, 'index'])->name('reports.day-book');
+        Route::get('reports/cash-book', [CashBookController::class, 'index'])->name('reports.cash-book');
+        Route::get('reports/bank-book', [BankBookController::class, 'index'])->name('reports.bank-book');
         Route::get('reports/vouchers-by-staff', [StaffActivityReportController::class, 'index'])->name('reports.vouchers-by-staff');
         Route::get('reports/{report}/export/{format}', [ReportExportController::class, 'export'])
             ->whereIn('format', ['pdf', 'xlsx'])

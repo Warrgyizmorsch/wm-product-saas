@@ -3,6 +3,7 @@
 namespace App\Domains\Accounting\Controllers;
 
 use App\Domains\Accounting\Models\ChartOfAccount;
+use App\Domains\Accounting\Models\LedgerGroup;
 use App\Domains\Accounting\Services\ChartOfAccountsService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -45,6 +46,7 @@ class ChartOfAccountController extends Controller
             'summary' => $summary,
             'filters' => $filters,
             'parentOptions' => $this->parentOptions(),
+            'ledgerGroups' => LedgerGroup::active()->orderBy('code')->get(),
         ]);
     }
 
@@ -59,17 +61,23 @@ class ChartOfAccountController extends Controller
             'subtype' => ['nullable', 'string', 'in:' . implode(',', ChartOfAccount::allSubtypes())],
             'normal_balance' => ['required', 'string', 'in:' . ChartOfAccount::BALANCE_DEBIT . ',' . ChartOfAccount::BALANCE_CREDIT],
             'parent_id' => ['nullable', 'integer', 'exists:chart_of_accounts,id'],
+            'ledger_group_id' => ['nullable', 'integer', 'exists:ledger_groups,id'],
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
             'is_cash_or_bank' => ['nullable', 'boolean'],
+            'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'opening_balance_type' => ['nullable', 'string', 'in:' . implode(',', ChartOfAccount::OPENING_BALANCE_TYPES)],
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
         $validated['is_cash_or_bank'] = $request->boolean('is_cash_or_bank');
+        $validated['opening_balance'] = (float) ($validated['opening_balance'] ?? 0);
+        $validated['opening_balance_type'] = $validated['opening_balance_type'] ?? $validated['normal_balance'];
         $validated['created_by'] = auth()->id();
 
         try {
-            $this->accounts->create($validated);
+            $account = $this->accounts->create($validated);
+            $this->accounts->syncOpeningBalance($account);
         } catch (InvalidArgumentException $e) {
             return back()->withErrors(['code' => $e->getMessage()])->withInput();
         }
@@ -89,16 +97,22 @@ class ChartOfAccountController extends Controller
             'subtype' => ['nullable', 'string', 'in:' . implode(',', ChartOfAccount::allSubtypes())],
             'normal_balance' => ['required', 'string', 'in:' . ChartOfAccount::BALANCE_DEBIT . ',' . ChartOfAccount::BALANCE_CREDIT],
             'parent_id' => ['nullable', 'integer', 'exists:chart_of_accounts,id'],
+            'ledger_group_id' => ['nullable', 'integer', 'exists:ledger_groups,id'],
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
             'is_cash_or_bank' => ['nullable', 'boolean'],
+            'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'opening_balance_type' => ['nullable', 'string', 'in:' . implode(',', ChartOfAccount::OPENING_BALANCE_TYPES)],
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
         $validated['is_cash_or_bank'] = $request->boolean('is_cash_or_bank');
+        $validated['opening_balance'] = (float) ($validated['opening_balance'] ?? 0);
+        $validated['opening_balance_type'] = $validated['opening_balance_type'] ?? $validated['normal_balance'];
 
         try {
-            $this->accounts->update($account->id, $validated);
+            $updated = $this->accounts->update($account->id, $validated);
+            $this->accounts->syncOpeningBalance($updated);
         } catch (InvalidArgumentException $e) {
             return back()->withErrors(['code' => $e->getMessage()])->withInput();
         }

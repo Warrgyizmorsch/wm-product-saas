@@ -16,8 +16,10 @@ class BankStatementLine extends BaseModel
     protected $fillable = [
         'tenant_id',
         'bank_reconciliation_id',
+        'bank_statement_upload_id',
         'transaction_date',
         'description',
+        'suggested_ledger',
         'amount',
         'is_matched',
         'matched_journal_entry_id',
@@ -32,6 +34,11 @@ class BankStatementLine extends BaseModel
     public function bankReconciliation(): BelongsTo
     {
         return $this->belongsTo(BankReconciliation::class, 'bank_reconciliation_id');
+    }
+
+    public function bankStatementUpload(): BelongsTo
+    {
+        return $this->belongsTo(BankStatementUpload::class, 'bank_statement_upload_id');
     }
 
     public function matchedJournalEntry(): BelongsTo

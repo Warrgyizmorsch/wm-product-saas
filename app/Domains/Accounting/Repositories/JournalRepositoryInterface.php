@@ -123,4 +123,15 @@ interface JournalRepositoryInterface
      * @return Collection<int, \App\Domains\Accounting\Models\JournalEntry>
      */
     public function partyLedgerEntries(string $partyType, int $partyId, \DateTimeInterface $from, \DateTimeInterface $to): Collection;
+
+    /**
+     * Every posted or reversed JournalEntry for one account within a date
+     * range, with its parent journal eager-loaded — the basis for the Cash
+     * Book / Bank Book reports (one specific cash/bank ledger's movements),
+     * unlike ledgerEntries() which is scoped to an accounting period rather
+     * than an arbitrary date range.
+     *
+     * @return Collection<int, \App\Domains\Accounting\Models\JournalEntry>
+     */
+    public function entriesForAccount(int $chartOfAccountId, \DateTimeInterface $from, \DateTimeInterface $to): Collection;
 }

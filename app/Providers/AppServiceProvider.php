@@ -286,6 +286,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Repositories\JournalRepository::class
         );
 
+        // ── Accounting: Ledger Group ───────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\LedgerGroupRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\LedgerGroupRepository::class
+        );
+
         // ── Accounting: Tax Rate ───────────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Accounting\Repositories\TaxRateRepositoryInterface::class,
@@ -320,6 +326,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Domains\Accounting\Services\ExchangeRates\ExchangeRateProvider::class,
             \App\Domains\Accounting\Services\ExchangeRates\FrankfurterProvider::class
+        );
+
+        // ── Accounting: Bank statement extraction (swap in the real API here) ──
+        $this->app->bind(
+            \App\Domains\Accounting\Services\StatementExtraction\StatementExtractionProvider::class,
+            \App\Domains\Accounting\Services\StatementExtraction\HttpStatementExtractionProvider::class
         );
     }
 
@@ -397,6 +409,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Event::listen(
             \App\Domains\Inventory\Events\StockOutflowRecorded::class,
             \App\Domains\Accounting\Listeners\PostCogsJournal::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Inventory\Events\StockOutflowRecorded::class,
+            \App\Domains\Accounting\Listeners\PostProductionConsumptionJournal::class
         );
 
         \Illuminate\Support\Facades\Event::listen(
@@ -733,6 +750,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Accounting\Models\CostCenter::class,
             \App\Domains\Accounting\Policies\CostCenterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\LedgerGroup::class,
+            \App\Domains\Accounting\Policies\LedgerGroupPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(

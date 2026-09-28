@@ -50,4 +50,13 @@ return [
         'url' => env('FRANKFURTER_URL', 'https://api.frankfurter.app'),
     ],
 
+    // Bank Statement Parser & Tally Automation API — POST {url}/parse.
+    // See HttpStatementExtractionProvider. Leave STATEMENT_EXTRACTION_API_URL
+    // unset to have statement uploads fail with a clear "not configured" error.
+    // 'key' is optional — this API doesn't require auth today.
+    'statement_extraction' => [
+        'url' => env('STATEMENT_EXTRACTION_API_URL'),
+        'key' => env('STATEMENT_EXTRACTION_API_KEY'),
+    ],
+
 ];

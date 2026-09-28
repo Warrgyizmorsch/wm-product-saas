@@ -5,12 +5,15 @@ namespace App\Domains\Accounting\Services;
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
 class ChartOfAccountsService
 {
     public function __construct(
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly JournalService $journals,
+        private readonly AccountResolverService $accountResolver,
     ) {
     }
 
@@ -77,6 +80,80 @@ class ChartOfAccountsService
         }
 
         return $this->accounts->delete($id);
+    }
+
+    /**
+     * Keeps the GL in sync with a ledger's opening_balance field: reverses any
+     * previously-posted opening-balance journal for this account (if the
+     * balance changed) and posts a fresh one against a suspense/equity offset
+     * account, so opening balances flow through the same double-entry ledger
+     * that Trial Balance/Balance Sheet read from, rather than being a field
+     * that reports would have to special-case.
+     *
+     * Posted with today's date (not the fiscal year start) since a tenant's
+     * accounting periods may not yet cover that back-date — this keeps ledger
+     * creation from failing when period setup is incomplete. Failures here are
+     * logged and swallowed rather than propagated, since a missing opening
+     * journal shouldn't block basic Chart of Accounts CRUD.
+     */
+    public function syncOpeningBalance(ChartOfAccount $account): void
+    {
+        try {
+            $existing = $this->journals->findByReference('chart_of_account_opening_balance', $account->id)
+                ->whereNotIn('status', [\App\Domains\Accounting\Models\Journal::STATUS_REVERSED])
+                ->first();
+
+            $balance = round((float) $account->opening_balance, 2);
+
+            if ($existing && round((float) $existing->total_debit, 2) !== $balance) {
+                $this->journals->reverse($existing->id, 'Opening balance changed');
+                $existing = null;
+            }
+
+            if ($balance <= 0 || $existing) {
+                return;
+            }
+
+            $suspense = $this->accountResolver->resolveAccount(
+                identifier: null,
+                tenantId: $account->tenant_id,
+                fallbackCode: '3020',
+                fallbackType: ChartOfAccount::TYPE_EQUITY,
+            );
+
+            if (!$suspense) {
+                return;
+            }
+
+            $isDebitOpening = $account->opening_balance_type === ChartOfAccount::BALANCE_DEBIT;
+
+            $this->journals->post([
+                [
+                    'chart_of_account_id' => $account->id,
+                    'debit' => $isDebitOpening ? $balance : 0,
+                    'credit' => $isDebitOpening ? 0 : $balance,
+                    'description' => "Opening balance for {$account->code} {$account->name}",
+                ],
+                [
+                    'chart_of_account_id' => $suspense->id,
+                    'debit' => $isDebitOpening ? 0 : $balance,
+                    'credit' => $isDebitOpening ? $balance : 0,
+                    'description' => "Opening balance offset for {$account->code} {$account->name}",
+                ],
+            ], [
+                'tenant_id' => $account->tenant_id,
+                'journal_date' => now(),
+                'source' => \App\Domains\Accounting\Models\Journal::SOURCE_MANUAL,
+                'reference_type' => 'chart_of_account_opening_balance',
+                'reference_id' => $account->id,
+                'memo' => "Opening balance — {$account->code} {$account->name}",
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('ChartOfAccountsService::syncOpeningBalance failed', [
+                'chart_of_account_id' => $account->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -219,6 +296,7 @@ class ChartOfAccountsService
             ['code' => '1201', 'name' => 'Stock-in-Hand - Finished Goods', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'current_asset', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '1202', 'name' => 'Stock-in-Hand - Raw Material', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'current_asset', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '1203', 'name' => 'Stock-in-Transit', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'current_asset', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
+            ['code' => '1204', 'name' => 'Work-in-Progress', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'current_asset', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '1400', 'name' => 'Loans & Advances', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'loans_advances', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '1410', 'name' => 'Advance to Suppliers', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'loans_advances', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '1420', 'name' => 'Advance to Employees', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'loans_advances', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],

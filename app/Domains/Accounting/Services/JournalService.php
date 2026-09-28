@@ -197,6 +197,36 @@ class JournalService
     }
 
     /**
+     * One account's posted/reversed entries within a date range, in
+     * chronological order with a running balance applied — the basis for
+     * Cash Book / Bank Book (a General Ledger scoped to one cash/bank ledger
+     * and an arbitrary date range rather than a fiscal period).
+     *
+     * @return array{opening: float, entries: Collection, closing: float}
+     */
+    public function forAccount(ChartOfAccount $account, \DateTimeInterface $from, \DateTimeInterface $to): array
+    {
+        $openingTotals = $this->journals->openingBalance($account->id, $from);
+        $opening = $account->signedMovement((float) $openingTotals['debit'], (float) $openingTotals['credit']);
+
+        $running = $opening;
+        $entries = $this->journals->entriesForAccount($account->id, $from, $to)->map(function ($entry) use ($account, &$running) {
+            $running = round($running + $account->signedMovement((float) $entry->debit, (float) $entry->credit), 2);
+
+            return [
+                'entry' => $entry,
+                'running_balance' => $running,
+            ];
+        });
+
+        return [
+            'opening' => round($opening, 2),
+            'entries' => $entries,
+            'closing' => $running,
+        ];
+    }
+
+    /**
      * Opening balance + chronological entries + running/closing balance for
      * one party (customer/vendor) over a date range — the Party Ledger.
      *
