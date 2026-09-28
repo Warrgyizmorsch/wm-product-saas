@@ -173,7 +173,7 @@ abstract class ApiBaseController extends Controller
         }
 
         // Domain rule violations and state transition conflicts
-        if ($e instanceof \DomainException || $e instanceof \InvalidArgumentException) {
+        if ($e instanceof \DomainException || $e instanceof \InvalidArgumentException || $e instanceof \LogicException) {
             return $this->errorResponse($e->getMessage(), Response::HTTP_CONFLICT);
         }
 

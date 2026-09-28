@@ -341,6 +341,16 @@ class ProductionApiWorkflowsTest extends TestCase
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
             'effective_date' => now()->toDateString(),
+            'status' => 'approved',
+            'created_by' => $this->planner->id,
+        ]);
+
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-TURB-01',
+            'name' => 'Turbine Routing',
+            'product_id' => $this->finishedGood->id,
+            'version' => '1.0.0',
             'status' => 'active',
             'created_by' => $this->planner->id,
         ]);
@@ -349,6 +359,7 @@ class ProductionApiWorkflowsTest extends TestCase
         $orderRes = $this->withHeaders($this->headers())->postJson('/api/v1/production/orders', [
             'product_id' => $this->finishedGood->id,
             'bom_id' => $bom->id,
+            'routing_id' => $routing->id,
             'quantity_ordered' => 10,
             'start_date' => now()->toDateString(),
             'end_date' => now()->addDays(7)->toDateString(),
@@ -385,20 +396,20 @@ class ProductionApiWorkflowsTest extends TestCase
             'status' => 'ready',
         ]);
 
-        // 2. Release Order
-        $releaseRes = $this->withHeaders($this->headers())->postJson('/api/v1/production/orders/' . $orderId . '/release');
-        $releaseRes->assertStatus(200)
-            ->assertJson([
-                'success' => true,
-            ]);
-
-        // 3. Issue Material
+        // 2. Issue Material
         $issueRes = $this->withHeaders($this->headers())->postJson('/api/v1/production/orders/' . $orderId . '/issue-material', [
             'reservation_id' => $reservation->id,
             'warehouse_id' => $this->warehouse->id,
             'quantity' => 10,
         ]);
         $issueRes->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        // 3. Release Order
+        $releaseRes = $this->withHeaders($this->headers())->postJson('/api/v1/production/orders/' . $orderId . '/release');
+        $releaseRes->assertStatus(200)
             ->assertJson([
                 'success' => true,
             ]);

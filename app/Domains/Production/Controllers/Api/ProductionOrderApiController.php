@@ -508,4 +508,186 @@ class ProductionOrderApiController extends ApiBaseController
             return $this->handleDomainException($e);
         }
     }
+
+    /**
+     * POST /api/v1/production/orders/{id}/close
+     * Close and archive a completed production order.
+     */
+    public function close(int $id, ProductionOrderService $orderService): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $order = ProductionOrder::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('close', $order);
+
+        try {
+            $orderService->close($id, auth()->id());
+
+            return $this->successResponse(
+                new ProductionOrderDetailResource($order->fresh(['product'])),
+                "Production order {$order->order_number} closed and archived successfully."
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/orders/{id}/return-material
+     * Return issued raw material back to warehouse inventory.
+     */
+    public function returnMaterial(Request $request, int $id, ProductionMaterialService $materialService): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $order = ProductionOrder::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('return', $order);
+
+        $validated = $request->validate([
+            'reservation_id' => 'required|exists:production_order_reservations,id',
+            'warehouse_id'   => 'nullable|exists:warehouses,id',
+            'quantity'       => 'required|numeric|min:0.0001',
+            'remarks'        => 'nullable|string|max:255',
+        ]);
+
+        ProductionOrderReservation::where('tenant_id', $tenantId)
+            ->where('production_order_id', $order->id)
+            ->findOrFail($validated['reservation_id']);
+
+        try {
+            $materialService->returnMaterial(
+                (int) $validated['reservation_id'],
+                (float) $validated['quantity'],
+                $validated['remarks'] ?? null,
+                auth()->id(),
+                isset($validated['warehouse_id']) ? (int) $validated['warehouse_id'] : null
+            );
+
+            return $this->successResponse(null, 'Material returned to warehouse successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/orders/{id}/request-additional-material
+     * Submit an ad-hoc requisition request for additional materials.
+     */
+    public function requestAdditionalMaterial(Request $request, int $id, ProductionOrderService $orderService): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $order = ProductionOrder::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('issue', $order);
+
+        if ($order->isCompleted() || $order->isClosed() || $order->isCancelled()) {
+            return $this->errorResponse('Cannot request additional material for a completed, closed, or cancelled order.', 422);
+        }
+
+        $validated = $request->validate([
+            'items'                     => 'required|array|min:1',
+            'items.*.product_id'        => 'required|integer|exists:products,id',
+            'items.*.quantity'          => 'required|numeric|gt:0',
+            'items.*.notes'             => 'nullable|string|max:255',
+            'notes'                     => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $slip = $orderService->createAdHocRequisitionSlip(
+                $order,
+                $validated['items'],
+                auth()->id(),
+                $validated['notes'] ?? null
+            );
+
+            return $this->createdResponse([
+                'requisition_id'     => $slip->id,
+                'requisition_number' => $slip->requisition_number,
+                'status'             => $slip->status,
+                'items_count'        => count($validated['items']),
+            ], "Request sent to store for additional materials (Requisition #{$slip->requisition_number}).");
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/orders/{id}/rework
+     * Register a rework loop on an operation.
+     */
+    public function logRework(Request $request, int $id, ProductionExecutionService $executionService): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $order = ProductionOrder::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('logProgress', $order);
+
+        $validated = $request->validate([
+            'operation_id' => 'nullable|exists:production_order_operations,id',
+            'quantity'     => 'required|numeric|min:0.0001',
+            'reason'       => 'nullable|string|max:255',
+        ]);
+
+        if (!empty($validated['operation_id'])) {
+            ProductionOrderOperation::where('tenant_id', $tenantId)
+                ->where('production_order_id', $order->id)
+                ->findOrFail($validated['operation_id']);
+        }
+
+        try {
+            $executionService->logRework(
+                $id,
+                isset($validated['operation_id']) ? (int) $validated['operation_id'] : null,
+                (float) $validated['quantity'],
+                $validated['reason'] ?? null,
+                auth()->id()
+            );
+
+            return $this->successResponse(null, 'Rework loop registered successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/orders/{id}/release-remnant-allocation/{allocation}
+     * Release a remnant reservation/allocation back to inventory.
+     */
+    public function releaseRemnantAllocation(int $id, int $allocationId, \App\Domains\Production\Services\RemnantAllocationService $allocationService): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $order = ProductionOrder::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('issue', $order);
+
+        try {
+            $allocation = \App\Domains\Production\Models\ProductionOrderRemnantAllocation::where('tenant_id', $tenantId)
+                ->where('production_order_id', $order->id)
+                ->findOrFail($allocationId);
+
+            $allocationService->releaseAllocation($allocation->id, auth()->id());
+
+            return $this->successResponse(null, 'Remnant allocation released successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * GET /api/v1/production/orders/export
+     * Export production orders.
+     */
+    public function export(Request $request)
+    {
+        Gate::authorize('viewAny', ProductionOrder::class);
+
+        $tenantId = $this->getTenantId();
+        $format = $request->query('format', 'xlsx');
+        $fileName = 'production_orders_export.' . ($format === 'csv' ? 'csv' : 'xlsx');
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\ProductionOrderExport($tenantId, $request->all()),
+            $fileName
+        );
+    }
 }

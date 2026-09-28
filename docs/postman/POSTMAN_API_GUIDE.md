@@ -29,8 +29,8 @@ The Postman package located in `docs/postman/` includes:
 
 | File | Description |
 | :--- | :--- |
-| `Production API v1.postman_collection.json` | The full Postman Collection (v2.1.0 schema) containing all 49 canonical Production routes, setup endpoints, and automated security/reliability test suites. |
-| `Production API - Local.postman_environment.json` | Pre-configured environment template for local development (`http://demo.localhost`). |
+| `Production API v1.postman_collection.json` | The full Postman Collection (v2.1.0 schema) containing all 141 requests covering 100% of registered Production routes (128 operational endpoints), setup endpoints, and automated security/reliability test suites. |
+| `Production API - Local.postman_environment.json` | Pre-configured environment template for local development (`http://127.0.0.1:8000`). |
 | `Production API - Staging.postman_environment.json` | Pre-configured environment template for staging environments. |
 | `POSTMAN_API_GUIDE.md` | This technical guide. |
 
@@ -55,7 +55,7 @@ Navigate to **Environments** > **Production API - Local** and set the current va
 
 | Variable | Description | Example / Default |
 | :--- | :--- | :--- |
-| `base_url` | Base URL of the Laravel application | `http://demo.localhost` |
+| `base_url` | Base URL of the Laravel application | `http://127.0.0.1:8000` |
 | `api_version` | API route version | `v1` |
 | `api_secret` | Production API Secret configured in `.env` (`PRODUCTION_API_SECRET`) | *Set to your local secret* |
 | `tenant_domain` | Tenant slug for tenant context resolution | `warrgyizmorsch` |
@@ -158,7 +158,7 @@ When requests send `Idempotency-Key: {{dynamic_idempotency_key}}`:
 
 ## 7. Collection Hierarchy & Route Coverage
 
-The collection contains **49 canonical routes** organized into 10 structured folders:
+The collection contains **119 requests** organized into 15 structured folders:
 
 ```text
 Production API v1
@@ -166,12 +166,12 @@ Production API v1
 ├── 00 - Authentication & Setup
 │   └── Obtain Bearer Token (API Login) [POST /api/auth/login]
 │
-├── 01 - Dashboard (3 routes)
+├── 01 - Dashboard (3 requests)
 │   ├── Get Dashboard Overview [GET /dashboard]
 │   ├── Get Dashboard Metrics [GET /dashboard/metrics]
 │   └── Get Dashboard Alerts [GET /dashboard/alerts]
 │
-├── 02 - BOMs (7 routes)
+├── 02 - BOMs (7 requests)
 │   ├── List BOMs [GET /boms]
 │   ├── Create BOM [POST /boms]
 │   ├── Get BOM Detail [GET /boms/{bom}]
@@ -180,65 +180,116 @@ Production API v1
 │   ├── Approve BOM [POST /boms/{bom}/approve]
 │   └── Clone BOM Revision [POST /boms/{bom}/clone]
 │
-├── 03 - Routings (4 routes)
+├── 03 - Routings (7 requests)
 │   ├── List Routings [GET /routings]
 │   ├── Create Routing [POST /routings]
 │   ├── Get Routing Detail [GET /routings/{routing}]
-│   └── Update Routing [PUT /routings/{routing}]
+│   ├── Update Routing [PUT /routings/{routing}]
+│   ├── Submit Routing for Approval [POST /routings/{routing}/submit]
+│   ├── Approve Routing [POST /routings/{routing}/approve]
+│   └── Clone Routing Revision [POST /routings/{routing}/duplicate]
 │
-├── 04 - Work Centers (4 routes)
+├── 04 - Work Centers (4 requests)
 │   ├── List Work Centers [GET /work-centers]
 │   ├── Create Work Center [POST /work-centers]
 │   ├── Get Work Center Detail [GET /work-centers/{workCenter}]
 │   └── Update Work Center [PUT /work-centers/{workCenter}]
 │
-├── 05 - Machines (4 routes)
+├── 05 - Machines (4 requests)
 │   ├── List Machines [GET /machines]
 │   ├── Create Machine [POST /machines]
 │   ├── Get Machine Detail [GET /machines/{machine}]
 │   └── Update Machine [PUT /machines/{machine}]
 │
-├── 06 - Production Plans (6 routes)
+├── 06 - Production Plans (15 requests)
 │   ├── List Production Plans [GET /plans]
 │   ├── Create Production Plan [POST /plans]
 │   ├── Get Production Plan Detail [GET /plans/{plan}]
 │   ├── Update Production Plan [PUT /plans/{plan}]
 │   ├── Submit Plan for Approval [POST /plans/{plan}/submit]
-│   └── Approve Production Plan [POST /plans/{plan}/approve]
+│   ├── Approve Production Plan [POST /plans/{plan}/approve]
+│   ├── Reject Production Plan [POST /plans/{plan}/reject]
+│   ├── Cancel Production Plan [POST /plans/{plan}/cancel]
+│   ├── Release Production Plan [POST /plans/{plan}/release]
+│   ├── Complete Production Plan [POST /plans/{plan}/complete]
+│   ├── Close Production Plan [POST /plans/{plan}/close]
+│   ├── Delete Production Plan [DELETE /plans/{plan}]
+│   ├── Create Order from Plan [POST /plans/{plan}/create-order]
+│   ├── Run MRP for Plan [POST /plans/{plan}/run-mrp]
+│   └── Export Production Plans [GET /plans/export]
 │
-├── 07 - Production Orders (10 routes)
+├── 07 - Production Orders (17 requests)
 │   ├── List Production Orders [GET /orders]
 │   ├── Create Production Order [POST /orders]
 │   ├── Get Production Order Detail [GET /orders/{order}]
 │   ├── Update Production Order [PUT /orders/{order}]
 │   ├── Release Production Order [POST /orders/{order}/release]
+│   ├── Cancel Production Order [POST /orders/{order}/cancel]
+│   ├── Close Production Order [POST /orders/{order}/close]
 │   ├── Issue Materials to Order [POST /orders/{order}/issue-material]
+│   ├── Return Material [POST /orders/{order}/return-material]
+│   ├── Request Additional Material [POST /orders/{order}/request-additional-material]
+│   ├── Release Remnant Allocation [POST /orders/{order}/release-remnant-allocation/{allocation}]
 │   ├── Log Order Progress [POST /orders/{order}/progress]
 │   ├── Receive Finished Goods [POST /orders/{order}/receive-fg]
 │   ├── Complete Production Order [POST /orders/{order}/complete]
-│   └── Log Scrap [POST /orders/{order}/scrap]
+│   ├── Log Scrap [POST /orders/{order}/scrap]
+│   ├── Log Order Rework [POST /orders/{order}/rework]
+│   └── Export Production Orders [GET /orders/export]
 │
-├── 08 - MES (7 routes)
+├── 08 - MES (11 requests)
 │   ├── Queue
 │   │   └── Get MES Operator Dispatch Queue [GET /mes/queue]
 │   ├── Operations
 │   │   ├── Start Operation [POST /mes/operations/{operation}/start]
 │   │   ├── Pause Operation [POST /mes/operations/{operation}/pause]
 │   │   ├── Resume Operation [POST /mes/operations/{operation}/resume]
-│   │   └── Complete Operation [POST /mes/operations/{operation}/complete]
+│   │   ├── Complete Operation [POST /mes/operations/{operation}/complete]
+│   │   ├── Hold Operation [POST /mes/operations/{operation}/hold]
+│   │   ├── Log Operation Progress [POST /mes/operations/{operation}/progress]
+│   │   ├── Trigger Andon Alert [POST /mes/operations/{operation}/andon-alert]
+│   │   └── Log MES Scrap [POST /mes/operations/{operation}/scrap]
 │   └── Downtime
 │       ├── Start Machine Downtime [POST /mes/downtime/start]
 │       └── End Machine Downtime [POST /mes/downtime/{downtime}/end]
 │
-├── 09 - Quality (4 routes)
-│   ├── Inspections
-│   │   ├── List Quality Inspections [GET /quality/inspections]
-│   │   ├── Get Quality Inspection Detail [GET /quality/inspections/{inspection}]
-│   │   └── Submit Inspection Results [POST /quality/inspections/{inspection}/submit]
-│   └── Quick Check
-│       └── Operator Inline Quick Check [POST /quality/orders/{order}/quick-check]
+├── 09 - Quality (17 requests)
+│   ├── Inspections (5 requests: List, Create, Show, Submit, Approve)
+│   ├── Quick Check (1 request: Operator Inline Quick Check)
+│   ├── Quality Plans (5 requests: List, Create, Show, Update, Delete)
+│   ├── NCRs (5 requests: List, Create, Show, Disposition, Close)
+│   └── Scrap Disposal (1 request: Approve Scrap Disposal)
 │
-└── 10 - Security & Reliability (12 negative/contract tests)
+├── 10 - Work in Progress (WIP) (5 requests)
+│   ├── List WIP Records [GET /wip]
+│   ├── Get WIP Record Detail [GET /wip/{wip}]
+│   ├── Transfer WIP [POST /wip/{wip}/transfer]
+│   ├── Convert WIP to Finished Goods [POST /wip/{wip}/convert]
+│   └── Export WIP Records [GET /wip/export]
+│
+├── 11 - Production Scheduling (6 requests)
+│   ├── List Schedules [GET /schedules]
+│   ├── Generate Schedule [POST /schedules]
+│   ├── Get Schedule Detail [GET /schedules/{schedule}]
+│   ├── Release Schedule [POST /schedules/{schedule}/release]
+│   ├── Cancel Schedule [POST /schedules/{schedule}/cancel]
+│   └── Export Schedules [GET /schedules/export]
+│
+├── 12 - Plant Maintenance (6 requests)
+│   ├── List Maintenance Work Orders [GET /maintenance/work-orders]
+│   ├── Create Maintenance Work Order [POST /maintenance/work-orders]
+│   ├── Log Breakdown Work Order [POST /maintenance/work-orders/breakdown]
+│   ├── Get Maintenance Work Order Detail [GET /maintenance/work-orders/{workOrder}]
+│   ├── Complete Maintenance Work Order [POST /maintenance/work-orders/{workOrder}/complete]
+│   └── Cancel Maintenance Work Order [POST /maintenance/work-orders/{workOrder}/cancel]
+│
+├── 13 - Production Shifts (4 requests)
+│   ├── List Production Shifts [GET /shifts]
+│   ├── Create Production Shift [POST /shifts]
+│   ├── Update Production Shift [PUT /shifts/{shift}]
+│   └── Delete Production Shift [DELETE /shifts/{shift}]
+│
+└── 14 - Security & Reliability (12 negative/contract tests)
     ├── Authentication Negative Tests (Missing Secret, Invalid Secret, Missing Token, Invalid Token)
     ├── Authorization Tests (Unauthorized Dashboard, Quick Check, Release)
     ├── Tenant Isolation (Cross-Tenant Order 404, Cross-Tenant BOM 404)
@@ -260,6 +311,14 @@ The collection utilizes Postman collection variables for dynamic IDs instead of 
 * `{{operation_id}}`
 * `{{inspection_id}}`
 * `{{downtime_id}}`
+* `{{quality_plan_id}}`
+* `{{ncr_id}}`
+* `{{scrap_id}}`
+* `{{wip_id}}`
+* `{{schedule_id}}`
+* `{{work_order_id}}`
+* `{{shift_id}}`
+* `{{allocation_id}}`
 
 ### Automated Variable Capture
 When running GET list or POST create requests, test scripts automatically capture returned IDs and store them in collection variables.

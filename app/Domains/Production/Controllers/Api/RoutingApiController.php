@@ -215,4 +215,152 @@ class RoutingApiController extends ApiBaseController
             return $this->handleDomainException($e);
         }
     }
+
+    /**
+     * POST /api/v1/production/routings/{id}/reject
+     * Reject a submitted routing.
+     */
+    public function reject(Request $request, int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $routing = Routing::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('reject', $routing);
+
+        $request->validate(['comments' => 'nullable|string|max:1000']);
+
+        try {
+            $this->routingService->reject($id, auth()->id() ?: 1, $request->input('comments'));
+
+            return $this->successResponse(
+                new RoutingDetailResource($routing->fresh(['product'])),
+                'Routing rejected and returned to draft.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/routings/{id}/cancel
+     * Cancel an active or draft routing.
+     */
+    public function cancel(Request $request, int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $routing = Routing::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('cancel', $routing);
+
+        $request->validate(['comments' => 'nullable|string|max:1000']);
+
+        try {
+            $this->routingService->cancel($id, auth()->id() ?: 1, $request->input('comments'));
+
+            return $this->successResponse(
+                new RoutingDetailResource($routing->fresh(['product'])),
+                'Routing cancelled.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * DELETE /api/v1/production/routings/{id}
+     * Delete an unapproved draft routing.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $routing = Routing::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('delete', $routing);
+
+        if (!$routing->isDraft()) {
+            return $this->errorResponse('Only draft routings can be deleted.', 409);
+        }
+
+        try {
+            $this->routingRepository->delete($id);
+
+            return $this->successResponse(null, 'Draft routing deleted successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * GET /api/v1/production/routings/{id}/operations
+     * Get operations sequence for a routing.
+     */
+    public function operations(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $routing = Routing::where('tenant_id', $tenantId)
+            ->with([
+                'operations' => fn($q) => $q->orderBy('sequence', 'asc'),
+                'operations.workCenter:id,name,code',
+                'operations.machine:id,name,code',
+                'operations.materials.material:id,name,sku',
+            ])
+            ->findOrFail($id);
+
+        Gate::authorize('view', $routing);
+
+        return $this->successResponse(
+            $routing->operations,
+            'Routing operations retrieved successfully.'
+        );
+    }
+
+    /**
+     * POST /api/v1/production/routings/import
+     * Import routing master records from spreadsheet.
+     */
+    public function import(Request $request, \App\Domains\Production\Services\ProductionMasterImportService $importService): JsonResponse
+    {
+        Gate::authorize('create', Routing::class);
+
+        $request->validate([
+            'file'     => 'required|file|max:10240|mimes:xlsx,xls,csv,txt',
+            'strategy' => 'nullable|string|in:create,update',
+        ]);
+
+        $strategy = $request->input('strategy', 'create');
+
+        try {
+            $result = $importService->import('routings', $request->file('file'), $strategy, $this->getTenantId(), auth()->id());
+
+            if ($result['status'] === 'failed') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Import validation failed. No records were imported.',
+                    'data'    => $result,
+                ], 422);
+            }
+
+            return $this->successResponse($result, 'Routings imported successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * GET /api/v1/production/routings/export
+     * Export routing master records.
+     */
+    public function export(Request $request)
+    {
+        Gate::authorize('viewAny', Routing::class);
+
+        $tenantId = $this->getTenantId();
+        $format = $request->query('format', 'xlsx');
+        $fileName = 'routings_export.' . ($format === 'csv' ? 'csv' : 'xlsx');
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\RoutingExport($tenantId, $request->all()),
+            $fileName
+        );
+    }
 }
