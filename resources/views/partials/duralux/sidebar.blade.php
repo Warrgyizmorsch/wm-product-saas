@@ -183,6 +183,7 @@
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
             ['label' => 'Travel & Expenses', 'icon' => 'feather-navigation', 'route' => 'hrms.travel-expense.index'],
+            ['label' => 'KRA & KPI Performance', 'icon' => 'feather-target', 'route' => 'hrms.kra-kpi.index'],
             $isHrAdmin ? ['label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index'] : null,
             ['label' => 'Broadcasts', 'icon' => 'feather-radio', 'route' => 'hrms.broadcasts.index'],
             ['label' => 'Helpdesk', 'icon' => 'feather-life-buoy', 'route' => 'hrms.helpdesk.tickets.index'],

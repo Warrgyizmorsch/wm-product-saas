@@ -33,6 +33,7 @@ use App\Domains\HRMS\Controllers\HelpdeskTicketController;
 use App\Domains\HRMS\Controllers\HelpdeskCategoryController;
 use App\Domains\HRMS\Controllers\HelpdeskKbController;
 use App\Domains\HRMS\Controllers\RecruitmentController;
+use App\Domains\HRMS\Controllers\KraKpiController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -574,5 +575,45 @@ Route::prefix('hrms')
             Route::post('/application/{application}/offer', [RecruitmentController::class, 'createOffer'])->name('offer.create');
             Route::post('/offer/{offer}/send-email', [RecruitmentController::class, 'sendOfferEmail'])->name('offer.send-email');
             Route::post('/offer/{offer}/convert-to-employee', [RecruitmentController::class, 'convertToEmployee'])->name('offer.convert');
+        });
+
+        // KRA & KPI Performance Management Hub
+        Route::prefix('kra-kpi')->name('kra-kpi.')->group(function (): void {
+            Route::get('/', [KraKpiController::class, 'index'])->name('index');
+            Route::get('/scorecard/{id}', [KraKpiController::class, 'show'])->name('show');
+
+            // Cycles Management
+            Route::post('/cycle/store', [KraKpiController::class, 'storeCycle'])->name('cycle.store');
+            Route::put('/cycle/{id}', [KraKpiController::class, 'updateCycle'])->name('cycle.update');
+            Route::delete('/cycle/{id}', [KraKpiController::class, 'deleteCycle'])->name('cycle.destroy');
+
+            // KRA Categories & KPI Master Library
+            Route::post('/kra-category/store', [KraKpiController::class, 'storeKraCategory'])->name('kra-category.store');
+            Route::delete('/kra-category/{id}', [KraKpiController::class, 'deleteKraCategory'])->name('kra-category.destroy');
+            Route::post('/kpi-master/store', [KraKpiController::class, 'storeKpiMaster'])->name('kpi-master.store');
+            Route::delete('/kpi-master/{id}', [KraKpiController::class, 'deleteKpiMaster'])->name('kpi-master.destroy');
+
+            // KPI Templates & Assignments
+            Route::post('/template/store', [KraKpiController::class, 'storeTemplate'])->name('template.store');
+            Route::put('/template/{id}', [KraKpiController::class, 'updateTemplate'])->name('template.update');
+            Route::delete('/template/{id}', [KraKpiController::class, 'deleteTemplate'])->name('template.destroy');
+            Route::post('/assign-template', [KraKpiController::class, 'assignTemplateToEmployees'])->name('assign-template');
+
+            // Scorecard & Goal Items Actions
+            Route::delete('/scorecard/{planId}', [KraKpiController::class, 'deletePlan'])->name('plan.destroy');
+            Route::post('/scorecard/{planId}/goal-item/store', [KraKpiController::class, 'addGoalItem'])->name('goal-item.store');
+            Route::delete('/goal-item/{itemId}', [KraKpiController::class, 'deleteGoalItem'])->name('goal-item.destroy');
+            Route::post('/scorecard/{planId}/submit-goals', [KraKpiController::class, 'submitGoals'])->name('submit-goals');
+            Route::post('/scorecard/{planId}/approve-goals', [KraKpiController::class, 'approveGoals'])->name('approve-goals');
+            Route::post('/goal-item/{itemId}/progress', [KraKpiController::class, 'logProgress'])->name('log-progress');
+
+            // Appraisals & Evaluations
+            Route::post('/scorecard/{planId}/self-appraisal', [KraKpiController::class, 'submitSelfAppraisal'])->name('self-appraisal');
+            Route::post('/scorecard/{planId}/manager-appraisal', [KraKpiController::class, 'submitManagerAppraisal'])->name('manager-appraisal');
+            Route::post('/scorecard/{planId}/calibrate', [KraKpiController::class, 'calibrateAppraisal'])->name('calibrate');
+            Route::post('/scorecard/{planId}/sign-off', [KraKpiController::class, 'signOffAppraisal'])->name('sign-off');
+
+            // 1-Click Bridge to PIP
+            Route::post('/scorecard/{planId}/trigger-pip', [KraKpiController::class, 'triggerPip'])->name('trigger-pip');
         });
     });

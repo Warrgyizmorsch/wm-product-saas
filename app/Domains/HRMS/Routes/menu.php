@@ -85,6 +85,7 @@ return [
     ['section' => 'hrms', 'order' => 80, 'label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index', 'permission' => $selfService],
     ['section' => 'hrms', 'order' => 90, 'label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index', 'permission' => $selfService],
     ['section' => 'hrms', 'order' => 100, 'label' => 'Travel & Expenses', 'icon' => 'feather-navigation', 'route' => 'hrms.travel-expense.index', 'permission' => $selfService],
+    ['section' => 'hrms', 'order' => 105, 'label' => 'KRA & KPI Performance', 'icon' => 'feather-target', 'route' => 'hrms.kra-kpi.index', 'permission' => $selfService],
     [
         'section' => 'hrms', 'order' => 110, 'permission' => [...$hrAdmin, 'hrms.pip.manage', 'hrms.performance.manage'],
         'label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index',
