@@ -817,6 +817,7 @@ return [
     'target_product' => 'लक्ष्य उत्पाद',
     'target_product_so' => 'लक्ष्य उत्पाद (बिक्री आदेश से)',
     'ordered_qty' => 'आदेशित मात्रा',
+    'scrap_quantity' => 'स्क्रैप मात्रा',
     'qty_to_manufacture' => 'निर्माण के लिए मात्रा',
     'quantity_ordered' => 'आदेशित मात्रा',
     'quantity_produced' => 'उत्पादित मात्रा',

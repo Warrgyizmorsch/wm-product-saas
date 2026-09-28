@@ -17,6 +17,7 @@ use App\Domains\Sales\Controllers\MaterialRequestController;
 use App\Domains\Sales\Controllers\DispatchOrderController;
 use App\Domains\Production\Controllers\MrpShortageController;
 use App\Domains\Inventory\Controllers\SupplyChainDashboardController;
+use App\Domains\Inventory\Controllers\RemnantController;
 
 Route::get('supply-chain/dashboard', [SupplyChainDashboardController::class, 'index'])->name('supply-chain.dashboard');
 
@@ -53,6 +54,13 @@ Route::prefix('inventory')
         Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
         Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update'])->name('warehouses.update');
         Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->name('warehouses.destroy');
+
+        // Remnants / Offcuts
+        Route::get('remnants', [RemnantController::class, 'index'])->name('remnants.index');
+        Route::get('remnants/{remnant}', [RemnantController::class, 'show'])->name('remnants.show');
+        Route::post('remnants/{remnant}/confirm', [RemnantController::class, 'confirm'])->name('remnants.confirm');
+        Route::post('remnants/{remnant}/split', [RemnantController::class, 'split'])->name('remnants.split');
+        Route::post('remnants/{remnant}/scrap', [RemnantController::class, 'scrap'])->name('remnants.scrap');
 
         // Stock Transfers
         Route::get('transfers/export', [StockTransferController::class, 'export'])->name('transfers.export');

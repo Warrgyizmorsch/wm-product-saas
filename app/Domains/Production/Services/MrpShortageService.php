@@ -597,6 +597,19 @@ class MrpShortageService
             }
         }
 
+        // Include compatible available remnants
+        $remnantAvail = (float) \App\Domains\Inventory\Models\InventoryRemnant::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->whereIn('status', [
+                \App\Domains\Inventory\Models\InventoryRemnant::STATUS_AVAILABLE,
+                \App\Domains\Inventory\Models\InventoryRemnant::STATUS_PARTIALLY_RESERVED,
+            ])
+            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+            ->selectRaw('SUM(current_quantity - reserved_quantity) as total_avail')
+            ->value('total_avail') ?? 0.0;
+
+        $onHand += $remnantAvail;
         $available = max(0.0, $onHand - $reserved);
 
         return [

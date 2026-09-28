@@ -438,6 +438,87 @@ class ProductionOrderController extends Controller
         }
     }
 
+    public function allocateRemnant(Request $request, int $id, \App\Domains\Production\Services\RemnantAllocationService $allocationService)
+    {
+        $order = ProductionOrder::findOrFail($id);
+        Gate::authorize('issue', $order);
+
+        $request->validate([
+            'reservation_id' => 'required|exists:production_order_reservations,id',
+            'remnant_id' => 'required|exists:inventory_remnants,id',
+            'allocated_length' => 'nullable|numeric|min:0.0001',
+            'allocated_quantity' => 'nullable|numeric|min:0.0001',
+        ]);
+
+        try {
+            $allocations = [
+                [
+                    'remnant_id' => (int) $request->input('remnant_id'),
+                    'allocated_length' => $request->filled('allocated_length') ? (float) $request->input('allocated_length') : null,
+                    'allocated_quantity' => $request->filled('allocated_quantity') ? (float) $request->input('allocated_quantity') : null,
+                ]
+            ];
+
+            $allocationService->allocateRemnants(
+                $order->tenant_id,
+                $order->id,
+                (int) $request->input('reservation_id'),
+                $allocations,
+                Auth::id()
+            );
+
+            return redirect()->back()->with('success', 'Remnant allocated successfully to production requirement.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function releaseRemnantAllocation(Request $request, int $id, int $allocationId, \App\Domains\Production\Services\RemnantAllocationService $allocationService)
+    {
+        $order = ProductionOrder::findOrFail($id);
+        Gate::authorize('issue', $order);
+
+        try {
+            $allocation = \App\Domains\Production\Models\ProductionOrderRemnantAllocation::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->findOrFail($allocationId);
+
+            $allocationService->releaseAllocation($allocation->id, Auth::id());
+
+            return redirect()->back()->with('success', 'Remnant allocation released successfully.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function consumeRemnantAllocation(Request $request, int $id, int $allocationId, \App\Domains\Production\Services\RemnantAllocationService $allocationService)
+    {
+        $order = ProductionOrder::findOrFail($id);
+        Gate::authorize('issue', $order);
+
+        $request->validate([
+            'consumed_length' => 'nullable|numeric|min:0.0001',
+            'consumed_quantity' => 'nullable|numeric|min:0.0001',
+        ]);
+
+        try {
+            $allocation = \App\Domains\Production\Models\ProductionOrderRemnantAllocation::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->findOrFail($allocationId);
+
+            $allocationService->consumeAllocatedRemnant(
+                $allocation->id,
+                $request->filled('consumed_length') ? (float) $request->input('consumed_length') : null,
+                $request->filled('consumed_quantity') ? (float) $request->input('consumed_quantity') : null,
+                Auth::id()
+            );
+
+            return redirect()->back()->with('success', 'Allocated remnant consumed into production successfully.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
     // ── Progress Operations ──
 
     public function logProgress(Request $request, int $id)

@@ -70,6 +70,15 @@ Route::middleware([
         Route::post('/{order}/scrap', [ProductionOrderApiController::class, 'logScrap'])
             ->middleware(['production.api.idempotency', 'throttle:production-api-write'])
             ->name('api.v1.production.orders.scrap');
+        Route::post('/{order}/remnants', [ProductionOrderApiController::class, 'registerRemnant'])
+            ->middleware(['production.api.idempotency', 'throttle:production-api-write'])
+            ->name('api.v1.production.orders.remnants');
+        Route::post('/{order}/allocate-remnant', [ProductionOrderApiController::class, 'allocateRemnant'])
+            ->middleware(['production.api.idempotency', 'throttle:production-api-write'])
+            ->name('api.v1.production.orders.allocate_remnant');
+        Route::post('/{order}/consume-remnant/{allocation}', [ProductionOrderApiController::class, 'consumeRemnant'])
+            ->middleware(['production.api.idempotency', 'throttle:production-api-write'])
+            ->name('api.v1.production.orders.consume_remnant');
     });
 
     // --- Bills of Materials (BOM) ---

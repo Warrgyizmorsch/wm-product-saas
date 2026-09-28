@@ -411,7 +411,7 @@
     @else
         <table class="data-table">
             <thead>
-                <tr><th>{{ __('production.scrapped_item') }}</th><th>SKU</th><th>Operation</th><th class="text-right">Quantity</th><th>Reason</th><th>{{ __('production.recorded_at') }}</th><th>{{ __('production.stock_posted') }}</th></tr>
+                <tr><th>{{ __('production.scrapped_item') }}</th><th>SKU</th><th>Operation</th><th class="text-right">Scrap Qty / Dimensions</th><th>Reason</th><th>{{ __('production.recorded_at') }}</th><th>{{ __('production.stock_posted') }}</th></tr>
             </thead>
             <tbody>
                 @foreach($reportData['scrap_events'] as $s)
@@ -419,7 +419,22 @@
                         <td style="font-weight:600;">{{ $s['product'] }}</td>
                         <td style="font-family:monospace; color:#64748b;">{{ $s['product_sku'] }}</td>
                         <td style="color:#64748b;">{{ $s['operation'] }}</td>
-                        <td class="text-right" style="color:#dc2626; font-weight:bold;">{{ number_format($s['quantity'], 2) }}</td>
+                        <td class="text-right" style="color:#dc2626; font-weight:bold;">
+                            @if(($s['measurement_type'] ?? '') === 'linear' && !empty($s['length']))
+                                {{ number_format($s['length'], 1) }} mm
+                                @if(($s['pieces'] ?? 1) > 1) ({{ $s['pieces'] }} pcs) @endif
+                                <div style="font-size:6.5pt; color:#64748b; font-weight:normal;">{{ number_format($s['quantity'], 3) }} canonical</div>
+                            @elseif(($s['measurement_type'] ?? '') === 'sheet' && !empty($s['length']))
+                                {{ number_format($s['length'], 0) }} &times; {{ number_format($s['width'], 0) }} mm
+                                <div style="font-size:6.5pt; color:#64748b; font-weight:normal;">{{ number_format($s['quantity'], 3) }} canonical</div>
+                            @elseif(($s['measurement_type'] ?? '') === 'weight' && !empty($s['weight']))
+                                {{ number_format($s['weight'], 3) }} {{ $s['weight_unit'] ?? 'kg' }}
+                                <div style="font-size:6.5pt; color:#64748b; font-weight:normal;">{{ number_format($s['quantity'], 3) }} canonical</div>
+                            @else
+                                {{ number_format($s['quantity'], 2) }}
+                                @if(!empty($s['pieces']) && $s['pieces'] > 1) ({{ $s['pieces'] }} pcs) @endif
+                            @endif
+                        </td>
                         <td>{{ $s['reason'] }}</td>
                         <td style="color:#64748b; font-size:7.5pt;">{{ $s['recorded_at'] }}</td>
                         <td class="text-center">
@@ -429,6 +444,47 @@
                                 <span class="badge badge-warning">Pending</span>
                             @endif
                         </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    {{-- Reusable Offcuts & Remnants --}}
+    <div class="section-title">Reusable Offcuts & Remnants ({{ count($reportData['remnants'] ?? []) }})</div>
+    @if(empty($reportData['remnants']))
+        <p style="color:#64748b; font-size:8.5pt; padding:5px 0;">No reusable offcuts or remnants recorded for this order.</p>
+    @else
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Remnant Code</th>
+                    <th>Product / Material</th>
+                    <th>Type</th>
+                    <th>Physical Measurements</th>
+                    <th class="text-right">Available for Reuse</th>
+                    <th>Warehouse / Location</th>
+                    <th class="text-right">Valuation</th>
+                    <th class="text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($reportData['remnants'] as $rem)
+                    <tr>
+                        <td style="font-family:monospace; font-weight:bold;">{{ $rem['remnant_code'] }}</td>
+                        <td>
+                            <span style="font-weight:600;">{{ $rem['product_name'] }}</span><br>
+                            <span style="font-family:monospace; font-size:6.5pt; color:#64748b;">{{ $rem['product_sku'] }}</span>
+                        </td>
+                        <td style="text-transform:uppercase; font-size:7pt;">{{ $rem['measurement_type'] }}</td>
+                        <td style="font-weight:600;">{{ $rem['dimensions'] }}</td>
+                        <td class="text-right" style="color:#16a34a; font-weight:bold;">{{ $rem['available_display'] }}</td>
+                        <td>
+                            {{ $rem['warehouse'] }}
+                            @if($rem['location'] !== '—')<br><small style="color:#64748b;">{{ $rem['location'] }}</small>@endif
+                        </td>
+                        <td class="text-right">{{ number_format($rem['valuation'], 2) }}</td>
+                        <td class="text-center" style="text-transform:uppercase; font-size:7pt;">{{ str_replace('_', ' ', $rem['status']) }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -757,7 +813,7 @@
             </td>
             <td>
                 <div class="kpi-label">{{ __('production.total_scrapped') ?? 'Scrapped' }}</div>
-                <div class="kpi-value danger">{{ number_format($reportData['summary']['total_scrapped'] ?? 0, 0) }}</div>
+                <div class="kpi-value danger">{{ number_format($reportData['summary']['total_scrapped'] ?? 0, 2) }}</div>
             </td>
             <td>
                 <div class="kpi-label">{{ __('production.total_run_hours') ?? 'Run Time' }}</div>
@@ -766,6 +822,10 @@
             <td>
                 <div class="kpi-label">{{ __('production.operation_events') ?? 'Events Logged' }}</div>
                 <div class="kpi-value">{{ number_format($reportData['summary']['total_events_count'] ?? 0, 0) }}</div>
+            </td>
+            <td>
+                <div class="kpi-label">Reusable Offcuts</div>
+                <div class="kpi-value" style="color:#059669;">{{ number_format($reportData['summary']['total_offcuts_count'] ?? 0, 0) }}</div>
             </td>
         </tr>
     </table>
@@ -955,6 +1015,106 @@
             @endforelse
         </tbody>
     </table>
+
+    {{-- Section 5: Operational Scrap Log Entries --}}
+    @if(!empty($reportData['scraps']))
+        <div class="section-title">Operational Scrap Log Entries ({{ count($reportData['scraps']) }})</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date / Time</th>
+                    <th>Order #</th>
+                    <th>Product / Material</th>
+                    <th>Operation</th>
+                    <th>Work Center</th>
+                    <th class="text-right">Scrap Qty / Dimensions</th>
+                    <th>Reason</th>
+                    <th>Scrap Storage Location</th>
+                    <th>Operator</th>
+                    <th class="text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($reportData['scraps'] as $scr)
+                    <tr>
+                        <td style="font-size:7pt; white-space:nowrap;">{{ $scr['recorded_at'] }}</td>
+                        <td style="font-family:monospace; font-weight:bold;">{{ $scr['order_number'] }}</td>
+                        <td>
+                            <span style="font-weight:600;">{{ $scr['product_name'] }}</span><br>
+                            <span style="font-family:monospace; font-size:6.5pt; color:#64748b;">{{ $scr['product_sku'] }}</span>
+                        </td>
+                        <td style="font-size:7pt;">{{ $scr['operation'] }}</td>
+                        <td style="font-size:7pt;">{{ $scr['work_center'] }}</td>
+                        <td class="text-right">
+                            @if(!empty($scr['dimensions']))
+                                <span style="font-weight:600; color:#dc2626;">{{ $scr['dimensions'] }}</span><br>
+                                <span style="font-size:6.5pt; color:#64748b;">{{ number_format($scr['quantity'], 3) }} {{ $scr['uom'] }}</span>
+                            @else
+                                <span style="font-weight:bold; color:#dc2626;">{{ number_format($scr['quantity'], 2) }} {{ $scr['uom'] }}</span>
+                                @if(($scr['pieces'] ?? 1) > 1)<br><small style="color:#64748b;">({{ $scr['pieces'] }} pcs)</small>@endif
+                            @endif
+                        </td>
+                        <td style="color:#dc2626;">{{ $scr['reason'] }}</td>
+                        <td>
+                            {{ $scr['warehouse'] }}
+                            @if($scr['storage_location'] !== '—')<br><small style="color:#64748b;">{{ $scr['storage_location'] }}</small>@endif
+                        </td>
+                        <td style="font-size:7pt; color:#64748b;">{{ $scr['operator'] }}</td>
+                        <td class="text-center" style="font-size:7pt;">
+                            @if(($scr['disposal_status'] ?? '') === 'approved' || !empty($scr['stock_posted']))
+                                <span style="color:#16a34a; font-weight:bold;">APPROVED</span>
+                            @elseif(($scr['disposal_status'] ?? '') === 'pending_approval')
+                                <span style="color:#d97706; font-weight:bold;">PENDING</span>
+                            @else
+                                <span style="color:#64748b;">RECORDED</span>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    {{-- Section 6: Reusable Offcut Remnants --}}
+    @if(!empty($reportData['offcuts']))
+        <div class="section-title">Reusable Offcut Remnants Placed in Storage ({{ count($reportData['offcuts']) }})</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Remnant Code</th>
+                    <th>Order #</th>
+                    <th>Product / Material</th>
+                    <th>Type</th>
+                    <th>Dimensions</th>
+                    <th class="text-right">Available</th>
+                    <th>Warehouse / Location</th>
+                    <th class="text-right">Valuation</th>
+                    <th class="text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($reportData['offcuts'] as $off)
+                    <tr>
+                        <td style="font-family:monospace; font-weight:bold;">{{ $off['remnant_code'] }}</td>
+                        <td style="font-family:monospace;">{{ $off['order_number'] }}</td>
+                        <td>
+                            <span style="font-weight:600;">{{ $off['product_name'] }}</span><br>
+                            <span style="font-family:monospace; font-size:6.5pt; color:#64748b;">{{ $off['product_sku'] }}</span>
+                        </td>
+                        <td style="text-transform:uppercase; font-size:7pt;">{{ $off['measurement_type'] }}</td>
+                        <td style="font-weight:600;">{{ $off['dimensions'] }}</td>
+                        <td class="text-right" style="color:#16a34a; font-weight:bold;">{{ $off['available_display'] }}</td>
+                        <td>
+                            {{ $off['warehouse'] }}
+                            @if($off['location'] !== '—')<br><small style="color:#64748b;">{{ $off['location'] }}</small>@endif
+                        </td>
+                        <td class="text-right">{{ number_format($off['valuation'], 2) }}</td>
+                        <td class="text-center" style="text-transform:uppercase; font-size:7pt;">{{ str_replace('_', ' ', $off['status']) }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
 @endif
 
 </body>

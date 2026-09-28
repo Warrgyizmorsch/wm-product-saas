@@ -1672,7 +1672,7 @@
                                                         <div class="fs-10 text-muted">{{ __('production.lead') }}: {{ $op->subcontract_lead_time_days ?? 0 }}d
                                                         </div>
                                                     @else
-                                                        {{ $op->workCenter->name }}
+                                                        {{ $op->workCenter?->name ?? 'Unassigned' }}
                                                     @endif
                                                 </td>
                                                 <td>
@@ -2799,6 +2799,7 @@
                             <x-ui.horizontal-tabs id="scrapReworkSubTabs" class="mb-4" :tabs="[
             ['id' => 'inspections-subtab', 'label' => __('production.quality_inspections'), 'active' => true, 'icon' => 'feather-shield-check text-primary'],
             ['id' => 'scrap-subtab', 'label' => __('production.scrap_log_entries'), 'active' => false, 'icon' => 'feather-trash-2 text-danger'],
+            ['id' => 'offcuts-subtab', 'label' => 'Reusable Offcuts / Remnants', 'active' => false, 'icon' => 'feather-scissors text-success'],
             ['id' => 'rework-subtab', 'label' => __('production.rework_events_track'), 'active' => false, 'icon' => 'feather-refresh-cw text-warning']
         ]" />
 
@@ -2869,9 +2870,8 @@
                                                 <tr>
                                                     <th style="width:15%">{{ __('production.date') }}</th>
                                                     <th style="width:25%">{{ __('production.item_component') }}</th>
-                                                    <th style="width:12%" class="text-center">{{ __('production.ordered_qty') }}
-                                                    </th>
-                                                    <th style="width:28%">{{ __('production.reason') }}</th>
+                                                    <th style="width:16%" class="text-center">{{ __('production.scrap_quantity') }} / Dimensions</th>
+                                                    <th style="width:24%">{{ __('production.reason') }}</th>
                                                     <th style="width:20%">{{ __('production.status') }}</th>
                                                 </tr>
                                             </thead>
@@ -2888,8 +2888,28 @@
                                                                 </div>
                                                             @endif
                                                         </td>
-                                                        <td class="text-center text-danger fw-bold">
-                                                            {{ number_format($scr->quantity, 2) }}
+                                                        <td class="text-center">
+                                                            @if($scr->measurement_type === 'linear' && $scr->length)
+                                                                <div class="fw-bold text-danger">{{ number_format($scr->length, 1) }} mm</div>
+                                                                @if($scr->pieces > 1)
+                                                                    <div class="text-muted fs-11">({{ $scr->pieces }} pcs)</div>
+                                                                @endif
+                                                                <div class="text-muted fs-10 font-monospace">{{ number_format($scr->quantity, 3) }} {{ $scr->product?->uom?->code ?? 'MTR' }}</div>
+                                                            @elseif($scr->measurement_type === 'sheet' && $scr->length)
+                                                                <div class="fw-bold text-danger">{{ number_format($scr->length, 0) }} &times; {{ number_format($scr->width, 0) }} mm</div>
+                                                                @if($scr->thickness)
+                                                                    <div class="text-muted fs-11">Thk: {{ $scr->thickness }}mm</div>
+                                                                @endif
+                                                                <div class="text-muted fs-10 font-monospace">{{ number_format($scr->quantity, 3) }} {{ $scr->product?->uom?->code ?? 'SQM' }}</div>
+                                                            @elseif($scr->measurement_type === 'weight' && $scr->weight)
+                                                                <div class="fw-bold text-danger">{{ number_format($scr->weight, 3) }} {{ $scr->weight_unit ?? 'kg' }}</div>
+                                                                <div class="text-muted fs-10 font-monospace">{{ number_format($scr->quantity, 3) }} {{ $scr->product?->uom?->code ?? 'KG' }}</div>
+                                                            @else
+                                                                <div class="fw-bold text-danger">{{ number_format($scr->quantity, 2) }} {{ $scr->product?->uom?->code ?? '' }}</div>
+                                                                @if($scr->pieces)
+                                                                    <div class="text-muted fs-11">({{ $scr->pieces }} pcs)</div>
+                                                                @endif
+                                                            @endif
                                                         </td>
                                                         <td class="text-muted fs-12">{{ $scr->reason ?? '—' }}</td>
                                                         <td>
@@ -2928,6 +2948,102 @@
                                                     <tr>
                                                         <td colspan="5" class="text-center py-4 text-muted">
                                                             {{ __('production.no_scrap_logged') }}
+                                                        </td>
+                                                    </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {{-- Reusable Offcuts / Remnants Sub-tab --}}
+                                <div class="tab-pane fade" id="offcuts-subtab" role="tabpanel" aria-labelledby="offcuts-subtab-tab">
+                                    @php
+                                        $orderRemnants = \App\Domains\Inventory\Models\InventoryRemnant::where('source_production_order_id', $order->id)
+                                            ->with(['product.uom', 'warehouse'])
+                                            ->latest()
+                                            ->get();
+                                    @endphp
+                                    <div class="table-responsive">
+                                        <table class="erp-thin-table">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width:15%">Remnant Code</th>
+                                                    <th style="width:22%">Product / Material</th>
+                                                    <th style="width:10%">Type</th>
+                                                    <th style="width:18%">Physical Measurements</th>
+                                                    <th style="width:12%">Available</th>
+                                                    <th style="width:13%">Storage Location</th>
+                                                    <th style="width:10%" class="text-end">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse($orderRemnants as $rem)
+                                                    <tr>
+                                                        <td>
+                                                            <a href="{{ route('inventory.remnants.show', $rem->id) }}" class="fw-bold text-primary font-monospace" target="_blank">
+                                                                 {{ $rem->remnant_code }}
+                                                            </a>
+                                                            <div class="text-muted fs-11">{{ $rem->created_at->format('m-d H:i') }}</div>
+                                                        </td>
+                                                        <td>
+                                                            <span class="fw-bold text-dark">{{ $rem->product?->name ?? '—' }}</span>
+                                                            <div class="text-muted fs-11 font-monospace">{{ $rem->product?->sku ?? '' }}</div>
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge bg-secondary-subtle text-secondary text-uppercase fs-10">
+                                                                {{ $rem->measurement_type }}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            @if($rem->measurement_type === 'linear')
+                                                                <span class="fw-bold text-dark">{{ number_format($rem->current_length, 1) }} mm</span>
+                                                                @if($rem->pieces > 1) <span class="text-muted">({{ $rem->pieces }} pcs)</span> @endif
+                                                            @elseif($rem->measurement_type === 'sheet')
+                                                                <span class="fw-bold text-dark">{{ number_format($rem->current_length, 0) }} &times; {{ number_format($rem->current_width, 0) }} mm</span>
+                                                                @if($rem->thickness) <span class="text-muted">({{ $rem->thickness }}mm)</span> @endif
+                                                            @elseif($rem->measurement_type === 'weight')
+                                                                <span class="fw-bold text-dark">{{ number_format($rem->weight, 3) }} {{ $rem->weight_unit }}</span>
+                                                            @else
+                                                                <span class="fw-bold text-dark">{{ $rem->pieces }} pcs</span>
+                                                            @endif
+                                                            <div class="fs-11 text-muted">{{ number_format($rem->current_quantity, 3) }} {{ $rem->product?->uom?->code ?? 'canonical' }}</div>
+                                                        </td>
+                                                        <td>
+                                                            @if($rem->measurement_type === 'linear')
+                                                                <span class="fw-bold text-success">{{ number_format($rem->available_length, 1) }} mm</span>
+                                                            @else
+                                                                <span class="fw-bold text-success">{{ number_format($rem->available_quantity, 3) }} {{ $rem->product?->uom?->code ?? '' }}</span>
+                                                            @endif
+                                                            @if($rem->reserved_quantity > 0)
+                                                                <div class="fs-10 text-warning">Res: {{ number_format($rem->reserved_quantity, 2) }}</div>
+                                                            @endif
+                                                        </td>
+                                                        <td>
+                                                            <div class="text-dark">{{ $rem->warehouse?->name ?? 'Default Store' }}</div>
+                                                            @if($rem->warehouse_location)
+                                                                <span class="badge bg-light text-dark border fs-10"><i class="feather-map-pin me-1"></i>{{ $rem->warehouse_location }}</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="text-end">
+                                                            @php
+                                                                $rBadge = match($rem->status) {
+                                                                    'available'            => 'bg-success text-white',
+                                                                    'partially_reserved'   => 'bg-warning text-dark',
+                                                                    'fully_reserved'       => 'bg-info text-white',
+                                                                    'consumed'             => 'bg-secondary text-white',
+                                                                    'scrapped'             => 'bg-danger text-white',
+                                                                    default                => 'bg-dark text-white',
+                                                                };
+                                                            @endphp
+                                                            <span class="badge {{ $rBadge }} fs-10 text-uppercase">{{ str_replace('_', ' ', $rem->status) }}</span>
+                                                        </td>
+                                                    </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="7" class="text-center py-4 text-muted">
+                                                            <i class="feather-scissors fs-18 d-block mb-1 opacity-50"></i>
+                                                            No reusable offcuts or remnants recorded for this order yet.
                                                         </td>
                                                     </tr>
                                                 @endforelse
