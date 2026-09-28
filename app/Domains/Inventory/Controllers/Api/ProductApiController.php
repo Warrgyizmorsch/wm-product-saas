@@ -48,7 +48,42 @@ class ProductApiController extends Controller
     }
 
     /**
-     * GET /api/inventory/products/export (and GET /api/inventory/products)
+     * GET /api/inventory/products/meta
+     * Master dropdowns and configuration options for Product UI.
+     */
+    public function meta(Request $request): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $uoms = Uom::where('tenant_id', $tenantId)->orWhereNull('tenant_id')->orderBy('name')->get(['id', 'name', 'code']);
+        $warehouses = Warehouse::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'code']);
+        $vendors = Vendor::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'company_name']);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'types'            => ['finished_good', 'semi_finished', 'raw_material', 'component', 'service'],
+                'item_types'       => ['Goods', 'Service'],
+                'variation_types'  => ['Single', 'Variant'],
+                'statuses'         => ['active', 'inactive', 'draft', 'discontinued'],
+                'uoms'             => $uoms,
+                'warehouses'       => $warehouses,
+                'vendors'          => $vendors,
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/inventory/products
+     * List / search products with standard filters and pagination.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        return $this->export($request);
+    }
+
+    /**
+     * GET /api/inventory/products/export
      * 
      * Full Enterprise Product Export API Kit for 3rd-party ERPs & platforms.
      * Outputs all parent products and child variants with clean, well-categorized domain objects.
@@ -1068,5 +1103,355 @@ class ProductApiController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * GET /api/inventory/products/{id}
+     */
+    public function show(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $product = Product::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->with([
+                'uom', 'vendor', 'images', 'primaryImage', 'detailImages', 'warehouseStocks.warehouse',
+                'variants.images', 'variants.primaryImage', 'variants.detailImages', 'variants.warehouseStocks.warehouse'
+            ])
+            ->findOrFail($id);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $this->formatProductForExport($product),
+        ]);
+    }
+
+    /**
+     * PUT/PATCH /api/inventory/products/{id}
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('update', $product);
+
+        $validator = Validator::make($request->all(), [
+            'name'                     => ['sometimes', 'required', 'string', 'max:255'],
+            'sku'                      => ['sometimes', 'required', 'string', 'max:100'],
+            'status'                   => ['nullable', 'string', 'in:active,inactive,draft,discontinued'],
+            'selling_price'            => ['nullable', 'numeric', 'min:0'],
+            'cost_price'               => ['nullable', 'numeric', 'min:0'],
+            'unit_cost'                => ['nullable', 'numeric', 'min:0'],
+            'hsn_sac'                  => ['nullable', 'string', 'max:50'],
+            'gst_rate'                 => ['nullable', 'numeric', 'min:0'],
+            'barcode'                  => ['nullable', 'string', 'max:100'],
+            'brand'                    => ['nullable', 'string', 'max:100'],
+            'manufacturer'             => ['nullable', 'string', 'max:100'],
+            'description'              => ['nullable', 'string'],
+            'reorder_point'            => ['nullable', 'numeric', 'min:0'],
+            'minimum_order_qty'        => ['nullable', 'numeric', 'min:0'],
+            'track_serial_number'      => ['nullable', 'boolean'],
+            'track_batch'              => ['nullable', 'boolean'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+        $product->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product updated successfully',
+            'data'    => $product->fresh(['uom', 'vendor', 'warehouseStocks']),
+        ]);
+    }
+
+    /**
+     * DELETE /api/inventory/products/{id}
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('delete', $product);
+
+        // Check if product has active inventory
+        $hasStock = $product->warehouseStocks()->where('quantity', '>', 0)->exists();
+        if ($hasStock) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete product with existing stock inventory. Adjust stock to 0 first.',
+            ], 422);
+        }
+
+        $product->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product deleted successfully',
+        ]);
+    }
+
+    /**
+     * POST /api/inventory/products/{id}/toggle-status
+     */
+    public function toggleStatus(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('update', $product);
+
+        $newStatus = $request->input('status') ?: ($product->status === 'active' ? 'inactive' : 'active');
+        $product->update(['status' => $newStatus]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Product status updated to {$newStatus}",
+            'data'    => ['status' => $newStatus],
+        ]);
+    }
+
+    /**
+     * GET /api/inventory/products/barcode-lookup
+     */
+    public function barcodeLookup(Request $request): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $code = trim((string)$request->input('code', $request->input('barcode', '')));
+
+        if (empty($code)) {
+            return response()->json(['success' => false, 'message' => 'Barcode / SKU / Serial code is required.'], 422);
+        }
+
+        $product = Product::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($code) {
+                $q->where('barcode', $code)
+                  ->orWhere('sku', $code)
+                  ->orWhere('upc', $code)
+                  ->orWhere('ean', $code);
+            })
+            ->first();
+
+        $isSerial = false;
+        $serialNumber = null;
+
+        if (!$product) {
+            $snRecord = \App\Domains\Inventory\Models\SerialNumber::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('serial_number', $code)
+                ->with(['product', 'warehouse'])
+                ->first();
+
+            if ($snRecord && $snRecord->product) {
+                $product = $snRecord->product;
+                $isSerial = true;
+                $serialNumber = $snRecord->serial_number;
+            }
+        }
+
+        if (!$product) {
+            return response()->json(['success' => false, 'message' => "Item not found for code: {$code}"], 404);
+        }
+
+        return response()->json([
+            'success'       => true,
+            'is_serial'     => $isSerial,
+            'serial_number' => $serialNumber,
+            'data'          => [
+                'id'                  => $product->id,
+                'name'                => $product->name,
+                'sku'                 => $product->sku,
+                'barcode'             => $product->barcode,
+                'track_serial_number' => (bool)$product->track_serial_number,
+                'track_batch'         => (bool)$product->track_batch,
+                'selling_price'       => (float)$product->selling_price,
+                'cost_price'          => (float)$product->cost_price,
+                'unit_cost'           => (float)($product->unit_cost ?: $product->cost_price),
+                'gst_rate'            => (float)$product->gst_rate,
+                'hsn_sac'             => $product->hsn_sac,
+                'uom'                 => $product->uom?->name ?? 'Pcs',
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/inventory/products/stock-check
+     */
+    public function stockCheck(Request $request): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $productId   = (int)$request->input('product_id');
+        $warehouseId = (int)$request->input('warehouse_id');
+
+        if (!$productId || !$warehouseId) {
+            return response()->json(['success' => false, 'message' => 'Both product_id and warehouse_id are required.'], 422);
+        }
+
+        $stock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->first();
+
+        $reserved = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('status', 'Active')
+            ->sum('reserved_qty');
+
+        $physicalQty  = (float)($stock?->quantity ?? 0);
+        $reservedQty  = (float)$reserved;
+        $availableQty = max(0, $physicalQty - $reservedQty);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'product_id'    => $productId,
+                'warehouse_id'  => $warehouseId,
+                'physical_qty'  => $physicalQty,
+                'reserved_qty'  => $reservedQty,
+                'available_qty' => $availableQty,
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/inventory/products/{id}/opening-stock
+     */
+    public function getOpeningStock(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($id);
+        $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
+
+        $stocks = \App\Domains\Inventory\Models\ProductWarehouseStock::where('product_id', $id)->get();
+
+        $data = $warehouses->map(function ($wh) use ($stocks) {
+            $ws = $stocks->firstWhere('warehouse_id', $wh->id);
+            return [
+                'warehouse_id'   => $wh->id,
+                'warehouse_name' => $wh->name,
+                'warehouse_code' => $wh->code,
+                'quantity'       => (float)($ws?->quantity ?? 0),
+                'unit_cost'      => (float)($ws?->unit_cost ?? 0),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'product_id'       => $product->id,
+                'product_name'     => $product->name,
+                'warehouse_stocks' => $data,
+            ],
+        ]);
+    }
+
+    /**
+     * POST /api/inventory/products/{id}/opening-stock
+     */
+    public function saveOpeningStock(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('update', $product);
+
+        $validator = Validator::make($request->all(), [
+            'stocks'                  => ['required', 'array', 'min:1'],
+            'stocks.*.warehouse_id'   => ['required', 'integer', 'exists:warehouses,id'],
+            'stocks.*.quantity'       => ['required', 'numeric', 'min:0'],
+            'stocks.*.unit_cost'      => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        DB::transaction(function () use ($product, $request, $tenantId) {
+            foreach ($request->input('stocks') as $stk) {
+                $whId = (int)$stk['warehouse_id'];
+                $qty  = (float)$stk['quantity'];
+                $cost = (float)($stk['unit_cost'] ?? $product->cost_price);
+
+                if ($qty > 0) {
+                    StockService::recordInflow(
+                        $tenantId,
+                        $product->id,
+                        $whId,
+                        $qty,
+                        $cost,
+                        'Opening Stock API'
+                    );
+                }
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Opening stock updated successfully',
+        ]);
+    }
+
+    /**
+     * POST /api/inventory/products/quick-create
+     */
+    public function quickCreate(Request $request): JsonResponse
+    {
+        [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
+        $this->authorize('create', Product::class);
+
+        $validator = Validator::make($request->all(), [
+            'name'          => ['required', 'string', 'max:255'],
+            'sku'           => ['required', 'string', 'max:100'],
+            'selling_price' => ['required', 'numeric', 'min:0'],
+            'cost_price'    => ['nullable', 'numeric', 'min:0'],
+            'uom_id'        => ['nullable', 'integer'],
+            'gst_rate'      => ['nullable', 'numeric', 'min:0'],
+            'hsn_sac'       => ['nullable', 'string', 'max:50'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+
+        $product = Product::create([
+            'tenant_id'       => $tenantId,
+            'company_id'      => $companyId,
+            'branch_id'       => $branchId,
+            'name'            => $validated['name'],
+            'sku'             => $validated['sku'],
+            'selling_price'   => $validated['selling_price'],
+            'cost_price'      => $validated['cost_price'] ?? 0,
+            'unit_cost'       => $validated['cost_price'] ?? 0,
+            'uom_id'          => $validated['uom_id'] ?? null,
+            'gst_rate'        => $validated['gst_rate'] ?? 18.0,
+            'hsn_sac'         => $validated['hsn_sac'] ?? null,
+            'status'          => 'active',
+            'item_type'       => 'Goods',
+            'type'            => 'finished_good',
+            'variation_type'  => 'Single',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product quick-created successfully',
+            'data'    => $product->fresh(['uom']),
+        ], 201);
     }
 }

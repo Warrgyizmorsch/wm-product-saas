@@ -194,9 +194,9 @@ class PurchaseRequisitionRepository
                     }
 
                     if (!$vendor) {
-                        if ($product->preferred_vendor_id) {
+                        if ($product && $product->preferred_vendor_id) {
                             $vendor = $product->vendor;
-                        } else {
+                        } elseif ($product) {
                             $lastPoItem = PurchaseOrderItem::where('tenant_id', $tenantId)
                                 ->where('product_id', $product->id)
                                 ->whereHas('order', function ($q) {
@@ -213,8 +213,8 @@ class PurchaseRequisitionRepository
                     $pendingItems[] = [
                         'item_id' => $item->id,
                         'product_id' => $item->product_id,
-                        'product_name' => $product->name,
-                        'sku' => $product->sku ?: 'No SKU',
+                        'product_name' => $product?->name ?? ($item->description ?? 'Unknown Item'),
+                        'sku' => $product?->sku ?: 'No SKU',
                         'uom' => $item->uom?->code ?? $product?->uom?->code ?? 'PCS',
                         'requisition_number' => $pr->requisition_number,
                         'requisition_id' => $pr->id,

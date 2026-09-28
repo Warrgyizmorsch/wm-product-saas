@@ -4,11 +4,18 @@ namespace App\Domains\CRM\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\LeadStatus;
+use App\Domains\CRM\Models\CrmAccount;
+use App\Domains\CRM\Models\CrmContact;
+use App\Domains\CRM\Models\CrmDeal;
+use App\Domains\CRM\Models\Customer;
+use App\Domains\CRM\Models\DealStatus;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -18,6 +25,7 @@ use Illuminate\Support\Str;
  * 
  * Enterprise-Grade Lead Export & Import REST API Kit.
  * Endpoints:
+ * - GET  /api/crm/leads/meta    (Master dropdowns for Lead UI)
  * - GET  /api/crm/leads/export  (Full Big-ERP Export API with advanced filters)
  * - GET  /api/crm/leads         (Alias to Export / List API)
  * - POST /api/crm/leads         (Single & Bulk Lead Import / Sync API)
@@ -41,7 +49,164 @@ class LeadApiController extends Controller
     }
 
     /**
-     * GET /api/crm/leads/export (and GET /api/crm/leads)
+     * GET /api/crm/leads/meta
+     */
+    public function meta(Request $request): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $statuses = LeadStatus::where(function ($q) use ($tenantId) {
+                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            })
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get(['id', 'name', 'color', 'is_protected', 'sort_order']);
+
+        $owners = User::where('tenant_id', $tenantId)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'statuses'   => $statuses,
+                'priorities' => ['low', 'medium', 'high', 'urgent'],
+                'sources'    => ['Website', 'Referral', 'Cold Call', 'WhatsApp', 'Exhibition', 'Partner', 'Inbound', 'Other'],
+                'lead_types' => ['Individual', 'Corporate', 'Government', 'Dealer/Distributor'],
+                'owners'     => $owners,
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/crm/leads/check-duplicate
+     */
+    public function checkDuplicate(Request $request): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $email = trim((string)$request->input('email'));
+        $phone = trim((string)$request->input('phone'));
+        $excludeId = $request->input('exclude_id');
+
+        if (empty($email) && empty($phone)) {
+            return response()->json([
+                'success' => true,
+                'is_duplicate' => false,
+                'message' => 'Please provide email or phone to check.',
+            ]);
+        }
+
+        $query = Lead::where('tenant_id', $tenantId);
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        $query->where(function ($q) use ($email, $phone) {
+            if ($email) {
+                $q->where('email', $email)->orWhere('company_email', $email);
+            }
+            if ($phone) {
+                $q->orWhere('phone', $phone)->orWhere('company_phone', $phone);
+            }
+        });
+
+        $duplicates = $query->get(['id', 'lead_number', 'contact_person', 'company_name', 'email', 'phone', 'status', 'created_at']);
+
+        return response()->json([
+            'success'      => true,
+            'is_duplicate' => $duplicates->isNotEmpty(),
+            'count'        => $duplicates->count(),
+            'duplicates'   => $duplicates,
+        ]);
+    }
+
+    /**
+     * GET /api/crm/leads
+     */
+    public function index(Request $request): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $query = Lead::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['owner:id,name,email', 'crmAccount:id,name', 'crmDeal:id,title,estimated_value']);
+
+        // Search
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('contact_person', 'like', "%{$search}%")
+                  ->orWhere('company_name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhere('lead_number', 'like', "%{$search}%");
+            });
+        }
+
+        // Status Filter (status_id or status name)
+        if ($statusId = $request->input('status_id')) {
+            $statusObj = LeadStatus::find($statusId);
+            if ($statusObj) {
+                $query->where('status', $statusObj->name);
+            }
+        } elseif ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        // Priority Filter
+        if ($priority = $request->input('priority')) {
+            $query->where('priority', $priority);
+        }
+
+        // Owner Filter
+        if ($ownerId = $request->input('owner_id')) {
+            $query->where('lead_owner_id', $ownerId);
+        }
+
+        // Date Filters
+        if ($fromDate = $request->input('from_date')) {
+            $query->whereDate('created_at', '>=', $fromDate);
+        }
+        if ($toDate = $request->input('to_date')) {
+            $query->whereDate('created_at', '<=', $toDate);
+        }
+
+        // Has Deal / Converted Filter
+        if ($request->has('has_deal')) {
+            if ($request->boolean('has_deal')) {
+                $query->whereNotNull('crm_deal_id');
+            } else {
+                $query->whereNull('crm_deal_id');
+            }
+        }
+
+        // Sorting
+        $sortBy  = $request->input('sort_by', 'id');
+        $sortDir = strtolower($request->input('sort_direction', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $allowedSorts = ['id', 'lead_number', 'contact_person', 'company_name', 'expected_amount', 'created_at', 'priority', 'status'];
+        if (in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+
+        $perPage = min((int)$request->input('per_page', 15), 100);
+        $leads   = $query->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $leads->items(),
+            'meta'    => [
+                'current_page' => $leads->currentPage(),
+                'last_page'    => $leads->lastPage(),
+                'per_page'     => $leads->perPage(),
+                'total'        => $leads->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/crm/leads/export
      * 
      * Full Database Lead Export API Kit for 3rd-party ERPs / CRM integrations.
      * Outputs all lead records with structured entity objects + complete database flat fields.
@@ -426,6 +591,9 @@ class LeadApiController extends Controller
 
         // Resolve Lead Owner
         $leadOwnerId = $data['lead_owner_id'] ?? ($data['lead_owner']['id'] ?? null);
+        if ($leadOwnerId && !User::where('id', $leadOwnerId)->exists()) {
+            $leadOwnerId = null;
+        }
         if (!$leadOwnerId && !empty($data['owner_email'])) {
             $owner = User::where('tenant_id', $tenantId)->where('email', $data['owner_email'])->first();
             if ($owner) {
@@ -433,7 +601,7 @@ class LeadApiController extends Controller
             }
         }
         if (!$leadOwnerId) {
-            $leadOwnerId = auth()->id() ?? 1;
+            $leadOwnerId = auth()->id() ?? User::where('tenant_id', $tenantId)->value('id') ?? User::first()?->id;
         }
 
         // Clean additional_contacts array
@@ -621,4 +789,419 @@ class LeadApiController extends Controller
             'failed'        => $failed,
         ], 200);
     }
+
+    /**
+     * GET /api/crm/leads/{id}
+     */
+    public function show(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $lead = Lead::where('tenant_id', $tenantId)
+            ->with(['owner', 'crmAccount', 'crmContact', 'crmDeal', 'followups'])
+            ->find($id);
+
+        if (!$lead) {
+            return response()->json([
+                'success' => false,
+                'message' => "Lead with ID {$id} not found in this tenant context.",
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => $lead,
+        ]);
+    }
+
+    /**
+     * PUT/PATCH /api/crm/leads/{id}
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->find($id);
+
+        if (!$lead) {
+            return response()->json([
+                'success' => false,
+                'message' => "Lead with ID {$id} not found.",
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name'            => ['sometimes', 'required', 'string', 'max:255'],
+            'company_name'    => ['nullable', 'string', 'max:255'],
+            'email'           => ['nullable', 'email', 'max:255'],
+            'phone'           => ['nullable', 'string', 'max:50'],
+            'priority'        => ['nullable', 'in:low,medium,high,urgent'],
+            'status'          => ['nullable', 'string'],
+            'status_id'       => ['nullable', 'integer'],
+            'estimated_value' => ['nullable', 'numeric'],
+            'lead_owner_id'   => ['nullable', 'integer'],
+            'notes'           => ['nullable', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+        if (isset($validated['status_id'])) {
+            $statusObj = LeadStatus::find($validated['status_id']);
+            if ($statusObj) {
+                $validated['status'] = $statusObj->name;
+            }
+        }
+
+        $lead->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lead updated successfully',
+            'data'    => $lead->fresh()->load(['owner', 'crmAccount']),
+        ]);
+    }
+
+    /**
+     * PATCH /api/crm/leads/{id}/status
+     */
+    public function updateStatus(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->find($id);
+        if (!$lead) {
+            return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'status_id' => ['nullable', 'integer'],
+            'status'    => ['nullable', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $newStatus = null;
+        if ($statusId = $request->input('status_id')) {
+            $statusObj = LeadStatus::find($statusId);
+            if ($statusObj) {
+                $newStatus = $statusObj->name;
+            }
+        } elseif ($status = $request->input('status')) {
+            $newStatus = $status;
+        }
+
+        if (!$newStatus) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please provide status or status_id.',
+            ], 422);
+        }
+
+        $leadService = app(\App\Domains\CRM\Services\LeadService::class);
+        $result = $leadService->updateLeadStatus($lead, $newStatus);
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'data'    => $lead->fresh()->load(['owner', 'crmAccount', 'crmDeal']),
+        ]);
+    }
+
+    /**
+     * PATCH /api/crm/leads/{id}/priority
+     */
+    public function updatePriority(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->find($id);
+        if (!$lead) {
+            return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'priority' => ['required', 'string', 'in:low,medium,high,urgent,Low,Medium,High,Urgent'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $lead->priority = ucfirst(strtolower($request->input('priority')));
+        $lead->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Lead priority updated to {$lead->priority}",
+            'data'    => $lead,
+        ]);
+    }
+
+    /**
+     * POST /api/crm/leads/{id}/qualify
+     */
+    public function qualify(Request $request, int $id): JsonResponse
+    {
+        [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'deal_title'          => ['nullable', 'string', 'max:255'],
+            'deal_amount'         => ['nullable', 'numeric', 'min:0'],
+            'deal_status_id'      => ['nullable', 'integer'],
+            'expected_close_date' => ['nullable', 'date'],
+            'notes'               => ['nullable', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+        $dealTitle = !empty($validated['deal_title']) ? $validated['deal_title'] : ($lead->company_name ?: ($lead->contact_person ?: "Lead #{$lead->id} Deal"));
+        $dealAmount = isset($validated['deal_amount']) ? (float)$validated['deal_amount'] : (float)($lead->expected_amount ?? 0);
+
+        $result = DB::transaction(function () use ($lead, $validated, $dealTitle, $dealAmount, $tenantId, $companyId, $branchId) {
+            // 1. Create or Find Customer
+            $customer = Customer::firstOrCreate(
+                [
+                    'tenant_id' => $tenantId,
+                    'email'     => $lead->email ?: ($lead->company_email ?: "lead_{$lead->id}@placeholder.com")
+                ],
+                [
+                    'company_id'   => $companyId,
+                    'branch_id'    => $branchId,
+                    'name'         => $lead->name ?: ($lead->company_name ?: 'Valued Client'),
+                    'company_name' => $lead->company_name,
+                    'phone'        => $lead->phone ?: $lead->company_phone,
+                    'status'       => 'active',
+                ]
+            );
+
+            // 2. Create or Find CrmAccount
+            $account = CrmAccount::firstOrCreate(
+                [
+                    'tenant_id' => $tenantId,
+                    'name'      => $lead->company_name ?: ($lead->name ?: 'Valued Account')
+                ],
+                [
+                    'company_id'  => $companyId,
+                    'branch_id'   => $branchId,
+                    'customer_id' => $customer->id,
+                    'email'       => $lead->email ?: $lead->company_email,
+                    'phone'       => $lead->phone ?: $lead->company_phone,
+                    'status'      => 'active',
+                    'owner_id'    => $lead->lead_owner_id ?: (auth()->id() ?? 1),
+                ]
+            );
+
+            // 3. Create or Find CrmContact
+            $contact = CrmContact::firstOrCreate(
+                [
+                    'tenant_id'      => $tenantId,
+                    'crm_account_id' => $account->id,
+                    'name'           => $lead->contact_person ?: ($lead->name ?: 'Primary Contact')
+                ],
+                [
+                    'email'      => $lead->email,
+                    'phone'      => $lead->phone,
+                    'is_primary' => true,
+                ]
+            );
+
+            // 4. Create Deal
+            $dealNo = 'DEAL-' . strtoupper(bin2hex(random_bytes(4)));
+            $stageName = 'Qualification';
+            if (!empty($validated['deal_status_id'])) {
+                $statusObj = DealStatus::find($validated['deal_status_id']);
+                if ($statusObj) {
+                    $stageName = $statusObj->name;
+                }
+            }
+
+            $deal = CrmDeal::create([
+                'tenant_id'        => $tenantId,
+                'company_id'       => $companyId,
+                'branch_id'        => $branchId,
+                'crm_account_id'   => $account->id,
+                'crm_contact_id'   => $contact->id,
+                'deal_number'      => $dealNo,
+                'title'            => $dealTitle,
+                'stage'            => $stageName,
+                'estimated_value'  => $dealAmount,
+                'closing_date'     => $validated['expected_close_date'] ?? now()->addDays(30)->toDateString(),
+                'owner_id'         => $lead->lead_owner_id ?: (auth()->id() ?? 1),
+                'notes'            => $validated['notes'] ?? null,
+            ]);
+
+            // 5. Update Lead
+            $lead->crm_account_id = $account->id;
+            $lead->crm_contact_id = $contact->id;
+            $lead->crm_deal_id    = $deal->id;
+            $lead->status         = 'Qualified';
+            $lead->save();
+
+            return [
+                'lead'     => $lead->fresh(),
+                'account'  => $account,
+                'customer' => $customer,
+                'contact'  => $contact,
+                'deal'     => $deal,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lead qualified and converted to Deal, Account, & Customer successfully',
+            'data'    => $result,
+        ], 201);
+    }
+
+    /**
+     * DELETE /api/crm/leads/{id}
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $lead->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lead deleted successfully',
+        ]);
+    }
+
+    /**
+     * PATCH /api/crm/leads/{id}/owner
+     */
+    public function updateOwner(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->find($id);
+        if (!$lead) {
+            return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'lead_owner_id' => 'required|integer|exists:users,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $lead->lead_owner_id = $request->input('lead_owner_id');
+        $lead->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lead owner reassigned successfully.',
+            'data'    => $lead->load('owner'),
+        ]);
+    }
+
+    /**
+     * PATCH /api/crm/leads/{id}/requirement
+     */
+    public function updateRequirement(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->find($id);
+        if (!$lead) {
+            return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
+        }
+
+        $lead->requirement = $request->input('requirement');
+        $lead->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lead requirement updated.',
+            'data'    => $lead,
+        ]);
+    }
+
+    /**
+     * GET /api/crm/leads/kanban
+     */
+    public function kanban(Request $request): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $statuses = LeadStatus::where(function ($q) use ($tenantId) {
+                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            })
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
+        $allLeads = Lead::where('tenant_id', $tenantId)->with('owner')->get();
+
+        $columns = [];
+        foreach ($statuses as $st) {
+            $leadsInStatus = $allLeads->where('status', $st->name)->values();
+            $columns[$st->name] = [
+                'status' => $st,
+                'count'  => $leadsInStatus->count(),
+                'leads'  => $leadsInStatus,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => $columns,
+        ]);
+    }
+
+    /**
+     * POST /api/crm/leads/{id}/restore
+     */
+    public function restore(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->onlyTrashed()->find($id);
+        if (!$lead) {
+            return response()->json(['success' => false, 'message' => "Deleted Lead with ID {$id} not found."], 404);
+        }
+
+        $lead->restore();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lead restored successfully',
+            'data'    => $lead,
+        ]);
+    }
 }
+
