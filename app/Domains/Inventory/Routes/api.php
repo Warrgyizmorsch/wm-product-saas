@@ -14,6 +14,8 @@ use App\Domains\Inventory\Controllers\Api\BarcodeApiController;
 use App\Domains\Inventory\Controllers\Api\UomApiController;
 use App\Domains\Inventory\Controllers\Api\SupplyChainDashboardApiController;
 use App\Domains\Inventory\Controllers\Api\MaterialRequirementApiController;
+use App\Domains\Inventory\Controllers\Api\MrpShortageApiController;
+use App\Domains\Inventory\Controllers\Api\TransporterApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -34,6 +36,8 @@ Route::prefix('api/inventory')->name('api.inventory.')->group(function () {
     // Product APIs
     Route::prefix('products')->name('products.')->group(function () {
         Route::get('/meta', [ProductApiController::class, 'meta'])->name('meta');
+        Route::get('/download-sample', [ProductApiController::class, 'downloadSample'])->name('download-sample');
+        Route::post('/import', [ProductApiController::class, 'import'])->name('import');
         Route::get('/export', [ProductApiController::class, 'export'])->name('export');
         Route::get('/barcode-lookup', [ProductApiController::class, 'barcodeLookup'])->name('barcode-lookup');
         Route::get('/stock-check', [ProductApiController::class, 'stockCheck'])->name('stock-check');
@@ -44,6 +48,7 @@ Route::prefix('api/inventory')->name('api.inventory.')->group(function () {
         Route::match(['put', 'patch'], '/{id}', [ProductApiController::class, 'update'])->name('update');
         Route::delete('/{id}', [ProductApiController::class, 'destroy'])->name('destroy');
         Route::post('/{id}/toggle-status', [ProductApiController::class, 'toggleStatus'])->name('toggle-status');
+        Route::get('/{id}/warehouse-stocks', [ProductApiController::class, 'warehouseStocks'])->name('warehouse-stocks');
         Route::get('/{id}/opening-stock', [ProductApiController::class, 'getOpeningStock'])->name('opening-stock.get');
         Route::post('/{id}/opening-stock', [ProductApiController::class, 'saveOpeningStock'])->name('opening-stock.save');
     });
@@ -89,6 +94,8 @@ Route::prefix('api/inventory')->name('api.inventory.')->group(function () {
         Route::get('/', [BatchApiController::class, 'index'])->name('index');
         Route::post('/', [BatchApiController::class, 'store'])->name('store');
         Route::get('/{id}', [BatchApiController::class, 'show'])->name('show');
+        Route::match(['put', 'patch'], '/{id}', [BatchApiController::class, 'update'])->name('update');
+        Route::delete('/{id}', [BatchApiController::class, 'destroy'])->name('destroy');
     });
 
     // Serial Number Tracking APIs
@@ -97,6 +104,8 @@ Route::prefix('api/inventory')->name('api.inventory.')->group(function () {
         Route::get('/', [SerialNumberApiController::class, 'index'])->name('index');
         Route::post('/', [SerialNumberApiController::class, 'store'])->name('store');
         Route::get('/{id}', [SerialNumberApiController::class, 'show'])->name('show');
+        Route::match(['put', 'patch'], '/{id}', [SerialNumberApiController::class, 'update'])->name('update');
+        Route::delete('/{id}', [SerialNumberApiController::class, 'destroy'])->name('destroy');
     });
 
     // Stock Ledger / Transaction Ledger APIs
@@ -111,6 +120,8 @@ Route::prefix('api/inventory')->name('api.inventory.')->group(function () {
         Route::post('/low-stock/create-pr', [InventoryReportApiController::class, 'createPrFromLowStock'])->name('low-stock.create-pr');
         Route::get('/valuation', [InventoryReportApiController::class, 'valuationReport'])->name('valuation');
         Route::get('/valuation/export', [InventoryReportApiController::class, 'exportValuationReport'])->name('valuation.export');
+        Route::get('/expiry', [InventoryReportApiController::class, 'expiryReport'])->name('expiry');
+        Route::get('/expiry/export', [InventoryReportApiController::class, 'exportExpiryReport'])->name('expiry.export');
     });
 
     // Stock Reservations APIs
@@ -131,6 +142,22 @@ Route::prefix('api/inventory')->name('api.inventory.')->group(function () {
         Route::get('/', [UomApiController::class, 'index'])->name('index');
         Route::post('/', [UomApiController::class, 'store'])->name('store');
         Route::post('/quick-create', [UomApiController::class, 'quickCreate'])->name('quick-create');
+    });
+
+    // Transporters APIs
+    Route::prefix('transporters')->name('transporters.')->group(function () {
+        Route::get('/', [TransporterApiController::class, 'index'])->name('index');
+        Route::post('/', [TransporterApiController::class, 'store'])->name('store');
+        Route::post('/quick-create', [TransporterApiController::class, 'quickCreate'])->name('quick-create');
+        Route::get('/{id}', [TransporterApiController::class, 'show'])->name('show');
+        Route::match(['put', 'patch'], '/{id}', [TransporterApiController::class, 'update'])->name('update');
+        Route::delete('/{id}', [TransporterApiController::class, 'destroy'])->name('destroy');
+    });
+
+    // MRP & Shortage Analysis APIs
+    Route::prefix('mrp-shortage')->name('mrp-shortage.')->group(function () {
+        Route::get('/calculate', [MrpShortageApiController::class, 'calculate'])->name('calculate');
+        Route::post('/generate-pr', [MrpShortageApiController::class, 'generatePr'])->name('generate-pr');
     });
 
     // Material Requirements (Warehouse Dispatch Slips & Pick/Pack/Dispatch)

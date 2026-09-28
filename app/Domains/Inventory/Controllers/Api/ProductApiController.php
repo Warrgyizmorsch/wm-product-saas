@@ -1454,4 +1454,219 @@ class ProductApiController extends Controller
             'data'    => $product->fresh(['uom']),
         ], 201);
     }
+
+    /**
+     * GET /api/inventory/products/{id}/warehouse-stocks
+     * Detailed warehouse-wise stock breakdown for a single product.
+     */
+    public function warehouseStocks(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $product = Product::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $warehouseStocks = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+            ->where('product_id', $product->id)
+            ->with(['warehouse:id,name,code,location,type'])
+            ->get();
+
+        $totalOnHand = 0.0;
+        $totalReserved = 0.0;
+        $totalAvailable = 0.0;
+        $breakdown = [];
+
+        foreach ($warehouseStocks as $stock) {
+            $onHand = (float)($stock->quantity ?? 0);
+            $reserved = (float)($stock->reserved_qty ?? 0);
+            $available = max(0.0, $onHand - $reserved);
+
+            $totalOnHand += $onHand;
+            $totalReserved += $reserved;
+            $totalAvailable += $available;
+
+            $breakdown[] = [
+                'warehouse_id'    => $stock->warehouse_id,
+                'warehouse_name'  => $stock->warehouse?->name ?? 'Unknown',
+                'warehouse_code'  => $stock->warehouse?->code ?? '',
+                'warehouse_type'  => $stock->warehouse?->type ?? '',
+                'location'        => $stock->warehouse?->location ?? '',
+                'quantity'        => $onHand,
+                'reserved_qty'    => $reserved,
+                'available_qty'   => $available,
+                'unit_cost'       => (float)($stock->unit_cost ?? $product->cost_price ?? 0),
+                'stock_value'     => $onHand * (float)($stock->unit_cost ?? $product->cost_price ?? 0),
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'product' => [
+                'id'            => $product->id,
+                'name'          => $product->name,
+                'sku'           => $product->sku,
+                'barcode'       => $product->barcode,
+                'total_on_hand' => $totalOnHand,
+                'total_reserved'=> $totalReserved,
+                'net_available' => $totalAvailable,
+                'reorder_point' => (float)($product->reorder_point ?? 0),
+            ],
+            'data' => $breakdown,
+        ]);
+    }
+
+    /**
+     * GET /api/inventory/products/download-sample
+     * Download sample CSV template for bulk product import.
+     */
+    public function downloadSample()
+    {
+        $headers = [
+            'name',
+            'sku',
+            'item_type',
+            'type',
+            'barcode',
+            'hsn_sac',
+            'selling_price',
+            'cost_price',
+            'gst_rate',
+            'reorder_point',
+            'uom',
+            'category',
+            'brand',
+            'description',
+        ];
+
+        $sampleRow = [
+            'Industrial Bearing 6205',
+            'BRG-6205',
+            'Goods',
+            'finished_good',
+            '8901234567890',
+            '84821010',
+            '450.00',
+            '280.00',
+            '18.00',
+            '25',
+            'PCS',
+            'Bearings',
+            'SKF',
+            'Deep groove ball bearing 25x52x15mm',
+        ];
+
+        $fileName = 'Product_Import_Sample_' . date('Y-m-d') . '.csv';
+
+        return response()->streamDownload(function () use ($headers, $sampleRow) {
+            $handle = fopen('php://output', 'w');
+            fputs($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, $headers);
+            fputcsv($handle, $sampleRow);
+            fclose($handle);
+        }, $fileName, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+        ]);
+    }
+
+    /**
+     * POST /api/inventory/products/import
+     * Bulk import products via CSV/Excel file or structured JSON rows.
+     */
+    public function import(Request $request): JsonResponse
+    {
+        [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
+
+        if ($request->hasFile('file')) {
+            $validator = Validator::make($request->all(), [
+                'file' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation error',
+                    'errors'  => $validator->errors(),
+                ], 422);
+            }
+
+            $file = $request->file('file');
+            $path = $file->getRealPath();
+            $rows = array_map('str_getcsv', file($path));
+
+            if (empty($rows) || count($rows) < 2) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The uploaded file is empty or missing data rows.',
+                ], 422);
+            }
+
+            $headers = array_map('trim', array_map('strtolower', array_shift($rows)));
+
+            $createdCount = 0;
+            $updatedCount = 0;
+            $errors = [];
+
+            foreach ($rows as $index => $row) {
+                if (count($row) < 2 || empty(trim($row[0]))) continue;
+
+                $data = [];
+                foreach ($headers as $hIdx => $header) {
+                    $data[$header] = isset($row[$hIdx]) ? trim($row[$hIdx]) : null;
+                }
+
+                $name = $data['name'] ?? null;
+                $sku = $data['sku'] ?? null;
+
+                if (!$name || !$sku) {
+                    $errors[] = "Row " . ($index + 2) . ": Product Name and SKU are required.";
+                    continue;
+                }
+
+                $existing = Product::where('tenant_id', $tenantId)->where('sku', $sku)->first();
+
+                $productPayload = [
+                    'tenant_id'       => $tenantId,
+                    'company_id'      => $companyId,
+                    'branch_id'       => $branchId,
+                    'name'            => $name,
+                    'sku'             => $sku,
+                    'barcode'         => $data['barcode'] ?? null,
+                    'hsn_sac'         => $data['hsn_sac'] ?? null,
+                    'item_type'       => $data['item_type'] ?? 'Goods',
+                    'type'            => $data['type'] ?? 'finished_good',
+                    'selling_price'   => (float)($data['selling_price'] ?? 0),
+                    'cost_price'      => (float)($data['cost_price'] ?? 0),
+                    'unit_cost'       => (float)($data['cost_price'] ?? 0),
+                    'gst_rate'        => (float)($data['gst_rate'] ?? 18.0),
+                    'reorder_point'   => (float)($data['reorder_point'] ?? 10),
+                    'category'        => $data['category'] ?? null,
+                    'brand'           => $data['brand'] ?? null,
+                    'description'     => $data['description'] ?? null,
+                    'status'          => 'active',
+                ];
+
+                if ($existing) {
+                    $existing->update($productPayload);
+                    $updatedCount++;
+                } else {
+                    Product::create($productPayload);
+                    $createdCount++;
+                }
+            }
+
+            return response()->json([
+                'success'       => true,
+                'message'       => "Bulk import completed: {$createdCount} created, {$updatedCount} updated.",
+                'total_created' => $createdCount,
+                'total_updated' => $updatedCount,
+                'errors'        => $errors,
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Please provide a valid CSV file using the multipart/form-data "file" field.',
+        ], 422);
+    }
 }
+
