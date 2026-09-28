@@ -25,59 +25,83 @@ class EWayBillService
         $distance = (int)($transportData['distance_km'] ?? 100);
         if ($distance <= 0) $distance = 100;
 
-        $apiUrl = config('services.ewaybill.api_url') ?: env('EWAYBILL_API_URL');
-        $clientId = config('services.ewaybill.client_id') ?: env('EWAYBILL_CLIENT_ID');
-        $clientSecret = config('services.ewaybill.client_secret') ?: env('EWAYBILL_CLIENT_SECRET');
-        $authToken = config('services.ewaybill.auth_token') ?: env('EWAYBILL_AUTH_TOKEN');
+        $gstConfig = \App\Models\GstConfiguration::getForCurrentContext(
+            $invoice->company_id ?? null,
+            $invoice->branch_id ?? null
+        );
+
+        if (!$gstConfig || !$gstConfig->is_active) {
+            $errorMsg = 'No active GST / E-Way Bill API configuration found. Please setup your GSP credentials in Administration > GST & E-Invoice Setup.';
+            $invoice->update([
+                'eway_bill_status' => 'Failed',
+                'eway_bill_error'  => $errorMsg,
+            ]);
+            return [
+                'success' => false,
+                'message' => $errorMsg,
+            ];
+        }
+
+        $apiUrl = $gstConfig->api_base_url ?: (config('services.ewaybill.api_url') ?: env('EWAYBILL_API_URL'));
+        $clientId = $gstConfig->client_id ?: (config('services.ewaybill.client_id') ?: env('EWAYBILL_CLIENT_ID'));
+        $clientSecret = $gstConfig->client_secret ?: (config('services.ewaybill.client_secret') ?: env('EWAYBILL_CLIENT_SECRET'));
+        $authToken = $gstConfig->api_token ?: (config('services.ewaybill.auth_token') ?: env('EWAYBILL_AUTH_TOKEN'));
+
+        if (empty($apiUrl) || (empty($authToken) && (empty($clientId) || empty($clientSecret)))) {
+            $errorMsg = 'E-Way Bill API credentials (API URL, Token or Client ID/Secret) are missing in your GST Setup.';
+            $invoice->update([
+                'eway_bill_status' => 'Failed',
+                'eway_bill_error'  => $errorMsg,
+            ]);
+            return [
+                'success' => false,
+                'message' => $errorMsg,
+            ];
+        }
 
         $payload = $this->buildEWayBillPayload($invoice, $transportData);
 
-        if (!empty($apiUrl) && !empty($clientId)) {
-            try {
-                $response = Http::withHeaders([
-                    'client_id'     => $clientId,
-                    'client_secret' => $clientSecret,
-                    'auth_token'    => $authToken,
-                    'Content-Type'  => 'application/json',
-                ])->timeout(30)->post("{$apiUrl}/ewaybill/generate", $payload);
+        try {
+            $headers = [
+                'Content-Type' => 'application/json',
+                'Accept'       => 'application/json',
+            ];
+            if (!empty($authToken)) {
+                $headers['auth_token'] = $authToken;
+                $headers['Authorization'] = 'Bearer ' . $authToken;
+            }
+            if (!empty($clientId)) {
+                $headers['client_id'] = $clientId;
+                $headers['client_secret'] = $clientSecret;
+            }
 
-                if ($response->successful()) {
-                    $data = $response->json();
-                    return $this->recordSuccess($invoice, $transportData, $data);
-                } else {
-                    $errorMsg = $response->json('message') ?? $response->body() ?? 'E-Way Bill generation failed.';
-                    
-                    if (env('APP_ENV') !== 'production') {
-                        Log::info('E-Way Bill API non-200, simulating statutory Sandbox EWB: ' . substr($errorMsg, 0, 100));
-                        return $this->generateSandboxEWayBill($invoice, $transportData);
-                    }
+            $response = Http::withHeaders($headers)->timeout(30)->post("{$apiUrl}/ewaybill/generate", $payload);
 
-                    $invoice->update([
-                        'eway_bill_status' => 'Failed',
-                        'eway_bill_error'  => $errorMsg,
-                    ]);
-                    return [
-                        'success' => false,
-                        'message' => "E-Way Bill Generation Failed: {$errorMsg}",
-                    ];
-                }
-            } catch (\Exception $e) {
-                Log::error('EWayBillService API Exception: ' . $e->getMessage());
-                if (env('APP_ENV') !== 'production') {
-                    return $this->generateSandboxEWayBill($invoice, $transportData);
-                }
+            if ($response->successful()) {
+                $data = $response->json();
+                return $this->recordSuccess($invoice, $transportData, $data);
+            } else {
+                $errorMsg = $response->json('message') ?? $response->json('error') ?? $response->body() ?? 'E-Way Bill generation failed.';
                 $invoice->update([
                     'eway_bill_status' => 'Failed',
-                    'eway_bill_error'  => $e->getMessage(),
+                    'eway_bill_error'  => $errorMsg,
                 ]);
                 return [
                     'success' => false,
-                    'message' => 'API connection failed: ' . $e->getMessage(),
+                    'message' => "E-Way Bill Generation Failed: {$errorMsg}",
                 ];
             }
+        } catch (\Exception $e) {
+            Log::error('EWayBillService API Exception: ' . $e->getMessage());
+            $invoice->update([
+                'eway_bill_status' => 'Failed',
+                'eway_bill_error'  => $e->getMessage(),
+            ]);
+            return [
+                'success' => false,
+                'message' => 'API connection failed: ' . $e->getMessage(),
+            ];
         }
-
-        return $this->generateSandboxEWayBill($invoice, $transportData);
     }
 
     /**

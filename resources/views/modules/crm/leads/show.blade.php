@@ -86,10 +86,14 @@
                                 'lost' => 'bg-soft-danger text-danger',
                                 default => $presetSoftClasses[abs(crc32($statusKey)) % count($presetSoftClasses)],
                             };
+                            $statusDisplayName = \Illuminate\Support\Facades\Lang::has('crm.statuses.' . $statusKey) ? __('crm.statuses.' . $statusKey) : $statusKey;
                         @endphp
-                        <span class="badge {{ $statusClass }} px-2 py-0.5 fs-10 fw-semibold">{{ __('crm.statuses.' . $statusKey) ?? $statusKey }}</span>
+                        <span class="badge {{ $statusClass }} px-2 py-0.5 fs-10 fw-semibold">{{ $statusDisplayName }}</span>
                         @if($lead->segment && $lead->segment !== 'Select an Option')
-                            <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span>
+                            @php
+                                $segmentDisplayName = \Illuminate\Support\Facades\Lang::has('crm.segments.' . $lead->segment) ? __('crm.segments.' . $lead->segment) : $lead->segment;
+                            @endphp
+                            <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold">{{ $segmentDisplayName }}</span>
                         @endif
                     </div>
                     <!-- Tag Button -->
