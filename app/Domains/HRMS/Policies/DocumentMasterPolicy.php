@@ -13,25 +13,29 @@ class DocumentMasterPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
+        return $this->access->allows($user, 'hrms.document_templates.manage', ['tenant_id' => $user->tenant_id])
+            || $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $user->tenant_id]);
     }
 
     public function create(User $user): bool
     {
-        return $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
+        return $this->access->allows($user, 'hrms.document_templates.manage', ['tenant_id' => $user->tenant_id])
+            || $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $user->tenant_id]);
     }
 
     public function update(User $user, mixed $model = null): bool
     {
-        return $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
+        return $this->access->allows($user, 'hrms.document_templates.manage', ['tenant_id' => $user->tenant_id])
+            || $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $user->tenant_id]);
     }
 
     public function delete(User $user, mixed $model = null): bool
     {
-        return $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
+        return $this->access->allows($user, 'hrms.document_templates.manage', ['tenant_id' => $user->tenant_id])
+            || $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $user->tenant_id]);
     }
 }

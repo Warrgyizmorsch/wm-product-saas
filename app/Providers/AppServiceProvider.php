@@ -807,6 +807,11 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Document::class,
+            \App\Domains\HRMS\Policies\DocumentPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\HolidayCalendar::class,
             \App\Domains\HRMS\Policies\HolidayPolicy::class
         );

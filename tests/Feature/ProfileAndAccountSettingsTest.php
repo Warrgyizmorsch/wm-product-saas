@@ -99,6 +99,10 @@ class ProfileAndAccountSettingsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Jane Doe');
+        $response->assertSee('Exit & NOC');
+        $response->assertSee('PIP Plans');
+        $response->assertSee('Security & Password');
+        $response->assertSee('Activity & Sessions');
     }
 
     /** @test */

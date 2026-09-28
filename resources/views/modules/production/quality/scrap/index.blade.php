@@ -71,36 +71,69 @@
                     </thead>
                     <tbody>
                         @forelse($scraps as $sc)
+                            @php
+                                $scrapRecord = $sc->ncr_id ? \App\Domains\Production\Models\ProductionOrderScrap::where('ncr_id', $sc->ncr_id)->with('product.uom')->first() : null;
+                                $itemText = $scrapRecord?->product?->name ?? $sc->ncr?->order?->product?->name;
+                                $skuText = $scrapRecord?->product?->sku ?? $sc->ncr?->order?->product?->sku;
+                            @endphp
                             <tr>
                                 <td class="font-monospace fw-bold text-dark">#{{ $sc->id }}</td>
-                                <td class="text-capitalize text-dark fw-medium">{{ str_replace('_', ' ', $sc->category) }}</td>
+                                <td class="text-capitalize text-dark fw-medium">
+                                    <span class="badge {{ $sc->category === 'finished_good' ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-light text-dark border' }}">
+                                        {{ str_replace('_', ' ', $sc->category) }}
+                                    </span>
+                                </td>
                                 <td>
                                     @if($sc->ncr && $sc->ncr->order)
                                         <div class="d-flex flex-column">
                                             <a href="{{ route('production.orders.show', $sc->ncr->order->id) }}" class="fw-bold text-primary">
                                                 {{ $sc->ncr->order->order_number }}
                                             </a>
-                                            @if($sc->ncr->order->product)
-                                                <span class="text-muted fs-11 text-truncate" style="max-width: 180px;">
-                                                    {{ $sc->ncr->order->product->name }}
+                                            @if($itemText)
+                                                <span class="text-dark fw-semibold fs-11 text-truncate" style="max-width: 200px;" title="{{ $itemText }}">
+                                                    {{ $itemText }}
                                                 </span>
+                                            @endif
+                                            @if($skuText)
+                                                <span class="text-muted font-monospace fs-10">{{ $skuText }}</span>
                                             @endif
                                         </div>
                                     @else
                                         <span class="text-muted">—</span>
                                     @endif
                                 </td>
-                                <td class="text-capitalize text-muted">{{ str_replace('_', ' ', $sc->reason_code) }}</td>
-                                <td class="text-end fw-bold text-dark">{{ number_format($sc->quantity, 2) }}</td>
+                                <td>
+                                    <div class="text-capitalize text-dark fw-semibold">{{ str_replace('_', ' ', $sc->reason_code) }}</div>
+                                    @if($scrapRecord?->reason && $scrapRecord->reason !== $sc->reason_code)
+                                        <div class="text-muted fs-11 text-truncate" style="max-width: 150px;" title="{{ $scrapRecord->reason }}">{{ $scrapRecord->reason }}</div>
+                                    @endif
+                                </td>
+                                <td class="text-end">
+                                    @if($scrapRecord && $scrapRecord->measurement_type === 'linear' && $scrapRecord->length)
+                                        <div class="fw-bold text-danger">{{ number_format($scrapRecord->length, 1) }} mm</div>
+                                        <div class="text-muted fs-10 font-monospace">{{ number_format($sc->quantity, 2) }} {{ $scrapRecord->product?->uom?->code ?? 'MTR' }}</div>
+                                    @elseif($scrapRecord && $scrapRecord->measurement_type === 'sheet' && $scrapRecord->length)
+                                        <div class="fw-bold text-danger">{{ number_format($scrapRecord->length, 0) }} &times; {{ number_format($scrapRecord->width, 0) }} mm</div>
+                                        <div class="text-muted fs-10 font-monospace">{{ number_format($sc->quantity, 2) }} {{ $scrapRecord->product?->uom?->code ?? 'SQM' }}</div>
+                                    @elseif($scrapRecord && $scrapRecord->measurement_type === 'weight' && $scrapRecord->weight)
+                                        <div class="fw-bold text-danger">{{ number_format($scrapRecord->weight, 3) }} {{ $scrapRecord->weight_unit ?? 'kg' }}</div>
+                                        <div class="text-muted fs-10 font-monospace">{{ number_format($sc->quantity, 2) }} {{ $scrapRecord->product?->uom?->code ?? 'KG' }}</div>
+                                    @else
+                                        <div class="fw-bold text-dark">{{ number_format($sc->quantity, 2) }}</div>
+                                        @if($scrapRecord?->product?->uom)
+                                            <div class="text-muted fs-10 font-monospace">{{ $scrapRecord->product->uom->code }}</div>
+                                        @endif
+                                    @endif
+                                </td>
                                 <td class="text-end text-danger fw-bold">{{ format_currency($sc->cost) }}</td>
 
                                 <td>
                                     @if($sc->status === 'approved')
-                                        <span class="erp-badge-active">{{ __('production.approved') }}</span>
+                                        <span class="badge bg-success text-white">{{ __('production.approved') }}</span>
                                     @elseif($sc->status === 'pending_approval')
-                                        <span class="erp-badge-pending">{{ __('production.pending') }}</span>
+                                        <span class="badge bg-warning text-dark">{{ __('production.pending') }}</span>
                                     @else
-                                        <span class="erp-badge-draft text-uppercase">{{ $sc->status }}</span>
+                                        <span class="badge bg-secondary text-white text-uppercase">{{ $sc->status }}</span>
                                     @endif
                                 </td>
                                 <td class="text-end">

@@ -17,6 +17,7 @@ use App\Domains\Sales\Controllers\MaterialRequestController;
 use App\Domains\Sales\Controllers\DispatchOrderController;
 use App\Domains\Production\Controllers\MrpShortageController;
 use App\Domains\Inventory\Controllers\SupplyChainDashboardController;
+use App\Domains\Inventory\Controllers\RemnantController;
 
 Route::get('supply-chain/dashboard', [SupplyChainDashboardController::class, 'index'])->name('supply-chain.dashboard');
 
@@ -30,12 +31,15 @@ Route::prefix('inventory')
         Route::get('products/barcode-lookup', [ProductController::class, 'barcodeLookup'])->name('products.barcodeLookup');
         Route::get('products/stock-check', [ProductController::class, 'stockCheck'])->name('products.stockCheck');
         Route::post('products/import', [ProductController::class, 'import'])->name('products.import');
+        Route::post('products/import/parse', [ProductController::class, 'parseImportFile'])->name('products.import.parse');
+        Route::post('products/import/process', [ProductController::class, 'processMappedImport'])->name('products.import.process');
         Route::get('products/export', [ProductController::class, 'export'])->name('products.export');
         Route::post('products', [ProductController::class, 'store'])->name('products.store');
         Route::get('products/{product}', [ProductController::class, 'show'])->name('products.show');
         Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
         Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+        Route::post('products/{product}/toggle-status', [ProductController::class, 'toggleStatus'])->name('products.toggle-status');
         Route::get('products/{product}/opening-stock', [ProductController::class, 'openingStock'])->name('products.opening-stock');
         Route::post('products/{product}/opening-stock', [ProductController::class, 'saveOpeningStock'])->name('products.opening-stock.save');
 
@@ -50,6 +54,13 @@ Route::prefix('inventory')
         Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
         Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update'])->name('warehouses.update');
         Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->name('warehouses.destroy');
+
+        // Remnants / Offcuts
+        Route::get('remnants', [RemnantController::class, 'index'])->name('remnants.index');
+        Route::get('remnants/{remnant}', [RemnantController::class, 'show'])->name('remnants.show');
+        Route::post('remnants/{remnant}/confirm', [RemnantController::class, 'confirm'])->name('remnants.confirm');
+        Route::post('remnants/{remnant}/split', [RemnantController::class, 'split'])->name('remnants.split');
+        Route::post('remnants/{remnant}/scrap', [RemnantController::class, 'scrap'])->name('remnants.scrap');
 
         // Stock Transfers
         Route::get('transfers/export', [StockTransferController::class, 'export'])->name('transfers.export');

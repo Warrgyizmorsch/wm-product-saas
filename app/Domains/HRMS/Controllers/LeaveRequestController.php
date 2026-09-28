@@ -422,6 +422,31 @@ class LeaveRequestController extends Controller
 
         return app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class)->canApprove($user, $leaveRequest->employee, $leaveRequest);
     }
+
+    public function destroy(Request $request, LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $leaveRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+            if ($leaveRequest->status !== 'pending') {
+                return redirect()->back()->with('error', 'Only pending applications can be deleted.');
+            }
+        }
+
+        // If it was approved or cancellation was requested, restore leave balance before deletion
+        if (in_array($leaveRequest->status, ['approved', 'cancellation_requested'])) {
+            $this->leaveRequestRepository->cancelLeaveRequest($leaveRequest);
+        }
+
+        $leaveRequest->delete();
+
+        return redirect()->back()->with('success', 'Leave application deleted successfully.');
+    }
 }
 
 

@@ -20,7 +20,29 @@ class ProductionSettingsController extends Controller
             'settings' => $settings,
             'currentWorkflow' => $settings['subcontract_procurement_workflow'] ?? 'manual_pr_po',
             'autoApprovalLimit' => $settings['subcontract_auto_approval_limit'] ?? 10000.00,
+            'remnantReleasePolicy' => $settings['remnant_release_policy'] ?? 'immediate',
         ]);
+    }
+
+    public function updateRemnantPolicy(Request $request): RedirectResponse
+    {
+        \Illuminate\Support\Facades\Gate::authorize('create', \App\Domains\Production\Models\WorkCenter::class);
+        $validated = $request->validate([
+            'remnant_release_policy' => 'required|in:immediate,require_approval',
+        ]);
+
+        $tenant = tenant();
+        if (!$tenant) {
+            return redirect()->back()->with('error', 'Tenant context not found.');
+        }
+
+        $currentSettings = is_array($tenant->settings) ? $tenant->settings : [];
+        $currentSettings['remnant_release_policy'] = $validated['remnant_release_policy'];
+
+        $tenant->update(['settings' => $currentSettings]);
+
+        return redirect()->route('production.settings.index')
+            ->with('success', 'Remnant release policy updated successfully.');
     }
 
     public function updateSubcontract(Request $request): RedirectResponse

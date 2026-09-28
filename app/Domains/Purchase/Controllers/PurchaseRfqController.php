@@ -15,6 +15,7 @@ use App\Domains\Purchase\Models\PurchaseOrderItem;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Platform\Models\PaymentTerm;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Exports\PurchaseRfqExport;
@@ -229,8 +230,9 @@ class PurchaseRfqController extends Controller
         $rfq = $this->rfqRepo->findWithDetails($id);
         $this->authorize('view', $rfq);
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
+        $paymentTerms = PaymentTerm::where('is_active', true)->orderBy('due_days')->get();
 
-        return view('modules.purchase.rfqs.show', compact('rfq', 'warehouses'));
+        return view('modules.purchase.rfqs.show', compact('rfq', 'warehouses', 'paymentTerms'));
     }
 
     public function edit(int $id)
@@ -655,7 +657,18 @@ class PurchaseRfqController extends Controller
         $vendor = $rfqVendor->vendor;
         $existingRates = $rfqVendor->rates->keyBy('product_id');
 
-        return view('modules.purchase.rfqs.portal', compact('rfqVendor', 'rfq', 'vendor', 'existingRates'));
+        $tenantId = $rfqVendor->tenant_id ?? $rfq?->tenant_id;
+        $paymentTerms = PaymentTerm::withoutGlobalScopes()
+            ->where('is_active', true)
+            ->where(function ($q) use ($tenantId) {
+                if ($tenantId) {
+                    $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+                }
+            })
+            ->orderBy('due_days')
+            ->get();
+
+        return view('modules.purchase.rfqs.portal', compact('rfqVendor', 'rfq', 'vendor', 'existingRates', 'paymentTerms'));
     }
 
     public function submitPortal(Request $request, string $token)

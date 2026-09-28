@@ -265,7 +265,7 @@
                                         <a href="{{ route('hrms.employees.show', $emp->id) }}" class="fw-bold text-dark text-decoration-none d-block">
                                             {{ $emp->full_name }}
                                         </a>
-                                        <span class="text-muted fs-12">{{ $emp->employee_id }} &bull; {{ $emp->personal_email ?: 'No email' }}</span>
+                                        <span class="text-muted fs-12">{{ $emp->employee_id }} &bull; {{ $emp->office_email ?: ($emp->user?->email ?: ($emp->personal_email ?: 'No email')) }}</span>
                                     </div>
                                 </div>
                             </td>

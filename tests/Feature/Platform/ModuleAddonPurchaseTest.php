@@ -8,6 +8,7 @@ use App\Domains\Platform\Models\Plan;
 use App\Domains\Platform\Models\PlatformSetting;
 use App\Domains\Platform\Models\SubscriptionPayment;
 use App\Domains\Platform\Models\TenantModule;
+use App\Domains\Platform\Models\TenantSubscription;
 use App\Domains\Platform\Services\PaymentGatewayManager;
 use App\Domains\Platform\Services\SubscriptionPaymentService;
 use App\Models\Access\Role;
@@ -320,5 +321,20 @@ class FakeModuleGateway implements PaymentGateway
     public function resolveSubscriptionWebhook(Request $request): ?array
     {
         return null;
+    }
+
+    public function createChangeCheckout(Tenant $tenant, TenantSubscription $subscription, int $amountInSmallestUnit): array
+    {
+        throw new \LogicException('Not used.');
+    }
+
+    public function scheduleSubscriptionChange(TenantSubscription $subscription, int $perSeatTotal, int $seats): string
+    {
+        throw new \LogicException('Not used.');
+    }
+
+    public function cancelScheduledSubscriptionChange(TenantSubscription $subscription): void
+    {
+        throw new \LogicException('Not used.');
     }
 }

@@ -49,6 +49,7 @@ class AssetModuleController extends Controller
 
         // 1. Asset Requests Query (with search, sort, and filters)
         $requestsQuery = AssetRequest::with(['employee', 'category', 'item', 'allocatedAsset']);
+        \App\Domains\HRMS\Services\HrmsScopeService::applyEmployeeScope($requestsQuery, auth()->user(), 'employee_id');
 
         if ($requestSearch = $request->input('request_search')) {
             $requestsQuery->where(function($q) use ($requestSearch) {
@@ -84,7 +85,7 @@ class AssetModuleController extends Controller
         }
 
         $requests = $requestsQuery->paginate(10, ['*'], 'request_page')->withQueryString();
-        $pendingRequestsCount = AssetRequest::whereIn('status', ['pending', 'partially_allocated'])->count();
+        $pendingRequestsCount = (clone $requestsQuery)->whereIn('status', ['pending', 'partially_allocated'])->count();
 
         // 2. Active Custodians Query (with search and filters)
         $employeesWithAllocationsQuery = Employee::whereHas('allocations', function($q) {
@@ -92,6 +93,7 @@ class AssetModuleController extends Controller
         })->with(['company', 'allocations' => function($q) {
             $q->whereNull('returned_at')->with(['asset.category', 'asset.item']);
         }]);
+        \App\Domains\HRMS\Services\HrmsScopeService::applyEmployeeScope($employeesWithAllocationsQuery, auth()->user(), 'id');
 
         if ($historySearch = $request->input('history_search')) {
             $employeesWithAllocationsQuery->where(function ($q) use ($historySearch) {

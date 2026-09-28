@@ -103,9 +103,14 @@ class ProductionMaterialService
             $this->assertWarehouseActive($warehouseId, $res->tenant_id);
 
             if ($quantity > (float) $res->quantity_reserved) {
-                throw new InvalidArgumentException(
-                    "Cannot issue more than reserved quantity ({$res->quantity_reserved}). Refresh MRP or reserve stock first."
-                );
+                if ((float) $res->quantity_reserved == 0 && $quantity <= (float) $res->quantity_planned) {
+                    $this->reserveMaterial($reservationId, $quantity);
+                    $res->refresh();
+                } else {
+                    throw new InvalidArgumentException(
+                        "Cannot issue more than reserved quantity ({$res->quantity_reserved}). Refresh MRP or reserve stock first."
+                    );
+                }
             }
 
             // Correction #14: Validate lot/batch eligibility before issuing

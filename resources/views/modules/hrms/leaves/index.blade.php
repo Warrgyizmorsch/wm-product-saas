@@ -21,6 +21,72 @@
     </div>
 @endsection
 
+@push('styles')
+    <style>
+        /* Action Status Dropdown Styling (matching Shift & Overtime module) */
+        .btn-status-dropdown {
+            background-color: #7c6f6c !important;
+            color: #ffffff !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            height: 36px !important;
+            border-radius: 8px !important;
+            width: 120px !important;
+            border: none !important;
+            padding: 0 12px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+        }
+        .btn-status-dropdown:hover,
+        .btn-status-dropdown:focus,
+        .btn-status-dropdown:active {
+            background-color: #6a5e5a !important;
+            color: #ffffff !important;
+        }
+        .btn-status-dropdown::after {
+            display: inline-block;
+            margin-left: 8px;
+            vertical-align: 0.255em;
+            content: "";
+            border-top: 0.3em solid;
+            border-right: 0.3em solid transparent;
+            border-bottom: 0;
+            border-left: 0.3em solid transparent;
+            color: #ffffff !important;
+        }
+
+        .status-dropdown-menu {
+            min-width: 120px !important;
+            width: 120px !important;
+            border-radius: 8px !important;
+            border: none !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+            padding: 6px !important;
+            background: #ffffff !important;
+        }
+        .status-dropdown-menu .dropdown-item {
+            text-align: center !important;
+            font-size: 13px !important;
+            font-weight: 500 !important;
+            padding: 8px 12px !important;
+            border-radius: 6px !important;
+            color: #1e293b !important;
+            background: transparent !important;
+            transition: all 0.2s ease;
+        }
+        .status-dropdown-menu .dropdown-item:hover {
+            background-color: #f8fafc !important;
+            color: #1e293b !important;
+        }
+        .status-dropdown-menu .dropdown-item.active-status {
+            background-color: #f1f5f9 !important;
+            color: #1e293b !important;
+            font-weight: 700 !important;
+        }
+    </style>
+@endpush
+
 @php
     $formatLeaveRulePoints = static function (?array $rules): array {
         if (empty($rules)) {
@@ -1369,7 +1435,7 @@
                         </div>
                         
                         <div>
-                            <div class="table-responsive">
+                            <div class="table-responsive" style="overflow: visible;">
                                 <table class="table table-hover align-middle mb-0" id="leavesTable">
                                     <thead class="table-light">
                                         <tr>
@@ -1511,25 +1577,25 @@
 
                                                          @if($isAdmin && $req->status !== 'cancelled')
                                                              {{-- Status Dropdown --}}
-                                                             <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
-                                                                 <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 120px; border: none;" title="Change Status">
+                                                             <div class="dropdown d-inline-block position-relative">
+                                                                 <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Change Status">
                                                                      <span>{{ $statusBadge['lbl'] }}</span>
                                                                  </button>
-                                                                 <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 130px; border-radius: 8px; left: auto; right: 0; background: #ffffff; z-index: 1050;">
+                                                                 <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu shadow" style="z-index: 1060;">
                                                                      @if($req->status === 'cancellation_requested')
                                                                          <li>
                                                                              <form action="{{ route('hrms.leaves.approve-cancellation', $req->id) }}" method="POST">
                                                                                  @csrf
-                                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-success fw-medium d-flex align-items-center justify-content-between">
-                                                                                     <span>Approve Cancellation</span>
+                                                                                 <button type="submit" class="dropdown-item text-success fw-medium">
+                                                                                     {{ __('hrms.leave.app.status_approved') }}
                                                                                  </button>
                                                                              </form>
                                                                          </li>
                                                                          <li>
                                                                              <form action="{{ route('hrms.leaves.deny-cancellation', $req->id) }}" method="POST">
                                                                                  @csrf
-                                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-danger fw-medium d-flex align-items-center justify-content-between">
-                                                                                     <span>Deny Cancellation</span>
+                                                                                 <button type="submit" class="dropdown-item text-danger fw-medium">
+                                                                                     {{ __('hrms.leave.app.status_rejected') }}
                                                                                  </button>
                                                                              </form>
                                                                          </li>
@@ -1548,8 +1614,8 @@
                                                                                  <form action="{{ route('hrms.leaves.update-status', $req->id) }}" method="POST">
                                                                                      @csrf
                                                                                      <input type="hidden" name="action" value="{{ $actionKey }}">
-                                                                                     <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === $actionKey ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $req->status === $actionKey ? 'color: var(--bs-primary) !important;' : '' }}">
-                                                                                         <span>{{ $actionLabel }}</span>
+                                                                                     <button type="submit" class="dropdown-item {{ $req->status === $actionKey ? 'active-status' : '' }}">
+                                                                                         {{ $actionLabel }}
                                                                                      </button>
                                                                                  </form>
                                                                              </li>
@@ -1560,7 +1626,17 @@
                                                          @endif
 
                                                          {{-- Unified Withdraw / Cancellation Delete button --}}
-                                                         @if($req->canWithdraw())
+                                                         @if($isAdmin)
+                                                             <form method="POST" action="{{ route('hrms.leaves.destroy', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this leave application?', { title: 'Delete Leave Application', variant: 'danger', confirmButtonText: 'Delete' })" class="d-inline">
+                                                                 @csrf
+                                                                 @method('DELETE')
+                                                                 <button type="submit" class="btn btn-sm btn-soft-danger border" 
+                                                                         title="Delete Application"
+                                                                         style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                                     <i class="feather-trash-2 fs-14"></i>
+                                                                 </button>
+                                                             </form>
+                                                         @elseif($req->canWithdraw())
                                                              <form method="POST" action="{{ route('hrms.leaves.withdraw', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Withdraw this leave application?', { title: 'Withdraw Leave Application', variant: 'warning', confirmButtonText: 'Withdraw' })" class="d-inline">
                                                                  @csrf
                                                                  <button type="submit" class="btn btn-sm btn-soft-danger border" 
@@ -1810,7 +1886,7 @@
                         </div>
 
                         <div>
-                            <div class="table-responsive">
+                            <div class="table-responsive" style="overflow: visible;">
                                 <table class="table table-hover align-middle mb-0">
                                     <thead class="table-light">
                                         <tr>
@@ -1864,24 +1940,24 @@
                                                 </td>
                                                 @if($isAdmin)
                                                     <td class="text-end pe-3" style="white-space: nowrap;">
-                                                        <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
-                                                            <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;" title="Change Status">
+                                                        <div class="dropdown d-inline-block position-relative">
+                                                            <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Change Status">
                                                                 <span>{{ $enc->status === 'approved' ? __('hrms.leave.app.status_approved') : ($enc->status === 'rejected' ? __('hrms.leave.app.status_rejected') : __('hrms.leave.app.status_pending')) }}</span>
                                                             </button>
-                                                            <ul class="dropdown-menu dropdown-menu-start shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 100%; width: 100%; border-radius: 8px; left: 0; background: #ffffff;">
+                                                            <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu shadow" style="z-index: 1060;">
                                                                 <li>
                                                                     <form action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" method="POST">
                                                                         @csrf
-                                                                        <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'approved' ? 'color: var(--bs-primary) !important;' : '' }}">
-                                                                            <span>{{ __('hrms.leave.app.status_approved') }}</span>
+                                                                        <button type="submit" class="dropdown-item {{ $enc->status === 'approved' ? 'active-status' : '' }}">
+                                                                            {{ __('hrms.leave.app.status_approved') }}
                                                                         </button>
                                                                     </form>
                                                                 </li>
                                                                 <li>
                                                                     <form action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" method="POST">
                                                                         @csrf
-                                                                        <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'rejected' ? 'color: var(--bs-primary) !important;' : '' }}">
-                                                                            <span>{{ __('hrms.leave.app.status_rejected') }}</span>
+                                                                        <button type="submit" class="dropdown-item {{ $enc->status === 'rejected' ? 'active-status' : '' }}">
+                                                                            {{ __('hrms.leave.app.status_rejected') }}
                                                                         </button>
                                                                     </form>
                                                                 </li>

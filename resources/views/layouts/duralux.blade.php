@@ -646,6 +646,53 @@
         });
     </script>
 
+    {{-- Google Workspace / Calendar Sync Warning Modal (Appears only on sync error / missing auth) --}}
+    @if(session('google_sync_warning'))
+        <x-ui.modal 
+            id="googleSyncWarningModal" 
+            :title="'<i class=\'feather-alert-triangle text-warning me-2 fs-18\'></i>Google Calendar & Meet Sync Notice'" 
+            size="md" 
+            :centered="true"
+            :showFooter="true"
+        >
+            <div class="text-center py-2">
+                <div class="rounded-circle d-inline-flex align-items-center justify-content-center bg-soft-warning text-warning mb-3" style="width: 56px; height: 56px;">
+                    <i class="feather-video" style="font-size: 28px;"></i>
+                </div>
+                <h5 class="fw-bold text-dark mb-2">Activity Saved in CRM (Google Sync Notice)</h5>
+                <div class="text-start bg-light p-3 rounded-2 border mb-3">
+                    <div class="fw-semibold text-danger fs-13 mb-1">
+                        <i class="feather-info me-1"></i> {{ session('google_sync_warning') }}
+                    </div>
+                    <div class="text-muted fs-12">
+                        Your CRM activity is saved. However, live Google Meet conference link and calendar invite could not be created until your Google Workspace account is connected.
+                    </div>
+                </div>
+            </div>
+
+            <x-slot name="footer">
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">Close</button>
+                    @if(session('google_auth_url'))
+                        <a href="{{ session('google_auth_url') }}" class="btn btn-sm btn-primary px-3 shadow-sm">
+                            <i class="feather-link me-1"></i> Connect Google Account
+                        </a>
+                    @endif
+                </div>
+            </x-slot>
+        </x-ui.modal>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var modalEl = document.getElementById('googleSyncWarningModal');
+                if (modalEl && typeof bootstrap !== 'undefined') {
+                    var m = new bootstrap.Modal(modalEl);
+                    m.show();
+                }
+            });
+        </script>
+    @endif
+
     <script src="{{ asset('assets/js/dynamic-geography.js') }}"></script>
     @stack('scripts')
 </body>

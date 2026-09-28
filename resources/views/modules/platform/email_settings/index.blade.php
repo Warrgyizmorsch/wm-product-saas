@@ -239,7 +239,7 @@
             btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Testing...');
 
             $.ajax({
-                url: "/platform/email-settings/" + accId + "/test",
+                url: "{{ url('platform/email-settings') }}/" + accId + "/test",
                 method: "POST",
                 data: {
                     _token: "{{ csrf_token() }}"

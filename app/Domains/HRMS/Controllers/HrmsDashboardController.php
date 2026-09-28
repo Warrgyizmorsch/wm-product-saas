@@ -41,21 +41,7 @@ class HrmsDashboardController extends Controller
         $now = Carbon::now();
 
         // 1. Resolve current logged-in employee context
-        $currentEmployee = null;
-        if (auth()->check()) {
-            $user = auth()->user();
-            $currentEmployee = Employee::where('tenant_id', $tenantId)
-                ->where(function ($q) use ($user) {
-                    if ($user->email) {
-                        $q->where('office_email', $user->email)
-                          ->orWhere('personal_email', $user->email);
-                    }
-                })
-                ->first();
-        }
-        if (!$currentEmployee) {
-            $currentEmployee = Employee::where('tenant_id', $tenantId)->first();
-        }
+        $currentEmployee = $this->resolveCurrentEmployee(auth()->user(), $tenantId);
 
         // 2. Workforce Overview Metrics
         $totalEmployees = Employee::where('tenant_id', $tenantId)->count();
@@ -171,6 +157,23 @@ class HrmsDashboardController extends Controller
                 }
             }
 
+            // Calculate Profile & KYC Completion %
+            $fields = [
+                $currentEmployee->full_name,
+                $currentEmployee->office_email,
+                $currentEmployee->phone_number,
+                $currentEmployee->date_of_birth,
+                $currentEmployee->pan_card_number,
+                $currentEmployee->aadhaar_card_number,
+                $currentEmployee->bank_name,
+                $currentEmployee->account_number,
+                $currentEmployee->ifsc_code,
+                $currentEmployee->emergency_contact_phone ?? $currentEmployee->phone_number,
+            ];
+            $filled = count(array_filter($fields));
+            $profileCompletion = count($fields) > 0 ? round(($filled / count($fields)) * 100) : 100;
+        }
+
         // Resolve Assigned Leave Plan & Detailed Leave Types List
         $myAssignedPlan = null;
         if ($currentEmployee && $currentEmployee->leave_plan_id) {
@@ -275,7 +278,7 @@ class HrmsDashboardController extends Controller
                     'is_off' => false,
                 ];
             } else {
-                $isWeekend = ($dayDate->dayOfWeek === 0 || $dayDate->dayOfWeek === 6);
+                $isWeekend = ($dayDate->dayOfWeek === 0);
                 if ($isWeekend) {
                     $myWeeklyPattern[] = [
                         'day'    => $dayName,
@@ -292,51 +295,33 @@ class HrmsDashboardController extends Controller
             }
         }
 
-            // Calculate Profile & KYC Completion %
-            $fields = [
-                $currentEmployee->full_name,
-                $currentEmployee->office_email,
-                $currentEmployee->phone_number,
-                $currentEmployee->date_of_birth,
-                $currentEmployee->pan_card_number,
-                $currentEmployee->aadhaar_card_number,
-                $currentEmployee->bank_name,
-                $currentEmployee->account_number,
-                $currentEmployee->ifsc_code,
-                $currentEmployee->emergency_contact_phone ?? $currentEmployee->phone_number,
-            ];
-            $filled = count(array_filter($fields));
-            $profileCompletion = count($fields) > 0 ? round(($filled / count($fields)) * 100) : 100;
-        }
-
         // 5. Unified Action Center / Pending Inboxes (Leaves, WFH, Regularizations, Expenses)
-        $pendingLeaves = LeaveRequest::with(['employee.department', 'employee.designation', 'leaveType'])
-            ->where('tenant_id', $tenantId)
-            ->where('status', 'pending')
-            ->latest()
-            ->take(20)
-            ->get();
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $user = auth()->user();
 
-        $pendingWfh = WfhRequest::with(['employee.department', 'employee.designation'])
+        $pendingLeavesQuery = LeaveRequest::with(['employee.department', 'employee.designation', 'leaveType'])
             ->where('tenant_id', $tenantId)
-            ->where('status', 'pending')
-            ->latest()
-            ->take(20)
-            ->get();
+            ->where('status', 'pending');
+        $scopeService->applyRelatedScope($pendingLeavesQuery, $user);
+        $pendingLeaves = $pendingLeavesQuery->latest()->take(20)->get();
 
-        $pendingCorrections = AttendanceCorrection::with(['employee.department', 'attendance'])
+        $pendingWfhQuery = WfhRequest::with(['employee.department', 'employee.designation'])
             ->where('tenant_id', $tenantId)
-            ->where('status', 'pending')
-            ->latest()
-            ->take(20)
-            ->get();
+            ->where('status', 'pending');
+        $scopeService->applyRelatedScope($pendingWfhQuery, $user);
+        $pendingWfh = $pendingWfhQuery->latest()->take(20)->get();
 
-        $pendingExpenses = ExpenseReport::with(['employee.department'])
+        $pendingCorrectionsQuery = AttendanceCorrection::with(['employee.department', 'attendance'])
             ->where('tenant_id', $tenantId)
-            ->where('status', 'pending')
-            ->latest()
-            ->take(20)
-            ->get();
+            ->where('status', 'pending');
+        $scopeService->applyRelatedScope($pendingCorrectionsQuery, $user);
+        $pendingCorrections = $pendingCorrectionsQuery->latest()->take(20)->get();
+
+        $pendingExpensesQuery = ExpenseReport::with(['employee.department'])
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'pending');
+        $scopeService->applyRelatedScope($pendingExpensesQuery, $user);
+        $pendingExpenses = $pendingExpensesQuery->latest()->take(20)->get();
 
         $totalPendingApprovals = $pendingLeaves->count() + $pendingWfh->count() + $pendingCorrections->count() + $pendingExpenses->count();
 
@@ -409,10 +394,7 @@ class HrmsDashboardController extends Controller
             ->where('tenant_id', $tenantId)
             ->whereIn('status', ['late', 'half_day'])
             ->whereDate('date', '>=', $now->copy()->subDays(7));
-
-        if (!$isHrOrAdmin && $currentEmployee) {
-            $lateArrivalsQuery->where('employee_id', $currentEmployee->id);
-        }
+        $scopeService->applyRelatedScope($lateArrivalsQuery, $user);
 
         $recentLateArrivals = $lateArrivalsQuery
             ->orderBy('date', 'desc')
@@ -426,10 +408,7 @@ class HrmsDashboardController extends Controller
                   ->orWhere('status', 'pending')
                   ->orWhere('status', 'unprocessed');
             });
-
-        if (!$isHrOrAdmin && $currentEmployee) {
-            $penaltiesQuery->where('employee_id', $currentEmployee->id);
-        }
+        $scopeService->applyRelatedScope($penaltiesQuery, $user);
 
         $unprocessedPenalties = $penaltiesQuery
             ->orderBy('date', 'desc')
@@ -446,10 +425,7 @@ class HrmsDashboardController extends Controller
             ->where('tenant_id', $tenantId)
             ->where('status', 'approved')
             ->whereDate('end_date', '>=', $today);
-
-        if (!$isHrOrAdmin && $currentEmployee) {
-            $approvedLeavesQuery->where('employee_id', $currentEmployee->id);
-        }
+        $scopeService->applyRelatedScope($approvedLeavesQuery, $user);
 
         $approvedLeaves = $approvedLeavesQuery
             ->orderBy('start_date', 'asc')
@@ -496,6 +472,11 @@ class HrmsDashboardController extends Controller
         })->take(3)->values();
 
         $user = auth()->user();
+        $isHrOrAdmin = $user && (
+            app(\App\Services\Access\AccessService::class)->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
+            || app(\App\Services\Access\AccessService::class)->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         $activeView = $request->input('view', 'overview');
 
         $widgetQuery = array_filter([
@@ -554,23 +535,16 @@ class HrmsDashboardController extends Controller
         ]);
     }
 
+    private function resolveCurrentEmployee(?\App\Models\User $user, int $tenantId): ?Employee
+    {
+        return app(\App\Domains\HRMS\Services\HrmsScopeService::class)->resolveEmployee($user, $tenantId);
+    }
+
     public function getWebPunchData(?\App\Models\User $user, int $tenantId): array
     {
         $today = Carbon::today()->format('Y-m-d');
         $now = Carbon::now();
-        $currentEmployee = null;
-        if ($user) {
-            $currentEmployee = Employee::where('tenant_id', $tenantId)
-                ->where(function ($q) use ($user) {
-                    if ($user->email) {
-                        $q->where('office_email', $user->email)
-                          ->orWhere('personal_email', $user->email);
-                    }
-                })->first();
-        }
-        if (!$currentEmployee) {
-            $currentEmployee = Employee::where('tenant_id', $tenantId)->first();
-        }
+        $currentEmployee = $this->resolveCurrentEmployee($user, $tenantId);
 
         $myTodayAttendance = null;
         $recentPunches = [];
@@ -629,17 +603,27 @@ class HrmsDashboardController extends Controller
 
     public function getApprovalsData(?\App\Models\User $user, int $tenantId): array
     {
-        $pendingLeaves = LeaveRequest::with(['employee.department', 'employee.designation', 'leaveType'])
-            ->where('tenant_id', $tenantId)->where('status', 'pending')->latest()->take(10)->get();
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
 
-        $pendingWfh = WfhRequest::with(['employee.department', 'employee.designation'])
-            ->where('tenant_id', $tenantId)->where('status', 'pending')->latest()->take(10)->get();
+        $pendingLeavesQuery = LeaveRequest::with(['employee.department', 'employee.designation', 'leaveType'])
+            ->where('tenant_id', $tenantId)->where('status', 'pending');
+        $scopeService->applyRelatedScope($pendingLeavesQuery, $user);
+        $pendingLeaves = $pendingLeavesQuery->latest()->take(10)->get();
 
-        $pendingCorrections = AttendanceCorrection::with(['employee.department'])
-            ->where('tenant_id', $tenantId)->where('status', 'pending')->latest()->take(10)->get();
+        $pendingWfhQuery = WfhRequest::with(['employee.department', 'employee.designation'])
+            ->where('tenant_id', $tenantId)->where('status', 'pending');
+        $scopeService->applyRelatedScope($pendingWfhQuery, $user);
+        $pendingWfh = $pendingWfhQuery->latest()->take(10)->get();
 
-        $pendingExpenses = ExpenseReport::with(['employee.department'])
-            ->where('tenant_id', $tenantId)->where('status', 'pending')->latest()->take(10)->get();
+        $pendingCorrectionsQuery = AttendanceCorrection::with(['employee.department', 'attendance'])
+            ->where('tenant_id', $tenantId)->where('status', 'pending');
+        $scopeService->applyRelatedScope($pendingCorrectionsQuery, $user);
+        $pendingCorrections = $pendingCorrectionsQuery->latest()->take(10)->get();
+
+        $pendingExpensesQuery = ExpenseReport::with(['employee.department'])
+            ->where('tenant_id', $tenantId)->where('status', 'pending');
+        $scopeService->applyRelatedScope($pendingExpensesQuery, $user);
+        $pendingExpenses = $pendingExpensesQuery->latest()->take(10)->get();
 
         $totalPendingApprovals = $pendingLeaves->count() + $pendingWfh->count() + $pendingCorrections->count() + $pendingExpenses->count();
 
@@ -648,25 +632,13 @@ class HrmsDashboardController extends Controller
 
     public function getLeaveBalancesData(?\App\Models\User $user, int $tenantId): array
     {
-        $currentEmployee = null;
-        if ($user) {
-            $currentEmployee = Employee::where('tenant_id', $tenantId)
-                ->where(function ($q) use ($user) {
-                    if ($user->email) {
-                        $q->where('office_email', $user->email)
-                          ->orWhere('personal_email', $user->email);
-                    }
-                })->first();
-        }
-        if (!$currentEmployee) {
-            $currentEmployee = Employee::where('tenant_id', $tenantId)->first();
-        }
+        $currentEmployee = $this->resolveCurrentEmployee($user, $tenantId);
 
         $myAssignedPlan = null;
         if ($currentEmployee && $currentEmployee->leave_plan_id) {
             $myAssignedPlan = LeavePlan::with('types')->find($currentEmployee->leave_plan_id);
         }
-        if (!$myAssignedPlan) {
+        if (!$myAssignedPlan && $currentEmployee) {
             $myAssignedPlan = LeavePlan::where('tenant_id', $tenantId)->where('status', true)->with('types')->first();
         }
 
@@ -677,7 +649,7 @@ class HrmsDashboardController extends Controller
             $dbBalances = $currentEmployee ? LeaveBalance::where('tenant_id', $tenantId)->where('employee_id', $currentEmployee->id)->with('leaveType')->get() : collect();
             if ($dbBalances->isNotEmpty()) {
                 $planTypesCollection = $dbBalances->pluck('leaveType')->filter()->unique('id');
-            } else {
+            } elseif ($currentEmployee) {
                 $planTypesCollection = LeaveType::where('tenant_id', $tenantId)->where('status', true)->take(4)->get();
             }
         }
@@ -710,25 +682,13 @@ class HrmsDashboardController extends Controller
     {
         $today = Carbon::today()->format('Y-m-d');
         $now = Carbon::now();
-        $currentEmployee = null;
-        if ($user) {
-            $currentEmployee = Employee::where('tenant_id', $tenantId)
-                ->where(function ($q) use ($user) {
-                    if ($user->email) {
-                        $q->where('office_email', $user->email)
-                          ->orWhere('personal_email', $user->email);
-                    }
-                })->first();
-        }
-        if (!$currentEmployee) {
-            $currentEmployee = Employee::where('tenant_id', $tenantId)->first();
-        }
+        $currentEmployee = $this->resolveCurrentEmployee($user, $tenantId);
 
         $activeShift = $currentEmployee ? $currentEmployee->resolveShiftForDate($today) : null;
         $myShiftDetails = [
             'name' => $activeShift?->name ?: 'General Shift',
             'badge' => $activeShift?->code ?: 'Default',
-            'timing' => ($activeShift?->start_time ? Carbon::parse($activeShift->start_time)->format('H:i') : '09:00') . ' - ' . ($activeShift?->end_time ? Carbon::parse($activeShift->end_time)->format('H:i') : '18:00'),
+            'timing' => ($activeShift?->start_time ? Carbon::parse($activeShift->start_time)->format('h:i A') : '09:00 AM') . ' - ' . ($activeShift?->end_time ? Carbon::parse($activeShift->end_time)->format('h:i A') : '06:00 PM'),
             'overtime_status' => ($activeShift?->overtime_allowed ?? false) ? 'Allowed' : 'Not Allowed',
             'is_ot_allowed' => (bool) ($activeShift?->overtime_allowed ?? false),
         ];
@@ -737,11 +697,23 @@ class HrmsDashboardController extends Controller
         $startOfWeek = $now->copy()->startOfWeek(Carbon::SUNDAY);
         for ($i = 0; $i < 7; $i++) {
             $dayDate = $startOfWeek->copy()->addDays($i);
-            $isWeekend = ($dayDate->dayOfWeek === 0 || $dayDate->dayOfWeek === 6);
-            $myWeeklyPattern[] = [
-                'day' => $dayDate->format('D'),
-                'is_off' => $isWeekend,
-            ];
+            $dayDateStr = $dayDate->format('Y-m-d');
+            $dayShift = $currentEmployee ? $currentEmployee->resolveShiftForDate($dayDateStr) : null;
+
+            if ($dayShift) {
+                $myWeeklyPattern[] = [
+                    'day'    => $dayDate->format('D'),
+                    'status' => $dayShift->name,
+                    'is_off' => false,
+                ];
+            } else {
+                $isWeekend = ($dayDate->dayOfWeek === 0);
+                $myWeeklyPattern[] = [
+                    'day'    => $dayDate->format('D'),
+                    'status' => $isWeekend ? 'Day Off' : ($activeShift ? $activeShift->name : 'Day Shift'),
+                    'is_off' => $isWeekend,
+                ];
+            }
         }
 
         return compact('myShiftDetails', 'myWeeklyPattern');
@@ -749,16 +721,7 @@ class HrmsDashboardController extends Controller
 
     public function getBroadcastsData(?\App\Models\User $user, int $tenantId): array
     {
-        $currentEmployee = null;
-        if ($user) {
-            $currentEmployee = Employee::where('tenant_id', $tenantId)
-                ->where(function ($q) use ($user) {
-                    if ($user->email) {
-                        $q->where('office_email', $user->email)
-                          ->orWhere('personal_email', $user->email);
-                    }
-                })->first();
-        }
+        $currentEmployee = $this->resolveCurrentEmployee($user, $tenantId);
 
         $latestBroadcasts = Broadcast::with(['receipts', 'comments.employee'])
             ->where('tenant_id', $tenantId)
@@ -774,10 +737,14 @@ class HrmsDashboardController extends Controller
 
     public function getProbationData(?\App\Models\User $user, int $tenantId): array
     {
-        $upcomingProbationEmployees = Employee::with(['department'])
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $query = Employee::with(['department'])
             ->where('tenant_id', $tenantId)
             ->where('employee_stage', 'Probation')
-            ->whereNotNull('probation_end_date')
+            ->whereNotNull('probation_end_date');
+        $scopeService->applyEmployeeScope($query, $user);
+
+        $upcomingProbationEmployees = $query
             ->orderBy('probation_end_date', 'asc')
             ->take(10)
             ->get();
@@ -787,9 +754,13 @@ class HrmsDashboardController extends Controller
 
     public function getExitData(?\App\Models\User $user, int $tenantId): array
     {
-        $activeExits = EmployeeExit::with(['employee.department'])
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $query = EmployeeExit::with(['employee.department'])
             ->where('tenant_id', $tenantId)
-            ->whereIn('status', ['initiated', 'in_clearance', 'approved'])
+            ->whereIn('status', ['initiated', 'in_clearance', 'approved']);
+        $scopeService->applyRelatedScope($query, $user);
+
+        $activeExits = $query
             ->latest()
             ->take(10)
             ->get();
@@ -799,38 +770,68 @@ class HrmsDashboardController extends Controller
 
     public function getKpiData(?\App\Models\User $user, int $tenantId): array
     {
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
         $today = Carbon::today()->format('Y-m-d');
-        $totalEmployees = Employee::where('tenant_id', $tenantId)->count();
-        $probationCount = Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Probation')->count();
-        $confirmedCount = Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Confirmed')->count();
-        $noticeCount = Employee::where('tenant_id', $tenantId)->whereIn('employee_stage', ['Notice Period', 'Serving Notice'])->count();
+        
+        $empQuery = Employee::where('tenant_id', $tenantId);
+        $scopeService->applyEmployeeScope($empQuery, $user);
+        $totalEmployees = (clone $empQuery)->count();
+        $probationCount = (clone $empQuery)->where('employee_stage', 'Probation')->count();
+        $confirmedCount = (clone $empQuery)->where('employee_stage', 'Confirmed')->count();
+        $noticeCount = (clone $empQuery)->whereIn('employee_stage', ['Notice Period', 'Serving Notice'])->count();
 
-        $todayAttendances = Attendance::where('tenant_id', $tenantId)->whereDate('date', $today)->get();
+        $attQuery = Attendance::where('tenant_id', $tenantId)->whereDate('date', $today);
+        $scopeService->applyRelatedScope($attQuery, $user);
+        $todayAttendances = $attQuery->get();
         $presentCount = $todayAttendances->whereIn('status', ['present', 'late', 'half_day'])->count();
         $lateCount = $todayAttendances->where('status', 'late')->count();
 
-        $wfhCount = WfhRequest::where('tenant_id', $tenantId)->where('status', 'approved')->whereDate('start_date', '<=', $today)->whereDate('end_date', '>=', $today)->count() + $todayAttendances->where('location_type', 'wfh')->count();
-        $onLeaveCount = LeaveRequest::where('tenant_id', $tenantId)->where('status', 'approved')->whereDate('start_date', '<=', $today)->whereDate('end_date', '>=', $today)->count();
+        $wfhQuery = WfhRequest::where('tenant_id', $tenantId)->where('status', 'approved')->whereDate('start_date', '<=', $today)->whereDate('end_date', '>=', $today);
+        $scopeService->applyRelatedScope($wfhQuery, $user);
+        $wfhCount = $wfhQuery->count() + $todayAttendances->where('location_type', 'wfh')->count();
+
+        $leaveQuery = LeaveRequest::where('tenant_id', $tenantId)->where('status', 'approved')->whereDate('start_date', '<=', $today)->whereDate('end_date', '>=', $today);
+        $scopeService->applyRelatedScope($leaveQuery, $user);
+        $onLeaveCount = $leaveQuery->count();
+
         $attendancePercent = $totalEmployees > 0 ? round(($presentCount / $totalEmployees) * 100, 1) : 0;
 
-        $pendingLeaves = LeaveRequest::where('tenant_id', $tenantId)->where('status', 'pending')->get();
-        $pendingWfh = WfhRequest::where('tenant_id', $tenantId)->where('status', 'pending')->get();
-        $pendingCorrections = AttendanceCorrection::where('tenant_id', $tenantId)->where('status', 'pending')->get();
+        $pendingLeavesQuery = LeaveRequest::where('tenant_id', $tenantId)->where('status', 'pending');
+        $scopeService->applyRelatedScope($pendingLeavesQuery, $user);
+        $pendingLeaves = $pendingLeavesQuery->get();
+
+        $pendingWfhQuery = WfhRequest::where('tenant_id', $tenantId)->where('status', 'pending');
+        $scopeService->applyRelatedScope($pendingWfhQuery, $user);
+        $pendingWfh = $pendingWfhQuery->get();
+
+        $pendingCorrectionsQuery = AttendanceCorrection::where('tenant_id', $tenantId)->where('status', 'pending');
+        $scopeService->applyRelatedScope($pendingCorrectionsQuery, $user);
+        $pendingCorrections = $pendingCorrectionsQuery->get();
+
         $totalPendingApprovals = $pendingLeaves->count() + $pendingWfh->count() + $pendingCorrections->count();
 
-        $upcomingProbationEmployees = Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Probation')->whereNotNull('probation_end_date')->get();
-        $activeExits = EmployeeExit::where('tenant_id', $tenantId)->whereIn('status', ['initiated', 'in_clearance', 'approved'])->get();
+        $probationQuery = Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Probation')->whereNotNull('probation_end_date');
+        $scopeService->applyEmployeeScope($probationQuery, $user);
+        $upcomingProbationEmployees = $probationQuery->get();
+
+        $exitQuery = EmployeeExit::where('tenant_id', $tenantId)->whereIn('status', ['initiated', 'in_clearance', 'approved']);
+        $scopeService->applyRelatedScope($exitQuery, $user);
+        $activeExits = $exitQuery->get();
 
         return compact('totalEmployees', 'probationCount', 'confirmedCount', 'noticeCount', 'presentCount', 'lateCount', 'wfhCount', 'onLeaveCount', 'attendancePercent', 'pendingLeaves', 'pendingWfh', 'pendingCorrections', 'totalPendingApprovals', 'upcomingProbationEmployees', 'activeExits');
     }
 
     public function getLateArrivalsData(?\App\Models\User $user, int $tenantId): array
     {
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
         $now = Carbon::now();
-        $recentLateArrivals = Attendance::with(['employee.department'])
+        $query = Attendance::with(['employee.department'])
             ->where('tenant_id', $tenantId)
             ->whereIn('status', ['late', 'half_day'])
-            ->whereDate('date', '>=', $now->copy()->subDays(7))
+            ->whereDate('date', '>=', $now->copy()->subDays(7));
+        $scopeService->applyRelatedScope($query, $user);
+
+        $recentLateArrivals = $query
             ->orderBy('date', 'desc')
             ->take(10)
             ->get();
@@ -840,11 +841,15 @@ class HrmsDashboardController extends Controller
 
     public function getPenaltiesData(?\App\Models\User $user, int $tenantId): array
     {
-        $unprocessedPenalties = EmployeePenalty::with(['employee.department'])
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $query = EmployeePenalty::with(['employee.department'])
             ->where('tenant_id', $tenantId)
             ->where(function ($q) {
                 $q->whereNull('status')->orWhere('status', 'pending')->orWhere('status', 'unprocessed');
-            })
+            });
+        $scopeService->applyRelatedScope($query, $user);
+
+        $unprocessedPenalties = $query
             ->latest()
             ->take(10)
             ->get();
@@ -854,11 +859,15 @@ class HrmsDashboardController extends Controller
 
     public function getApprovedLeavesData(?\App\Models\User $user, int $tenantId): array
     {
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
         $today = Carbon::today()->format('Y-m-d');
-        $approvedLeaves = LeaveRequest::with(['employee.department', 'leaveType'])
+        $query = LeaveRequest::with(['employee.department', 'leaveType'])
             ->where('tenant_id', $tenantId)
             ->where('status', 'approved')
-            ->whereDate('end_date', '>=', $today)
+            ->whereDate('end_date', '>=', $today);
+        $scopeService->applyRelatedScope($query, $user);
+
+        $approvedLeaves = $query
             ->orderBy('start_date', 'asc')
             ->take(10)
             ->get();
@@ -936,29 +945,11 @@ class HrmsDashboardController extends Controller
         $now = Carbon::now();
         $today = $now->format('Y-m-d');
 
-        // Resolve employee
-        $employeeId = $request->input('employee_id');
-        $employee = null;
-        if ($employeeId) {
-            $employee = Employee::where('tenant_id', $tenantId)->find($employeeId);
-        }
-        if (!$employee && auth()->check()) {
-            $user = auth()->user();
-            $employee = Employee::where('tenant_id', $tenantId)
-                ->where(function ($q) use ($user) {
-                    if ($user->email) {
-                        $q->where('office_email', $user->email)
-                          ->orWhere('personal_email', $user->email);
-                    }
-                })
-                ->first();
-        }
-        if (!$employee) {
-            $employee = Employee::where('tenant_id', $tenantId)->first();
-        }
+        // Resolve current employee strictly for authenticated user
+        $employee = $this->resolveCurrentEmployee(auth()->user(), $tenantId);
 
         if (!$employee) {
-            return redirect()->back()->with('error', 'No active employee profile found to record attendance.');
+            return redirect()->back()->with('error', 'No active employee profile linked to your account to record attendance.');
         }
 
         // Fetch today's Attendance record

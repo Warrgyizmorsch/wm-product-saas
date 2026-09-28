@@ -3,13 +3,14 @@
 namespace App\Domains\HRMS\Models;
 
 use App\Core\Database\BaseModel;
+use App\Domains\HRMS\Traits\HasHrmsScope;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends BaseModel
 {
-    use SoftDeletes;
+    use SoftDeletes, HasHrmsScope;
 
     protected $fillable = [
 
@@ -248,6 +249,16 @@ class Employee extends BaseModel
     public function probationEvaluations(): HasMany
     {
         return $this->hasMany(EmployeeProbationEvaluation::class, 'employee_id')->orderBy('evaluation_date', 'desc');
+    }
+
+    public function profileUpdateRequests(): HasMany
+    {
+        return $this->hasMany(EmployeeProfileUpdateRequest::class, 'employee_id')->latest('id');
+    }
+
+    public function pendingProfileUpdateRequest(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(EmployeeProfileUpdateRequest::class, 'employee_id')->where('status', 'pending')->latest('id');
     }
 
     public function exits(): HasMany

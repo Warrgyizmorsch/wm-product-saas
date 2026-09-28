@@ -239,7 +239,7 @@
                                         @if(($bc->is_acknowledgement_required ?? false) && !$isAcked)
                                             <form action="{{ \Illuminate\Support\Facades\Route::has('hrms.broadcasts.acknowledge') ? route('hrms.broadcasts.acknowledge', $bc->id) : '#' }}" method="POST" class="m-0">
                                                 @csrf
-                                                <button type="submit" class="btn text-white fw-bold text-uppercase fs-11 px-3 py-1.5 rounded-2 d-inline-flex align-items-center gap-1.5 shadow-2xs" style="background: #4a3b32; border: none;">
+                                                <button type="submit" class="btn text-white fw-bold text-uppercase fs-11 px-3 py-1.5 rounded-2 d-inline-flex align-items-center gap-1.5 shadow-2xs" style="background: var(--bs-primary, #6337fa) !important; color: #ffffff !important; border: none !important;">
                                                     <i class="feather-check-circle fs-13"></i> ACKNOWLEDGE NOTICE
                                                 </button>
                                             </form>
@@ -249,7 +249,7 @@
                                             </span>
                                         @endif
                                         @if($bc->allow_comments ?? true)
-                                            <button type="button" class="btn text-white fw-bold text-uppercase fs-11 px-3 py-1.5 rounded-2 d-inline-flex align-items-center gap-1.5 shadow-2xs" style="background: #6343e8; border: none;" data-bs-toggle="modal" data-bs-target="#employeeBroadcastModal{{ $bc->id }}">
+                                            <button type="button" class="btn text-white fw-bold text-uppercase fs-11 px-3 py-1.5 rounded-2 d-inline-flex align-items-center gap-1.5 shadow-2xs" style="background: var(--bs-primary, #6337fa) !important; color: #ffffff !important; border: none !important;" data-bs-toggle="modal" data-bs-target="#employeeBroadcastModal{{ $bc->id }}">
                                                 <i class="feather-message-square fs-13"></i> ADD COMMENT
                                             </button>
                                         @endif
@@ -265,7 +265,7 @@
                                     <div class="mt-2.5 pt-2.5 border-top" style="border-color: #f1f5f9 !important;">
                                         <div class="mb-1.5">
                                             <span class="fs-11 fw-bold text-dark d-inline-flex align-items-center gap-1.5">
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6343e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--bs-primary, #6337fa)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                                                 </svg>
                                                 Comments & Discussion ({{ $topLevelComments->count() }})
@@ -276,7 +276,7 @@
                                             @foreach($topLevelComments as $comm)
                                                 <div class="py-1 px-0 border-bottom d-flex align-items-center justify-content-between gap-2 fs-11" style="border-color: #f8fafc !important; background: transparent;">
                                                     <div class="d-flex align-items-center text-truncate" style="min-width: 0;">
-                                                        <span class="rounded-circle text-white fw-bold d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 17px; height: 17px; font-size: 9.5px; line-height: 1; background-color: #6343e8 !important; margin-right: 6px;">
+                                                        <span class="rounded-circle text-white fw-bold d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 17px; height: 17px; font-size: 9.5px; line-height: 1; background-color: var(--bs-primary, #6337fa) !important; margin-right: 6px;">
                                                             {{ strtoupper(substr($comm->employee->full_name ?? ($comm->user->name ?? 'U'), 0, 1)) }}
                                                         </span>
                                                         <strong class="fw-bold fs-11 text-nowrap" style="color: #0f172a !important; margin-right: 4px;">{{ $comm->employee->full_name ?? ($comm->user->name ?? 'Employee') }}:</strong>
@@ -300,8 +300,8 @@
                                         <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
                                             <div class="modal-header bg-white border-0 pt-4 px-4 pb-2 d-flex align-items-center justify-content-between">
                                                 <div class="d-flex align-items-center gap-3">
-                                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px; background-color: #eef2ff; border: 1px solid #e0e7ff;">
-                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6343e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px; background-color: rgba(var(--bs-primary-rgb, 99, 55, 250), 0.1); border: 1px solid rgba(var(--bs-primary-rgb, 99, 55, 250), 0.2);">
+                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--bs-primary, #6337fa)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                                                         </svg>
                                                     </div>
@@ -322,7 +322,7 @@
                                                 </div>
                                                 <div class="modal-footer py-3 px-4 border-0 d-flex justify-content-between align-items-center" style="background-color: #f4f6fa !important;">
                                                     <button type="button" class="btn btn-sm btn-link text-uppercase text-dark fw-bold text-decoration-none px-2 py-1 fs-12" data-bs-dismiss="modal">CANCEL</button>
-                                                    <button type="submit" class="btn btn-sm text-white fw-bold px-4 py-2 rounded-3 shadow-2xs d-inline-flex align-items-center gap-1.5 text-uppercase fs-12" style="background-color: #6343e8; border: none;">
+                                                    <button type="submit" class="btn btn-sm text-white fw-bold px-4 py-2 rounded-3 shadow-2xs d-inline-flex align-items-center gap-1.5 text-uppercase fs-12" style="background-color: var(--bs-primary, #6337fa) !important; color: #ffffff !important; border: none !important;">
                                                         <i class="feather-send fs-12 me-1"></i> <span>POST COMMENT</span>
                                                     </button>
                                                 </div>

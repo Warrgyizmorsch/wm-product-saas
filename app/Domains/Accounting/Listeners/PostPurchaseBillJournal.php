@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\Listeners;
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
+use App\Domains\Accounting\Services\AccountResolverService;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Purchase\Events\BillPosted;
@@ -18,6 +19,7 @@ class PostPurchaseBillJournal
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
         private readonly PostingFailureRecorder $failures,
+        private readonly AccountResolverService $accountResolver,
     ) {
     }
 
@@ -41,6 +43,7 @@ class PostPurchaseBillJournal
 
         try {
             $tenantId = $bill->tenant_id;
+            $bill->loadMissing('items.product', 'items.grnItem');
 
             // Fetch Chart of Accounts by standard codes & names
             $accountsPayable = $this->accounts->findByCode('2010', $tenantId);
@@ -78,9 +81,9 @@ class PostPurchaseBillJournal
             $outputIgst      = $this->accounts->findByCode('2130', $tenantId)
                 ?? ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Output IGST%')->first();
 
-            $inventory       = $this->accounts->findByCode('1200', $tenantId);
-            $purchaseExpense = $this->accounts->findByCode('5900', $tenantId);
-            $freightExpense  = $this->accounts->findByCode('5030', $tenantId) ?: $purchaseExpense;
+            $defaultInventory       = $this->accountResolver->resolveInventoryAccount(null, $tenantId);
+            $defaultPurchaseExpense = $this->accountResolver->resolvePurchaseAccount(null, $tenantId);
+            $freightExpense         = $this->accounts->findByCode('5030', $tenantId) ?: $defaultPurchaseExpense;
 
             // RCM: the buyer self-assesses this tax rather than paying it to the
             // vendor, so it needs its own input-credit and payable accounts,
@@ -103,8 +106,8 @@ class PostPurchaseBillJournal
                 return;
             }
 
-            $goodsSubtotal = 0.0;
-            $assetBuckets = []; // chart_of_account_id => subtotal
+            $stockBuckets = [];   // chart_of_account_id => subtotal
+            $assetBuckets = [];   // chart_of_account_id => subtotal
             $expenseBuckets = []; // chart_of_account_id => subtotal
 
             foreach ($bill->items as $item) {
@@ -121,36 +124,59 @@ class PostPurchaseBillJournal
                         $assetBuckets[$accountId] = ($assetBuckets[$accountId] ?? 0) + $lineSubtotal;
                     }
                 } elseif ($lineType === PurchaseOrderItem::LINE_TYPE_EXPENSE) {
-                    $account = $grnItem->chartOfAccount ?? $purchaseExpense;
+                    $account = $grnItem->chartOfAccount
+                        ?? ($item->product ? $this->accountResolver->resolvePurchaseAccount($item->product, $tenantId) : null)
+                        ?? $defaultPurchaseExpense;
                     $accountId = $account?->id;
                     if ($accountId) {
                         $expenseBuckets[$accountId] = ($expenseBuckets[$accountId] ?? 0) + $lineSubtotal;
                     }
                 } elseif ($lineType === PurchaseOrderItem::LINE_TYPE_STOCK) {
-                    $goodsSubtotal += $lineSubtotal;
+                    $account = ($item->product ? $this->accountResolver->resolveInventoryAccount($item->product, $tenantId) : null)
+                        ?? $defaultInventory;
+                    $accountId = $account?->id;
+                    if ($accountId) {
+                        $stockBuckets[$accountId] = ($stockBuckets[$accountId] ?? 0) + $lineSubtotal;
+                    }
                 } else {
-                    // Legacy fallback: no linked GRN line / no line_type recorded — preserve
-                    // the original goods-vs-service split so pre-existing bills post unchanged.
+                    // Legacy fallback: no linked GRN line / no line_type recorded
                     $isService = ($item->product && $item->product->item_type === 'Service') || (empty($item->product_id) && empty($item->goods_receipt_note_item_id));
                     if ($isService) {
-                        $serviceAccount = $this->resolveServiceHeadAccount($bill, $tenantId, $freightExpense, $purchaseExpense);
-                        $accountId = $serviceAccount?->id ?: ($freightExpense?->id ?: $purchaseExpense?->id);
+                        $serviceAccount = ($item->product ? $this->accountResolver->resolvePurchaseAccount($item->product, $tenantId) : null)
+                            ?? $this->resolveServiceHeadAccount($bill, $tenantId, $freightExpense, $defaultPurchaseExpense);
+                        $accountId = $serviceAccount?->id ?: ($freightExpense?->id ?: $defaultPurchaseExpense?->id);
                         if ($accountId) {
                             $expenseBuckets[$accountId] = ($expenseBuckets[$accountId] ?? 0) + $lineSubtotal;
                         }
                     } else {
-                        $goodsSubtotal += $lineSubtotal;
+                        $account = ($item->product ? $this->accountResolver->resolveInventoryAccount($item->product, $tenantId) : null)
+                            ?? $defaultInventory;
+                        $accountId = $account?->id;
+                        if ($accountId) {
+                            $stockBuckets[$accountId] = ($stockBuckets[$accountId] ?? 0) + $lineSubtotal;
+                        }
                     }
                 }
             }
 
             // Calculate item base value (subtotal minus discount)
             $netItemsValue = max(0.01, (float)$bill->subtotal - (float)$bill->discount_amount);
-            $totalLinesSubtotal = $goodsSubtotal + array_sum($assetBuckets) + array_sum($expenseBuckets);
+            $totalLinesSubtotal = array_sum($stockBuckets) + array_sum($assetBuckets) + array_sum($expenseBuckets);
             if ($totalLinesSubtotal <= 0) {
-                $goodsSubtotal = $netItemsValue;
-            } else if ($bill->discount_amount > 0) {
-                $goodsSubtotal = max(0.01, $goodsSubtotal - (float)$bill->discount_amount);
+                if ($defaultInventory) {
+                    $stockBuckets[$defaultInventory->id] = $netItemsValue;
+                }
+            } elseif ($bill->discount_amount > 0 && $totalLinesSubtotal > 0) {
+                $discountScale = max(0.01, $totalLinesSubtotal - (float)$bill->discount_amount) / $totalLinesSubtotal;
+                foreach ($stockBuckets as $accId => $amt) {
+                    $stockBuckets[$accId] = round($amt * $discountScale, 2);
+                }
+                foreach ($expenseBuckets as $accId => $amt) {
+                    $expenseBuckets[$accId] = round($amt * $discountScale, 2);
+                }
+                foreach ($assetBuckets as $accId => $amt) {
+                    $assetBuckets[$accId] = round($amt * $discountScale, 2);
+                }
             }
 
             $lines = [];
@@ -160,18 +186,25 @@ class PostPurchaseBillJournal
                 && !in_array($bill->freight_allocation_method, ['none', 'direct_expense']);
             $freightAmt = (float)$bill->freight_amount;
 
-            $totalInventoryDebit = $goodsSubtotal + ($isFreightCapitalized ? $freightAmt : 0);
+            if ($isFreightCapitalized && $freightAmt > 0) {
+                $primaryStockAccId = !empty($stockBuckets) ? array_key_first($stockBuckets) : ($defaultInventory?->id);
+                if ($primaryStockAccId) {
+                    $stockBuckets[$primaryStockAccId] = ($stockBuckets[$primaryStockAccId] ?? 0) + $freightAmt;
+                }
+            }
 
-            // 1. Inventory / Stock Asset (Debit) - Landed Stock Value (Items + Freight)
-            if ($totalInventoryDebit > 0 && $inventory) {
-                $lines[] = [
-                    'chart_of_account_id' => $inventory->id,
-                    'debit'               => round($totalInventoryDebit, 2),
-                    'credit'              => 0,
-                    'description'         => $isFreightCapitalized && $freightAmt > 0
-                        ? "Bill {$bill->bill_number} - Stock Purchase & Capitalized Freight Landed Cost"
-                        : "Bill {$bill->bill_number} - Stock Purchase (Base Item Value)",
-                ];
+            // 1. Inventory / Stock Asset (Debit) - partitioned by resolved product inventory accounts
+            foreach ($stockBuckets as $accountId => $amount) {
+                if ($amount > 0) {
+                    $lines[] = [
+                        'chart_of_account_id' => $accountId,
+                        'debit'               => round($amount, 2),
+                        'credit'              => 0,
+                        'description'         => $isFreightCapitalized && $freightAmt > 0
+                            ? "Bill {$bill->bill_number} - Stock Purchase & Capitalized Freight Landed Cost"
+                            : "Bill {$bill->bill_number} - Stock Purchase (Base Item Value)",
+                    ];
+                }
             }
 
             // 2. Fixed Asset purchases (Debit), one line per resolved account

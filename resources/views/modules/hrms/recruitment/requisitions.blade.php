@@ -55,6 +55,19 @@
         border-color: var(--bs-primary) !important;
         box-shadow: 0 0 0 0.18rem rgba(0, 0, 0, 0.05);
     }
+
+    /* Recruitment Tables: Prevent horizontal scrollbar & wrap long content to next line */
+    .recruitment-table {
+        width: 100% !important;
+        table-layout: fixed !important;
+    }
+    .recruitment-table th,
+    .recruitment-table td {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        white-space: normal !important;
+    }
 </style>
 @endpush
 
@@ -222,28 +235,28 @@
         </div>
 
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0 recruitment-table">
                 <thead class="bg-light text-muted fs-12 text-uppercase">
                     <tr>
-                        <th>Code & Job Title</th>
-                        <th>Department & Role</th>
-                        <th>Required Experience</th>
-                        <th>Vacancies</th>
-                        <th>Priority</th>
-                        <th>Status</th>
-                        <th class="text-end">Actions</th>
+                        <th class="ps-3" style="width: 25%;">Code & Job Title</th>
+                        <th style="width: 20%;">Department & Role</th>
+                        <th style="width: 14%;">Required Experience</th>
+                        <th style="width: 11%;">Vacancies</th>
+                        <th class="text-center" style="width: 9%;">Priority</th>
+                        <th class="text-center" style="width: 8%;">Status</th>
+                        <th class="text-end pe-3" style="width: 13%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($requisitions as $req)
                         <tr>
-                            <td>
-                                <div class="fw-bold text-dark fs-15">{{ $req->job_title }}</div>
+                            <td class="ps-3">
+                                <div class="fw-bold text-dark fs-14">{{ $req->job_title }}</div>
                                 <span class="badge bg-light text-secondary border mt-1">{{ $req->requisition_code }}</span>
                             </td>
                             <td>
-                                <div class="fw-semibold text-dark">{{ $req->department->name ?? 'N/A' }}</div>
-                                <small class="text-muted">{{ $req->designation->name ?? 'N/A' }}</small>
+                                <div class="fw-semibold text-dark fs-13">{{ $req->department->name ?? 'N/A' }}</div>
+                                <small class="text-muted fs-12 d-block">{{ $req->designation->name ?? 'N/A' }}</small>
                             </td>
                             <td>
                                 <x-ui.badge variant="primary" soft>
@@ -251,9 +264,9 @@
                                 </x-ui.badge>
                             </td>
                             <td>
-                                <span class="fw-bold text-dark fs-14">{{ $req->vacancies }} Positions</span>
+                                <span class="fw-bold text-dark fs-13">{{ $req->vacancies }} Positions</span>
                             </td>
-                            <td>
+                            <td class="text-center">
                                 @if($req->priority === 'urgent')
                                     <x-ui.badge variant="danger">Urgent</x-ui.badge>
                                 @elseif($req->priority === 'high')
@@ -262,11 +275,11 @@
                                     <x-ui.badge variant="info" soft>{{ ucfirst($req->priority) }}</x-ui.badge>
                                 @endif
                             </td>
-                            <td>
+                            <td class="text-center">
                                 <x-ui.status-badge :status="$req->status" :label="in_array($req->status, ['approved', 'published', 'open']) ? 'Open' : null" />
                             </td>
-                            <td class="text-end">
-                                <x-ui.button :href="route('hrms.recruitment.pipeline', $req->id)" variant="primary" size="sm" icon="feather-columns">
+                            <td class="text-end pe-3">
+                                <x-ui.button :href="route('hrms.recruitment.pipeline', $req->id)" variant="primary" size="sm" icon="feather-columns" class="text-nowrap">
                                     View Pipeline
                                 </x-ui.button>
                             </td>

@@ -54,6 +54,19 @@
         border-color: var(--bs-primary) !important;
         box-shadow: 0 0 0 0.18rem rgba(0, 0, 0, 0.05);
     }
+
+    /* Recruitment Tables: Prevent horizontal scrollbar & wrap long content to next line */
+    .recruitment-table {
+        width: 100% !important;
+        table-layout: fixed !important;
+    }
+    .recruitment-table th,
+    .recruitment-table td {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        white-space: normal !important;
+    }
 </style>
 @endpush
 
@@ -168,16 +181,16 @@
         </div>
 
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0 recruitment-table">
                 <thead class="bg-light text-muted fs-12 text-uppercase">
                     <tr>
-                        <th>Candidate Details</th>
-                        <th>Contact Info</th>
-                        <th>Experience</th>
-                        <th>Applied Position</th>
-                        <th>Source</th>
-                        <th>Resume</th>
-                        <th>Status</th>
+                        <th class="ps-3" style="width: 24%;">Candidate Details</th>
+                        <th style="width: 20%;">Contact Info</th>
+                        <th style="width: 13%;">Experience</th>
+                        <th style="width: 19%;">Applied Position</th>
+                        <th class="text-center" style="width: 8%;">Source</th>
+                        <th class="text-center" style="width: 8%;">Resume</th>
+                        <th class="text-center pe-3" style="width: 8%;">Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -186,8 +199,8 @@
                             $latestApp = $candidate->applications->first();
                         @endphp
                         <tr>
-                            <td>
-                                <div class="fw-bold text-dark fs-15">{{ $candidate->full_name }}</div>
+                            <td class="ps-3">
+                                <div class="fw-bold text-dark fs-14">{{ $candidate->full_name }}</div>
                                 <div class="text-muted fs-12">{{ $candidate->current_designation ?? 'N/A' }} @ {{ $candidate->current_company ?? 'N/A' }}</div>
                                 <span class="badge bg-light text-secondary border mt-1">{{ $candidate->candidate_code }}</span>
                             </td>
@@ -209,10 +222,10 @@
                                     <span class="text-muted">Unassigned</span>
                                 @endif
                             </td>
-                            <td>
+                            <td class="text-center">
                                 <x-ui.badge variant="light">{{ ucfirst($candidate->source) }}</x-ui.badge>
                             </td>
-                            <td>
+                            <td class="text-center">
                                 @if($candidate->resume_path)
                                     <x-ui.button 
                                         :href="route('hrms.recruitment.candidates.download-resume', $candidate)" 
@@ -220,6 +233,7 @@
                                         variant="outline-primary" 
                                         size="sm" 
                                         icon="feather-file-text"
+                                        class="text-nowrap"
                                     >
                                         View CV
                                     </x-ui.button>
@@ -227,7 +241,7 @@
                                     <span class="text-muted fs-12">No Resume</span>
                                 @endif
                             </td>
-                            <td>
+                            <td class="text-center pe-3">
                                 @if($candidate->status === 'hired')
                                     <x-ui.status-badge status="approved" label="Hired" />
                                 @elseif($candidate->status === 'rejected')

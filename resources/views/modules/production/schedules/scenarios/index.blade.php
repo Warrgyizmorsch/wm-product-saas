@@ -155,7 +155,7 @@ function promoteScenario(scenarioId, scenarioName) {
         confirmButtonText: 'Promote to Live',
         variant: 'success',
         onConfirm: function() {
-            fetch(`/production/schedules/scenarios/${scenarioId}/promote`, {
+            fetch(`{{ url('production/schedules/scenarios') }}/${scenarioId}/promote`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -185,7 +185,7 @@ function discardScenario(scenarioId, scenarioName) {
         confirmButtonText: 'Discard Scenario',
         variant: 'danger',
         onConfirm: function() {
-            fetch(`/production/schedules/scenarios/${scenarioId}/discard`, {
+            fetch(`{{ url('production/schedules/scenarios') }}/${scenarioId}/discard`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

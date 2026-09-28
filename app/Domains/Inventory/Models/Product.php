@@ -257,4 +257,44 @@ class Product extends BaseModel
               ->orWhereNotNull('parent_id');
         });
     }
+
+    /**
+     * Chart of Account Relationships (when IDs are stored)
+     */
+    public function salesChartOfAccount(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Accounting\Models\ChartOfAccount::class, 'sales_account');
+    }
+
+    public function purchaseChartOfAccount(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Accounting\Models\ChartOfAccount::class, 'purchase_account');
+    }
+
+    public function inventoryChartOfAccount(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Accounting\Models\ChartOfAccount::class, 'inventory_account');
+    }
+
+    /**
+     * Resolve actual Chart of Account instance (supports ID, Code, Name, or parent fallback)
+     */
+    public function getResolvedSalesAccount(?int $tenantId = null): ?\App\Domains\Accounting\Models\ChartOfAccount
+    {
+        $tenantId = $tenantId ?? $this->tenant_id ?? (tenant_id() ?? 1);
+        return app(\App\Domains\Accounting\Services\AccountResolverService::class)->resolveSalesAccount($this, $tenantId);
+    }
+
+    public function getResolvedPurchaseAccount(?int $tenantId = null): ?\App\Domains\Accounting\Models\ChartOfAccount
+    {
+        $tenantId = $tenantId ?? $this->tenant_id ?? (tenant_id() ?? 1);
+        return app(\App\Domains\Accounting\Services\AccountResolverService::class)->resolvePurchaseAccount($this, $tenantId);
+    }
+
+    public function getResolvedInventoryAccount(?int $tenantId = null): ?\App\Domains\Accounting\Models\ChartOfAccount
+    {
+        $tenantId = $tenantId ?? $this->tenant_id ?? (tenant_id() ?? 1);
+        return app(\App\Domains\Accounting\Services\AccountResolverService::class)->resolveInventoryAccount($this, $tenantId);
+    }
 }
+

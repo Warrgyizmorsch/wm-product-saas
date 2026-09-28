@@ -61,6 +61,7 @@ Route::prefix('production')
         // ── Tenant Subcontract Settings ───────────────────────────────────────
         Route::get('settings', [\App\Domains\Production\Controllers\ProductionSettingsController::class, 'index'])->name('settings.index');
         Route::post('settings/subcontract', [\App\Domains\Production\Controllers\ProductionSettingsController::class, 'updateSubcontract'])->name('settings.subcontract.update');
+        Route::post('settings/remnant-policy', [\App\Domains\Production\Controllers\ProductionSettingsController::class, 'updateRemnantPolicy'])->name('settings.remnant-policy.update');
 
         // ── Subcontract Analytics & Vendor SLA ──────────────────────────────
         Route::get('subcontract/analytics', [\App\Domains\Production\Controllers\SubcontractAnalyticsController::class, 'index'])->name('subcontract.analytics');
@@ -166,6 +167,9 @@ Route::prefix('production')
         Route::post('orders/{order}/release', [ProductionOrderController::class, 'release'])->name('orders.release');
         Route::post('orders/{order}/issue', [ProductionOrderController::class, 'issueMaterial'])->name('orders.issue');
         Route::post('orders/{order}/return', [ProductionOrderController::class, 'returnMaterial'])->name('orders.return');
+        Route::post('orders/{order}/allocate-remnant', [ProductionOrderController::class, 'allocateRemnant'])->name('orders.allocate-remnant');
+        Route::post('orders/{order}/release-remnant-allocation/{allocation}', [ProductionOrderController::class, 'releaseRemnantAllocation'])->name('orders.release-remnant-allocation');
+        Route::post('orders/{order}/consume-remnant/{allocation}', [ProductionOrderController::class, 'consumeRemnantAllocation'])->name('orders.consume-remnant');
         Route::post('orders/{order}/log-progress', [ProductionOrderController::class, 'logProgress'])->name('orders.log-progress');
         Route::post('orders/{order}/log-scrap', [ProductionOrderController::class, 'logScrap'])->name('orders.log-scrap');
         Route::post('orders/{order}/log-rework', [ProductionOrderController::class, 'logRework'])->name('orders.log-rework');
@@ -243,6 +247,8 @@ Route::prefix('production')
         Route::post('mes/{op}/quality-inspection', [MesController::class, 'recordQualityInspection'])->name('mes.quality-inspection');
         Route::post('mes/{op}/scrap', [MesController::class, 'recordOperationalScrap'])->name('mes.scrap');
         Route::post('mes/{op}/disposition', [MesController::class, 'recordDisposition'])->name('mes.disposition');
+        Route::post('mes/{op}/remnant', [MesController::class, 'saveRemnant'])->name('mes.remnant');
+        Route::post('mes/{op}/return-material', [MesController::class, 'returnUnusedMaterial'])->name('mes.return-material');
 
         // ── Advanced MES Refinements ───────────────────────────────────────────
         // Touch Operator Dashboard and My Operations

@@ -2,6 +2,7 @@
 
 use App\Domains\HRMS\Controllers\OrgController;
 use App\Domains\HRMS\Controllers\EmployeeController;
+use App\Domains\HRMS\Controllers\EmployeeProfileRequestController;
 use App\Domains\HRMS\Controllers\SalaryStructureController;
 use App\Domains\HRMS\Controllers\LeaveStructureController;
 use App\Domains\HRMS\Controllers\PenalizationPolicyController;
@@ -32,6 +33,7 @@ use App\Domains\HRMS\Controllers\HelpdeskTicketController;
 use App\Domains\HRMS\Controllers\HelpdeskCategoryController;
 use App\Domains\HRMS\Controllers\HelpdeskKbController;
 use App\Domains\HRMS\Controllers\RecruitmentController;
+use App\Domains\HRMS\Controllers\KraKpiController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -124,6 +126,12 @@ Route::prefix('hrms')
             Route::post('/import', [EmployeeController::class, 'import'])->name('employees.import');
             Route::get('/export', [EmployeeController::class, 'export'])->name('employees.export');
             Route::get('/import/template', [EmployeeController::class, 'downloadTemplate'])->name('employees.import.template');
+            
+            // Profile Update Requests
+            Route::get('/profile-requests', [EmployeeProfileRequestController::class, 'index'])->name('employees.profile-requests.index');
+            Route::post('/profile-requests/{profileRequest}/approve', [EmployeeProfileRequestController::class, 'approve'])->name('employees.profile-requests.approve');
+            Route::post('/profile-requests/{profileRequest}/reject', [EmployeeProfileRequestController::class, 'reject'])->name('employees.profile-requests.reject');
+
             Route::post('/store', [EmployeeController::class, 'store'])->name('employees.store');
             Route::post('/update/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
             Route::post('/{employee}/update-status', [EmployeeController::class, 'updateStatus'])->name('employees.update-status');
@@ -205,6 +213,7 @@ Route::prefix('hrms')
             Route::post('/{leaveRequest}/approve', [LeaveRequestController::class, 'approve'])->name('leaves.approve');
             Route::post('/{leaveRequest}/reject', [LeaveRequestController::class, 'reject'])->name('leaves.reject');
             Route::post('/{leaveRequest}/update-status', [LeaveRequestController::class, 'updateStatus'])->name('leaves.update-status');
+            Route::delete('/{leaveRequest}', [LeaveRequestController::class, 'destroy'])->name('leaves.destroy');
 
             // Employee cancellation flow
             Route::post('/{leaveRequest}/withdraw', [LeaveRequestController::class, 'withdraw'])->name('leaves.withdraw');
@@ -229,6 +238,7 @@ Route::prefix('hrms')
             Route::post('/{wfhRequest}/approve', [WfhRequestController::class, 'approve'])->name('wfh.approve');
             Route::post('/{wfhRequest}/reject', [WfhRequestController::class, 'reject'])->name('wfh.reject');
             Route::post('/{wfhRequest}/update-status', [WfhRequestController::class, 'updateStatus'])->name('wfh.update-status');
+            Route::delete('/{wfhRequest}', [WfhRequestController::class, 'destroy'])->name('wfh.destroy');
 
             // Employee cancellation flow
             Route::post('/{wfhRequest}/withdraw', [WfhRequestController::class, 'withdraw'])->name('wfh.withdraw');
@@ -257,6 +267,12 @@ Route::prefix('hrms')
             Route::post('/{shiftChangeRequest}/reject', [ShiftChangeRequestController::class, 'reject'])->name('shift-change.reject');
             Route::post('/{shiftChangeRequest}/update-status', [ShiftChangeRequestController::class, 'updateStatus'])->name('shift-change.update-status');
             Route::delete('/{shiftChangeRequest}', [ShiftChangeRequestController::class, 'destroy'])->name('shift-change.destroy');
+
+            // Shift Change Cancellation / Withdraw flow
+            Route::post('/{shiftChangeRequest}/withdraw', [ShiftChangeRequestController::class, 'withdraw'])->name('shift-change.withdraw');
+            Route::post('/{shiftChangeRequest}/request-cancellation', [ShiftChangeRequestController::class, 'requestCancellation'])->name('shift-change.request-cancellation');
+            Route::post('/{shiftChangeRequest}/approve-cancellation', [ShiftChangeRequestController::class, 'approveCancellation'])->name('shift-change.approve-cancellation');
+            Route::post('/{shiftChangeRequest}/deny-cancellation', [ShiftChangeRequestController::class, 'denyCancellation'])->name('shift-change.deny-cancellation');
         });
 
         // Overtime Request Management (Actions only)
@@ -267,6 +283,12 @@ Route::prefix('hrms')
             Route::post('/{overtimeRequest}/update-status', [OvertimeRequestController::class, 'updateStatus'])->name('overtime.update-status');
             Route::delete('/{overtimeRequest}', [OvertimeRequestController::class, 'destroy'])->name('overtime.destroy');
             Route::post('/settings', [OvertimeRequestController::class, 'updateSettings'])->name('overtime.update-settings');
+
+            // Overtime Cancellation / Withdraw flow
+            Route::post('/{overtimeRequest}/withdraw', [OvertimeRequestController::class, 'withdraw'])->name('overtime.withdraw');
+            Route::post('/{overtimeRequest}/request-cancellation', [OvertimeRequestController::class, 'requestCancellation'])->name('overtime.request-cancellation');
+            Route::post('/{overtimeRequest}/approve-cancellation', [OvertimeRequestController::class, 'approveCancellation'])->name('overtime.approve-cancellation');
+            Route::post('/{overtimeRequest}/deny-cancellation', [OvertimeRequestController::class, 'denyCancellation'])->name('overtime.deny-cancellation');
         });
 
         // Asset Management
@@ -553,5 +575,45 @@ Route::prefix('hrms')
             Route::post('/application/{application}/offer', [RecruitmentController::class, 'createOffer'])->name('offer.create');
             Route::post('/offer/{offer}/send-email', [RecruitmentController::class, 'sendOfferEmail'])->name('offer.send-email');
             Route::post('/offer/{offer}/convert-to-employee', [RecruitmentController::class, 'convertToEmployee'])->name('offer.convert');
+        });
+
+        // KRA & KPI Performance Management Hub
+        Route::prefix('kra-kpi')->name('kra-kpi.')->group(function (): void {
+            Route::get('/', [KraKpiController::class, 'index'])->name('index');
+            Route::get('/scorecard/{id}', [KraKpiController::class, 'show'])->name('show');
+
+            // Cycles Management
+            Route::post('/cycle/store', [KraKpiController::class, 'storeCycle'])->name('cycle.store');
+            Route::put('/cycle/{id}', [KraKpiController::class, 'updateCycle'])->name('cycle.update');
+            Route::delete('/cycle/{id}', [KraKpiController::class, 'deleteCycle'])->name('cycle.destroy');
+
+            // KRA Categories & KPI Master Library
+            Route::post('/kra-category/store', [KraKpiController::class, 'storeKraCategory'])->name('kra-category.store');
+            Route::delete('/kra-category/{id}', [KraKpiController::class, 'deleteKraCategory'])->name('kra-category.destroy');
+            Route::post('/kpi-master/store', [KraKpiController::class, 'storeKpiMaster'])->name('kpi-master.store');
+            Route::delete('/kpi-master/{id}', [KraKpiController::class, 'deleteKpiMaster'])->name('kpi-master.destroy');
+
+            // KPI Templates & Assignments
+            Route::post('/template/store', [KraKpiController::class, 'storeTemplate'])->name('template.store');
+            Route::put('/template/{id}', [KraKpiController::class, 'updateTemplate'])->name('template.update');
+            Route::delete('/template/{id}', [KraKpiController::class, 'deleteTemplate'])->name('template.destroy');
+            Route::post('/assign-template', [KraKpiController::class, 'assignTemplateToEmployees'])->name('assign-template');
+
+            // Scorecard & Goal Items Actions
+            Route::delete('/scorecard/{planId}', [KraKpiController::class, 'deletePlan'])->name('plan.destroy');
+            Route::post('/scorecard/{planId}/goal-item/store', [KraKpiController::class, 'addGoalItem'])->name('goal-item.store');
+            Route::delete('/goal-item/{itemId}', [KraKpiController::class, 'deleteGoalItem'])->name('goal-item.destroy');
+            Route::post('/scorecard/{planId}/submit-goals', [KraKpiController::class, 'submitGoals'])->name('submit-goals');
+            Route::post('/scorecard/{planId}/approve-goals', [KraKpiController::class, 'approveGoals'])->name('approve-goals');
+            Route::post('/goal-item/{itemId}/progress', [KraKpiController::class, 'logProgress'])->name('log-progress');
+
+            // Appraisals & Evaluations
+            Route::post('/scorecard/{planId}/self-appraisal', [KraKpiController::class, 'submitSelfAppraisal'])->name('self-appraisal');
+            Route::post('/scorecard/{planId}/manager-appraisal', [KraKpiController::class, 'submitManagerAppraisal'])->name('manager-appraisal');
+            Route::post('/scorecard/{planId}/calibrate', [KraKpiController::class, 'calibrateAppraisal'])->name('calibrate');
+            Route::post('/scorecard/{planId}/sign-off', [KraKpiController::class, 'signOffAppraisal'])->name('sign-off');
+
+            // 1-Click Bridge to PIP
+            Route::post('/scorecard/{planId}/trigger-pip', [KraKpiController::class, 'triggerPip'])->name('trigger-pip');
         });
     });

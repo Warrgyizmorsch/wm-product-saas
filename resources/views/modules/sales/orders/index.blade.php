@@ -258,7 +258,7 @@
                                             {{ __('crm.view_details') }}
                                         </x-ui.dropdown-item>
                                         
-                                        @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
+                                        @if ($order->status === 'Draft')
                                             <x-ui.dropdown-item href="{{ route('sales.orders.edit', $order->id) }}" icon="feather-edit-2 me-2">
                                                 {{ __('crm.edit_sales_order') }}
                                             </x-ui.dropdown-item>

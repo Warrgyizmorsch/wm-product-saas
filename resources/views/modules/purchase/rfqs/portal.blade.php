@@ -140,10 +140,19 @@
                                     <label class="form-label">{{ __('purchase.payment_terms') }}</label>
                                     <select name="payment_type" class="form-select">
                                         <option value="">{{ __('purchase.select_payment_terms') }}</option>
-                                        <option value="Cash" @selected(old('payment_type', $rfqVendor->payment_type) === 'Cash')>{{ __('purchase.cash') }}</option>
-                                        <option value="Net 30" @selected(old('payment_type', $rfqVendor->payment_type) === 'Net 30')>{{ __('purchase.net_30_days') }}</option>
-                                        <option value="Net 60" @selected(old('payment_type', $rfqVendor->payment_type) === 'Net 60')>{{ __('purchase.net_60_days') }}</option>
-                                        <option value="50% Advance, 50% Delivery" @selected(old('payment_type', $rfqVendor->payment_type) === '50% Advance, 50% Delivery')>{{ __('purchase.payment_50_50') }}</option>
+                                        @if(isset($paymentTerms) && count($paymentTerms) > 0)
+                                            @foreach($paymentTerms as $term)
+                                                <option value="{{ $term->name }}" @selected(old('payment_type', $rfqVendor->payment_type) === $term->name || old('payment_type', $rfqVendor->payment_type) === $term->code)>{{ $term->name }}</option>
+                                            @endforeach
+                                        @else
+                                            <option value="Cash" @selected(old('payment_type', $rfqVendor->payment_type) === 'Cash')>{{ __('purchase.cash') }}</option>
+                                            <option value="Net 30" @selected(old('payment_type', $rfqVendor->payment_type) === 'Net 30')>{{ __('purchase.net_30_days') }}</option>
+                                            <option value="Net 60" @selected(old('payment_type', $rfqVendor->payment_type) === 'Net 60')>{{ __('purchase.net_60_days') }}</option>
+                                            <option value="50% Advance, 50% Delivery" @selected(old('payment_type', $rfqVendor->payment_type) === '50% Advance, 50% Delivery')>{{ __('purchase.payment_50_50') }}</option>
+                                        @endif
+                                        @if($rfqVendor->payment_type && !in_array($rfqVendor->payment_type, ($paymentTerms ?? collect())->pluck('name')->toArray(), true) && !in_array($rfqVendor->payment_type, ($paymentTerms ?? collect())->pluck('code')->toArray(), true) && !in_array($rfqVendor->payment_type, ['Cash', 'Net 30', 'Net 60', '50% Advance, 50% Delivery']))
+                                            <option value="{{ $rfqVendor->payment_type }}" selected>{{ $rfqVendor->payment_type }}</option>
+                                        @endif
                                     </select>
                                 </div>
                                 <div class="col-md-4">

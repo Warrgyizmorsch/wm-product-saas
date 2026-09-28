@@ -439,6 +439,10 @@
                     @php
                         $order = $schedule->order;
                         $ops = $schedule->operations->sort(function ($a, $b) use ($order) {
+                            if ($a->planned_start && $b->planned_start && !$a->planned_start->equalTo($b->planned_start)) {
+                                return $a->planned_start <=> $b->planned_start;
+                            }
+
                             $aOrderOp = $a->orderOperation ?? $a;
                             $bOrderOp = $b->orderOperation ?? $b;
 
@@ -751,9 +755,9 @@
                                                             @endif
 
                                                             @if(!$isCompleted)
-                                                                <span class="d-inline-block" data-bs-toggle="tooltip" data-bs-placement="top" title="Record Operational Scrap">
-                                                                    <button type="button" class="action-icon-btn" data-bs-toggle="modal" data-bs-target="#scrapModal{{ $op->id }}">
-                                                                        <i class="feather-trash-2 fs-12"></i>
+                                                                <span class="d-inline-block" data-bs-toggle="tooltip" data-bs-placement="top" title="Material Disposition (Scrap / Offcut / Return)">
+                                                                    <button type="button" class="action-icon-btn" data-bs-toggle="modal" data-bs-target="#materialDispositionModal{{ $op->id }}">
+                                                                        <i class="feather-package fs-12"></i>
                                                                     </button>
                                                                 </span>
                                                             @endif
@@ -1447,66 +1451,13 @@
                                 </x-slot>
                             </x-ui.modal>
 
-                            {{-- Record Operational Scrap Modal --}}
-                            <x-ui.modal id="scrapModal{{ $activeOp->id }}"
-                                title="RECORD OPERATIONAL SCRAP — {{ html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') }}"
-                                class="text-start" size="md">
-                                <form method="POST" action="{{ route('production.mes.scrap', $activeOrderOp->id) }}"
-                                    id="scrapForm{{ $activeOp->id }}">
-                                    @csrf
-                                    <div class="bg-soft-danger p-3 rounded mb-3 border border-danger-subtle">
-                                        <h6 class="fw-bold text-danger mb-1"><i class="feather-trash-2 me-2"></i>Record Operational Loss
-                                            / Damaged Output</h6>
-                                        <span class="fs-11 text-muted">Order: <strong>{{ $activeOrder->order_number }}</strong> |
-                                            Operation: <strong>{{ $activeOrderOp->name }}</strong></span>
-                                    </div>
-
-                                    <div class="row g-3">
-                                        <div class="col-md-12">
-                                            <x-ui.odoo-form-ui type="select" label="Component / Material to Scrap" name="product_id"
-                                                :required="true">
-                                                @php
-                                                    $scrappableMats = $activeOrderOp->scrappable_materials;
-                                                @endphp
-                                                @foreach($scrappableMats as $idx => $mat)
-                                                    <option value="{{ $mat['id'] }}" {{ $idx === 0 ? 'selected' : '' }}>
-                                                        {{ $mat['name'] }} — {{ $mat['type_label'] }}
-                                                    </option>
-                                                @endforeach
-                                            </x-ui.odoo-form-ui>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <x-ui.odoo-form-ui type="input" label="Scrap Quantity" name="quantity" inputType="number"
-                                                step="any" value="1" :required="true" />
-                                        </div>
-                                        <div class="col-md-6">
-                                            <x-ui.odoo-form-ui type="select" label="Scrap Reason Category" name="reason"
-                                                :required="true">
-                                                <option value="Cutting Error / Wrong Dimension">Cutting Error / Wrong Dimension</option>
-                                                <option value="Setup Damage / Calibration Loss">Setup Damage / Calibration Loss</option>
-                                                <option value="Machine Breakdown / Tool Defect">Machine Breakdown / Tool Defect</option>
-                                                <option value="Raw Material Void / Internal Defect">Raw Material Void / Internal Defect
-                                                </option>
-                                                <option value="Operator Mishap / Handling Damage">Operator Mishap / Handling Damage
-                                                </option>
-                                                <option value="Other Operational Loss">Other Operational Loss</option>
-                                            </x-ui.odoo-form-ui>
-                                        </div>
-                                        <div class="col-md-12">
-                                            <x-ui.odoo-form-ui type="textarea" label="Scrap Observations & Material Notes"
-                                                name="remarks" placeholder="Provide additional details regarding scrap cause..."
-                                                rows="2" />
-                                        </div>
-                                    </div>
-                                </form>
-                                <x-slot name="footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                                    <button type="button" class="btn btn-danger fw-bold px-4"
-                                        onclick="document.getElementById('scrapForm{{ $activeOp->id }}').submit();">
-                                        <i class="feather-trash-2 me-1"></i>Record Scrap
-                                    </button>
-                                </x-slot>
-                            </x-ui.modal>
+                            {{-- Unified Material Disposition Modal (Scrap, Offcut, Return Unused) --}}
+                            @include('modules.production.partials.material-disposition-modal', [
+                                'op' => $activeOrderOp,
+                                'order' => $activeOrder,
+                                'modalId' => 'materialDispositionModal' . $activeOp->id,
+                                'warehouses' => $warehouses
+                            ])
 
                             {{-- Disposition Rejected Quantity Modal --}}
                             <x-ui.modal id="dispositionModal{{ $activeOp->id }}"

@@ -1,11 +1,39 @@
 @props([
+    'paginator' => null,
     'currentPage' => 1,
     'totalPages' => 1,
     'totalResults' => 0,
     'perPage' => 10,
     'pageParam' => 'page',
-    'tab' => null
+    'tab' => null,
+    'onEachSide' => 2
 ])
+
+@php
+    if ($paginator instanceof \Illuminate\Contracts\Pagination\Paginator || $paginator instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator) {
+        $currentPage  = $paginator->currentPage();
+        $totalPages   = method_exists($paginator, 'lastPage') ? $paginator->lastPage() : (method_exists($paginator, 'hasMorePages') && $paginator->hasMorePages() ? $currentPage + 1 : $currentPage);
+        $totalResults = method_exists($paginator, 'total') ? $paginator->total() : $paginator->count();
+        $perPage      = $paginator->perPage();
+        $pageParam    = $paginator->getPageName();
+    }
+
+    $activeTab = $tab ?: request()->query('tab');
+    $queryParams = $activeTab ? ['tab' => $activeTab] : [];
+
+    // Calculate smart window around current page
+    $start = max(1, $currentPage - $onEachSide);
+    $end   = min($totalPages, $currentPage + $onEachSide);
+
+    if ($currentPage <= $onEachSide + 1) {
+        $end = min($totalPages, 1 + ($onEachSide * 2));
+    } elseif ($currentPage >= $totalPages - $onEachSide) {
+        $start = max(1, $totalPages - ($onEachSide * 2));
+    }
+
+    $from = $totalResults > 0 ? min(($currentPage - 1) * $perPage + 1, $totalResults) : 0;
+    $to   = min($currentPage * $perPage, $totalResults);
+@endphp
 
 @once
     <style>
@@ -14,14 +42,17 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 12px;
+            gap: 10px;
             margin-top: auto !important;
             padding-top: 15px;
+            padding-bottom: 5px;
             border-top: 1px solid #f1f5f9;
         }
         .erp-pagination {
             display: flex;
             align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
             gap: 6px;
             margin-bottom: 0;
             padding-left: 0;
@@ -36,7 +67,7 @@
             justify-content: center;
             width: 36px;
             height: 36px;
-            border-radius: 50% !important; /* Circle instead of square */
+            border-radius: 50% !important;
             border: 1px solid #cbd5e1;
             background-color: #ffffff;
             color: #475569;
@@ -62,6 +93,14 @@
             border-color: #e2e8f0;
             color: #94a3b8;
             cursor: not-allowed;
+        }
+        .erp-pagination .page-item.ellipsis .page-link {
+            background: transparent !important;
+            border-color: transparent !important;
+            color: #64748b !important;
+            cursor: default !important;
+            width: 28px;
+            box-shadow: none !important;
         }
         .erp-pagination-info {
             font-size: 12px;
@@ -93,16 +132,16 @@
             border-color: #1b2436 !important;
             color: #475569 !important;
         }
+        html.app-skin-dark .erp-pagination .page-item.ellipsis .page-link {
+            background: transparent !important;
+            border-color: transparent !important;
+            color: #94a3b8 !important;
+        }
         html.app-skin-dark .erp-pagination-info {
             color: #94a3b8 !important;
         }
     </style>
 @endonce
-
-@php
-    $activeTab = $tab ?: request()->query('tab');
-    $queryParams = $activeTab ? ['tab' => $activeTab] : [];
-@endphp
 
 @if($totalPages > 1)
 <div class="erp-pagination-container" {{ $attributes }}>
@@ -114,12 +153,36 @@
             </a>
         </li>
 
-        <!-- Page Numbers -->
-        @for ($i = 1; $i <= $totalPages; $i++)
+        <!-- First Page Link (if start > 1) -->
+        @if($start > 1)
+            <li class="page-item">
+                <a class="page-link" href="{{ request()->fullUrlWithQuery(array_merge($queryParams, [$pageParam => 1])) }}">1</a>
+            </li>
+            @if($start > 2)
+                <li class="page-item ellipsis disabled">
+                    <span class="page-link">…</span>
+                </li>
+            @endif
+        @endif
+
+        <!-- Windowed Page Numbers -->
+        @for ($i = $start; $i <= $end; $i++)
             <li class="page-item {{ $currentPage == $i ? 'active' : '' }}">
                 <a class="page-link" href="{{ request()->fullUrlWithQuery(array_merge($queryParams, [$pageParam => $i])) }}">{{ $i }}</a>
             </li>
         @endfor
+
+        <!-- Last Page Link (if end < totalPages) -->
+        @if($end < $totalPages)
+            @if($end < $totalPages - 1)
+                <li class="page-item ellipsis disabled">
+                    <span class="page-link">…</span>
+                </li>
+            @endif
+            <li class="page-item">
+                <a class="page-link" href="{{ request()->fullUrlWithQuery(array_merge($queryParams, [$pageParam => $totalPages])) }}">{{ $totalPages }}</a>
+            </li>
+        @endif
 
         <!-- Next Page Link -->
         <li class="page-item {{ $currentPage >= $totalPages ? 'disabled' : '' }}">
@@ -130,7 +193,7 @@
     </ul>
 
     <div class="erp-pagination-info">
-        Showing {{ min(($currentPage - 1) * $perPage + 1, $totalResults) }} to {{ min($currentPage * $perPage, $totalResults) }} of {{ $totalResults }} entries
+        Showing {{ $from }} to {{ $to }} of {{ $totalResults }} entries
     </div>
 </div>
 @endif

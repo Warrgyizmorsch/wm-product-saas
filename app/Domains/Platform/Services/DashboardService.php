@@ -109,7 +109,7 @@ class DashboardService
             'source' => $layout['source'],
             'catalog' => collect($this->registry->availableFor($user, $tenantId, $dashboard))->map(fn (array $w) => [
                 'key' => $w['key'], 'title' => $w['title'], 'module' => $w['module'], 'type' => $w['type'],
-                'icon' => $w['icon'], 'w' => $w['w'], 'h' => $w['h'], 'description' => $w['description'],
+                'icon' => $w['icon'], 'w' => $w['w'], 'h' => $w['h'], 'min_w' => $w['min_w'] ?? 2, 'min_h' => $w['min_h'] ?? 1, 'description' => $w['description'],
                 'settings' => (object) $w['settings'], 'chrome' => $w['chrome'],
             ])->values(),
             'canManage' => $canManage,

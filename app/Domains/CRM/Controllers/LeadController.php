@@ -379,6 +379,66 @@ class LeadController extends Controller
         return Excel::download(new LeadSampleExport, 'lead_sample.xlsx');
     }
 
+    public function parseImportFile(Request $request): JsonResponse
+    {
+        $this->authorize('create', Lead::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:20480',
+        ]);
+
+        try {
+            $service = app(\App\Domains\CRM\Services\LeadImportMapperService::class);
+            $result = $service->parseFile($request->file('file'), $tenantId);
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function processMappedImport(Request $request): JsonResponse
+    {
+        $this->authorize('create', Lead::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $companyId = company_id() ?? auth()->user()?->company_id ?? null;
+        $branchId = branch_id() ?? auth()->user()?->branch_id ?? null;
+        $userId = auth()->id() ?: 1;
+
+        $request->validate([
+            'file_token' => 'required|string',
+            'mapping' => 'required|array',
+            'options' => 'nullable|array',
+        ]);
+
+        try {
+            $service = app(\App\Domains\CRM\Services\LeadImportMapperService::class);
+            $result = $service->processImport(
+                fileToken: (string)$request->input('file_token'),
+                mapping: (array)$request->input('mapping', []),
+                options: (array)$request->input('options', []),
+                tenantId: $tenantId,
+                userId: $userId,
+                companyId: $companyId,
+                branchId: $branchId
+            );
+
+            return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
     public function import(Request $request)
     {
         $this->authorize('create', Lead::class);
@@ -455,6 +515,9 @@ class LeadController extends Controller
     public function edit(Lead $lead)
     {
         $this->authorize('update', $lead);
+        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+            return redirect()->route('crm.leads.show', $lead)->with('info', "This lead is in '{$lead->status}' stage and is locked in read-only mode.");
+        }
         $users = User::orderBy('name')->get();
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
         $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses();
@@ -464,6 +527,9 @@ class LeadController extends Controller
     public function update(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
+        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+            return redirect()->route('crm.leads.show', $lead)->withErrors(['lead' => "Leads in '{$lead->status}' stage cannot be modified."]);
+        }
         $validated = $request->validate($this->getLeadValidationRules($request), $this->getLeadValidationMessages());
 
         $this->leadService->updateLead($lead, $validated, $request->input('items', []), $request->input('product_ids', []));
@@ -473,6 +539,12 @@ class LeadController extends Controller
     public function updateStatus(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
+        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+            if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                return response()->json(['success' => false, 'message' => "Lead status in '{$lead->status}' stage is locked."], 422);
+            }
+            return redirect()->back()->withErrors(['status' => "Lead status in '{$lead->status}' stage is locked."]);
+        }
         $dbStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses()->pluck('name')->toArray();
         $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost'], $dbStatuses)));
         $validated = $request->validate(['status' => 'required|string|in:' . $allowedStatuses]);

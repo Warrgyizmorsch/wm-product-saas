@@ -93,6 +93,8 @@ class QuotationController extends Controller
         $users = User::orderBy('name')->get();
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
 
+        $nextQuotationNumber = $this->quotationService->getNextQuotationNumber();
+
         $prefilledItems = [];
         $rawItems = [];
         if ($selectedDeal) {
@@ -233,6 +235,9 @@ class QuotationController extends Controller
         $this->authorize('view', $quotation);
 
         $pdf = Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
+        if (request()->has('preview') || request()->has('stream')) {
+            return $pdf->stream("Quotation_{$quotation->quotation_number}.pdf");
+        }
         return $pdf->download("Quotation_{$quotation->quotation_number}.pdf");
     }
 
@@ -273,8 +278,9 @@ class QuotationController extends Controller
         $this->authorize('view', $quotation);
 
         $request->validate([
-            'phone'   => 'required|string',
-            'caption' => 'nullable|string',
+            'phone'      => 'required|string',
+            'caption'    => 'nullable|string',
+            'custom_pdf' => 'nullable|file|mimes:pdf|max:10240',
         ]);
 
         $phone = $request->input('phone');
@@ -288,7 +294,8 @@ class QuotationController extends Controller
             $result = $waService->sendQuotation(
                 quotation: $quotation,
                 mobile: $phone,
-                customCaption: $request->input('caption')
+                customCaption: $request->input('caption'),
+                customPdfFile: $request->file('custom_pdf')
             );
 
             if ($result['success']) {

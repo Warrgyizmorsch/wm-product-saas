@@ -41,7 +41,36 @@
             {{ __('production.adjust') }}
         </x-ui.button>
         @php
-            $unreceivedDetailQty = max(0, (float) ($wip->completed_quantity > 0 ? $wip->completed_quantity : ($wip->status === 'completed' ? $wip->available_quantity : 0)));
+            $order = $wip->order;
+            $isFgCard = ($wip->product_id === null || (int) $wip->product_id === (int) ($order?->product_id ?? 0));
+
+            $allOpsCompleted = $order && $order->operations->isNotEmpty() && $order->operations->every(function ($op) {
+                return in_array($op->status, [
+                    \App\Domains\Production\Models\ProductionOrderOperation::STATUS_COMPLETED,
+                    \App\Domains\Production\Models\ProductionOrderOperation::STATUS_SKIPPED,
+                    \App\Domains\Production\Models\ProductionOrderOperation::STATUS_CANCELLED,
+                ], true);
+            });
+
+            $hasPendingRework = $order && \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $wip->tenant_id)
+                ->where('production_order_id', $wip->production_order_id)
+                ->where('status', 'pending')
+                ->exists();
+
+            $hasQualityHold = $order && \App\Domains\Production\Models\ProductionQualityInspection::where('tenant_id', $wip->tenant_id)
+                ->where('production_order_id', $wip->production_order_id)
+                ->whereIn('status', ['hold', 'failed'])
+                ->exists();
+
+            $canReceiveFg = $isFgCard
+                && ($allOpsCompleted || $order?->status === 'completed')
+                && !in_array($wip->status, ['rework', 'quality_hold'], true)
+                && !$hasPendingRework
+                && !$hasQualityHold;
+
+            $unreceivedDetailQty = $canReceiveFg
+                ? max(0, (float) ($wip->completed_quantity > 0 ? $wip->completed_quantity : ($wip->status === 'completed' ? $wip->available_quantity : 0)))
+                : 0.0;
         @endphp
         @if($unreceivedDetailQty > 0)
             <x-ui.button variant="success" data-bs-toggle="modal" data-bs-target="#convertToFgModal"
@@ -283,14 +312,21 @@
     @if($wip->status !== 'completed' && $wip->available_quantity > 0)
         <x-ui.modal id="transferWipModal" title="{{ __('production.transfer_wip') }}"
             formAction="{{ route('production.wip.transfer', $wip->id) }}" submitText="Transfer WIP" closeText="Cancel">
-            <input type="hidden" name="from_operation_id" value="{{ $wip->current_routing_operation_id }}">
-            <x-ui.odoo-form-ui type="input" label="From Stage" name="from_stage_dummy" :value="$wip->currentRoutingOperation ? $wip->currentRoutingOperation->name : 'Start'" readonly />
+            @php
+                $currentOrderOp = $wip->order?->operations->first(function ($o) use ($wip) {
+                    return (int) $o->id === (int) $wip->current_routing_operation_id
+                        || (int) $o->routing_operation_id === (int) $wip->current_routing_operation_id;
+                });
+                $fromOpIdVal = $currentOrderOp ? $currentOrderOp->id : $wip->current_routing_operation_id;
+            @endphp
+            <input type="hidden" name="from_operation_id" value="{{ $fromOpIdVal }}">
+            <x-ui.odoo-form-ui type="input" label="From Stage" name="from_stage_dummy" :value="$currentOrderOp ? $currentOrderOp->name : ($wip->currentRoutingOperation ? $wip->currentRoutingOperation->name : 'Start')" readonly />
 
             <x-ui.odoo-form-ui type="select" label="To Stage" name="to_operation_id" :searchable="false" required>
                 @if($wip->order)
                     @foreach($wip->order->operations as $op)
-                        @if($op->routing_operation_id !== $wip->current_routing_operation_id)
-                            <option value="{{ $op->routing_operation_id }}">{{ $op->name }} (Seq: {{ $op->sequence }})</option>
+                        @if((int) $op->id !== (int) $fromOpIdVal)
+                            <option value="{{ $op->id }}">{{ $op->name }} (Seq: {{ $op->sequence }})</option>
                         @endif
                     @endforeach
                 @endif
@@ -329,11 +365,11 @@
     </x-ui.modal>
 
     {{-- Convert WIP Modal --}}
-    @if($wip->status === 'completed' || $wip->available_quantity > 0 || $wip->completed_quantity > 0)
+    @if($unreceivedDetailQty > 0)
         <x-ui.modal id="convertToFgModal" title="Receive Finished Goods into Warehouse"
-            formAction="{{ route('production.wip.convert', $wip->id) }}" submitText="Receive {{ number_format($wip->completed_quantity > 0 ? $wip->completed_quantity : $wip->available_quantity, 2) }} Units into Warehouse" closeText="Cancel">
+            formAction="{{ route('production.wip.convert', $wip->id) }}" submitText="Receive {{ number_format($unreceivedDetailQty, 2) }} Units into Warehouse" closeText="Cancel">
             <x-ui.odoo-form-ui type="input" label="Receive Quantity" name="convert_qty_dummy"
-                :value="number_format($wip->completed_quantity > 0 ? $wip->completed_quantity : $wip->available_quantity, 2) . ' units'" readonly />
+                :value="number_format($unreceivedDetailQty, 2) . ' units'" readonly />
 
             <x-ui.odoo-form-ui type="select" label="Target Warehouse" name="warehouse_id" :searchable="false" required>
                 @foreach($warehouses as $w)

@@ -127,4 +127,74 @@ class WorkCenterApiController extends ApiBaseController
             return $this->handleDomainException($e);
         }
     }
+
+    /**
+     * DELETE /api/v1/production/work-centers/{id}
+     * Delete an unused work center.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $workCenter = WorkCenter::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('delete', $workCenter);
+
+        try {
+            $this->service->delete($id);
+
+            return $this->successResponse(null, 'Work center deleted successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/work-centers/import
+     * Import work center master records from spreadsheet.
+     */
+    public function import(Request $request, \App\Domains\Production\Services\ProductionMasterImportService $importService): JsonResponse
+    {
+        Gate::authorize('create', WorkCenter::class);
+
+        $request->validate([
+            'file'     => 'required|file|max:10240|mimes:xlsx,xls,csv,txt',
+            'strategy' => 'nullable|string|in:create,update',
+        ]);
+
+        $strategy = $request->input('strategy', 'create');
+
+        try {
+            $result = $importService->import('work-centers', $request->file('file'), $strategy, $this->getTenantId(), auth()->id());
+
+            if ($result['status'] === 'failed') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Import validation failed. No records were imported.',
+                    'data'    => $result,
+                ], 422);
+            }
+
+            return $this->successResponse($result, 'Work centers imported successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * GET /api/v1/production/work-centers/export
+     * Export work center master records.
+     */
+    public function export(Request $request)
+    {
+        Gate::authorize('viewAny', WorkCenter::class);
+
+        $tenantId = $this->getTenantId();
+        $format = $request->query('format', 'xlsx');
+        $fileName = 'work_centers_export.' . ($format === 'csv' ? 'csv' : 'xlsx');
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\WorkCenterExport($tenantId, $request->all()),
+            $fileName
+        );
+    }
 }

@@ -4,7 +4,18 @@
     $empObj = $employee ?? null;
     $fieldValue = function (string $field, $default = '') use ($isEdit, $empObj) {
         $fallback = ($isEdit && $empObj && isset($empObj->$field)) ? $empObj->$field : $default;
-        return old($field, $fallback);
+        if ($fallback instanceof \Carbon\CarbonInterface || $fallback instanceof \DateTimeInterface) {
+            $fallback = $fallback->format('Y-m-d');
+        } elseif (is_string($fallback) && preg_match('/^\d{4}-\d{2}-\d{2}/', $fallback)) {
+            $fallback = substr($fallback, 0, 10);
+        }
+        $val = old($field, $fallback);
+        if ($val instanceof \Carbon\CarbonInterface || $val instanceof \DateTimeInterface) {
+            $val = $val->format('Y-m-d');
+        } elseif (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}/', $val)) {
+            $val = substr($val, 0, 10);
+        }
+        return $val;
     };
     $authUser = auth()->user();
     $isHrOrAdmin = $isHrOrAdmin ?? ($authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]));
@@ -401,24 +412,42 @@
                         <div class="col-md-4">
                             <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_marital_status') }}" name="marital_status" id="{{ $prefix }}_marital_status" select2-selector="default" :errorText="$errors->first('marital_status')" data-field-group="employee">
                                 <option value="">{{ __('hrms.employees.frm_select_status') }}</option>
-                                @foreach($maritalStatuses as $status)
-                                    <option value="{{ $status }}" @selected($fieldValue('marital_status') === $status)>{{ $status }}</option>
+                                @foreach($maritalStatuses as $key => $status)
+                                    @php
+                                        $val = is_string($key) && !is_numeric($key) ? $key : $status;
+                                        $label = is_string($status) ? $status : $val;
+                                        $curVal = (string) $fieldValue('marital_status');
+                                    @endphp
+                                    <option value="{{ $val }}" @selected(strcasecmp($curVal, (string)$val) === 0 || strcasecmp($curVal, (string)$label) === 0)>{{ $label }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-md-4" id="{{ $prefix }}_blood_group_wrapper">
                             <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_blood_group') }}" name="blood_group" id="{{ $prefix }}_blood_group" select2-selector="default" :errorText="$errors->first('blood_group')" data-field-group="employee">
                                 <option value="">{{ __('hrms.employees.frm_select_blood') }}</option>
-                                @foreach($bloodGroups as $bloodGroup)
-                                    <option value="{{ $bloodGroup }}" @selected($fieldValue('blood_group') === $bloodGroup)>{{ $bloodGroup }}</option>
+                                @foreach($bloodGroups as $key => $bloodGroup)
+                                    @php
+                                        $val = is_string($key) && !is_numeric($key) ? $key : $bloodGroup;
+                                        $label = is_string($bloodGroup) ? $bloodGroup : $val;
+                                        $curVal = (string) $fieldValue('blood_group');
+                                    @endphp
+                                    <option value="{{ $val }}" @selected(strcasecmp($curVal, (string)$val) === 0 || strcasecmp($curVal, (string)$label) === 0)>{{ $label }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-md-4">
                             <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_diet_pref') }}" name="diet_preference" id="{{ $prefix }}_diet_preference" select2-selector="default" :errorText="$errors->first('diet_preference')" data-field-group="employee">
                                 <option value="">{{ __('hrms.employees.frm_select_diet') }}</option>
-                                @foreach($dietPreferences as $preference)
-                                    <option value="{{ $preference }}" @selected($fieldValue('diet_preference') === $preference)>{{ $preference }}</option>
+                                @foreach($dietPreferences as $key => $preference)
+                                    @php
+                                        $val = is_string($key) && !is_numeric($key) ? $key : $preference;
+                                        $label = is_string($preference) ? $preference : $val;
+                                        $curVal = (string) $fieldValue('diet_preference');
+                                        $isDietSelected = strcasecmp($curVal, (string)$val) === 0 ||
+                                                          strcasecmp($curVal, (string)$label) === 0 ||
+                                                          (in_array(strtolower($curVal), ['veg', 'vegetarian']) && in_array(strtolower((string)$val), ['veg', 'vegetarian']));
+                                    @endphp
+                                    <option value="{{ $val }}" @selected($isDietSelected)>{{ $label }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>

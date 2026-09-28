@@ -15,6 +15,15 @@
         $canDeleteEmployee = $authUser && $accessService->allows($authUser, 'hrms.employees.delete', ['tenant_id' => $tenantId]);
     @endphp
     <div class="d-flex align-items-center gap-2 flex-wrap">
+        <x-ui.button variant="outline-info" icon="feather-user-check" href="{{ route('hrms.employees.profile-requests.index') }}" class="fw-semibold position-relative">
+            Profile Edit Requests
+            @php
+                $pendingProfileRequestsCount = \App\Domains\HRMS\Models\EmployeeProfileUpdateRequest::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->where('status', 'pending')->count();
+            @endphp
+            @if($pendingProfileRequestsCount > 0)
+                <span class="badge bg-danger rounded-pill ms-1">{{ $pendingProfileRequestsCount }}</span>
+            @endif
+        </x-ui.button>
         <x-ui.button variant="outline-primary" icon="feather-award" href="{{ route('hrms.probation.index') }}" class="fw-semibold">
             Probation Reviews
         </x-ui.button>
@@ -593,7 +602,7 @@
                                             <div>
                                                 <div class="fw-bold text-dark">{{ $employee->display_name }}</div>
                                                 <div class="mt-1" style="font-size: 11px;"><code>{{ $employee->employee_id }}</code></div>
-                                                <div class="text-muted fs-12">{{ $employee->personal_email ?: 'No personal email' }}</div>
+                                                <div class="text-muted fs-12">{{ $employee->office_email ?: ($employee->user?->email ?: ($employee->personal_email ?: 'No email')) }}</div>
                                             </div>
                                         </div>
                                     </td>

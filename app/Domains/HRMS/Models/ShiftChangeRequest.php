@@ -3,13 +3,14 @@
 namespace App\Domains\HRMS\Models;
 
 use App\Core\Database\BaseModel;
+use App\Domains\HRMS\Traits\HasHrmsScope;
 use App\Domains\Production\Models\ProductionShift;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ShiftChangeRequest extends BaseModel
 {
-    use SoftDeletes;
+    use SoftDeletes, HasHrmsScope;
 
     protected $fillable = [
         'tenant_id',
@@ -25,6 +26,7 @@ class ShiftChangeRequest extends BaseModel
         'status',
         'approved_by',
         'rejection_reason',
+        'cancellation_reason',
         'attachment_path',
     ];
 
@@ -52,5 +54,17 @@ class ShiftChangeRequest extends BaseModel
     public function approvedByEmployee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'approved_by');
+    }
+
+    /** Employee can directly withdraw only if still pending */
+    public function canWithdraw(): bool
+    {
+        return $this->status === 'pending';
+    }
+
+    /** Employee can request cancellation only if already approved */
+    public function canRequestCancellation(): bool
+    {
+        return $this->status === 'approved';
     }
 }

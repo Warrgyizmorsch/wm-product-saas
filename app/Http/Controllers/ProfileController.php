@@ -15,8 +15,13 @@ use Illuminate\View\View;
 class ProfileController extends Controller
 {
     public function __construct(
-        protected AccountService $accountService
-    ) {}
+        protected AccountService $accountService,
+        protected ?\App\Domains\HRMS\Repositories\EmployeeRepository $employeeRepository = null
+    ) {
+        if (class_exists(\App\Domains\HRMS\Repositories\EmployeeRepository::class) && !$this->employeeRepository) {
+            $this->employeeRepository = app(\App\Domains\HRMS\Repositories\EmployeeRepository::class);
+        }
+    }
 
     /**
      * Display the universal, module-agnostic Profile detail page.
@@ -30,10 +35,15 @@ class ProfileController extends Controller
         $tenant = tenant() ?? $user->tenant ?? Tenant::find($user->tenant_id);
 
         $employee = null;
+        $employeeData = [];
         if (class_exists(\App\Domains\HRMS\Models\Employee::class)) {
             $employee = $user->relationLoaded('employee')
                 ? $user->employee
                 : \App\Domains\HRMS\Models\Employee::resolveForUser($user);
+
+            if ($employee && $this->employeeRepository) {
+                $employeeData = $this->employeeRepository->getProfileData($employee, $request->all());
+            }
         }
 
         $recentActivity = collect();
@@ -49,7 +59,9 @@ class ProfileController extends Controller
                 ->get();
         }
 
-        return view('profile.show', compact('user', 'tenant', 'employee', 'recentActivity'));
+        $viewData = array_merge($employeeData, compact('user', 'tenant', 'employee', 'recentActivity'));
+
+        return view('profile.show', $viewData);
     }
 
     /**

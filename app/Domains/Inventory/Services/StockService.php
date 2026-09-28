@@ -276,7 +276,7 @@ class StockService
             $mfgDate,
             $expiryDate
         ) {
-            $product = Product::findOrFail($productId);
+            $product = Product::withoutGlobalScopes()->findOrFail($productId);
 
             // 1. Manage batch details if batch tracking is active
             $batchId = null;
@@ -424,33 +424,16 @@ class StockService
                 return;
             }
 
-            $product = Product::find($productId);
+            $product = Product::withoutGlobalScopes()->find($productId);
             $productName = $product ? $product->name : "Product #{$productId}";
 
-            $inventoryAccountName = $product ? $product->inventory_account : null;
-            if (!$inventoryAccountName && $product && $product->parent_id) {
-                $inventoryAccountName = $product->parent?->inventory_account;
-            }
-
-            $inventoryAcc = null;
-            if ($inventoryAccountName) {
-                $inventoryAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
-                    ->where(function ($q) use ($inventoryAccountName) {
-                        $q->where('name', $inventoryAccountName)
-                          ->orWhere('code', $inventoryAccountName);
-                    })->first();
-            }
-
-            if (!$inventoryAcc) {
-                $inventoryAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
-                    ->where(function ($q) {
-                        $q->where('code', '1200')->orWhere('name', 'like', '%Inventory%');
-                    })->first();
-            }
+            /** @var \App\Domains\Accounting\Services\AccountResolverService $accountResolver */
+            $accountResolver = app(\App\Domains\Accounting\Services\AccountResolverService::class);
+            $inventoryAcc = $accountResolver->resolveInventoryAccount($product, $tenantId);
 
             $equityAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
                 ->where(function ($q) {
-                    $q->where('code', '3010')->orWhere('code', '3020');
+                    $q->where('code', '3010')->orWhere('code', '3020')->orWhere('subtype', 'capital')->orWhere('type', 'equity');
                 })->first();
 
             if (!$inventoryAcc || !$equityAcc) {
@@ -530,7 +513,7 @@ class StockService
             $referenceId,
             $serialNumbers
         ) {
-            $product = Product::findOrFail($productId);
+            $product = Product::withoutGlobalScopes()->findOrFail($productId);
 
             // 1. Consume reservation if one existed for this document
             if ($referenceId) {

@@ -20,6 +20,7 @@ class SubscriptionPaymentService
     public function __construct(
         private readonly TenantService $tenants,
         private readonly TenantModuleService $modules,
+        private readonly TenantSubscriptionService $subscriptions,
     ) {
     }
 
@@ -63,7 +64,10 @@ class SubscriptionPaymentService
                 'status' => SubscriptionPayment::STATUS_PAID,
             ]);
 
-            if ($payment->purpose === SubscriptionPayment::PURPOSE_MODULE_ADDON) {
+            if ($payment->purpose === SubscriptionPayment::PURPOSE_SUBSCRIPTION_CHANGE) {
+                // Prorated upgrade of a live subscription: apply the change it paid for.
+                $this->subscriptions->applyPaidChange($payment);
+            } elseif ($payment->purpose === SubscriptionPayment::PURPOSE_MODULE_ADDON) {
                 // Grants the modules and fills their starter masters, like a plan switch.
                 // Paid with the one-time fee, so free for life (never recurring-billed).
                 $this->modules->install($payment->tenant, $payment->modules ?? [], $payment, null, TenantModule::BILLING_LIFETIME);

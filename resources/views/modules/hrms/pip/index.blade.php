@@ -47,6 +47,20 @@
         justify-content: center;
         font-weight: 700;
         font-size: 13px;
+        flex-shrink: 0;
+    }
+
+    /* PIP Tables: Prevent horizontal scrollbar & wrap long content to next line */
+    .pip-table {
+        width: 100% !important;
+        table-layout: fixed !important;
+    }
+    .pip-table th,
+    .pip-table td {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        white-space: normal !important;
     }
 </style>
 @endpush
@@ -256,16 +270,16 @@
 
             <!-- PIP PLANS TABLE -->
             <div class="table-responsive border rounded">
-                <table class="table table-hover align-middle mb-0 fs-13">
+                <table class="table table-hover align-middle mb-0 fs-13 pip-table">
                     <thead class="bg-light">
                         <tr>
-                            <th class="ps-3 py-3 text-muted text-uppercase fs-11">PIP #</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Employee</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Reason / Category</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Timeline</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Check-in Freq</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Status</th>
-                            <th class="text-end pe-3 py-3 text-muted text-uppercase fs-11">Actions</th>
+                            <th class="ps-3 py-3 text-muted text-uppercase fs-11" style="width: 10%;">PIP #</th>
+                            <th class="py-3 text-muted text-uppercase fs-11" style="width: 22%;">Employee</th>
+                            <th class="py-3 text-muted text-uppercase fs-11" style="width: 16%;">Reason / Category</th>
+                            <th class="py-3 text-muted text-uppercase fs-11" style="width: 16%;">Timeline</th>
+                            <th class="py-3 text-muted text-uppercase fs-11" style="width: 11%;">Check-in Freq</th>
+                            <th class="py-3 text-muted text-uppercase fs-11 text-center" style="width: 14%;">Status</th>
+                            <th class="text-end pe-3 py-3 text-muted text-uppercase fs-11" style="width: 11%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -283,7 +297,7 @@
                                         </div>
                                         <div>
                                             <div class="fw-semibold text-dark">{{ $plan->employee->full_name ?? 'N/A' }}</div>
-                                            <small class="text-muted fs-11">{{ $plan->employee->designation?->name ?? 'N/A' }} &bull; {{ $plan->employee->department?->name ?? 'N/A' }}</small>
+                                            <small class="text-muted fs-11 d-block" style="line-height: 1.3;">{{ $plan->employee->designation?->name ?? 'N/A' }} &bull; {{ $plan->employee->department?->name ?? 'N/A' }}</small>
                                         </div>
                                     </div>
                                 </td>
@@ -316,7 +330,7 @@
                                         <small class="text-muted fs-11 d-block mt-0.5">Next: {{ $plan->next_checkin_due_date->format('M d') }}</small>
                                     @endif
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     @php
                                         $badgeVariant = match($plan->status) {
                                             'active' => 'success',
@@ -327,7 +341,7 @@
                                             default => 'secondary'
                                         };
                                     @endphp
-                                    <x-ui.badge soft variant="{{ $badgeVariant }}" class="text-capitalize">
+                                    <x-ui.badge soft variant="{{ $badgeVariant }}" class="text-capitalize text-nowrap">
                                         {{ str_replace('_', ' ', $plan->status) }}
                                     </x-ui.badge>
                                 </td>
@@ -442,13 +456,13 @@
         @elseif($activeTab === 'categories')
             <!-- TAB 2: PIP CATEGORIES MASTER -->
             <div class="table-responsive border rounded">
-                <table class="table table-hover align-middle mb-0 fs-13">
+                <table class="table table-hover align-middle mb-0 fs-13 pip-table">
                     <thead class="bg-light">
                         <tr>
-                            <th class="ps-3 py-3 text-muted text-uppercase fs-11">Category Name</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Description</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Status</th>
-                            <th class="text-end pe-3 py-3 text-muted text-uppercase fs-11">Actions</th>
+                            <th class="ps-3 py-3 text-muted text-uppercase fs-11" style="width: 25%;">Category Name</th>
+                            <th class="py-3 text-muted text-uppercase fs-11" style="width: 50%;">Description</th>
+                            <th class="py-3 text-muted text-uppercase fs-11 text-center" style="width: 15%;">Status</th>
+                            <th class="text-end pe-3 py-3 text-muted text-uppercase fs-11" style="width: 10%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -456,7 +470,7 @@
                             <tr>
                                 <td class="ps-3 fw-bold text-dark">{{ $cat->name }}</td>
                                 <td class="text-muted">{{ $cat->description ?? 'N/A' }}</td>
-                                <td><x-ui.badge soft variant="success">Active</x-ui.badge></td>
+                                <td class="text-center"><x-ui.badge soft variant="success">Active</x-ui.badge></td>
                                 <td class="text-end pe-3">
                                     <form action="{{ route('hrms.pip.category.destroy', $cat->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this category?')">
                                         @csrf
@@ -489,14 +503,14 @@
         @elseif($activeTab === 'templates')
             <!-- TAB 3: POLICY TEMPLATES MASTER -->
             <div class="table-responsive border rounded">
-                <table class="table table-hover align-middle mb-0 fs-13">
+                <table class="table table-hover align-middle mb-0 fs-13 pip-table">
                     <thead class="bg-light">
                         <tr>
-                            <th class="ps-3 py-3 text-muted text-uppercase fs-11">Template Name</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Duration (Days)</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Check-in Frequency</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Description</th>
-                            <th class="text-end pe-3 py-3 text-muted text-uppercase fs-11">Actions</th>
+                            <th class="ps-3 py-3 text-muted text-uppercase fs-11" style="width: 25%;">Template Name</th>
+                            <th class="py-3 text-muted text-uppercase fs-11" style="width: 15%;">Duration (Days)</th>
+                            <th class="py-3 text-muted text-uppercase fs-11" style="width: 15%;">Check-in Frequency</th>
+                            <th class="py-3 text-muted text-uppercase fs-11" style="width: 35%;">Description</th>
+                            <th class="text-end pe-3 py-3 text-muted text-uppercase fs-11" style="width: 10%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>

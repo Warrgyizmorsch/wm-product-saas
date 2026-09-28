@@ -29,11 +29,14 @@ class ProductionWipService
             $order = ProductionOrder::findOrFail($orderId);
 
             $orderOp = ProductionOrderOperation::where('production_order_id', $orderId)
-                ->where(function ($q) use ($operationId) {
-                    $q->where('routing_operation_id', $operationId)
-                        ->orWhere('id', $operationId);
-                })
+                ->where('id', $operationId)
                 ->first();
+
+            if (!$orderOp) {
+                $orderOp = ProductionOrderOperation::where('production_order_id', $orderId)
+                    ->where('routing_operation_id', $operationId)
+                    ->first();
+            }
 
             $routingOpId = $orderOp ? $orderOp->routing_operation_id : $operationId;
             $workCenterId = $orderOp ? $orderOp->work_center_id : null;
@@ -478,13 +481,31 @@ class ProductionWipService
                 ->orderByRaw("id = ? DESC", [$fromOpId])
                 ->first();
 
-            if ($fromOrderOp && $toOrderOp->sequence > $fromOrderOp->sequence) {
-                $nextSequence = ProductionOrderOperation::where('production_order_id', $wip->production_order_id)
-                    ->where('sequence', '>', $fromOrderOp->sequence)
-                    ->min('sequence');
+            if ($fromOrderOp) {
+                // Check if $toOrderOp is an explicit successor of $fromOrderOp
+                $isExplicitSuccessor = ((int) $toOrderOp->previous_operation_id === (int) $fromOrderOp->id)
+                    || $toOrderOp->predecessorDependencies()->where('predecessor_operation_id', $fromOrderOp->id)->exists()
+                    || $fromOrderOp->successorDependencies()->where('operation_id', $toOrderOp->id)->exists();
 
-                if ($toOrderOp->sequence !== $nextSequence) {
-                    throw new InvalidArgumentException("WIP cannot skip routing operations. Next allowed stage sequence is {$nextSequence}.");
+                // If not an explicit successor, enforce sequential progress within the same operation chain
+                if (!$isExplicitSuccessor && $toOrderOp->sequence > $fromOrderOp->sequence) {
+                    $isSameChain = ($toOrderOp->source_product_id === $fromOrderOp->source_product_id);
+                    if ($isSameChain) {
+                        $nextSequence = ProductionOrderOperation::where('production_order_id', $wip->production_order_id)
+                            ->where(function ($q) use ($fromOrderOp) {
+                                if ($fromOrderOp->source_product_id) {
+                                    $q->where('source_product_id', $fromOrderOp->source_product_id);
+                                } else {
+                                    $q->whereNull('source_product_id');
+                                }
+                            })
+                            ->where('sequence', '>', $fromOrderOp->sequence)
+                            ->min('sequence');
+
+                        if ($nextSequence !== null && $toOrderOp->sequence !== $nextSequence) {
+                            throw new InvalidArgumentException("WIP cannot skip routing operations. Next allowed stage sequence is {$nextSequence}.");
+                        }
+                    }
                 }
             }
 
@@ -494,9 +515,12 @@ class ProductionWipService
             }
 
             // Quality Hold & Rework Validation
+            $fromOrderOpId = $fromOrderOp?->id;
+            $fromRoutingOpId = $fromOrderOp?->routing_operation_id ?? $fromOpId;
+
             $qhQuery = \App\Domains\Production\Models\ProductionQualityInspection::where('tenant_id', $wip->tenant_id)
                 ->where('production_order_id', $wip->production_order_id)
-                ->whereIn('production_order_operation_id', [$fromOrderOp->id, $fromOrderOp->routing_operation_id])
+                ->when($fromOrderOpId, fn($q) => $q->where('production_order_operation_id', $fromOrderOpId))
                 ->whereIn('status', ['hold', 'failed']);
             if ($targetBatchId) {
                 $qhQuery->where(fn($sub) => $sub->whereNull('batch_id')->orWhere('batch_id', $targetBatchId));
@@ -505,7 +529,7 @@ class ProductionWipService
 
             $rwQuery = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $wip->tenant_id)
                 ->where('production_order_id', $wip->production_order_id)
-                ->whereIn('production_order_operation_id', [$fromOrderOp->id, $fromOrderOp->routing_operation_id])
+                ->when($fromOrderOpId, fn($q) => $q->where('production_order_operation_id', $fromOrderOpId))
                 ->where('status', 'pending');
             if ($targetBatchId) {
                 $rwQuery->where('production_batch_id', $targetBatchId);
@@ -518,21 +542,14 @@ class ProductionWipService
             }
 
             // Calculate actual ready-to-transfer balance
-            $fromOpIds = array_filter(array_unique([
-                $fromOpId,
-                $fromOrderOp?->id,
-                $fromOrderOp?->routing_operation_id,
-                $wip->current_routing_operation_id,
-            ]));
-
             $logQuery = \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $wip->tenant_id)
                 ->where('production_order_id', $wip->production_order_id)
-                ->whereIn('operation_id', $fromOpIds);
+                ->when($fromOrderOpId, fn($q) => $q->where('operation_id', $fromOrderOpId));
             $logQty = (float) $logQuery->sum('quantity_produced');
 
             $txQty = (float) ProductionWipTransaction::where('tenant_id', $wip->tenant_id)
                 ->where('production_order_id', $wip->production_order_id)
-                ->whereIn('from_operation_id', $fromOpIds)
+                ->where('from_operation_id', $fromRoutingOpId)
                 ->whereIn('transaction_type', ['operation_completed', 'progress_logged', 'rework_completed'])
                 ->sum('quantity');
 
@@ -542,12 +559,12 @@ class ProductionWipService
 
             $scrapQuery = \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $wip->tenant_id)
                 ->where('production_order_id', $wip->production_order_id)
-                ->whereIn('production_order_operation_id', $fromOpIds);
+                ->when($fromOrderOpId, fn($q) => $q->where('production_order_operation_id', $fromOrderOpId));
             $goodOutput -= (float) $scrapQuery->sum('quantity');
 
             $txQuery = ProductionWipTransaction::where('tenant_id', $wip->tenant_id)
                 ->where('production_order_id', $wip->production_order_id)
-                ->whereIn('from_operation_id', array_filter([$fromOpId, $fromOrderOp?->routing_operation_id, $fromOrderOp?->id]))
+                ->where('from_operation_id', $fromRoutingOpId)
                 ->where('transaction_type', 'transferred');
             if ($wip->production_batch_id) {
                 $txQuery->where('production_batch_id', $wip->production_batch_id);
@@ -574,10 +591,13 @@ class ProductionWipService
                 throw new InvalidArgumentException("Transfer quantity (" . number_format($quantity, 2) . ") exceeds available ready-to-transfer quantity (" . number_format($readyToTransfer, 2) . ") for {$batchLabel}.");
             }
 
-            $destWip = $batchId ? $this->getOrCreateWipForBatchOperation($wip->production_order_id, $batchId, $toOpId, $userId) : $wip;
+            $toRoutingOpId = $toOrderOp->routing_operation_id ?: $toOpId;
+            $destWip = $batchId ? $this->getOrCreateWipForBatchOperation($wip->production_order_id, $batchId, $toOrderOp->id, $userId) : $wip;
 
-            $fromOp = RoutingOperation::find($fromOpId);
-            $toOp = RoutingOperation::find($toOpId);
+            $fromOp = RoutingOperation::find($fromOpId) ?: $fromOrderOp?->routingOperation;
+            $toOp = RoutingOperation::find($toOpId) ?: $toOrderOp?->routingOperation;
+            $fromOpName = $fromOp?->name ?? $fromOrderOp?->name ?? 'OP';
+            $toOpName = $toOp?->name ?? $toOrderOp?->name ?? 'OP';
 
             if ($fromOrderOp) {
                 $fromOrderOp->quantity_transferred_out = round((float) $fromOrderOp->quantity_transferred_out + $quantity, 4);
@@ -598,31 +618,37 @@ class ProductionWipService
                     ->update(['status' => ProductionScheduleOperation::STATUS_READY]);
             }
 
-            $destWip->current_routing_operation_id = $toOpId;
-            $destWip->available_quantity = round((float) $destWip->available_quantity + $quantity, 4);
-            $destWip->save();
+            $destWip->current_routing_operation_id = $toRoutingOpId;
 
             if ($wip->id !== $destWip->id) {
+                $destWip->available_quantity = round((float) $destWip->available_quantity + $quantity, 4);
+                $destWip->save();
+
                 $wip->available_quantity = max(0.0000, round((float) $wip->available_quantity - $quantity, 4));
                 if ($wip->available_quantity <= 0.0001 && $wip->status === 'active') {
                     $wip->status = 'transferred';
                 }
                 $wip->save();
+            } else {
+                $destWip->save();
             }
 
-            if ($batch && $toOrderOp->sequence >= ($batch->currentOperation?->sequence ?? 0)) {
+            if ($batch) {
                 $batch->current_operation_id = $toOrderOp->id;
                 $batch->save();
             }
+
+            $fromRoutingOpId = $fromOrderOp?->routing_operation_id ?: (RoutingOperation::where('id', $fromOpId)->exists() ? $fromOpId : null);
+            $toRoutingOpId = $toOrderOp?->routing_operation_id ?: (RoutingOperation::where('id', $toOpId)->exists() ? $toOpId : null);
 
             ProductionWipTransaction::create([
                 'tenant_id' => $wip->tenant_id,
                 'wip_id' => $wip->id,
                 'production_order_id' => $wip->production_order_id,
                 'production_batch_id' => $batchId,
-                'from_operation_id' => $fromOpId,
-                'to_operation_id' => $toOpId,
-                'from_work_center_id' => $fromOp ? $fromOp->work_center_id : null,
+                'from_operation_id' => $fromRoutingOpId,
+                'to_operation_id' => $toRoutingOpId,
+                'from_work_center_id' => $fromOp ? $fromOp->work_center_id : ($fromOrderOp?->work_center_id),
                 'to_work_center_id' => $toOrderOp->work_center_id,
                 'machine_id' => $toOrderOp->machine_id,
                 'operator_id' => $userId,
@@ -632,7 +658,7 @@ class ProductionWipService
                 'cost_before' => $wip->total_value,
                 'cost_added' => 0.00,
                 'cost_after' => $wip->total_value,
-                'remarks' => ($remarks ?? "WIP transferred from " . ($fromOp?->name ?? 'OP') . " to " . $toOp->name . " for " . ($batch ? "batch #{$batch->batch_number}" : "order #{$wip->production_order_id}") . ".") . ($idempotencyKey ? " IDEMPOTENCY:{$idempotencyKey}" : ""),
+                'remarks' => ($remarks ?? "WIP transferred from {$fromOpName} to {$toOpName} for " . ($batch ? "batch #{$batch->batch_number}" : "order #{$wip->production_order_id}") . ".") . ($idempotencyKey ? " IDEMPOTENCY:{$idempotencyKey}" : ""),
                 'transaction_at' => now(),
                 'created_by' => $userId,
             ]);
@@ -641,7 +667,7 @@ class ProductionWipService
                 'production_order_id' => $wip->production_order_id,
                 'event_type' => 'WIP Transferred',
                 'title' => 'WIP Transferred Step',
-                'description' => "Transferred {$quantity} units to routing operation step '{$toOp->name}' for " . ($batch ? "batch #{$batch->batch_number}" : "order #{$wip->production_order_id}") . ".",
+                'description' => "Transferred {$quantity} units to operation step '{$toOpName}' for " . ($batch ? "batch #{$batch->batch_number}" : "order #{$wip->production_order_id}") . ".",
                 'severity' => 'info',
                 'event_source' => 'ProductionWipService',
                 'triggered_by' => $userId,
@@ -654,9 +680,9 @@ class ProductionWipService
      * Evaluates untransferred good output on a source operation and executes
      * sub-batch WIP transfer to the successor operation.
      */
-    public function evaluateAndExecuteWipTransfers(int $sourceOrderOpId, ?int $userId = null): float
+    public function evaluateAndExecuteWipTransfers(int $sourceOrderOpId, ?int $userId = null, ?int $targetBatchId = null): float
     {
-        return DB::transaction(function () use ($sourceOrderOpId, $userId) {
+        return DB::transaction(function () use ($sourceOrderOpId, $userId, $targetBatchId) {
             $sourceOp = ProductionOrderOperation::lockForUpdate()
                 ->findOrFail($sourceOrderOpId);
             $tenantId = $sourceOp->tenant_id;
@@ -698,10 +724,18 @@ class ProductionWipService
                     ->first();
             }
 
-            if (!$nextOp) {
+            if (!$nextOp && $sourceOp->source_product_id && (int) $sourceOp->source_product_id !== (int) $order->product_id) {
+                // If final operation of a subassembly, look for downstream assembly operation that consumes it
                 $nextOp = ProductionOrderOperation::where('tenant_id', $sourceOp->tenant_id)
                     ->where('production_order_id', $sourceOp->production_order_id)
-                    ->where('sequence', '>', $sourceOp->sequence)
+                    ->where(function ($q) use ($order) {
+                        $q->whereNull('source_product_id')
+                          ->orWhere('source_product_id', $order->product_id);
+                    })
+                    ->where(function ($q) use ($sourceOp) {
+                        $q->where('previous_operation_id', $sourceOp->id)
+                          ->orWhereHas('predecessorDependencies', fn($d) => $d->where('predecessor_operation_id', $sourceOp->id));
+                    })
                     ->orderBy('sequence', 'asc')
                     ->lockForUpdate()
                     ->first();
@@ -711,16 +745,20 @@ class ProductionWipService
                 return 0.0; // Final operation has no downstream operation to transfer to
             }
 
-            $batches = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $tenantId)
-                ->where('production_order_id', $sourceOp->production_order_id)
-                ->whereNotIn('status', [\App\Domains\Production\Models\ProductionBatch::STATUS_CANCELLED, \App\Domains\Production\Models\ProductionBatch::STATUS_CONSUMED])
-                ->lockForUpdate()
-                ->get();
+            $sourceRoutingOpId = $sourceOp->routing_operation_id ?? $sourceOp->id;
+            $nextRoutingOpId = $nextOp->routing_operation_id ?? $nextOp->id;
 
-            $isFirstOp = !ProductionOrderOperation::where('tenant_id', $tenantId)
+            $batchQuery = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $tenantId)
                 ->where('production_order_id', $sourceOp->production_order_id)
-                ->where('sequence', '<', $sourceOp->sequence)
-                ->exists();
+                ->whereNotIn('status', [\App\Domains\Production\Models\ProductionBatch::STATUS_CANCELLED, \App\Domains\Production\Models\ProductionBatch::STATUS_CONSUMED]);
+
+            if ($targetBatchId) {
+                $batchQuery->where('id', $targetBatchId);
+            }
+
+            $batches = $batchQuery->lockForUpdate()->get();
+
+            $isFirstOp = $sourceOp->isEntryOperation();
 
             $totalTransferredAllBatches = 0.0;
             $batchList = $batches->isNotEmpty() ? $batches : [null];
@@ -740,7 +778,7 @@ class ProductionWipService
                 $hasPendingRework = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->when($batchId, fn($q) => $q->where(fn($sub) => $sub->whereNull('production_batch_id')->orWhere('production_batch_id', $batchId)))
-                    ->whereIn('production_order_operation_id', [$sourceOp->id, $sourceOp->routing_operation_id])
+                    ->where('production_order_operation_id', $sourceOp->id)
                     ->where('status', 'pending')
                     ->exists();
 
@@ -751,41 +789,34 @@ class ProductionWipService
                 $logQty = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                    ->whereIn('operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
+                    ->where('operation_id', $sourceOp->id)
                     ->sum('quantity_produced');
 
                 $txQty = (float) ProductionWipTransaction::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                    ->where(function ($q) use ($sourceOp) {
-                        $fromOpIds = array_filter(array_unique([$sourceOp->routing_operation_id, $sourceOp->id]));
-                        if (!empty($fromOpIds)) {
-                            $q->whereIn('from_operation_id', $fromOpIds);
-                        }
-                        $q->orWhere('remarks', 'like', "%from Op {$sourceOp->sequence}%");
-                    })
+                    ->where('from_operation_id', $sourceRoutingOpId)
                     ->whereIn('transaction_type', ['operation_completed', 'progress_logged', 'rework_completed', 'subcontract_received', 'subcontract_qc_passed', 'subcontract_completed'])
                     ->sum('quantity');
 
                 $reworkPendingQty = (float) \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                    ->whereIn('production_order_operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
+                    ->where('production_order_operation_id', $sourceOp->id)
                     ->where('status', '!=', 'completed')
                     ->sum('quantity');
 
                 $scrapQty = (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                    ->whereIn('production_order_operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
+                    ->where('production_order_operation_id', $sourceOp->id)
                     ->sum('quantity');
 
-                $opRoutingIds = array_filter([$sourceOp->routing_operation_id, $sourceOp->id]);
                 $wipCompletedQty = (float) ProductionWip::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                    ->where(function ($q) use ($opRoutingIds) {
-                        $q->whereIn('current_routing_operation_id', $opRoutingIds)
+                    ->where(function ($q) use ($sourceRoutingOpId) {
+                        $q->where('current_routing_operation_id', $sourceRoutingOpId)
                             ->orWhereNull('current_routing_operation_id');
                     })
                     ->sum('completed_quantity');
@@ -797,38 +828,36 @@ class ProductionWipService
                 $progressScrap = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                    ->whereIn('operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
+                    ->where('operation_id', $sourceOp->id)
                     ->sum('quantity_scrapped');
 
                 $progressRework = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                    ->whereIn('operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
+                    ->where('operation_id', $sourceOp->id)
                     ->sum('quantity_rejected');
 
                 $standaloneScrap = max(0.0, $scrapQty - $progressScrap);
                 $standaloneRework = max(0.0, $reworkPendingQty - $progressRework);
                 $goodOutput = round(max(0.0, $rawGoodOutput - $standaloneRework - $standaloneScrap), 4);
 
-                $latestInspection = \App\Domains\Production\Models\ProductionQualityInspection::where('tenant_id', $tenantId)
-                    ->whereIn('production_order_operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
-                    ->where('status', 'approved')
-                    ->latest()
-                    ->first();
+                $isQcRequired = (bool) ($sourceOp->quality_required || ($sourceOp->routingOperation?->quality_required ?? false));
+                if ($isQcRequired) {
+                    $approvedPassedQty = (float) \App\Domains\Production\Models\ProductionQualityInspection::where('tenant_id', $tenantId)
+                        ->where('production_order_id', $sourceOp->production_order_id)
+                        ->when($batchId, fn($q) => $q->where(fn($sub) => $sub->whereNull('batch_id')->orWhere('batch_id', $batchId)))
+                        ->where('production_order_operation_id', $sourceOp->id)
+                        ->where('status', 'approved')
+                        ->sum('passed_qty');
 
-                if ($latestInspection && (float) $latestInspection->passed_qty >= 0) {
-                    $goodOutput = min($goodOutput, (float) $latestInspection->passed_qty);
+                    $goodOutput = min($goodOutput, $approvedPassedQty);
                 }
 
                 $alreadyTransferred = (float) ProductionWipTransaction::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
                     ->where('transaction_type', 'transferred')
-                    ->where(function ($q) use ($sourceOp) {
-                        $fromOpIds = array_filter(array_unique([$sourceOp->id, $sourceOp->routing_operation_id]));
-                        $q->whereIn('from_operation_id', $fromOpIds)
-                          ->orWhere('remarks', 'like', "%from Op {$sourceOp->sequence}%");
-                    })
+                    ->where('from_operation_id', $sourceRoutingOpId)
                     ->sum('quantity');
 
                 $readyToTransfer = round(max(0.0, $goodOutput - $alreadyTransferred), 4);
@@ -844,34 +873,35 @@ class ProductionWipService
                         ->where('production_order_id', $sourceOp->production_order_id)
                         ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
                         ->where('transaction_type', 'transferred')
-                        ->where(function ($q) use ($sourceOp) {
-                            $toOpIds = array_filter(array_unique([$sourceOp->id, $sourceOp->routing_operation_id]));
-                            $q->whereIn('to_operation_id', $toOpIds)
-                              ->orWhere('remarks', 'like', "%to Op {$sourceOp->sequence}%");
-                        })
+                        ->where('to_operation_id', $sourceRoutingOpId)
                         ->sum('quantity');
                 }
 
                 $processedAtCurrentOp = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                    ->whereIn('operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
+                    ->where('operation_id', $sourceOp->id)
                     ->sum('quantity_produced')
                     + (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
                         ->where('production_order_id', $sourceOp->production_order_id)
                         ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                        ->whereIn('operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
+                        ->where('operation_id', $sourceOp->id)
                         ->sum('quantity_rejected')
                     + (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
                         ->where('production_order_id', $sourceOp->production_order_id)
                         ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                        ->whereIn('operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
+                        ->where('operation_id', $sourceOp->id)
                         ->sum('quantity_scrapped');
+
+                $isAllQcPassed = $isQcRequired
+                    && $goodOutput > 0
+                    && app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($sourceOp->id, $batchId) <= 0.0001;
 
                 $batchCompletedAtOp = ($expectedInput > 0 && $processedAtCurrentOp >= $expectedInput)
                     || ($goodOutput >= $plannedQty && $plannedQty > 0)
                     || ($sourceOp->status === ProductionOrderOperation::STATUS_COMPLETED)
-                    || ($sourceOp->is_external && $sourceOp->status !== 'subcontract_qc_pending' && $readyToTransfer > 0);
+                    || ($sourceOp->is_external && $sourceOp->status !== 'subcontract_qc_pending' && $readyToTransfer > 0)
+                    || ($isAllQcPassed && $readyToTransfer > 0);
 
                 // Transfer Chunk Determination
                 $transferBatchQty = (float) ($sourceOp->transfer_batch_quantity > 0
@@ -904,11 +934,11 @@ class ProductionWipService
 
                 // Get batch-and-operation-specific WIP records
                 $sourceWip = $batchId
-                    ? $this->getOrCreateWipForBatchOperation($sourceOp->production_order_id, $batchId, $sourceOp->routing_operation_id ?? $sourceOp->id, $userId)
+                    ? $this->getOrCreateWipForBatchOperation($sourceOp->production_order_id, $batchId, $sourceRoutingOpId, $userId)
                     : ProductionWip::where('tenant_id', $tenantId)->where('production_order_id', $sourceOp->production_order_id)->first();
 
                 $destWip = $batchId
-                    ? $this->getOrCreateWipForBatchOperation($sourceOp->production_order_id, $batchId, $nextOp->routing_operation_id ?? $nextOp->id, $userId)
+                    ? $this->getOrCreateWipForBatchOperation($sourceOp->production_order_id, $batchId, $nextRoutingOpId, $userId)
                     : $sourceWip;
 
                 foreach ($chunks as $chunkQty) {
@@ -936,16 +966,16 @@ class ProductionWipService
                         ->update(['status' => ProductionScheduleOperation::STATUS_READY]);
 
                     if ($destWip && $destWip->id !== $sourceWip?->id) {
-                        $destWip->current_routing_operation_id = $nextOp->routing_operation_id;
+                        $destWip->current_routing_operation_id = $nextRoutingOpId;
                         $destWip->available_quantity = round((float) $destWip->available_quantity + $chunkQty, 4);
                         $destWip->save();
                     } elseif ($sourceWip) {
-                        $sourceWip->current_routing_operation_id = $nextOp->routing_operation_id;
+                        $sourceWip->current_routing_operation_id = $nextRoutingOpId;
                         $sourceWip->available_quantity = round(max((float) $sourceWip->available_quantity, $chunkQty), 4);
                         $sourceWip->save();
                     }
 
-                    if ($batch && $nextOp->sequence >= ($batch->currentOperation?->sequence ?? 0)) {
+                    if ($batch) {
                         $batch->current_operation_id = $nextOp->id;
                         $batch->save();
                     }
@@ -955,8 +985,8 @@ class ProductionWipService
                         'wip_id' => $sourceWip?->id,
                         'production_order_id' => $sourceOp->production_order_id,
                         'production_batch_id' => $batchId,
-                        'from_operation_id' => $sourceOp->routing_operation_id,
-                        'to_operation_id' => $nextOp->routing_operation_id,
+                        'from_operation_id' => $sourceRoutingOpId,
+                        'to_operation_id' => $nextRoutingOpId,
                         'from_work_center_id' => $sourceOp->work_center_id,
                         'to_work_center_id' => $nextOp->work_center_id,
                         'machine_id' => $nextOp->machine_id,
@@ -986,21 +1016,7 @@ class ProductionWipService
     public function getAvailableInputWip(ProductionOrderOperation $op, ?int $batchId = null): float
     {
         // Entry-level operation in routing branch has target input based on target_produced_qty or order quantity
-        $isFirstOp = !ProductionOrderOperation::where('tenant_id', $op->tenant_id)
-            ->where('production_order_id', $op->production_order_id)
-            ->where(function ($q) use ($op) {
-                if ($op->previous_operation_id) {
-                    $q->where('id', $op->previous_operation_id);
-                } else {
-                    $q->where('sequence', '<', $op->sequence)
-                      ->where(function ($w) use ($op) {
-                          if ($op->source_product_id && (int) $op->source_product_id !== (int) ($op->order?->product_id ?? 0)) {
-                              $w->where('source_product_id', $op->source_product_id);
-                          }
-                      });
-                }
-            })
-            ->exists();
+        $isFirstOp = $op->isEntryOperation();
 
         if ($isFirstOp) {
             if ($batchId) {
@@ -1041,29 +1057,15 @@ class ProductionWipService
         }
 
         $toOpIds = array_filter(array_unique([
-            $op->id,
             $op->routing_operation_id,
-            $op->routingOperation?->id,
-            ...ProductionOrderOperation::where('tenant_id', $op->tenant_id)
-                ->where('production_order_id', $op->production_order_id)
-                ->where('sequence', $op->sequence)
-                ->pluck('routing_operation_id')
-                ->toArray(),
-            ...ProductionOrderOperation::where('tenant_id', $op->tenant_id)
-                ->where('production_order_id', $op->production_order_id)
-                ->where('sequence', $op->sequence)
-                ->pluck('id')
-                ->toArray(),
+            $op->id,
         ]));
 
         $txTransferredIn = (float) ProductionWipTransaction::where('tenant_id', $op->tenant_id)
             ->where('production_order_id', $op->production_order_id)
             ->when($batchId, fn($q) => $q->where(fn($sub) => $sub->whereNull('production_batch_id')->orWhere('production_batch_id', $batchId)))
             ->where('transaction_type', 'transferred')
-            ->where(function ($q) use ($toOpIds, $op) {
-                $q->whereIn('to_operation_id', $toOpIds)
-                  ->orWhere('remarks', 'like', "%to Op {$op->sequence}%");
-            })
+            ->whereIn('to_operation_id', $toOpIds)
             ->sum('quantity');
 
         $transferredIn = max((float) $op->quantity_transferred_in, $txTransferredIn);
@@ -1494,9 +1496,10 @@ class ProductionWipService
                         return;
                     }
 
-                    $opSeq = $wip->currentRoutingOperation?->sequence ?? 0;
-                    $isAtFinalStage = ($wip->current_routing_operation_id == $finalFgOp->routing_operation_id)
-                        || ($opSeq >= $finalFgOp->sequence);
+                    $isAtFinalStage = $finalFgOp && (
+                        (int) $wip->current_routing_operation_id === (int) $finalFgOp->id
+                        || (int) $wip->current_routing_operation_id === (int) ($finalFgOp->routing_operation_id ?? 0)
+                    );
 
                     $isWipCompleted = ($isOrderOrFinalOpCompleted && $isAtFinalStage);
 

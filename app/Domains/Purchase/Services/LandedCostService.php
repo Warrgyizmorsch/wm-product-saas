@@ -608,10 +608,10 @@ class LandedCostService
         foreach ($grnItems as $item) {
             $items[] = [
                 'grn_id'       => $item->goods_receipt_note_id,
-                'grn_number'   => $item->goodsReceiptNote->grn_number,
+                'grn_number'   => $item->goodsReceiptNote?->grn_number ?? '—',
                 'product_id'   => $item->product_id,
-                'product_name' => $item->product->name,
-                'sku'          => $item->product->sku ?: 'No SKU',
+                'product_name' => $item->product?->name ?? ($item->description ?? 'Product #' . $item->product_id),
+                'sku'          => $item->product?->sku ?: 'No SKU',
                 'uom'          => $item->product?->uom?->code ?? 'PCS',
                 'received_qty' => (float) $item->received_qty,
                 'unit_rate'    => (float) $item->unit_rate,

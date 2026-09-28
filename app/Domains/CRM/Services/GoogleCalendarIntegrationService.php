@@ -57,30 +57,51 @@ class GoogleCalendarIntegrationService
             if ($response->successful()) {
                 $data = $response->json();
                 $eventData = $data['event'] ?? $data;
+                $realMeetLink = $data['meet_link'] ?? $eventData['meet_link'] ?? null;
                 return [
                     'success' => true,
-                    'google_event_id' => $eventData['event_id'] ?? $data['id'] ?? $data['event_id'] ?? ('g_evt_' . time()),
-                    'meet_link' => $data['meet_link'] ?? $eventData['meet_link'] ?? $eventData['html_link'] ?? null,
+                    'google_event_id' => $eventData['event_id'] ?? $data['id'] ?? $data['event_id'] ?? null,
+                    'meet_link' => $realMeetLink,
+                    'message' => 'Event scheduled on Google Calendar successfully.',
                     'raw' => $data
                 ];
             }
 
             if ($response->status() === 401) {
                 Log::info('Google Calendar API notice: User Google Account not authorized yet. Please click Connect Google Account.');
+                return [
+                    'success' => false,
+                    'google_event_id' => null,
+                    'meet_link' => null,
+                    'error_type' => 'auth_required',
+                    'message' => 'Your Google Account is not connected yet. Please connect your Google Calendar in CRM Activities to generate live Google Meet links.',
+                    'auth_url' => $this->getAuthUrl(),
+                    'raw' => null
+                ];
             } else {
+                $body = $response->json();
+                $msg = $body['message'] ?? $body['detail'] ?? ('Google Calendar service error (' . $response->status() . ').');
                 Log::warning('Google Calendar API returned error status', ['status' => $response->status(), 'body' => $response->body()]);
+                return [
+                    'success' => false,
+                    'google_event_id' => null,
+                    'meet_link' => null,
+                    'error_type' => 'api_error',
+                    'message' => $msg,
+                    'raw' => null
+                ];
             }
         } catch (\Throwable $e) {
             Log::error('Google Calendar API request failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'google_event_id' => null,
+                'meet_link' => null,
+                'error_type' => 'connection_failed',
+                'message' => 'Could not connect to Google Calendar service. Please check your internet or connect your Google Workspace account.',
+                'raw' => null
+            ];
         }
-
-        // Return graceful fallback response
-        return [
-            'success' => true,
-            'google_event_id' => 'g_evt_' . time() . '_' . rand(1000, 9999),
-            'meet_link' => !empty($params['create_meet_link']) ? 'https://meet.google.com/wm-' . strtolower(substr(md5((string)time()), 0, 7)) : null,
-            'raw' => null
-        ];
     }
 
     /**

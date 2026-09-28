@@ -1,28 +1,28 @@
 <div class="card border-0 mb-0 h-100 shadow-sm" style="border-radius: 16px; background: #ffffff;">
-    <div class="card-header bg-white pt-4 pb-3 px-4 d-flex align-items-center justify-content-between border-bottom-0">
-        <div class="d-flex align-items-center gap-2.5" style="gap: 10px;">
-            <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px; background: #fff7ed; border-radius: 8px; color: #ea580c;">
-                <i class="feather-clock fs-14"></i>
+    <div class="card-header bg-white pt-3.5 pb-2.5 px-4 d-flex align-items-center justify-content-between border-bottom-0">
+        <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 30px; height: 30px; background: #fff7ed; border-radius: 8px; color: #ea580c;">
+                <i class="feather-clock fs-13"></i>
             </div>
-            <h6 class="fw-bold mb-0 text-dark" style="font-size: 16px; color: #1e293b !important; font-weight: 700;">Late Arrivals (Last 7 Days)</h6>
+            <h6 class="fw-bold mb-0 text-dark fs-14" style="color: #0f172a !important;">Late Arrivals (Last 7 Days)</h6>
         </div>
-        <span class="badge px-2.5 py-1 fs-11 fw-bold rounded-2" style="background: #ffedd5; color: #c2410c;">
+        <span class="badge px-2.5 py-1 fs-11 fw-semibold rounded-pill" style="background: #ffedd5; color: #c2410c;">
             {{ isset($recentLateArrivals) ? count($recentLateArrivals) : 0 }} Cases
         </span>
     </div>
 
-    <div class="card-body p-0 overflow-auto" style="min-height: 240px;">
+    <div class="card-body p-0 overflow-auto" style="min-height: 220px;">
         @if(!empty($recentLateArrivals) && count($recentLateArrivals) > 0)
             <div class="table-responsive">
-                <table class="table align-middle mb-0 fs-13">
+                <table class="table align-middle mb-0">
                     <tbody>
                         @foreach($recentLateArrivals as $late)
                             <tr>
-                                <td class="py-3 ps-4 border-bottom" style="border-color: #f1f5f9;">
-                                    <div class="fw-bold text-dark fs-14" style="color: #1e293b !important; font-weight: 700;">{{ $late->employee?->full_name ?? 'Employee' }}</div>
+                                <td class="py-2.5 ps-4 border-bottom" style="border-color: #f1f5f9;">
+                                    <div class="fw-semibold text-dark fs-13" style="color: #1e293b !important;">{{ $late->employee?->full_name ?? 'Employee' }}</div>
                                 </td>
-                                <td class="py-3 pe-4 text-end border-bottom" style="border-color: #f1f5f9;">
-                                    <span class="badge px-2.5 py-1 fs-11 fw-bold rounded-2" style="background: #ffedd5; color: #c2410c;">Late {{ $late->late_minutes ?? 15 }} mins</span>
+                                <td class="py-2.5 pe-4 text-end border-bottom" style="border-color: #f1f5f9;">
+                                    <span class="badge px-2.5 py-1 fs-11 fw-semibold rounded-pill" style="background: #ffedd5; color: #c2410c;">Late {{ $late->late_minutes ?? 15 }} mins</span>
                                 </td>
                             </tr>
                         @endforeach

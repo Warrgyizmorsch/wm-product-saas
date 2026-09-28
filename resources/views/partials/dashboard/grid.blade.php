@@ -15,7 +15,8 @@
         .dash-widget-title { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--bs-secondary-color, #6c757d); }
         .dash-kpi { height: 100%; display: flex; flex-direction: column; justify-content: center; }
         .dash-kpi-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
-        .dash-bare { position: relative; height: 100%; overflow: auto; }
+        .dash-bare { position: relative; height: 100%; overflow: hidden; }
+        .dash-bare:hover { overflow-y: auto; overflow-x: hidden; }
         .dash-bare > .card, .dash-bare > .row > [class*="col"] > .card { height: 100%; margin-bottom: 0 !important; }
         .dash-tools { position: absolute; top: 6px; right: 6px; z-index: 5; display: none; gap: 4px; background: #fffc; border-radius: 6px; padding: 2px; }
         .dash-editing .dash-tools { display: flex; }
@@ -102,7 +103,6 @@
             const CSRF = document.querySelector('meta[name="csrf-token"]').content;
             const catalogByKey = Object.fromEntries(CATALOG.map(w => [w.key, w]));
 
-            let currentSource = @json($source ?? 'starter');
             const root = document.getElementById('dash-root');
             const emptyEl = document.getElementById('dash-empty');
             const gallery = document.getElementById('dash-gallery');
@@ -162,7 +162,9 @@
                 const def = catalogByKey[item.key];
                 if (!def) return;
                 meta.set(item.id, {key: item.key, config: item.config || {}});
-                const node = {id: item.id, x: item.x, y: item.y, w: item.w, h: item.h, minW: 2, minH: 1, content: itemHtml(item.id, def, item.config || {})};
+                const minW = def.min_w || def.minW || 2;
+                const minH = def.min_h || def.minH || 1;
+                const node = {id: item.id, x: item.x, y: item.y, w: item.w, h: item.h, minW: minW, minH: minH, content: itemHtml(item.id, def, item.config || {})};
                 if (item.x === undefined) { delete node.x; delete node.y; }
                 grid.addWidget(node);
 
@@ -247,20 +249,31 @@
                 }
             }
 
-            // A block that draws its own card grows until its content fits (except fixed KPI cards & saved user layouts).
+            // A block that draws its own card grows until its content fits, so it never scrolls.
+            // KPI cards in one row then all take the tallest one's height, keeping the row even.
             function fit(id) {
-                if (currentSource !== 'starter') return;
                 const node = grid.engine.nodes.find(n => n.id === id);
                 if (!node) return;
-                const key = meta.get(id)?.key || '';
-                if (key.includes('kpi')) return; // Keep top KPI summary boxes at fixed height
-                const content = node.el && node.el.querySelector('.grid-stack-item-content');
-                if (!content) return;
-                const holder = content.querySelector('.dash-bare');
-                if (!holder || holder.scrollHeight <= holder.clientHeight + 2) return;
-                const unit = 70 + 8;
-                grid.update(node.el, {h: Math.ceil((holder.scrollHeight + 8) / unit)});
+                const holder = node.el && node.el.querySelector('.grid-stack-item-content > .dash-bare');
+                if (holder && holder.scrollHeight > holder.clientHeight + 2) {
+                    const unit = 70 + 8;
+                    grid.update(node.el, {h: Math.ceil((holder.scrollHeight + 8) / unit)});
+                }
+                if ((meta.get(id)?.key || '').includes('kpi')) evenKpiRow(node.y);
             }
+
+            function evenKpiRow(y) {
+                const row = grid.engine.nodes.filter(n => n.y === y && (meta.get(n.id)?.key || '').includes('kpi'));
+                const h = Math.max(...row.map(n => n.h));
+                row.forEach(n => { if (n.h !== h) grid.update(n.el, {h}); });
+            }
+
+            // Narrower cards wrap their text: fit again once the window settles.
+            let refitTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(refitTimer);
+                refitTimer = setTimeout(() => meta.forEach((_, id) => fit(id)), 200);
+            });
 
             // ── Editing ──
             function setEditing(on) {
@@ -375,10 +388,7 @@
                     const layout = current();
                     const s = scope ? scope.value : 'personal';
                     await send('PUT', {scope: s, role_id: s === 'role' ? el('dash-role').value : null, widgets: layout});
-                    if (s === 'personal') {
-                        saved = layout;
-                        currentSource = 'personal';
-                    }
+                    if (s === 'personal') saved = layout;
                     setEditing(false);
                 } catch (e) {
                     alert('Could not save the dashboard. Please try again.');

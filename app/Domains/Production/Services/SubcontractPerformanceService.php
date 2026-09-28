@@ -518,9 +518,16 @@ class SubcontractPerformanceService
                 $blockingOp = null;
                 if ($op->order && $op->order->operations) {
                     $nextOp = $op->order->operations
-                        ->where('sequence', '>', $op->sequence)
+                        ->where('previous_operation_id', $op->id)
                         ->whereNotIn('status', ['completed', 'cancelled'])
                         ->first();
+
+                    if (!$nextOp) {
+                        $nextOp = $op->order->operations
+                            ->filter(fn($o) => ($op->source_product_id ? $o->source_product_id === $op->source_product_id : $o->source_product_id === null) && $o->sequence > $op->sequence && !in_array($o->status, ['completed', 'cancelled']))
+                            ->sortBy('sequence')
+                            ->first();
+                    }
 
                     if ($nextOp) {
                         $blockingOp = "Op #{$nextOp->sequence} — {$nextOp->name}";

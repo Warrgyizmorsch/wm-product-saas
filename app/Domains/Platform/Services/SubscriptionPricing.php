@@ -147,7 +147,13 @@ class SubscriptionPricing
      */
     public function prorate(SubscriptionQuote $current, SubscriptionQuote $new, CarbonInterface $periodStart, CarbonInterface $periodEnd, CarbonInterface $now): int
     {
-        $delta = $new->subtotal - $current->subtotal;
+        return $this->prorateSubtotals($current->subtotal, $new->subtotal, $periodStart, $periodEnd, $now);
+    }
+
+    /** prorate() on bare cycle subtotals (paise, excl. GST) — e.g. a live subscription's stored one. */
+    public function prorateSubtotals(int $currentSubtotal, int $newSubtotal, CarbonInterface $periodStart, CarbonInterface $periodEnd, CarbonInterface $now): int
+    {
+        $delta = $newSubtotal - $currentSubtotal;
         $periodSeconds = $periodEnd->getTimestamp() - $periodStart->getTimestamp();
         $remainingSeconds = $periodEnd->getTimestamp() - $now->getTimestamp();
 

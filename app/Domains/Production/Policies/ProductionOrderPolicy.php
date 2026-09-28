@@ -43,7 +43,7 @@ class ProductionOrderPolicy
 
     public function issue(User $user, ProductionOrder $order): bool
     {
-        return ($order->isReleased() || $order->isInProgress())
+        return ($order->isDraft() || $order->isReleased() || $order->isInProgress())
             && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 

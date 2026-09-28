@@ -6,6 +6,7 @@ use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Models\VoucherDetail;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
+use App\Domains\Accounting\Services\AccountResolverService;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Accounting\Support\VoucherType;
@@ -21,6 +22,7 @@ class PostPurchaseReturnJournal
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
         private readonly PostingFailureRecorder $failures,
+        private readonly AccountResolverService $accountResolver,
     ) {
     }
 
@@ -35,9 +37,11 @@ class PostPurchaseReturnJournal
         $tenantId = $return->tenant_id ?: (tenant_id() ?? 1);
 
         try {
+            $return->loadMissing('items.product');
+
             // Chart of Account lookups
             $accountsPayable = $this->accounts->findByCode('2010', $tenantId);
-            $inventory       = $this->accounts->findByCode('1200', $tenantId);
+            $defaultInventory = $this->accountResolver->resolveInventoryAccount(null, $tenantId);
             $inputGst        = $this->accounts->findByCode('1600', $tenantId);
             $inputCgst       = $this->accounts->findByCode('1610', $tenantId)
                 ?? $this->accounts->findByCode('1601', $tenantId)
@@ -50,7 +54,7 @@ class PostPurchaseReturnJournal
                 ?? (ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Input IGST%')->first() ?: $inputGst);
             $freightExpense  = $this->accounts->findByCode('5030', $tenantId) ?: $this->accounts->findByCode('5900', $tenantId);
 
-            if (!$accountsPayable || !$inventory) {
+            if (!$accountsPayable || !$defaultInventory) {
                 Log::warning('PostPurchaseReturnJournal: missing Chart of Accounts (2010/1200), skipping auto-post', [
                     'purchase_return_id' => $return->id,
                     'tenant_id' => $tenantId,
@@ -65,6 +69,7 @@ class PostPurchaseReturnJournal
             $totalSgstAmount     = 0.0;
             $totalIgstAmount     = 0.0;
             $totalExtraFreight   = 0.0;
+            $inventoryBuckets    = []; // inv_account_id => amount
 
             // Related Vendor Bill lookup for exact line item GST tax rates
             $bill = null;
@@ -79,6 +84,9 @@ class PostPurchaseReturnJournal
                 $unitPrice = (float) $item->unit_price;
                 $lineBase  = round($itemQty * $unitPrice, 2);
                 $totalBaseAmount += $lineBase;
+
+                $invAcc = $this->accountResolver->resolveInventoryAccount($item->product ?? $item->product_id, $tenantId) ?: $defaultInventory;
+                $inventoryBuckets[$invAcc->id] = ($inventoryBuckets[$invAcc->id] ?? 0.0) + $lineBase;
 
                 // 1. Check if Landed Cost Voucher was posted for this GRN Item
                 if ($return->goods_receipt_note_id) {
@@ -118,7 +126,6 @@ class PostPurchaseReturnJournal
             }
 
             $vendorRefundAmount   = round($totalBaseAmount + $totalTaxAmount, 2);
-            $totalInventoryCredit = round($totalBaseAmount + $totalExtraFreight, 2);
 
             $lines = [];
 
@@ -142,13 +149,28 @@ class PostPurchaseReturnJournal
                 ];
             }
 
-            // 3. Inventory Asset Account - CREDIT (Full Landed Stock Value Cleared)
-            $lines[] = [
-                'chart_of_account_id' => $inventory->id,
-                'debit'               => 0,
-                'credit'              => $totalInventoryCredit,
-                'description'         => "Purchase Return {$return->return_number} - Stock Asset Reduction",
-            ];
+            // 3. Inventory Asset Accounts - CREDIT (Full Landed Stock Value Cleared per resolved product account)
+            foreach ($inventoryBuckets as $invAccountId => $baseAmt) {
+                if ($baseAmt > 0) {
+                    $lines[] = [
+                        'chart_of_account_id' => $invAccountId,
+                        'debit'               => 0,
+                        'credit'              => round($baseAmt, 2),
+                        'description'         => "Purchase Return {$return->return_number} - Stock Asset Reduction",
+                    ];
+                }
+            }
+
+            // If extra freight was added, credit primary inventory asset
+            if ($totalExtraFreight > 0) {
+                $primaryInvId = !empty($inventoryBuckets) ? array_key_first($inventoryBuckets) : $defaultInventory->id;
+                $lines[] = [
+                    'chart_of_account_id' => $primaryInvId,
+                    'debit'               => 0,
+                    'credit'              => round($totalExtraFreight, 2),
+                    'description'         => "Purchase Return {$return->return_number} - Freight Landed Cost Reduction",
+                ];
+            }
 
             // 4. Input GST Tax Credit Reversals - CREDIT
             if ($totalIgstAmount > 0 && $inputIgst) {

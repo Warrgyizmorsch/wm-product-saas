@@ -4,6 +4,7 @@ namespace App\Domains\Sales\Services;
 
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Services\AccountResolverService;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Sales\Models\Invoice;
@@ -16,13 +17,14 @@ class SalesAccountingService
     public function __construct(
         private readonly JournalService $journalService,
         private readonly PostingFailureRecorder $failures,
+        private readonly AccountResolverService $accountResolver,
     ) {}
 
     /**
      * Automatically post balanced double-entry accounting journal for a Sales Invoice.
      *
      * Debit:  Accounts Receivable (Customer A/c) - Total Invoice Amount
-     * Credit: Sales Revenue A/c - Net Taxable Sales (Subtotal - Discount)
+     * Credit: Sales Revenue A/c (Product specific or standard 4010) - Net Taxable Sales
      * Credit: Output CGST A/c - Output CGST Tax Amount
      * Credit: Output SGST A/c - Output SGST Tax Amount
      * Credit: Output IGST A/c - Output IGST Tax Amount
@@ -41,17 +43,18 @@ class SalesAccountingService
             return $existing;
         }
 
-        // 1. Debtors / Accounts Receivable A/c
-        $accountsReceivable = ChartOfAccount::where('tenant_id', $tenantId)
-            ->where(function ($q) {
-                $q->where('code', '1100')->orWhere('name', 'Accounts Receivable');
-            })->first() ?? ChartOfAccount::where('tenant_id', $tenantId)->where('subtype', ChartOfAccount::SUBTYPE_CURRENT_ASSET)->first();
+        $invoice->loadMissing('items.product');
 
-        // 2. Sales Revenue A/c
-        $salesRevenue = ChartOfAccount::where('tenant_id', $tenantId)
-            ->where(function ($q) {
-                $q->where('code', '4010')->orWhere('name', 'Sales Revenue');
-            })->first() ?? ChartOfAccount::where('tenant_id', $tenantId)->where('type', ChartOfAccount::TYPE_INCOME)->first();
+        // 1. Debtors / Accounts Receivable A/c (1100)
+        $accountsReceivable = $this->accountResolver->resolveAccount(
+            identifier: null,
+            tenantId: $tenantId,
+            fallbackCode: '1100',
+            fallbackType: ChartOfAccount::TYPE_ASSET
+        );
+
+        // 2. Default Sales Revenue A/c (4010)
+        $defaultSalesRevenue = $this->accountResolver->resolveSalesAccount(null, $tenantId);
 
         // 3. Output CGST A/c
         $outputCgst = ChartOfAccount::where('tenant_id', $tenantId)
@@ -78,12 +81,10 @@ class SalesAccountingService
                     $q->where('name', 'like', '%Freight%')->orWhere('name', 'like', '%Shipping%');
                 })->first() ?? ChartOfAccount::where('tenant_id', $tenantId)->where('code', '4900')->first());
 
-        // 7. Round Off (manual total adjustment, most commonly rounding to a
-        // whole currency unit) — without this line the AR debit (which already
-        // includes the adjustment) would never balance against the credit side.
+        // 7. Round Off
         $roundOff = ChartOfAccount::where('tenant_id', $tenantId)->where('code', '5730')->first();
 
-        if (!$accountsReceivable || !$salesRevenue) {
+        if (!$accountsReceivable || !$defaultSalesRevenue) {
             Log::warning("SalesAccountingService: Missing core Chart of Accounts for tenant {$tenantId}");
             $this->failures->record($tenantId, InvoicePosted::class, $invoice, 'Missing Accounts Receivable or Sales Revenue account.');
             return null;
@@ -99,15 +100,50 @@ class SalesAccountingService
             'description'         => "Debtors - Invoice {$invoice->invoice_number}",
         ];
 
-        // Credit Sales Revenue -> Net Taxable Amount
+        // Credit Sales Revenue -> Net Taxable Amount partitioned by each product's sales account
         $netTaxableSales = round((float) ($invoice->subtotal - $invoice->discount_amount), 2);
         if ($netTaxableSales > 0) {
-            $lines[] = [
-                'chart_of_account_id' => $salesRevenue->id,
-                'debit'               => 0,
-                'credit'              => $netTaxableSales,
-                'description'         => "Sales Revenue - Taxable Goods for Invoice {$invoice->invoice_number}",
-            ];
+            $salesBuckets = []; // account_id => ['account' => ChartOfAccount, 'amount' => float]
+            $itemsSubtotalSum = 0.0;
+
+            foreach ($invoice->items as $item) {
+                $lineTaxable = max(0, ((float)$item->quantity * (float)$item->unit_price) - (float)($item->discount ?? 0));
+                $itemsSubtotalSum += $lineTaxable;
+                $resolvedSalesAcc = $this->accountResolver->resolveSalesAccount($item->product, $tenantId) ?: $defaultSalesRevenue;
+                $accId = $resolvedSalesAcc->id;
+
+                if (!isset($salesBuckets[$accId])) {
+                    $salesBuckets[$accId] = [
+                        'account' => $resolvedSalesAcc,
+                        'amount' => 0.0,
+                    ];
+                }
+                $salesBuckets[$accId]['amount'] += $lineTaxable;
+            }
+
+            // If header discount was applied or no item records exist, scale buckets to match netTaxableSales
+            if ($itemsSubtotalSum > 0 && abs($itemsSubtotalSum - $netTaxableSales) > 0.005) {
+                $scale = $netTaxableSales / $itemsSubtotalSum;
+                foreach ($salesBuckets as $accId => $bucket) {
+                    $salesBuckets[$accId]['amount'] = round($bucket['amount'] * $scale, 2);
+                }
+            } elseif ($itemsSubtotalSum <= 0 || empty($salesBuckets)) {
+                $salesBuckets[$defaultSalesRevenue->id] = [
+                    'account' => $defaultSalesRevenue,
+                    'amount'  => $netTaxableSales,
+                ];
+            }
+
+            foreach ($salesBuckets as $accId => $bucket) {
+                if ($bucket['amount'] > 0) {
+                    $lines[] = [
+                        'chart_of_account_id' => $accId,
+                        'debit'               => 0,
+                        'credit'              => round($bucket['amount'], 2),
+                        'description'         => "Sales Revenue ({$bucket['account']->name}) - Invoice {$invoice->invoice_number}",
+                    ];
+                }
+            }
         }
 
         // Credit Output CGST
@@ -151,10 +187,7 @@ class SalesAccountingService
             ];
         }
 
-        // Round Off / manual adjustment — rounding UP (customer pays more than
-        // taxable+tax+freight) is credited as other income; rounding DOWN is
-        // debited as a small expense. Without this, a non-zero adjustment
-        // leaves the journal unbalanced and posting fails outright.
+        // Round Off / manual adjustment
         $adjustment = round((float) $invoice->adjustment, 2);
         if ($adjustment != 0) {
             if (!$roundOff) {
@@ -197,29 +230,14 @@ class SalesAccountingService
     /**
      * Automatically post balanced COGS Inventory Accounting Journal when a Dispatch Order is shipped/outwarded.
      *
-     * Debit:  Cost of Goods Sold (COGS A/c) - Code 5010
-     * Credit: Inventory Asset A/c           - Code 1200
+     * Debit:  Cost of Goods Sold (COGS A/c) - Product COGS / 5010
+     * Credit: Inventory Asset A/c           - Product Inventory / 1200
      */
     public function postDispatchOrderCogsJournal(\App\Domains\Sales\Models\DispatchOrder $dispatch): ?Journal
     {
         $tenantId = $dispatch->tenant_id ?: (tenant_id() ?? 1);
 
-        // 1. COGS Expense A/c (Code 5010 or subtype cogs)
-        $cogsAccount = ChartOfAccount::where('tenant_id', $tenantId)
-            ->where(function ($q) {
-                $q->where('code', '5010')->orWhere('name', 'Cost of Goods Sold');
-            })->first() ?? ChartOfAccount::where('tenant_id', $tenantId)->where('subtype', ChartOfAccount::SUBTYPE_COGS)->first();
-
-        // 2. Inventory Asset A/c (Code 1200 or Inventory)
-        $inventoryAccount = ChartOfAccount::where('tenant_id', $tenantId)
-            ->where(function ($q) {
-                $q->where('code', '1200')->orWhere('name', 'Inventory');
-            })->first() ?? ChartOfAccount::where('tenant_id', $tenantId)->where('type', ChartOfAccount::TYPE_ASSET)->first();
-
-        if (!$cogsAccount || !$inventoryAccount) {
-            Log::warning("SalesAccountingService: Missing COGS or Inventory Chart of Accounts for tenant {$tenantId}");
-            return null;
-        }
+        $dispatch->loadMissing('items.product');
 
         // Check if journal already posted for this Dispatch Order
         $existing = Journal::where('tenant_id', $tenantId)
@@ -231,39 +249,94 @@ class SalesAccountingService
             return $existing;
         }
 
-        // Calculate total cost value of dispatched items
-        $totalCogs = 0;
+        $cogsBuckets = [];      // cogs_account_id => float
+        $inventoryBuckets = []; // inventory_account_id => float
+
         foreach ($dispatch->items as $item) {
             $qty = (float) ($item->quantity_dispatched > 0 ? $item->quantity_dispatched : $item->quantity_ordered);
             
-            // Valuation Cost Price: use product cost_price, purchase_price, or selling_price * 0.6
-            $productCost = (float) ($item->product?->cost_price ?? $item->product?->purchase_price ?? 0);
-            if ($productCost <= 0) {
-                $productCost = round((float) ($item->product?->selling_price ?? 0) * 0.6, 2);
+            // Valuation Cost Price:
+            // 1. First look up the exact StockTransaction recorded for this DispatchOrder & product.
+            //    StockService::recordOutflow() calculates FIFO lot depletion or Weighted Average unit cost.
+            $stockTx = \App\Domains\Inventory\Models\StockTransaction::where('tenant_id', $tenantId)
+                ->where('reference_type', 'DispatchOrder')
+                ->where('reference_id', $dispatch->id)
+                ->where('product_id', $item->product_id)
+                ->where('type', 'OUT')
+                ->first();
+
+            $lineCogs = 0.0;
+            if ($stockTx && (float)$stockTx->total_value > 0) {
+                $lineCogs = round((float)$stockTx->total_value, 2);
+            } elseif ($stockTx && (float)$stockTx->unit_cost > 0) {
+                $lineCogs = round($qty * (float)$stockTx->unit_cost, 2);
             }
 
-            $lineCogs = round($qty * $productCost, 2);
-            $totalCogs += $lineCogs;
+            // 2. Fallbacks if StockTransaction was not present or zero
+            if ($lineCogs <= 0) {
+                $whCost = (float) (\App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                    ->where('product_id', $item->product_id)
+                    ->where('warehouse_id', $item->warehouse_id)
+                    ->value('unit_cost') ?? 0);
+
+                $productCost = $whCost > 0 ? $whCost : (float) ($item->product?->cost_price ?? $item->product?->purchase_price ?? $item->product?->unit_cost ?? 0);
+
+                if ($productCost <= 0) {
+                    $latestInCost = (float) (\App\Domains\Inventory\Models\StockTransaction::where('tenant_id', $tenantId)
+                        ->where('product_id', $item->product_id)
+                        ->where('type', 'IN')
+                        ->latest('id')
+                        ->value('unit_cost') ?? 0);
+                    if ($latestInCost > 0) {
+                        $productCost = $latestInCost;
+                    }
+                }
+
+                if ($productCost <= 0) {
+                    $productCost = round((float) ($item->product?->selling_price ?? 0) * 0.6, 2);
+                }
+
+                $lineCogs = round($qty * $productCost, 2);
+            }
+
+            if ($lineCogs <= 0) continue;
+
+            $cogsAcc = $this->accountResolver->resolveCogsAccount($item->product, $tenantId);
+            $invAcc  = $this->accountResolver->resolveInventoryAccount($item->product, $tenantId);
+
+            if ($cogsAcc && $invAcc) {
+                $cogsBuckets[$cogsAcc->id] = ($cogsBuckets[$cogsAcc->id] ?? 0.0) + $lineCogs;
+                $inventoryBuckets[$invAcc->id] = ($inventoryBuckets[$invAcc->id] ?? 0.0) + $lineCogs;
+            }
         }
 
-        if ($totalCogs <= 0) {
+        if (empty($cogsBuckets) || empty($inventoryBuckets)) {
             return null;
         }
 
-        $lines = [
-            [
-                'chart_of_account_id' => $cogsAccount->id,
-                'debit'               => round($totalCogs, 2),
-                'credit'              => 0,
-                'description'         => "COGS Expense - Goods Outward for Dispatch #{$dispatch->dispatch_number}",
-            ],
-            [
-                'chart_of_account_id' => $inventoryAccount->id,
-                'debit'               => 0,
-                'credit'              => round($totalCogs, 2),
-                'description'         => "Inventory Outward - Stock Shipped for Dispatch #{$dispatch->dispatch_number}",
-            ]
-        ];
+        $lines = [];
+
+        foreach ($cogsBuckets as $cogsAccId => $amount) {
+            if ($amount > 0) {
+                $lines[] = [
+                    'chart_of_account_id' => $cogsAccId,
+                    'debit'               => round($amount, 2),
+                    'credit'              => 0,
+                    'description'         => "COGS Expense - Goods Outward for Dispatch #{$dispatch->dispatch_number}",
+                ];
+            }
+        }
+
+        foreach ($inventoryBuckets as $invAccId => $amount) {
+            if ($amount > 0) {
+                $lines[] = [
+                    'chart_of_account_id' => $invAccId,
+                    'debit'               => 0,
+                    'credit'              => round($amount, 2),
+                    'description'         => "Inventory Outward - Stock Shipped for Dispatch #{$dispatch->dispatch_number}",
+                ];
+            }
+        }
 
         $companyId = $dispatch->company_id ?? (company_id() ?? \App\Domains\HRMS\Models\Company::where('tenant_id', $tenantId)->value('id'));
         $branchId  = $dispatch->branch_id ?? (branch_id() ?? \App\Domains\HRMS\Models\Branch::where('tenant_id', $tenantId)->value('id'));
@@ -288,3 +361,4 @@ class SalesAccountingService
         }
     }
 }
+

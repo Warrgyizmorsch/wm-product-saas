@@ -57,6 +57,19 @@
         font-weight: 700;
         font-size: 12px;
     }
+
+    /* Helpdesk Tickets Table: Prevent horizontal scrollbar & wrap long content to next line */
+    .helpdesk-table {
+        width: 100% !important;
+        table-layout: fixed !important;
+    }
+    .helpdesk-table th,
+    .helpdesk-table td {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        white-space: normal !important;
+    }
 </style>
 @endpush
 
@@ -182,23 +195,23 @@
 
             <!-- Datatable -->
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0 helpdesk-table">
                     <thead class="table-light">
                         <tr>
-                            <th>Ticket #</th>
-                            <th>Subject & Category</th>
-                            <th>Requester</th>
-                            <th>Assigned To</th>
-                            <th>Priority</th>
-                            <th>Status</th>
-                            <th>SLA Due</th>
-                            <th class="text-end">Action</th>
+                            <th class="ps-3" style="width: 12%;">Ticket #</th>
+                            <th style="width: 22%;">Subject & Category</th>
+                            <th style="width: 16%;">Requester</th>
+                            <th style="width: 15%;">Assigned To</th>
+                            <th class="text-center text-nowrap" style="width: 8%;">Priority</th>
+                            <th class="text-center text-nowrap" style="width: 10%;">Status</th>
+                            <th class="text-center text-nowrap" style="width: 10%;">SLA Due</th>
+                            <th class="text-end pe-3 text-nowrap" style="width: 7%;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($tickets as $ticket)
                             <tr>
-                                <td class="fw-bold">
+                                <td class="fw-bold ps-3">
                                     <a href="{{ route('hrms.helpdesk.tickets.show', $ticket->id) }}" class="text-decoration-none text-primary">
                                         {{ $ticket->ticket_number }}
                                     </a>
@@ -209,7 +222,7 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <div class="fw-bold text-dark">{{ Str::limit($ticket->subject, 45) }}</div>
+                                    <div class="fw-bold text-dark fs-13">{{ $ticket->subject }}</div>
                                     <small class="text-muted"><i class="feather-tag me-1"></i>{{ $ticket->category ? $ticket->category->name : 'General' }}</small>
                                 </td>
                                 <td>
@@ -239,7 +252,7 @@
                                          <span class="badge bg-secondary-subtle text-secondary fs-12">Unassigned</span>
                                      @endif
                                  </td>
-                                <td>
+                                <td class="text-center">
                                     @if($ticket->priority === 'urgent')
                                         <x-ui.badge variant="danger" soft class="fw-bold text-uppercase">{{ $ticket->priority }}</x-ui.badge>
                                     @elseif($ticket->priority === 'high')
@@ -250,7 +263,7 @@
                                         <x-ui.badge variant="secondary" soft class="fw-bold text-uppercase">{{ $ticket->priority }}</x-ui.badge>
                                     @endif
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     @if($ticket->status === 'open')
                                         <x-ui.badge variant="primary" soft class="fw-bold">{{ strtoupper($ticket->status) }}</x-ui.badge>
                                     @elseif($ticket->status === 'in_progress')
@@ -263,18 +276,18 @@
                                         <x-ui.badge variant="secondary" soft class="fw-bold">CLOSED</x-ui.badge>
                                     @endif
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     @if(in_array($ticket->status, ['resolved', 'closed']))
-                                        <span class="text-success small fw-semibold"><i class="feather-check me-1"></i> Completed</span>
+                                        <span class="text-success small fw-semibold text-nowrap"><i class="feather-check me-1"></i> Completed</span>
                                     @elseif($ticket->isOverdue())
                                         <x-ui.badge variant="danger" title="Overdue Target: {{ $ticket->due_at ? $ticket->due_at->format('M d, H:i') : '' }}">
                                             <i class="feather-alert-circle me-1"></i> Overdue
                                         </x-ui.badge>
                                     @else
-                                        <small class="text-muted">{{ $ticket->due_at ? $ticket->due_at->diffForHumans() : 'N/A' }}</small>
+                                        <small class="text-muted text-nowrap">{{ $ticket->due_at ? $ticket->due_at->diffForHumans() : 'N/A' }}</small>
                                     @endif
                                 </td>
-                                <td class="text-end">
+                                <td class="text-end pe-3">
                                     <x-ui.action-dropdown :viewUrl="route('hrms.helpdesk.tickets.show', $ticket->id)" align="end" />
                                 </td>
                             </tr>

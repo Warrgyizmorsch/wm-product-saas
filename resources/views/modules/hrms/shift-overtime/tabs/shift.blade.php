@@ -62,25 +62,25 @@
     </div>
 </div>
 <div>
-    <div class="table-responsive" style="overflow: visible;">
-        <table class="table table-hover align-middle mb-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 w-100" id="shiftTable">
             <thead class="table-light">
                 <tr>
-                    <th>{{ __('hrms.shift_change.employee') }}</th>
-                    <th>{{ __('hrms.shift_change.type') }}</th>
-                    <th>{{ __('hrms.shift_change.effective_period') }}</th>
-                    <th>{{ __('hrms.shift_change.current_shift') }}</th>
-                    <th>{{ __('hrms.shift_change.requested_shift') }}</th>
-                    <th>{{ __('hrms.shift_change.status') }}</th>
-                    <th class="text-end">{{ __('hrms.shift_change.actions') }}</th>
+                    <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 20%;">{{ __('hrms.shift_change.employee') }}</th>
+                    <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 11%;">{{ __('hrms.shift_change.type') }}</th>
+                    <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 14%;">{{ __('hrms.shift_change.effective_period') }}</th>
+                    <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 18%;">{{ __('hrms.shift_change.current_shift') }}</th>
+                    <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 18%;">{{ __('hrms.shift_change.requested_shift') }}</th>
+                    <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 9%;">{{ __('hrms.shift_change.status') }}</th>
+                    <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 10%;">{{ __('hrms.shift_change.actions') }}</th>
                 </tr>
             </thead>
             <tbody id="shiftTableBody">
                 @forelse($shiftRequests as $req)
                     <tr class="shift-row" data-employee="{{ strtolower($req->employee->full_name) }}" data-employee-id="{{ $req->employee_id }}" data-status="{{ $req->status }}" data-created-at="{{ $req->created_at->timestamp }}">
-                        <td>
+                        <td class="ps-3">
                             <div class="d-flex align-items-center gap-2">
-                                <div class="avatar bg-soft-primary text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-weight: bold; background-color: rgba(13, 110, 253, 0.1);">
+                                <div class="avatar bg-soft-primary text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px; font-weight: bold; background-color: rgba(13, 110, 253, 0.1);">
                                     {{ substr($req->employee->full_name, 0, 2) }}
                                 </div>
                                 <div>
@@ -128,63 +128,102 @@
                         </td>
                         <td>
                             <div class="fw-medium text-dark">{{ $req->start_date->format('d M Y') }}</div>
-                            @if($req->type === 'temporary' && $req->end_date)
+                            @if($req->type === 'temporary' && $req->end_date && !$req->start_date->isSameDay($req->end_date))
                                 <div class="text-muted fs-11">to {{ $req->end_date->format('d M Y') }}</div>
                             @endif
                         </td>
                         <td>
                             @if($req->currentShift)
-                                <div class="fw-medium text-dark">{{ $req->currentShift->name }}</div>
-                                <div class="text-muted fs-10">{{ substr($req->currentShift->start_time, 0, 5) }} - {{ substr($req->currentShift->end_time, 0, 5) }}</div>
+                                <div class="fw-medium text-dark fs-12">{{ $req->currentShift->name }}</div>
                             @else
                                 <span class="badge bg-soft-secondary text-secondary">Day Off</span>
                             @endif
                         </td>
                         <td>
                             @if($req->requestedShift)
-                                <div class="fw-medium text-dark">{{ $req->requestedShift->name }}</div>
-                                <div class="text-muted fs-10">{{ substr($req->requestedShift->start_time, 0, 5) }} - {{ substr($req->requestedShift->end_time, 0, 5) }}</div>
+                                <div class="fw-medium text-dark fs-12">{{ $req->requestedShift->name }}</div>
                             @else
                                 <span class="badge bg-soft-secondary text-secondary">Day Off</span>
                             @endif
                         </td>
-                        <td>
+                        <td class="text-center">
                             <span class="badge text-uppercase fs-10" style="background-color: {{ $req->status === 'approved' ? 'rgba(25, 135, 84, 0.1)' : ($req->status === 'rejected' ? 'rgba(220, 53, 69, 0.1)' : 'rgba(255, 193, 7, 0.1)') }}; color: {{ $req->status === 'approved' ? '#198754' : ($req->status === 'rejected' ? '#dc3545' : '#ffc107') }};">
                                 {{ $req->status === 'approved' ? __('hrms.shift_change.approved') : ($req->status === 'rejected' ? __('hrms.shift_change.rejected') : __('hrms.shift_change.pending')) }}
                             </span>
                         </td>
-                        <td class="text-end">
-                            <div class="d-flex align-items-center justify-content-end gap-2">
+                        <td class="text-end pe-3" style="white-space: nowrap;">
+                            <div class="d-flex align-items-center justify-content-end gap-2 flex-nowrap">
                                 @if($isAdmin)
-                                    <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
-                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
-                                            <span>{{ $req->status === 'approved' ? __('hrms.shift_change.approved') : ($req->status === 'rejected' ? __('hrms.shift_change.rejected') : __('hrms.shift_change.pending')) }}</span>
+                                    <div class="dropdown d-inline-block position-relative">
+                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <span>{{ $req->status === 'cancellation_requested' ? 'Cancel Req.' : ($req->status === 'approved' ? __('hrms.shift_change.approved') : ($req->status === 'rejected' ? __('hrms.shift_change.rejected') : ($req->status === 'cancelled' ? 'Cancelled' : __('hrms.shift_change.pending')))) }}</span>
                                         </button>
-                                        <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu">
-                                            <li>
-                                                <button type="button" class="dropdown-item {{ $req->status === 'approved' ? 'active-status' : '' }}" onclick="handleShiftDecision('approve', {{ $req->id }})">
-                                                    {{ __('hrms.shift_change.approved') }}
-                                                </button>
-                                            </li>
-                                            <li>
-                                                <button type="button" class="dropdown-item {{ $req->status === 'rejected' ? 'active-status' : '' }}" onclick="handleShiftDecision('reject', {{ $req->id }})">
-                                                    {{ __('hrms.shift_change.rejected') }}
-                                                </button>
-                                            </li>
+                                        <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu shadow" style="z-index: 1060;">
+                                            @if($req->status === 'cancellation_requested')
+                                                <li>
+                                                    <form action="{{ route('hrms.shift-change.approve-cancellation', $req->id) }}" method="POST">
+                                                        @csrf
+                                                        <button type="submit" class="dropdown-item text-success fw-medium">
+                                                            Approve Cancel
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form action="{{ route('hrms.shift-change.deny-cancellation', $req->id) }}" method="POST">
+                                                        @csrf
+                                                        <button type="submit" class="dropdown-item text-danger fw-medium">
+                                                            Deny Cancel
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            @else
+                                                <li>
+                                                    <button type="button" class="dropdown-item {{ $req->status === 'approved' ? 'active-status' : '' }}" onclick="handleShiftDecision('approve', {{ $req->id }})">
+                                                        {{ __('hrms.shift_change.approved') }}
+                                                    </button>
+                                                </li>
+                                                <li>
+                                                    <button type="button" class="dropdown-item {{ $req->status === 'rejected' ? 'active-status' : '' }}" onclick="handleShiftDecision('reject', {{ $req->id }})">
+                                                        {{ __('hrms.shift_change.rejected') }}
+                                                    </button>
+                                                </li>
+                                            @endif
                                         </ul>
                                     </div>
-                                @endif
 
-                                <form action="{{ route('hrms.shift-change.destroy', $req->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this shift change request?', { title: 'Delete Shift Change Request', variant: 'danger', confirmButtonText: 'Delete' });" class="d-inline m-0">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-soft-danger border" 
-                                            title="{{ $req->status === 'approved' ? 'Approved requests cannot be deleted' : 'Delete Request' }}"
-                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; @if($req->status === 'approved') opacity: 0.5; cursor: not-allowed; @endif"
-                                            {{ $req->status === 'approved' ? 'disabled' : '' }}>
-                                        <i class="feather-trash-2 fs-14"></i>
-                                    </button>
-                                </form>
+                                    <form action="{{ route('hrms.shift-change.destroy', $req->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this shift change request?', { title: 'Delete Shift Change Request', variant: 'danger', confirmButtonText: 'Delete' });" class="d-inline m-0">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-soft-danger border" 
+                                                title="Delete Request"
+                                                style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                            <i class="feather-trash-2 fs-14"></i>
+                                        </button>
+                                    </form>
+                                @else
+                                    @if($req->canWithdraw())
+                                        <form action="{{ route('hrms.shift-change.withdraw', $req->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Withdraw this shift change request?', { title: 'Withdraw Shift Change Request', variant: 'warning', confirmButtonText: 'Withdraw' });" class="d-inline m-0">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-soft-danger border" 
+                                                    title="Withdraw Request"
+                                                    style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                <i class="feather-trash-2 fs-14"></i>
+                                            </button>
+                                        </form>
+                                    @elseif($req->canRequestCancellation())
+                                        <button type="button" class="btn btn-sm btn-soft-danger border" 
+                                                title="Request Cancellation"
+                                                onclick="openShiftCancellationModal({{ $req->id }}, '{{ route('hrms.shift-change.request-cancellation', $req->id) }}')"
+                                                style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                            <i class="feather-trash-2 fs-14"></i>
+                                        </button>
+                                    @else
+                                        <button type="button" class="btn btn-sm btn-light border disabled" 
+                                                style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled>
+                                            <i class="feather-trash-2 fs-14"></i>
+                                        </button>
+                                    @endif
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -216,6 +255,38 @@
     </div>
 </div>
 </div>
+</div>
+
+{{-- Shift Change Cancellation Request Modal --}}
+<div class="modal fade" id="shiftCancellationModal" tabindex="-1" aria-labelledby="shiftCancellationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom py-3">
+                <h5 class="modal-title fw-bold text-dark" id="shiftCancellationModalLabel">
+                    <i class="feather-x-circle text-warning me-2"></i>Cancel Shift Change Request
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="shiftCancellationForm" method="POST" action="">
+                @csrf
+                <div class="modal-body p-4">
+                    <p class="text-muted fs-13 mb-3">
+                        Please provide a reason for requesting cancellation of this approved shift change request.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark fs-13">Reason / Comments <span class="text-danger">*</span></label>
+                        <textarea name="cancellation_reason" id="shift_cancellation_reason" class="form-control fs-13" rows="3" placeholder="Enter reason for cancellation..." required maxlength="1000"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-3 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-warning text-dark fw-semibold">
+                        <i class="feather-send me-1"></i>Submit Cancellation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 {{-- Apply Shift Change Modal --}}

@@ -338,6 +338,13 @@ class SubcontractDeliveryChallanController extends Controller
         $order = $operation->order;
         $prevOp = $operation->previousOperation ?: ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('production_order_id', $operation->production_order_id)
+            ->where(function ($q) use ($operation) {
+                if ($operation->source_product_id) {
+                    $q->where('source_product_id', $operation->source_product_id);
+                } else {
+                    $q->whereNull('source_product_id');
+                }
+            })
             ->where('sequence', '<', $operation->sequence)
             ->orderBy('sequence', 'desc')
             ->first();

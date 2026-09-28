@@ -414,10 +414,10 @@
                                     </div>
 
                                     <div class="col">
-                                        <x-ui.button variant="outline-danger" icon="feather-trash-2"
-                                            class="btn-touch-large w-100" data-bs-toggle="modal"
-                                            data-bs-target="#scrapModal">
-                                            LOG SCRAP
+                                        <x-ui.button variant="outline-primary" icon="feather-package"
+                                            class="btn-touch-large w-100 fw-bold shadow-2xs" data-bs-toggle="modal"
+                                            data-bs-target="#materialDispositionModal">
+                                            MATERIAL DISPOSITION
                                         </x-ui.button>
                                     </div>
 
@@ -833,47 +833,14 @@
             </div>
         </div>
     </x-ui.modal>
+    {{-- Unified Material Disposition Modal (Scrap, Offcut, Return Unused) --}}
+    @include('modules.production.partials.material-disposition-modal', [
+        'op' => $op,
+        'order' => $order,
+        'modalId' => 'materialDispositionModal',
+        'warehouses' => $warehouses
+    ])
 
-    {{-- Record Operational Scrap Modal --}}
-    <x-ui.modal id="scrapModal" title="Record Operational Scrap" centered="true" size="md"
-        formAction="{{ route('production.mes.scrap', $op->id) }}" submitText="Record Scrap" closeText="Cancel">
-        <div class="bg-soft-danger p-3 rounded mb-3 border border-danger-subtle">
-            <h6 class="fw-bold text-danger mb-1"><i class="feather-trash-2 me-2"></i>Record Operational Loss / Damaged Output</h6>
-            <span class="fs-11 text-muted">Order: <strong>{{ $order->order_number }}</strong> | Operation: <strong>{{ $op->name }}</strong></span>
-        </div>
-
-        <div class="row g-3 text-start">
-            <div class="col-md-12">
-                <x-ui.odoo-form-ui type="select" label="Component / Material to Scrap" name="product_id" :required="true">
-                    @php
-                        $scrappableMats = $op->scrappable_materials;
-                    @endphp
-                    @foreach($scrappableMats as $idx => $mat)
-                        <option value="{{ $mat['id'] }}" {{ $idx === 0 ? 'selected' : '' }}>
-                            {{ $mat['name'] }} — {{ $mat['type_label'] }}
-                        </option>
-                    @endforeach
-                </x-ui.odoo-form-ui>
-            </div>
-            <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" label="Scrap Quantity" name="quantity" inputType="number" step="any" value="1" :required="true" />
-            </div>
-            <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="Scrap Reason Category" name="reason" :required="true">
-                    <option value="Cutting Error / Wrong Dimension">Cutting Error / Wrong Dimension</option>
-                    <option value="Setup Damage / Calibration Loss">Setup Damage / Calibration Loss</option>
-                    <option value="Machine Breakdown / Tool Defect">Machine Breakdown / Tool Defect</option>
-                    <option value="Raw Material Void / Internal Defect">Raw Material Void / Internal Defect</option>
-                    <option value="Operator Mishap / Handling Damage">Operator Mishap / Handling Damage</option>
-                    <option value="Other Operational Loss">Other Operational Loss</option>
-                </x-ui.odoo-form-ui>
-            </div>
-            <div class="col-md-12">
-                <x-ui.odoo-form-ui type="textarea" label="Scrap Observations & Material Notes" name="remarks"
-                    placeholder="Provide additional details regarding scrap cause..." rows="2" />
-            </div>
-        </div>
-    </x-ui.modal>
 
     {{-- Rejected Quantity Disposition Modal --}}
     <x-ui.modal id="dispositionModal" title="REJECTED OUTPUT DISPOSITION — {{ html_entity_decode($op->name ?? 'Op #' . $op->sequence, ENT_QUOTES, 'UTF-8') }}" centered="true" size="lg"
@@ -1247,7 +1214,6 @@
                             }
                         });
                     });
-                }
             });
         </script>
     @endpush

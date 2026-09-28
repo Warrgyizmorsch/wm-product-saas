@@ -14,12 +14,23 @@ class ProductionOrderScrap extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'ncr_id',
         'production_order_id',
         'production_order_operation_id',
         'production_batch_id',
         'product_id',
         'quantity',
         'reason',
+        'scrap_type',
+        'measurement_type',
+        'length',
+        'width',
+        'thickness',
+        'pieces',
+        'weight',
+        'weight_unit',
+        'scrap_warehouse_id',
+        'storage_location',
         'recorded_by',
         'recorded_at',
         'stock_transaction_id', // idempotency guard: set once when stock outflow is posted
@@ -27,6 +38,11 @@ class ProductionOrderScrap extends BaseModel
 
     protected $casts = [
         'quantity'    => 'float',
+        'length'      => 'float',
+        'width'       => 'float',
+        'thickness'   => 'float',
+        'pieces'      => 'integer',
+        'weight'      => 'float',
         'recorded_at' => 'datetime',
     ];
 
@@ -50,22 +66,45 @@ class ProductionOrderScrap extends BaseModel
         return $this->belongsTo(Product::class, 'product_id');
     }
 
+    public function scrapWarehouse(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\Warehouse::class, 'scrap_warehouse_id');
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by');
     }
 
+    public function ncr(): BelongsTo
+    {
+        return $this->belongsTo(ProductionNcr::class, 'ncr_id');
+    }
+
     public function getNcrAttribute()
     {
+        if ($this->ncr_id && $this->relationLoaded('ncr')) {
+            return $this->getRelation('ncr');
+        }
+        if ($this->ncr_id) {
+            return ProductionNcr::find($this->ncr_id);
+        }
         return \App\Domains\Production\Models\ProductionNcr::where('production_order_id', $this->production_order_id)
             ->where('production_order_operation_id', $this->production_order_operation_id)
             ->where('disposition_type', 'scrap')
+            ->latest()
             ->first();
     }
 
     public function getDisposalAttribute()
     {
-        $ncr = $this->ncr;
+        if ($this->ncr_id) {
+            $disposal = ProductionScrapDisposal::where('ncr_id', $this->ncr_id)->first();
+            if ($disposal) {
+                return $disposal;
+            }
+        }
+        $ncr = $this->ncr_attribute ?? $this->ncr;
         return $ncr ? \App\Domains\Production\Models\ProductionScrapDisposal::where('ncr_id', $ncr->id)->first() : null;
     }
 

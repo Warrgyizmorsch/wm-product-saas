@@ -277,6 +277,10 @@ class CrmDealController extends Controller
     {
         $this->authorize('view', $deal);
 
+        if ($request->has('google_connected') || $request->has('connected')) {
+            session(['google_calendar_connected' => true]);
+        }
+
         $tenantId = tenant_id() ?? 1;
         $deal->load(['account.contacts', 'account.owner', 'contact', 'quotations.items.product', 'salesOrders', 'owner']);
         $nextQuotationNumber = app(\App\Domains\CRM\Services\QuotationService::class)->getNextQuotationNumber();
@@ -943,6 +947,80 @@ class CrmDealController extends Controller
     }
 
     /**
+     * AJAX action to sync and persist Google OAuth connection from browser session
+     */
+    public function syncGoogleAuth(Request $request): JsonResponse
+    {
+        $isConnected = filter_var($request->input('is_connected', false), FILTER_VALIDATE_BOOLEAN);
+        $email = $request->input('email');
+        if ($isConnected) {
+            session([
+                'google_calendar_connected' => true,
+                'google_connected_email' => $email ?: 'Connected',
+            ]);
+        }
+        return response()->json([
+            'success' => true,
+            'is_connected' => $isConnected,
+            'email' => $email
+        ]);
+    }
+
+    /**
+     * AJAX action to save health evaluation payload fetched by browser session
+     */
+    public function saveHealthEvaluation(Request $request, CrmDeal $deal): JsonResponse
+    {
+        $this->authorize('update', $deal);
+
+        $payload = $request->input('evaluation', []);
+        $rawScore = $payload['score'] ?? $request->input('health_score');
+        $rawStatus = strtoupper((string)($payload['status'] ?? $request->input('risk_level', 'LOW')));
+
+        $riskLevel = match($rawStatus) {
+            'RISK', 'HIGH' => 'High',
+            'NEUTRAL', 'MEDIUM' => 'Medium',
+            'HEALTHY', 'LOW', 'POSITIVE' => 'Low',
+            default => 'Low',
+        };
+
+        if (is_numeric($rawScore)) {
+            $healthScore = ($rawScore <= 5) ? ($rawScore * 20) . '%' : $rawScore . '%';
+        } else {
+            $healthScore = $rawScore ? (string)$rawScore : ($riskLevel === 'High' ? '20%' : '80%');
+        }
+
+        $sentimentScore = match($rawStatus) {
+            'RISK' => 'Negative / Risk Alert',
+            'NEUTRAL' => 'Neutral',
+            default => 'Positive',
+        };
+
+        $reasoning = $payload['reasoning'] ?? $request->input('reasoning', '');
+        $nextStep = $payload['next_step'] ?? $request->input('next_step', '');
+        $nextBestAction = trim($reasoning . ($nextStep ? " [Suggested Action: {$nextStep}]" : '')) ?: ($request->input('next_best_action') ?: 'No immediate risk detected.');
+
+        $deal->update([
+            'risk_level'       => ucfirst(strtolower((string) $riskLevel)),
+            'health_score'     => (string) $healthScore,
+            'sentiment_score'  => (string) $sentimentScore,
+            'next_best_action' => $nextBestAction,
+            'health_synced_at' => \Carbon\Carbon::now(),
+        ]);
+
+        return response()->json([
+            'success'          => true,
+            'auth_connected'   => true,
+            'risk_level'       => $deal->risk_level,
+            'health_score'     => $deal->health_score ?: 'N/A',
+            'sentiment_score'  => $deal->sentiment_score,
+            'next_best_action' => $deal->next_best_action,
+            'health_synced_at' => $deal->health_synced_at->diffForHumans(),
+            'message'          => 'Deal Health synced successfully via AI Engine.',
+        ]);
+    }
+
+    /**
      * AJAX action to sync AI Deal Health
      */
     public function syncHealth(CrmDeal $deal, DealHealthService $service): JsonResponse
@@ -954,15 +1032,18 @@ class CrmDealController extends Controller
     }
 
     /**
-     * AJAX action to generate AI email draft reply
+     * AJAX action to generate AI email draft reply with Multi-Tone support
      */
-    public function generateDraftReply(CrmDeal $deal, DealHealthService $service): JsonResponse
+    public function generateDraftReply(Request $request, CrmDeal $deal, DealHealthService $service): JsonResponse
     {
         $this->authorize('view', $deal);
 
-        $result = $service->generateDraftReply($deal);
+        $tone = $request->input('tone', 'professional');
+        $result = $service->generateDraftReply($deal, $tone);
         return response()->json($result);
     }
+
+
 
     /**
      * Export Deals to Excel with customizable columns and applied filters

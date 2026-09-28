@@ -15,6 +15,7 @@ class SubscriptionPayment extends BaseModel
     public const PURPOSE_PLAN_SWITCH = 'plan_switch';
     public const PURPOSE_MODULE_ADDON = 'module_addon';
     public const PURPOSE_SUBSCRIPTION = 'subscription';
+    public const PURPOSE_SUBSCRIPTION_CHANGE = 'subscription_change'; // prorated mid-cycle upgrade
 
     protected $fillable = [
         'tenant_id',

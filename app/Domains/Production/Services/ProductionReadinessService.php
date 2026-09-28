@@ -355,6 +355,19 @@ class ProductionReadinessService
                 ->where('product_id', $res->product_id)
                 ->sum('quantity');
 
+            // Include compatible unreserved remnants in available material stock
+            $remnantAvail = (float) \App\Domains\Inventory\Models\InventoryRemnant::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('product_id', $res->product_id)
+                ->whereIn('status', [
+                    \App\Domains\Inventory\Models\InventoryRemnant::STATUS_AVAILABLE,
+                    \App\Domains\Inventory\Models\InventoryRemnant::STATUS_PARTIALLY_RESERVED,
+                ])
+                ->selectRaw('SUM(current_quantity - reserved_quantity) as total_avail')
+                ->value('total_avail') ?? 0.0;
+
+            $whStock += $remnantAvail;
+
             $totalAvailable += $whStock;
             $usableForThisItem = $iss + $resv + $whStock;
 

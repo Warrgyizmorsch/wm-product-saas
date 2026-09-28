@@ -15,6 +15,23 @@
     </div>
 @endsection
 
+@push('styles')
+<style>
+    /* Prevent horizontal scrollbar & wrap long content to next line */
+    .helpdesk-table {
+        width: 100% !important;
+        table-layout: fixed !important;
+    }
+    .helpdesk-table th,
+    .helpdesk-table td {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        white-space: normal !important;
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="container-fluid">
     @if(session('success'))
@@ -29,16 +46,16 @@
             <h6 class="fw-bold mb-0 text-dark"><i class="feather-settings me-2 text-primary"></i> Category Routing & Service Level Agreement (SLA) Configurations</h6>
         </div>
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0 helpdesk-table">
                     <thead class="table-light">
                         <tr>
-                            <th>Category Name</th>
-                            <th>Code</th>
-                            <th>Target SLA (Hours)</th>
-                            <th>Default Assigned Agent</th>
-                            <th>Confidential</th>
-                            <th>Total Tickets</th>
-                            <th class="text-end">Actions</th>
+                            <th class="ps-3" style="width: 23%;">Category Name</th>
+                            <th style="width: 11%;">Code</th>
+                            <th style="width: 18%;">Target SLA (Hours)</th>
+                            <th style="width: 19%;">Default Assigned Agent</th>
+                            <th class="text-center text-nowrap" style="width: 10%;">Confidential</th>
+                            <th class="text-center text-nowrap" style="width: 9%;">Total Tickets</th>
+                            <th class="text-end pe-3 text-nowrap" style="width: 10%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>

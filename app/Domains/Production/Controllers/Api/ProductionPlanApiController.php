@@ -186,6 +186,52 @@ class ProductionPlanApiController extends ApiBaseController
     }
 
     /**
+     * POST /api/v1/production/plans/{id}/reject
+     * Reject a pending production plan and return to draft.
+     */
+    public function reject(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $plan = ProductionPlan::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('reject', $plan);
+
+        try {
+            $this->planService->reject($id);
+
+            return $this->successResponse(
+                new ProductionPlanDetailResource($plan->fresh(['product'])),
+                'Production plan rejected successfully.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/plans/{id}/cancel
+     * Cancel a production plan.
+     */
+    public function cancel(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $plan = ProductionPlan::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('cancel', $plan);
+
+        try {
+            $this->planService->cancel($id);
+
+            return $this->successResponse(
+                new ProductionPlanDetailResource($plan->fresh(['product'])),
+                'Production plan cancelled successfully.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
      * POST /api/v1/production/plans/{id}/release
      * Release an approved production plan.
      */
@@ -197,11 +243,100 @@ class ProductionPlanApiController extends ApiBaseController
         Gate::authorize('release', $plan);
 
         try {
-            $this->planService->release($id, auth()->id());
+            $this->planService->release($id);
 
             return $this->successResponse(
                 new ProductionPlanDetailResource($plan->fresh(['product'])),
                 'Production plan released successfully.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/plans/{id}/complete
+     * Complete a released production plan.
+     */
+    public function complete(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $plan = ProductionPlan::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('complete', $plan);
+
+        try {
+            $this->planService->complete($id);
+
+            return $this->successResponse(
+                new ProductionPlanDetailResource($plan->fresh(['product'])),
+                'Production plan completed successfully.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/plans/{id}/close
+     * Close and archive a completed production plan.
+     */
+    public function close(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $plan = ProductionPlan::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('close', $plan);
+
+        try {
+            $this->planService->close($id);
+
+            return $this->successResponse(
+                new ProductionPlanDetailResource($plan->fresh(['product'])),
+                'Production plan closed successfully.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * DELETE /api/v1/production/plans/{id}
+     * Delete a draft production plan.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $plan = ProductionPlan::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('delete', $plan);
+
+        try {
+            $this->planService->delete($id);
+
+            return $this->successResponse(null, 'Production plan deleted successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/plans/{id}/run-mrp
+     * Run MRP calculation and explosion for the plan.
+     */
+    public function runMrp(int $id, \App\Domains\Production\Services\MrpEngineService $mrpEngine): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $plan = ProductionPlan::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('runMrp', $plan);
+
+        try {
+            $mrpEngine->runMrp($plan);
+
+            return $this->successResponse(
+                new ProductionPlanDetailResource($plan->fresh(['product', 'bom', 'routing'])),
+                'MRP exploded successfully. Component requirements and capacity operations generated.'
             );
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);
@@ -229,5 +364,23 @@ class ProductionPlanApiController extends ApiBaseController
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);
         }
+    }
+
+    /**
+     * GET /api/v1/production/plans/export
+     * Export production plans.
+     */
+    public function export(Request $request)
+    {
+        Gate::authorize('viewAny', ProductionPlan::class);
+
+        $tenantId = $this->getTenantId();
+        $format = $request->query('format', 'xlsx');
+        $fileName = 'production_plans_export.' . ($format === 'csv' ? 'csv' : 'xlsx');
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\ProductionPlanExport($tenantId, $request->all()),
+            $fileName
+        );
     }
 }

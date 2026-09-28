@@ -3,12 +3,13 @@
 namespace App\Domains\HRMS\Models;
 
 use App\Core\Database\BaseModel;
+use App\Domains\HRMS\Traits\HasHrmsScope;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class WfhRequest extends BaseModel
 {
-    use SoftDeletes;
+    use SoftDeletes, HasHrmsScope;
 
     protected $fillable = [
         'tenant_id',

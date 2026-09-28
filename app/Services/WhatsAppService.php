@@ -253,11 +253,18 @@ class WhatsAppService
         }
     }
 
-    public function sendQuotation(Quotation $quotation, string $mobile, ?string $customCaption = null): array
+    public function sendQuotation(Quotation $quotation, string $mobile, ?string $customCaption = null, $customPdfFile = null): array
     {
-        $pdf = Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
-        $pdfBinary = $pdf->output();
-        $filename = "Quotation_{$quotation->quotation_number}.pdf";
+        $quotation->load(['items.product', 'lead', 'crmDeal', 'crmAccount']);
+
+        if ($customPdfFile && method_exists($customPdfFile, 'isValid') && $customPdfFile->isValid()) {
+            $pdfBinary = file_get_contents($customPdfFile->getRealPath());
+            $filename = $customPdfFile->getClientOriginalName() ?: "Quotation_{$quotation->quotation_number}.pdf";
+        } else {
+            $pdf = Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
+            $pdfBinary = $pdf->output();
+            $filename = "Quotation_{$quotation->quotation_number}.pdf";
+        }
 
         $dealTitle = $quotation->crmDeal?->title ?: ($quotation->lead?->title ?: 'your enquiry');
         $totalFormatted = format_currency($quotation->total_amount);

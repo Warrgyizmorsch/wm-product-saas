@@ -51,6 +51,8 @@ return [
     'stock_on_hand' => 'उपलब्ध स्टॉक',
     'edit_item' => 'वस्तु संपादित करें',
     'delete_item' => 'वस्तु हटाएं',
+    'mark_active' => 'सक्रिय करें (Mark Active)',
+    'mark_inactive' => 'निष्क्रिय करें (Mark Inactive)',
     'confirm_delete_product' => 'क्या आप वाकई इस उत्पाद को हटाना चाहते हैं?',
     'no_items_found' => 'इस कार्यक्षेत्र में कोई वस्तु या उत्पाद नहीं मिला।',
 
@@ -243,6 +245,9 @@ return [
     'rate' => 'दर',
     'total' => 'कुल',
     'unconsumed_qty' => 'गैर-उपभोगित मात्रा (FIFO लॉट)',
+    'valuation_tracking' => 'मूल्यांकन स्थिति',
+    'pooled_avg' => 'पूल औसत (Avg)',
+    'outward_avg' => 'आउटवर्ड @ औसत दर',
     'left' => 'बचा है',
     'depleted' => 'समाप्त',
     'no_transactions_logged' => 'अभी तक कोई स्टॉक लेनदेन लॉग नहीं किया गया है।',

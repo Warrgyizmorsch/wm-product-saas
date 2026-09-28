@@ -3,11 +3,14 @@
 namespace App\Domains\HRMS\Models;
 
 use App\Core\Database\BaseModel;
+use App\Domains\HRMS\Traits\HasHrmsScope;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Attendance extends BaseModel
 {
+    use HasHrmsScope;
+
     protected $table = 'attendances';
 
     protected $fillable = [

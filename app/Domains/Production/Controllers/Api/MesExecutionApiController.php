@@ -272,7 +272,7 @@ class MesExecutionApiController extends ApiBaseController
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
         $tenantId = $this->getTenantId();
-        ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($operation);
+        $scheduleOpId = $this->resolveScheduleOperationId($operation, $tenantId);
 
         $request->validate([
             'quantity_produced' => 'required|numeric|min:0',
@@ -282,9 +282,67 @@ class MesExecutionApiController extends ApiBaseController
         ]);
 
         try {
-            $this->mesService->logPartialProgress($operation, $request->all(), auth()->id());
+            $this->mesService->logPartialProgress($scheduleOpId, $request->all(), auth()->id());
 
             return $this->successResponse(null, 'Progress logged successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/mes/operations/{operation}/hold
+     * Place an operation on hold.
+     */
+    public function hold(Request $request, int $operation): JsonResponse
+    {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
+        $tenantId = $this->getTenantId();
+        $scheduleOpId = $this->resolveScheduleOperationId($operation, $tenantId);
+
+        $request->validate([
+            'remarks' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $this->mesService->holdOperation($scheduleOpId, $request->input('remarks'));
+
+            return $this->successResponse(null, 'Operation placed on hold.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/mes/operations/{operation}/andon-alert
+     * Report an Andon alert / breakdown from shop floor.
+     */
+    public function andonAlert(Request $request, int $operation): JsonResponse
+    {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
+        $tenantId = $this->getTenantId();
+        $scheduleOpId = $this->resolveScheduleOperationId($operation, $tenantId);
+
+        $request->validate([
+            'category' => 'required|string|max:100',
+            'severity' => 'required|string|in:info,warning,critical,danger',
+            'reason'   => 'required|string|max:255',
+            'remarks'  => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            $result = $this->mesService->reportAndonAlert(
+                $scheduleOpId,
+                $request->input('category'),
+                $request->input('severity'),
+                $request->input('reason'),
+                $request->input('remarks'),
+                auth()->id()
+            );
+
+            return $this->createdResponse($result, 'Andon alert reported successfully.');
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);
         }
@@ -299,7 +357,7 @@ class MesExecutionApiController extends ApiBaseController
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
         $tenantId = $this->getTenantId();
-        ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($op);
+        $scheduleOpId = $this->resolveScheduleOperationId($op, $tenantId);
 
         $request->validate([
             'quantity' => 'required|numeric|min:0.01',
@@ -308,7 +366,7 @@ class MesExecutionApiController extends ApiBaseController
 
         try {
             $this->mesService->recordOperationalScrap(
-                $op,
+                $scheduleOpId,
                 (float) $request->input('quantity'),
                 $request->input('reason'),
                 auth()->id(),

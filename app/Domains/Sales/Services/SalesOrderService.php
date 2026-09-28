@@ -167,6 +167,10 @@ class SalesOrderService
 
     public function update(SalesOrder $salesOrder, array $data, array $items): SalesOrder
     {
+        if ($salesOrder->status !== 'Draft') {
+            throw new \Exception('Only Draft Sales Orders can be updated.');
+        }
+
         return DB::transaction(function () use ($salesOrder, $data, $items) {
             $discountType = $data['discount_type'] ?? $salesOrder->discount_type ?? 'item_wise';
             $taxType = $data['tax_type'] ?? $salesOrder->tax_type ?? 'item_wise_tax';

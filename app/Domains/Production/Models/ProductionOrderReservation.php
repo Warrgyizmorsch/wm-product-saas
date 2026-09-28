@@ -67,4 +67,14 @@ class ProductionOrderReservation extends BaseModel
     {
         return $this->hasMany(ProductionOrderIssue::class, 'reservation_id');
     }
+
+    public function remnantAllocations(): HasMany
+    {
+        return $this->hasMany(ProductionOrderRemnantAllocation::class, 'production_order_reservation_id');
+    }
+
+    public function getActiveAllocatedRemnantQuantityAttribute(): float
+    {
+        return (float) $this->remnantAllocations()->where('status', ProductionOrderRemnantAllocation::STATUS_RESERVED)->sum('allocated_quantity');
+    }
 }

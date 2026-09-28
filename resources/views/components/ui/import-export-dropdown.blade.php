@@ -3,6 +3,7 @@
     'label' => '',
     'exportRoute' => null,
     'downloadTemplateRoute' => null,
+    'templateRoute' => null,
     'importModalTarget' => null,
     'exportColumns' => null,
     'canExport' => true,
@@ -17,6 +18,11 @@
     $modalTitle = \App\Exports\ExportRegistry::getTitleForType($type);
     $exportActionUrl = $exportRoute ?? (Route::has('production.import-export.export') ? route('production.import-export.export', $type) : '#');
     $currentQueryParams = request()->query();
+
+    $resolvedTemplateRoute = $downloadTemplateRoute 
+        ?? $templateRoute 
+        ?? ($type === 'products' && Route::has('inventory.products.downloadSample') ? route('inventory.products.downloadSample') : null)
+        ?? (Route::has('production.import-export.download-template') ? route('production.import-export.download-template', $type) : '#');
 @endphp
 
 @once
@@ -113,7 +119,7 @@
         @endif
         @if($canDownloadTemplate)
             <li>
-                <x-ui.dropdown-item href="{{ $downloadTemplateRoute ?? (Route::has('production.import-export.download-template') ? route('production.import-export.download-template', $type) : '#') }}" icon="feather-file-text me-2 text-muted fs-12">
+                <x-ui.dropdown-item href="{{ $resolvedTemplateRoute }}" icon="feather-file-text me-2 text-muted fs-12">
                     {{ __('hrms.common.download_template') }}
                 </x-ui.dropdown-item>
             </li>

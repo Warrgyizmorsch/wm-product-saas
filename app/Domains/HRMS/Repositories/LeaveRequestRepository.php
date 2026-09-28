@@ -194,19 +194,10 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         $query = LeaveRequest::query()->with(['employee', 'leaveType']);
         $encashQuery = LeaveEncashment::query()->with(['employee', 'leaveType', 'approver']);
 
-        // 🔒 Restrict ordinary employees to their OWN records + team reportees (for managers/dept heads)
+        // 🔒 Apply Enterprise Scoping (Company Admin, Unit Head, Branch Manager, Dept Head, Reporting Manager, Employee)
         if (!$isHrAdmin) {
-            $empId = $employee ? $employee->id : 0;
-            $query->where(function ($q) use ($empId) {
-                $q->where('employee_id', $empId)
-                  ->orWhereHas('employee', function ($eq) use ($empId) {
-                      $eq->where('reporting_manager_id', $empId)
-                        ->orWhereHas('department', function ($dq) use ($empId) {
-                            $dq->where('head_employee_id', $empId);
-                        });
-                  });
-            });
-            $encashQuery->where('employee_id', $empId);
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyRelatedScope($query, $user);
+            $encashQuery->where('employee_id', $employee?->id ?? 0);
         }
 
         // Apply filters to Leave Requests
