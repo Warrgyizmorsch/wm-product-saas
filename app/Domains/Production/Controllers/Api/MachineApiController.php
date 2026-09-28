@@ -132,4 +132,124 @@ class MachineApiController extends ApiBaseController
             return $this->handleDomainException($e);
         }
     }
+
+    /**
+     * DELETE /api/v1/production/machines/{id}
+     * Delete an unreferenced machine.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $machine = Machine::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('delete', $machine);
+
+        try {
+            $this->service->delete($id);
+
+            return $this->successResponse(null, 'Machine deleted successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/machines/{id}/link-asset
+     * Link an existing Fixed Asset to a machine.
+     */
+    public function linkAsset(Request $request, int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $machine = Machine::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('update', $machine);
+
+        $request->validate([
+            'asset_id' => 'required|integer|exists:assets,id',
+        ]);
+
+        try {
+            $updated = $this->service->linkAsset($id, (int) $request->input('asset_id'), $tenantId);
+
+            return $this->successResponse(
+                new MachineResource($updated),
+                'Fixed asset linked to machine successfully.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/machines/{id}/unlink-asset
+     * Unlink a Fixed Asset from a machine.
+     */
+    public function unlinkAsset(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $machine = Machine::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('update', $machine);
+
+        try {
+            $updated = $this->service->unlinkAsset($id, $tenantId);
+
+            return $this->successResponse(
+                new MachineResource($updated),
+                'Fixed asset unlinked from machine successfully.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/machines/import
+     * Import machine master records from spreadsheet.
+     */
+    public function import(Request $request, \App\Domains\Production\Services\ProductionMasterImportService $importService): JsonResponse
+    {
+        Gate::authorize('create', Machine::class);
+
+        $request->validate([
+            'file'     => 'required|file|max:10240|mimes:xlsx,xls,csv,txt',
+            'strategy' => 'nullable|string|in:create,update',
+        ]);
+
+        $strategy = $request->input('strategy', 'create');
+
+        try {
+            $result = $importService->import('machines', $request->file('file'), $strategy, $this->getTenantId(), auth()->id());
+
+            if ($result['status'] === 'failed') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Import validation failed. No records were imported.',
+                    'data'    => $result,
+                ], 422);
+            }
+
+            return $this->successResponse($result, 'Machines imported successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * GET /api/v1/production/machines/export
+     * Export machine master records.
+     */
+    public function export(Request $request)
+    {
+        Gate::authorize('viewAny', Machine::class);
+
+        $tenantId = $this->getTenantId();
+        $format = $request->query('format', 'xlsx');
+        $fileName = 'machines_export.' . ($format === 'csv' ? 'csv' : 'xlsx');
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\MachineExport($tenantId, $request->all()),
+            $fileName
+        );
+    }
 }

@@ -268,4 +268,104 @@ class ProductionBomApiController extends ApiBaseController
     {
         return $this->duplicate($request, $id);
     }
+
+    /**
+     * POST /api/v1/production/boms/{id}/reject
+     * Reject a submitted BOM.
+     */
+    public function reject(Request $request, int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $bom = ProductionBom::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('approve', $bom);
+
+        $request->validate(['comments' => 'nullable|string|max:1000']);
+
+        try {
+            $this->bomService->reject($id, auth()->id() ?: 1, $request->input('comments'));
+
+            return $this->successResponse(
+                new ProductionBomDetailResource($bom->fresh(['product'])),
+                'BOM rejected successfully.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/boms/{id}/cancel
+     * Cancel an active or draft BOM.
+     */
+    public function cancel(Request $request, int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $bom = ProductionBom::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('cancel', $bom);
+
+        $request->validate(['comments' => 'nullable|string|max:1000']);
+
+        try {
+            $this->bomService->cancel($id, auth()->id() ?: 1, $request->input('comments'));
+
+            return $this->successResponse(
+                new ProductionBomDetailResource($bom->fresh(['product'])),
+                'BOM cancelled successfully.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/boms/import
+     * Import BOM master records from spreadsheet.
+     */
+    public function import(Request $request, \App\Domains\Production\Services\ProductionMasterImportService $importService): JsonResponse
+    {
+        Gate::authorize('create', ProductionBom::class);
+
+        $request->validate([
+            'file'     => 'required|file|max:10240|mimes:xlsx,xls,csv,txt',
+            'strategy' => 'nullable|string|in:create,update',
+        ]);
+
+        $strategy = $request->input('strategy', 'create');
+
+        try {
+            $result = $importService->import('boms', $request->file('file'), $strategy, $this->getTenantId(), auth()->id());
+
+            if ($result['status'] === 'failed') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Import validation failed. No records were imported.',
+                    'data'    => $result,
+                ], 422);
+            }
+
+            return $this->successResponse($result, 'BOMs imported successfully.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * GET /api/v1/production/boms/export
+     * Export BOM master records.
+     */
+    public function export(Request $request)
+    {
+        Gate::authorize('viewAny', ProductionBom::class);
+
+        $tenantId = $this->getTenantId();
+        $format = $request->query('format', 'xlsx');
+        $fileName = 'boms_export.' . ($format === 'csv' ? 'csv' : 'xlsx');
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\BomExport($tenantId, $request->all()),
+            $fileName
+        );
+    }
 }
