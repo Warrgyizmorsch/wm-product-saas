@@ -81,6 +81,31 @@ class DealHealthService
         $contactEmail = $deal->contact?->email ?: ($deal->account?->email ?: $deal->lead?->email);
         $authStatus = $this->checkAuthStatus($userId);
 
+        // When Gmail is disconnected, do NOT use fallback heuristic. Return N/A.
+        if (empty($authStatus['is_connected'])) {
+            $deal->update([
+                'risk_level'       => null,
+                'health_score'     => null,
+                'sentiment_score'  => null,
+                'next_best_action' => null,
+                'health_synced_at' => null,
+            ]);
+
+            return [
+                'success'               => false,
+                'auth_connected'        => false,
+                'connected_email'       => null,
+                'contact_email_checked' => $contactEmail,
+                'risk_level'            => 'N/A',
+                'health_score'          => 'N/A',
+                'sentiment_score'       => 'N/A',
+                'next_best_action'      => 'Gmail is disconnected. Please connect your Gmail account to analyze AI deal health and email sentiment.',
+                'health_synced_at'      => 'N/A',
+                'message'               => 'Gmail Disconnected. Please connect your Gmail account to sync AI deal health.',
+                'login_url'             => $authStatus['login_url'] ?? null,
+            ];
+        }
+
         try {
             // Attempt external AI Engine call
             $response = Http::withoutVerifying()->timeout(4)->get($this->baseUrl . "/agent/evaluate-emails/{$userId}", [

@@ -727,15 +727,15 @@
 
                         <!-- AI DEAL HEALTH & INTELLIGENCE CARD -->
                         @php
-                            $isSynced = !empty($deal->health_synced_at);
-                            $riskVal = $isSynced ? ucfirst(strtolower($deal->risk_level ?: 'Low')) : 'Not Synced';
+                            $isSynced = !empty($deal->health_synced_at) && !empty($deal->health_score) && $deal->health_score !== 'N/A';
+                            $riskVal = $isSynced ? ucfirst(strtolower($deal->risk_level ?: 'Low')) : 'N/A';
                             $riskBadgeStyle = match($riskVal) {
                                 'High' => 'bg-danger text-white',
                                 'Medium' => 'bg-warning text-dark',
                                 'Low' => 'bg-success text-white',
                                 default => 'bg-secondary text-white',
                             };
-                            $scoreVal = $isSynced ? ($deal->health_score ?: 'N/A') : 'Not Synced';
+                            $scoreVal = $isSynced ? ($deal->health_score ?: 'N/A') : 'N/A';
                             if (is_numeric($scoreVal)) {
                                 $scoreVal .= '%';
                             }
@@ -749,10 +749,10 @@
                                     </h5>
                                     <div class="d-flex align-items-center gap-2">
                                         <a href="https://love14-deal-health-scoring.hf.space/auth/login?user_id={{ auth()->id() ?? 1 }}&next={{ urlencode(url()->current()) }}" 
-                                           id="googleAuthBadge" 
-                                           target="_blank" 
-                                           class="badge bg-secondary text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center"
-                                           title="Google OAuth Connection Status">
+                                            id="googleAuthBadge" 
+                                            target="_blank" 
+                                            class="badge bg-secondary text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center"
+                                            title="Google OAuth Connection Status">
                                             <i class="feather-loader spin me-1"></i>Checking Gmail Auth...
                                         </a>
                                         <button type="button" id="btnSyncHealth" class="btn btn-xs btn-outline-primary fw-bold px-2.5 py-1 fs-11 rounded-1">
@@ -769,10 +769,10 @@
                                         <div class="p-2.5 rounded border bg-white d-flex align-items-center justify-content-between">
                                             <div>
                                                 <span class="fs-11 text-muted fw-bold d-block text-uppercase">{{ __('crm.deal_health_score') }}</span>
-                                                <span class="fs-18 fw-extrabold text-dark" id="healthScoreDisplay">{{ $scoreVal === 'Not Synced' ? __('crm.not_synced') : $scoreVal }}</span>
+                                                <span class="fs-18 fw-extrabold text-dark" id="healthScoreDisplay">{{ $scoreVal }}</span>
                                             </div>
                                             <span class="badge {{ $riskBadgeStyle }} px-2.5 py-1 fs-11 fw-bold" id="riskLevelDisplay">
-                                                {{ $isSynced ? ($riskVal . ' Risk') : __('crm.not_synced') }}
+                                                {{ $isSynced && $riskVal !== 'N/A' ? ($riskVal . ' Risk') : 'N/A' }}
                                             </span>
                                         </div>
                                     </div>
@@ -780,7 +780,11 @@
                                         <div class="p-2.5 rounded border bg-white">
                                             <span class="fs-11 text-muted fw-bold d-block text-uppercase">{{ __('crm.client_sentiment') }}</span>
                                             <span class="fs-13 fw-bold text-dark" id="sentimentDisplay">
-                                                <i class="feather-smile text-primary me-1"></i>{{ $isSynced ? ($deal->sentiment_score ?: 'Neutral') : __('crm.not_synced') }}
+                                                @if($isSynced && $deal->sentiment_score && $deal->sentiment_score !== 'N/A')
+                                                    <i class="feather-smile text-primary me-1"></i>{{ $deal->sentiment_score }}
+                                                @else
+                                                    <span class="text-muted">N/A</span>
+                                                @endif
                                             </span>
                                         </div>
                                     </div>
@@ -788,7 +792,7 @@
                                         <div class="p-2.5 rounded border bg-white">
                                             <span class="fs-11 text-muted fw-bold d-block text-uppercase">{{ __('crm.last_ai_sync') }}</span>
                                             <span class="fs-12 fw-semibold text-muted" id="syncedAtDisplay">
-                                                <i class="feather-clock me-1"></i>{{ $isSynced ? $deal->health_synced_at->diffForHumans() : __('crm.never_synced') }}
+                                                <i class="feather-clock me-1"></i>{{ $isSynced && $deal->health_synced_at ? $deal->health_synced_at->diffForHumans() : 'N/A' }}
                                             </span>
                                         </div>
                                     </div>
@@ -799,7 +803,7 @@
                                         <i class="feather-zap me-1"></i>{{ __('crm.ai_recommended_action') }}
                                     </div>
                                     <div class="fs-12 text-dark fw-medium" id="nextActionDisplay">
-                                        {{ $isSynced ? ($deal->next_best_action ?: 'No specific action recommended by AI.') : __('crm.sync_ai_health_notice') }}
+                                        {{ $isSynced && $deal->next_best_action ? $deal->next_best_action : 'N/A' }}
                                     </div>
                                 </div>
 
@@ -3032,18 +3036,25 @@
                 $('#syncDiagnosticNotice').removeClass('d-none');
             }
 
-            if (res.success) {
+            if (!res.auth_connected || res.health_score === 'N/A' || !res.success) {
+                $('#healthScoreDisplay').text('N/A');
+                $('#riskLevelDisplay').attr('class', 'badge px-2.5 py-1 fs-11 fw-bold bg-secondary text-white').text('N/A');
+                $('#sentimentDisplay').html('<span class="text-muted">N/A</span>');
+                $('#nextActionDisplay').text(res.next_best_action || 'N/A');
+                $('#syncedAtDisplay').html('<i class="feather-clock me-1"></i>N/A');
+            } else {
                 $('#healthScoreDisplay').text(res.health_score);
                 $('#sentimentDisplay').html('<i class="feather-smile text-success me-1"></i>' + res.sentiment_score);
-                $('#nextActionDisplay').text(res.next_best_action);
-                $('#syncedAtDisplay').html('<i class="feather-clock me-1"></i>' + res.health_synced_at);
+                $('#nextActionDisplay').text(res.next_best_action || 'N/A');
+                $('#syncedAtDisplay').html('<i class="feather-clock me-1"></i>' + (res.health_synced_at || 'Just now'));
 
                 const risk = (res.risk_level || 'Low').toLowerCase();
                 let badgeClass = 'bg-success text-white';
                 if (risk === 'high') badgeClass = 'bg-danger text-white';
                 else if (risk === 'medium') badgeClass = 'bg-warning text-dark';
+                else if (risk === 'n/a' || !risk) badgeClass = 'bg-secondary text-white';
 
-                $('#riskLevelDisplay').attr('class', 'badge px-2.5 py-1 fs-11 fw-bold ' + badgeClass).text(res.risk_level + ' Risk');
+                $('#riskLevelDisplay').attr('class', 'badge px-2.5 py-1 fs-11 fw-bold ' + badgeClass).text(res.risk_level === 'N/A' ? 'N/A' : res.risk_level + ' Risk');
             }
         }
 
@@ -3061,10 +3072,13 @@
                 },
                 success: function (res) {
                     btn.prop('disabled', false).html(origHtml);
-                    if (res && res.success) {
+                    if (res) {
                         applySyncSuccess(res);
+                        if (res.auth_connected === false) {
+                            showNotificationModal(false, 'Gmail Disconnected', res.message || 'Gmail is disconnected. Please connect Gmail to analyze live Deal Health.');
+                        }
                     } else {
-                        showNotificationModal(false, 'AI Sync Notification', (res && res.message) ? res.message : 'Could not analyze deal health.');
+                        showNotificationModal(false, 'AI Sync Notification', 'Could not analyze deal health.');
                     }
                 },
                 error: function () {
