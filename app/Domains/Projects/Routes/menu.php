@@ -10,7 +10,8 @@ return [
             ['label' => 'ui.projects', 'default' => 'Projects', 'route' => 'projects.index', 'permission' => 'projects.projects.view'],
             ['label' => 'projects.milestones', 'default' => 'Milestones', 'route' => 'projects.milestones.index', 'permission' => 'projects.projects.view'],
             ['label' => 'Tasks'],
-            ['label' => 'Timesheets'],
+            ['label' => 'projects.timesheets', 'default' => 'Timesheets', 'route' => 'projects.timesheets.approval', 'permission' => 'projects.projects.view'],
         ],
     ],
 ];
+

@@ -10,11 +10,12 @@
 
 | Attribute | State |
 |---|---|
-| **Last Completed Major Phase** | **Phase 2 — Core Foundation Hardening** (Status: Completed & Formally Verified) |
+| **Last Completed Major Phase** | **Phase 3 — Time Tracking & Timesheet Approval** (Status: Completed & Formally Verified) |
 | **Current Major Phase** | **None** — between major phases (no major implementation phase currently in progress) |
-| **Next Major Phase** | **Phase 3 — Time Tracking & Timesheet Approval** |
-| **Phase 3 Status** | **NOT STARTED** |
-| **Next Authorized Action** | **Phase 3A — Read-Only Requirements / Current-State Audit** |
+| **Next Major Phase** | **Phase 4 — Issue Management & Project Documents** |
+| **Phase 4 Status** | **PLANNED** |
+| **Next Authorized Action** | **Phase 4A — Read-Only Requirements / Current-State Audit** |
+
 
 > [!IMPORTANT]
 > **Roadmap Scope & Governance Principle:**  
@@ -166,25 +167,58 @@ Project Management is an integral module of the existing ERP ecosystem and must 
 
 **Ownership Principle:**  
 Project Management owns project execution, tasks, milestones, dependencies, project review workflows, project reporting, and project-level time/work-tracking **requirements** (such as task attribution, billability tracking, and timesheet approvals). Crucially, existing ERP time/worklog infrastructure must be reused or integrated if available; this does not imply that a separate `project_time_logs` table must necessarily be created.  
-When Project Management needs functionality owned by another module, it must **integrate with that module** instead of reproducing that module's functionality inside Projects.
+#### 4. Global UI Component Selection & Design System Governance Rule
+For every Project Management implementation phase that contains UI work, the implementation agent **MUST** first read:
+`docs/project-management/design-spec.md`
+
+The design specification is the **canonical PM UI/UX/component reference**. The implementation must strictly obey the following seven component selection and visual hierarchy rules across **all future PM phases**:
+
+1. **PM Form Fields $\to$ Odoo-Form System Only:**  
+   All form inputs, controls, field labels, help texts, and error feedback across PM views must be rendered exclusively through `<x-ui.odoo-form-ui>` (`type="input"`, `type="select"`, `type="textarea"`, `type="checkbox"`, `type="radio"`, `type="file"`, `type="editor"`, `type="sheet"`).  
+   *Explicit restriction:* Never introduce or use standalone form components (such as `<x-ui.input>`, `<x-ui.select>`, `<x-ui.textarea>`, `<x-ui.checkbox>`, `<x-ui.radio>`) when an equivalent Odoo-form field capability exists.
+2. **PM Tables $\to$ Odoo-Form Table System Only:**  
+   All PM tabular displays, directories, data grids, subtask tables, timesheets, issues, documents, UAT/CR lists, tab tables, and reports must use `<x-ui.odoo-form-ui type="table">`.  
+   *Explicit restriction:* Never use the separate/common `<x-ui.table>` for PM tables when the Odoo-form table capability is available. Do not create PM-specific table components.
+3. **Inline Editing $\to$ Existing Inline-Edit Component + Odoo-Form Field Controls:**  
+   Preserve the existing `<x-ui.inline-edit>` component and AJAX architecture. When an inline edit requires an editable input, select, or date control, the control itself must use the Odoo-form field system (`.odoo-form-control`, `.odoo-table-input`, `.odoo-table-select`, or Odoo-form field variants).
+4. **Other UI Needs $\to$ Existing Common ERP Components Strongly Encouraged:**  
+   Apart from the two strict restrictions above (Form Fields and Tables), agents must freely reuse the rich library of existing common ERP components by their established APIs:  
+   - Modals: `<x-ui.modal>`, `<x-ui.confirm-modal>`, `<x-ui.confirmation-modal>`  
+   - Drawers: `<x-ui.drawer>`  
+   - Tabs: `<x-ui.horizontal-tabs>`, `<x-ui.vertical-tabs>`  
+   - Pagination: `<x-ui.pagination>` / `$paginator->links()`  
+   - Filters & Sorting: `<x-ui.filter>`, `<x-ui.sort-dropdown>`  
+   - Row & Context Actions: `<x-ui.action-dropdown>`, `<x-ui.dropdown>`, `<x-ui.dropdown-item>`  
+   - Bulk Actions Toolbar: `<x-ui.bulk-actions>`  
+   - Buttons: `<x-ui.button>`, `<x-ui.icon-btn>`, standard Duralux buttons  
+   - Badges & Pills: `<x-ui.badge>`, `<x-ui.status-badge>`, `<x-ui.priority-badge>`  
+   - Alerts & Toasts: `<x-ui.alert>`, `<x-ui.toast>`  
+   - Cards & Widgets: `<x-ui.card>`, `<x-ui.stat-widget>`, `<x-ui.progress-bar>`
+5. **Layout & Panels $\to$ Standard ERP Layout Patterns (`erp-single-panel`):**  
+   All main PM screens must be wrapped in `<div class="erp-single-panel bg-white p-4 rounded-3 border">`. Do not create PM-specific container wrappers.
+6. **Production BOM $\to$ Primary Practical Visual & Layout Reference:**  
+   Inspect `resources/views/modules/production/bom/` (`index.blade.php`, `create.blade.php`, `edit.blade.php`, `show.blade.php`) as the primary practical reference for page structure, form sheet composition, table styling, horizontal tabs, filter composition, bulk actions, and button placement.  
+   *Boundary reminder:* BOM is a UI/layout/component reference only. Do **NOT** copy BOM manufacturing business logic, routes, permissions, or database schemas into Project Management.
+7. **Zero Duplicate UI Components:**  
+   Never create duplicate or PM-specific replacements when an existing ERP component or Odoo-form feature provides the required capability.
 
 ---
 
 ### AI Agent Continuation Rules
 
-All future AI agents working in this repository must strictly adhere to the following 20 governance rules:
+All future AI agents working in this repository must strictly adhere to the following 21 governance rules:
 
 1. **Read Roadmap First:** Inspect `docs/project-management/IMPLEMENTATION_ROADMAP.md` before initiating any Project Management task.
-2. **Determine Last Completed Phase:** Identify the last completed and verified major phase (`Phase 2 — Core Foundation Hardening`).
-3. **Determine Next Major Phase:** Identify the next major phase in the canonical sequence (`Phase 3 — Time Tracking & Timesheet Approval`).
-4. **Determine Next Authorized Action:** Perform only the next authorized step (`Phase 3A — Read-Only Requirements / Current-State Audit`) for the next phase. Phase 3A is strictly a read-only discovery/current-state/gap audit; architecture and integration decisions must happen only in the following Architecture / Integration Validation gate.
+2. **Determine Last Completed Phase:** Identify the last completed and verified major phase (`Phase 3 — Time Tracking & Timesheet Approval`).
+3. **Determine Next Major Phase:** Identify the next major phase in the canonical sequence (`Phase 4 — Issue Management & Project Documents`).
+4. **Determine Next Authorized Action:** Perform only the next authorized step (`Phase 4A — Read-Only Requirements / Current-State Audit`) for the next phase. Phase 4A is strictly a read-only discovery/current-state/gap audit; architecture and integration decisions must happen only in the following Architecture / Integration Validation gate.
 5. **No Automatic Implementation:** Do not automatically start implementation of the next phase. A phase remains `NOT STARTED` until explicitly authorized.
 6. **Follow Lifecycle Gates:** Strictly observe the progression: `NOT STARTED` $\to$ `AUDIT` $\to$ `ARCHITECTURE` $\to$ `PLAN` $\to$ `APPROVAL` $\to$ `IMPLEMENTATION` $\to$ `TESTING` $\to$ `VERIFICATION` $\to$ `COMPLETED`.
 7. **Maintenance Is Not a Phase:** Do not create or track ad-hoc maintenance, UI cleanup, visual polish, or minor bug fixes as roadmap phases.
 8. **Preserve Completed Phases:** Do not refactor, rename, or dismantle completed phases unless a verified regression requires correction.
 9. **No Premature Feature Creep:** Never introduce models, migrations, routes, or UI from future phases prematurely.
 10. **Zero Infrastructure Duplication:** Reuse existing ERP infrastructure (Duralux UI components, `AccessService`, `BaseModel`, tenant traits, activity logging).
-11. **Observe Documentation Standards:** Adhere strictly to `AGENTS.md`, `PRD.md`, `ARCHITECTURE.md`, `WORKFLOW.md`, and `DATA_MODEL.md`.
+11. **Observe Documentation Standards:** Adhere strictly to `AGENTS.md`, `PRD.md`, `ARCHITECTURE.md`, `WORKFLOW.md`, `DATA_MODEL.md`, and `design-spec.md`.
 12. **Existing Infrastructure First:** Before creating anything, search the repository and migration history for an existing implementation of the required business capability.
 13. **Migration-First Audit:** Never assume a table is missing. Inspect migration history and current database schema before proposing a migration.
 14. **Reuse Before Extend:** Prefer: existing implementation $\to$ existing extension $\to$ new implementation only if strictly necessary.
@@ -194,6 +228,7 @@ All future AI agents working in this repository must strictly adhere to the foll
 18. **Audit Findings Override Assumptions:** If the roadmap proposes a component that the audit proves already exists or should be owned by another module, revise the implementation plan accordingly.
 19. **Integration Before Isolation:** Prefer clean integration with existing ERP contracts over PM-specific isolated implementations.
 20. **Explicit Justification Required:** Every genuinely new infrastructure component introduced in a future implementation plan must have a documented reason explaining why existing infrastructure could not safely be reused or extended.
+21. **Mandatory UI Design Spec Compliance:** For every implementation phase containing UI work, the agent MUST first read `docs/project-management/design-spec.md`. All UI implementation must strictly follow the Global Component Selection Rules (Odoo-form for form fields and tables, common ERP components for modals/drawers/tabs/buttons/badges/filters, `erp-single-panel` layout, and Production BOM as the primary visual reference).
 
 ---
 
@@ -253,10 +288,22 @@ All future AI agents working in this repository must strictly adhere to the foll
 
 ---
 
-### Phase 3: Time Tracking & Timesheet Approval — [NOT STARTED]
-- **Status:** **NOT STARTED**
-- **Next Authorized Action:** **Phase 3A — Read-Only Requirements / Current-State Audit**
+### Phase 3: Time Tracking & Timesheet Approval — [COMPLETED / VERIFIED]
+- **Status:** **COMPLETED / VERIFIED**
 - **Objective:** Enable team members to log time against tasks, and Project Managers to review and approve hours.
+- **Completed Implementation:**
+  1. **Database:** Created `database/migrations/2026_09_29_110000_create_project_time_logs_table.php` (`project_time_logs` table with tenant, company, branch scoping, project_id, task_id, user_id, date, hours, is_billable, hourly_rate, approval_status, approved_by, approved_at, rejection_remarks, is_invoiced, invoice_id, timestamps, soft deletes).
+  2. **Model:** Created `App\Domains\Projects\Models\TimeLog` extending `BaseModel`, using `BelongsToTenant`, `BelongsToCompany`, `BelongsToBranch`, `SoftDeletes`, with scopes and billable amount calculation. Linked on `Project` and `Task`.
+  3. **Repository:** Created `TimeLogRepositoryInterface` and `TimeLogRepository`, bound in `AppServiceProvider`.
+  4. **Domain Service:** Built `TimeLogService` handling time logging with collaborator invariant validation, automatic member rate fallback, approval/rejection state machine, separation of duty rules, and automatic rollup to `Task.actual_hours`.
+  5. **Policy & Requests:** Built `TimeLogPolicy` registered in `AppServiceProvider`, along with `StoreTimeLogRequest`, `UpdateTimeLogRequest`, and `RejectTimeLogRequest`.
+  6. **Controllers & Routes:** Built `TimeLogController` (task time entry endpoints) and `TimesheetApprovalController` (approval queue, one-click approve, and reject). Registered in `app/Domains/Projects/Routes/web.php` and sidebar in `menu.php`.
+  7. **UI Views:** Created `resources/views/modules/projects/tasks/workspace/_timelogs.blade.php` modal & ledger, updated `_rail.blade.php` with actual hours display, and created `resources/views/modules/projects/timelogs/approval.blade.php`.
+  8. **Permissions:** Added `projects.timetracking.view`, `projects.timetracking.log`, `projects.timetracking.approve` in `RbacSeeder.php`.
+- **Exit Verification:**
+  - Automated feature suites `TimeLogTest` (6 tests) and `TimesheetApprovalTest` (6 tests) passing with 100%.
+  - Full Project regression test suite (137 tests, 404 assertions) passing with 0 regressions.
+
 
 #### Initial Target Scope — Subject to Phase 3A Audit and Architecture Validation
 > [!IMPORTANT]

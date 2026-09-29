@@ -121,7 +121,7 @@
                         <x-ui.inline-edit field="status" :value="$milestone->status"
                             :url="route('projects.milestones.field', [$project, $milestone])" type="select" :options="$heroStatusOptions" :label="__('projects.status')" />
                     @else
-                        {{ __('projects.statuses.' . $milestone->status) }}
+                        {{ __('projects.statuses.' . ($milestone->status ?: 'Draft')) }}
                     @endif
                 </span>
                 <span class="fs-11 text-muted">{{ __('projects.status') }}</span>

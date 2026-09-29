@@ -347,6 +347,13 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Repositories\TaskDependencyRepository::class
         );
 
+        // ── Projects: Time Log ────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\TimeLogRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\TimeLogRepository::class
+        );
+
+
         // ── Accounting: Chart of Accounts ─────────────────────────────────────
         $this->app->bind(
             \App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface::class,
@@ -820,6 +827,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Models\Task::class,
             \App\Domains\Projects\Policies\TaskPolicy::class
         );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\TimeLog::class,
+            \App\Domains\Projects\Policies\TimeLogPolicy::class
+        );
+
 
         // ── Accounting Policies ────────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(

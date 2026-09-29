@@ -166,7 +166,7 @@
 @endsection
 
 @section('content')
-    <div class="erp-single-panel">
+    <div class="erp-single-panel bg-white p-4 rounded-3 border">
 
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">

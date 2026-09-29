@@ -16,18 +16,6 @@
 
 @push('styles')
     <style>
-        .project-details-accordion .accordion-item {
-            border: none;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
-            overflow: hidden;
-        }
-        .project-details-accordion .accordion-button {
-            border-left: 3px solid var(--bs-primary);
-        }
-        .project-details-accordion .accordion-body {
-            border-top: 1px solid #eef0f5;
-        }
         .project-header-activity-btn {
             height: 32px;
             display: inline-flex;
@@ -38,7 +26,7 @@
 @endpush
 
 @section('content')
-    <div class="erp-single-panel project-show-panel">
+    <div class="erp-single-panel bg-white p-4 rounded-3 border">
         @if ($errors->any())
             <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
                 <h6 class="alert-heading fw-bold mb-1">{{ __('projects.validation_errors') }}</h6>
@@ -74,7 +62,7 @@
                     @endif
                 </span>
                 <x-ui.badge variant="{{ $projectStatusVariant }}" soft>
-                    {{ __('projects.statuses.' . $project->status) }}
+                    {{ __('projects.statuses.' . ($project->status ?: 'Draft')) }}
                 </x-ui.badge>
             </h4>
             <div class="d-flex flex-wrap align-items-center gap-2">
@@ -202,7 +190,7 @@
                                 @endphp
                                 <x-ui.inline-edit field="status" :value="$project->status" :url="route('projects.field', $project)" type="select" :options="$statusOptions" :label="__('projects.status')" />
                             @else
-                                {{ __('projects.statuses.' . $project->status) }}
+                                {{ __('projects.statuses.' . ($project->status ?: 'Draft')) }}
                             @endif
                         </span>
                     </div>

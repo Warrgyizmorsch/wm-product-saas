@@ -146,4 +146,50 @@ class ProjectsLocaleTest extends TestCase
 
         $this->assertSame('Cancelled', $project->fresh()->status);
     }
+
+    /** @test */
+    public function timesheet_approvals_page_renders_translated_strings_in_english(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->withSession(['locale' => 'en'])
+            ->get(route('projects.timesheets.approval'));
+
+        $response->assertOk();
+        $response->assertSee('Pending Timesheet Approvals');
+        $response->assertSee('Team Member');
+        $response->assertSee('All Caught Up!');
+        $response->assertDontSee('projects.pending_timesheet_approvals');
+        $response->assertDontSee('projects.team_member');
+    }
+
+    /** @test */
+    public function timesheet_approvals_page_renders_translated_strings_in_bulgarian(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->withSession(['locale' => 'bg'])
+            ->get(route('projects.timesheets.approval'));
+
+        $response->assertOk();
+        $response->assertSee('Чакащи одобрения на часови карти');
+        $response->assertSee('Член на екипа');
+        $response->assertSee('Всичко е прегледано!');
+        $response->assertDontSee('projects.pending_timesheet_approvals');
+    }
+
+    /** @test */
+    public function timesheet_approvals_page_renders_translated_strings_in_hindi(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->withSession(['locale' => 'hi'])
+            ->get(route('projects.timesheets.approval'));
+
+        $response->assertOk();
+        $response->assertSee('लंबित टाइमशीट अनुमोदन');
+        $response->assertSee('टीम सदस्य');
+        $response->assertSee('सब कुछ स्वीकृत है!');
+        $response->assertDontSee('projects.pending_timesheet_approvals');
+    }
 }

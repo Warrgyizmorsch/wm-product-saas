@@ -15,7 +15,7 @@
 @include('modules.projects._panel-styles')
 
 @section('content')
-    <div class="erp-single-panel project-show-panel">
+    <div class="erp-single-panel bg-white p-4 rounded-3 border">
         @if ($errors->any())
             <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
                 <h6 class="alert-heading fw-bold mb-1">{{ __('projects.validation_errors') }}</h6>

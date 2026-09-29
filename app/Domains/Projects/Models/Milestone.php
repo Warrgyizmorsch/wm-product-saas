@@ -32,6 +32,11 @@ class Milestone extends BaseModel
         self::STATUS_CLOSED,
     ];
 
+    protected $attributes = [
+        'status'                => self::STATUS_DRAFT,
+        'completion_percentage' => 0,
+    ];
+
     protected $fillable = [
         'tenant_id',
         'company_id',

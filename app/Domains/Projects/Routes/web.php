@@ -8,7 +8,10 @@ use App\Domains\Projects\Controllers\SubTaskController;
 use App\Domains\Projects\Controllers\TaskController;
 use App\Domains\Projects\Controllers\TaskDependencyController;
 use App\Domains\Projects\Controllers\TaskListController;
+use App\Domains\Projects\Controllers\TimeLogController;
+use App\Domains\Projects\Controllers\TimesheetApprovalController;
 use Illuminate\Support\Facades\Route;
+
 
 Route::prefix('projects')
     ->as('projects.')
@@ -23,6 +26,10 @@ Route::prefix('projects')
         Route::get('lookups/owners', [ProjectController::class, 'searchOwners'])->name('lookups.owners');
 
         Route::get('milestones', [MilestoneController::class, 'index'])->name('milestones.index');
+        Route::get('timesheets/approval', [TimesheetApprovalController::class, 'index'])->name('timesheets.approval');
+        Route::patch('timesheets/{timeLog}/approve', [TimesheetApprovalController::class, 'approve'])->name('timesheets.approve');
+        Route::patch('timesheets/{timeLog}/reject', [TimesheetApprovalController::class, 'reject'])->name('timesheets.reject');
+
 
         Route::get('{project}', [ProjectController::class, 'show'])->name('show');
         Route::put('{project}', [ProjectController::class, 'update'])->name('update');
@@ -99,5 +106,16 @@ Route::prefix('projects')
                         Route::post('/', [TaskDependencyController::class, 'store'])->name('store');
                         Route::delete('{dependency}', [TaskDependencyController::class, 'destroy'])->name('destroy');
                     });
+
+                Route::prefix('{task}/timelogs')
+                    ->as('timelogs.')
+                    ->scopeBindings()
+                    ->group(function (): void {
+                        Route::get('/', [TimeLogController::class, 'index'])->name('index');
+                        Route::post('/', [TimeLogController::class, 'store'])->name('store');
+                        Route::put('{timeLog}', [TimeLogController::class, 'update'])->name('update');
+                        Route::delete('{timeLog}', [TimeLogController::class, 'destroy'])->name('destroy');
+                    });
             });
+
     });

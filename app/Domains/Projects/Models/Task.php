@@ -110,4 +110,10 @@ class Task extends BaseModel
     {
         return $this->hasMany(TaskDependency::class, 'depends_on_task_id');
     }
+
+    public function timeLogs(): HasMany
+    {
+        return $this->hasMany(TimeLog::class, 'task_id');
+    }
 }
+

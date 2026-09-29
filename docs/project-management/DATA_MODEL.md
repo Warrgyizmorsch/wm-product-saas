@@ -242,40 +242,47 @@ erDiagram
 
 ---
 
-## 2. Target Future Data Structures
-
-> [!IMPORTANT]
-> The following schemas represent requirements-driven target specifications.
-> **DO NOT write migrations or alter database schema during this baseline phase.**
-> Exact column types and indexes will be finalized during their respective implementation phases.
-
----
-
-### 2.1 `project_time_logs` (Time Tracking & Timesheet)
+### 1.9 `project_time_logs`
 - **Purpose:** Records hours logged by users against tasks and projects for productivity and billing.
-- **Entity Model:** `App\Domains\Projects\Models\TimeLog` *(To be created in Phase 3)*
-- **Proposed Attributes:**
-  - `id`: bigint PK
-  - `tenant_id`, `company_id`, `branch_id` (Tenant Scopes)
-  - `project_id`: FK -> `projects(id)` ON DELETE CASCADE
-  - `task_id`: FK -> `project_tasks(id)` ON DELETE CASCADE
-  - `user_id`: FK -> `users(id)` ON DELETE CASCADE (resource logging time)
+- **Model:** [`App\Domains\Projects\Models\TimeLog`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Domains/Projects/Models/TimeLog.php)
+- **Primary Key:** `id` (bigint unsigned)
+- **Tenant Ownership:** `tenant_id`, `company_id`, `branch_id`
+- **Foreign Keys:**
+  - `project_id` -> `projects(id)` ON DELETE CASCADE
+  - `task_id` -> `project_tasks(id)` ON DELETE CASCADE
+  - `user_id` -> `users(id)` ON DELETE CASCADE
+  - `approved_by` -> `users(id)` ON DELETE SET NULL
+- **Key Columns:**
   - `log_date`: date
   - `start_time`: time, nullable
   - `end_time`: time, nullable
   - `hours`: decimal(8, 2)
   - `is_billable`: boolean, default true
-  - `hourly_rate`: decimal(12, 2), nullable (captured from `project_members.rate_per_hour` at log time)
+  - `hourly_rate`: decimal(12, 2), nullable (derived from `project_members.rate_per_hour`)
   - `description`: text, nullable
   - `approval_status`: string, default 'Pending' (`Pending`, `Approved`, `Rejected`)
-  - `approved_by`: FK -> `users(id)` ON DELETE SET NULL
   - `approved_at`: timestamp, nullable
   - `rejection_remarks`: text, nullable
   - `is_invoiced`: boolean, default false
-  - `invoice_id`: FK -> `invoices(id)` ON DELETE SET NULL (Sales Invoice linkage)
-- **Status:** **TO BE DESIGNED & IMPLEMENTED IN PHASE 3**
+  - `invoice_id`: unsignedBigInteger, nullable (future Sales Invoice link)
+- **Constraints & Indexes:**
+  - INDEX: `['tenant_id', 'project_id']`
+  - INDEX: `['tenant_id', 'task_id']`
+  - INDEX: `['tenant_id', 'user_id']`
+  - INDEX: `['tenant_id', 'approval_status']`
+  - INDEX: `['tenant_id', 'log_date']`
+- **Soft Deletes:** Yes (`deleted_at`)
+- **Status:** **ACTIVE / IN USE**
 
 ---
+
+## 2. Target Future Data Structures
+
+> [!IMPORTANT]
+> The following schemas represent requirements-driven target specifications.
+> Exact column types and indexes will be finalized during their respective implementation phases.
+
+
 
 ### 2.2 `project_issues` (Defect & Issue Management)
 - **Purpose:** Tracks project bugs, quality defects, and resolutions with retest verification.

@@ -700,7 +700,11 @@ class RbacSeeder extends Seeder
             ['name' => 'projects.tasks.create', 'module' => 'projects', 'entity' => 'tasks', 'action' => 'create'],
             ['name' => 'projects.tasks.update', 'module' => 'projects', 'entity' => 'tasks', 'action' => 'update'],
             ['name' => 'projects.tasks.delete', 'module' => 'projects', 'entity' => 'tasks', 'action' => 'delete'],
+            ['name' => 'projects.timetracking.view', 'module' => 'projects', 'entity' => 'timetracking', 'action' => 'view'],
+            ['name' => 'projects.timetracking.log', 'module' => 'projects', 'entity' => 'timetracking', 'action' => 'log'],
+            ['name' => 'projects.timetracking.approve', 'module' => 'projects', 'entity' => 'timetracking', 'action' => 'approve'],
             ['name' => 'accounting.chart_of_accounts.view', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'view'],
+
             ['name' => 'accounting.chart_of_accounts.create', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'create'],
             ['name' => 'accounting.chart_of_accounts.update', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'update'],
             ['name' => 'accounting.chart_of_accounts.delete', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'delete'],
