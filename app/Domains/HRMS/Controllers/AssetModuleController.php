@@ -49,7 +49,7 @@ class AssetModuleController extends Controller
 
         // 1. Asset Requests Query (with search, sort, and filters)
         $requestsQuery = AssetRequest::with(['employee', 'category', 'item', 'allocatedAsset']);
-        \App\Domains\HRMS\Services\HrmsScopeService::applyEmployeeScope($requestsQuery, auth()->user(), 'employee_id');
+        app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($requestsQuery, auth()->user(), 'employee_id');
 
         if ($requestSearch = $request->input('request_search')) {
             $requestsQuery->where(function($q) use ($requestSearch) {
@@ -93,7 +93,7 @@ class AssetModuleController extends Controller
         })->with(['company', 'allocations' => function($q) {
             $q->whereNull('returned_at')->with(['asset.category', 'asset.item']);
         }]);
-        \App\Domains\HRMS\Services\HrmsScopeService::applyEmployeeScope($employeesWithAllocationsQuery, auth()->user(), 'id');
+        app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($employeesWithAllocationsQuery, auth()->user(), 'id');
 
         if ($historySearch = $request->input('history_search')) {
             $employeesWithAllocationsQuery->where(function ($q) use ($historySearch) {

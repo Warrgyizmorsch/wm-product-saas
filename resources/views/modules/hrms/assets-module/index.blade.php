@@ -95,11 +95,27 @@
                 <h5 class="fw-bold text-dark mb-0 fs-16">Assets Custody & Requests Dashboard</h5>
                 <p class="text-muted fs-12 mb-0">Manage employee requests, direct allocations, custody records and histories</p>
             </div>
-            <div>
-                <button type="button" class="btn btn-primary fw-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px; border-radius: 6px; padding: 8px 16px;" data-bs-toggle="modal" data-bs-target="#directAllocateModal">
-                    <i class="feather-plus me-1"></i> Allocate Asset
-                </button>
-            </div>
+            @php
+                $canManageAssets = auth()->user() && (
+                    auth()->user()->hasHrPermission('hrms.assets.manage') ||
+                    auth()->user()->hasHrPermission('hrms.assets.create') ||
+                    auth()->user()->hasHrPermission('hr.settings.manage') ||
+                    ($isCompanyAdmin ?? false)
+                );
+                $canApproveAssets = auth()->user() && (
+                    auth()->user()->hasHrPermission('hrms.assets.approve') ||
+                    auth()->user()->hasHrPermission('hrms.assets.manage') ||
+                    auth()->user()->hasHrPermission('hr.settings.manage') ||
+                    ($isCompanyAdmin ?? false)
+                );
+            @endphp
+            @if($canManageAssets)
+                <div>
+                    <button type="button" class="btn btn-primary fw-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px; border-radius: 6px; padding: 8px 16px;" data-bs-toggle="modal" data-bs-target="#directAllocateModal">
+                        <i class="feather-plus me-1"></i> Allocate Asset
+                    </button>
+                </div>
+            @endif
         </div>
 
 
@@ -346,7 +362,7 @@
                                                         <span>View Details</span>
                                                     </a>
                                                 </li>
-                                                @if(in_array($req->status, ['pending', 'approved', 'partially_allocated']))
+                                                @if(in_array($req->status, ['pending', 'approved', 'partially_allocated']) && $canApproveAssets)
                                                     <li>
                                                         <a class="dropdown-item allocate-request-trigger-btn d-flex align-items-center text-success" href="javascript:void(0)"
                                                             data-bs-toggle="modal"

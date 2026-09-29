@@ -3,18 +3,19 @@
 namespace App\Domains\HRMS\Controllers;
 
 use App\Domains\HRMS\Models\Employee;
-use App\Domains\HRMS\Models\HelpdeskCategory;
+use App\Domains\HRMS\Repositories\HelpdeskKbRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class HelpdeskCategoryController extends Controller
 {
-    public function __construct(private readonly AccessService $access)
-    {
+    public function __construct(
+        private readonly HelpdeskKbRepositoryInterface $kbRepository,
+        private readonly AccessService $access
+    ) {
     }
 
     public function index(Request $request): View
@@ -29,12 +30,7 @@ class HelpdeskCategoryController extends Controller
             abort(403, 'Unauthorized to manage helpdesk categories.');
         }
 
-        $categories = HelpdeskCategory::where('tenant_id', $tenantId)
-            ->with(['defaultAgent'])
-            ->withCount('tickets')
-            ->orderBy('name')
-            ->get();
-
+        $categories = $this->kbRepository->getAllCategoriesWithCounts();
         $agents = Employee::where('tenant_id', $tenantId)->orderBy('full_name')->get();
 
         return view('modules.hrms.helpdesk.categories', compact('categories', 'agents', 'canManage'));
@@ -42,7 +38,6 @@ class HelpdeskCategoryController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $tenantId = tenant_id();
         $request->validate([
             'name'              => 'required|string|max:255',
             'description'       => 'nullable|string',
@@ -51,17 +46,12 @@ class HelpdeskCategoryController extends Controller
             'is_confidential'   => 'nullable|boolean',
         ]);
 
-        $code = Str::slug($request->input('name'), '_');
-
-        HelpdeskCategory::create([
-            'tenant_id'         => $tenantId,
+        $this->kbRepository->createCategory([
             'name'              => $request->input('name'),
-            'code'              => $code,
             'description'       => $request->input('description'),
             'default_agent_id'  => $request->input('default_agent_id'),
             'default_sla_hours' => $request->input('default_sla_hours', 24),
             'is_confidential'   => $request->boolean('is_confidential'),
-            'is_active'         => true,
         ]);
 
         return redirect()->route('hrms.helpdesk.categories.index')
@@ -70,9 +60,6 @@ class HelpdeskCategoryController extends Controller
 
     public function update(Request $request, int $id): RedirectResponse
     {
-        $tenantId = tenant_id();
-        $category = HelpdeskCategory::where('tenant_id', $tenantId)->findOrFail($id);
-
         $request->validate([
             'name'              => 'required|string|max:255',
             'description'       => 'nullable|string',
@@ -82,13 +69,13 @@ class HelpdeskCategoryController extends Controller
             'is_active'         => 'nullable|boolean',
         ]);
 
-        $category->update([
+        $this->kbRepository->updateCategory($id, [
             'name'              => $request->input('name'),
             'description'       => $request->input('description'),
             'default_agent_id'  => $request->input('default_agent_id'),
             'default_sla_hours' => $request->input('default_sla_hours', 24),
             'is_confidential'   => $request->boolean('is_confidential'),
-            'is_active'         => $request->has('is_active') ? $request->boolean('is_active') : $category->is_active,
+            'is_active'         => $request->has('is_active') ? $request->boolean('is_active') : null,
         ]);
 
         return redirect()->route('hrms.helpdesk.categories.index')
@@ -97,9 +84,7 @@ class HelpdeskCategoryController extends Controller
 
     public function destroy(int $id): RedirectResponse
     {
-        $tenantId = tenant_id();
-        $category = HelpdeskCategory::where('tenant_id', $tenantId)->findOrFail($id);
-        $category->delete();
+        $this->kbRepository->deleteCategory($id);
 
         return redirect()->route('hrms.helpdesk.categories.index')
             ->with('success', 'Category deleted successfully.');

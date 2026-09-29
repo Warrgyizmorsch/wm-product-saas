@@ -130,7 +130,7 @@ class AssetRepository implements AssetRepositoryInterface
         $requestsQuery = AssetRequest::query()
             ->with(['company', 'employee', 'category', 'item', 'allocatedAsset', 'requestedAsset', 'allocatedAssets']);
 
-        \App\Domains\HRMS\Services\HrmsScopeService::applyEmployeeScope($requestsQuery, auth()->user(), 'employee_id');
+        app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($requestsQuery, auth()->user(), 'employee_id');
 
         if ($hasRequestColumn) {
             $requestsQuery->withCount('allocatedAssets');

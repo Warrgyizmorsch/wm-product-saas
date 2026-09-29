@@ -2,18 +2,14 @@
 
 namespace App\Domains\HRMS\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Domains\HRMS\Models\ExpenseApprovalWorkflow;
+use App\Domains\HRMS\Models\ExpenseCategory;
 use App\Domains\HRMS\Models\ExpensePolicy;
 use App\Domains\HRMS\Models\ExpensePolicyRule;
-use App\Domains\HRMS\Models\ExpenseCategory;
-use App\Domains\HRMS\Models\ExpenseApprovalWorkflow;
-use App\Domains\HRMS\Models\Designation;
-use App\Domains\HRMS\Models\Department;
-use App\Domains\HRMS\Models\Company;
-use App\Domains\HRMS\Models\BusinessUnit;
-use App\Domains\HRMS\Models\Branch;
-use Illuminate\Http\Request;
+use App\Domains\HRMS\Repositories\ExpensePolicyRepositoryInterface;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
@@ -26,9 +22,10 @@ use Illuminate\View\View;
  */
 class ExpensePolicyController extends Controller
 {
-    // ─────────────────────────────────────────────────────────────────
-    // Policy & Master CRUD
-    // ─────────────────────────────────────────────────────────────────
+    public function __construct(
+        private readonly ExpensePolicyRepositoryInterface $policyRepository
+    ) {
+    }
 
     /**
      * List all expense categories, workflows, and policies for current tenant.
@@ -37,118 +34,10 @@ class ExpensePolicyController extends Controller
     {
         $this->authorize('viewAny', ExpensePolicy::class);
 
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $activeTab = $request->query('tab', 'categories');
+        $data = $this->policyRepository->getIndexData($request->all(), $activeTab);
 
-        // Policy tab filters
-        $filters = [
-            'search' => $request->query('search', ''),
-            'status' => $request->query('status', ''),
-            'sort'   => $request->query('sort', 'name_asc'),
-        ];
-
-        // Category tab filters
-        $catFilters = [
-            'search' => $request->query('cat_search', ''),
-            'status' => $request->query('cat_status', ''),
-            'sort'   => $request->query('cat_sort', 'name_asc'),
-        ];
-
-        // Workflow tab filters
-        $workflowFilters = [
-            'search' => $request->query('wf_search', ''),
-            'status' => $request->query('wf_status', ''),
-            'sort'   => $request->query('wf_sort', 'name_asc'),
-        ];
-
-        // 1. Query Policies
-        $policyQuery = ExpensePolicy::where('tenant_id', $tenantId)
-            ->with(['designation', 'department', 'company', 'businessUnit', 'branch', 'rules.category']);
-
-        if ($activeTab === 'policies') {
-            if ($filters['search'] !== '') {
-                $policyQuery->where('name', 'like', '%' . $filters['search'] . '%');
-            }
-            if ($filters['status'] !== '') {
-                $policyQuery->where('status', (bool) $filters['status']);
-            }
-            match ($filters['sort']) {
-                'name_desc' => $policyQuery->orderBy('name', 'desc'),
-                'newest'    => $policyQuery->orderBy('created_at', 'desc'),
-                'oldest'    => $policyQuery->orderBy('created_at', 'asc'),
-                default     => $policyQuery->orderBy('name', 'asc'),
-            };
-        } else {
-            $policyQuery->orderBy('name', 'asc');
-        }
-        $policies = $policyQuery->get();
-
-        // 2. Query Categories
-        $catQuery = ExpenseCategory::where('tenant_id', $tenantId);
-        
-        if ($activeTab === 'categories') {
-            if ($catFilters['search'] !== '') {
-                $search = $catFilters['search'];
-                $catQuery->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
-                });
-            }
-            if ($catFilters['status'] !== '') {
-                $catQuery->where('status', (bool) $catFilters['status']);
-            }
-            match ($catFilters['sort']) {
-                'name_desc' => $catQuery->orderBy('name', 'desc'),
-                'code_asc'  => $catQuery->orderBy('code', 'asc'),
-                'code_desc' => $catQuery->orderBy('code', 'desc'),
-                'newest'    => $catQuery->orderBy('created_at', 'desc'),
-                'oldest'    => $catQuery->orderBy('created_at', 'asc'),
-                default     => $catQuery->orderBy('name', 'asc'),
-            };
-        } else {
-            $catQuery->orderBy('name', 'asc');
-        }
-        $categoriesList = $catQuery->get();
-
-        // 3. Query Approval Workflows
-        $wfQuery = ExpenseApprovalWorkflow::where('tenant_id', $tenantId)
-            ->with(['designation', 'department', 'company', 'businessUnit', 'branch']);
-
-        if ($activeTab === 'workflows') {
-            if ($workflowFilters['search'] !== '') {
-                $search = $workflowFilters['search'];
-                $wfQuery->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
-                });
-            }
-            if ($workflowFilters['status'] !== '') {
-                $wfQuery->where('status', (bool) $workflowFilters['status']);
-            }
-            match ($workflowFilters['sort']) {
-                'name_desc' => $wfQuery->orderBy('name', 'desc'),
-                'newest'    => $wfQuery->orderBy('created_at', 'desc'),
-                'oldest'    => $wfQuery->orderBy('created_at', 'asc'),
-                default     => $wfQuery->orderBy('name', 'asc'),
-            };
-        } else {
-            $wfQuery->orderBy('is_default', 'desc')->orderBy('name', 'asc');
-        }
-        $workflowsList = $wfQuery->get();
-
-        // Constants/scope helpers
-        $categories    = ExpenseCategory::where('tenant_id', $tenantId)->where('status', true)->orderBy('name')->get();
-        $designations  = Designation::where('status', true)->orderBy('name')->get();
-        $departments   = Department::orderBy('name')->get();
-        $companies     = Company::orderBy('company_name')->get();
-        $businessUnits = BusinessUnit::orderBy('name')->get();
-        $branches      = Branch::orderBy('name')->get();
-
-        return view('modules.hrms.expense-policy.index', compact(
-            'policies', 'categoriesList', 'workflowsList', 'categories', 'designations', 'departments',
-            'companies', 'businessUnits', 'branches', 'filters', 'catFilters', 'workflowFilters', 'activeTab'
-        ));
+        return view('modules.hrms.expense-policy.index', $data);
     }
 
     /**
@@ -178,7 +67,7 @@ class ExpensePolicyController extends Controller
         $validated['tenant_id'] = $tenantId;
         $validated['status']    = (bool) ($request->input('status', 1));
 
-        ExpensePolicy::create($validated);
+        $this->policyRepository->storePolicy($validated);
 
         return redirect()->route('hrms.expense-policy.index')
             ->with('success', 'Expense policy created successfully.');
@@ -207,7 +96,7 @@ class ExpensePolicyController extends Controller
 
         $validated['status'] = (bool) ($request->input('status', 1));
 
-        $policy->update($validated);
+        $this->policyRepository->updatePolicy($policy, $validated);
 
         return redirect()->route('hrms.expense-policy.index')
             ->with('success', 'Expense policy updated successfully.');
@@ -219,16 +108,11 @@ class ExpensePolicyController extends Controller
     public function destroy(ExpensePolicy $policy): RedirectResponse
     {
         $this->authorize('delete', $policy);
-        $policy->rules()->delete();
-        $policy->delete();
+        $this->policyRepository->deletePolicy($policy);
 
         return redirect()->route('hrms.expense-policy.index')
             ->with('success', 'Expense policy deleted successfully.');
     }
-
-    // ─────────────────────────────────────────────────────────────────
-    // Policy Rules (Category-wise limits)
-    // ─────────────────────────────────────────────────────────────────
 
     /**
      * Add a category limit rule to an existing policy.
@@ -248,14 +132,7 @@ class ExpensePolicyController extends Controller
         $validated['expense_policy_id']  = $policy->id;
         $validated['receipt_required']   = (bool) ($request->input('receipt_required', 0));
 
-        // Upsert: one rule per category per policy
-        ExpensePolicyRule::updateOrCreate(
-            [
-                'expense_policy_id'   => $policy->id,
-                'expense_category_id' => $validated['expense_category_id'],
-            ],
-            $validated
-        );
+        $this->policyRepository->storeRule($policy, $validated);
 
         return redirect()->route('hrms.expense-policy.rules', $policy)
             ->with('success', 'Category limit added/updated successfully.');
@@ -266,74 +143,9 @@ class ExpensePolicyController extends Controller
      */
     public function showRules(Request $request, ExpensePolicy $policy): View
     {
-        $tenantId  = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $policy->load(['designation', 'department']);
+        $data = $this->policyRepository->getPolicyRulesData($policy, $request->all());
 
-        // Base query for rules belonging to this policy
-        $rulesQuery = $policy->rules()->with('category');
-
-        // Apply Search (by Category Name or Code)
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $rulesQuery->whereHas('category', function ($q) use ($search) {
-                $q->where('name', 'like', '%' . $search . '%')
-                  ->orWhere('code', 'like', '%' . $search . '%');
-            });
-        }
-
-        // Apply Filter (Receipt Required: 'always', 'threshold', 'not_required')
-        if ($request->filled('receipt')) {
-            $receipt = $request->input('receipt');
-            if ($receipt === 'always') {
-                $rulesQuery->where('receipt_required', true);
-            } elseif ($receipt === 'threshold') {
-                $rulesQuery->where('receipt_required', false)
-                           ->whereNotNull('receipt_required_threshold')
-                           ->where('receipt_required_threshold', '>', 0);
-            } elseif ($receipt === 'not_required') {
-                $rulesQuery->where('receipt_required', false)
-                           ->where(function ($q) {
-                               $q->whereNull('receipt_required_threshold')
-                                 ->orWhere('receipt_required_threshold', 0);
-                           });
-            }
-        }
-
-        // Apply Sorting
-        $sort = $request->input('sort', 'category_asc');
-        if ($sort === 'category_desc') {
-            $rulesQuery->join('expense_categories', 'expense_policy_rules.expense_category_id', '=', 'expense_categories.id')
-                       ->select('expense_policy_rules.*')
-                       ->orderBy('expense_categories.name', 'desc');
-        } elseif ($sort === 'limit_desc') {
-            $rulesQuery->orderByRaw('COALESCE(max_limit_per_claim, 0) desc');
-        } elseif ($sort === 'limit_asc') {
-            $rulesQuery->orderByRaw('COALESCE(max_limit_per_claim, 99999999) asc');
-        } else {
-            // Default category_asc
-            $rulesQuery->join('expense_categories', 'expense_policy_rules.expense_category_id', '=', 'expense_categories.id')
-                       ->select('expense_policy_rules.*')
-                       ->orderBy('expense_categories.name', 'asc');
-        }
-
-        $rules = $rulesQuery->get();
-
-        $categories = ExpenseCategory::where('tenant_id', $tenantId)
-            ->where('status', true)
-            ->orderBy('name')
-            ->get();
-
-        // Categories not yet added to this policy
-        $usedCategoryIds  = $policy->rules()->pluck('expense_category_id')->toArray();
-        $availableCategories = $categories->whereNotIn('id', $usedCategoryIds)->values();
-
-        $filters = [
-            'search'  => $request->input('search', ''),
-            'sort'    => $sort,
-            'receipt' => $request->input('receipt', ''),
-        ];
-
-        return view('modules.hrms.expense-policy.rules', compact('policy', 'rules', 'availableCategories', 'filters'));
+        return view('modules.hrms.expense-policy.rules', $data);
     }
 
     /**
@@ -341,15 +153,11 @@ class ExpensePolicyController extends Controller
      */
     public function destroyRule(ExpensePolicy $policy, ExpensePolicyRule $rule): RedirectResponse
     {
-        $rule->delete();
+        $this->policyRepository->deleteRule($rule);
 
         return redirect()->route('hrms.expense-policy.rules', $policy)
             ->with('success', 'Category rule removed.');
     }
-
-    // ─────────────────────────────────────────────────────────────────
-    // Approval Workflow CRUD
-    // ─────────────────────────────────────────────────────────────────
 
     public function storeWorkflow(Request $request): RedirectResponse
     {
@@ -377,11 +185,7 @@ class ExpensePolicyController extends Controller
         $validated['status']     = (bool) ($request->input('status', 1));
         $validated['is_default'] = (bool) ($request->input('is_default', 0));
 
-        if ($validated['is_default']) {
-            ExpenseApprovalWorkflow::where('tenant_id', $tenantId)->update(['is_default' => false]);
-        }
-
-        ExpenseApprovalWorkflow::create($validated);
+        $this->policyRepository->storeWorkflow($validated);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'workflows'])
             ->with('success', 'Approval workflow created successfully.');
@@ -412,11 +216,7 @@ class ExpensePolicyController extends Controller
         $validated['status']     = (bool) ($request->input('status', 1));
         $validated['is_default'] = (bool) ($request->input('is_default', 0));
 
-        if ($validated['is_default']) {
-            ExpenseApprovalWorkflow::where('tenant_id', $tenantId)->where('id', '!=', $workflow->id)->update(['is_default' => false]);
-        }
-
-        $workflow->update($validated);
+        $this->policyRepository->updateWorkflow($workflow, $validated);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'workflows'])
             ->with('success', 'Approval workflow updated successfully.');
@@ -426,7 +226,7 @@ class ExpensePolicyController extends Controller
     {
         $this->authorize('delete', ExpensePolicy::class);
 
-        $workflow->delete();
+        $this->policyRepository->deleteWorkflow($workflow);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'workflows'])
             ->with('success', 'Approval workflow deleted successfully.');

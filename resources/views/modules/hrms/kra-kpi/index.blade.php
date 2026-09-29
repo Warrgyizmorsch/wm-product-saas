@@ -52,6 +52,64 @@
         border: none;
         border-radius: 50%;
     }
+
+    /* Single-line text truncation with ellipsis (...) for selects & inputs */
+    .odoo-table-select,
+    select.odoo-table-select,
+    select.odoo-form-control,
+    .odoo-form-control select,
+    .kpi-select-wrap select,
+    .kra-select-wrap select {
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        padding-right: 24px !important;
+        max-width: 100% !important;
+    }
+
+    /* Select2 container and single selection truncation */
+    .select2-container {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--single {
+        position: relative !important;
+        padding-right: 24px !important;
+        height: 30px !important;
+        min-height: 30px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        padding-left: 0 !important;
+        padding-right: 16px !important;
+        font-size: 13px !important;
+        color: #212529 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: block !important;
+        max-width: 100% !important;
+        line-height: normal !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+        position: absolute !important;
+        top: 50% !important;
+        right: 0 !important;
+        transform: translateY(-50%) !important;
+        width: 20px !important;
+        height: 20px !important;
+    }
+
+    /* Keep dropdown menu results showing complete text with wrapping */
+    .select2-container--bootstrap-5 .select2-results__option {
+        white-space: normal !important;
+        word-break: break-word !important;
+        line-height: 1.35 !important;
+        padding: 8px 12px !important;
+        font-size: 13px !important;
+    }
 </style>
 @endpush
 
@@ -816,15 +874,23 @@
 
         <div class="mt-4">
             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                <h6 class="fw-bold text-dark mb-0">KPI Goals in this Template (Weightage sum should be 100%)</h6>
-                <x-ui.button type="button" variant="light" size="sm" icon="feather-plus" id="addTemplateRowBtn" class="border fw-semibold">
-                    Add Goal Row
-                </x-ui.button>
+                <div>
+                    <h6 class="fw-bold text-dark mb-0">KPI Goals in this Template (Weightage sum should be 100%)</h6>
+                    <small class="text-muted">Select standard KPIs from library or type custom goals. Values auto-fill on selection.</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <x-ui.button type="button" variant="light" size="sm" icon="feather-plus-circle" class="border fw-semibold text-primary" data-bs-toggle="modal" data-bs-target="#createKpiMasterModal">
+                        + New Library KPI
+                    </x-ui.button>
+                    <x-ui.button type="button" variant="light" size="sm" icon="feather-plus" id="addTemplateRowBtn" class="border fw-semibold">
+                        Add Goal Row
+                    </x-ui.button>
+                </div>
             </div>
             <x-ui.odoo-form-ui type="table">
                 <thead>
                     <tr>
-                        <th style="width: 28%;">KPI Title <span class="text-danger">*</span></th>
+                        <th style="width: 28%;">KPI Metric / Title <span class="text-danger">*</span></th>
                         <th style="width: 22%;">KRA Focus</th>
                         <th style="width: 18%;">Direction</th>
                         <th style="width: 12%;">Unit</th>
@@ -836,14 +902,47 @@
                 <tbody id="templateRowsTbody">
                     <tr>
                         <td>
-                            <x-ui.odoo-form-ui type="input" name="items[0][title]" placeholder="e.g. Code Quality & Bug Escape" :required="true" />
+                            <div class="kpi-select-wrap d-flex align-items-center" style="width: 100%;">
+                                <select class="odoo-table-select odoo-select2 kpi-template-select" style="width: 100%;">
+                                    <option value="">-- Choose Standard KPI --</option>
+                                    <option value="__custom__">+ Add Custom KPI (Type Manually)</option>
+                                    @foreach($kpiMasters as $km)
+                                        <option value="{{ $km->name }}"
+                                            data-kpi-id="{{ $km->id }}"
+                                            data-kra-id="{{ $km->kra_category_id }}"
+                                            data-calc="{{ $km->calculation_type }}"
+                                            data-unit="{{ $km->unit }}"
+                                            data-target="{{ $km->default_target }}"
+                                            data-weight="{{ $km->default_weightage }}">
+                                            {{ $km->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="kpi-input-wrap d-none align-items-center gap-1">
+                                <input type="text" name="items[0][title]" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                    <i class="feather-list"></i>
+                                </button>
+                            </div>
                         </td>
                         <td>
-                            <x-ui.odoo-form-ui type="select" name="items[0][kra_category_id]">
-                                @foreach($kraCategories as $kra)
-                                    <option value="{{ $kra->id }}">{{ $kra->name }}</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
+                            <div class="kra-select-wrap d-flex align-items-center" style="width: 100%;">
+                                <select class="odoo-table-select odoo-select2 kra-template-select" style="width: 100%;">
+                                    <option value="">-- Choose KRA Focus --</option>
+                                    <option value="__custom__">+ Add Custom KRA (Type Manually)</option>
+                                    @foreach($kraCategories as $kra)
+                                        <option value="{{ $kra->id }}">{{ $kra->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="kra-input-wrap d-none align-items-center gap-1">
+                                <input type="text" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                    <i class="feather-list"></i>
+                                </button>
+                            </div>
+                            <input type="hidden" name="items[0][kra_category_id]" class="kra-final-id-input" value="" />
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="items[0][calculation_type]">
@@ -857,6 +956,8 @@
                                 <option value="percentage">%</option>
                                 <option value="number">Qty</option>
                                 <option value="currency">₹</option>
+                                <option value="rating">Rating (1-5)</option>
+                                <option value="boolean">Milestone</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
@@ -871,25 +972,62 @@
                     </tr>
                     <tr>
                         <td>
-                            <x-ui.odoo-form-ui type="input" name="items[1][title]" placeholder="e.g. Sprint Task Delivery" :required="true" />
+                            <div class="kpi-select-wrap d-flex align-items-center" style="width: 100%;">
+                                <select class="odoo-table-select odoo-select2 kpi-template-select" style="width: 100%;">
+                                    <option value="">-- Choose Standard KPI --</option>
+                                    <option value="__custom__">+ Add Custom KPI (Type Manually)</option>
+                                    @foreach($kpiMasters as $km)
+                                        <option value="{{ $km->name }}"
+                                            data-kpi-id="{{ $km->id }}"
+                                            data-kra-id="{{ $km->kra_category_id }}"
+                                            data-calc="{{ $km->calculation_type }}"
+                                            data-unit="{{ $km->unit }}"
+                                            data-target="{{ $km->default_target }}"
+                                            data-weight="{{ $km->default_weightage }}">
+                                            {{ $km->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="kpi-input-wrap d-none align-items-center gap-1">
+                                <input type="text" name="items[1][title]" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                    <i class="feather-list"></i>
+                                </button>
+                            </div>
                         </td>
                         <td>
-                            <x-ui.odoo-form-ui type="select" name="items[1][kra_category_id]">
-                                @foreach($kraCategories as $kra)
-                                    <option value="{{ $kra->id }}">{{ $kra->name }}</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
+                            <div class="kra-select-wrap d-flex align-items-center" style="width: 100%;">
+                                <select class="odoo-table-select odoo-select2 kra-template-select" style="width: 100%;">
+                                    <option value="">-- Choose KRA Focus --</option>
+                                    <option value="__custom__">+ Add Custom KRA (Type Manually)</option>
+                                    @foreach($kraCategories as $kra)
+                                        <option value="{{ $kra->id }}">{{ $kra->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="kra-input-wrap d-none align-items-center gap-1">
+                                <input type="text" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                    <i class="feather-list"></i>
+                                </button>
+                            </div>
+                            <input type="hidden" name="items[1][kra_category_id]" class="kra-final-id-input" value="" />
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="items[1][calculation_type]">
                                 <option value="higher_is_better">Higher is Better</option>
                                 <option value="lower_is_better">Lower is Better</option>
+                                <option value="milestone">Milestone</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="items[1][unit]">
                                 <option value="percentage">%</option>
                                 <option value="number">Qty</option>
+                                <option value="currency">₹</option>
+                                <option value="rating">Rating (1-5)</option>
+                                <option value="boolean">Milestone</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
@@ -962,16 +1100,56 @@
                 </thead>
                 <tbody id="editTemplateRowsTbody_{{ $tpl->id }}">
                     @foreach($tpl->items as $idx => $item)
+                        @php
+                            $isStandardKpi = $kpiMasters->contains('name', $item->title);
+                        @endphp
                         <tr>
                             <td>
-                                <x-ui.odoo-form-ui type="input" name="items[{{ $idx }}][title]" value="{{ $item->title }}" :required="true" />
+                                <div class="kpi-select-wrap {{ $isStandardKpi ? 'd-flex' : 'd-none' }} align-items-center" style="width: 100%;">
+                                    <select class="odoo-table-select odoo-select2 kpi-template-select" style="width: 100%;">
+                                        <option value="">-- Choose Standard KPI --</option>
+                                        <option value="__custom__" @selected(!$isStandardKpi)>+ Add Custom KPI (Type Manually)</option>
+                                        @foreach($kpiMasters as $km)
+                                            <option value="{{ $km->name }}"
+                                                data-kpi-id="{{ $km->id }}"
+                                                data-kra-id="{{ $km->kra_category_id }}"
+                                                data-calc="{{ $km->calculation_type }}"
+                                                data-unit="{{ $km->unit }}"
+                                                data-target="{{ $km->default_target }}"
+                                                data-weight="{{ $km->default_weightage }}"
+                                                @selected($item->title === $km->name)>
+                                                {{ $km->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="kpi-input-wrap {{ $isStandardKpi ? 'd-none' : 'd-flex' }} align-items-center gap-1">
+                                    <input type="text" name="items[{{ $idx }}][title]" value="{{ $item->title }}" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." required />
+                                    <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                        <i class="feather-list"></i>
+                                    </button>
+                                </div>
                             </td>
                             <td>
-                                <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][kra_category_id]">
-                                    @foreach($kraCategories as $kra)
-                                        <option value="{{ $kra->id }}" @selected($item->kra_category_id == $kra->id)>{{ $kra->name }}</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
+                                @php
+                                    $isKnownKra = $kraCategories->contains('id', $item->kra_category_id);
+                                @endphp
+                                <div class="kra-select-wrap {{ $isKnownKra ? 'd-flex' : 'd-none' }} align-items-center" style="width: 100%;">
+                                    <select class="odoo-table-select odoo-select2 kra-template-select" style="width: 100%;">
+                                        <option value="">-- Choose KRA Focus --</option>
+                                        <option value="__custom__" @selected(!$isKnownKra && $item->kra_category_id)>+ Add Custom KRA (Type Manually)</option>
+                                        @foreach($kraCategories as $kra)
+                                            <option value="{{ $kra->id }}" @selected($item->kra_category_id == $kra->id)>{{ $kra->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="kra-input-wrap {{ $isKnownKra ? 'd-none' : 'd-flex' }} align-items-center gap-1">
+                                    <input type="text" value="{{ $isKnownKra ? '' : ($item->kraCategory->name ?? '') }}" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
+                                    <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                        <i class="feather-list"></i>
+                                    </button>
+                                </div>
+                                <input type="hidden" name="items[{{ $idx }}][kra_category_id]" class="kra-final-id-input" value="{{ $item->kra_category_id }}" />
                             </td>
                             <td>
                                 <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][calculation_type]">
@@ -985,6 +1163,8 @@
                                     <option value="percentage" @selected($item->unit === 'percentage')>%</option>
                                     <option value="number" @selected($item->unit === 'number')>Qty</option>
                                     <option value="currency" @selected($item->unit === 'currency')>₹</option>
+                                    <option value="rating" @selected($item->unit === 'rating')>Rating (1-5)</option>
+                                    <option value="boolean" @selected($item->unit === 'boolean')>Milestone</option>
                                 </x-ui.odoo-form-ui>
                             </td>
                             <td>
@@ -1111,7 +1291,6 @@
                 deptWrap.classList.add('d-none');
                 empWrap.classList.remove('d-none');
             } else {
-                // all active employees
                 deptWrap.classList.add('d-none');
                 empWrap.classList.add('d-none');
             }
@@ -1127,9 +1306,197 @@
             }
         });
 
+        // Initialize Select2 in Modals
+        if (window.jQuery) {
+            $('#createTemplateModal, [id^="editTemplateModal_"]').on('shown.bs.modal', function() {
+                const $modal = $(this);
+                $modal.find('.odoo-select2').each(function() {
+                    if (!$(this).hasClass('select2-hidden-accessible')) {
+                        $(this).select2({
+                            theme: 'bootstrap-5',
+                            dropdownParent: $modal,
+                            width: '100%'
+                        });
+                    }
+                });
+            });
+
+            $(document).on('change change.select2 select2:select', '.kpi-template-select', function() {
+                handleTemplateKpiSelect(this);
+            });
+
+            $(document).on('change change.select2 select2:select', '.kra-template-select', function() {
+                handleTemplateKraSelect(this);
+            });
+        }
+
+        // KPI Masters & KRA Categories Data for Dynamic Rows
+        let kraOptionsHtml = `<option value="">-- Choose KRA Focus --</option><option value="__custom__">+ Add Custom KRA (Type Manually)</option>{!! addslashes(collect($kraCategories)->map(fn($k) => "<option value='{$k->id}'>{$k->name}</option>")->implode('')) !!}`;
+        let kpiOptionsHtml = `<option value="">-- Choose Standard KPI --</option><option value="__custom__">+ Add Custom KPI (Type Manually)</option>{!! addslashes(collect($kpiMasters)->map(fn($km) => "<option value='{$km->name}' data-kpi-id='{$km->id}' data-kra-id='{$km->kra_category_id}' data-calc='{$km->calculation_type}' data-unit='{$km->unit}' data-target='{$km->default_target}' data-weight='{$km->default_weightage}'>{$km->name}</option>")->implode('')) !!}`;
+
+        // Smart KPI Select Handler for Template Builder
+        window.handleTemplateKpiSelect = function(selectEl) {
+            const $sel = $(selectEl);
+            const tr = selectEl.closest('tr');
+            if (!tr) return;
+
+            const selectWrap = tr.querySelector('.kpi-select-wrap');
+            const inputWrap = tr.querySelector('.kpi-input-wrap');
+            const titleInput = tr.querySelector('.kpi-title-input');
+            const val = $sel.val();
+
+            if (val === '__custom__') {
+                if (selectWrap) selectWrap.classList.add('d-none');
+                if (inputWrap) {
+                    inputWrap.classList.remove('d-none');
+                    inputWrap.classList.add('d-flex');
+                }
+                if (titleInput) {
+                    titleInput.value = '';
+                    titleInput.focus();
+                }
+                return;
+            }
+
+            if (val) {
+                if (titleInput) {
+                    titleInput.value = val;
+                }
+                const opt = selectEl.options ? selectEl.selectedOptions[0] : null;
+                if (opt) {
+                    const kraId = opt.dataset.kraId;
+                    const calc = opt.dataset.calc;
+                    const unit = opt.dataset.unit;
+                    const target = opt.dataset.target;
+                    const weight = opt.dataset.weight;
+
+                    const $kraSelect = $(tr).find('.kra-template-select');
+                    if ($kraSelect.length && kraId) {
+                        const kraInputWrap = tr.querySelector('.kra-input-wrap');
+                        const kraSelectWrap = tr.querySelector('.kra-select-wrap');
+                        if (kraInputWrap) {
+                            kraInputWrap.classList.add('d-none');
+                            kraInputWrap.classList.remove('d-flex');
+                        }
+                        if (kraSelectWrap) {
+                            kraSelectWrap.classList.remove('d-none');
+                            kraSelectWrap.classList.add('d-flex');
+                        }
+                        $kraSelect.val(kraId).trigger('change.select2');
+                        const finalKra = tr.querySelector('.kra-final-id-input');
+                        if (finalKra) finalKra.value = kraId;
+                    }
+
+                    const $calcSelect = $(tr).find('select[name$="[calculation_type]"]');
+                    if ($calcSelect.length && calc) $calcSelect.val(calc).trigger('change.select2');
+
+                    const $unitSelect = $(tr).find('select[name$="[unit]"]');
+                    if ($unitSelect.length && unit) $unitSelect.val(unit).trigger('change.select2');
+
+                    const targetInput = tr.querySelector('input[name$="[target]"]');
+                    if (targetInput && target) targetInput.value = target;
+
+                    const weightInput = tr.querySelector('input[name$="[weightage]"]');
+                    if (weightInput && weight) weightInput.value = weight;
+                }
+            } else {
+                if (titleInput) {
+                    titleInput.value = '';
+                }
+            }
+        };
+
+        window.switchToTemplateSelect = function(btn) {
+            const tr = btn.closest('tr');
+            if (!tr) return;
+            const selectWrap = tr.querySelector('.kpi-select-wrap');
+            const inputWrap = tr.querySelector('.kpi-input-wrap');
+            const selectEl = tr.querySelector('.kpi-template-select');
+            const titleInput = tr.querySelector('.kpi-title-input');
+
+            if (inputWrap) {
+                inputWrap.classList.add('d-none');
+                inputWrap.classList.remove('d-flex');
+            }
+            if (selectWrap) {
+                selectWrap.classList.remove('d-none');
+                selectWrap.classList.add('d-flex');
+            }
+            if (selectEl) {
+                $(selectEl).val('').trigger('change.select2');
+                $(selectEl).select2('open');
+            }
+            if (titleInput) {
+                titleInput.value = '';
+            }
+        };
+
+        window.handleTemplateKraSelect = function(selectEl) {
+            const $sel = $(selectEl);
+            const tr = selectEl.closest('tr');
+            if (!tr) return;
+
+            const selectWrap = tr.querySelector('.kra-select-wrap');
+            const inputWrap = tr.querySelector('.kra-input-wrap');
+            const titleInput = tr.querySelector('.kra-title-input');
+            const finalInput = tr.querySelector('.kra-final-id-input');
+            const val = $sel.val();
+
+            if (val === '__custom__') {
+                if (selectWrap) selectWrap.classList.add('d-none');
+                if (inputWrap) {
+                    inputWrap.classList.remove('d-none');
+                    inputWrap.classList.add('d-flex');
+                }
+                if (titleInput) {
+                    titleInput.value = '';
+                    titleInput.focus();
+                }
+                if (finalInput) finalInput.value = '';
+                return;
+            }
+
+            if (val) {
+                if (finalInput) finalInput.value = val;
+            } else {
+                if (finalInput) finalInput.value = '';
+            }
+        };
+
+        window.switchToTemplateKraSelect = function(btn) {
+            const tr = btn.closest('tr');
+            if (!tr) return;
+            const selectWrap = tr.querySelector('.kra-select-wrap');
+            const inputWrap = tr.querySelector('.kra-input-wrap');
+            const selectEl = tr.querySelector('.kra-template-select');
+            const titleInput = tr.querySelector('.kra-title-input');
+            const finalInput = tr.querySelector('.kra-final-id-input');
+
+            if (inputWrap) {
+                inputWrap.classList.add('d-none');
+                inputWrap.classList.remove('d-flex');
+            }
+            if (selectWrap) {
+                selectWrap.classList.remove('d-none');
+                selectWrap.classList.add('d-flex');
+            }
+            if (selectEl) {
+                $(selectEl).val('').trigger('change.select2');
+                $(selectEl).select2('open');
+            }
+            if (titleInput) titleInput.value = '';
+            if (finalInput) finalInput.value = '';
+        };
+
+        $(document).on('input', '.kra-title-input', function() {
+            const tr = this.closest('tr');
+            if (!tr) return;
+            const finalInput = tr.querySelector('.kra-final-id-input');
+            if (finalInput) finalInput.value = this.value;
+        });
+
         // Dynamic Add/Remove Row for KPI Template Builder
         let templateRowIndex = 2;
-        const kraOptionsHtml = `{!! addslashes(collect($kraCategories)->map(fn($k) => "<option value='{$k->id}'>{$k->name}</option>")->implode('')) !!}`;
 
         document.getElementById('addTemplateRowBtn')?.addEventListener('click', function() {
             const tbody = document.getElementById('templateRowsTbody');
@@ -1138,25 +1505,46 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    <input type="text" name="items[${templateRowIndex}][title]" class="odoo-table-input" placeholder="e.g. Operational Goal" required />
+                    <div class="kpi-select-wrap d-flex align-items-center" style="width: 100%;">
+                        <select class="odoo-table-select odoo-select2 kpi-template-select" style="width: 100%;">
+                            ${kpiOptionsHtml}
+                        </select>
+                    </div>
+                    <div class="kpi-input-wrap d-none align-items-center gap-1">
+                        <input type="text" name="items[${templateRowIndex}][title]" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." />
+                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                            <i class="feather-list"></i>
+                        </button>
+                    </div>
                 </td>
                 <td>
-                    <select name="items[${templateRowIndex}][kra_category_id]" class="odoo-table-select">
-                        ${kraOptionsHtml}
-                    </select>
+                    <div class="kra-select-wrap d-flex align-items-center" style="width: 100%;">
+                        <select class="odoo-table-select odoo-select2 kra-template-select" style="width: 100%;">
+                            ${kraOptionsHtml}
+                        </select>
+                    </div>
+                    <div class="kra-input-wrap d-none align-items-center gap-1">
+                        <input type="text" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
+                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                            <i class="feather-list"></i>
+                        </button>
+                    </div>
+                    <input type="hidden" name="items[${templateRowIndex}][kra_category_id]" class="kra-final-id-input" />
                 </td>
                 <td>
-                    <select name="items[${templateRowIndex}][calculation_type]" class="odoo-table-select">
+                    <select name="items[${templateRowIndex}][calculation_type]" class="odoo-table-select odoo-select2" style="width: 100%;">
                         <option value="higher_is_better">Higher is Better</option>
                         <option value="lower_is_better">Lower is Better</option>
                         <option value="milestone">Milestone</option>
                     </select>
                 </td>
                 <td>
-                    <select name="items[${templateRowIndex}][unit]" class="odoo-table-select">
+                    <select name="items[${templateRowIndex}][unit]" class="odoo-table-select odoo-select2" style="width: 100%;">
                         <option value="percentage">%</option>
                         <option value="number">Qty</option>
                         <option value="currency">₹</option>
+                        <option value="rating">Rating (1-5)</option>
+                        <option value="boolean">Milestone</option>
                     </select>
                 </td>
                 <td>
@@ -1172,6 +1560,14 @@
                 </td>
             `;
             tbody.appendChild(tr);
+            
+            const $newRow = $(tr);
+            $newRow.find('.odoo-select2').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#createTemplateModal'),
+                width: '100%'
+            });
+
             templateRowIndex++;
         });
 
@@ -1184,25 +1580,46 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    <input type="text" name="items[${rowIndex}][title]" class="odoo-table-input" placeholder="e.g. Goal Title" required />
+                    <div class="kpi-select-wrap d-flex align-items-center" style="width: 100%;">
+                        <select class="odoo-table-select odoo-select2 kpi-template-select" style="width: 100%;">
+                            ${kpiOptionsHtml}
+                        </select>
+                    </div>
+                    <div class="kpi-input-wrap d-none align-items-center gap-1">
+                        <input type="text" name="items[${rowIndex}][title]" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." />
+                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                            <i class="feather-list"></i>
+                        </button>
+                    </div>
                 </td>
                 <td>
-                    <select name="items[${rowIndex}][kra_category_id]" class="odoo-table-select">
-                        ${kraOptionsHtml}
-                    </select>
+                    <div class="kra-select-wrap d-flex align-items-center" style="width: 100%;">
+                        <select class="odoo-table-select odoo-select2 kra-template-select" style="width: 100%;">
+                            ${kraOptionsHtml}
+                        </select>
+                    </div>
+                    <div class="kra-input-wrap d-none align-items-center gap-1">
+                        <input type="text" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
+                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                            <i class="feather-list"></i>
+                        </button>
+                    </div>
+                    <input type="hidden" name="items[${rowIndex}][kra_category_id]" class="kra-final-id-input" />
                 </td>
                 <td>
-                    <select name="items[${rowIndex}][calculation_type]" class="odoo-table-select">
+                    <select name="items[${rowIndex}][calculation_type]" class="odoo-table-select odoo-select2" style="width: 100%;">
                         <option value="higher_is_better">Higher is Better</option>
                         <option value="lower_is_better">Lower is Better</option>
                         <option value="milestone">Milestone</option>
                     </select>
                 </td>
                 <td>
-                    <select name="items[${rowIndex}][unit]" class="odoo-table-select">
+                    <select name="items[${rowIndex}][unit]" class="odoo-table-select odoo-select2" style="width: 100%;">
                         <option value="percentage">%</option>
                         <option value="number">Qty</option>
                         <option value="currency">₹</option>
+                        <option value="rating">Rating (1-5)</option>
+                        <option value="boolean">Milestone</option>
                     </select>
                 </td>
                 <td>
@@ -1218,6 +1635,13 @@
                 </td>
             `;
             tbody.appendChild(tr);
+
+            const $newRow = $(tr);
+            $newRow.find('.odoo-select2').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#editTemplateModal_' + tplId),
+                width: '100%'
+            });
         };
 
         // Delegated Row Removal Listener
@@ -1233,6 +1657,66 @@
                 }
             }
         });
+
+        // AJAX Quick Creation Handler for createKpiMasterModal
+        const createKpiModalForm = document.querySelector('#createKpiMasterModal form');
+        if (createKpiModalForm) {
+            createKpiModalForm.addEventListener('submit', function(e) {
+                if (window.lastActiveKpiSelect) {
+                    e.preventDefault();
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    const originalBtnText = submitBtn.innerHTML;
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+
+                    const formData = new FormData(this);
+
+                    fetch(this.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+
+                        if (data.success && data.kpi) {
+                            const k = data.kpi;
+                            const optHtml = `<option value="${k.name}" data-kpi-id="${k.id}" data-kra-id="${k.kra_category_id}" data-calc="${k.calculation_type}" data-unit="${k.unit}" data-target="${k.default_target}" data-weight="${k.default_weightage}">${k.name} (${k.kra_category_name})</option>`;
+                            kpiOptionsHtml += optHtml;
+
+                            document.querySelectorAll('.kpi-options-group').forEach(group => {
+                                group.insertAdjacentHTML('beforeend', optHtml);
+                            });
+
+                            if (window.lastActiveKpiSelect) {
+                                window.lastActiveKpiSelect.value = k.name;
+                                window.handleTemplateKpiSelect(window.lastActiveKpiSelect);
+                                window.lastActiveKpiSelect = null;
+                            }
+
+                            const modalEl = document.getElementById('createKpiMasterModal');
+                            if (modalEl) {
+                                const bsModal = bootstrap.Modal.getInstance(modalEl);
+                                if (bsModal) bsModal.hide();
+                            }
+                            createKpiModalForm.reset();
+                        } else {
+                            alert(data.message || 'Error creating KPI metric.');
+                        }
+                    })
+                    .catch(err => {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+                        alert('Failed to save KPI metric. Please check your inputs.');
+                    });
+                }
+            });
+        }
 
         // Instant Debounce Search (Standard across HRMS)
         const searchInput = document.getElementById('kraSearchInput');

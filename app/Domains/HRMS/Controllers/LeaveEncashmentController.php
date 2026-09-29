@@ -3,326 +3,97 @@
 namespace App\Domains\HRMS\Controllers;
 
 use App\Domains\HRMS\Helpers\XlsxHelper;
-use App\Http\Controllers\Controller;
-use App\Domains\HRMS\Models\Employee;
-use App\Domains\HRMS\Models\LeaveBalance;
 use App\Domains\HRMS\Models\LeaveEncashment;
-use App\Domains\HRMS\Models\LeaveType;
-use Carbon\Carbon;
+use App\Domains\HRMS\Repositories\LeaveEncashmentRepositoryInterface;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class LeaveEncashmentController extends Controller
 {
+    public function __construct(
+        private readonly LeaveEncashmentRepositoryInterface $leaveEncashmentRepository
+    ) {}
+
     public function store(Request $request): RedirectResponse
     {
-
-
-        $request->validate([
+        $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'leave_type_id' => 'required|exists:leave_types,id',
             'requested_days' => 'required|numeric|min:0.5',
             'reason' => 'nullable|string|max:1000',
         ]);
 
-        $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
-        if (!$isHrAdmin) {
-            $currentEmp = Employee::resolveForUser($user);
-            if ($currentEmp) {
-                $request->merge(['employee_id' => $currentEmp->id]);
-            }
+        $res = $this->leaveEncashmentRepository->storeEncashment($validated, $request, $request->user());
+
+        if (!$res['success']) {
+            return redirect()->back()->with('error', $res['message']);
         }
 
-        $employee = Employee::findOrFail($request->employee_id);
-        $leaveType = LeaveType::findOrFail($request->leave_type_id);
-
-        $rules = $leaveType->rules ?? [];
-        $encashRules = $rules['encashment'] ?? [];
-
-        $isEnabled = !empty($encashRules['enabled']) && ($encashRules['enabled'] === true || $encashRules['enabled'] === '1' || $encashRules['enabled'] === 'true');
-        
-        if (!$isEnabled) {
-            return redirect()->back()->with('error', __('hrms.leave.encashment_app.not_enabled', ['name' => $leaveType->name]));
-        }
-
-        $frequency = $encashRules['frequency'] ?? 'anytime';
-        $periods = $this->getCyclePeriods($employee, Carbon::now(), $frequency);
-
-        if (!$periods['is_valid_month']) {
-            $freqLabel = ucfirst(str_replace('_', ' ', $frequency));
-            return redirect()->back()->with('error', __('hrms.leave.encashment_app.invalid_month', ['name' => $leaveType->name, 'frequency' => $freqLabel]));
-        }
-
-        if (!$this->isWithinFrequencyLimits($employee->id, $leaveType->id, $periods['start'], $periods['end'], $frequency)) {
-            $freqLabel = ucfirst(str_replace('_', ' ', $frequency));
-            return redirect()->back()->with('error', "You have already submitted an encashment request in the current {$freqLabel} period.");
-        }
-
-        $maxPerRequest = floatval($encashRules['max_days_per_request'] ?? 999.0);
-        $requestedDays = round(floatval($request->requested_days) * 2) / 2;
-
-        if ($requestedDays > $maxPerRequest) {
-            return redirect()->back()->with('error', __('hrms.leave.encashment_app.max_days_exceeded', ['name' => $leaveType->name, 'max' => $maxPerRequest]));
-        }
-
-        $balance = LeaveBalance::where('employee_id', $employee->id)
-            ->where('leave_type_id', $leaveType->id)
-            ->first();
-
-        $remaining = $balance ? floatval($balance->remaining) : 0.0;
-        $minBalanceToKeep = floatval($encashRules['min_balance_to_keep'] ?? 0.0);
-
-        if (($remaining - $requestedDays) < $minBalanceToKeep) {
-            return redirect()->back()->with('error', __('hrms.leave.encashment_app.min_balance_required', ['min' => $minBalanceToKeep, 'remaining' => $remaining]));
-        }
-
-        if ($requestedDays > $remaining) {
-            return redirect()->back()->with('error', __('hrms.leave.encashment_app.insufficient_balance', ['remaining' => $remaining]));
-        }
-
-        LeaveEncashment::create([
-            'tenant_id' => $employee->tenant_id,
-            'company_id' => $employee->company_id,
-            'employee_id' => $employee->id,
-            'leave_type_id' => $leaveType->id,
-            'requested_days' => $requestedDays,
-            'status' => 'pending',
-            'reason' => $request->reason,
-        ]);
-
-        return redirect()->back()
-            ->with('success', __('hrms.leave.encashment_app.submitted_successfully'));
+        return redirect()->back()->with('success', $res['message']);
     }
 
     public function approve(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
-        $user = $request->user();
-        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
-        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
-        if ($actorEmpId && (int) $actorEmpId === (int) $leaveEncashment->employee_id) {
-            abort(403, 'Self-approval is prohibited. You cannot approve your own leave encashment request.');
+        $res = $this->leaveEncashmentRepository->approve($leaveEncashment, $request, $request->user());
+
+        if (!$res['success']) {
+            return redirect()->back()->with('error', $res['message']);
         }
 
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
-        abort_unless($isHrAdmin, 403);
-
-        $leaveEncashment->update([
-            'status' => 'approved',
-            'approved_by' => auth()->id(),
-            'approved_at' => now(),
-        ]);
-
-        $this->reconcileEncashedBalance($leaveEncashment->employee_id, $leaveEncashment->leave_type_id);
-
-        return redirect()->back()
-            ->with('success', __('hrms.leave.encashment_app.approved_successfully'));
+        return redirect()->back()->with('success', $res['message']);
     }
 
     public function reject(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
-        $user = $request->user();
-        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
-        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
-        if ($actorEmpId && (int) $actorEmpId === (int) $leaveEncashment->employee_id) {
-            abort(403, 'Self-approval is prohibited. You cannot reject your own leave encashment request.');
-        }
+        $request->validate(['rejection_reason' => 'nullable|string|max:1000']);
 
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
-        abort_unless($isHrAdmin, 403);
+        $res = $this->leaveEncashmentRepository->reject($leaveEncashment, $request->rejection_reason, $request->user());
 
-        $leaveEncashment->update([
-            'status' => 'rejected',
-            'approved_by' => auth()->id(),
-        ]);
-
-        $this->reconcileEncashedBalance($leaveEncashment->employee_id, $leaveEncashment->leave_type_id);
-
-        return redirect()->back()
-            ->with('success', __('hrms.leave.encashment_app.rejected_successfully'));
+        return redirect()->back()->with('success', $res['message']);
     }
 
-    public function destroy(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
+    public function destroy(LeaveEncashment $leaveEncashment): RedirectResponse
     {
-        $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
-        if (!$isHrAdmin) {
-            $employee = Employee::resolveForUser($user);
-            if (!$employee || $leaveEncashment->employee_id !== $employee->id) {
-                abort(403, 'Unauthorized action.');
-            }
-            if ($leaveEncashment->status !== 'pending') {
-                return redirect()->back()->with('error', 'Only pending encashment requests can be deleted.');
-            }
-        }
+        $this->leaveEncashmentRepository->delete($leaveEncashment);
 
-        $empId = $leaveEncashment->employee_id;
-        $typeId = $leaveEncashment->leave_type_id;
-
-        $leaveEncashment->delete();
-
-        $this->reconcileEncashedBalance($empId, $typeId);
-
-        return redirect()->back()
-            ->with('success', __('hrms.leave.encashment_app.deleted_successfully'));
+        return redirect()->back()->with('success', __('hrms.leave.encashment_app.deleted_successfully'));
     }
 
-    private function isValidEncashmentMonth(Carbon $date, string $frequency): bool
+    public function exportEncashments(Request $request)
     {
-        $month = $date->month;
-
-        return match ($frequency) {
-            'monthly' => true,
-            'quarterly' => in_array($month, [3, 6, 9, 12]),
-            'half_yearly' => in_array($month, [6, 12]),
-            'yearly' => $month === 12,
-            default => true,
-        };
-    }
-
-    private function reconcileEncashedBalance(int $employeeId, int $leaveTypeId): void
-    {
-        $balance = LeaveBalance::where('employee_id', $employeeId)
-            ->where('leave_type_id', $leaveTypeId)
-            ->first();
-
-        if (!$balance) {
-            return;
-        }
-
-        $employee = Employee::with('leavePlan')->find($employeeId);
-        $currentCycleStart = null;
-        if ($employee && $employee->leavePlan && $employee->leavePlan->effective_from) {
-            $startDate = Carbon::parse($employee->leavePlan->effective_from);
-            $now = Carbon::now();
-            $diffInYears = $startDate->diffInYears($now);
-            $currentCycleStart = $startDate->copy()->addYears($diffInYears);
-            if ($currentCycleStart->isAfter($now)) {
-                $currentCycleStart->subYear();
-            }
-        }
-
-        $query = LeaveEncashment::where('employee_id', $employeeId)
-            ->where('leave_type_id', $leaveTypeId)
-            ->where('status', 'approved');
-
-        if ($currentCycleStart) {
-            $query->where('created_at', '>=', $currentCycleStart);
-        }
-
-        $approvedEncashedSum = floatval($query->sum('requested_days'));
-
-        $balance->update([
-            'encashed' => round($approvedEncashedSum * 2) / 2,
-        ]);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Export Encashment Requests to Excel
-    // ─────────────────────────────────────────────────────────────────────────
-
-    public function exportEncashments(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
-    {
-        $user = auth()->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
-        $employee = Employee::resolveForUser($user);
-
-        $query = LeaveEncashment::with(['employee', 'leaveType'])->orderBy('created_at', 'desc');
-
-        // Non-admin: scope to own records only
-        if (!$isHrAdmin) {
-            $query->where('employee_id', $employee ? $employee->id : 0);
-        }
-
-        $rows = $query->get();
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $encashments = $this->leaveEncashmentRepository->getExportData($request->all(), $request->user(), $tenantId);
 
         $headers = [
+            'ID',
+            'Employee Code',
             'Employee Name',
-            'Employee ID',
+            'Department',
             'Leave Type',
             'Requested Days',
-            'Reason',
             'Status',
-            'Submitted Date',
+            'Reason',
+            'Rejection Reason',
+            'Applied Date',
         ];
 
-        $data = $rows->map(function ($enc) {
-            return [
-                $enc->employee->full_name ?? '—',
-                $enc->employee->employee_id ?? '—',
-                $enc->leaveType->name ?? '—',
-                floatval($enc->requested_days),
-                $enc->reason ?? '',
-                ucfirst($enc->status),
-                $enc->created_at ? $enc->created_at->format('d M Y') : '—',
+        $rows = [];
+        foreach ($encashments as $encash) {
+            $rows[] = [
+                $encash->id,
+                $encash->employee->employee_id ?? 'N/A',
+                $encash->employee->full_name ?? 'N/A',
+                $encash->employee->department->name ?? 'N/A',
+                $encash->leaveType->name ?? 'N/A',
+                $encash->requested_days,
+                ucfirst($encash->status),
+                $encash->reason ?? '',
+                $encash->rejection_reason ?? '',
+                $encash->created_at ? $encash->created_at->format('Y-m-d H:i') : '',
             ];
-        })->toArray();
-
-        $filename = 'leave_encashments_' . now()->format('Y-m-d') . '.xlsx';
-
-        return XlsxHelper::export($headers, $data, $filename);
-    }
-
-    private function isWithinFrequencyLimits(int $employeeId, int $leaveTypeId, Carbon $start, Carbon $end, string $frequency): bool
-    {
-        if ($frequency === 'anytime' || $frequency === 'any_time') {
-            return true;
         }
 
-        $exists = LeaveEncashment::where('employee_id', $employeeId)
-            ->where('leave_type_id', $leaveTypeId)
-            ->whereIn('status', ['pending', 'approved'])
-            ->whereBetween('created_at', [$start, $end])
-            ->exists();
-
-        return !$exists;
-    }
-
-    private function getCyclePeriods(Employee $employee, Carbon $now, string $frequency): array
-    {
-        $startDate = null;
-        if ($employee && $employee->leavePlan && $employee->leavePlan->effective_from) {
-            $startDate = Carbon::parse($employee->leavePlan->effective_from);
-        } else {
-            $startDate = Carbon::create($now->year, 1, 1, 0, 0, 0);
-        }
-
-        $diffInYears = $startDate->diffInYears($now);
-        $cycleStart = $startDate->copy()->addYears($diffInYears);
-        if ($cycleStart->isAfter($now)) {
-            $cycleStart->subYear();
-        }
-
-        $elapsedMonths = $cycleStart->diffInMonths($now);
-
-        $periodStart = $cycleStart->copy();
-        $periodEnd = $cycleStart->copy()->addYear()->subSecond();
-        $isValidMonth = true;
-
-        if ($frequency === 'monthly') {
-            $periodStart = $cycleStart->copy()->addMonths($elapsedMonths);
-            $periodEnd = $periodStart->copy()->addMonth()->subSecond();
-            $isValidMonth = true;
-        } elseif ($frequency === 'quarterly') {
-            $quarterIndex = floor($elapsedMonths / 3);
-            $periodStart = $cycleStart->copy()->addMonths($quarterIndex * 3);
-            $periodEnd = $periodStart->copy()->addMonths(3)->subSecond();
-            $isValidMonth = ($elapsedMonths % 3) === 2;
-        } elseif ($frequency === 'half_yearly') {
-            $halfIndex = floor($elapsedMonths / 6);
-            $periodStart = $cycleStart->copy()->addMonths($halfIndex * 6);
-            $periodEnd = $periodStart->copy()->addMonths(6)->subSecond();
-            $isValidMonth = ($elapsedMonths % 6) === 5;
-        } elseif ($frequency === 'yearly') {
-            $periodStart = $cycleStart->copy();
-            $periodEnd = $cycleStart->copy()->addYear()->subSecond();
-            $isValidMonth = ($elapsedMonths % 12) === 11;
-        }
-
-        return [
-            'start' => $periodStart,
-            'end' => $periodEnd,
-            'is_valid_month' => $isValidMonth,
-        ];
+        return XlsxHelper::download('leave_encashments_' . date('Ymd_His') . '.xlsx', 'Leave Encashments', $headers, $rows);
     }
 }

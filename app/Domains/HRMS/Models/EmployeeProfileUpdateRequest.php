@@ -27,6 +27,51 @@ class EmployeeProfileUpdateRequest extends BaseModel
         'reviewed_at' => 'datetime',
     ];
 
+    public function getChangesAttribute($value): array
+    {
+        $decoded = is_string($value) ? json_decode($value, true) : $value;
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $emp = $this->employee;
+        $formatted = [];
+
+        foreach ($decoded as $key => $data) {
+            if (is_array($data)) {
+                $old = $data['old'] ?? null;
+                $new = $data['new'] ?? ($data['value'] ?? '—');
+                if ((empty($old) || $old === '—') && $emp) {
+                    $rawOld = $emp->{$key} ?? null;
+                    if (!empty($rawOld)) {
+                        $old = (string) $rawOld;
+                    }
+                }
+                $formatted[$key] = [
+                    'old'      => !empty($old) ? $old : '—',
+                    'new'      => !empty($new) ? $new : '—',
+                    'label'    => $data['label'] ?? ucwords(str_replace('_', ' ', (string) $key)),
+                    'is_image' => !empty($data['is_image']) || $key === 'photo',
+                ];
+            } else {
+                $old = $emp ? ($emp->{$key} ?? '—') : '—';
+                $formatted[$key] = [
+                    'old'      => !empty($old) ? (string) $old : '—',
+                    'new'      => !empty($data) ? (string) $data : '—',
+                    'label'    => ucwords(str_replace('_', ' ', (string) $key)),
+                    'is_image' => $key === 'photo',
+                ];
+            }
+        }
+
+        return $formatted;
+    }
+
+    public function getFormattedChangesAttribute(): array
+    {
+        return $this->changes;
+    }
+
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
