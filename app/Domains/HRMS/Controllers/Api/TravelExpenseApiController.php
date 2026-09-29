@@ -201,13 +201,25 @@ class TravelExpenseApiController extends Controller
             ])->values();
         }
 
-        if ($detailed && $tr->relationLoaded('expenseReports')) {
+        if ($tr->relationLoaded('expenseReports')) {
             $data['expense_reports'] = $tr->expenseReports->map(fn($er) => [
-                'id'           => $er->id,
-                'title'        => $er->title,
-                'total_amount' => floatval($er->total_amount),
-                'status'       => $er->status,
-                'created_at'   => $er->created_at?->toDateTimeString(),
+                'id'                => $er->id,
+                'title'             => $er->title,
+                'total_amount'      => floatval($er->total_amount),
+                'advance_adjusted'  => floatval($er->advance_adjusted ?? 0),
+                'net_reimbursement' => floatval($er->net_reimbursement ?? $er->total_amount),
+                'status'            => $er->status,
+                'created_at'        => $er->created_at?->toDateTimeString(),
+                'claims'            => $er->relationLoaded('claims') ? $er->claims->map(fn($c) => [
+                    'id'            => $c->id,
+                    'category_id'   => $c->expense_category_id,
+                    'category_name' => $c->category?->name ?? 'General',
+                    'amount'        => floatval($c->amount),
+                    'spent_at'      => $c->spent_at ? $c->spent_at->format('Y-m-d') : null,
+                    'merchant'      => $c->merchant,
+                    'description'   => $c->description,
+                    'receipt_path'  => $c->receipt_path,
+                ])->values() : [],
             ])->values();
         }
 
@@ -354,6 +366,7 @@ class TravelExpenseApiController extends Controller
             ->with([
                 'employee:id,employee_id,full_name,photo',
                 'cashAdvances:id,travel_request_id,amount,approved_amount,status',
+                'expenseReports.claims.category',
             ]);
 
         if ($request->filled('employee_id')) {
@@ -414,7 +427,7 @@ class TravelExpenseApiController extends Controller
             ->with([
                 'employee:id,employee_id,full_name,office_email,personal_email,photo,job_title',
                 'cashAdvances:id,travel_request_id,amount,approved_amount,purpose,status,created_at',
-                'expenseReports:id,travel_request_id,title,total_amount,status,created_at',
+                'expenseReports.claims.category',
             ])
             ->find($id);
 
@@ -686,7 +699,11 @@ class TravelExpenseApiController extends Controller
             return $tr;
         });
 
-        return $this->sendSuccess($travelRequest->load('cashAdvances'), 'Travel request submitted successfully.', 201);
+        return $this->sendSuccess(
+            $this->transformTravelRequest($travelRequest->load(['employee', 'cashAdvances', 'expenseReports.claims.category'])),
+            'Travel request submitted successfully.',
+            201
+        );
     }
 
     /**

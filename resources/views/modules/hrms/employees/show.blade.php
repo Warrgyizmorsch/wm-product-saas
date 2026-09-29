@@ -2406,35 +2406,43 @@
                             <i class="feather-info"></i>
                             <span>These changes have been submitted to HR. They will reflect on your profile once reviewed and approved.</span>
                         </div>
-                        <div class="table-responsive rounded-3 border">
-                            <table class="table align-middle mb-0">
+                        <div class="border rounded-3 overflow-hidden">
+                            <table class="table align-middle mb-0" style="table-layout: fixed; width: 100%;">
                                 <thead class="table-light">
                                     <tr>
-                                        <th class="ps-3 text-muted text-uppercase fs-11 fw-bold" style="width: 30%;">Field</th>
-                                        <th class="text-muted text-uppercase fs-11 fw-bold" style="width: 35%;">Current Value</th>
-                                        <th class="pe-3 text-muted text-uppercase fs-11 fw-bold text-success" style="width: 35%;">Requested New Value</th>
+                                        <th class="ps-3 text-muted text-uppercase fs-11 fw-bold" style="width: 28%;">Field</th>
+                                        <th class="text-muted text-uppercase fs-11 fw-bold text-danger" style="width: 36%;">Current Value</th>
+                                        <th class="pe-3 text-muted text-uppercase fs-11 fw-bold text-success" style="width: 36%;">Requested New Value</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach($pendingRequest->changes ?? [] as $fieldKey => $change)
                                         <tr>
-                                            <td class="ps-3 fw-semibold text-dark">{{ $change['label'] ?? ucwords(str_replace('_', ' ', $fieldKey)) }}</td>
-                                            <td class="text-muted fs-13">
+                                            <td class="ps-3 fw-semibold text-dark text-break" style="white-space: normal; word-break: break-word;">{{ $change['label'] ?? ucwords(str_replace('_', ' ', $fieldKey)) }}</td>
+                                            <td class="text-muted fs-13 text-break" style="white-space: normal; word-break: break-word;">
                                                 @if(!empty($change['is_image']))
                                                     @if($change['old'] && $change['old'] !== '—')
                                                         <img src="{{ asset('storage/' . $change['old']) }}" class="rounded-circle" style="width: 38px; height: 38px; object-fit: cover;">
                                                     @else
-                                                        <span class="text-muted">—</span>
+                                                        <span class="text-muted">&mdash;</span>
                                                     @endif
                                                 @else
-                                                    {{ $change['old'] ?? '—' }}
+                                                    @if(empty($change['old']) || $change['old'] === '—')
+                                                        <span class="text-muted">&mdash;</span>
+                                                    @else
+                                                        <span class="text-danger text-decoration-line-through d-inline-block" style="line-height: 1.45;">{{ $change['old'] }}</span>
+                                                    @endif
                                                 @endif
                                             </td>
-                                            <td class="pe-3 fw-semibold text-success fs-13">
+                                            <td class="pe-3 fw-semibold text-success fs-13 text-break" style="white-space: normal; word-break: break-word;">
                                                 @if(!empty($change['is_image']))
                                                     <img src="{{ asset('storage/' . $change['new']) }}" class="rounded-circle border border-success border-2" style="width: 38px; height: 38px; object-fit: cover;">
                                                 @else
-                                                    {{ $change['new'] ?? '—' }}
+                                                    @if(empty($change['new']) || $change['new'] === '—')
+                                                        <span class="text-muted">&mdash;</span>
+                                                    @else
+                                                        <div class="p-2 rounded-2 bg-success-subtle text-success border border-success-subtle fs-13 fw-semibold text-break d-block" style="white-space: normal; word-break: break-word; line-height: 1.45;">{{ $change['new'] }}</div>
+                                                    @endif
                                                 @endif
                                             </td>
                                         </tr>

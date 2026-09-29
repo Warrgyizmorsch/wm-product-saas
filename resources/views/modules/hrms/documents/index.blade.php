@@ -343,6 +343,13 @@
                                         <td>
                                             <!-- Status Dropdown or Badge -->
                                             <div>
+                                                @php
+                                                    $canManageDocStatus = $authUser && (
+                                                        $authUser->hasHrPermission('hrms.documents.manage') ||
+                                                        $authUser->hasHrPermission('hr.settings.manage') ||
+                                                        ($isCompanyAdmin ?? false)
+                                                    );
+                                                @endphp
                                                 @if(!$doc->file_path || $isExpired)
                                                     <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.08) !important; color: #ff9800 !important; border: 1px solid rgba(255, 193, 7, 0.15); font-weight: 500;">
                                                         <i class="feather-clock fs-11"></i>
@@ -353,7 +360,7 @@
                                                         <i class="feather-edit-3 fs-11"></i> Pending Signature
                                                     </span>
                                                 @else
-                                                    @if($requiresApproval)
+                                                    @if($requiresApproval && $canManageDocStatus)
                                                         <div class="dropdown d-inline-block">
                                                             <span class="dropdown-toggle doc-status-toggle fw-bold" 
                                                                   id="docStatusDropdown_{{ $doc->id }}" 

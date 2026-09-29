@@ -3,14 +3,19 @@
 namespace App\Domains\HRMS\Controllers;
 
 use App\Domains\HRMS\Models\ExpenseCategory;
+use App\Domains\HRMS\Repositories\ExpensePolicyRepositoryInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 use Illuminate\Validation\Rule;
 
 class ExpenseCategoryController extends Controller
 {
+    public function __construct(
+        private readonly ExpensePolicyRepositoryInterface $policyRepository
+    ) {
+    }
+
     public function index(Request $request): RedirectResponse
     {
         $this->authorizeManage();
@@ -44,7 +49,7 @@ class ExpenseCategoryController extends Controller
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = $request->has('status') ? (bool) $request->status : true;
 
-        ExpenseCategory::create($validated);
+        $this->policyRepository->storeCategory($validated);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'categories'])
             ->with('success', 'Expense category created successfully.');
@@ -72,7 +77,7 @@ class ExpenseCategoryController extends Controller
 
         $validated['status'] = $request->has('status') ? (bool) $request->status : true;
 
-        $category->update($validated);
+        $this->policyRepository->updateCategory($category, $validated);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'categories'])
             ->with('success', 'Expense category updated successfully.');
@@ -88,7 +93,7 @@ class ExpenseCategoryController extends Controller
                 ->with('error', 'Cannot delete category as it contains submitted expense claims.');
         }
 
-        $category->delete();
+        $this->policyRepository->deleteCategory($category);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'categories'])
             ->with('success', 'Expense category deleted successfully.');

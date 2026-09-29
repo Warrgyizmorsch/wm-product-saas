@@ -81,8 +81,18 @@ use App\Domains\HRMS\Models\EmployeeEmploymentHistory;
 use App\Domains\HRMS\Models\EmployeeProbationEvaluation;
 use App\Domains\HRMS\Models\EmployeeExit;
 use App\Domains\HRMS\Models\EmployeeExitClearance;
+use App\Domains\HRMS\Models\EmployeeExitDocument;
 use App\Domains\HRMS\Models\EmployeeFnfSettlement;
 use App\Domains\HRMS\Models\ExitClearanceTemplate;
+use App\Domains\HRMS\Models\EmployeeProfileUpdateRequest;
+use App\Domains\HRMS\Models\KraCategory;
+use App\Domains\HRMS\Models\KpiMaster;
+use App\Domains\HRMS\Models\KpiTemplate;
+use App\Domains\HRMS\Models\KpiTemplateItem;
+use App\Domains\HRMS\Models\AppraisalCycle;
+use App\Domains\HRMS\Models\EmployeeGoalPlan;
+use App\Domains\HRMS\Models\EmployeeGoalItem;
+use App\Domains\HRMS\Models\GoalProgressLog;
 use App\Domains\Production\Models\ProductionShift;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -111,6 +121,15 @@ class HrmsDemoSeeder extends Seeder
 
         // 1. Truncate all related HRMS tables safely
         $tablesToTruncate = [
+            'goal_progress_logs',
+            'employee_goal_items',
+            'employee_goal_plans',
+            'appraisal_cycles',
+            'kpi_template_items',
+            'kpi_templates',
+            'kpi_masters',
+            'kra_categories',
+            'employee_profile_update_requests',
             'wfh_requests',
             'shift_change_requests',
             'overtime_requests',
@@ -1732,19 +1751,68 @@ class HrmsDemoSeeder extends Seeder
             'admin_notes' => 'Declined: Executive chair policy is limited to designated workstation desks; existing seating is compliant.',
         ]);
 
-        // 14. Biometric Device Master
-        $bioDevice = BiometricDevice::create([
+        // 14. Biometric Device Master & Hardware Registry
+        $bioDeviceHq = BiometricDevice::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'business_unit_id' => $buTech->id,
+            'business_unit_id' => $buCorporate->id,
             'branch_id' => $branchHq->id,
-            'name' => 'HQ Main Lobby Biometric Scanner',
+            'name' => 'HQ Noida Main Lobby Turnstile Scanner',
             'device_serial' => 'ZKT-ECO-994820',
             'ip_address' => '192.168.10.50',
             'port' => 4370,
             'status' => true,
             'last_ping_at' => now(),
         ]);
+
+        $bioDevicePune = BiometricDevice::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'business_unit_id' => $buMfg->id,
+            'branch_id' => $branchPune->id,
+            'name' => 'Pune Plant Production Bay Biometric Terminal',
+            'device_serial' => 'ESL-BIO-882190',
+            'ip_address' => '192.168.20.75',
+            'port' => 4370,
+            'status' => true,
+            'last_ping_at' => now(),
+        ]);
+
+        $bioDeviceBlr = BiometricDevice::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'business_unit_id' => $buTech->id,
+            'branch_id' => $branchBlr->id,
+            'name' => 'Bangalore Tech Center 4th Floor Face Scanner',
+            'device_serial' => 'HIK-VIS-771142',
+            'ip_address' => '192.168.30.90',
+            'port' => 4370,
+            'status' => true,
+            'last_ping_at' => now(),
+        ]);
+
+        // Sample Biometric Punch Logs
+        BiometricPunchLog::withoutEvents(function () use ($tenant, $bioDeviceHq, $bioDevicePune, $employees) {
+            BiometricPunchLog::create([
+                'tenant_id' => $tenant->id,
+                'biometric_device_id' => $bioDeviceHq->id,
+                'employee_id' => $employees[0]->id, // Rajesh Singhania
+                'punch_time' => Carbon::parse('2026-09-24 08:55:00'),
+                'punch_type' => 'check_in',
+                'processed' => true,
+                'raw_data' => ['card_no' => 'WRG-001', 'verify_mode' => 'fingerprint', 'device_ip' => '192.168.10.50'],
+            ]);
+
+            BiometricPunchLog::create([
+                'tenant_id' => $tenant->id,
+                'biometric_device_id' => $bioDevicePune->id,
+                'employee_id' => $employees[3]->id, // Vikramaditya (Plant Mgr)
+                'punch_time' => Carbon::parse('2026-09-24 05:50:00'),
+                'punch_type' => 'check_in',
+                'processed' => true,
+                'raw_data' => ['card_no' => 'WRG-004', 'verify_mode' => 'facial_recognition', 'device_ip' => '192.168.20.75'],
+            ]);
+        });
 
         // 15. Shift Rosters Generation from Joining Date to 2026-10-31
         $today = Carbon::parse('2026-09-24');
@@ -2426,6 +2494,134 @@ class HrmsDemoSeeder extends Seeder
             'status'            => 'approved',
         ]);
 
+        // Attendance Corrections
+        AttendanceCorrection::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employees[6]->id, // Devendra
+            'date' => '2026-09-10',
+            'requested_check_in' => '2026-09-10 09:15:00',
+            'requested_check_out' => '2026-09-10 18:30:00',
+            'reason' => 'Morning offsite client pitch meeting; forgot mobile clock-in during presentation.',
+            'status' => 'approved',
+            'approved_by' => $user->id,
+        ]);
+
+        AttendanceCorrection::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employees[15]->id, // Pooja
+            'date' => '2026-09-22',
+            'requested_check_in' => '2026-09-22 09:30:00',
+            'requested_check_out' => '2026-09-22 18:30:00',
+            'reason' => 'Lobby turnstile network sync latency on Tuesday morning.',
+            'status' => 'pending',
+        ]);
+
+        // WFH Requests
+        WfhRequest::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employees[14]->id, // Rahul
+            'start_date' => '2026-08-10',
+            'end_date' => '2026-08-14',
+            'duration' => 5.0,
+            'start_date_type' => 'full_day',
+            'end_date_type' => 'full_day',
+            'reason' => 'Focus sprint delivery for core database migration.',
+            'status' => 'approved',
+            'approved_by' => $employees[13]->id,
+        ]);
+
+        WfhRequest::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employees[9]->id, // Sneha (HR Mgr)
+            'start_date' => '2026-10-01',
+            'end_date' => '2026-10-02',
+            'duration' => 2.0,
+            'start_date_type' => 'full_day',
+            'end_date_type' => 'full_day',
+            'reason' => 'Remote hiring interviews for Q4 technical pipeline.',
+            'status' => 'pending',
+        ]);
+
+        // Employee Self-Service Profile Update Requests
+        EmployeeProfileUpdateRequest::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employees[13]->id, // Priya (Tech Lead)
+            'user_id' => $employees[13]->user_id,
+            'changes' => [
+                'present_address' => [
+                    'old' => $employees[13]->present_address,
+                    'new' => 'Flat 402, Prestige Lakeside Habitat, Varthur, Bangalore - 560087',
+                    'label' => 'Present Address',
+                ],
+                'personal_mobile_number' => [
+                    'old' => $employees[13]->personal_mobile_number,
+                    'new' => '+91 98450 99881',
+                    'label' => 'Personal Mobile Number',
+                ],
+            ],
+            'status' => 'pending',
+        ]);
+
+        EmployeeProfileUpdateRequest::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employees[6]->id, // Devendra
+            'user_id' => $employees[6]->user_id,
+            'changes' => [
+                'emergency_contact_name' => [
+                    'old' => $employees[6]->emergency_contact_name,
+                    'new' => 'Kavita Verma',
+                    'label' => 'Emergency Contact Name',
+                ],
+                'emergency_contact_number' => [
+                    'old' => $employees[6]->emergency_contact_number,
+                    'new' => '+91 99887 76655',
+                    'label' => 'Emergency Contact Number',
+                ],
+                'emergency_contact_relation' => [
+                    'old' => $employees[6]->emergency_contact_relation,
+                    'new' => 'Spouse',
+                    'label' => 'Emergency Contact Relation',
+                ],
+                'marital_status' => [
+                    'old' => $employees[6]->marital_status,
+                    'new' => 'Married',
+                    'label' => 'Marital Status',
+                ],
+            ],
+            'status' => 'approved',
+            'reviewed_by' => $user->id,
+            'reviewed_at' => Carbon::parse('2026-08-15 14:30:00'),
+        ]);
+
+        EmployeeProfileUpdateRequest::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employees[15]->id, // Pooja
+            'user_id' => $employees[15]->user_id,
+            'changes' => [
+                'bank_name' => [
+                    'old' => $employees[15]->bank_name,
+                    'new' => 'State Bank of India',
+                    'label' => 'Bank Name',
+                ],
+                'account_number' => [
+                    'old' => $employees[15]->account_number,
+                    'new' => '30998877665',
+                    'label' => 'Bank Account Number',
+                ],
+                'ifsc_code' => [
+                    'old' => $employees[15]->ifsc_code,
+                    'new' => 'SBIN0001234',
+                    'label' => 'IFSC Code',
+                ],
+            ],
+            'status' => 'rejected',
+            'rejection_reason' => 'Passbook scan was illegible. Please upload clear scan showing account number and IFSC code.',
+            'reviewed_by' => $user->id,
+            'reviewed_at' => Carbon::parse('2026-08-18 11:00:00'),
+        ]);
+
         // 18. Travel & Expense Management
         $travelReq = TravelRequest::create([
             'tenant_id' => $tenant->id,
@@ -2900,11 +3096,355 @@ class HrmsDemoSeeder extends Seeder
             ]);
         }
 
-        // Calculate and save FnF Settlement
-        $fnfService = new \App\Domains\HRMS\Services\FnFCalculationService();
-        $computedFnF = $fnfService->calculateFnF($sampleExit);
-        $fnfService->saveSettlement($sampleExit, $computedFnF);
+        // Seed Exit Clearance Templates Master
+        foreach (ExitClearanceTemplate::DEFAULT_TEMPLATES as $tpl) {
+            ExitClearanceTemplate::create([
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'clearance_category' => $tpl['clearance_category'],
+                'category_name' => $tpl['category_name'],
+                'item_name' => $tpl['item_name'],
+                'description' => $tpl['description'],
+                'is_mandatory' => $tpl['is_mandatory'],
+                'sort_order' => $tpl['sort_order'],
+                'status' => true,
+            ]);
+        }
 
-        $this->command?->info('HrmsDemoSeeder successfully completed! All 13 roles, complete employee forms, attendance history, salary structures, leave plans, fixed assets, recruitment, helpdesk, PIP, broadcasts, and travel expenses are seeded with real-world data.');
+        // Issue Official Exit Documents (Relieving Letter & Experience Certificate)
+        EmployeeExitDocument::create([
+            'tenant_id' => $tenant->id,
+            'employee_exit_id' => $sampleExit->id,
+            'employee_id' => $employees[4]->id,
+            'document_type' => 'relieving_letter',
+            'reference_number' => 'WRG/REL/2026/001',
+            'issue_date' => '2026-09-30',
+            'file_path' => 'documents/relieving_rohan_kulkarni.pdf',
+            'content_data' => [
+                'employee_name' => 'Rohan Kulkarni',
+                'designation' => 'Senior Production Engineer',
+                'department' => 'Plant Operations & Manufacturing',
+                'relieving_date' => '2026-09-30',
+                'signatory' => 'Vikram Malhotra (VP HR)',
+            ],
+        ]);
+
+        EmployeeExitDocument::create([
+            'tenant_id' => $tenant->id,
+            'employee_exit_id' => $sampleExit->id,
+            'employee_id' => $employees[4]->id,
+            'document_type' => 'experience_letter',
+            'reference_number' => 'WRG/EXP/2026/001',
+            'issue_date' => '2026-09-30',
+            'file_path' => 'documents/experience_rohan_kulkarni.pdf',
+            'content_data' => [
+                'employee_name' => 'Rohan Kulkarni',
+                'joining_date' => '2026-07-01',
+                'relieving_date' => '2026-09-30',
+                'conduct' => 'Exemplary',
+            ],
+        ]);
+
+        // 25. KRA & KPI Performance Management Master & Cycles
+        $kraEng = KraCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Core Engineering Velocity & Architecture',
+            'code' => 'KRA-ENG',
+            'color' => '#3B82F6',
+            'description' => 'Software engineering deliverables, test automation, system architecture, and uptime.',
+            'status' => 'active',
+        ]);
+
+        $kraSales = KraCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Sales Pipeline & Revenue Generation',
+            'code' => 'KRA-SALES',
+            'color' => '#10B981',
+            'description' => 'Target quota achievement, qualified opportunity pipeline, and client conversion.',
+            'status' => 'active',
+        ]);
+
+        $kraOps = KraCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Operational Quality & Plant Safety',
+            'code' => 'KRA-OPS',
+            'color' => '#F59E0B',
+            'description' => 'Zero-defect manufacturing, machine OEE, inventory turn rate, and compliance.',
+            'status' => 'active',
+        ]);
+
+        $kraLead = KraCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Leadership, Mentorship & Culture',
+            'code' => 'KRA-LEAD',
+            'color' => '#8B5CF6',
+            'description' => 'Team development, knowledge sharing, onboarding mentorship, and innovation.',
+            'status' => 'active',
+        ]);
+
+        // KPI Masters
+        $kpiStoryPoints = KpiMaster::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'kra_category_id' => $kraEng->id,
+            'name' => 'Sprint Velocity (Story Points Completed)',
+            'code' => 'KPI-ENG-SP',
+            'description' => 'Total story points committed vs delivered in two-week agile sprints.',
+            'unit' => 'number',
+            'calculation_type' => 'higher_is_better',
+            'default_target' => 45.0,
+            'default_weightage' => 40.0,
+            'status' => 'active',
+        ]);
+
+        $kpiCodeReview = KpiMaster::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'kra_category_id' => $kraEng->id,
+            'name' => 'PR Review SLA (< 24 Hours)',
+            'code' => 'KPI-ENG-CR',
+            'description' => 'Peer code reviews performed within 24 hours of submission with constructive feedback.',
+            'unit' => 'percentage',
+            'calculation_type' => 'higher_is_better',
+            'default_target' => 95.0,
+            'default_weightage' => 30.0,
+            'status' => 'active',
+        ]);
+
+        $kpiTestCoverage = KpiMaster::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'kra_category_id' => $kraEng->id,
+            'name' => 'Automated Test Coverage',
+            'code' => 'KPI-ENG-TEST',
+            'description' => 'Unit and integration test code coverage on new pull requests.',
+            'unit' => 'percentage',
+            'calculation_type' => 'higher_is_better',
+            'default_target' => 85.0,
+            'default_weightage' => 30.0,
+            'status' => 'active',
+        ]);
+
+        $kpiRevenue = KpiMaster::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'kra_category_id' => $kraSales->id,
+            'name' => 'Quarterly Booked Revenue (INR)',
+            'code' => 'KPI-SALES-REV',
+            'description' => 'Gross closed-won deal value recorded in CRM.',
+            'unit' => 'currency',
+            'calculation_type' => 'higher_is_better',
+            'default_target' => 2500000.0,
+            'default_weightage' => 50.0,
+            'status' => 'active',
+        ]);
+
+        $kpiOee = KpiMaster::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'kra_category_id' => $kraOps->id,
+            'name' => 'Overall Equipment Effectiveness (OEE)',
+            'code' => 'KPI-OPS-OEE',
+            'description' => 'Machine availability, performance rate, and quality output in plant machining.',
+            'unit' => 'percentage',
+            'calculation_type' => 'higher_is_better',
+            'default_target' => 92.0,
+            'default_weightage' => 50.0,
+            'status' => 'active',
+        ]);
+
+        // KPI Scorecard Templates
+        $tplSwe = KpiTemplate::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'department_id' => $deptEng->id,
+            'designation_id' => $desigSrSwe->id,
+            'name' => 'Senior Software Engineer Performance Template',
+            'code' => 'TPL-SR-SWE',
+            'description' => 'Standard technical deliverables scorecard for senior engineering talent.',
+            'status' => 'active',
+        ]);
+
+        KpiTemplateItem::create([
+            'tenant_id' => $tenant->id,
+            'kpi_template_id' => $tplSwe->id,
+            'kra_category_id' => $kraEng->id,
+            'kpi_master_id' => $kpiStoryPoints->id,
+            'title' => $kpiStoryPoints->name,
+            'description' => $kpiStoryPoints->description,
+            'unit' => $kpiStoryPoints->unit,
+            'calculation_type' => $kpiStoryPoints->calculation_type,
+            'target' => 45.0,
+            'weightage' => 40.0,
+        ]);
+        KpiTemplateItem::create([
+            'tenant_id' => $tenant->id,
+            'kpi_template_id' => $tplSwe->id,
+            'kra_category_id' => $kraEng->id,
+            'kpi_master_id' => $kpiCodeReview->id,
+            'title' => $kpiCodeReview->name,
+            'description' => $kpiCodeReview->description,
+            'unit' => $kpiCodeReview->unit,
+            'calculation_type' => $kpiCodeReview->calculation_type,
+            'target' => 95.0,
+            'weightage' => 30.0,
+        ]);
+        KpiTemplateItem::create([
+            'tenant_id' => $tenant->id,
+            'kpi_template_id' => $tplSwe->id,
+            'kra_category_id' => $kraEng->id,
+            'kpi_master_id' => $kpiTestCoverage->id,
+            'title' => $kpiTestCoverage->name,
+            'description' => $kpiTestCoverage->description,
+            'unit' => $kpiTestCoverage->unit,
+            'calculation_type' => $kpiTestCoverage->calculation_type,
+            'target' => 85.0,
+            'weightage' => 30.0,
+        ]);
+
+        // Appraisal Review Cycles
+        $cycleAnnual = AppraisalCycle::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'FY 2026-27 Annual Performance Appraisal Cycle',
+            'code' => 'CYC-FY26-ANNUAL',
+            'period_type' => 'annual',
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'goal_setting_deadline' => '2026-05-15',
+            'self_review_deadline' => '2027-03-15',
+            'manager_review_deadline' => '2027-03-25',
+            'status' => 'in_progress',
+            'goal_weightage_percent' => 70.0,
+            'competency_weightage_percent' => 30.0,
+            'description' => 'Company-wide annual compensation appraisal and leadership review.',
+        ]);
+
+        $cycleH1 = AppraisalCycle::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'H1 FY 2026-27 Mid-Year Performance Review',
+            'code' => 'CYC-FY26-H1',
+            'period_type' => 'semi_annual',
+            'start_date' => '2026-04-01',
+            'end_date' => '2026-09-30',
+            'goal_setting_deadline' => '2026-05-01',
+            'self_review_deadline' => '2026-09-15',
+            'manager_review_deadline' => '2026-09-25',
+            'status' => 'in_review',
+            'goal_weightage_percent' => 80.0,
+            'competency_weightage_percent' => 20.0,
+            'description' => 'Mid-year progress calibration and milestone scoring.',
+        ]);
+
+        // Employee Goal Plan for Rahul Sharma (Senior SWE)
+        $goalPlanRahul = EmployeeGoalPlan::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'plan_number' => 'GP-2026-001',
+            'employee_id' => $employees[14]->id, // Rahul Sharma
+            'appraisal_cycle_id' => $cycleH1->id,
+            'manager_id' => $employees[13]->id,  // Priya Nair (Tech Lead)
+            'kpi_template_id' => $tplSwe->id,
+            'status' => 'manager_reviewed',
+            'total_weightage' => 100.0,
+            'goal_score' => 93.5,
+            'competency_score' => 90.0,
+            'final_score' => 92.8,
+            'final_grade' => 'A',
+            'normalized_score' => 92.8,
+            'employee_comments' => 'Completed core multi-tenant authentication refactor and maintained zero sprint carryover.',
+            'manager_comments' => 'Exceptional technical depth and sprint velocity. Consistently leads architecture reviews.',
+            'hr_comments' => 'Eligible for annual leadership merit bonus.',
+            'promotion_recommended' => true,
+            'pip_triggered' => false,
+            'submitted_at' => '2026-09-10 14:00:00',
+            'approved_at' => '2026-09-12 10:00:00',
+            'self_reviewed_at' => '2026-09-16 11:00:00',
+            'manager_reviewed_at' => '2026-09-20 16:30:00',
+        ]);
+
+        $itemStoryPoints = EmployeeGoalItem::create([
+            'tenant_id' => $tenant->id,
+            'employee_goal_plan_id' => $goalPlanRahul->id,
+            'kra_category_id' => $kraEng->id,
+            'kpi_master_id' => $kpiStoryPoints->id,
+            'title' => 'Deliver 45+ Story Points per Sprint',
+            'description' => 'Execute high-complexity backend PRs for tenant isolation and billing engine.',
+            'unit' => 'number',
+            'calculation_type' => 'higher_is_better',
+            'target' => 45.0,
+            'actual' => 48.0,
+            'weightage' => 40.0,
+            'self_rating' => 4.8,
+            'self_score' => 96.0,
+            'self_comment' => 'Delivered 48 points on average across 6 sprints.',
+            'manager_rating' => 5.0,
+            'manager_score' => 96.0,
+            'manager_comment' => 'Exceeded targets consistently with high test quality.',
+            'final_score' => 96.0,
+            'status' => 'achieved',
+        ]);
+
+        $itemReview = EmployeeGoalItem::create([
+            'tenant_id' => $tenant->id,
+            'employee_goal_plan_id' => $goalPlanRahul->id,
+            'kra_category_id' => $kraEng->id,
+            'kpi_master_id' => $kpiCodeReview->id,
+            'title' => 'Maintain 95%+ PR Turnaround SLA',
+            'description' => 'Review all assigned team PRs within 24 hours.',
+            'unit' => 'percentage',
+            'calculation_type' => 'higher_is_better',
+            'target' => 95.0,
+            'actual' => 96.5,
+            'weightage' => 30.0,
+            'self_rating' => 4.5,
+            'self_score' => 95.0,
+            'self_comment' => 'Average review time was 18 hours.',
+            'manager_rating' => 4.8,
+            'manager_score' => 95.0,
+            'manager_comment' => 'Very prompt and thorough reviews.',
+            'final_score' => 95.0,
+            'status' => 'achieved',
+        ]);
+
+        $itemCoverage = EmployeeGoalItem::create([
+            'tenant_id' => $tenant->id,
+            'employee_goal_plan_id' => $goalPlanRahul->id,
+            'kra_category_id' => $kraEng->id,
+            'kpi_master_id' => $kpiTestCoverage->id,
+            'title' => 'Maintain 85%+ Automated Test Coverage',
+            'description' => 'Ensure all new APIs have comprehensive Pest / PHPUnit tests.',
+            'unit' => 'percentage',
+            'calculation_type' => 'higher_is_better',
+            'target' => 85.0,
+            'actual' => 88.0,
+            'weightage' => 30.0,
+            'self_rating' => 4.5,
+            'self_score' => 90.0,
+            'self_comment' => 'Coverage maintained at 88% on new endpoints.',
+            'manager_rating' => 4.5,
+            'manager_score' => 90.0,
+            'manager_comment' => 'Great test hygiene.',
+            'final_score' => 90.0,
+            'status' => 'achieved',
+        ]);
+
+        // Goal Progress Logs
+        GoalProgressLog::create([
+            'tenant_id' => $tenant->id,
+            'employee_goal_item_id' => $itemStoryPoints->id,
+            'employee_id' => $employees[14]->id,
+            'logged_by_id' => $employees[14]->user_id,
+            'previous_value' => 40.0,
+            'current_value' => 48.0,
+            'notes' => 'Sprint 14 closed with 52 points, lifting the cumulative average to 48.',
+        ]);
+
+        $this->command?->info('HrmsDemoSeeder successfully completed! All 13 roles, complete employee forms, attendance history, salary structures, leave plans, fixed assets, recruitment, helpdesk, PIP, broadcasts, KRA/KPI scorecards, exit clearances, and travel expenses are seeded with real-world data.');
     }
 }

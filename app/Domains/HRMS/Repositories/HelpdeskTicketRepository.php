@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-class HelpdeskTicketRepository
+class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 {
     public function __construct(private readonly AccessService $access)
     {

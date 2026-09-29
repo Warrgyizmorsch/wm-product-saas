@@ -209,6 +209,91 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Repositories\OvertimeRequestRepository::class
         );
 
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\KraKpiRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\KraKpiRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\RecruitmentRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\RecruitmentRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\PayrollRunRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\PayrollRunRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\TravelExpenseRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\TravelExpenseRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\PipRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\PipRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\ProbationRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\ProbationRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\EmployeeExitRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\EmployeeExitRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\AttendanceCorrectionRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\AttendanceCorrectionRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\BroadcastRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\BroadcastRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\PenalizationPolicyRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\PenalizationPolicyRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\LeaveEncashmentRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\LeaveEncashmentRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\DocumentRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\DocumentRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\HelpdeskKbRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\HelpdeskKbRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\HelpdeskTicketRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\HelpdeskTicketRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\ExpensePolicyRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\ExpensePolicyRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\EmployeeProfileRequestRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\EmployeeProfileRequestRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\ExitClearancePolicyRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\ExitClearancePolicyRepository::class
+        );
+
         // ── Projects: Project ─────────────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Projects\Repositories\ProjectRepositoryInterface::class,

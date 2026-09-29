@@ -6,7 +6,7 @@ use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\HelpdeskCategory;
 use App\Domains\HRMS\Models\HelpdeskSatisfactionRating;
 use App\Domains\HRMS\Models\HelpdeskTicket;
-use App\Domains\HRMS\Repositories\HelpdeskTicketRepository;
+use App\Domains\HRMS\Repositories\HelpdeskTicketRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
 use Illuminate\Http\RedirectResponse;
@@ -16,7 +16,7 @@ use Illuminate\View\View;
 class HelpdeskTicketController extends Controller
 {
     public function __construct(
-        private readonly HelpdeskTicketRepository $ticketRepository,
+        private readonly HelpdeskTicketRepositoryInterface $ticketRepository,
         private readonly AccessService $access
     ) {
     }
