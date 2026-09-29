@@ -192,11 +192,11 @@ Inspect the existing **Production BOM module** (`resources/views/modules/product
   2. **Milestones Tab:** Embedded milestone listing using `<x-ui.odoo-form-ui type="table">` with inline creation row, health badges, and link to Milestone Workspace.
   3. **Tasks Tab:** *(Target Phase 2)* Complete task list board using `<x-ui.odoo-form-ui type="table">`.
   4. **Timesheets Tab:** *(Target Phase 3)* Time log ledger table using `<x-ui.odoo-form-ui type="table">`.
-  5. **Issues Tab:** *(Target Phase 4)* Defect log table using `<x-ui.odoo-form-ui type="table">`.
-  6. **Documents Tab:** *(Target Phase 4)* Project document repository table using `<x-ui.odoo-form-ui type="table">`.
+  5. **Issues Tab:** *(Phase 4 — Completed)* Defect log table using `<x-ui.odoo-form-ui type="table">` with status, severity, priority badges, filters, and action dropdown.
+  6. **Documents Tab:** *(Phase 4 — Completed)* Project document repository table using `<x-ui.odoo-form-ui type="table">` with inline preview, secure download, and delete.
   7. **UAT & Change Requests Tab:** *(Target Phase 5)* Review sign-offs and CR grids using `<x-ui.odoo-form-ui type="table">`.
   8. **Billing Tab:** *(Target Phase 7)* Associated Sales Invoices table using `<x-ui.odoo-form-ui type="table">`.
-- **Status:** **PARTIALLY IMPLEMENTED (SUMMARY, MILESTONES, AND TIMESHEETS TABS WORKING; REMAINING TABS TARGETED).**
+- **Status:** **PARTIALLY IMPLEMENTED (SUMMARY, MILESTONES, TIMESHEETS, ISSUES, AND DOCUMENTS TABS WORKING; REMAINING TABS TARGETED).**
 
 ---
 
@@ -220,7 +220,7 @@ Inspect the existing **Production BOM module** (`resources/views/modules/product
     - Subtasks: Checklist and metadata table using `<x-ui.odoo-form-ui type="table">` with complete toggle, inline add, and progress fraction (`3/5`).
     - Dependencies: Predecessor list with blocker status; dependent task list ("Blocks X, Y").
     - Time Tracking: *(Phase 3)* "Log Time" button opening `<x-ui.modal>` with `<x-ui.odoo-form-ui>` inputs, and task-specific hours ledger table (`<x-ui.odoo-form-ui type="table">`).
-    - Attached Documents: *(Target Phase 4)* Task-specific file attachments table.
+    - Attached Documents: *(Phase 4 — Completed)* Task-specific file attachments table with upload, inline preview, secure download, and deletion.
   - Right Column (Meta Rail):
     - Assignee & Reviewer (Odoo-form searchable select validated against active project members).
     - Priority (Low, Medium, High, Critical) using `<x-ui.priority-badge>`.
@@ -228,7 +228,7 @@ Inspect the existing **Production BOM module** (`resources/views/modules/product
     - Start Date & Due Date (inline editable date controls).
     - Estimated Hours vs. Actual Hours (dynamically computed from approved timesheets).
   - Bottom Section: Paginated activity history stream specific to the task.
-- **Status:** **PARTIALLY IMPLEMENTED (HERO, DESCRIPTION, SUBTASKS, DEPENDENCIES, RAIL, TIME LOGS & ACTIVITY WORKING; ATTACHMENTS TARGETED).**
+- **Status:** **PARTIALLY IMPLEMENTED (HERO, DESCRIPTION, SUBTASKS, DEPENDENCIES, RAIL, TIME LOGS, ATTACHMENTS & ACTIVITY WORKING; REMAINING TABS TARGETED).**
 
 ---
 
@@ -255,20 +255,22 @@ Inspect the existing **Production BOM module** (`resources/views/modules/product
 
 ---
 
-### 3.7 Issue Management Screens *(Target Phase 4)*
-- **Issue Directory & Workspace (`projects/issues/index.blade.php`, `projects/issues/show.blade.php`):**
-  - Panel wrapper: `.erp-single-panel bg-white`.
-  - Issue Directory Table: `<x-ui.odoo-form-ui type="table">` with Issue Code (`PRJ-0001-ISS-001`), Title, Task link, Severity pill, Priority badge, Status.
-  - Issue Create/Edit Forms: Standard `<x-ui.odoo-form-ui type="sheet">` with Odoo-form inputs, selects, and textareas.
-  - Retest Action Banner: When status is `Resolved`, prominent "Verify & Retest" banner gives QA two choices: "Pass Retest (Close Issue)" or "Fail Retest (Return to In Progress)".
+### 3.7 Issue Management Screens *(Phase 4 — Completed)*
+- **Issue Directory & Workspace (`projects/_issues.blade.php`, `projects/issues/show.blade.php`):**
+  - Panel wrapper: `.erp-single-panel bg-white` with dark-mode support.
+  - Issue Directory Table: `<x-ui.odoo-form-ui type="table">` with Issue Code (`PRJ-0001-ISS-001`), Title, Severity pill, Priority badge, Status, Assignee, Reporter, and Action dropdown.
+  - Issue Create/Edit Forms: Responsive modal (`_modal.blade.php`) and inline edits with Odoo-form inputs, selects, and textareas.
+  - Retest Action Banner & Modal: When status is `Resolved`, prominent "Retest Issue" button triggers `<x-ui.modal>` with separation of duties enforcement (resolver cannot retest own fix, with PM override).
+- **Status:** **FULLY IMPLEMENTED.**
 
 ---
 
-### 3.8 Document Repository (`projects/documents/index.blade.php`) *(Target Phase 4)*
+### 3.8 Document Repository (`projects/_documents.blade.php`, `projects/tasks/workspace/_attachments.blade.php`) *(Phase 4 — Completed)*
 - **File Table:** `<x-ui.odoo-form-ui type="table">` inside `.erp-single-panel`.
-  - Category folders (Requirements, Architecture, Design, Test Cases, Meeting Notes, Attachments).
-  - Upload file modal (`<x-ui.modal>`) with `<x-ui.odoo-form-ui type="file">` and category select.
-  - File size, uploader avatar, upload date, and secure download action.
+  - Category folders/tags (`Requirement`, `Design`, `API`, `Test Case`, `Meeting Minutes`, `Attachment`).
+  - Upload file modal (`<x-ui.modal>`) with file input, category select, optional name, and remarks.
+  - File size, uploader avatar/name, upload date, inline preview action (`projects.documents.preview`), and secure download action.
+- **Status:** **FULLY IMPLEMENTED.**
 
 ---
 

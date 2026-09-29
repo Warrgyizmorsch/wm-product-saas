@@ -84,4 +84,11 @@ class ActivityLogService
             TaskDependency::class => $task->dependencies->pluck('id')->all(),
         ], $limit);
     }
+
+    public function forIssue(\App\Domains\Projects\Models\Issue $issue, int $limit = 50): Collection
+    {
+        return $this->logs->forSubjects($issue->project_id, [
+            \App\Domains\Projects\Models\Issue::class => [$issue->id],
+        ], $limit);
+    }
 }

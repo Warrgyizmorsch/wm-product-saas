@@ -51,6 +51,7 @@ class TaskController extends Controller
             'subTasks.assignee',
             'dependencies.dependsOn',
             'dependents.task',
+            'documents.uploader',
         ]);
 
         $canManageTask = auth()->user()->can('update', $task);

@@ -1,8 +1,10 @@
 <?php
 
+use App\Domains\Projects\Controllers\IssueController;
 use App\Domains\Projects\Controllers\MilestoneController;
 use App\Domains\Projects\Controllers\ProjectActivityLogController;
 use App\Domains\Projects\Controllers\ProjectController;
+use App\Domains\Projects\Controllers\ProjectDocumentController;
 use App\Domains\Projects\Controllers\ProjectMemberController;
 use App\Domains\Projects\Controllers\SubTaskController;
 use App\Domains\Projects\Controllers\TaskController;
@@ -116,6 +118,30 @@ Route::prefix('projects')
                         Route::put('{timeLog}', [TimeLogController::class, 'update'])->name('update');
                         Route::delete('{timeLog}', [TimeLogController::class, 'destroy'])->name('destroy');
                     });
+            });
+
+        Route::prefix('{project}/issues')
+            ->as('issues.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::get('/', [IssueController::class, 'index'])->name('index');
+                Route::post('/', [IssueController::class, 'store'])->name('store');
+                Route::get('{issue}', [IssueController::class, 'show'])->name('show');
+                Route::put('{issue}', [IssueController::class, 'update'])->name('update');
+                Route::patch('{issue}/field', [IssueController::class, 'updateField'])->name('field');
+                Route::post('{issue}/retest', [IssueController::class, 'retest'])->name('retest');
+                Route::delete('{issue}', [IssueController::class, 'destroy'])->name('destroy');
+            });
+
+        Route::prefix('{project}/documents')
+            ->as('documents.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::get('/', [ProjectDocumentController::class, 'index'])->name('index');
+                Route::post('/', [ProjectDocumentController::class, 'store'])->name('store');
+                Route::get('{document}/preview', [ProjectDocumentController::class, 'preview'])->name('preview');
+                Route::get('{document}/download', [ProjectDocumentController::class, 'download'])->name('download');
+                Route::delete('{document}', [ProjectDocumentController::class, 'destroy'])->name('destroy');
             });
 
     });

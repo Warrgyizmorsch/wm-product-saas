@@ -214,9 +214,9 @@ flowchart TD
 | **7. Dependencies** | Cycle Detection Implemented | FS/SS/FF Types + Transition Blocking | Enforce blocker in `updateStatus()` |
 | **8. Scheduling / Gantt** | Missing | Interactive Gantt + Critical Path | Build Gantt view and CPM engine |
 | **9. Execution & Status** | Implemented (FSM transitions) | Implemented | None |
-| **10. Time Tracking** | Missing | Daily time entry against tasks | Build `project_time_logs` & UI |
-| **11. Issue Management** | Missing | Defect tracking with retest loop | Build `project_issues` & lifecycle |
-| **12. Timesheet Approval** | Missing | PM approval queue | Build approval UI & lock mechanism |
+| **10. Time Tracking** | Implemented (Phase 3) | Daily time entry against tasks | None (Completed & Verified) |
+| **11. Issue Management** | Implemented (Phase 4) | Defect tracking with retest loop | None (Completed & Verified) |
+| **12. Timesheet Approval** | Implemented (Phase 3) | PM approval queue | None (Completed & Verified) |
 | **13. Client UAT** | Missing | Milestone gate + Sign-off | Build `project_reviews` & gates |
 | **14. Change Requests** | Missing | Impact analysis + Budget adjust | Build `project_change_requests` |
 | **15. Billing Integration** | Missing in PM | Sales Invoice generation | Bridge approved timesheets -> Sales Invoices |

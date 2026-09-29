@@ -27,10 +27,7 @@
                 @include('modules.projects.tasks.workspace._subtasks')
                 @include('modules.projects.tasks.workspace._dependencies')
                 @include('modules.projects.tasks.workspace._timelogs')
-
-                {{-- Future extension point: Comments and Attachments sections
-                     will be added here, each its own partial, without
-                     restructuring the page shell, hero, or rail. --}}
+                @include('modules.projects.tasks.workspace._attachments')
             </div>
             <div class="col-lg-4">
                 @include('modules.projects.tasks.workspace._rail')

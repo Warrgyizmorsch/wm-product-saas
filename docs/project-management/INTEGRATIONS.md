@@ -320,18 +320,21 @@ The application has an extensive library of 44 pre-built `<x-ui.*>` Blade compon
 9. `projects.tasks.create`
 10. `projects.tasks.update`
 11. `projects.tasks.delete`
+12. `projects.timetracking.view` (Phase 3)
+13. `projects.timetracking.log` (Phase 3)
+14. `projects.timetracking.approve` (Phase 3)
+15. `projects.issues.view` (Phase 4)
+16. `projects.issues.create` (Phase 4)
+17. `projects.issues.edit` (Phase 4)
+18. `projects.issues.resolve` (Phase 4)
+19. `projects.issues.retest` (Phase 4)
+20. `projects.issues.delete` (Phase 4)
+21. `projects.documents.view` (Phase 4)
+22. `projects.documents.upload` (Phase 4)
+23. `projects.documents.download` (Phase 4)
+24. `projects.documents.delete` (Phase 4)
 
 ### 13.2 Future Permissions Required (By Phase)
-- **Phase 3 (Time Tracking):**
-  - `projects.timetracking.view`
-  - `projects.timetracking.log`
-  - `projects.timetracking.approve`
-- **Phase 4 (Issues & Documents):**
-  - `projects.issues.view`
-  - `projects.issues.manage`
-  - `projects.documents.view`
-  - `projects.documents.upload`
-  - `projects.documents.delete`
 - **Phase 5 (UAT & Change Requests):**
   - `projects.reviews.view`
   - `projects.reviews.manage`

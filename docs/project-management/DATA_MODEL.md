@@ -286,43 +286,47 @@ erDiagram
 
 ### 2.2 `project_issues` (Defect & Issue Management)
 - **Purpose:** Tracks project bugs, quality defects, and resolutions with retest verification.
-- **Entity Model:** `App\Domains\Projects\Models\Issue` *(To be created in Phase 4)*
-- **Proposed Attributes:**
+- **Entity Model:** `App\Domains\Projects\Models\Issue`
+- **Implemented Attributes:**
   - `id`: bigint PK
   - `tenant_id`, `company_id`, `branch_id`
   - `project_id`: FK -> `projects(id)` ON DELETE CASCADE
   - `task_id`: FK -> `project_tasks(id)` ON DELETE SET NULL (optional task link)
   - `issue_number`: string (e.g. `PRJ-0001-ISS-001`)
   - `title`: string
-  - `description`: text
+  - `steps_to_reproduce`: text, nullable
+  - `description`: text, nullable
   - `reporter_id`: FK -> `users(id)` ON DELETE SET NULL
   - `assignee_id`: FK -> `users(id)` ON DELETE SET NULL
-  - `priority`: string (`Low`, `Medium`, `High`, `Critical`)
+  - `priority`: string (`Low`, `Medium`, `High`, `Urgent`)
   - `severity`: string (`Minor`, `Major`, `Critical`)
   - `status`: string, default 'Open' (`Open`, `Assigned`, `In Progress`, `Resolved`, `Closed`)
   - `resolution_date`: timestamp, nullable
   - `resolution_notes`: text, nullable
-- **Status:** **TO BE DESIGNED & IMPLEMENTED IN PHASE 4**
+  - `retest_notes`: text, nullable
+  - `deleted_at`: timestamp, soft deletes
+- **Status:** **COMPLETED & VERIFIED (PHASE 4)**
 
 ---
 
 ### 2.3 `project_documents` (Project File Management)
 - **Purpose:** Central repository for project documentation, architecture blueprints, test cases, and file attachments.
-- **Entity Model:** `App\Domains\Projects\Models\Document` *(To be created in Phase 4)*
-- **Proposed Attributes:**
+- **Entity Model:** `App\Domains\Projects\Models\ProjectDocument`
+- **Implemented Attributes:**
   - `id`: bigint PK
   - `tenant_id`, `company_id`, `branch_id`
   - `project_id`: FK -> `projects(id)` ON DELETE CASCADE
   - `attachable_type`, `attachable_id`: nullable polymorphic relation (link to Task, Issue, or Milestone)
-  - `name`: string
-  - `file_path`: string (storage path)
+  - `title`: string, nullable (user-friendly display title)
+  - `file_path`: string (storage path on tenant disk)
   - `file_name`: string (original filename)
   - `file_size`: integer (bytes)
   - `mime_type`: string
-  - `category`: string (e.g., Requirement, Design, API, Test Case, Meeting Minutes, Attachment)
+  - `category`: string (`Requirement`, `Design`, `API`, `Test Case`, `Meeting Minutes`, `Attachment`)
   - `uploaded_by`: FK -> `users(id)` ON DELETE SET NULL
   - `remarks`: text, nullable
-- **Status:** **TO BE DESIGNED & IMPLEMENTED IN PHASE 4**
+  - `deleted_at`: timestamp, soft deletes
+- **Status:** **COMPLETED & VERIFIED (PHASE 4)**
 
 ---
 

@@ -10,11 +10,11 @@
 
 | Attribute | State |
 |---|---|
-| **Last Completed Major Phase** | **Phase 3 — Time Tracking & Timesheet Approval** (Status: Completed & Formally Verified) |
+| **Last Completed Major Phase** | **Phase 4 — Issue Management & Project Documents** (Status: Completed & Formally Verified) |
 | **Current Major Phase** | **None** — between major phases (no major implementation phase currently in progress) |
-| **Next Major Phase** | **Phase 4 — Issue Management & Project Documents** |
-| **Phase 4 Status** | **PLANNED** |
-| **Next Authorized Action** | **Phase 4A — Read-Only Requirements / Current-State Audit** |
+| **Next Major Phase** | **Phase 5 — Client Review / UAT & Change Requests** |
+| **Phase 5 Status** | **PLANNED** |
+| **Next Authorized Action** | **Phase 5A — Read-Only Requirements / Current-State Audit** |
 
 
 > [!IMPORTANT]
@@ -209,9 +209,9 @@ The design specification is the **canonical PM UI/UX/component reference**. The 
 All future AI agents working in this repository must strictly adhere to the following 21 governance rules:
 
 1. **Read Roadmap First:** Inspect `docs/project-management/IMPLEMENTATION_ROADMAP.md` before initiating any Project Management task.
-2. **Determine Last Completed Phase:** Identify the last completed and verified major phase (`Phase 3 — Time Tracking & Timesheet Approval`).
-3. **Determine Next Major Phase:** Identify the next major phase in the canonical sequence (`Phase 4 — Issue Management & Project Documents`).
-4. **Determine Next Authorized Action:** Perform only the next authorized step (`Phase 4A — Read-Only Requirements / Current-State Audit`) for the next phase. Phase 4A is strictly a read-only discovery/current-state/gap audit; architecture and integration decisions must happen only in the following Architecture / Integration Validation gate.
+2. **Determine Last Completed Phase:** Identify the last completed and verified major phase (`Phase 4 — Issue Management & Project Documents`).
+3. **Determine Next Major Phase:** Identify the next major phase in the canonical sequence (`Phase 5 — Client Review / UAT & Change Requests`).
+4. **Determine Next Authorized Action:** Perform only the next authorized step (`Phase 5A — Read-Only Requirements / Current-State Audit`) for the next phase. Phase 5A is strictly a read-only discovery/current-state/gap audit; architecture and integration decisions must happen only in the following Architecture / Integration Validation gate.
 5. **No Automatic Implementation:** Do not automatically start implementation of the next phase. A phase remains `NOT STARTED` until explicitly authorized.
 6. **Follow Lifecycle Gates:** Strictly observe the progression: `NOT STARTED` $\to$ `AUDIT` $\to$ `ARCHITECTURE` $\to$ `PLAN` $\to$ `APPROVAL` $\to$ `IMPLEMENTATION` $\to$ `TESTING` $\to$ `VERIFICATION` $\to$ `COMPLETED`.
 7. **Maintenance Is Not a Phase:** Do not create or track ad-hoc maintenance, UI cleanup, visual polish, or minor bug fixes as roadmap phases.
@@ -229,6 +229,14 @@ All future AI agents working in this repository must strictly adhere to the foll
 19. **Integration Before Isolation:** Prefer clean integration with existing ERP contracts over PM-specific isolated implementations.
 20. **Explicit Justification Required:** Every genuinely new infrastructure component introduced in a future implementation plan must have a documented reason explaining why existing infrastructure could not safely be reused or extended.
 21. **Mandatory UI Design Spec Compliance:** For every implementation phase containing UI work, the agent MUST first read `docs/project-management/design-spec.md`. All UI implementation must strictly follow the Global Component Selection Rules (Odoo-form for form fields and tables, common ERP components for modals/drawers/tabs/buttons/badges/filters, `erp-single-panel` layout, and Production BOM as the primary visual reference).
+22. **Localization & Translation Variable Discipline:** The existing multi-language infrastructure is already implemented; never create or redesign localization infrastructure. When using translated strings with variables:
+    - First check whether the required variable already exists in the current PHP/Blade context.
+    - Reuse the existing variable instead of creating a duplicate variable.
+    - Ensure every variable passed to a translation key is actually defined.
+    - Ensure the exact same placeholders exist across all translation files (`EN`, `HI`, `BG`).
+    - Never allow raw placeholders such as `:name`, `:status`, `:count`, etc. to appear on the UI because a translation variable was missing or mismatched.
+    - If an existing variable can be reused, do not introduce another variable with the same purpose/name.
+    - Verify the rendered translation in the UI, not just the translation array.
 
 ---
 
@@ -339,17 +347,19 @@ Before entering the Architecture / Integration Validation gate or proposing any 
 
 ---
 
-### Phase 4: Issue Management & Project Documents — [PLANNED]
-- **Status:** **PLANNED**
+### Phase 4: Issue Management & Project Documents — [COMPLETED & VERIFIED]
+- **Status:** **COMPLETED & VERIFIED**
 - **Objective:** Implement quality defect tracking and project document management.
-- **Initial Target Scope (Subject to Phase 4 Audit):**
-  1. **Issues Database:** Migration creating `project_issues` (code `PRJ-0001-ISS-001`, project_id, task_id, reporter_id, assignee_id, priority, severity, status, resolution).
-  2. **Issue Lifecycle Service:** Build `IssueService` enforcing the retest workflow (`Open` -> `Assigned` -> `In Progress` -> `Resolved` -> Retest Fails / Retest Passes -> `Closed`).
-  3. **Issue UI Views:** Issue directory table and Issue Detail Workspace (`resources/views/modules/projects/issues/`).
-  4. **Documents Database:** Migration creating `project_documents` (project_id, attachable polymorphic relation, file_path, category, size, mime), reusing existing ERP storage infrastructure.
-  5. **Document Service & Controller:** Secure upload, category categorization, and permission-checked download streaming.
-  6. **UI Integration:** Documents tab on Project Detail and Attachments widget in Task Workspace.
-- **Exit Criteria:** Issues enforce retest loops; files upload securely to tenant storage and stream correctly to authorized users.
+- **Completed & Formally Verified Scope:**
+  1. **Issues Database:** Migrations creating `project_issues` (`id`, `tenant_id`, `company_id`, `branch_id`, `project_id`, `task_id`, `issue_number`, `title`, `steps_to_reproduce`, `description`, `reporter_id`, `assignee_id`, `priority`, `severity`, `status`, `resolution_date`, `resolution_notes`, `retest_notes`, `softDeletes`).
+  2. **Issue Lifecycle Service:** Built `IssueService` enforcing strict retest state machine (`Open` $\to$ `Assigned` $\to$ `In Progress` $\to$ `Resolved` $\to$ Retest Fails / Retest Passes $\to$ `Closed`), separation of duties preventing resolvers from retesting their own fixes (with project manager override), auto issue code generation (`PRJ-XXXX-ISS-YYY`), and activity logging (`project.issue_created`, `project.issue_resolved`, `project.issue_status_changed`, `project.issue_retested`, `project.issue_deleted`).
+  3. **Issue UI Views:** Issue directory tab (`_issues.blade.php`) and full Issue Workspace (`issues/show.blade.php`) following BOM single-panel design specification with dark mode support, inline editing, and responsive modals (`_modal.blade.php`, `_retest_modal.blade.php`).
+  4. **Documents Database:** Migration creating `project_documents` (`id`, `tenant_id`, `company_id`, `branch_id`, `project_id`, polymorphic `attachable_type`/`attachable_id`, `title`, `file_name`, `file_path`, `file_size`, `mime_type`, `category`, `uploaded_by`, `remarks`, `softDeletes`), reusing ERP filesystem infrastructure.
+  5. **Document Service & Controller:** Secure upload, MIME type validation, secure tenant-scoped storage, inline browser preview (`projects.documents.preview`), permission-checked download streaming, and activity logging (`project.document_uploaded`, `project.document_deleted`).
+  6. **UI Integration:** Documents tab on Project Detail (`_documents.blade.php`), Attachments widget in Task Workspace (`tasks/workspace/_attachments.blade.php`), and Document attachments list in Issue Workspace (`issues/show.blade.php`).
+  7. **RBAC & Authorization:** Policies registered for `IssuePolicy` and `ProjectDocumentPolicy` with granular permissions (`projects.issues.view`, `projects.issues.create`, `projects.issues.edit`, `projects.issues.resolve`, `projects.issues.retest`, `projects.issues.delete`, `projects.documents.view`, `projects.documents.upload`, `projects.documents.download`, `projects.documents.delete`).
+  8. **Localization:** Complete English, Bulgarian, and Hindi translations in `projects.php` and `ui.php` for all severities, priorities, issue statuses, document categories, UI labels, action buttons, and activity title templates.
+- **Exit Criteria Met:** Issues enforce retest loops; files upload securely to tenant storage, stream and preview correctly to authorized users; zero open regressions. Passed 100% of automated tests (23/23 tests, 72 assertions).
 
 ---
 

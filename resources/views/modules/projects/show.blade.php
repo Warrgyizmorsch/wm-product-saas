@@ -309,13 +309,37 @@
 
         {{-- Tab Navigation --}}
         @php
-            $activeProjectTab = in_array(request('tab'), ['summary', 'milestones'], true)
+            $allowedTabs = ['summary', 'milestones', 'issues', 'documents'];
+            $activeProjectTab = in_array(request('tab'), $allowedTabs, true)
                 ? request('tab')
-                : (in_array(old('_milestone_form'), ['add', 'edit'], true) ? 'milestones' : 'summary');
+                : (in_array(old('_milestone_form'), ['add', 'edit'], true)
+                    ? 'milestones'
+                    : (old('_issue_form')
+                        ? 'issues'
+                        : (old('_document_form') ? 'documents' : 'summary')));
+
             $projectDetailTabs = [
                 ['id' => 'tab-summary', 'label' => __('projects.summary'), 'icon' => 'feather-grid', 'active' => $activeProjectTab === 'summary'],
                 ['id' => 'tab-milestones', 'label' => __('projects.milestones'), 'icon' => 'feather-flag', 'active' => $activeProjectTab === 'milestones'],
             ];
+
+            if ($canViewIssues) {
+                $projectDetailTabs[] = [
+                    'id' => 'tab-issues',
+                    'label' => __('projects.issues') . ($issues->isNotEmpty() ? ' (' . $issues->count() . ')' : ''),
+                    'icon' => 'feather-alert-circle',
+                    'active' => $activeProjectTab === 'issues',
+                ];
+            }
+
+            if ($canViewDocuments) {
+                $projectDetailTabs[] = [
+                    'id' => 'tab-documents',
+                    'label' => __('projects.documents') . ($documents->isNotEmpty() ? ' (' . $documents->count() . ')' : ''),
+                    'icon' => 'feather-folder',
+                    'active' => $activeProjectTab === 'documents',
+                ];
+            }
         @endphp
         <x-ui.horizontal-tabs id="projectDetailsTabs" :tabs="$projectDetailTabs" />
 
@@ -329,6 +353,18 @@
                 role="tabpanel" aria-labelledby="tab-milestones-tab">
                 @include('modules.projects._milestones')
             </div>
+            @if ($canViewIssues)
+                <div class="tab-pane fade {{ $activeProjectTab === 'issues' ? 'show active' : '' }}" id="tab-issues"
+                    role="tabpanel" aria-labelledby="tab-issues-tab">
+                    @include('modules.projects._issues')
+                </div>
+            @endif
+            @if ($canViewDocuments)
+                <div class="tab-pane fade {{ $activeProjectTab === 'documents' ? 'show active' : '' }}" id="tab-documents"
+                    role="tabpanel" aria-labelledby="tab-documents-tab">
+                    @include('modules.projects._documents')
+                </div>
+            @endif
         </div>
 
         <x-ui.drawer id="activityLogDrawer" title="Activity History" position="end" style="width: 480px; max-width: 100%;">
@@ -340,6 +376,13 @@
             </div>
         </x-ui.drawer>
     </div>
+
+    @if ($canCreateIssues)
+        @include('modules.projects.issues._modal')
+    @endif
+    @if ($canUploadDocuments)
+        @include('modules.projects.documents._upload_modal')
+    @endif
 
     @push('scripts')
         <script type="module" src="{{ asset('assets/js/inline-edit/index.js') }}"></script>
