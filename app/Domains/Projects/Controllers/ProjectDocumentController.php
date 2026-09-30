@@ -47,6 +47,8 @@ class ProjectDocumentController extends Controller
                 $attachable = $project->tasks()->findOrFail($attachableId);
             } elseif ($attachableType === 'issue' || $attachableType === Issue::class) {
                 $attachable = $project->issues()->findOrFail($attachableId);
+            } elseif ($attachableType === 'review' || $attachableType === \App\Domains\Projects\Models\ProjectReview::class) {
+                $attachable = $project->reviews()->findOrFail($attachableId);
             }
         }
 

@@ -46,7 +46,7 @@
     ]);
 @endphp
 
-<div class="milestone-row border-bottom py-3 px-2 px-md-3">
+<div class="milestone-row {{ $loop->last ? '' : 'border-bottom' }} {{ $loop->first ? 'rounded-top-3' : '' }} {{ $loop->last ? 'rounded-bottom-3' : '' }} py-3 px-2 px-md-3">
     {{-- Desktop / tablet dense row --}}
     <div class="d-none d-md-flex align-items-center gap-3">
         <div class="avatar-text avatar-md rounded-circle bg-soft-{{ $rowHealthVariant }} text-{{ $rowHealthVariant }} flex-shrink-0">

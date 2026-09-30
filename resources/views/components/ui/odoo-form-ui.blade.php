@@ -858,9 +858,10 @@
         {{ $slot }}
     </div>
 
-@elseif ($type === 'input' || $type === 'text')
+@elseif ($type === 'input' || $type === 'text' || in_array($type, ['number', 'date', 'email', 'tel', 'password', 'url', 'time', 'datetime-local']))
     @php
         $fieldId = $id ?? ($name ? str_replace('[]', '', $name) . '_' . uniqid() : 'input_' . uniqid());
+        $actualInputType = ($inputType !== 'text') ? $inputType : (in_array($type, ['number', 'date', 'email', 'tel', 'password', 'url', 'time', 'datetime-local']) ? $type : 'text');
     @endphp
     @if($label)
         <div class="odoo-form-group">
@@ -869,7 +870,7 @@
             </label>
             <div class="flex-grow-1">
     @endif
-                <input type="{{ $inputType }}" 
+                <input type="{{ $actualInputType }}" 
                        name="{{ $name }}" 
                        id="{{ $fieldId }}"
                        value="{{ $value }}" 
@@ -1115,7 +1116,7 @@
     @endif
 
 @elseif ($type === 'table')
-    <table {{ $attributes->class(['odoo-table']) }} @if($id) id="{{ $id }}" @endif>
+    <table {{ $attributes->except('tableClass')->class(['odoo-table', $attributes->get('tableClass')]) }} @if($id) id="{{ $id }}" @endif>
         {{ $slot }}
     </table>
 @endif

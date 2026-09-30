@@ -10,11 +10,11 @@
 
 | Attribute | State |
 |---|---|
-| **Last Completed Major Phase** | **Phase 4 — Issue Management & Project Documents** (Status: Completed & Formally Verified) |
-| **Current Major Phase** | **None** — between major phases (no major implementation phase currently in progress) |
-| **Next Major Phase** | **Phase 5 — Client Review / UAT & Change Requests** |
-| **Phase 5 Status** | **PLANNED** |
-| **Next Authorized Action** | **Phase 5A — Read-Only Requirements / Current-State Audit** |
+| **Last Completed Major Phase** | **Phase 5 — Client Review / UAT & Change Requests** (Status: Completed & Formally Verified) |
+| **Current Major Phase** | **Phase 6 — Timeline, Scheduling, Gantt & Critical Path** (Lifecycle Gate: Discovery & Architecture Validation) |
+| **Next Major Phase** | **Phase 6 — Timeline, Scheduling, Gantt & Critical Path** |
+| **Phase 5 Status** | **COMPLETED & FORMALLY VERIFIED** |
+| **Next Authorized Action** | **Phase 6A — Read-Only Requirements & Current-State Audit** |
 
 
 > [!IMPORTANT]
@@ -363,16 +363,24 @@ Before entering the Architecture / Integration Validation gate or proposing any 
 
 ---
 
-### Phase 5: Client Review / UAT & Change Requests — [PLANNED]
-- **Status:** **PLANNED**
+### Phase 5: Client Review / UAT & Change Requests — [COMPLETED & FORMALLY VERIFIED]
+- **Status:** **COMPLETED & FORMALLY VERIFIED**
 - **Objective:** Implement formal client sign-off and scope change governance.
-- **Initial Target Scope (Subject to Phase 5 Audit):**
-  1. **UAT Database:** Migration creating `project_reviews` (project_id, reviewer_id, review_date, status, comments, sign-off evidence).
-  2. **UAT Service & Gatekeeper:** Build `ProjectReviewService` blocking review creation until 100% of milestones are `Completed`.
-  3. **Change Requests Database:** Migration creating `project_change_requests` (cr_number, project_id, requestor, impact_days, impact_budget_amount, impact_hours, status).
-  4. **Change Request Service:** Logic to automatically adjust project budget and create child tasks upon CR approval.
-  5. **UI Views:** UAT review modal/screen and Change Request management tab on Project Detail.
-- **Exit Criteria:** UAT cannot be started with open milestones; "Rework Required" triggers CR creation; approved CRs adjust project budget.
+- **Delivered Capabilities:**
+  1. **Database Schema:** `project_reviews` and `project_change_requests` tables created with strict tenant isolation, foreign keys, cascade/nullOnDelete constraints, soft deletes, and composite performance indexes.
+  2. **Domain Models & Invariants:**
+     - `ProjectReview` with relationships (`project`, `reviewer`, `creator`, `changeRequests`, polymorphic `documents`).
+     - `ChangeRequest` with relationships (`project`, `review`, `requester`, `approver`, `creator`).
+     - `Project::reviews()` and `Project::changeRequests()` relationships added.
+  3. **Domain Services:**
+     - `ProjectReviewService`: Enforces 100% completed milestone prerequisite (minimum 1 milestone), single pending review invariant, sign-off transition (`Pending` -> `Approved` / `Rework Required`), and polymorphic evidence upload.
+     - `ChangeRequestService`: Enforces UAT-rework linkage validation (requires `Rework Required` review on same project, at most 1 active CR per rework review), separation of duties on approval, transactional row-locked project budget increments (`budget_amount`, `budget_hours`), pre/post budget activity logging, rejection remarks, and authorized `markImplemented()` action.
+  4. **Authorization & RBAC:** Granular permissions registered in `RbacSeeder` (`projects.reviews.view`, `projects.reviews.create`, `projects.reviews.signoff`, `projects.changerequests.view`, `projects.changerequests.create`, `projects.changerequests.approve`) with policies `ProjectReviewPolicy` and `ChangeRequestPolicy` integrated via `AccessService`.
+  5. **UI & Blade Integration:** Fifth tab `tab-reviews` integrated in `show.blade.php` and `_reviews.blade.php` using `<x-ui.odoo-form-ui type="table">`, standard modals for Review creation, Sign-off, CR creation, CR rejection, and Evidence upload with status badges.
+  6. **Localization:** Complete English, Bulgarian, and Hindi translations in `projects.php` for all review/CR statuses, labels, actions, impact badges, and activity title templates with 100% key and placeholder parity.
+  7. **Testing:** 27 new automated feature tests across `ProjectReviewTest`, `ChangeRequestTest`, and `ProjectPhase5LocalizationTest` with 951 assertions passing 100%, plus 34 regression tests green.
+- **Exit Criteria Met:** Reviews require 100% completed milestones; creation always starts in `Pending`; "Rework Required" enforces CR linkage; approved CRs transactionally roll up budget and hours with activity audit; zero regressions.
+- **Next Authorized Action:** **Phase 6A — Read-Only Requirements & Current-State Audit**.
 
 ---
 

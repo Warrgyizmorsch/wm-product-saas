@@ -165,7 +165,7 @@
 
 {{-- Milestone hybrid rows --}}
 @if ($paginatedMilestones->isNotEmpty())
-    <div class="border rounded-3 overflow-hidden project-content-card" id="milestoneListContainer">
+    <div class="border rounded-3 project-content-card bg-white" id="milestoneListContainer" style="overflow: visible;">
         @foreach ($paginatedMilestones as $milestone)
             @include('modules.projects.milestones._row')
         @endforeach

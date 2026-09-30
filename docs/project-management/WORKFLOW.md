@@ -163,20 +163,22 @@ flowchart TD
 - **Status:** **TARGET REQUIRED (CURRENTLY MISSING).**
 
 ### Stage 13: Client Review / UAT (User Acceptance Testing)
-- **Gatekeeper:** Can only be initiated once **100% of project milestones are Completed**.
-- **Action:** Formal review record created with Client Reviewer and Target Sign-off Date.
+- **Gatekeeper:** Can only be initiated once **100% of project milestones are Completed** (at least 1 milestone required). Enforces at most 1 active `Pending` review.
+- **Action:** Formal review record created with Client Reviewer and Target Sign-off Date. Always initializes in `Pending` status.
 - **Outcomes:**
-  - **Approved:** Unlocks billing and project closure.
-  - **Rework Required:** Generates a mandatory Change Request.
-- **Status:** **TARGET REQUIRED (CURRENTLY MISSING).**
+  - **Approved:** Unlocks billing and project closure. Review becomes immutable.
+  - **Rework Required:** Mandatory linkage: Change Requests created to resolve rework must reference this review (`project_review_id`).
+- **Evidence:** Formal client acceptance documents attached via polymorphic `ProjectDocument`.
+- **Status:** **CURRENTLY IMPLEMENTED (PHASE 5 COMPLETED & VERIFIED).**
 
 ### Stage 14: Change Request (CR) Governance
-- **Trigger:** Initiated when client requests scope additions or UAT indicates rework beyond original specification.
-- **Action:** Log CR with Impact Analysis (Budget Delta, Hours Delta, Schedule Impact).
+- **Trigger:** Initiated when client requests scope additions (standalone CR) or UAT indicates rework (`Rework Required` review linked).
+- **Action:** Log CR with Impact Analysis (Budget Delta, Hours Delta, Schedule Impact). Sequential format: `PRJ-XXXX-CR-001`.
 - **Outcomes:**
-  - **Approved:** Automatically updates Project Budget, generates required new Tasks/Milestones, and returns project to `Active` execution.
-  - **Rejected:** Scope is discarded; project returns to UAT review or proceeds as planned.
-- **Status:** **TARGET REQUIRED (CURRENTLY MISSING).**
+  - **Approved:** Automatically updates Project Budget (`budget_amount`, `budget_hours`) transactionally with pre/post activity logging. Enforces separation of duties (requester cannot approve own CR unless PM/Owner).
+  - **Rejected:** Scope is rejected with mandatory rejection remarks.
+  - **Implemented:** Explicit operational action by authorized PM/Owner once approved scope is verified.
+- **Status:** **CURRENTLY IMPLEMENTED (PHASE 5 COMPLETED & VERIFIED).**
 
 ### Stage 15: Project Billing & Invoicing
 - **Action:** Generate commercial customer invoices based on agreed billing model:
@@ -217,7 +219,7 @@ flowchart TD
 | **10. Time Tracking** | Implemented (Phase 3) | Daily time entry against tasks | None (Completed & Verified) |
 | **11. Issue Management** | Implemented (Phase 4) | Defect tracking with retest loop | None (Completed & Verified) |
 | **12. Timesheet Approval** | Implemented (Phase 3) | PM approval queue | None (Completed & Verified) |
-| **13. Client UAT** | Missing | Milestone gate + Sign-off | Build `project_reviews` & gates |
-| **14. Change Requests** | Missing | Impact analysis + Budget adjust | Build `project_change_requests` |
+| **13. Client UAT** | Implemented (Phase 5) | Milestone gate + Sign-off | None (Completed & Verified) |
+| **14. Change Requests** | Implemented (Phase 5) | Impact analysis + Budget adjust | None (Completed & Verified) |
 | **15. Billing Integration** | Missing in PM | Sales Invoice generation | Bridge approved timesheets -> Sales Invoices |
 | **16. Project Closure** | Unvalidated Status Move | 5 Strict Validation Gates | Add closure fields & validation rules |

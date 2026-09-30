@@ -23,6 +23,20 @@ class Project extends BaseModel
         return 'project_code';
     }
 
+    public function resolveRouteBinding($value, $field = null)
+    {
+        $field = $field ?? $this->getRouteKeyName();
+
+        if ($field === 'project_code' && is_numeric($value)) {
+            $match = $this->where('id', (int) $value)->first();
+            if ($match) {
+                return $match;
+            }
+        }
+
+        return parent::resolveRouteBinding($value, $field);
+    }
+
     public const STATUS_DRAFT = 'Draft';
     public const STATUS_ACTIVE = 'Active';
     public const STATUS_ON_HOLD = 'On Hold';
@@ -161,6 +175,16 @@ class Project extends BaseModel
     public function documents(): HasMany
     {
         return $this->hasMany(ProjectDocument::class, 'project_id');
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(ProjectReview::class, 'project_id');
+    }
+
+    public function changeRequests(): HasMany
+    {
+        return $this->hasMany(ChangeRequest::class, 'project_id');
     }
 }
 

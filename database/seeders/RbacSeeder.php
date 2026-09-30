@@ -713,6 +713,12 @@ class RbacSeeder extends Seeder
             ['name' => 'projects.documents.view', 'module' => 'projects', 'entity' => 'documents', 'action' => 'view'],
             ['name' => 'projects.documents.upload', 'module' => 'projects', 'entity' => 'documents', 'action' => 'upload'],
             ['name' => 'projects.documents.delete', 'module' => 'projects', 'entity' => 'documents', 'action' => 'delete'],
+            ['name' => 'projects.reviews.view', 'module' => 'projects', 'entity' => 'reviews', 'action' => 'view'],
+            ['name' => 'projects.reviews.create', 'module' => 'projects', 'entity' => 'reviews', 'action' => 'create'],
+            ['name' => 'projects.reviews.signoff', 'module' => 'projects', 'entity' => 'reviews', 'action' => 'signoff'],
+            ['name' => 'projects.changerequests.view', 'module' => 'projects', 'entity' => 'changerequests', 'action' => 'view'],
+            ['name' => 'projects.changerequests.create', 'module' => 'projects', 'entity' => 'changerequests', 'action' => 'create'],
+            ['name' => 'projects.changerequests.approve', 'module' => 'projects', 'entity' => 'changerequests', 'action' => 'approve'],
             ['name' => 'accounting.chart_of_accounts.view', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'view'],
 
             ['name' => 'accounting.chart_of_accounts.create', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'create'],
