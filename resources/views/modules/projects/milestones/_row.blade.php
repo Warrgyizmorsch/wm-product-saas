@@ -44,9 +44,12 @@
     $rowCloneJsData = array_merge($rowJsData, [
         'name' => $milestone->name ? $milestone->name . ' ' . __('projects.clone_suffix') : '',
     ]);
+
+    $isFirst = isset($loop) && $loop->first;
+    $isLast = isset($loop) && $loop->last;
 @endphp
 
-<div class="milestone-row {{ $loop->last ? '' : 'border-bottom' }} {{ $loop->first ? 'rounded-top-3' : '' }} {{ $loop->last ? 'rounded-bottom-3' : '' }} py-3 px-2 px-md-3">
+<div class="milestone-row {{ $isLast ? '' : 'border-bottom' }} {{ $isFirst ? 'rounded-top-3' : '' }} {{ $isLast ? 'rounded-bottom-3' : '' }} py-3 px-2 px-md-3">
     {{-- Desktop / tablet dense row --}}
     <div class="d-none d-md-flex align-items-center gap-3">
         <div class="avatar-text avatar-md rounded-circle bg-soft-{{ $rowHealthVariant }} text-{{ $rowHealthVariant }} flex-shrink-0">

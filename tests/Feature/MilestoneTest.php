@@ -152,4 +152,31 @@ class MilestoneTest extends TestCase
         $responseB->assertDontSee('Milestone on Project A');
         $responseB->assertSee('Milestone on Project B');
     }
+
+    /** @test */
+    public function creating_milestone_via_ajax_returns_rendered_row_html_without_loop_variable_error(): void
+    {
+        $project = Project::create([
+            'tenant_id' => $this->tenant->id,
+            'project_code' => 'PRJ-0002',
+            'name' => 'Project AJAX',
+            'owner_id' => $this->tenantOwner->id,
+            'start_date' => now(),
+            'priority' => 'Medium',
+            'status' => 'Active',
+        ]);
+
+        $response = $this->actingAs($this->tenantOwner)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->postJson(route('projects.milestones.store', $project), [
+                'name' => 'Sprint 1 Delivery',
+                'status' => 'Active',
+                'completion_percentage' => 0,
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonStructure(['html', 'id']);
+        $this->assertStringContainsString('Sprint 1 Delivery', $response->json('html'));
+        $this->assertStringNotContainsString('Undefined variable', $response->json('html'));
+    }
 }

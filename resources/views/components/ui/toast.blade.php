@@ -18,7 +18,7 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        function showToast() {
+        function showToast(customType, customTitle) {
             if (typeof Swal !== 'undefined') {
                 Swal.mixin({
                     toast: true,
@@ -31,8 +31,8 @@
                         toast.addEventListener('mouseleave', Swal.resumeTimer);
                     }
                 }).fire({
-                    icon: @json($type),
-                    title: @json($title)
+                    icon: customType || @json($type),
+                    title: customTitle || @json($title)
                 });
             }
         }
@@ -44,7 +44,9 @@
             if (el) {
                 el.addEventListener('click', function (e) {
                     e.preventDefault();
-                    showToast();
+                    const dType = el.getAttribute('data-type') || el.dataset.type;
+                    const dTitle = el.getAttribute('data-title') || el.dataset.title;
+                    showToast(dType, dTitle);
                 });
             }
         @endif

@@ -309,7 +309,7 @@
 
         {{-- Tab Navigation --}}
         @php
-            $allowedTabs = ['summary', 'milestones', 'issues', 'documents', 'reviews'];
+            $allowedTabs = ['summary', 'milestones', 'timeline', 'issues', 'documents', 'reviews'];
             $activeProjectTab = in_array(request('tab'), $allowedTabs, true)
                 ? request('tab')
                 : (in_array(old('_milestone_form'), ['add', 'edit'], true)
@@ -323,6 +323,7 @@
             $projectDetailTabs = [
                 ['id' => 'tab-summary', 'label' => __('projects.summary'), 'icon' => 'feather-grid', 'active' => $activeProjectTab === 'summary'],
                 ['id' => 'tab-milestones', 'label' => __('projects.milestones'), 'icon' => 'feather-flag', 'active' => $activeProjectTab === 'milestones'],
+                ['id' => 'tab-timeline', 'label' => __('projects.timeline'), 'icon' => 'feather-calendar', 'active' => $activeProjectTab === 'timeline'],
             ];
 
             if ($canViewIssues) {
@@ -364,6 +365,10 @@
             <div class="tab-pane fade {{ $activeProjectTab === 'milestones' ? 'show active' : '' }}" id="tab-milestones"
                 role="tabpanel" aria-labelledby="tab-milestones-tab">
                 @include('modules.projects._milestones')
+            </div>
+            <div class="tab-pane fade {{ $activeProjectTab === 'timeline' ? 'show active' : '' }}" id="tab-timeline"
+                role="tabpanel" aria-labelledby="tab-timeline-tab">
+                @include('modules.projects._timeline', ['project' => $project, 'milestoneId' => null, 'milestones' => $milestones])
             </div>
             @if ($canViewIssues)
                 <div class="tab-pane fade {{ $activeProjectTab === 'issues' ? 'show active' : '' }}" id="tab-issues"

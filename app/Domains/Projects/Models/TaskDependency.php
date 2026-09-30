@@ -35,6 +35,11 @@ class TaskDependency extends BaseModel
         'task_id',
         'depends_on_task_id',
         'dependency_type',
+        'lag_days',
+    ];
+
+    protected $casts = [
+        'lag_days' => 'integer',
     ];
 
     public function project(): BelongsTo

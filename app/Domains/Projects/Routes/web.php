@@ -7,6 +7,7 @@ use App\Domains\Projects\Controllers\ProjectController;
 use App\Domains\Projects\Controllers\ProjectDocumentController;
 use App\Domains\Projects\Controllers\ProjectMemberController;
 use App\Domains\Projects\Controllers\ProjectReviewController;
+use App\Domains\Projects\Controllers\ProjectScheduleController;
 use App\Domains\Projects\Controllers\ChangeRequestController;
 use App\Domains\Projects\Controllers\SubTaskController;
 use App\Domains\Projects\Controllers\TaskController;
@@ -171,6 +172,15 @@ Route::prefix('projects')
                 Route::get('{changeRequest}/implement', fn ($project) => redirect()->to(route('projects.show', $project) . '?tab=reviews'));
                 Route::match(['post', 'patch'], '{changeRequest}/mark-implemented', [ChangeRequestController::class, 'markImplemented'])->name('mark-implemented');
                 Route::delete('{changeRequest}', [ChangeRequestController::class, 'destroy'])->name('destroy');
+            });
+
+        Route::prefix('{project}/timeline')
+            ->as('timeline.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::get('/', [ProjectScheduleController::class, 'index'])->name('index');
+                Route::get('data', [ProjectScheduleController::class, 'data'])->name('data');
+                Route::match(['post', 'patch'], 'tasks/{task}/reschedule', [ProjectScheduleController::class, 'reschedule'])->name('reschedule');
             });
 
     });
