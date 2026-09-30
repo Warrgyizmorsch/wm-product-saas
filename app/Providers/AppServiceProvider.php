@@ -294,6 +294,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Repositories\ExitClearancePolicyRepository::class
         );
 
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\SopRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\SopRepository::class
+        );
+
         // ── Projects: Project ─────────────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Projects\Repositories\ProjectRepositoryInterface::class,

@@ -90,6 +90,8 @@ return [
         'section' => 'hrms', 'order' => 110, 'permission' => [...$hrAdmin, 'hrms.pip.manage', 'hrms.performance.manage'],
         'label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index',
     ],
+    ['section' => 'hrms', 'order' => 112, 'label' => 'Goal Management (OKRs)', 'icon' => 'feather-target', 'route' => 'hrms.goals.index', 'permission' => $selfService],
+    ['section' => 'hrms', 'order' => 115, 'label' => 'SOP Management', 'icon' => 'feather-book-open', 'route' => 'hrms.sop.index', 'permission' => $selfService],
     ['section' => 'hrms', 'order' => 120, 'label' => 'Broadcasts', 'icon' => 'feather-radio', 'route' => 'hrms.broadcasts.index', 'permission' => $selfService],
     [
         'section' => 'hrms', 'order' => 125, 'permission' => ['hrms.recruitment.view', 'hrms.recruitment.manage', 'hr.settings.manage'],

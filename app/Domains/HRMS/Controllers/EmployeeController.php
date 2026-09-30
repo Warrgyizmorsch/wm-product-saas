@@ -263,6 +263,13 @@ class EmployeeController extends Controller
             }
         }
 
+        // Auto-assign department & company SOPs
+        try {
+            app(\App\Domains\HRMS\Services\SopService::class)->autoAssignForNewEmployee($employee);
+        } catch (\Throwable $e) {
+            // Ignore if SOP module not active
+        }
+
         // Dispatch Welcome Email with Login Credentials to Employee
         try {
             $toEmail = $employee->personal_email ?: ($employee->office_email ?: $employee->user?->email);

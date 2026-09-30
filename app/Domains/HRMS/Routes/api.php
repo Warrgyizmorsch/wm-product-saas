@@ -27,6 +27,8 @@ use App\Domains\HRMS\Controllers\Api\HelpdeskApiController;
 use App\Domains\HRMS\Controllers\Api\KraKpiApiController;
 use App\Domains\HRMS\Controllers\Api\RecruitmentApiController;
 use App\Domains\HRMS\Controllers\Api\EmployeeProfileRequestApiController;
+use App\Domains\HRMS\Controllers\Api\SopApiController;
+use App\Domains\HRMS\Controllers\Api\GoalApiController;
 use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
 /*
@@ -841,6 +843,74 @@ Route::prefix('api/hrms/recruitment')
         Route::post('/offers/{id}/send-email', [RecruitmentApiController::class, 'sendOfferEmail'])->name('offers.send-email');
         Route::post('/offers/{id}/convert-to-employee', [RecruitmentApiController::class, 'convertToEmployee'])->name('offers.convert-to-employee');
     });
+
+// ==========================================
+// 24. SOP MANAGEMENT API ROUTES
+// ==========================================
+Route::prefix('api/hrms/sop')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.sop.')
+    ->group(function () {
+        // Summary & Dashboard Metrics
+        Route::get('/summary', [SopApiController::class, 'summary'])->name('summary');
+
+        // SOP Documents CRUD
+        Route::get('/documents', [SopApiController::class, 'index'])->name('documents.index');
+        Route::post('/documents', [SopApiController::class, 'store'])->name('documents.store');
+        Route::get('/documents/{id}', [SopApiController::class, 'show'])->name('documents.show');
+        Route::put('/documents/{id}', [SopApiController::class, 'update'])->name('documents.update');
+        Route::delete('/documents/{id}', [SopApiController::class, 'destroy'])->name('documents.destroy');
+
+        // Document Lifecycle Actions
+        Route::post('/documents/{id}/publish', [SopApiController::class, 'publish'])->name('documents.publish');
+        Route::post('/documents/{id}/archive', [SopApiController::class, 'archive'])->name('documents.archive');
+        Route::post('/documents/{id}/sync-assignments', [SopApiController::class, 'syncAssignments'])->name('documents.sync-assignments');
+        Route::post('/documents/{id}/bulk-remind', [SopApiController::class, 'bulkRemind'])->name('documents.bulk-remind');
+        Route::get('/documents/{id}/assignments', [SopApiController::class, 'documentAssignments'])->name('documents.assignments');
+
+        // Employee Sign-Off & "My SOPs" Workspace
+        Route::get('/my-sops', [SopApiController::class, 'mySops'])->name('my-sops');
+        Route::post('/assignments/{id}/acknowledge', [SopApiController::class, 'acknowledge'])->name('assignments.acknowledge');
+        Route::post('/assignments/{id}/remind', [SopApiController::class, 'remind'])->name('assignments.remind');
+
+        // Organization Overdue Roster
+        Route::get('/overdue-roster', [SopApiController::class, 'overdueRoster'])->name('overdue-roster');
+
+        // Categories Master CRUD
+        Route::get('/categories', [SopApiController::class, 'indexCategories'])->name('categories.index');
+        Route::post('/categories', [SopApiController::class, 'storeCategory'])->name('categories.store');
+        Route::put('/categories/{id}', [SopApiController::class, 'updateCategory'])->name('categories.update');
+        Route::delete('/categories/{id}', [SopApiController::class, 'destroyCategory'])->name('categories.destroy');
+    });
+
+// ==========================================
+// 25. GOALS & OKRS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/goals')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.goals.')
+    ->group(function () {
+        // Summary & Metrics
+        Route::get('/summary', [GoalApiController::class, 'summary'])->name('summary');
+
+        // Goals CRUD & Listings
+        Route::get('/', [GoalApiController::class, 'index'])->name('index');
+        Route::post('/', [GoalApiController::class, 'store'])->name('store');
+        Route::get('/alignment-tree', [GoalApiController::class, 'alignmentTree'])->name('alignment-tree');
+        Route::get('/my-goals', [GoalApiController::class, 'myGoals'])->name('my-goals');
+        Route::get('/{id}', [GoalApiController::class, 'show'])->name('show');
+        Route::put('/{id}', [GoalApiController::class, 'update'])->name('update');
+        Route::delete('/{id}', [GoalApiController::class, 'destroy'])->name('destroy');
+
+        // Check-in
+        Route::post('/{id}/check-in', [GoalApiController::class, 'checkIn'])->name('check-in');
+
+        // Cycles & Categories
+        Route::get('/cycles', [GoalApiController::class, 'indexCycles'])->name('cycles.index');
+        Route::get('/categories', [GoalApiController::class, 'indexCategories'])->name('categories.index');
+    });
+
+
 
 
 
