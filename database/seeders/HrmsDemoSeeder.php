@@ -93,6 +93,16 @@ use App\Domains\HRMS\Models\AppraisalCycle;
 use App\Domains\HRMS\Models\EmployeeGoalPlan;
 use App\Domains\HRMS\Models\EmployeeGoalItem;
 use App\Domains\HRMS\Models\GoalProgressLog;
+use App\Domains\HRMS\Models\SopCategory;
+use App\Domains\HRMS\Models\SopDocument;
+use App\Domains\HRMS\Models\SopSection;
+use App\Domains\HRMS\Models\SopAssignment;
+use App\Domains\HRMS\Models\SopVersionHistory;
+use App\Domains\HRMS\Models\GoalCycle;
+use App\Domains\HRMS\Models\GoalCategory;
+use App\Domains\HRMS\Models\Goal;
+use App\Domains\HRMS\Models\GoalKeyResult;
+use App\Domains\HRMS\Models\GoalCheckIn;
 use App\Domains\Production\Models\ProductionShift;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -121,6 +131,11 @@ class HrmsDemoSeeder extends Seeder
 
         // 1. Truncate all related HRMS tables safely
         $tablesToTruncate = [
+            'sop_version_histories',
+            'sop_assignments',
+            'sop_sections',
+            'sop_documents',
+            'sop_categories',
             'goal_progress_logs',
             'employee_goal_items',
             'employee_goal_plans',
@@ -3445,6 +3460,434 @@ class HrmsDemoSeeder extends Seeder
             'notes' => 'Sprint 14 closed with 52 points, lifting the cumulative average to 48.',
         ]);
 
-        $this->command?->info('HrmsDemoSeeder successfully completed! All 13 roles, complete employee forms, attendance history, salary structures, leave plans, fixed assets, recruitment, helpdesk, PIP, broadcasts, KRA/KPI scorecards, exit clearances, and travel expenses are seeded with real-world data.');
+        // ==========================================
+        // 22. SOP (Standard Operating Procedure) Management Seeding
+        // ==========================================
+        $catIT = SopCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'IT & Information Security',
+            'code' => 'IT',
+            'color' => '#3b82f6',
+            'icon' => 'feather-shield',
+            'description' => 'Standard operating procedures for access security, server deployments, and data protection.',
+            'status' => 'active',
+        ]);
+
+        $catSafety = SopCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Workplace Safety & OSHA',
+            'code' => 'SAFE',
+            'color' => '#ef4444',
+            'icon' => 'feather-alert-triangle',
+            'description' => 'Mandatory safety protocols, emergency responses, and hazard prevention.',
+            'status' => 'active',
+        ]);
+
+        $catQA = SopCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Quality Assurance & Operations',
+            'code' => 'QA',
+            'color' => '#10b981',
+            'icon' => 'feather-check-circle',
+            'description' => 'Quality control guidelines, production inspection checklists, and release protocols.',
+            'status' => 'active',
+        ]);
+
+        $catHR = SopCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'HR Policies & Ethics',
+            'code' => 'HR',
+            'color' => '#8b5cf6',
+            'icon' => 'feather-users',
+            'description' => 'Code of conduct, POSH compliance, grievance resolution, and remote working guidelines.',
+            'status' => 'active',
+        ]);
+
+        // SOP 1: Production Server Deployment (IT)
+        $sopDeploy = SopDocument::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'sop_category_id' => $catIT->id,
+            'department_id' => $departments[3]->id ?? null, // Engineering/IT
+            'code' => 'SOP-IT-001',
+            'title' => 'Production Server Deployment & Release Rollback Protocol',
+            'summary' => 'Comprehensive step-by-step guideline for deploying releases into production with zero-downtime and automated rollback checks.',
+            'objective' => 'Ensure all production deployments adhere to security scanning, database backup snapshots, and smoke tests to minimize downtime.',
+            'scope' => 'Applicable to all DevOps engineers, Tech Leads, and Backend Developers with production deploy permissions.',
+            'prerequisites' => 'Production SSH keys, AWS/Cloud console access, Jenkins pipeline approval, and signed-off Jira release ticket.',
+            'version' => '1.0',
+            'status' => 'published',
+            'criticality' => 'critical',
+            'target_audience_type' => 'all',
+            'is_mandatory' => true,
+            'auto_assign_new_hires' => true,
+            'acknowledgment_days_limit' => 7,
+            'effective_date' => Carbon::now()->subMonths(2),
+            'review_interval_months' => 12,
+            'next_review_date' => Carbon::now()->addMonths(10),
+            'created_by' => $users['super_admin']->id,
+            'approved_by' => $users['hr_head']->id,
+            'approved_at' => Carbon::now()->subMonths(2),
+        ]);
+
+        SopSection::create([
+            'tenant_id' => $tenant->id,
+            'sop_document_id' => $sopDeploy->id,
+            'step_number' => 1,
+            'title' => 'Pre-Deployment Snapshot & Verification',
+            'content' => "1. Check server health metrics (CPU < 60%, RAM available > 4GB).\n2. Trigger automated DB snapshot in RDS.\n3. Verify latest staging build passed all unit & integration tests.",
+            'has_checklist' => true,
+            'checklist_items' => [
+                ['id' => 1, 'text' => 'Take automated database backup snapshot'],
+                ['id' => 2, 'text' => 'Verify staging integration tests pass 100%'],
+                ['id' => 3, 'text' => 'Notify #engineering channel 15 mins in advance'],
+            ],
+        ]);
+
+        SopSection::create([
+            'tenant_id' => $tenant->id,
+            'sop_document_id' => $sopDeploy->id,
+            'step_number' => 2,
+            'title' => 'Release Execution & Migration',
+            'content' => "1. Put application in maintenance mode if running non-concurrent DB migrations.\n2. Pull release tag: git checkout tags/vX.X.X.\n3. Run: composer install --no-dev --optimize-autoloader.\n4. Run: php artisan migrate --force.\n5. Warm up cache: php artisan config:cache && php artisan route:cache.",
+            'has_checklist' => true,
+            'checklist_items' => [
+                ['id' => 1, 'text' => 'Execute DB migrations with --force flag'],
+                ['id' => 2, 'text' => 'Clear and re-cache config/routes'],
+            ],
+        ]);
+
+        SopSection::create([
+            'tenant_id' => $tenant->id,
+            'sop_document_id' => $sopDeploy->id,
+            'step_number' => 3,
+            'title' => 'Post-Deployment Smoke Testing & Rollback Trigger',
+            'content' => "1. Run automated health check curl https://app.domain.com/health.\n2. Monitor Sentry / CloudWatch error rates for 15 minutes.\n3. If 5xx error rate exceeds 0.5%, immediately trigger rollback to previous release tag.",
+            'has_checklist' => true,
+            'checklist_items' => [
+                ['id' => 1, 'text' => 'Execute health check endpoint'],
+                ['id' => 2, 'text' => 'Monitor 5xx error logs for 15 minutes'],
+            ],
+        ]);
+
+        SopVersionHistory::create([
+            'tenant_id' => $tenant->id,
+            'sop_document_id' => $sopDeploy->id,
+            'version' => '1.0',
+            'change_type' => 'minor',
+            'changes_summary' => 'Initial publication of production release guidelines.',
+            'created_by' => $users['super_admin']->id,
+        ]);
+
+        // SOP 2: Workplace Safety & Fire Drill Protocol
+        $sopSafety = SopDocument::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'sop_category_id' => $catSafety->id,
+            'department_id' => null,
+            'code' => 'SOP-SAFE-001',
+            'title' => 'Workplace Safety, Hazard Reporting & Emergency Evacuation Protocol',
+            'summary' => 'Organization-wide safety guidelines covering fire alarms, first aid responses, emergency assembly areas, and hazard escalation.',
+            'objective' => 'Maintain zero workplace accidents and establish rapid response during fire or health emergencies.',
+            'scope' => 'Mandatory for all full-time employees, contractors, and visitors across all branches.',
+            'prerequisites' => 'Familiarity with office floor plan and nearest fire exits.',
+            'version' => '1.0',
+            'status' => 'published',
+            'criticality' => 'high',
+            'target_audience_type' => 'all',
+            'is_mandatory' => true,
+            'auto_assign_new_hires' => true,
+            'acknowledgment_days_limit' => 5,
+            'effective_date' => Carbon::now()->subMonths(3),
+            'review_interval_months' => 6,
+            'next_review_date' => Carbon::now()->addMonths(3),
+            'created_by' => $users['hr_head']->id,
+            'approved_by' => $users['hr_head']->id,
+            'approved_at' => Carbon::now()->subMonths(3),
+        ]);
+
+        SopSection::create([
+            'tenant_id' => $tenant->id,
+            'sop_document_id' => $sopSafety->id,
+            'step_number' => 1,
+            'title' => 'Emergency Alarm & Evacuation Protocol',
+            'content' => "1. Do NOT use elevators during a fire or earthquake alarm.\n2. Proceed calmly to the nearest illuminated Emergency Exit.\n3. Assemble at the designated Assembly Point (East Parking Lot).\n4. Report to your Department Fire Warden for head count.",
+            'has_checklist' => true,
+            'checklist_items' => [
+                ['id' => 1, 'text' => 'I have identified my nearest emergency exit'],
+                ['id' => 2, 'text' => 'I know my designated assembly point'],
+            ],
+        ]);
+
+        SopVersionHistory::create([
+            'tenant_id' => $tenant->id,
+            'sop_document_id' => $sopSafety->id,
+            'version' => '1.0',
+            'change_type' => 'minor',
+            'changes_summary' => 'Annual workplace safety compliance standard.',
+            'created_by' => $users['hr_head']->id,
+        ]);
+
+        // Seed Sample Assignments & Sign-offs
+        foreach ($employees as $idx => $emp) {
+            // Assign SOP-IT-001
+            $isAck = ($idx % 3 !== 0); // 66% acknowledged, others pending/overdue
+            SopAssignment::create([
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'sop_document_id' => $sopDeploy->id,
+                'employee_id' => $emp->id,
+                'version_assigned' => '1.0',
+                'status' => $isAck ? 'acknowledged' : 'pending',
+                'is_mandatory' => true,
+                'assigned_at' => Carbon::now()->subDays(15),
+                'due_date' => Carbon::now()->subDays(8),
+                'acknowledged_at' => $isAck ? Carbon::now()->subDays(rand(1, 10)) : null,
+                'ip_address' => $isAck ? '192.168.1.' . rand(10, 200) : null,
+                'user_agent' => $isAck ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0' : null,
+                'checklist_responses' => $isAck ? ['1' => 'Take automated database backup snapshot', '2' => 'Verify staging integration tests pass 100%'] : null,
+            ]);
+
+            // Assign SOP-SAFE-001
+            $isAckSafety = ($idx % 2 === 0);
+            SopAssignment::create([
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'sop_document_id' => $sopSafety->id,
+                'employee_id' => $emp->id,
+                'version_assigned' => '1.0',
+                'status' => $isAckSafety ? 'acknowledged' : 'pending',
+                'is_mandatory' => true,
+                'assigned_at' => Carbon::now()->subDays(20),
+                'due_date' => Carbon::now()->subDays(15),
+                'acknowledged_at' => $isAckSafety ? Carbon::now()->subDays(rand(1, 14)) : null,
+                'ip_address' => $isAckSafety ? '10.0.4.' . rand(10, 200) : null,
+                'user_agent' => $isAckSafety ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' : null,
+            ]);
+        }
+
+        // ==========================================
+        // 24. GOALS & OKRS MANAGEMENT MODULE SEEDING
+        // ==========================================
+        $cycleQ1 = GoalCycle::create([
+            'tenant_id'   => $tenant->id,
+            'company_id'  => $company->id,
+            'name'        => '2026-Q1 OKR Cycle',
+            'code'        => 'OKR-2026-Q1',
+            'start_date'  => Carbon::now()->startOfQuarter(),
+            'end_date'    => Carbon::now()->endOfQuarter(),
+            'status'      => 'active',
+            'description' => 'Q1 strategic execution sprint focusing on revenue growth and cloud scaling.',
+        ]);
+
+        $cycleAnnual = GoalCycle::create([
+            'tenant_id'   => $tenant->id,
+            'company_id'  => $company->id,
+            'name'        => '2026 Annual Strategic Horizon',
+            'code'        => 'STRAT-2026',
+            'start_date'  => Carbon::now()->startOfYear(),
+            'end_date'    => Carbon::now()->endOfYear(),
+            'status'      => 'active',
+            'description' => 'Organization-wide annual strategic goals and transformation initiatives.',
+        ]);
+
+        $catRevenue = GoalCategory::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Revenue & Global Expansion', 'code' => 'REV', 'color' => '#10b981', 'icon' => 'feather-trending-up', 'status' => 'active']);
+        $catTech = GoalCategory::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Product & Cloud Innovation', 'code' => 'TECH', 'color' => '#3b82f6', 'icon' => 'feather-cpu', 'status' => 'active']);
+        $catCust = GoalCategory::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Customer Success & Retention', 'code' => 'CUST', 'color' => '#06b6d4', 'icon' => 'feather-smile', 'status' => 'active']);
+        $catOps = GoalCategory::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Operational Excellence', 'code' => 'OPS', 'color' => '#8b5cf6', 'icon' => 'feather-shield', 'status' => 'active']);
+
+        // 1. Top-Level Company Strategic Goal
+        $goalCompany1 = Goal::create([
+            'tenant_id'           => $tenant->id,
+            'company_id'          => $company->id,
+            'code'                => 'G-2026-001',
+            'title'               => 'Accelerate Enterprise SaaS Market Penetration & ARR Growth',
+            'description'         => 'Expand global enterprise presence and acquire key anchor clients across North America and EMEA.',
+            'goal_cycle_id'       => $cycleQ1->id,
+            'goal_category_id'    => $catRevenue->id,
+            'owner_type'          => 'company',
+            'visibility'          => 'public',
+            'priority'            => 'critical',
+            'start_date'          => Carbon::now()->startOfQuarter(),
+            'due_date'            => Carbon::now()->endOfQuarter(),
+            'weightage'           => 100.00,
+            'progress_percentage' => 72.50,
+            'health_status'       => 'on_track',
+            'status'              => 'active',
+            'created_by'          => $users['company_admin']->id,
+            'approved_by'         => $users['company_admin']->id,
+            'approved_at'         => Carbon::now()->startOfQuarter(),
+        ]);
+
+        $kr1 = GoalKeyResult::create([
+            'tenant_id'           => $tenant->id,
+            'goal_id'             => $goalCompany1->id,
+            'title'               => 'Close $1,200,000 in Net New Annual Recurring Revenue',
+            'metric_type'         => 'currency',
+            'unit'                => 'USD',
+            'start_value'         => 0.00,
+            'target_value'        => 1200000.00,
+            'current_value'       => 900000.00,
+            'weightage'           => 50.00,
+            'progress_percentage' => 75.00,
+            'health_status'       => 'on_track',
+            'due_date'            => Carbon::now()->endOfQuarter(),
+        ]);
+
+        $kr2 = GoalKeyResult::create([
+            'tenant_id'           => $tenant->id,
+            'goal_id'             => $goalCompany1->id,
+            'title'               => 'Acquire 15 New Fortune 500 Enterprise Logo Accounts',
+            'metric_type'         => 'numeric',
+            'unit'                => 'Accounts',
+            'start_value'         => 0.00,
+            'target_value'        => 15.00,
+            'current_value'       => 10.00,
+            'weightage'           => 50.00,
+            'progress_percentage' => 66.67,
+            'health_status'       => 'on_track',
+            'due_date'            => Carbon::now()->endOfQuarter(),
+        ]);
+
+        // 2. Cascaded Department Goal (Sales)
+        $goalDeptSales = Goal::create([
+            'tenant_id'           => $tenant->id,
+            'company_id'          => $company->id,
+            'code'                => 'G-2026-002',
+            'title'               => 'Build $4.5M Qualified Enterprise Pipeline & Reduce Sales Cycle',
+            'description'         => 'Sales department objective directly aligned to Company ARR expansion.',
+            'goal_cycle_id'       => $cycleQ1->id,
+            'goal_category_id'    => $catRevenue->id,
+            'owner_type'          => 'department',
+            'department_id'       => $deptSales->id,
+            'parent_goal_id'      => $goalCompany1->id,
+            'visibility'          => 'department',
+            'priority'            => 'high',
+            'start_date'          => Carbon::now()->startOfQuarter(),
+            'due_date'            => Carbon::now()->endOfQuarter(),
+            'weightage'           => 100.00,
+            'progress_percentage' => 65.00,
+            'health_status'       => 'on_track',
+            'status'              => 'active',
+            'created_by'          => $users['sales_manager']->id ?? $users['company_admin']->id,
+        ]);
+
+        // 3. Cascaded Individual Goal (Account Executive)
+        $goalIndivSales = Goal::create([
+            'tenant_id'           => $tenant->id,
+            'company_id'          => $company->id,
+            'code'                => 'G-2026-003',
+            'title'               => 'Deliver 35 Technical Demonstrations and Close 4 Deals in EMEA',
+            'description'         => 'Individual contributor execution goal linked to department sales targets.',
+            'goal_cycle_id'       => $cycleQ1->id,
+            'goal_category_id'    => $catRevenue->id,
+            'owner_type'          => 'employee',
+            'employee_id'         => $empStaffSales->id ?? $employees[0]->id,
+            'parent_goal_id'      => $goalDeptSales->id,
+            'visibility'          => 'public',
+            'priority'            => 'high',
+            'start_date'          => Carbon::now()->startOfQuarter(),
+            'due_date'            => Carbon::now()->endOfQuarter(),
+            'weightage'           => 100.00,
+            'progress_percentage' => 80.00,
+            'health_status'       => 'on_track',
+            'status'              => 'active',
+            'created_by'          => $users['company_admin']->id,
+        ]);
+        if ($goalIndivSales->employee_id) {
+            $goalIndivSales->employees()->sync([$goalIndivSales->employee_id => ['tenant_id' => $tenant->id]]);
+        }
+
+        // 4. Technology High Availability Objective
+        $goalTech = Goal::create([
+            'tenant_id'           => $tenant->id,
+            'company_id'          => $company->id,
+            'code'                => 'G-2026-004',
+            'title'               => 'Maintain 99.99% Cloud Infrastructure High Availability & ISO 27001 Readiness',
+            'description'         => 'Core engineering initiative ensuring resilient cloud systems and zero unplanned downtime.',
+            'goal_cycle_id'       => $cycleQ1->id,
+            'goal_category_id'    => $catTech->id,
+            'owner_type'          => 'department',
+            'department_id'       => $deptTech->id ?? $deptOperations->id,
+            'visibility'          => 'public',
+            'priority'            => 'critical',
+            'start_date'          => Carbon::now()->startOfQuarter(),
+            'due_date'            => Carbon::now()->endOfQuarter(),
+            'weightage'           => 100.00,
+            'progress_percentage' => 50.00,
+            'health_status'       => 'at_risk',
+            'status'              => 'active',
+            'created_by'          => $users['company_admin']->id,
+        ]);
+
+        // Key Result for Tech
+        $krTech1 = GoalKeyResult::create([
+            'tenant_id'           => $tenant->id,
+            'goal_id'             => $goalTech->id,
+            'title'               => 'Deploy Multi-Region Database Replica Failover System',
+            'metric_type'         => 'boolean_milestone',
+            'unit'                => 'Milestone',
+            'start_value'         => 0.00,
+            'target_value'        => 1.00,
+            'current_value'       => 0.00,
+            'weightage'           => 50.00,
+            'progress_percentage' => 0.00,
+            'health_status'       => 'at_risk',
+            'due_date'            => Carbon::now()->endOfQuarter(),
+        ]);
+
+        $krTech2 = GoalKeyResult::create([
+            'tenant_id'           => $tenant->id,
+            'goal_id'             => $goalTech->id,
+            'title'               => 'Achieve < 120ms P99 API Response Latency Globally',
+            'metric_type'         => 'numeric',
+            'unit'                => 'ms',
+            'start_value'         => 250.00,
+            'target_value'        => 120.00,
+            'current_value'       => 150.00,
+            'weightage'           => 50.00,
+            'progress_percentage' => 76.92,
+            'health_status'       => 'on_track',
+            'due_date'            => Carbon::now()->endOfQuarter(),
+        ]);
+
+        // Seed Sample Check-ins
+        GoalCheckIn::create([
+            'tenant_id'          => $tenant->id,
+            'goal_id'            => $goalCompany1->id,
+            'goal_key_result_id' => $kr1->id,
+            'user_id'            => $users['company_admin']->id,
+            'employee_id'        => $empExecs[0]->id ?? $employees[0]->id,
+            'previous_value'     => 600000.00,
+            'new_value'          => 900000.00,
+            'previous_progress'  => 50.00,
+            'new_progress'       => 75.00,
+            'health_status'      => 'on_track',
+            'comment'            => 'Closed major $300K annual deal with global logistics partner in EMEA.',
+            'check_in_date'      => Carbon::now()->subDays(3),
+        ]);
+
+        GoalCheckIn::create([
+            'tenant_id'          => $tenant->id,
+            'goal_id'            => $goalTech->id,
+            'goal_key_result_id' => $krTech1->id,
+            'user_id'            => $users['company_admin']->id,
+            'employee_id'        => $employees[1]->id ?? $employees[0]->id,
+            'previous_value'     => 0.00,
+            'new_value'          => 0.00,
+            'previous_progress'  => 0.00,
+            'new_progress'       => 50.00,
+            'health_status'      => 'at_risk',
+            'comment'            => 'Completed architecture diagram. Awaiting AWS cross-region peering quota increase approval.',
+            'blockers'           => 'AWS Support ticket pending for Frankfurt VPC peering bandwidth increase.',
+            'check_in_date'      => Carbon::now()->subDays(1),
+        ]);
+
+        $this->command?->info('HrmsDemoSeeder successfully completed! All 13 roles, complete employee forms, attendance history, salary structures, leave plans, fixed assets, recruitment, helpdesk, PIP, broadcasts, KRA/KPI scorecards, exit clearances, SOP management, travel expenses, and Goals & OKRs are seeded with real-world data.');
     }
 }
+
