@@ -1118,7 +1118,14 @@ class ProductApiController extends Controller
                 'uom', 'vendor', 'images', 'primaryImage', 'detailImages', 'warehouseStocks.warehouse',
                 'variants.images', 'variants.primaryImage', 'variants.detailImages', 'variants.warehouseStocks.warehouse'
             ])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -1132,7 +1139,15 @@ class ProductApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($id);
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+        }
+
         $this->authorize('update', $product);
 
         $validator = Validator::make($request->all(), [
@@ -1178,7 +1193,15 @@ class ProductApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($id);
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+        }
+
         $this->authorize('delete', $product);
 
         // Check if product has active inventory
@@ -1204,7 +1227,15 @@ class ProductApiController extends Controller
     public function toggleStatus(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($id);
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+        }
+
         $this->authorize('update', $product);
 
         $newStatus = $request->input('status') ?: ($product->status === 'active' ? 'inactive' : 'active');
@@ -1327,7 +1358,15 @@ class ProductApiController extends Controller
     public function getOpeningStock(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($id);
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+        }
+
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
 
         $stocks = \App\Domains\Inventory\Models\ProductWarehouseStock::where('product_id', $id)->get();
@@ -1359,7 +1398,15 @@ class ProductApiController extends Controller
     public function saveOpeningStock(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($id);
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+        }
+
         $this->authorize('update', $product);
 
         $validator = Validator::make($request->all(), [
@@ -1463,7 +1510,14 @@ class ProductApiController extends Controller
     {
         [$tenantId] = $this->resolveTenantContext();
 
-        $product = Product::where('tenant_id', $tenantId)->findOrFail($id);
+        $product = Product::where('tenant_id', $tenantId)->find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+        }
 
         $warehouseStocks = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
             ->where('product_id', $product->id)

@@ -220,9 +220,10 @@ class LeadFollowupController extends Controller
             if ($syncGoogle) {
                 try {
                     $createMeet = $request->boolean('create_meet_link');
-                    $attendees = [];
-                    if ($deal->contact?->email) $attendees[] = $deal->contact->email;
-                    if ($deal->account?->email) $attendees[] = $deal->account->email;
+                    $clientEmail = !empty($deal->contact?->email) ? trim($deal->contact->email) : (!empty($deal->account?->email) ? trim($deal->account->email) : null);
+                    if ($clientEmail) {
+                        $attendees[] = $clientEmail;
+                    }
                     if (auth()->check() && auth()->user()?->email) {
                         $attendees[] = auth()->user()->email;
                     }

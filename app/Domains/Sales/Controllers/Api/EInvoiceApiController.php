@@ -140,7 +140,13 @@ class EInvoiceApiController extends Controller
      */
     public function exportJson(Request $request, int $id)
     {
-        $invoice = Invoice::with(['items.product', 'customer', 'salesOrder.customer'])->findOrFail($id);
+        $invoice = Invoice::with(['items.product', 'customer', 'salesOrder.customer'])->find($id);
+        if (!$invoice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found',
+            ], 404);
+        }
         $this->authorize('view', $invoice);
 
         $jsonData = $this->eInvoiceService->buildNicGeppJson($invoice);

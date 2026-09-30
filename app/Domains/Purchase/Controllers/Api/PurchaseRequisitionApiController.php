@@ -157,7 +157,14 @@ class PurchaseRequisitionApiController extends Controller
 
         $requisition = PurchaseRequisition::where('tenant_id', $tenantId)
             ->with(['requester', 'items.product', 'items.warehouse', 'reminders.user'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$requisition) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Requisition not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -171,7 +178,14 @@ class PurchaseRequisitionApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         [$tenantId]  = $this->resolveTenantContext();
-        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)->findOrFail($id);
+        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)->find($id);
+
+        if (!$requisition) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Requisition not found',
+            ], 404);
+        }
 
         if ($requisition->status !== 'Draft') {
             return response()->json([
@@ -220,7 +234,14 @@ class PurchaseRequisitionApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId]  = $this->resolveTenantContext();
-        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)->findOrFail($id);
+        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)->find($id);
+
+        if (!$requisition) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Requisition not found',
+            ], 404);
+        }
 
         if ($requisition->status !== 'Draft') {
             return response()->json([
@@ -243,7 +264,14 @@ class PurchaseRequisitionApiController extends Controller
     public function approve(int $id): JsonResponse
     {
         [$tenantId]  = $this->resolveTenantContext();
-        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)->findOrFail($id);
+        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)->find($id);
+
+        if (!$requisition) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Requisition not found',
+            ], 404);
+        }
 
         if ($requisition->status !== 'Draft') {
             return response()->json([
@@ -271,7 +299,14 @@ class PurchaseRequisitionApiController extends Controller
     public function reject(Request $request, int $id): JsonResponse
     {
         [$tenantId]  = $this->resolveTenantContext();
-        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)->findOrFail($id);
+        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)->find($id);
+
+        if (!$requisition) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Requisition not found',
+            ], 404);
+        }
 
         if ($requisition->status !== 'Draft') {
             return response()->json([
@@ -306,7 +341,14 @@ class PurchaseRequisitionApiController extends Controller
     public function remind(Request $request, int $id): JsonResponse
     {
         [$tenantId]  = $this->resolveTenantContext();
-        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)->findOrFail($id);
+        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)->find($id);
+
+        if (!$requisition) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Requisition not found',
+            ], 404);
+        }
 
         if ($requisition->status !== 'Draft') {
             return response()->json([

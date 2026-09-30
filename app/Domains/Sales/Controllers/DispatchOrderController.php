@@ -30,9 +30,21 @@ class DispatchOrderController extends Controller
     {
         $this->authorize('viewAny', DispatchOrder::class);
 
-        $dispatches = $this->dispatchRepo->getPaginated($request->all(), 15);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $activeTab = $request->get('tab', 'pending');
 
-        return view('modules.sales.dispatches.index', compact('dispatches'));
+        $pendingSalesOrders = $this->dispatchRepo->getPendingSalesOrders($tenantId, $request->all(), 15);
+        $pendingSalesOrdersCount = $this->dispatchRepo->getPendingSalesOrdersCount($tenantId);
+        $dispatches = $this->dispatchRepo->getPaginated($request->all(), 15);
+        $allDispatchesCount = DispatchOrder::where('tenant_id', $tenantId)->count();
+
+        return view('modules.sales.dispatches.index', compact(
+            'dispatches',
+            'pendingSalesOrders',
+            'pendingSalesOrdersCount',
+            'allDispatchesCount',
+            'activeTab'
+        ));
     }
 
     /**
@@ -56,11 +68,46 @@ class DispatchOrderController extends Controller
         $tenantId = require_tenant_id();
         $warehouses   = Warehouse::where('tenant_id', $tenantId)->orderBy('name')->get();
         $transporters = Transporter::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get();
+
+        $mrId = $request->input('material_requirement_id') ?: $request->input('mr_id');
+        $soId = $request->input('sales_order_id') ?: $request->input('so_id');
+
+        $prefillSalesOrder = null;
+        if ($soId) {
+            $prefillSalesOrder = \App\Domains\Sales\Models\SalesOrder::with(['items', 'customer'])->find($soId);
+            if ($prefillSalesOrder) {
+                $mr = MaterialRequirement::where('sales_order_id', $prefillSalesOrder->id)->first();
+                if (!$mr && $prefillSalesOrder->items->count() > 0) {
+                    $mrService = app(\App\Domains\Sales\Services\MaterialRequirementService::class);
+                    $mrItems = $prefillSalesOrder->items->map(fn($it) => [
+                        'product_id' => $it->product_id,
+                        'warehouse_id' => $it->warehouse_id ?: ($warehouses->first()?->id ?: 1),
+                        'quantity' => $it->quantity,
+                        'quantity_reserved' => 0,
+                        'sales_order_item_id' => $it->id,
+                    ])->toArray();
+
+                    $mr = $mrService->create([
+                        'tenant_id' => $tenantId,
+                        'company_id' => $prefillSalesOrder->company_id,
+                        'branch_id' => $prefillSalesOrder->branch_id,
+                        'sales_order_id' => $prefillSalesOrder->id,
+                        'status' => 'Pending',
+                        'requirement_date' => now()->toDateString(),
+                    ], $mrItems);
+                }
+                $mrId = $mr?->id;
+            }
+        } elseif ($mrId) {
+            $mr = MaterialRequirement::with('salesOrder.customer')->find($mrId);
+            $prefillSalesOrder = $mr?->salesOrder;
+            $soId = $prefillSalesOrder?->id;
+        }
+
         $pendingDOsFormatted = $this->dispatchService->getPendingMaterialRequirementsFormatted();
         $pendingDOIds = array_column($pendingDOsFormatted, 'id');
-        $mrIdTemp = $request->input('material_requirement_id') ?: $request->input('mr_id');
-        if ($mrIdTemp && !in_array((int)$mrIdTemp, $pendingDOIds)) {
-            $pendingDOIds[] = (int)$mrIdTemp;
+        if ($mrId && !in_array((int)$mrId, $pendingDOIds)) {
+            $pendingDOIds[] = (int)$mrId;
         }
 
         $pendingDOs = MaterialRequirement::with([
@@ -74,22 +121,6 @@ class DispatchOrderController extends Controller
 
         $customers    = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)->orderBy('name')->get();
         $products     = Product::where('tenant_id', $tenantId)->with(['uom'])->orderBy('name')->get();
-
-        $mrId = $request->input('material_requirement_id') ?: $request->input('mr_id');
-        $soId = $request->input('sales_order_id') ?: $request->input('so_id');
-
-        $prefillSalesOrder = null;
-        if ($soId) {
-            $prefillSalesOrder = \App\Domains\Sales\Models\SalesOrder::find($soId);
-            if (!$mrId && $prefillSalesOrder) {
-                $mr = \App\Domains\Sales\Models\MaterialRequirement::where('sales_order_id', $prefillSalesOrder->id)->first();
-                $mrId = $mr?->id;
-            }
-        } elseif ($mrId) {
-            $mr = \App\Domains\Sales\Models\MaterialRequirement::with('salesOrder')->find($mrId);
-            $prefillSalesOrder = $mr?->salesOrder;
-            $soId = $prefillSalesOrder?->id;
-        }
 
         $formattedWarehouses = $warehouses->map(fn ($w) => ['id' => $w->id, 'name' => $w->name])->values()->all();
         $formattedProducts   = $products->map(fn ($p) => [

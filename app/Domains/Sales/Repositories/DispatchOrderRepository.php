@@ -76,6 +76,141 @@ class DispatchOrderRepository
         ->get();
     }
 
+    public function getPendingSalesOrders(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
+    {
+        $salesOrdersQuery = \App\Domains\Sales\Models\SalesOrder::query()
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhereNotIn('status', ['Cancelled', 'cancelled']);
+            })
+            ->with(['customer', 'items.product.uom', 'items.warehouse'])
+            ->latest('order_date');
+
+        if (!empty($filters['search'])) {
+            $search = trim($filters['search']);
+            $salesOrdersQuery->where(function ($q) use ($search) {
+                $q->where('sales_order_number', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function ($cq) use ($search) {
+                      $cq->where('name', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $allOrders = $salesOrdersQuery->get();
+
+        $dispatchedAggregates = DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId) {
+            $q->where('tenant_id', $tenantId)->where('status', '!=', 'Cancelled');
+        })
+        ->select('dispatch_orders.sales_order_id', 'dispatch_order_items.product_id', DB::raw('SUM(COALESCE(NULLIF(dispatch_order_items.quantity_dispatched, 0), dispatch_order_items.quantity_ordered)) as total_dispatched'))
+        ->join('dispatch_orders', 'dispatch_orders.id', '=', 'dispatch_order_items.dispatch_order_id')
+        ->groupBy('dispatch_orders.sales_order_id', 'dispatch_order_items.product_id')
+        ->get()
+        ->groupBy('sales_order_id');
+
+        $pendingList = collect();
+
+        foreach ($allOrders as $order) {
+            $orderDispatches = $dispatchedAggregates->get($order->id, collect());
+            $totalOrdered = 0;
+            $totalDispatched = 0;
+            $itemsDetail = [];
+
+            foreach ($order->items as $item) {
+                $ordered = (float) $item->quantity;
+                $dispRow = $orderDispatches->firstWhere('product_id', $item->product_id);
+                $dispatched = $dispRow ? (float) $dispRow->total_dispatched : 0.0;
+                $pending = max(0, $ordered - $dispatched);
+
+                $totalOrdered += $ordered;
+                $totalDispatched += min($ordered, $dispatched);
+
+                $availStock = \App\Domains\Inventory\Services\StockService::getAvailableStock((int) $item->product_id, (int) $item->warehouse_id);
+
+                $itemsDetail[] = [
+                    'product_id'     => $item->product_id,
+                    'product_name'   => $item->product?->name ?? $item->item_name ?? 'Item',
+                    'sku'            => $item->product?->sku ?? '',
+                    'uom'            => $item->product?->uom?->code ?? 'Units',
+                    'warehouse_name' => $item->warehouse?->name ?? 'Main',
+                    'ordered_qty'    => $ordered,
+                    'dispatched_qty' => $dispatched,
+                    'pending_qty'    => $pending,
+                    'available_stock'=> $availStock,
+                ];
+            }
+
+            $totalPending = max(0, $totalOrdered - $totalDispatched);
+
+            if ($totalPending > 0) {
+                $progress = $totalOrdered > 0 ? round(($totalDispatched / $totalOrdered) * 100) : 0;
+                $order->total_ordered_qty = $totalOrdered;
+                $order->total_dispatched_qty = $totalDispatched;
+                $order->total_pending_qty = $totalPending;
+                $order->dispatch_progress = $progress;
+                $order->dispatch_status_label = ($totalDispatched > 0) ? 'Partially Dispatched' : 'Pending Dispatch';
+                $order->items_detail = $itemsDetail;
+
+                $pendingList->push($order);
+            }
+        }
+
+        $page = \Illuminate\Pagination\Paginator::resolveCurrentPage('pending_page') ?: 1;
+        $itemsForCurrentPage = $pendingList->slice(($page - 1) * $perPage, $perPage)->values();
+
+        return new \Illuminate\Pagination\LengthAwarePaginator(
+            $itemsForCurrentPage,
+            $pendingList->count(),
+            $perPage,
+            $page,
+            [
+                'path'     => \Illuminate\Pagination\Paginator::resolveCurrentPath(),
+                'pageName' => 'pending_page',
+            ]
+        );
+    }
+
+    public function getPendingSalesOrdersCount(int $tenantId): int
+    {
+        $allOrders = \App\Domains\Sales\Models\SalesOrder::where('tenant_id', $tenantId)
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhereNotIn('status', ['Cancelled', 'cancelled']);
+            })
+            ->with(['items'])
+            ->get();
+
+        $dispatchedAggregates = DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId) {
+            $q->where('tenant_id', $tenantId)->where('status', '!=', 'Cancelled');
+        })
+        ->select('dispatch_orders.sales_order_id', 'dispatch_order_items.product_id', DB::raw('SUM(COALESCE(NULLIF(dispatch_order_items.quantity_dispatched, 0), dispatch_order_items.quantity_ordered)) as total_dispatched'))
+        ->join('dispatch_orders', 'dispatch_orders.id', '=', 'dispatch_order_items.dispatch_order_id')
+        ->groupBy('dispatch_orders.sales_order_id', 'dispatch_order_items.product_id')
+        ->get()
+        ->groupBy('sales_order_id');
+
+        $count = 0;
+        foreach ($allOrders as $order) {
+            $orderDispatches = $dispatchedAggregates->get($order->id, collect());
+            $totalOrdered = (float) $order->items->sum('quantity');
+            $totalDispatched = 0;
+
+            foreach ($order->items as $item) {
+                $dispRow = $orderDispatches->firstWhere('product_id', $item->product_id);
+                $dispatched = $dispRow ? (float) $dispRow->total_dispatched : 0.0;
+                $totalDispatched += min((float) $item->quantity, $dispatched);
+            }
+
+            if (($totalOrdered - $totalDispatched) > 0) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
     public function find(int $id): ?DispatchOrder
     {
         return DispatchOrder::with(['customer', 'salesOrder', 'items.product', 'items.warehouse'])->find($id);

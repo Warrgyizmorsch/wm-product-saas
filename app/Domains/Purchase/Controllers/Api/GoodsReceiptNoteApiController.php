@@ -155,7 +155,14 @@ class GoodsReceiptNoteApiController extends Controller
 
         $grn = GoodsReceiptNote::where('tenant_id', $tenantId)
             ->with(['vendor', 'purchaseOrder', 'warehouse', 'items.product'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$grn) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Goods Receipt Note not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -169,7 +176,14 @@ class GoodsReceiptNoteApiController extends Controller
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $grn        = GoodsReceiptNote::where('tenant_id', $tenantId)->findOrFail($id);
+        $grn        = GoodsReceiptNote::where('tenant_id', $tenantId)->find($id);
+
+        if (!$grn) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Goods Receipt Note not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'string', 'in:Draft,Received,Inspected,Rejected'],
@@ -199,7 +213,14 @@ class GoodsReceiptNoteApiController extends Controller
     public function approve(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $grn        = GoodsReceiptNote::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+        $grn        = GoodsReceiptNote::where('tenant_id', $tenantId)->with('items')->find($id);
+
+        if (!$grn) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Goods Receipt Note not found',
+            ], 404);
+        }
 
         if ($grn->status === 'Approved') {
             return response()->json([
@@ -293,7 +314,14 @@ class GoodsReceiptNoteApiController extends Controller
     public function getPurchaseOrderItems(int $poId): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $po         = PurchaseOrder::where('tenant_id', $tenantId)->with('items.product')->findOrFail($poId);
+        $po         = PurchaseOrder::where('tenant_id', $tenantId)->with('items.product')->find($poId);
+
+        if (!$po) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found',
+            ], 404);
+        }
 
         $items = [];
         foreach ($po->items as $item) {

@@ -210,7 +210,14 @@ class StockAdjustmentApiController extends Controller
 
         $adj = StockAdjustment::where('tenant_id', $tenantId)
             ->with(['warehouse', 'creator', 'approver', 'items.product', 'items.batch'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$adj) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stock Adjustment not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -224,7 +231,14 @@ class StockAdjustmentApiController extends Controller
     public function approve(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $adjustment = StockAdjustment::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+        $adjustment = StockAdjustment::where('tenant_id', $tenantId)->with('items')->find($id);
+
+        if (!$adjustment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stock Adjustment not found',
+            ], 404);
+        }
 
         if ($adjustment->status !== 'Draft') {
             return response()->json([
@@ -285,7 +299,14 @@ class StockAdjustmentApiController extends Controller
     public function cancel(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $adjustment = StockAdjustment::where('tenant_id', $tenantId)->findOrFail($id);
+        $adjustment = StockAdjustment::where('tenant_id', $tenantId)->find($id);
+
+        if (!$adjustment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stock Adjustment not found',
+            ], 404);
+        }
 
         if ($adjustment->status === 'Approved') {
             return response()->json([

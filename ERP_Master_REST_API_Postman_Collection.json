@@ -3445,7 +3445,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"customer_id\": 1,\n    \"invoice_date\": \"2026-09-26\",\n    \"due_date\": \"2026-10-26\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"item_name\": \"Product Sample\",\n            \"quantity\": 5,\n            \"unit_price\": 300,\n            \"discount\": 0,\n            \"tax_rate\": 18\n        }\n    ]\n}"
+                                    "raw": "{\n    \"customer_id\": 1,\n    \"sales_order_id\": 1,\n    \"invoice_date\": \"2026-09-26\",\n    \"due_date\": \"2026-10-26\",\n    \"payment_terms\": \"Immediate Payment\",\n    \"freight_terms\": \"To Pay\",\n    \"freight_amount\": 0,\n    \"adjustment\": 0,\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"item_name\": \"Product Sample\",\n            \"quantity\": 5,\n            \"unit_price\": 300,\n            \"discount\": 0,\n            \"tax_rate\": 18\n        }\n    ]\n}"
                                 },
                                 "url": {
                                     "raw": "{{base_url}}/api/sales/invoices",
