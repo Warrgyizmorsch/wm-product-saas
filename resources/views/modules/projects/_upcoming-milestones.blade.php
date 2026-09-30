@@ -23,7 +23,7 @@
             };
         @endphp
         <x-ui.badge variant="{{ $milestoneStatusVariant }}" soft>
-            {{ __('projects.statuses.' . $milestone->status) }}
+            {{ __('projects.statuses.' . ($milestone->status ?: 'Draft')) }}
         </x-ui.badge>
     </div>
 @empty

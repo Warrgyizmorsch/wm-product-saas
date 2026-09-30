@@ -5,7 +5,7 @@
 @section('breadcrumb', __('projects.title') . ' / ' . __('projects.milestones'))
 
 @section('content')
-    <div class="erp-single-panel">
+    <div class="erp-single-panel bg-white p-4 rounded-3 border">
 
         <div class="d-flex align-items-center mb-3">
             <h5 class="fw-bold text-dark mb-0">
@@ -54,95 +54,93 @@
             </div>
         </div>
 
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-0">
-                <x-ui.table>
-                    <thead>
-                        <tr>
-                            <th scope="col">{{ __('projects.milestone_name') }}</th>
-                            <th scope="col">{{ __('projects.project') }}</th>
-                            <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.milestone_owner') }}</th>
-                            <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.start_date') }}</th>
-                            <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.due_date') }}</th>
-                            <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.status') }}</th>
-                            <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.completion_percentage') }}</th>
+        <div class="table-responsive">
+            <x-ui.odoo-form-ui type="table">
+                <thead>
+                    <tr>
+                        <th scope="col">{{ __('projects.milestone_name') }}</th>
+                        <th scope="col">{{ __('projects.project') }}</th>
+                        <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.milestone_owner') }}</th>
+                        <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.start_date') }}</th>
+                        <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.due_date') }}</th>
+                        <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.status') }}</th>
+                        <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.completion_percentage') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($milestones as $milestone)
+                        <tr @if ($milestone->project) @can('update', $milestone) role="button" style="cursor: pointer;"
+                                onclick="openMilestoneDetailsDrawer({
+                                    id: {{ $milestone->id }},
+                                    updateUrl: @js(route('projects.milestones.update', [$milestone->project, $milestone->id])),
+                                    deleteUrl: @js(route('projects.milestones.destroy', [$milestone->project, $milestone->id])),
+                                    name: @js($milestone->name),
+                                    description: @js($milestone->description),
+                                    ownerId: @js($milestone->owner_id),
+                                    ownerName: @js($milestone->owner?->name),
+                                    startDate: @js($milestone->start_date?->format('Y-m-d')),
+                                    dueDate: @js($milestone->due_date?->format('Y-m-d')),
+                                    startDateDisplay: @js($milestone->start_date?->format('d/m/Y')),
+                                    dueDateDisplay: @js($milestone->due_date?->format('d/m/Y')),
+                                    status: @js($milestone->status),
+                                    completionPercentage: {{ $milestone->completion_percentage }}
+                                })"
+                            @endcan @endif>
+                            <td>
+                                <div class="fw-semibold text-dark">{{ $milestone->name }}</div>
+                                @if ($milestone->description)
+                                    <div class="fs-11 text-muted">{{ \Illuminate\Support\Str::limit($milestone->description, 60) }}</div>
+                                @endif
+                            </td>
+                            <td>
+                                @if ($milestone->project)
+                                    <a href="{{ route('projects.show', $milestone->project) }}" class="fw-semibold text-primary hover-primary" onclick="event.stopPropagation();">
+                                        {{ $milestone->project->name }}
+                                    </a>
+                                    <div class="fs-11 text-muted">{{ $milestone->project->project_code }}</div>
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td>{{ $milestone->owner?->name ?: '—' }}</td>
+                            <td>{{ $milestone->start_date?->format('d/m/Y') ?: '—' }}</td>
+                            <td>{{ $milestone->due_date?->format('d/m/Y') ?: '—' }}</td>
+                            <td>
+                                @if ($milestone->status)
+                                    @php
+                                        $milestoneStatusVariant = match ($milestone->status) {
+                                            'Active' => 'success',
+                                            'On Hold' => 'warning',
+                                            'Completed' => 'primary',
+                                            'Closed' => 'dark',
+                                            default => 'secondary',
+                                        };
+                                    @endphp
+                                    <x-ui.badge variant="{{ $milestoneStatusVariant }}" soft>
+                                        {{ __('projects.statuses.' . ($milestone->status ?: 'Draft')) }}
+                                    </x-ui.badge>
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td>{{ $milestone->completion_percentage }}%</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($milestones as $milestone)
-                            <tr @if ($milestone->project) @can('update', $milestone) role="button" style="cursor: pointer;"
-                                    onclick="openMilestoneDetailsDrawer({
-                                        id: {{ $milestone->id }},
-                                        updateUrl: @js(route('projects.milestones.update', [$milestone->project, $milestone->id])),
-                                        deleteUrl: @js(route('projects.milestones.destroy', [$milestone->project, $milestone->id])),
-                                        name: @js($milestone->name),
-                                        description: @js($milestone->description),
-                                        ownerId: @js($milestone->owner_id),
-                                        ownerName: @js($milestone->owner?->name),
-                                        startDate: @js($milestone->start_date?->format('Y-m-d')),
-                                        dueDate: @js($milestone->due_date?->format('Y-m-d')),
-                                        startDateDisplay: @js($milestone->start_date?->format('d/m/Y')),
-                                        dueDateDisplay: @js($milestone->due_date?->format('d/m/Y')),
-                                        status: @js($milestone->status),
-                                        completionPercentage: {{ $milestone->completion_percentage }}
-                                    })"
-                                @endcan @endif>
-                                <td>
-                                    <div class="fw-semibold text-dark">{{ $milestone->name }}</div>
-                                    @if ($milestone->description)
-                                        <div class="fs-11 text-muted">{{ \Illuminate\Support\Str::limit($milestone->description, 60) }}</div>
-                                    @endif
-                                </td>
-                                <td>
-                                    @if ($milestone->project)
-                                        <a href="{{ route('projects.show', $milestone->project) }}" class="fw-semibold text-primary hover-primary" onclick="event.stopPropagation();">
-                                            {{ $milestone->project->name }}
-                                        </a>
-                                        <div class="fs-11 text-muted">{{ $milestone->project->project_code }}</div>
-                                    @else
-                                        —
-                                    @endif
-                                </td>
-                                <td>{{ $milestone->owner?->name ?: '—' }}</td>
-                                <td>{{ $milestone->start_date?->format('d/m/Y') ?: '—' }}</td>
-                                <td>{{ $milestone->due_date?->format('d/m/Y') ?: '—' }}</td>
-                                <td>
-                                    @if ($milestone->status)
-                                        @php
-                                            $milestoneStatusVariant = match ($milestone->status) {
-                                                'Active' => 'success',
-                                                'On Hold' => 'warning',
-                                                'Completed' => 'primary',
-                                                'Closed' => 'dark',
-                                                default => 'secondary',
-                                            };
-                                        @endphp
-                                        <x-ui.badge variant="{{ $milestoneStatusVariant }}" soft>
-                                            {{ __('projects.statuses.' . $milestone->status) }}
-                                        </x-ui.badge>
-                                    @else
-                                        —
-                                    @endif
-                                </td>
-                                <td>{{ $milestone->completion_percentage }}%</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="text-center text-muted py-4">
-                                    <i class="feather-info me-2 fs-16"></i>{{ __('projects.no_milestones_found') }}
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </x-ui.table>
-
-                <x-ui.pagination
-                    :currentPage="$milestones->currentPage()"
-                    :totalPages="$milestones->lastPage()"
-                    :totalResults="$milestones->total()"
-                    :perPage="$milestones->perPage()" />
-            </div>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                <i class="feather-info me-2 fs-16"></i>{{ __('projects.no_milestones_found') }}
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </x-ui.odoo-form-ui>
         </div>
+
+        <x-ui.pagination
+            :currentPage="$milestones->currentPage()"
+            :totalPages="$milestones->lastPage()"
+            :totalResults="$milestones->total()"
+            :perPage="$milestones->perPage()" />
     </div>
 
     @include('modules.projects.milestones._modal')

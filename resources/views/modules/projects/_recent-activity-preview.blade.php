@@ -8,6 +8,13 @@
         'milestone.updated' => ['icon' => 'feather-edit', 'class' => 'border-info text-info bg-soft-info', 'title' => 'Milestone Updated'],
         'milestone.completed' => ['icon' => 'feather-check-circle', 'class' => 'border-success text-success bg-soft-success', 'title' => 'Milestone Completed'],
         'milestone.deleted' => ['icon' => 'feather-trash-2', 'class' => 'border-danger text-danger bg-soft-danger', 'title' => 'Milestone Deleted'],
+        'project.issue_created' => ['icon' => 'feather-alert-circle', 'class' => 'border-danger text-danger bg-soft-danger', 'title' => 'Issue Reported'],
+        'project.issue_status_changed' => ['icon' => 'feather-refresh-cw', 'class' => 'border-warning text-warning bg-soft-warning', 'title' => 'Issue Status Changed'],
+        'project.issue_resolved' => ['icon' => 'feather-check-circle', 'class' => 'border-success text-success bg-soft-success', 'title' => 'Issue Resolved'],
+        'project.issue_retested' => ['icon' => 'feather-check-square', 'class' => 'border-info text-info bg-soft-info', 'title' => 'Issue Retested'],
+        'project.issue_deleted' => ['icon' => 'feather-trash-2', 'class' => 'border-danger text-danger bg-soft-danger', 'title' => 'Issue Deleted'],
+        'project.document_uploaded' => ['icon' => 'feather-paperclip', 'class' => 'border-primary text-primary bg-soft-primary', 'title' => 'Document Uploaded'],
+        'project.document_deleted' => ['icon' => 'feather-trash-2', 'class' => 'border-danger text-danger bg-soft-danger', 'title' => 'Document Deleted'],
     ];
 @endphp
 

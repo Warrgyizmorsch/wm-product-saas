@@ -31,13 +31,13 @@
             <div class="flex-grow-1" style="min-width: 0;">
                 <div class="d-flex flex-wrap align-items-start gap-2">
                     <div class="flex-grow-1" style="min-width: 200px;">
-                        <input type="text" class="form-control form-control-sm milestone-create-name"
+                        <input type="text" class="form-control form-control-sm odoo-table-input milestone-create-name"
                                placeholder="{{ __('projects.milestone_name') }}" maxlength="255">
                         <div class="invalid-feedback d-block fs-11 milestone-create-error" data-field="name"></div>
                     </div>
 
                     <div style="min-width: 180px; width: 200px;">
-                        <select class="form-select form-select-sm milestone-create-owner" data-select2-selector="user">
+                        <select class="form-select form-select-sm odoo-table-select milestone-create-owner" data-select2-selector="user">
                             <option value="">{{ __('projects.select_user') }}</option>
                             @foreach ($activeMemberOptions as $memberOption)
                                 <option value="{{ $memberOption->id }}">{{ $memberOption->name }}</option>
@@ -47,7 +47,7 @@
                     </div>
 
                     <div style="min-width: 150px; width: 160px;">
-                        <input type="date" class="form-control form-control-sm milestone-create-due-date">
+                        <input type="date" class="form-control form-control-sm odoo-table-input milestone-create-due-date">
                         <div class="invalid-feedback d-block fs-11 milestone-create-error" data-field="due_date"></div>
                     </div>
 

@@ -347,6 +347,25 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Repositories\TaskDependencyRepository::class
         );
 
+        // ── Projects: Time Log ────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\TimeLogRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\TimeLogRepository::class
+        );
+
+        // ── Projects: Issue ───────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\IssueRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\IssueRepository::class
+        );
+
+        // ── Projects: Document ────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\ProjectDocumentRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\ProjectDocumentRepository::class
+        );
+
+
         // ── Accounting: Chart of Accounts ─────────────────────────────────────
         $this->app->bind(
             \App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface::class,
@@ -820,6 +839,22 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Models\Task::class,
             \App\Domains\Projects\Policies\TaskPolicy::class
         );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\TimeLog::class,
+            \App\Domains\Projects\Policies\TimeLogPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\Issue::class,
+            \App\Domains\Projects\Policies\IssuePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\ProjectDocument::class,
+            \App\Domains\Projects\Policies\ProjectDocumentPolicy::class
+        );
+
 
         // ── Accounting Policies ────────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(

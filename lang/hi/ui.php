@@ -100,4 +100,6 @@ return [
     'tenant_isolation' => 'टेनेंट अलगाव',
     'welcome_back' => 'वापसी पर स्वागत है',
     'workspace' => 'वर्कस्पेस',
+    'optional' => 'वैकल्पिक',
+    'view' => 'देखें',
 ];

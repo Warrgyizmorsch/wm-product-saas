@@ -147,4 +147,20 @@ class Project extends BaseModel
     {
         return $this->hasMany(Task::class, 'project_id');
     }
+
+    public function timeLogs(): HasMany
+    {
+        return $this->hasMany(TimeLog::class, 'project_id');
+    }
+
+    public function issues(): HasMany
+    {
+        return $this->hasMany(Issue::class, 'project_id');
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(ProjectDocument::class, 'project_id');
+    }
 }
+

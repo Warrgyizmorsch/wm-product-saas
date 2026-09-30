@@ -858,7 +858,7 @@
         {{ $slot }}
     </div>
 
-@elseif ($type === 'input')
+@elseif ($type === 'input' || $type === 'text')
     @php
         $fieldId = $id ?? ($name ? str_replace('[]', '', $name) . '_' . uniqid() : 'input_' . uniqid());
     @endphp

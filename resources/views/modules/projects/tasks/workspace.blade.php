@@ -5,7 +5,7 @@
 @section('breadcrumb', __('projects.title') . ' / ' . ($task->milestone?->name ?? $task->taskList?->name) . ' / ' . $task->task_code)
 
 @section('content')
-    <div class="erp-single-panel bg-white">
+    <div class="erp-single-panel bg-white p-4 rounded-3 border">
         @if ($errors->any())
             <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
                 <h6 class="alert-heading fw-bold mb-1">{{ __('projects.validation_errors') }}</h6>
@@ -26,9 +26,8 @@
                 @include('modules.projects.tasks.workspace._description')
                 @include('modules.projects.tasks.workspace._subtasks')
                 @include('modules.projects.tasks.workspace._dependencies')
-                {{-- Future extension point: Comments and Attachments sections
-                     will be added here, each its own partial, without
-                     restructuring the page shell, hero, or rail. --}}
+                @include('modules.projects.tasks.workspace._timelogs')
+                @include('modules.projects.tasks.workspace._attachments')
             </div>
             <div class="col-lg-4">
                 @include('modules.projects.tasks.workspace._rail')

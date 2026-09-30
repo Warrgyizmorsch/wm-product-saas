@@ -45,9 +45,11 @@
         <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.estimated_hours') }}</div>
         <div class="fs-13 text-dark">{{ $task->estimated_hours ?? '—' }}</div>
     </div>
-    {{-- Future extension point: Logged/Actual Hours will render here once
-         Time Logs ship — intentionally omitted for now since nothing writes
-         actual_hours yet. --}}
+    <div class="mb-3">
+        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.actual_hours', ['default' => 'Actual Hours']) }}</div>
+        <div class="fs-13 text-dark font-monospace fw-semibold">{{ number_format((float) ($task->actual_hours ?? 0), 2) }} hrs</div>
+    </div>
+
 
     <div class="mb-3">
         <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.task_list') }}</div>
