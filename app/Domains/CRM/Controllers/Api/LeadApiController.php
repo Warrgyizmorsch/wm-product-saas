@@ -964,7 +964,14 @@ class LeadApiController extends Controller
     public function qualify(Request $request, int $id): JsonResponse
     {
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
-        $lead = Lead::where('tenant_id', $tenantId)->findOrFail($id);
+        $lead = Lead::where('tenant_id', $tenantId)->find($id);
+
+        if (!$lead) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lead not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'deal_title'          => ['nullable', 'string', 'max:255'],
@@ -1088,7 +1095,14 @@ class LeadApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $lead = Lead::where('tenant_id', $tenantId)->findOrFail($id);
+        $lead = Lead::where('tenant_id', $tenantId)->find($id);
+
+        if (!$lead) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lead not found',
+            ], 404);
+        }
 
         $lead->delete();
 

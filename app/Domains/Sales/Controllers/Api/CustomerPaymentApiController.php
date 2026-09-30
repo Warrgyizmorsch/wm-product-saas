@@ -145,8 +145,9 @@ class CustomerPaymentApiController extends Controller
                             'company_id'          => $companyId,
                             'branch_id'           => $branchId,
                             'customer_payment_id' => $pay->id,
+                            'sales_order_id'      => $invoice->sales_order_id,
                             'invoice_id'          => $invoice->id,
-                            'amount'              => $allocatedAmt,
+                            'allocated_amount'    => $allocatedAmt,
                         ]);
 
                         $invoice->amount_paid += $allocatedAmt;
@@ -160,10 +161,12 @@ class CustomerPaymentApiController extends Controller
             return $pay->load(['customer', 'allocations.invoice']);
         });
 
+        event(new \App\Domains\Sales\Events\CustomerPaymentReceived($payment));
+
         return response()->json([
             'success' => true,
             'message' => 'Customer payment recorded successfully',
-            'data'    => $payment,
+            'data'    => $payment->fresh(['customer', 'allocations.invoice']),
         ], 201);
     }
 
@@ -173,7 +176,14 @@ class CustomerPaymentApiController extends Controller
     public function show(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $payment    = CustomerPayment::where('tenant_id', $tenantId)->with(['customer', 'allocations.invoice'])->findOrFail($id);
+        $payment    = CustomerPayment::where('tenant_id', $tenantId)->with(['customer', 'allocations.invoice'])->find($id);
+
+        if (!$payment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Customer Payment not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -187,9 +197,18 @@ class CustomerPaymentApiController extends Controller
     public function confirm(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $payment    = CustomerPayment::where('tenant_id', $tenantId)->findOrFail($id);
+        $payment    = CustomerPayment::where('tenant_id', $tenantId)->find($id);
+
+        if (!$payment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Customer Payment not found',
+            ], 404);
+        }
 
         $payment->update(['status' => 'Posted']);
+
+        event(new \App\Domains\Sales\Events\CustomerPaymentReceived($payment));
 
         return response()->json([
             'success' => true,
@@ -204,7 +223,14 @@ class CustomerPaymentApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $payment    = CustomerPayment::where('tenant_id', $tenantId)->with('allocations')->findOrFail($id);
+        $payment    = CustomerPayment::where('tenant_id', $tenantId)->with('allocations')->find($id);
+
+        if (!$payment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Customer Payment not found',
+            ], 404);
+        }
 
         DB::transaction(function () use ($payment) {
             foreach ($payment->allocations as $alloc) {

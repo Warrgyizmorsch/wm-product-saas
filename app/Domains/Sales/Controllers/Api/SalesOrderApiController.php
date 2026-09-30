@@ -133,11 +133,20 @@ class SalesOrderApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $input = $request->all();
+
+        // Support aliases
+        if (empty($input['shipment_date']) && !empty($input['delivery_date'])) {
+            $input['shipment_date'] = $input['delivery_date'];
+        }
+
+        $validator = Validator::make($input, [
             'customer_id'       => ['required', 'integer'],
             'quotation_id'      => ['nullable', 'integer'],
             'order_date'        => ['required', 'date'],
             'shipment_date'     => ['nullable', 'date'],
+            'delivery_date'     => ['nullable', 'date'],
+            'warehouse_id'      => ['nullable', 'integer'],
             'status'            => ['nullable', 'string', 'in:Draft,Confirmed,Processing,Closed,Cancelled'],
             'billing_address'   => ['nullable', 'string'],
             'shipping_address'  => ['nullable', 'string'],
@@ -153,14 +162,16 @@ class SalesOrderApiController extends Controller
             'terms_conditions'  => ['nullable', 'string'],
             'notes'             => ['nullable', 'string'],
             'items'             => ['required', 'array', 'min:1'],
-            'items.*.product_id'   => ['nullable', 'integer'],
-            'items.*.warehouse_id' => ['nullable', 'integer'],
-            'items.*.item_name'    => ['required', 'string', 'max:255'],
-            'items.*.quantity'     => ['required', 'numeric', 'min:0.01'],
-            'items.*.unit_price'   => ['required', 'numeric', 'min:0'],
-            'items.*.tax_rate'     => ['nullable', 'numeric', 'min:0'],
-            'items.*.discount'     => ['nullable', 'numeric', 'min:0'],
-            'items.*.description'  => ['nullable', 'string'],
+            'items.*.product_id'        => ['nullable', 'integer'],
+            'items.*.warehouse_id'      => ['nullable', 'integer'],
+            'items.*.item_name'         => ['nullable', 'string', 'max:255'],
+            'items.*.quantity'          => ['required', 'numeric', 'min:0.01'],
+            'items.*.unit_price'        => ['required', 'numeric', 'min:0'],
+            'items.*.tax_rate'          => ['nullable', 'numeric', 'min:0'],
+            'items.*.tax_percent'       => ['nullable', 'numeric', 'min:0'],
+            'items.*.discount'          => ['nullable', 'numeric', 'min:0'],
+            'items.*.discount_percent'  => ['nullable', 'numeric', 'min:0'],
+            'items.*.description'       => ['nullable', 'string'],
         ]);
 
         if ($validator->fails()) {
@@ -187,8 +198,24 @@ class SalesOrderApiController extends Controller
             foreach ($validated['items'] as $row) {
                 $qty       = (float)$row['quantity'];
                 $price     = (float)$row['unit_price'];
-                $discount  = (float)($row['discount'] ?? 0);
-                $taxRate   = (float)($row['tax_rate'] ?? 0);
+                $taxRate   = (float)($row['tax_rate'] ?? ($row['tax_percent'] ?? 0));
+                
+                $discount = (float)($row['discount'] ?? 0);
+                if (empty($discount) && !empty($row['discount_percent'])) {
+                    $discount = (($qty * $price) * (float)$row['discount_percent']) / 100;
+                }
+
+                $productId = $row['product_id'] ?? null;
+                $itemName  = $row['item_name'] ?? null;
+                if (empty($itemName) && $productId) {
+                    $product  = Product::find($productId);
+                    $itemName = $product?->name ?? "Product #{$productId}";
+                }
+                if (empty($itemName)) {
+                    $itemName = 'Item';
+                }
+
+                $warehouseId = $row['warehouse_id'] ?? ($validated['warehouse_id'] ?? null);
 
                 $lineSubtotal = max(0, ($qty * $price) - $discount);
                 $lineTax      = $lineSubtotal * ($taxRate / 100);
@@ -201,9 +228,9 @@ class SalesOrderApiController extends Controller
                     'tenant_id'    => $tenantId,
                     'company_id'   => $companyId,
                     'branch_id'    => $branchId,
-                    'product_id'   => $row['product_id'] ?? null,
-                    'warehouse_id' => $row['warehouse_id'] ?? null,
-                    'item_name'    => $row['item_name'],
+                    'product_id'   => $productId,
+                    'warehouse_id' => $warehouseId,
+                    'item_name'    => $itemName,
                     'description'  => $row['description'] ?? null,
                     'quantity'     => $qty,
                     'unit_price'   => $price,
@@ -238,7 +265,7 @@ class SalesOrderApiController extends Controller
                 'subtotal'           => $subtotal,
                 'tax'                => $totalTax,
                 'discount'           => 0,
-                'freight_terms'      => $validated['freight_terms'] ?? null,
+                'freight_terms'      => $validated['freight_terms'] ?? 'Ex-Works',
                 'freight_amount'     => $freight,
                 'shipping_charges'   => $shipping,
                 'adjustment'         => $adjustment,
@@ -277,7 +304,14 @@ class SalesOrderApiController extends Controller
                 'items.warehouse',
                 'quotation',
             ])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sales Order not found',
+            ], 404);
+        }
 
         $invoices   = Invoice::where('tenant_id', $tenantId)->where('sales_order_id', $id)->get();
         $dispatches = DispatchOrder::where('tenant_id', $tenantId)->where('sales_order_id', $id)->get();
@@ -298,12 +332,27 @@ class SalesOrderApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
-        $order = SalesOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sales Order not found',
+            ], 404);
+        }
 
-        $validator = Validator::make($request->all(), [
+        $input = $request->all();
+
+        // Support aliases
+        if (empty($input['shipment_date']) && !empty($input['delivery_date'])) {
+            $input['shipment_date'] = $input['delivery_date'];
+        }
+
+        $validator = Validator::make($input, [
             'customer_id'       => ['sometimes', 'required', 'integer'],
             'order_date'        => ['sometimes', 'required', 'date'],
             'shipment_date'     => ['nullable', 'date'],
+            'delivery_date'     => ['nullable', 'date'],
+            'warehouse_id'      => ['nullable', 'integer'],
             'status'            => ['nullable', 'string', 'in:Draft,Confirmed,Processing,Closed,Cancelled'],
             'billing_address'   => ['nullable', 'string'],
             'shipping_address'  => ['nullable', 'string'],
@@ -319,14 +368,16 @@ class SalesOrderApiController extends Controller
             'terms_conditions'  => ['nullable', 'string'],
             'notes'             => ['nullable', 'string'],
             'items'             => ['nullable', 'array'],
-            'items.*.product_id'   => ['nullable', 'integer'],
-            'items.*.warehouse_id' => ['nullable', 'integer'],
-            'items.*.item_name'    => ['required', 'string', 'max:255'],
-            'items.*.quantity'     => ['required', 'numeric', 'min:0.01'],
-            'items.*.unit_price'   => ['required', 'numeric', 'min:0'],
-            'items.*.tax_rate'     => ['nullable', 'numeric', 'min:0'],
-            'items.*.discount'     => ['nullable', 'numeric', 'min:0'],
-            'items.*.description'  => ['nullable', 'string'],
+            'items.*.product_id'        => ['nullable', 'integer'],
+            'items.*.warehouse_id'      => ['nullable', 'integer'],
+            'items.*.item_name'         => ['nullable', 'string', 'max:255'],
+            'items.*.quantity'          => ['required', 'numeric', 'min:0.01'],
+            'items.*.unit_price'        => ['required', 'numeric', 'min:0'],
+            'items.*.tax_rate'          => ['nullable', 'numeric', 'min:0'],
+            'items.*.tax_percent'       => ['nullable', 'numeric', 'min:0'],
+            'items.*.discount'          => ['nullable', 'numeric', 'min:0'],
+            'items.*.discount_percent'  => ['nullable', 'numeric', 'min:0'],
+            'items.*.description'       => ['nullable', 'string'],
         ]);
 
         if ($validator->fails()) {
@@ -349,8 +400,24 @@ class SalesOrderApiController extends Controller
                 foreach ($validated['items'] as $row) {
                     $qty       = (float)$row['quantity'];
                     $price     = (float)$row['unit_price'];
-                    $discount  = (float)($row['discount'] ?? 0);
-                    $taxRate   = (float)($row['tax_rate'] ?? 0);
+                    $taxRate   = (float)($row['tax_rate'] ?? ($row['tax_percent'] ?? 0));
+                    
+                    $discount = (float)($row['discount'] ?? 0);
+                    if (empty($discount) && !empty($row['discount_percent'])) {
+                        $discount = (($qty * $price) * (float)$row['discount_percent']) / 100;
+                    }
+
+                    $productId = $row['product_id'] ?? null;
+                    $itemName  = $row['item_name'] ?? null;
+                    if (empty($itemName) && $productId) {
+                        $product  = Product::find($productId);
+                        $itemName = $product?->name ?? "Product #{$productId}";
+                    }
+                    if (empty($itemName)) {
+                        $itemName = 'Item';
+                    }
+
+                    $warehouseId = $row['warehouse_id'] ?? ($validated['warehouse_id'] ?? null);
 
                     $lineSubtotal = max(0, ($qty * $price) - $discount);
                     $lineTax      = $lineSubtotal * ($taxRate / 100);
@@ -364,9 +431,9 @@ class SalesOrderApiController extends Controller
                         'company_id'     => $companyId,
                         'branch_id'      => $branchId,
                         'sales_order_id' => $order->id,
-                        'product_id'     => $row['product_id'] ?? null,
-                        'warehouse_id'   => $row['warehouse_id'] ?? null,
-                        'item_name'      => $row['item_name'],
+                        'product_id'     => $productId,
+                        'warehouse_id'   => $warehouseId,
+                        'item_name'      => $itemName,
                         'description'    => $row['description'] ?? null,
                         'quantity'       => $qty,
                         'unit_price'     => $price,
@@ -405,7 +472,14 @@ class SalesOrderApiController extends Controller
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order      = SalesOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order      = SalesOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sales Order not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'string', 'in:Draft,Confirmed,Processing,Closed,Cancelled'],
@@ -439,11 +513,29 @@ class SalesOrderApiController extends Controller
     public function convertToInvoice(Request $request, int $id): JsonResponse
     {
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
-        $order = SalesOrder::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+        $order = SalesOrder::where('tenant_id', $tenantId)->with('items')->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sales Order not found',
+            ], 404);
+        }
 
         $invoiceNumber = 'INV-' . strtoupper(bin2hex(random_bytes(4)));
 
-        $invoice = DB::transaction(function () use ($order, $invoiceNumber, $tenantId, $companyId, $branchId, $request) {
+            $gstType = $order->gst_type ?? 'cgst_sgst';
+            $orderTax = (float)($order->tax ?? 0);
+            $cgstAmt = 0.0;
+            $sgstAmt = 0.0;
+            $igstAmt = 0.0;
+            if ($gstType === 'cgst_sgst') {
+                $cgstAmt = round($orderTax / 2, 2);
+                $sgstAmt = round($orderTax - $cgstAmt, 2);
+            } elseif ($gstType === 'igst') {
+                $igstAmt = $orderTax;
+            }
+
             $inv = Invoice::create([
                 'tenant_id'        => $tenantId,
                 'company_id'       => $companyId,
@@ -459,8 +551,13 @@ class SalesOrderApiController extends Controller
                 'tax_amount'       => $order->tax,
                 'tax_type'         => $order->tax_type,
                 'discount_type'    => $order->discount_type,
+                'discount_amount'  => (float)($order->discount ?? 0),
                 'order_tax_rate'   => $order->order_tax_rate,
-                'gst_type'         => $order->gst_type,
+                'gst_type'         => $gstType,
+                'cgst_amount'      => $cgstAmt,
+                'sgst_amount'      => $sgstAmt,
+                'igst_amount'      => $igstAmt,
+                'freight_terms'    => $order->freight_terms ?? 'To Pay',
                 'freight_amount'   => $order->freight_amount,
                 'adjustment'       => $order->adjustment,
                 'total_amount'     => $order->total_amount,
@@ -489,10 +586,12 @@ class SalesOrderApiController extends Controller
             return $inv->load(['items', 'customer']);
         });
 
+        event(new \App\Domains\Sales\Events\InvoicePosted($invoice));
+
         return response()->json([
             'success' => true,
             'message' => 'Sales Order successfully converted to Invoice',
-            'data'    => $invoice,
+            'data'    => $invoice->fresh(['items', 'customer']),
         ], 201);
     }
 
@@ -502,7 +601,14 @@ class SalesOrderApiController extends Controller
     public function convertToDispatch(Request $request, int $id): JsonResponse
     {
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
-        $order = SalesOrder::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+        $order = SalesOrder::where('tenant_id', $tenantId)->with('items')->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sales Order not found',
+            ], 404);
+        }
 
         $dispatchNo = 'DO-' . strtoupper(bin2hex(random_bytes(4)));
 
@@ -549,7 +655,14 @@ class SalesOrderApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order      = SalesOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order      = SalesOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sales Order not found',
+            ], 404);
+        }
 
         $order->delete();
 
@@ -565,7 +678,14 @@ class SalesOrderApiController extends Controller
     public function restore(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order      = SalesOrder::where('tenant_id', $tenantId)->onlyTrashed()->findOrFail($id);
+        $order      = SalesOrder::where('tenant_id', $tenantId)->onlyTrashed()->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sales Order not found in trash',
+            ], 404);
+        }
 
         $order->restore();
 
@@ -583,7 +703,15 @@ class SalesOrderApiController extends Controller
     public function confirm(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order = SalesOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sales Order not found',
+            ], 404);
+        }
+
         $this->authorize('update', $order);
 
         $order->status = 'Confirmed';
@@ -603,7 +731,15 @@ class SalesOrderApiController extends Controller
     public function cancel(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order = SalesOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sales Order not found',
+            ], 404);
+        }
+
         $this->authorize('update', $order);
 
         $order->status = 'Cancelled';

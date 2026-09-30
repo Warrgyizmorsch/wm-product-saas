@@ -52,11 +52,9 @@ class GoogleCalendarController extends Controller
         if (!empty($validated['lead_id'])) {
             $lead = Lead::find($validated['lead_id']);
             if ($lead) {
-                if ($lead->email && !in_array($lead->email, $attendees)) {
-                    $attendees[] = $lead->email;
-                }
-                if ($lead->company_email && !in_array($lead->company_email, $attendees)) {
-                    $attendees[] = $lead->company_email;
+                $primaryEmail = !empty($lead->email) ? trim($lead->email) : (!empty($lead->company_email) ? trim($lead->company_email) : null);
+                if ($primaryEmail && !in_array($primaryEmail, $attendees)) {
+                    $attendees[] = $primaryEmail;
                 }
             }
         }

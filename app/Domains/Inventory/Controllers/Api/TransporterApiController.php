@@ -116,7 +116,14 @@ class TransporterApiController extends Controller
     {
         [$tenantId] = $this->resolveTenantContext();
 
-        $transporter = Transporter::where('tenant_id', $tenantId)->findOrFail($id);
+        $transporter = Transporter::where('tenant_id', $tenantId)->find($id);
+
+        if (!$transporter) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Transporter not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -131,7 +138,14 @@ class TransporterApiController extends Controller
     {
         [$tenantId] = $this->resolveTenantContext();
 
-        $transporter = Transporter::where('tenant_id', $tenantId)->findOrFail($id);
+        $transporter = Transporter::where('tenant_id', $tenantId)->find($id);
+
+        if (!$transporter) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Transporter not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'name'                 => ['sometimes', 'required', 'string', 'max:255'],
@@ -176,7 +190,15 @@ class TransporterApiController extends Controller
     {
         [$tenantId] = $this->resolveTenantContext();
 
-        $transporter = Transporter::where('tenant_id', $tenantId)->findOrFail($id);
+        $transporter = Transporter::where('tenant_id', $tenantId)->find($id);
+
+        if (!$transporter) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Transporter not found',
+            ], 404);
+        }
+
         $transporter->delete();
 
         return response()->json([

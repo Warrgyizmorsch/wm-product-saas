@@ -133,6 +133,12 @@ class ProductService
                             'track_serial_number' => $parentProduct->track_serial_number,
                             'track_batch' => $parentProduct->track_batch,
                             'supplier_method' => $parentProduct->supplier_method,
+                            'inventory_account' => $parentProduct->inventory_account,
+                            'sales_account' => $parentProduct->sales_account,
+                            'purchase_account' => $parentProduct->purchase_account,
+                            'inventory_valuation_method' => $parentProduct->inventory_valuation_method,
+                            'hsn_sac' => $parentProduct->hsn_sac,
+                            'gst_rate' => $parentProduct->gst_rate,
                         ]);
 
                         $openingQty = (float)($vData['opening_stock'] ?? 0);
@@ -142,7 +148,7 @@ class ProductService
                                 $variantProduct->id,
                                 $defaultWarehouse->id,
                                 $openingQty,
-                                $variantProduct->cost_price,
+                                $variantProduct->cost_price > 0 ? (float)$variantProduct->cost_price : (float)$parentProduct->cost_price,
                                 'Opening Stock'
                             );
                         }
@@ -178,7 +184,7 @@ class ProductService
                 'type' => $isService ? 'service' : ($validated['type'] ?? $product->type),
                 'sku' => $validated['sku'],
                 'uom_id' => $validated['uom_id'] ?? null,
-                'status' => $validated['status'],
+                'status' => $validated['status'] ?? $product->status ?? 'active',
                 'hsn_sac' => $validated['hsn_sac'] ?? null,
                 'gst_rate' => $validated['gst_rate'] ?? 18.00,
                 'preferred_vendor_id' => $isService ? null : ($validated['preferred_vendor_id'] ?? null),
@@ -257,6 +263,7 @@ class ProductService
                     }
 
                     if ($variant) {
+                        $oldOpening = (float)($variant->opening_stock ?? 0);
                         $variant->update([
                             'name' => $name,
                             'sku' => $variantSku ?: $variant->sku,
@@ -264,12 +271,51 @@ class ProductService
                             'cost_price' => $vCost,
                             'unit_cost' => $vCost,
                             'reorder_point' => $vReorder,
+                            'opening_stock' => $vOpening,
+                            'opening_stock_rate' => $vCost,
                             'status' => $vData['status'] ?? 'active',
                             'type' => $validated['type'],
                             'supplier_method' => $validated['supplier_method'] ?? 'buy',
                             'uom_id' => $validated['uom_id'] ?? null,
+                            'inventory_account' => $product->inventory_account,
+                            'sales_account' => $product->sales_account,
+                            'purchase_account' => $product->purchase_account,
+                            'inventory_valuation_method' => $product->inventory_valuation_method,
+                            'hsn_sac' => $product->hsn_sac,
+                            'gst_rate' => $product->gst_rate,
                         ]);
                         $processedIds[] = $variant->id;
+
+                        // Check and record opening stock diff for updated variant
+                        if ($defaultWarehouse && $vOpening != $oldOpening) {
+                            $currentWhStock = ProductWarehouseStock::query()
+                                ->where('tenant_id', $tenantId)
+                                ->where('product_id', $variant->id)
+                                ->where('warehouse_id', $defaultWarehouse->id)
+                                ->first();
+                            $currentQty = $currentWhStock ? (float)$currentWhStock->quantity : 0.0;
+                            if ($vOpening > $currentQty) {
+                                $diff = $vOpening - $currentQty;
+                                StockService::recordInflow(
+                                    $tenantId,
+                                    $variant->id,
+                                    $defaultWarehouse->id,
+                                    $diff,
+                                    $vCost > 0 ? $vCost : (float)$product->cost_price,
+                                    'Opening Stock'
+                                );
+                            } elseif ($vOpening < $currentQty && $currentQty > 0) {
+                                $diff = $currentQty - $vOpening;
+                                StockService::recordOutflow(
+                                    $tenantId,
+                                    $variant->id,
+                                    $defaultWarehouse->id,
+                                    $diff,
+                                    'Adjustment'
+                                );
+                                StockService::postOpeningStockAccountingJournal($tenantId, $variant->id, -($diff * $vCost));
+                            }
+                        }
 
                         // Variant media update (main & detail images)
                         $this->imageService->saveVariantMedia($variant, $vData, $tenantId);
@@ -294,6 +340,12 @@ class ProductService
                             'track_serial_number' => $product->track_serial_number,
                             'track_batch' => $product->track_batch,
                             'supplier_method' => $validated['supplier_method'] ?? 'buy',
+                            'inventory_account' => $product->inventory_account,
+                            'sales_account' => $product->sales_account,
+                            'purchase_account' => $product->purchase_account,
+                            'inventory_valuation_method' => $product->inventory_valuation_method,
+                            'hsn_sac' => $product->hsn_sac,
+                            'gst_rate' => $product->gst_rate,
                         ]);
                         $processedIds[] = $newVariant->id;
 
@@ -307,7 +359,7 @@ class ProductService
                                     $newVariant->id,
                                     $defaultWarehouse->id,
                                     $vOpening,
-                                    $vCost,
+                                    $vCost > 0 ? $vCost : (float)$product->cost_price,
                                     'Opening Stock'
                                 );
                             } catch (\Exception $e) {}
@@ -471,6 +523,9 @@ class ProductService
                                     null,
                                     $serialNumbers
                                 );
+                                if (abs($netValDiff) > 0.005) {
+                                    StockService::postOpeningStockAccountingJournal($tenantId, $variantId, $netValDiff);
+                                }
                             }
                         }
 
@@ -542,6 +597,9 @@ class ProductService
                                 null,
                                 $serialNumbers
                             );
+                            if (abs($netValDiff) > 0.005) {
+                                StockService::postOpeningStockAccountingJournal($tenantId, $product->id, $netValDiff);
+                            }
                         }
                     }
 

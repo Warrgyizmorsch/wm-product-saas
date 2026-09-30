@@ -69,7 +69,14 @@ class StockReservationApiController extends Controller
     public function release(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $reservation = StockReservation::where('tenant_id', $tenantId)->findOrFail($id);
+        $reservation = StockReservation::where('tenant_id', $tenantId)->find($id);
+
+        if (!$reservation) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stock Reservation not found',
+            ], 404);
+        }
 
         if ($reservation->status !== 'Active') {
             return response()->json([

@@ -176,7 +176,14 @@ class PurchaseReturnApiController extends Controller
 
         $return = PurchaseReturn::where('tenant_id', $tenantId)
             ->with(['vendor', 'purchaseOrder', 'goodsReceiptNote', 'vendorBill', 'items.product', 'items.warehouse'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$return) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Return not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -190,7 +197,14 @@ class PurchaseReturnApiController extends Controller
     public function approve(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $purchaseReturn = PurchaseReturn::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+        $purchaseReturn = PurchaseReturn::where('tenant_id', $tenantId)->with('items')->find($id);
+
+        if (!$purchaseReturn) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Return not found',
+            ], 404);
+        }
 
         if (!in_array($purchaseReturn->status, ['Pending', 'Draft'])) {
             return response()->json(['success' => false, 'message' => 'Only Pending or Draft Purchase Returns can be approved.'], 422);

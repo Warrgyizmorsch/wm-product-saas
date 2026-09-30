@@ -154,7 +154,14 @@ class StockTransferApiController extends Controller
 
         $transfer = StockTransfer::where('tenant_id', $tenantId)
             ->with(['fromWarehouse', 'toWarehouse', 'creator', 'items.product'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$transfer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stock Transfer not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -168,7 +175,14 @@ class StockTransferApiController extends Controller
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $transfer   = StockTransfer::where('tenant_id', $tenantId)->findOrFail($id);
+        $transfer   = StockTransfer::where('tenant_id', $tenantId)->find($id);
+
+        if (!$transfer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stock Transfer not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'string', 'in:Draft,Pending,In Transit,In-Transit,Completed,Cancelled'],
@@ -201,7 +215,14 @@ class StockTransferApiController extends Controller
     public function dispatch(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $transfer   = StockTransfer::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+        $transfer   = StockTransfer::where('tenant_id', $tenantId)->with('items')->find($id);
+
+        if (!$transfer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stock Transfer not found',
+            ], 404);
+        }
 
         if (!in_array($transfer->status, ['Draft', 'Pending'])) {
             return response()->json([
@@ -249,7 +270,14 @@ class StockTransferApiController extends Controller
     public function receive(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $transfer   = StockTransfer::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+        $transfer   = StockTransfer::where('tenant_id', $tenantId)->with('items')->find($id);
+
+        if (!$transfer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stock Transfer not found',
+            ], 404);
+        }
 
         if (!in_array($transfer->status, ['In Transit', 'In-Transit'])) {
             return response()->json([
@@ -310,7 +338,14 @@ class StockTransferApiController extends Controller
     public function cancel(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $transfer   = StockTransfer::where('tenant_id', $tenantId)->findOrFail($id);
+        $transfer   = StockTransfer::where('tenant_id', $tenantId)->find($id);
+
+        if (!$transfer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stock Transfer not found',
+            ], 404);
+        }
 
         if (in_array($transfer->status, ['Completed', 'In Transit', 'In-Transit'])) {
             return response()->json([

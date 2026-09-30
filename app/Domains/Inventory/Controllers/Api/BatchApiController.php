@@ -116,7 +116,14 @@ class BatchApiController extends Controller
 
         $batch = Batch::where('tenant_id', $tenantId)
             ->with(['product', 'warehouse', 'serialNumbers'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$batch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Batch not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -144,7 +151,14 @@ class BatchApiController extends Controller
     {
         [$tenantId] = $this->resolveTenantContext();
 
-        $batch = Batch::where('tenant_id', $tenantId)->findOrFail($id);
+        $batch = Batch::where('tenant_id', $tenantId)->find($id);
+
+        if (!$batch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Batch not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'batch_number'       => ['sometimes', 'required', 'string', 'max:100'],
@@ -179,7 +193,15 @@ class BatchApiController extends Controller
     {
         [$tenantId] = $this->resolveTenantContext();
 
-        $batch = Batch::where('tenant_id', $tenantId)->findOrFail($id);
+        $batch = Batch::where('tenant_id', $tenantId)->find($id);
+
+        if (!$batch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Batch not found',
+            ], 404);
+        }
+
         $batch->delete();
 
         return response()->json([

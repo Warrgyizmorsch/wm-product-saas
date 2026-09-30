@@ -165,7 +165,14 @@ class CustomerApiController extends Controller
                 'invoices'    => fn($q) => $q->latest()->limit(5),
                 'payments'    => fn($q) => $q->latest()->limit(5),
             ])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$customer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Customer not found',
+            ], 404);
+        }
 
         $totalInvoiced = (float) Invoice::where('tenant_id', $tenantId)->where('customer_id', $id)->sum('total_amount');
         $totalPaid     = (float) CustomerPayment::where('tenant_id', $tenantId)->where('customer_id', $id)->sum('amount');
@@ -191,7 +198,14 @@ class CustomerApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $customer   = Customer::where('tenant_id', $tenantId)->findOrFail($id);
+        $customer   = Customer::where('tenant_id', $tenantId)->find($id);
+
+        if (!$customer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Customer not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'name'             => ['sometimes', 'required', 'string', 'max:255'],
@@ -228,7 +242,14 @@ class CustomerApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $customer   = Customer::where('tenant_id', $tenantId)->findOrFail($id);
+        $customer   = Customer::where('tenant_id', $tenantId)->find($id);
+
+        if (!$customer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Customer not found',
+            ], 404);
+        }
 
         // Check active orders or pending balances
         $hasInvoices = Invoice::where('tenant_id', $tenantId)->where('customer_id', $id)->exists();

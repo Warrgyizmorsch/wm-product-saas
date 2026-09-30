@@ -115,7 +115,14 @@ class SerialNumberApiController extends Controller
 
         $serial = SerialNumber::where('tenant_id', $tenantId)
             ->with(['product', 'warehouse', 'batch', 'transactionIn', 'transactionOut'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$serial) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Serial Number not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -184,7 +191,14 @@ class SerialNumberApiController extends Controller
     {
         [$tenantId] = $this->resolveTenantContext();
 
-        $serial = SerialNumber::where('tenant_id', $tenantId)->findOrFail($id);
+        $serial = SerialNumber::where('tenant_id', $tenantId)->find($id);
+
+        if (!$serial) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Serial Number not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'warehouse_id'  => ['nullable', 'integer'],
@@ -219,7 +233,15 @@ class SerialNumberApiController extends Controller
     {
         [$tenantId] = $this->resolveTenantContext();
 
-        $serial = SerialNumber::where('tenant_id', $tenantId)->findOrFail($id);
+        $serial = SerialNumber::where('tenant_id', $tenantId)->find($id);
+
+        if (!$serial) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Serial Number not found',
+            ], 404);
+        }
+
         $serial->delete();
 
         return response()->json([

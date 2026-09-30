@@ -155,10 +155,12 @@ class VendorPaymentApiController extends Controller
             return $pay->load(['vendor', 'allocations.vendorBill']);
         });
 
+        event(new \App\Domains\Purchase\Events\VendorPaymentRecorded($payment));
+
         return response()->json([
             'success' => true,
             'message' => 'Vendor payment recorded successfully',
-            'data'    => $payment,
+            'data'    => $payment->fresh(['vendor', 'allocations.vendorBill']),
         ], 201);
     }
 
@@ -168,7 +170,14 @@ class VendorPaymentApiController extends Controller
     public function show(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $payment    = VendorPayment::where('tenant_id', $tenantId)->with(['vendor', 'allocations.vendorBill'])->findOrFail($id);
+        $payment    = VendorPayment::where('tenant_id', $tenantId)->with(['vendor', 'allocations.vendorBill'])->find($id);
+
+        if (!$payment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor Payment not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -182,7 +191,14 @@ class VendorPaymentApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $payment    = VendorPayment::where('tenant_id', $tenantId)->with('allocations')->findOrFail($id);
+        $payment    = VendorPayment::where('tenant_id', $tenantId)->with('allocations')->find($id);
+
+        if (!$payment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor Payment not found',
+            ], 404);
+        }
 
         DB::transaction(function () use ($payment) {
             foreach ($payment->allocations as $alloc) {

@@ -252,7 +252,14 @@ class PurchaseOrderApiController extends Controller
                 'vendorBills',
                 'advancePayments',
             ])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -266,7 +273,14 @@ class PurchaseOrderApiController extends Controller
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order      = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order      = PurchaseOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'status'           => ['required', 'string', 'in:Draft,Approved,Completed,Cancelled'],
@@ -302,7 +316,14 @@ class PurchaseOrderApiController extends Controller
     public function convertToGrn(Request $request, int $id): JsonResponse
     {
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
-        $order = PurchaseOrder::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+        $order = PurchaseOrder::where('tenant_id', $tenantId)->with('items')->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found',
+            ], 404);
+        }
 
         $grnNo = 'GRN-' . strtoupper(bin2hex(random_bytes(4)));
 
@@ -371,7 +392,14 @@ class PurchaseOrderApiController extends Controller
     public function convertToBill(Request $request, int $id): JsonResponse
     {
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
-        $order = PurchaseOrder::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+        $order = PurchaseOrder::where('tenant_id', $tenantId)->with('items')->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found',
+            ], 404);
+        }
 
         $billNo = 'BILL-' . strtoupper(bin2hex(random_bytes(4)));
 
@@ -414,10 +442,12 @@ class PurchaseOrderApiController extends Controller
             return $vb->load(['items.product', 'vendor']);
         });
 
+        event(new \App\Domains\Purchase\Events\BillPosted($bill));
+
         return response()->json([
             'success' => true,
             'message' => 'Vendor Bill created successfully from Purchase Order',
-            'data'    => $bill,
+            'data'    => $bill->fresh(['items.product', 'vendor']),
         ], 201);
     }
 
@@ -427,7 +457,14 @@ class PurchaseOrderApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order      = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order      = PurchaseOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found',
+            ], 404);
+        }
 
         $order->delete();
 
@@ -443,7 +480,14 @@ class PurchaseOrderApiController extends Controller
     public function restore(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order      = PurchaseOrder::where('tenant_id', $tenantId)->onlyTrashed()->findOrFail($id);
+        $order      = PurchaseOrder::where('tenant_id', $tenantId)->onlyTrashed()->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found in trash',
+            ], 404);
+        }
 
         $order->restore();
 
@@ -460,7 +504,14 @@ class PurchaseOrderApiController extends Controller
     public function approve(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order      = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order      = PurchaseOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found',
+            ], 404);
+        }
 
         if ($order->status !== 'Draft') {
             return response()->json([
@@ -488,7 +539,14 @@ class PurchaseOrderApiController extends Controller
     public function reject(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order      = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order      = PurchaseOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found',
+            ], 404);
+        }
 
         if ($order->status !== 'Draft') {
             return response()->json([
@@ -523,7 +581,14 @@ class PurchaseOrderApiController extends Controller
     public function remind(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order      = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order      = PurchaseOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found',
+            ], 404);
+        }
 
         if ($order->status !== 'Draft') {
             return response()->json([

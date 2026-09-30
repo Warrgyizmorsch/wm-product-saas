@@ -58,9 +58,10 @@ class LeadFollowupService
         if ($followup->status === 'Pending' && $syncGoogle) {
             try {
                 $createMeet = !empty($validated['create_meet_link']);
-                $attendees = [];
-                if ($lead->email) $attendees[] = $lead->email;
-                if ($lead->company_email) $attendees[] = $lead->company_email;
+                $primaryLeadEmail = !empty($lead->email) ? trim($lead->email) : (!empty($lead->company_email) ? trim($lead->company_email) : null);
+                if ($primaryLeadEmail) {
+                    $attendees[] = $primaryLeadEmail;
+                }
                 if (auth()->check() && auth()->user()?->email) {
                     $attendees[] = auth()->user()->email;
                 }

@@ -115,7 +115,14 @@ class PurchaseAdvancePaymentApiController extends Controller
         [$tenantId] = $this->resolveTenantContext();
         $advance    = PurchaseAdvancePayment::where('tenant_id', $tenantId)
             ->with(['vendor', 'purchaseOrder'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$advance) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Advance Payment not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,

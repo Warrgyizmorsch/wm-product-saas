@@ -431,10 +431,23 @@ class StockService
             $accountResolver = app(\App\Domains\Accounting\Services\AccountResolverService::class);
             $inventoryAcc = $accountResolver->resolveInventoryAccount($product, $tenantId);
 
-            $equityAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
-                ->where(function ($q) {
-                    $q->where('code', '3010')->orWhere('code', '3020')->orWhere('subtype', 'capital')->orWhere('type', 'equity');
-                })->first();
+            $equityAcc = $accountResolver->resolveAccount(
+                identifier: null,
+                tenantId: $tenantId,
+                fallbackCode: '3020',
+                fallbackType: \App\Domains\Accounting\Models\ChartOfAccount::TYPE_EQUITY
+            );
+
+            if ($equityAcc && \App\Domains\Accounting\Models\ChartOfAccount::where('parent_id', $equityAcc->id)->exists()) {
+                $equityAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('parent_id', $equityAcc->id)
+                    ->whereNotIn('id', function ($sub) use ($tenantId) {
+                        $sub->select('parent_id')
+                            ->from('chart_of_accounts')
+                            ->where('tenant_id', $tenantId)
+                            ->whereNotNull('parent_id');
+                    })
+                    ->first() ?? $equityAcc;
+            }
 
             if (!$inventoryAcc || !$equityAcc) {
                 return;

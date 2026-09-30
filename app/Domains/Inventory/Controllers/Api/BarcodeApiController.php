@@ -81,7 +81,13 @@ class BarcodeApiController extends Controller
             ], 422);
         }
 
-        $product   = Product::where('tenant_id', $tenantId)->findOrFail($request->input('product_id'));
+        $product = Product::where('tenant_id', $tenantId)->find($request->input('product_id'));
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+        }
         $printType = $request->input('print_type', 'product');
         $labels    = [];
         $whSuffix  = $request->filled('warehouse_id') ? '@' . $request->input('warehouse_id') : '';

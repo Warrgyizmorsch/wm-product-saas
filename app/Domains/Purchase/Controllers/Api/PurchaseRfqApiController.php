@@ -155,7 +155,14 @@ class PurchaseRfqApiController extends Controller
 
         $rfq = PurchaseRfq::where('tenant_id', $tenantId)
             ->with(['creator', 'requisition', 'items.product', 'rfqVendors.vendor', 'rfqVendors.rates.product'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$rfq) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase RFQ not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -169,7 +176,14 @@ class PurchaseRfqApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $rfq        = PurchaseRfq::where('tenant_id', $tenantId)->findOrFail($id);
+        $rfq        = PurchaseRfq::where('tenant_id', $tenantId)->find($id);
+
+        if (!$rfq) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase RFQ not found',
+            ], 404);
+        }
 
         if ($rfq->status !== 'Draft') {
             return response()->json([
@@ -213,7 +227,14 @@ class PurchaseRfqApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $rfq        = PurchaseRfq::where('tenant_id', $tenantId)->findOrFail($id);
+        $rfq        = PurchaseRfq::where('tenant_id', $tenantId)->find($id);
+
+        if (!$rfq) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase RFQ not found',
+            ], 404);
+        }
 
         if ($rfq->status !== 'Draft') {
             return response()->json([
@@ -236,7 +257,14 @@ class PurchaseRfqApiController extends Controller
     public function storeQuotes(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $rfq        = PurchaseRfq::where('tenant_id', $tenantId)->findOrFail($id);
+        $rfq        = PurchaseRfq::where('tenant_id', $tenantId)->find($id);
+
+        if (!$rfq) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase RFQ not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'quotes'                     => ['required', 'array'],
@@ -299,7 +327,14 @@ class PurchaseRfqApiController extends Controller
     public function confirmRfq(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $rfq        = PurchaseRfq::where('tenant_id', $tenantId)->findOrFail($id);
+        $rfq        = PurchaseRfq::where('tenant_id', $tenantId)->find($id);
+
+        if (!$rfq) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase RFQ not found',
+            ], 404);
+        }
 
         $rfq->update(['status' => 'Confirmed']);
 
@@ -316,7 +351,14 @@ class PurchaseRfqApiController extends Controller
     public function createPo(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $rfq        = PurchaseRfq::where('tenant_id', $tenantId)->findOrFail($id);
+        $rfq        = PurchaseRfq::where('tenant_id', $tenantId)->find($id);
+
+        if (!$rfq) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase RFQ not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'vendor_id'                 => ['required', 'integer'],
@@ -378,7 +420,14 @@ class PurchaseRfqApiController extends Controller
         [$tenantId] = $this->resolveTenantContext();
         $order      = PurchaseOrder::where('tenant_id', $tenantId)
             ->with(['vendor', 'creator', 'items.product', 'requisition'])
-            ->findOrFail($orderId);
+            ->find($orderId);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found',
+            ], 404);
+        }
 
         $rfqNumber = $order->reference ? str_replace('RFQ: ', '', $order->reference) : null;
         $rfq       = null;

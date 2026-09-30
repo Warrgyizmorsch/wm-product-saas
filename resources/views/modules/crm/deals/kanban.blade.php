@@ -100,7 +100,7 @@
 
             <!-- Common Filter Component -->
             <form method="GET" action="{{ route('crm.deals.kanban') }}" class="d-inline">
-                <x-ui.filter :label="__('crm.filter_options')" offset="0, 5">
+                <x-ui.filter :label="__('crm.filter')" offset="0, 5">
                     <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                     
                     <div class="mb-3">
