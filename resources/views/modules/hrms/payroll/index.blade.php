@@ -4,10 +4,29 @@
 @section('page-title', 'Payroll Operations')
 @section('breadcrumb', 'HRMS / Payroll Runs')
 
+@php
+    $authUser = auth()->user();
+    $canCreatePayroll = $authUser && (
+        $authUser->hasHrPermission('hrms.payroll_runs.create') ||
+        $authUser->hasHrPermission('hrms.payroll_runs.process') ||
+        $authUser->hasHrPermission('hr.settings.manage') ||
+        $authUser->hasHrPermission('hr.payroll.manage') ||
+        ($isCompanyAdmin ?? false)
+    );
+    $canApprovePayroll = $authUser && (
+        $authUser->hasHrPermission('hrms.payroll_runs.approve') ||
+        $authUser->hasHrPermission('hr.settings.manage') ||
+        $authUser->hasHrPermission('hr.payroll.manage') ||
+        ($isCompanyAdmin ?? false)
+    );
+@endphp
+
 @section('page-actions')
-    <x-ui.button variant="primary" icon="feather-play" data-bs-toggle="modal" data-bs-target="#initiateRunModal">
-        Process New Month
-    </x-ui.button>
+    @if($canCreatePayroll)
+        <x-ui.button variant="primary" icon="feather-play" data-bs-toggle="modal" data-bs-target="#initiateRunModal">
+            Process New Month
+        </x-ui.button>
+    @endif
 @endsection
 
 @section('content')
@@ -101,18 +120,26 @@
                                 </x-ui.button>
                             @endif
                             @if($selectedRun->status === 'draft')
-                                <button type="button" class="btn btn-secondary fw-bold" data-bs-toggle="modal" data-bs-target="#bulkAdhocModal">
-                                    <i class="feather-plus-circle me-1.5"></i>Bulk Ad-hoc
-                                </button>
-                                <form action="{{ route('hrms.payroll.run.lock', $selectedRun->id) }}" method="POST" class="d-inline m-0">
-                                    @csrf
-                                    <button type="submit" class="btn btn-warning text-white fw-bold"><i class="feather-lock me-2"></i>Lock Payroll Register</button>
-                                </form>
+                                @if($canCreatePayroll)
+                                    <button type="button" class="btn btn-secondary fw-bold" data-bs-toggle="modal" data-bs-target="#bulkAdhocModal">
+                                        <i class="feather-plus-circle me-1.5"></i>Bulk Ad-hoc
+                                    </button>
+                                @endif
+                                @if($canApprovePayroll)
+                                    <form action="{{ route('hrms.payroll.run.lock', $selectedRun->id) }}" method="POST" class="d-inline m-0">
+                                        @csrf
+                                        <button type="submit" class="btn btn-warning text-white fw-bold"><i class="feather-lock me-2"></i>Lock Payroll Register</button>
+                                    </form>
+                                @endif
                             @elseif($selectedRun->status === 'locked')
-                                <form action="{{ route('hrms.payroll.run.release', $selectedRun->id) }}" method="POST" class="d-inline m-0">
-                                    @csrf
-                                    <button type="submit" class="btn btn-success fw-bold"><i class="feather-check-circle me-2"></i>Release Payouts</button>
-                                </form>
+                                @if($canApprovePayroll)
+                                    <form action="{{ route('hrms.payroll.run.release', $selectedRun->id) }}" method="POST" class="d-inline m-0">
+                                        @csrf
+                                        <button type="submit" class="btn btn-success fw-bold"><i class="feather-check-circle me-2"></i>Release Payouts</button>
+                                    </form>
+                                @else
+                                    <span class="badge bg-soft-primary text-primary px-3 py-2 fw-bold fs-12"><i class="feather-lock me-1"></i>Awaiting Release</span>
+                                @endif
                             @else
                                 <button class="btn btn-outline-success fw-bold border-2 m-0" disabled><i class="feather-check me-2"></i>Payout Completed</button>
                             @endif

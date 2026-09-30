@@ -89,7 +89,10 @@
                                     data-subtype="{{ $account->subtype }}"
                                     data-normal-balance="{{ $account->normal_balance }}"
                                     data-parent-id="{{ $account->parent_id }}"
+                                    data-ledger-group-id="{{ $account->ledger_group_id }}"
                                     data-description="{{ $account->description }}"
+                                    data-opening-balance="{{ $account->opening_balance }}"
+                                    data-opening-balance-type="{{ $account->opening_balance_type }}"
                                     data-is-active="{{ $account->is_active ? '1' : '0' }}"
                                     data-is-system="{{ $account->is_system ? '1' : '0' }}"
                                     data-is-cash-or-bank="{{ $account->is_cash_or_bank ? '1' : '0' }}" />
@@ -174,7 +177,23 @@
                      :options="['' => 'None (top level)'] + collect($parentOptions)->mapWithKeys(fn ($o) => [$o['account']->id => $o['label']])->all()"
                      :selected="old('parent_id', $editingAccount?->parent_id)" />
 
+        <x-ui.select label="Ledger Group" name="ledger_group_id" id="coaLedgerGroupId"
+                     :options="['' => 'None'] + collect($ledgerGroups ?? [])->mapWithKeys(fn ($g) => [$g->id => $g->code . ' ' . $g->name])->all()"
+                     :selected="old('ledger_group_id', $editingAccount?->ledger_group_id)" />
+
         <x-ui.textarea label="Description" name="description" id="coaDescription" rows="2" :value="old('description', $editingAccount?->description)" />
+
+        <div class="row">
+            <div class="col-md-6">
+                <x-ui.input label="Opening Balance" name="opening_balance" id="coaOpeningBalance" type="number" step="0.01"
+                            :value="old('opening_balance', $editingAccount?->opening_balance ?? 0)" />
+            </div>
+            <div class="col-md-6">
+                <x-ui.select label="Opening Balance Type" name="opening_balance_type" id="coaOpeningBalanceType"
+                             :options="['debit' => 'Debit', 'credit' => 'Credit']"
+                             :selected="old('opening_balance_type', $editingAccount?->opening_balance_type ?? 'debit')" />
+            </div>
+        </div>
 
         <div class="row">
             <div class="col-md-6">
@@ -234,7 +253,10 @@
                 filterSubtypes(data.type, data.subtype || '');
                 $('#coaNormalBalance').val(data.normalBalance);
                 $('#coaParentId').val(data.parentId || '');
+                $('#coaLedgerGroupId').val(data.ledgerGroupId || '');
                 $('#coaDescription').val(data.description);
+                $('#coaOpeningBalance').val(data.openingBalance || 0);
+                $('#coaOpeningBalanceType').val(data.openingBalanceType || 'debit');
                 $('#coaIsActive').prop('checked', data.isActive === '1');
                 $('#coaIsCashOrBank').prop('checked', data.isCashOrBank === '1');
                 $('#coaSystemNotice').toggle(data.isSystem === '1');

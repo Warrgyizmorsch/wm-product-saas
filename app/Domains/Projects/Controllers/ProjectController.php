@@ -4,8 +4,10 @@ namespace App\Domains\Projects\Controllers;
 
 use App\Domains\CRM\Models\Customer;
 use App\Domains\Projects\Exports\ProjectsExport;
+use App\Domains\Projects\Models\Issue;
 use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
+use App\Domains\Projects\Models\ProjectDocument;
 use App\Domains\Projects\Models\ProjectMember;
 use App\Domains\Projects\Models\Task;
 use App\Domains\Projects\Models\TaskList;
@@ -158,9 +160,13 @@ class ProjectController extends Controller
         $canManageTaskLists = auth()->user()->can('manage', [TaskList::class, $project]);
         $canCreateTasks = auth()->user()->can('create', [Task::class, $project]);
         $canUpdateProject = auth()->user()->can('update', $project);
+        $canViewIssues = auth()->user()->can('viewAny', [Issue::class, $project]);
+        $canCreateIssues = auth()->user()->can('create', [Issue::class, $project]);
+        $canViewDocuments = auth()->user()->can('viewAny', [ProjectDocument::class, $project]);
+        $canUploadDocuments = auth()->user()->can('create', [ProjectDocument::class, $project]);
 
         $members = $this->members->list($project);
-        $activeMembers = ($canManageMembers || $canManageMilestones || $canManageTaskLists || $canCreateTasks || $canUpdateProject)
+        $activeMembers = ($canManageMembers || $canManageMilestones || $canManageTaskLists || $canCreateTasks || $canUpdateProject || $canCreateIssues)
             ? $this->members->activeMembers($project)
             : collect();
         $milestones = $this->milestones->list($project);
@@ -173,6 +179,14 @@ class ProjectController extends Controller
         $taskLists = $this->taskLists->list($project);
         $allTasks = $this->tasks->list($project);
         $tasksByList = $allTasks->groupBy('task_list_id');
+
+        $issues = $canViewIssues
+            ? $project->issues()->with(['reporter', 'assignee', 'task'])->latest()->get()
+            : collect();
+
+        $documents = $canViewDocuments
+            ? $project->documents()->with(['uploader', 'attachable'])->latest()->get()
+            : collect();
 
         $taskFilters = array_filter(
             $request->only(['search', 'status', 'priority', 'assignee_id']),
@@ -189,6 +203,10 @@ class ProjectController extends Controller
             'members'             => $members,
             'canManageMembers'    => $canManageMembers,
             'canUpdateProject'    => $canUpdateProject,
+            'canViewIssues'       => $canViewIssues,
+            'canCreateIssues'     => $canCreateIssues,
+            'canViewDocuments'    => $canViewDocuments,
+            'canUploadDocuments'  => $canUploadDocuments,
             'statusTransitions'   => $canUpdateProject ? $this->projects->availableStatusTransitions($project) : [],
             'customers'           => $canUpdateProject ? Customer::query()->orderBy('name')->get() : collect(),
             'activeMemberOptions' => $activeMembers->pluck('user'),
@@ -199,6 +217,8 @@ class ProjectController extends Controller
             'canManageTaskLists'  => $canManageTaskLists,
             'tasksByList'         => $filteredTasksByList,
             'allTasks'            => $allTasks->keyBy('id'),
+            'issues'              => $issues,
+            'documents'           => $documents,
             'taskFilters'         => $taskFilters,
             'hasActiveTaskFilters' => $hasActiveTaskFilters,
             'taskStatuses'        => Task::STATUSES,

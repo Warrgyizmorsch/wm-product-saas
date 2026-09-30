@@ -34,6 +34,8 @@ use App\Domains\HRMS\Controllers\HelpdeskCategoryController;
 use App\Domains\HRMS\Controllers\HelpdeskKbController;
 use App\Domains\HRMS\Controllers\RecruitmentController;
 use App\Domains\HRMS\Controllers\KraKpiController;
+use App\Domains\HRMS\Controllers\SopController;
+use App\Domains\HRMS\Controllers\GoalController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -615,5 +617,48 @@ Route::prefix('hrms')
 
             // 1-Click Bridge to PIP
             Route::post('/scorecard/{planId}/trigger-pip', [KraKpiController::class, 'triggerPip'])->name('trigger-pip');
+        });
+
+        // SOP (Standard Operating Procedure) Management Hub
+        Route::prefix('sop')->name('sop.')->group(function (): void {
+            Route::get('/', [SopController::class, 'index'])->name('index');
+            Route::get('/my-sops', [SopController::class, 'index'])->name('my-sops');
+            Route::post('/store', [SopController::class, 'store'])->name('store');
+            Route::get('/{sop}', [SopController::class, 'show'])->name('show');
+            Route::put('/{sop}', [SopController::class, 'update'])->name('update');
+            Route::delete('/{sop}', [SopController::class, 'destroy'])->name('destroy');
+
+            // Lifecycle transitions
+            Route::post('/{sop}/publish', [SopController::class, 'publish'])->name('publish');
+            Route::post('/{sop}/approve', [SopController::class, 'publish'])->name('approve');
+            Route::post('/{sop}/archive', [SopController::class, 'archive'])->name('archive');
+            Route::post('/{sop}/assign', [SopController::class, 'assign'])->name('assign');
+            Route::get('/{sop}/export-audit', [SopController::class, 'exportAudit'])->name('export-audit');
+            Route::post('/{sop}/bulk-remind', [SopController::class, 'bulkRemind'])->name('bulk-remind');
+
+            // Employee Sign-off & Reminder
+            Route::post('/assignment/{assignment}/acknowledge', [SopController::class, 'acknowledge'])->name('acknowledge');
+            Route::post('/assignment/{assignment}/remind', [SopController::class, 'remind'])->name('remind');
+
+            // Categories Management
+            Route::post('/category/store', [SopController::class, 'storeCategory'])->name('category.store');
+            Route::put('/category/{category}', [SopController::class, 'updateCategory'])->name('category.update');
+            Route::delete('/category/{category}', [SopController::class, 'destroyCategory'])->name('category.destroy');
+        });
+
+        // Goals & OKRs Management Hub
+        Route::prefix('goals')->name('goals.')->group(function (): void {
+            Route::get('/', [GoalController::class, 'index'])->name('index');
+            Route::post('/store', [GoalController::class, 'store'])->name('store');
+            Route::get('/{goal}', [GoalController::class, 'show'])->name('show');
+            Route::put('/{goal}', [GoalController::class, 'update'])->name('update');
+            Route::delete('/{goal}', [GoalController::class, 'destroy'])->name('destroy');
+            Route::post('/{goal}/check-in', [GoalController::class, 'checkIn'])->name('check-in');
+
+            // Cycles & Categories Masters
+            Route::post('/cycle/store', [GoalController::class, 'storeCycle'])->name('cycle.store');
+            Route::delete('/cycle/{cycle}', [GoalController::class, 'destroyCycle'])->name('cycle.destroy');
+            Route::post('/category/store', [GoalController::class, 'storeCategory'])->name('category.store');
+            Route::delete('/category/{category}', [GoalController::class, 'destroyCategory'])->name('category.destroy');
         });
     });

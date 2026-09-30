@@ -66,7 +66,14 @@ class MaterialRequestApiController extends Controller
         $slip = ProductionRequisitionSlip::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->with(['order.product', 'items.product', 'items.uom', 'items.warehouse'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$slip) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Material Request Slip not found',
+            ], 404);
+        }
 
         $items = $slip->items->groupBy('product_id')->map(function ($itemsForProduct) use ($tenantId) {
             $first = $itemsForProduct->first();
@@ -191,7 +198,13 @@ class MaterialRequestApiController extends Controller
         [$tenantId] = $this->resolveTenantContext();
 
         try {
-            $item = ProductionRequisitionSlipItem::findOrFail($itemId);
+            $item = ProductionRequisitionSlipItem::find($itemId);
+            if (!$item) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Material Request item not found',
+                ], 404);
+            }
             $allItemIds = ProductionRequisitionSlipItem::where('production_requisition_slip_id', $item->production_requisition_slip_id)
                 ->where('product_id', $item->product_id)
                 ->pluck('id')

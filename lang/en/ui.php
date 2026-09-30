@@ -107,4 +107,6 @@ return [
     'tenant_isolation' => 'Tenant isolation',
     'welcome_back' => 'Welcome back',
     'workspace' => 'Workspace',
+    'optional' => 'Optional',
+    'view' => 'View',
 ];

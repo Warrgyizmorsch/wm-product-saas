@@ -676,20 +676,20 @@
                             <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body p-4">
-                            <div class="table-responsive border rounded">
-                                <table class="table table-bordered align-middle mb-0 fs-13">
+                            <div class="border rounded-3 overflow-hidden mb-3">
+                                <table class="table table-bordered align-middle mb-0 fs-13" style="table-layout: fixed; width: 100%;">
                                     <thead class="bg-light text-uppercase fs-11 text-muted">
                                         <tr>
-                                            <th>Field</th>
-                                            <th class="text-danger">Current Value</th>
-                                            <th class="text-success">Requested New Value</th>
+                                            <th style="width: 28%;" class="ps-3">Field</th>
+                                            <th style="width: 36%;" class="text-danger bg-soft-danger">Current Value</th>
+                                            <th style="width: 36%;" class="text-success bg-soft-success">Requested New Value</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach($pChanges as $fKey => $fData)
                                             <tr>
-                                                <td class="fw-bold text-dark">{{ $fData['label'] ?? ucwords(str_replace('_', ' ', $fKey)) }}</td>
-                                                <td class="text-muted">
+                                                <td class="fw-bold text-dark ps-3 text-break" style="white-space: normal; word-break: break-word;">{{ $fData['label'] ?? ucwords(str_replace('_', ' ', $fKey)) }}</td>
+                                                <td class="text-muted text-break" style="white-space: normal; word-break: break-word;">
                                                     @if(!empty($fData['is_image']))
                                                         @if(!empty($fData['old']) && $fData['old'] !== '—')
                                                             <img src="{{ asset('storage/' . $fData['old']) }}" alt="Old Photo" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px;">
@@ -697,14 +697,22 @@
                                                             <span class="text-muted">No photo</span>
                                                         @endif
                                                     @else
-                                                        <span class="text-decoration-line-through text-danger">{{ $fData['old'] ?? '—' }}</span>
+                                                        @if(empty($fData['old']) || $fData['old'] === '—')
+                                                            <span class="text-muted">&mdash;</span>
+                                                        @else
+                                                            <span class="text-danger text-decoration-line-through d-inline-block" style="line-height: 1.45;">{{ $fData['old'] }}</span>
+                                                        @endif
                                                     @endif
                                                 </td>
-                                                <td class="fw-bold text-success">
+                                                <td class="fw-bold text-success text-break" style="white-space: normal; word-break: break-word;">
                                                     @if(!empty($fData['is_image']))
                                                         <img src="{{ asset('storage/' . $fData['new']) }}" alt="New Photo" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 2px solid #22c55e;">
                                                     @else
-                                                        <x-ui.badge variant="success" soft class="fs-13 fw-bold">{{ $fData['new'] ?? '—' }}</x-ui.badge>
+                                                        @if(empty($fData['new']) || $fData['new'] === '—')
+                                                            <span class="text-muted">&mdash;</span>
+                                                        @else
+                                                            <div class="p-2 rounded-2 bg-success-subtle text-success border border-success-subtle fs-13 fw-semibold text-break d-block" style="white-space: normal; word-break: break-word; line-height: 1.45;">{{ $fData['new'] }}</div>
+                                                        @endif
                                                     @endif
                                                 </td>
                                             </tr>

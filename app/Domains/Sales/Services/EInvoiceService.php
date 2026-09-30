@@ -29,79 +29,85 @@ class EInvoiceService
             $invoice->branch_id ?? null
         );
 
+        if (!$gstConfig || !$gstConfig->is_active) {
+            $errorMsg = 'No active GST / GSP API configuration found. Please setup your GSP credentials in Administration > GST & E-Invoice Setup.';
+            $invoice->update([
+                'einvoice_status' => 'Failed',
+                'einvoice_error'  => $errorMsg,
+            ]);
+            return [
+                'success' => false,
+                'message' => $errorMsg,
+            ];
+        }
+
+        $apiUrl = $gstConfig->api_base_url ?: (config('services.einvoice.api_url') ?: env('EINVOICE_BASE_URL'));
+        $clientId = $gstConfig->client_id ?: (config('services.einvoice.client_id') ?: env('EINVOICE_GSP_CLIENT_ID'));
+        $clientSecret = $gstConfig->client_secret ?: (config('services.einvoice.client_secret') ?: env('EINVOICE_GSP_CLIENT_SECRET'));
+        $apiToken = $gstConfig->api_token ?: (config('services.einvoice.auth_token') ?: env('EINVOICE_AUTH_TOKEN'));
+
+        if (empty($apiUrl) || (empty($apiToken) && (empty($clientId) || empty($clientSecret)))) {
+            $errorMsg = 'GST API credentials (API URL, Token or Client ID/Secret) are missing in your GST Setup. Please update your credentials.';
+            $invoice->update([
+                'einvoice_status' => 'Failed',
+                'einvoice_error'  => $errorMsg,
+            ]);
+            return [
+                'success' => false,
+                'message' => $errorMsg,
+            ];
+        }
+
         $payload = $this->buildEInvoicePayload($invoice, $gstConfig);
 
-        // Check if real GSP credentials exist in DB or .env
-        $provider = $gstConfig?->provider ?? 'sandbox';
-        $apiUrl = $gstConfig?->api_base_url ?: (config('services.einvoice.api_url') ?: env('EINVOICE_BASE_URL'));
-        $clientId = $gstConfig?->client_id ?: (config('services.einvoice.client_id') ?: env('EINVOICE_GSP_CLIENT_ID'));
-        $clientSecret = $gstConfig?->client_secret ?: (config('services.einvoice.client_secret') ?: env('EINVOICE_GSP_CLIENT_SECRET'));
-        $apiToken = $gstConfig?->api_token ?: (config('services.einvoice.auth_token') ?: env('EINVOICE_AUTH_TOKEN'));
+        try {
+            $headers = [
+                'Content-Type' => 'application/json',
+                'Accept'       => 'application/json',
+            ];
 
-        if ($provider !== 'sandbox' && !empty($apiUrl) && (!empty($apiToken) || (!empty($clientId) && !empty($clientSecret)))) {
-            try {
-                $headers = [
-                    'Content-Type' => 'application/json',
-                    'Accept'       => 'application/json',
-                ];
+            if (!empty($apiToken)) {
+                $headers['Authorization'] = 'Bearer ' . $apiToken;
+                $headers['x-api-key'] = $apiToken;
+            }
 
-                if (!empty($apiToken)) {
-                    $headers['Authorization'] = 'Bearer ' . $apiToken;
-                    $headers['x-api-key'] = $apiToken;
-                }
+            if (!empty($clientId)) {
+                $headers['client_id'] = $clientId;
+                $headers['client_secret'] = $clientSecret;
+            }
 
-                if (!empty($clientId)) {
-                    $headers['client_id'] = $clientId;
-                    $headers['client_secret'] = $clientSecret;
-                }
+            if (!empty($gstConfig->gstin_username)) {
+                $headers['gstin_user'] = $gstConfig->gstin_username;
+                $headers['gstin_pass'] = $gstConfig->gstin_password;
+            }
 
-                if (!empty($gstConfig?->gstin_username)) {
-                    $headers['gstin_user'] = $gstConfig->gstin_username;
-                    $headers['gstin_pass'] = $gstConfig->gstin_password;
-                }
+            $response = Http::withHeaders($headers)->timeout(30)->post("{$apiUrl}/einvoice/generate", $payload);
 
-                $response = Http::withHeaders($headers)->timeout(30)->post("{$apiUrl}/einvoice/generate", $payload);
-
-                if ($response->successful()) {
-                    $data = $response->json();
-                    return $this->recordSuccess($invoice, $data);
-                } else {
-                    $errorMsg = $response->json('message') ?? $response->body() ?? 'GSP API generation failed.';
-                    
-                    // In sandbox testing mode, fallback to high-fidelity statutory simulation engine
-                    if (($gstConfig?->environment ?? 'sandbox') === 'sandbox' || env('APP_ENV') !== 'production') {
-                        Log::info('GSP Sandbox API returned non-200, generating statutory Sandbox IRN & QR Code: ' . substr($errorMsg, 0, 100));
-                        return $this->generateSandboxEInvoice($invoice, $payload);
-                    }
-
-                    $invoice->update([
-                        'einvoice_status' => 'Failed',
-                        'einvoice_error'  => $errorMsg,
-                    ]);
-                    return [
-                        'success' => false,
-                        'message' => "E-Invoice Generation Failed: {$errorMsg}",
-                    ];
-                }
-            } catch (\Exception $e) {
-                Log::error('EInvoiceService API Exception: ' . $e->getMessage(), ['invoice_id' => $invoice->id]);
-                // If remote network call fails in test mode, fall back to sandbox generation
-                if (env('APP_ENV') !== 'production' || ($gstConfig?->environment ?? 'sandbox') === 'sandbox') {
-                    return $this->generateSandboxEInvoice($invoice, $payload);
-                }
+            if ($response->successful()) {
+                $data = $response->json();
+                return $this->recordSuccess($invoice, $data);
+            } else {
+                $errorMsg = $response->json('message') ?? $response->json('error') ?? $response->body() ?? 'GSP API generation failed.';
                 $invoice->update([
                     'einvoice_status' => 'Failed',
-                    'einvoice_error'  => $e->getMessage(),
+                    'einvoice_error'  => $errorMsg,
                 ]);
                 return [
                     'success' => false,
-                    'message' => 'API connection failed: ' . $e->getMessage(),
+                    'message' => "E-Invoice Generation Failed: {$errorMsg}",
                 ];
             }
+        } catch (\Exception $e) {
+            Log::error('EInvoiceService API Exception: ' . $e->getMessage(), ['invoice_id' => $invoice->id]);
+            $invoice->update([
+                'einvoice_status' => 'Failed',
+                'einvoice_error'  => $e->getMessage(),
+            ]);
+            return [
+                'success' => false,
+                'message' => 'API connection failed: ' . $e->getMessage(),
+            ];
         }
-
-        // Standard developer/sandbox fallback generation
-        return $this->generateSandboxEInvoice($invoice, $payload);
     }
 
     /**

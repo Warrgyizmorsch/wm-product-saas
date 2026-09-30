@@ -2,10 +2,9 @@
 
 namespace App\Domains\HRMS\Controllers;
 
-use App\Domains\HRMS\Models\DocumentCategory;
-use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\Document;
-use App\Domains\HRMS\Models\DocumentMaster;
+use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Repositories\DocumentRepositoryInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,390 +12,113 @@ use Illuminate\View\View;
 
 class DocumentController extends Controller
 {
+    public function __construct(
+        private readonly DocumentRepositoryInterface $documentRepository
+    ) {}
+
     public function index(Request $request): View
     {
-        $this->authorize('viewAny', \App\Domains\HRMS\Models\Document::class);
+        $this->authorize('viewAny', Document::class);
 
-        $activeTab = $request->query('tab', 'employee');
+        $data = $this->documentRepository->getIndexData($request->all(), auth()->user());
 
-        $query = Document::with(['documentable', 'documentMaster', 'requestedBy'])
-            ->where('documentable_type', Employee::class);
-
-        \App\Domains\HRMS\Services\HrmsScopeService::applyEmployeeScope($query, auth()->user(), 'documentable_id');
-
-        // Separate by tab (Employee vs HR Uploads)
-        if ($activeTab === 'employee') {
-            $query->whereHasMorph('documentable', [Employee::class], function ($q) {
-                $q->whereColumn('user_id', 'documents.requested_by_id');
-            });
-        } else {
-            $query->where(function ($q) {
-                $q->whereDoesntHaveMorph('documentable', [Employee::class], function ($q2) {
-                    $q2->whereColumn('user_id', 'documents.requested_by_id');
-                })->orWhereNull('requested_by_id');
-            });
-        }
-
-        // Search by employee name, ID or document name
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search): void {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhereHas('documentMaster', function ($q2) use ($search): void {
-                      $q2->where('name', 'like', "%{$search}%");
-                  })
-                  ->orWhereHasMorph('documentable', [Employee::class], function ($q3) use ($search): void {
-                      $q3->where('full_name', 'like', "%{$search}%")
-                         ->orWhere('employee_id', 'like', "%{$search}%");
-                  });
-            });
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        // Filter by document category
-        if ($request->filled('category_id')) {
-            $query->whereHas('documentMaster', function ($q) use ($request) {
-                $q->where('document_category_id', $request->input('category_id'));
-            });
-        }
-
-        // Sort options
-        $sort = $request->input('sort', 'newest');
-        if ($sort === 'oldest') {
-            $query->orderBy('created_at', 'asc');
-        } elseif ($sort === 'employee_asc') {
-            $query->select('documents.*')
-                ->leftJoin('employees', function ($join) {
-                    $join->on('employees.id', '=', 'documents.documentable_id')
-                         ->where('documents.documentable_type', '=', Employee::class);
-                })
-                ->orderBy('employees.full_name', 'asc');
-        } elseif ($sort === 'employee_desc') {
-            $query->select('documents.*')
-                ->leftJoin('employees', function ($join) {
-                    $join->on('employees.id', '=', 'documents.documentable_id')
-                         ->where('documents.documentable_type', '=', Employee::class);
-                })
-                ->orderBy('employees.full_name', 'desc');
-        } elseif ($sort === 'doc_name_asc') {
-            $query->orderBy('name', 'asc');
-        } elseif ($sort === 'doc_name_desc') {
-            $query->orderBy('name', 'desc');
-        } else {
-            $query->orderBy('created_at', 'desc');
-        }
-
-        $documents = $query->paginate(10)->withQueryString();
-
-        // Fetch all active employees, document masters, templates and categories for the upload modal selection
-        $employees = Employee::orderBy('full_name')->get();
-        $categories = DocumentCategory::orderBy('name')->get();
-        $templates = DocumentMaster::where('status', 'active')
-            ->orderBy('name')
-            ->get();
-        $documentTemplates = \App\Domains\HRMS\Models\DocumentTemplate::where('status', 'active')
-            ->orderBy('name')
-            ->get();
-
-        $templatesJson = $templates->map(fn($tmpl) => [
-            'id' => $tmpl->id,
-            'text' => $tmpl->name,
-            'categoryId' => $tmpl->document_category_id,
-            'expiry' => $tmpl->expiry_applicable ? '1' : '0'
-        ]);
-
-        return view('modules.hrms.documents.index', compact('documents', 'employees', 'templates', 'documentTemplates', 'categories', 'activeTab', 'templatesJson'));
+        return view('modules.hrms.documents.index', $data);
     }
 
-    public function bulkUpload(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', \App\Domains\HRMS\Models\Document::class);
+        $this->authorize('create', Document::class);
 
-        $uploadMode = $request->input('upload_mode', 'file');
-
-        if (in_array($uploadMode, ['generate', 'generate_template'])) {
-            $request->validate([
-                'employee_id'          => 'required|string',
-                'document_template_id' => 'required|exists:document_templates,id',
-            ]);
-        } else {
-            $request->validate([
-                'employee_id'        => 'required|string',
-                'document_master_id' => 'required|exists:document_masters,id',
-                'file'               => 'required|file|max:10240', // Max 10MB
-                'expiry_date'        => 'nullable|date',
-            ]);
-        }
-
-        $tenantId = auth()->user()->tenant_id;
-
-        // Resolve target employee IDs
-        $employeeId = $request->input('employee_id');
-        $targetEmployeeIds = [];
-        if ($employeeId === 'all') {
-            $targetEmployeeIds = Employee::pluck('id')->toArray();
-        } else {
-            $targetEmployeeIds = [$employeeId];
-        }
-
-        if (empty($targetEmployeeIds)) {
-            return redirect()->back()->with('error', 'No employees found for this upload target.');
-        }
-
-        if (in_array($uploadMode, ['generate', 'generate_template'])) {
-            $docTemplate = \App\Domains\HRMS\Models\DocumentTemplate::findOrFail($request->integer('document_template_id'));
-            $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
-
-            $hrName = $request->input('hr_name', auth()->user()?->name ?? 'Authorized Signatory');
-            $hrDesignation = $request->input('hr_designation', 'HR Manager');
-            $issueDate = $request->input('issue_date', date('Y-m-d'));
-            
-            $hrSigUrl = null;
-            if ($request->hasFile('hr_signature_file') && $request->file('hr_signature_file')->isValid()) {
-                $file = $request->file('hr_signature_file');
-                $hrSigPath = $file->store("signatures/hr_tenant_{$tenantId}", 'public');
-                $hrSigUrl = asset('storage/' . $hrSigPath);
-            } elseif ($request->input('hr_signature_data')) {
-                $hrSigData = $request->input('hr_signature_data');
-                if (str_starts_with($hrSigData, 'data:image')) {
-                    $image = str_replace(' ', '+', preg_replace('/^data:image\/\w+;base64,/', '', $hrSigData));
-                    $imageName = 'hr_sig_' . time() . '_' . \Str::random(6) . '.png';
-                    $hrSigPath = "signatures/hr_tenant_{$tenantId}/{$imageName}";
-                    \Storage::disk('public')->put($hrSigPath, base64_decode($image));
-                    $hrSigUrl = asset('storage/' . $hrSigPath);
-                } else {
-                    $hrSigUrl = $hrSigData;
-                }
-            }
-
-            $extraData = [
-                'hr_name'          => $hrName,
-                'hr_designation'   => $hrDesignation,
-                'issue_date'       => $issueDate,
-                'hr_signature_url' => $hrSigUrl,
-            ];
-
-            foreach ($targetEmployeeIds as $empId) {
-                $employee = Employee::find($empId);
-                if (!$employee) {
-                    continue;
-                }
-
-                $customRef = $request->input('reference_number');
-                $customTitle = $request->input('document_title');
-                $refNo = $customRef ?: ('DOC/' . date('Y') . '/' . str_pad((string)$employee->id, 4, '0', STR_PAD_LEFT));
-                $renderedContent = $templateService->renderTemplate($docTemplate, $employee, $refNo, $extraData);
-                $title = $customTitle ?: ($docTemplate->name . ' - ' . $employee->full_name);
-
-                // Render to a proper A4 PDF so "view"/"download" open a printable, correctly
-                // paginated document instead of a raw, unstyled HTML fragment.
-                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($templateService->toPrintableDocument($renderedContent, $title))
-                    ->setPaper('a4', 'portrait')
-                    ->setWarnings(false);
-                $pdfContent = $pdf->output();
-
-                $fileName = \Str::slug($docTemplate->name . '-' . $employee->full_name) . '-' . time() . '.pdf';
-                $path = "documents/tenant_{$tenantId}/employee_{$employee->id}/{$fileName}";
-                \Storage::disk('public')->put($path, $pdfContent);
-
-                // Resolve or associate DocumentMaster for category tracking
-                $masterId = null;
-                if ($docTemplate->document_category_id) {
-                    $master = DocumentMaster::where('tenant_id', $tenantId)
-                        ->where(function ($q) use ($docTemplate) {
-                            $q->where('code', $docTemplate->code)
-                              ->orWhere('name', $docTemplate->name);
-                        })->first();
-
-                    if (!$master) {
-                        $master = DocumentMaster::create([
-                            'tenant_id'             => $tenantId,
-                            'document_category_id'  => $docTemplate->document_category_id,
-                            'name'                  => $docTemplate->name,
-                            'code'                  => $docTemplate->code,
-                            'upload_responsibility' => 'hr',
-                            'employee_can_view'     => true,
-                            'employee_can_download' => true,
-                            'status'                => 'active',
-                        ]);
-                    } else {
-                        $master->update([
-                            'employee_can_view'     => true,
-                            'employee_can_download' => true,
-                        ]);
-                    }
-                    $masterId = $master?->id;
-                }
-
-                $docStatus = $docTemplate->requires_signature ? 'pending_signature' : 'approved';
-
-                // 1. Create GeneratedDocument record
-                $genDoc = \App\Domains\HRMS\Models\GeneratedDocument::create([
-                    'tenant_id'            => $tenantId,
-                    'employee_id'          => $employee->id,
-                    'document_template_id' => $docTemplate->id,
-                    'document_master_id'   => $masterId,
-                    'reference_number'     => $refNo,
-                    'title'                => $title,
-                    'rendered_content'     => $renderedContent,
-                    'file_path'            => $path,
-                    'issue_date'           => $request->input('issue_date', now()->format('Y-m-d')),
-                    'generated_by'         => auth()->id(),
-                    'status'               => 'issued',
-                ]);
-
-                // 2. Create main Document registry entry for employee locker
-                Document::create([
-                    'tenant_id'          => $tenantId,
-                    'documentable_id'    => $employee->id,
-                    'documentable_type'  => Employee::class,
-                    'document_master_id' => $masterId,
-                    'name'               => $title,
-                    'description'        => "Generated from template: " . $docTemplate->name,
-                    'file_name'          => $fileName,
-                    'file_path'          => $path,
-                    'file_type'          => 'pdf',
-                    'file_size'          => strlen($pdfContent),
-                    'status'             => $docStatus,
-                    'requested_by_id'    => auth()->id(),
-                ]);
-
-                if ($docTemplate->requires_signature) {
-                    \App\Services\Notification\NotificationService::sendToEmployee(
-                        employeeId: $employee->id,
-                        title: 'Action Required: Digital Signature Needed',
-                        message: "Document '{$title}' requires your digital signature.",
-                        actionUrl: route('hrms.documents.index'),
-                        module: 'hrms',
-                        type: 'signature_required',
-                        iconClass: 'feather-pen-tool'
-                    );
-                } else {
-                    \App\Services\Notification\NotificationService::sendToEmployee(
-                        employeeId: $employee->id,
-                        title: 'New Document Issued',
-                        message: "A new document '{$title}' has been issued to your document vault.",
-                        actionUrl: route('hrms.documents.index'),
-                        module: 'hrms',
-                        type: 'document_issued',
-                        iconClass: 'feather-file-text'
-                    );
-                }
-            }
-
-            return redirect()->route('hrms.documents.index')->with('success', 'Documents generated from template successfully.');
-        }
-
-        // Standard File Upload Mode
-        $file = $request->file('file');
-        $documentMaster = DocumentMaster::findOrFail($request->integer('document_master_id'));
-        $requiresSignature = (bool) $documentMaster->requires_signature;
-        $approvalRequired = (bool) $documentMaster->approval_required;
-        $status = $requiresSignature ? 'pending_signature' : ($approvalRequired ? 'uploaded' : 'approved');
-
-        foreach ($targetEmployeeIds as $empId) {
-            $employee = Employee::find($empId);
-            if (!$employee) {
-                continue;
-            }
-
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
-
-            $document = Document::where('documentable_type', Employee::class)
-                ->where('documentable_id', $employee->id)
-                ->where('document_master_id', $documentMaster->id)
-                ->first();
-
-            if ($document) {
-                $document->update([
-                    'file_name'          => $file->getClientOriginalName(),
-                    'file_path'          => $path,
-                    'file_type'          => $file->getClientMimeType(),
-                    'file_size'          => $file->getSize(),
-                    'expiry_date'        => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                    'requires_signature' => $requiresSignature,
-                    'status'             => $status,
-                ]);
-            } else {
-                Document::create([
-                    'tenant_id'          => $tenantId,
-                    'documentable_id'    => $employee->id,
-                    'documentable_type'  => Employee::class,
-                    'document_master_id' => $documentMaster->id,
-                    'name'               => $documentMaster->name,
-                    'description'        => $documentMaster->description,
-                    'has_expiry'         => $documentMaster->expiry_applicable,
-                    'file_name'          => $file->getClientOriginalName(),
-                    'file_path'          => $path,
-                    'file_type'          => $file->getClientMimeType(),
-                    'file_size'          => $file->getSize(),
-                    'expiry_date'        => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                    'requires_signature' => $requiresSignature,
-                    'status'             => $status,
-                    'requested_by_id'    => auth()->id(),
-                ]);
-            }
-
-            if ($requiresSignature) {
-                \App\Services\Notification\NotificationService::sendToEmployee(
-                    employeeId: $employee->id,
-                    title: 'Action Required: Digital Signature Needed',
-                    message: "Document '{$documentMaster->name}' requires your digital signature.",
-                    actionUrl: route('hrms.documents.index'),
-                    module: 'hrms',
-                    type: 'signature_required',
-                    iconClass: 'feather-pen-tool'
-                );
-            } else {
-                \App\Services\Notification\NotificationService::sendToEmployee(
-                    employeeId: $employee->id,
-                    title: 'New Document Uploaded',
-                    message: "A new document '{$documentMaster->name}' has been uploaded to your vault.",
-                    actionUrl: route('hrms.documents.index'),
-                    module: 'hrms',
-                    type: 'document_uploaded',
-                    iconClass: 'feather-file-text'
-                );
-            }
-        }
-
-        return redirect()->route('hrms.documents.index')->with('success', 'Documents uploaded successfully.');
-    }
-
-    public function updateDocumentStatus(Request $request, Document $document): RedirectResponse
-    {
-        $this->authorize('update', \App\Domains\HRMS\Models\Document::class);
         $validated = $request->validate([
-            'status' => 'required|string|in:approved,rejected,uploaded,expired,pending_signature',
+            'employee_id'         => 'required|exists:employees,id',
+            'document_master_id'  => 'nullable|exists:document_masters,id',
+            'name'                => 'nullable|string|max:255',
+            'file'                => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
         ]);
 
-        $document->update([
-            'status' => $validated['status'],
-        ]);
+        $this->documentRepository->storeDocument($validated, $request, auth()->user());
 
-        return redirect()->back()->with('success', 'Document status updated successfully.');
+        return redirect()->back()->with('success', 'Document uploaded successfully.');
     }
 
-    /**
-     * Web endpoint for signing uploaded documents.
-     */
-    public function signDocument(Request $request, Document $document): RedirectResponse
+    public function update(Request $request, Document $document): RedirectResponse
     {
+        $this->authorize('update', $document);
+
         $validated = $request->validate([
-            'signature_image' => 'required|string',
-            'save_as_default' => 'nullable|boolean',
+            'document_master_id' => 'nullable|exists:document_masters,id',
+            'name'               => 'nullable|string|max:255',
+            'file'               => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
         ]);
 
-        $signatureService = app(\App\Domains\HRMS\Services\DocumentSignatureService::class);
-        $signatureService->signUploadedDocument(
-            $document,
-            $validated['signature_image'],
-            (bool)($validated['save_as_default'] ?? false)
-        );
+        $this->documentRepository->updateDocument($document, $validated, $request);
 
-        return redirect()->back()->with('success', 'Document digitally signed successfully.');
+        return redirect()->back()->with('success', 'Document updated successfully.');
+    }
+
+    public function updateStatus(Request $request, Document $document): RedirectResponse
+    {
+        $this->authorize('update', $document);
+
+        $validated = $request->validate([
+            'status'           => 'required|in:approved,rejected',
+            'rejection_reason' => 'required_if:status,rejected|nullable|string|max:500',
+        ]);
+
+        $this->documentRepository->updateStatus($document, $validated['status'], $validated['rejection_reason'] ?? null, auth()->user());
+
+        return redirect()->back()->with('success', "Document status updated to {$validated['status']}.");
+    }
+
+    public function destroy(Document $document): RedirectResponse
+    {
+        $this->authorize('delete', $document);
+
+        $this->documentRepository->deleteDocument($document);
+
+        return redirect()->back()->with('success', 'Document deleted successfully.');
+    }
+
+    public function bulkApprove(Request $request): RedirectResponse
+    {
+        $this->authorize('update', Document::class);
+
+        $validated = $request->validate([
+            'document_ids'   => 'required|array|min:1',
+            'document_ids.*' => 'exists:documents,id',
+        ]);
+
+        $count = $this->documentRepository->bulkApprove($validated['document_ids'], auth()->user());
+
+        return redirect()->back()->with('success', "Successfully approved {$count} documents.");
+    }
+
+    public function bulkReject(Request $request): RedirectResponse
+    {
+        $this->authorize('update', Document::class);
+
+        $validated = $request->validate([
+            'document_ids'     => 'required|array|min:1',
+            'document_ids.*'   => 'exists:documents,id',
+            'rejection_reason' => 'nullable|string|max:500',
+        ]);
+
+        $count = $this->documentRepository->bulkReject($validated['document_ids'], $validated['rejection_reason'] ?? null, auth()->user());
+
+        return redirect()->back()->with('success', "Successfully rejected {$count} documents.");
+    }
+
+    public function bulkDelete(Request $request): RedirectResponse
+    {
+        $this->authorize('delete', Document::class);
+
+        $validated = $request->validate([
+            'document_ids'   => 'required|array|min:1',
+            'document_ids.*' => 'exists:documents,id',
+        ]);
+
+        $count = $this->documentRepository->bulkDelete($validated['document_ids']);
+
+        return redirect()->back()->with('success', "Successfully deleted {$count} documents.");
     }
 }

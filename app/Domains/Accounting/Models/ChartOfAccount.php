@@ -113,6 +113,11 @@ class ChartOfAccount extends BaseModel
     public const BALANCE_DEBIT = 'debit';
     public const BALANCE_CREDIT = 'credit';
 
+    public const OPENING_BALANCE_TYPES = [
+        self::BALANCE_DEBIT,
+        self::BALANCE_CREDIT,
+    ];
+
     protected $table = 'chart_of_accounts';
 
     /** Default masters are seeded without a company/branch and shown in every one. */
@@ -128,7 +133,10 @@ class ChartOfAccount extends BaseModel
         'subtype',
         'normal_balance',
         'is_cash_or_bank',
+        'opening_balance',
+        'opening_balance_type',
         'parent_id',
+        'ledger_group_id',
         'description',
         'is_system',
         'is_active',
@@ -140,11 +148,18 @@ class ChartOfAccount extends BaseModel
         'is_active' => 'boolean',
         'is_cash_or_bank' => 'boolean',
         'parent_id' => 'integer',
+        'ledger_group_id' => 'integer',
+        'opening_balance' => 'decimal:2',
     ];
 
     public function parent(): BelongsTo
     {
         return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function ledgerGroup(): BelongsTo
+    {
+        return $this->belongsTo(LedgerGroup::class, 'ledger_group_id');
     }
 
     public function children(): HasMany

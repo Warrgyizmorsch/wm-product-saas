@@ -116,7 +116,14 @@ class BatchApiController extends Controller
 
         $batch = Batch::where('tenant_id', $tenantId)
             ->with(['product', 'warehouse', 'serialNumbers'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$batch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Batch not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -136,4 +143,71 @@ class BatchApiController extends Controller
             'batches_export_' . date('Y-m-d_His') . '.xlsx'
         );
     }
+
+    /**
+     * PUT/PATCH /api/inventory/batches/{id}
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $batch = Batch::where('tenant_id', $tenantId)->find($id);
+
+        if (!$batch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Batch not found',
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'batch_number'       => ['sometimes', 'required', 'string', 'max:100'],
+            'warehouse_id'       => ['sometimes', 'required', 'integer'],
+            'quantity'           => ['nullable', 'numeric', 'min:0'],
+            'available_qty'      => ['nullable', 'numeric', 'min:0'],
+            'manufacturing_date' => ['nullable', 'date'],
+            'expiry_date'        => ['nullable', 'date'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $batch->update($validator->validated());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Batch updated successfully',
+            'data'    => $batch->fresh(['product', 'warehouse']),
+        ]);
+    }
+
+    /**
+     * DELETE /api/inventory/batches/{id}
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $batch = Batch::where('tenant_id', $tenantId)->find($id);
+
+        if (!$batch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Batch not found',
+            ], 404);
+        }
+
+        $batch->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Batch deleted successfully',
+        ]);
+    }
 }
+

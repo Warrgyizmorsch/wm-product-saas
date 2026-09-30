@@ -209,6 +209,96 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Repositories\OvertimeRequestRepository::class
         );
 
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\KraKpiRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\KraKpiRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\RecruitmentRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\RecruitmentRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\PayrollRunRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\PayrollRunRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\TravelExpenseRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\TravelExpenseRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\PipRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\PipRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\ProbationRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\ProbationRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\EmployeeExitRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\EmployeeExitRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\AttendanceCorrectionRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\AttendanceCorrectionRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\BroadcastRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\BroadcastRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\PenalizationPolicyRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\PenalizationPolicyRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\LeaveEncashmentRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\LeaveEncashmentRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\DocumentRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\DocumentRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\HelpdeskKbRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\HelpdeskKbRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\HelpdeskTicketRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\HelpdeskTicketRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\ExpensePolicyRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\ExpensePolicyRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\EmployeeProfileRequestRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\EmployeeProfileRequestRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\ExitClearancePolicyRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\ExitClearancePolicyRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\SopRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\SopRepository::class
+        );
+
         // ── Projects: Project ─────────────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Projects\Repositories\ProjectRepositoryInterface::class,
@@ -262,6 +352,25 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Repositories\TaskDependencyRepository::class
         );
 
+        // ── Projects: Time Log ────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\TimeLogRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\TimeLogRepository::class
+        );
+
+        // ── Projects: Issue ───────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\IssueRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\IssueRepository::class
+        );
+
+        // ── Projects: Document ────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\ProjectDocumentRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\ProjectDocumentRepository::class
+        );
+
+
         // ── Accounting: Chart of Accounts ─────────────────────────────────────
         $this->app->bind(
             \App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface::class,
@@ -284,6 +393,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Domains\Accounting\Repositories\JournalRepositoryInterface::class,
             \App\Domains\Accounting\Repositories\JournalRepository::class
+        );
+
+        // ── Accounting: Ledger Group ───────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\LedgerGroupRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\LedgerGroupRepository::class
         );
 
         // ── Accounting: Tax Rate ───────────────────────────────────────────────
@@ -320,6 +435,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Domains\Accounting\Services\ExchangeRates\ExchangeRateProvider::class,
             \App\Domains\Accounting\Services\ExchangeRates\FrankfurterProvider::class
+        );
+
+        // ── Accounting: Bank statement extraction (swap in the real API here) ──
+        $this->app->bind(
+            \App\Domains\Accounting\Services\StatementExtraction\StatementExtractionProvider::class,
+            \App\Domains\Accounting\Services\StatementExtraction\HttpStatementExtractionProvider::class
         );
     }
 
@@ -397,6 +518,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Event::listen(
             \App\Domains\Inventory\Events\StockOutflowRecorded::class,
             \App\Domains\Accounting\Listeners\PostCogsJournal::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Inventory\Events\StockOutflowRecorded::class,
+            \App\Domains\Accounting\Listeners\PostProductionConsumptionJournal::class
         );
 
         \Illuminate\Support\Facades\Event::listen(
@@ -719,6 +845,22 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Policies\TaskPolicy::class
         );
 
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\TimeLog::class,
+            \App\Domains\Projects\Policies\TimeLogPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\Issue::class,
+            \App\Domains\Projects\Policies\IssuePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\ProjectDocument::class,
+            \App\Domains\Projects\Policies\ProjectDocumentPolicy::class
+        );
+
+
         // ── Accounting Policies ────────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Accounting\Models\ChartOfAccount::class,
@@ -733,6 +875,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Accounting\Models\CostCenter::class,
             \App\Domains\Accounting\Policies\CostCenterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\LedgerGroup::class,
+            \App\Domains\Accounting\Policies\LedgerGroupPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(

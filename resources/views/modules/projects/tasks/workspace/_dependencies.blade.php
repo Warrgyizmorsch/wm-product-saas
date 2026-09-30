@@ -1,26 +1,30 @@
 <div class="border rounded-3 p-3 mb-4">
     <div class="d-flex align-items-center justify-content-between mb-3">
         <h6 class="fw-bold text-dark mb-0"><i class="feather-link me-2 text-primary"></i>{{ __('projects.dependencies') }}</h6>
-        <span id="wsDependenciesCount" class="badge bg-soft-secondary text-secondary fs-11"></span>
+        <x-ui.badge variant="secondary" soft id="wsDependenciesCount" class="fs-11"></x-ui.badge>
     </div>
 
     <div id="wsDependenciesList" class="mb-2"></div>
 
     @if ($canManageTask)
-        <form id="wsDependencyAddForm" class="d-flex gap-2 mb-3" action="{{ route('projects.tasks.dependencies.store', [$project, $task]) }}">
+        <form id="wsDependencyAddForm" class="d-flex gap-2 mb-3 align-items-center" action="{{ route('projects.tasks.dependencies.store', [$project, $task]) }}">
             @csrf
-            <select name="depends_on_task_id" class="form-select form-select-sm" required>
-                <option value="">{{ __('projects.select_option') }}</option>
-                @foreach ($otherTasks as $otherTask)
-                    <option value="{{ $otherTask['id'] }}">{{ $otherTask['label'] }}</option>
-                @endforeach
-            </select>
-            <select name="dependency_type" class="form-select form-select-sm" style="max-width: 150px;">
-                <option value="Finish-to-Start">Finish-to-Start</option>
-                <option value="Start-to-Start">Start-to-Start</option>
-                <option value="Finish-to-Finish">Finish-to-Finish</option>
-                <option value="Start-to-Finish">Start-to-Finish</option>
-            </select>
+            <div class="flex-grow-1">
+                <x-ui.odoo-form-ui type="select" name="depends_on_task_id" :searchable="false" :required="true">
+                    <option value="">{{ __('projects.select_option') }}</option>
+                    @foreach ($otherTasks as $otherTask)
+                        <option value="{{ $otherTask['id'] }}">{{ $otherTask['label'] }}</option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
+            </div>
+            <div style="max-width: 160px;">
+                <x-ui.odoo-form-ui type="select" name="dependency_type" :searchable="false">
+                    <option value="Finish-to-Start">Finish-to-Start</option>
+                    <option value="Start-to-Start">Start-to-Start</option>
+                    <option value="Finish-to-Finish">Finish-to-Finish</option>
+                    <option value="Start-to-Finish">Start-to-Finish</option>
+                </x-ui.odoo-form-ui>
+            </div>
             <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">{{ __('projects.add') }}</button>
         </form>
     @endif

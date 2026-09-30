@@ -415,4 +415,197 @@ class InventoryReportApiController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
         ]);
     }
+
+    /**
+     * GET /api/inventory/reports/expiry
+     * Batches expiring soon / expired with risk asset valuation.
+     */
+    public function expiryReport(Request $request): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $days = (int)$request->input('days', 30);
+        $thresholdDate = now()->addDays($days)->toDateString();
+
+        $baseQuery = \App\Domains\Inventory\Models\Batch::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['product:id,name,sku,type,cost_price,selling_price', 'warehouse:id,name,code'])
+            ->whereNotNull('expiry_date')
+            ->where('available_qty', '>', 0);
+
+        if ($warehouseId = $request->input('warehouse_id')) {
+            $baseQuery->where('warehouse_id', $warehouseId);
+        }
+
+        if ($productId = $request->input('product_id')) {
+            $baseQuery->where('product_id', $productId);
+        }
+
+        if ($search = $request->input('search')) {
+            $baseQuery->where(function ($q) use ($search) {
+                $q->where('batch_number', 'like', "%{$search}%")
+                  ->orWhereHas('product', function ($pq) use ($search) {
+                      $pq->where('name', 'like', "%{$search}%")
+                         ->orWhere('sku', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $allBatches = (clone $baseQuery)->get();
+
+        $totalBatches = $allBatches->count();
+        $expiredCount = 0;
+        $expiringSoonCount = 0;
+        $totalRiskValue = 0.0;
+        $todayStr = now()->toDateString();
+
+        foreach ($allBatches as $batch) {
+            $unitCost = (float)($batch->product?->cost_price ?? 0);
+            $val = (float)$batch->available_qty * $unitCost;
+            $expDate = $batch->expiry_date ? \Illuminate\Support\Carbon::parse($batch->expiry_date)->toDateString() : null;
+
+            if ($expDate && $expDate < $todayStr) {
+                $expiredCount++;
+                $totalRiskValue += $val;
+            } elseif ($expDate && $expDate <= $thresholdDate) {
+                $expiringSoonCount++;
+                $totalRiskValue += $val;
+            }
+        }
+
+        $filterStatus = $request->input('status', 'all'); // 'expired', 'expiring_soon', 'all'
+        $filteredQuery = clone $baseQuery;
+
+        if ($filterStatus === 'expired') {
+            $filteredQuery->where('expiry_date', '<', $todayStr);
+        } elseif ($filterStatus === 'expiring_soon') {
+            $filteredQuery->where('expiry_date', '>=', $todayStr)
+                          ->where('expiry_date', '<=', $thresholdDate);
+        } else {
+            $filteredQuery->where('expiry_date', '<=', $thresholdDate);
+        }
+
+        $perPage = min((int)$request->input('per_page', 15), 100);
+        $batches = $filteredQuery->orderBy('expiry_date', 'asc')->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'summary' => [
+                'days_threshold'       => $days,
+                'total_tracked'        => $totalBatches,
+                'expired_batches'      => $expiredCount,
+                'expiring_soon_count'  => $expiringSoonCount,
+                'total_risk_valuation' => round($totalRiskValue, 2),
+            ],
+            'data'    => $batches->items(),
+            'meta'    => [
+                'current_page' => $batches->currentPage(),
+                'last_page'    => $batches->lastPage(),
+                'per_page'     => $batches->perPage(),
+                'total'        => $batches->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/inventory/reports/expiry/export
+     */
+    public function exportExpiryReport(Request $request)
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $days = (int)$request->input('days', 30);
+        $thresholdDate = now()->addDays($days)->toDateString();
+        $todayStr = now()->toDateString();
+
+        $query = \App\Domains\Inventory\Models\Batch::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['product', 'warehouse'])
+            ->whereNotNull('expiry_date')
+            ->where('available_qty', '>', 0)
+            ->where('expiry_date', '<=', $thresholdDate)
+            ->orderBy('expiry_date', 'asc');
+
+        if ($request->filled('warehouse_id')) {
+            $query->where('warehouse_id', $request->input('warehouse_id'));
+        }
+
+        $fileName = 'Batch_Expiry_Report_' . date('Y-m-d_Hi') . '.csv';
+
+        return response()->streamDownload(function () use ($query, $todayStr) {
+            $handle = fopen('php://output', 'w');
+            fputs($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, ['BATCH EXPIRY RISK REPORT']);
+            fputcsv($handle, ['Generated Date', date('d M Y, h:i A')]);
+            fputcsv($handle, []);
+
+            fputcsv($handle, [
+                'S.No',
+                'Batch Number',
+                'Product Name',
+                'Product SKU',
+                'Warehouse',
+                'Available Qty',
+                'Expiry Date',
+                'Days Remaining',
+                'Status',
+                'Unit Cost',
+                'Total Risk Value',
+            ]);
+
+            $index = 1;
+            $totalQty = 0.0;
+            $totalVal = 0.0;
+
+            $query->chunk(500, function ($batches) use ($handle, $todayStr, &$index, &$totalQty, &$totalVal) {
+                foreach ($batches as $b) {
+                    $expDate = $b->expiry_date ? \Illuminate\Support\Carbon::parse($b->expiry_date) : null;
+                    $daysRemaining = $expDate ? (int)now()->diffInDays($expDate, false) : 0;
+                    $status = $daysRemaining < 0 ? 'EXPIRED' : ($daysRemaining <= 30 ? 'EXPIRING CRITICAL' : 'EXPIRING SOON');
+
+                    $unitCost = (float)($b->product?->cost_price ?? 0);
+                    $val = (float)$b->available_qty * $unitCost;
+
+                    $totalQty += (float)$b->available_qty;
+                    $totalVal += $val;
+
+                    fputcsv($handle, [
+                        $index++,
+                        $b->batch_number,
+                        $b->product?->name ?? 'N/A',
+                        $b->product?->sku ?? '-',
+                        $b->warehouse?->name ?? 'N/A',
+                        number_format($b->available_qty, 2, '.', ''),
+                        $expDate ? $expDate->format('d M Y') : 'N/A',
+                        $daysRemaining,
+                        $status,
+                        number_format($unitCost, 2, '.', ''),
+                        number_format($val, 2, '.', ''),
+                    ]);
+                }
+            });
+
+            fputcsv($handle, []);
+            fputcsv($handle, [
+                '',
+                'TOTAL RISK SUMMARY',
+                '',
+                '',
+                '',
+                number_format($totalQty, 2, '.', ''),
+                '',
+                '',
+                '',
+                '',
+                number_format($totalVal, 2, '.', ''),
+            ]);
+
+            fclose($handle);
+        }, $fileName, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+        ]);
+    }
 }
+

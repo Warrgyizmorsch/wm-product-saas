@@ -245,7 +245,17 @@
                                     </td>
                                     <!-- Actions -->
                                     <td class="pe-4 text-end">
-                                        @if($correction->status === 'pending')
+                                        @php
+                                            $canApproveThisCorrection = auth()->user() && (
+                                                auth()->user()->hasHrPermission('hrms.attendance_corrections.approve') ||
+                                                auth()->user()->hasHrPermission('hrms.attendance_corrections.manage') ||
+                                                auth()->user()->hasHrPermission('hr.settings.manage') ||
+                                                auth()->user()->hasHrPermission('hrms.attendance.manage') ||
+                                                auth()->user()->hasHrPermission('hrms.attendance.approve')
+                                            );
+                                            $isSelfCorrection = auth()->user()?->employee && auth()->user()->employee->id === $correction->employee_id;
+                                        @endphp
+                                        @if($correction->status === 'pending' && ($canApproveThisCorrection || ($correction->employee?->reporting_manager_id === auth()->user()?->employee?->id)) && !$isSelfCorrection)
                                             <div class="d-flex align-items-center justify-content-end gap-1">
                                                 <button type="button" 
                                                         class="btn btn-xs btn-soft-success text-uppercase fw-bold" 

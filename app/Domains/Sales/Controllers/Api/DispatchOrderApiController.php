@@ -173,7 +173,14 @@ class DispatchOrderApiController extends Controller
 
         $dispatch = DispatchOrder::where('tenant_id', $tenantId)
             ->with(['salesOrder.customer', 'customer', 'transporter', 'items.product', 'items.warehouse'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$dispatch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dispatch Order not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -187,7 +194,14 @@ class DispatchOrderApiController extends Controller
     public function confirm(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $dispatch   = DispatchOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $dispatch   = DispatchOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$dispatch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dispatch Order not found',
+            ], 404);
+        }
 
         try {
             $dispatch = $this->dispatchService->confirmDispatchOrder($dispatch);
@@ -210,7 +224,14 @@ class DispatchOrderApiController extends Controller
     public function ship(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $dispatch   = DispatchOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $dispatch   = DispatchOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$dispatch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dispatch Order not found',
+            ], 404);
+        }
 
         try {
             $dispatch = $this->dispatchService->shipDispatchOrder($dispatch);
@@ -242,7 +263,14 @@ class DispatchOrderApiController extends Controller
     public function updateTracking(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $dispatch   = DispatchOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $dispatch   = DispatchOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$dispatch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dispatch Order not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'carrier'          => 'nullable|string|max:255',
@@ -280,7 +308,14 @@ class DispatchOrderApiController extends Controller
     public function uploadPod(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $dispatch   = DispatchOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $dispatch   = DispatchOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$dispatch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dispatch Order not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'pod_file'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',

@@ -182,10 +182,12 @@ class VendorBillApiController extends Controller
             return $vb->load(['items.product', 'vendor']);
         });
 
+        event(new \App\Domains\Purchase\Events\BillPosted($bill));
+
         return response()->json([
             'success' => true,
             'message' => 'Vendor Bill created successfully',
-            'data'    => $bill,
+            'data'    => $bill->fresh(['items.product', 'vendor']),
         ], 201);
     }
 
@@ -198,7 +200,14 @@ class VendorBillApiController extends Controller
 
         $bill = VendorBill::where('tenant_id', $tenantId)
             ->with(['vendor', 'purchaseOrder', 'items.product'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$bill) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor Bill not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -212,7 +221,14 @@ class VendorBillApiController extends Controller
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $bill       = VendorBill::where('tenant_id', $tenantId)->findOrFail($id);
+        $bill       = VendorBill::where('tenant_id', $tenantId)->find($id);
+
+        if (!$bill) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor Bill not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'string', 'in:Draft,Approved,Paid,Partial,Cancelled'],
@@ -233,10 +249,14 @@ class VendorBillApiController extends Controller
         }
         $bill->save();
 
+        if (in_array($bill->status, ['Approved', 'Paid'])) {
+            event(new \App\Domains\Purchase\Events\BillPosted($bill));
+        }
+
         return response()->json([
             'success' => true,
             'message' => "Vendor Bill status updated to {$bill->status}",
-            'data'    => $bill,
+            'data'    => $bill->fresh(['vendor', 'items.product']),
         ]);
     }
 
@@ -246,7 +266,14 @@ class VendorBillApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $bill       = VendorBill::where('tenant_id', $tenantId)->findOrFail($id);
+        $bill       = VendorBill::where('tenant_id', $tenantId)->find($id);
+
+        if (!$bill) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor Bill not found',
+            ], 404);
+        }
 
         if ($bill->amount_paid > 0) {
             return response()->json([
@@ -412,7 +439,14 @@ class VendorBillApiController extends Controller
     public function applyAdvance(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $bill       = VendorBill::where('tenant_id', $tenantId)->findOrFail($id);
+        $bill       = VendorBill::where('tenant_id', $tenantId)->find($id);
+
+        if (!$bill) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor Bill not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'advance_payment_id' => ['required', 'integer'],
@@ -423,7 +457,14 @@ class VendorBillApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Validation error', 'errors' => $validator->errors()], 422);
         }
 
-        $advance = \App\Domains\Purchase\Models\PurchaseAdvancePayment::where('tenant_id', $tenantId)->findOrFail($request->input('advance_payment_id'));
+        $advance = \App\Domains\Purchase\Models\PurchaseAdvancePayment::where('tenant_id', $tenantId)->find($request->input('advance_payment_id'));
+
+        if (!$advance) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Advance Payment record not found',
+            ], 404);
+        }
 
         $dueAmt       = (float)($bill->due_amount ?? $bill->balance_due);
         $allocatedAmt = min((float)$request->input('amount'), $dueAmt);

@@ -460,7 +460,14 @@ class CrmDealApiController extends Controller
     public function restore(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $deal = CrmDeal::withTrashed()->where('tenant_id', $tenantId)->findOrFail($id);
+        $deal = CrmDeal::withTrashed()->where('tenant_id', $tenantId)->find($id);
+
+        if (!$deal) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Deal not found',
+            ], 404);
+        }
 
         $this->authorize('update', $deal);
         $deal->restore();

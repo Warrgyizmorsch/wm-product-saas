@@ -187,6 +187,17 @@ class InvoiceApiController extends Controller
                 ];
             }
 
+            $gstType = $validated['gst_type'] ?? 'cgst_sgst';
+            $cgstAmt = 0.0;
+            $sgstAmt = 0.0;
+            $igstAmt = 0.0;
+            if ($gstType === 'cgst_sgst') {
+                $cgstAmt = round($totalTax / 2, 2);
+                $sgstAmt = round($totalTax - $cgstAmt, 2);
+            } elseif ($gstType === 'igst') {
+                $igstAmt = $totalTax;
+            }
+
             $freight    = (float)($validated['freight_amount'] ?? 0);
             $adjustment = (float)($validated['adjustment'] ?? 0);
             $grandTotal = $subtotal + $totalTax + $freight + $adjustment;
@@ -203,11 +214,15 @@ class InvoiceApiController extends Controller
                 'payment_terms'    => $validated['payment_terms'] ?? null,
                 'status'           => 'Draft',
                 'discount_type'    => $validated['discount_type'] ?? 'fixed',
+                'discount_amount'  => 0.00,
                 'tax_type'         => $validated['tax_type'] ?? 'exclusive',
-                'gst_type'         => $validated['gst_type'] ?? 'cgst_sgst',
+                'gst_type'         => $gstType,
+                'cgst_amount'      => $cgstAmt,
+                'sgst_amount'      => $sgstAmt,
+                'igst_amount'      => $igstAmt,
                 'subtotal'         => $subtotal,
                 'tax_amount'       => $totalTax,
-                'freight_terms'    => $validated['freight_terms'] ?? null,
+                'freight_terms'    => $validated['freight_terms'] ?? 'To Pay',
                 'freight_amount'   => $freight,
                 'adjustment'       => $adjustment,
                 'total_amount'     => $grandTotal,
@@ -224,10 +239,12 @@ class InvoiceApiController extends Controller
             return $inv->load(['items.product', 'customer']);
         });
 
+        event(new \App\Domains\Sales\Events\InvoicePosted($invoice));
+
         return response()->json([
             'success' => true,
             'message' => 'Invoice created successfully',
-            'data'    => $invoice,
+            'data'    => $invoice->fresh(['items.product', 'customer']),
         ], 201);
     }
 
@@ -240,7 +257,14 @@ class InvoiceApiController extends Controller
 
         $invoice = Invoice::where('tenant_id', $tenantId)
             ->with(['customer', 'salesOrder', 'items.product'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$invoice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found',
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -254,7 +278,14 @@ class InvoiceApiController extends Controller
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $invoice    = Invoice::where('tenant_id', $tenantId)->findOrFail($id);
+        $invoice    = Invoice::where('tenant_id', $tenantId)->find($id);
+
+        if (!$invoice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'string', 'in:Draft,Sent,Partial,Paid,Overdue,Void'],
@@ -288,7 +319,14 @@ class InvoiceApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $invoice    = Invoice::where('tenant_id', $tenantId)->findOrFail($id);
+        $invoice    = Invoice::where('tenant_id', $tenantId)->find($id);
+
+        if (!$invoice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found',
+            ], 404);
+        }
 
         if ($invoice->amount_paid > 0) {
             return response()->json([
@@ -313,11 +351,21 @@ class InvoiceApiController extends Controller
     public function post(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $invoice = Invoice::where('tenant_id', $tenantId)->findOrFail($id);
+        $invoice = Invoice::where('tenant_id', $tenantId)->find($id);
+
+        if (!$invoice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found',
+            ], 404);
+        }
+
         $this->authorize('update', $invoice);
 
-        $invoice->status = 'Sent';
+        $invoice->status = 'Posted';
         $invoice->save();
+
+        event(new \App\Domains\Sales\Events\InvoicePosted($invoice));
 
         return response()->json([
             'success' => true,
@@ -333,7 +381,15 @@ class InvoiceApiController extends Controller
     public function pay(Request $request, int $id): JsonResponse
     {
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
-        $invoice = Invoice::where('tenant_id', $tenantId)->findOrFail($id);
+        $invoice = Invoice::where('tenant_id', $tenantId)->find($id);
+
+        if (!$invoice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found',
+            ], 404);
+        }
+
         $this->authorize('update', $invoice);
 
         $validator = Validator::make($request->all(), [
@@ -365,7 +421,7 @@ class InvoiceApiController extends Controller
                 'payment_number' => $paymentNo,
                 'payment_date'   => $validated['payment_date'],
                 'amount'         => $validated['amount'],
-                'payment_mode'   => $validated['payment_method'],
+                'payment_method' => $validated['payment_method'],
                 'reference_no'   => $validated['reference_no'] ?? null,
                 'status'         => 'Completed',
                 'notes'          => $validated['notes'] ?? null,
@@ -373,7 +429,10 @@ class InvoiceApiController extends Controller
 
             \App\Domains\Sales\Models\PaymentAllocation::create([
                 'tenant_id'           => $tenantId,
+                'company_id'          => $companyId,
+                'branch_id'           => $branchId,
                 'customer_payment_id' => $payment->id,
+                'sales_order_id'      => $invoice->sales_order_id,
                 'invoice_id'          => $invoice->id,
                 'allocated_amount'    => $validated['amount'],
             ]);
@@ -385,6 +444,8 @@ class InvoiceApiController extends Controller
 
             return $payment;
         });
+
+        event(new \App\Domains\Sales\Events\CustomerPaymentReceived($payment));
 
         return response()->json([
             'success' => true,
@@ -416,7 +477,15 @@ class InvoiceApiController extends Controller
     public function sendEmail(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $invoice = Invoice::where('tenant_id', $tenantId)->findOrFail($id);
+        $invoice = Invoice::where('tenant_id', $tenantId)->find($id);
+
+        if (!$invoice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found',
+            ], 404);
+        }
+
         $this->authorize('view', $invoice);
 
         $validator = Validator::make($request->all(), [
@@ -458,7 +527,15 @@ class InvoiceApiController extends Controller
     public function sendWhatsApp(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $invoice = Invoice::where('tenant_id', $tenantId)->findOrFail($id);
+        $invoice = Invoice::where('tenant_id', $tenantId)->find($id);
+
+        if (!$invoice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found',
+            ], 404);
+        }
+
         $this->authorize('view', $invoice);
 
         $validator = Validator::make($request->all(), [

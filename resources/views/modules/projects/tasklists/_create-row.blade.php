@@ -29,7 +29,7 @@
             <div class="flex-grow-1" style="min-width: 0;">
                 <div class="d-flex flex-wrap align-items-start gap-2">
                     <div class="flex-grow-1" style="min-width: 200px;">
-                        <input type="text" class="form-control form-control-sm tasklist-create-name"
+                        <input type="text" class="form-control form-control-sm odoo-table-input tasklist-create-name"
                                placeholder="{{ __('projects.tasklist_name') }}" maxlength="255">
                         <div class="invalid-feedback d-block fs-11 tasklist-create-error" data-field="name"></div>
                     </div>

@@ -50,6 +50,11 @@ class BankReconciliation extends BaseModel
         return $this->hasMany(BankStatementLine::class, 'bank_reconciliation_id');
     }
 
+    public function statementUploads(): HasMany
+    {
+        return $this->hasMany(BankStatementUpload::class, 'bank_reconciliation_id');
+    }
+
     public function matchedJournalEntries(): HasMany
     {
         return $this->hasMany(JournalEntry::class, 'bank_reconciliation_id');

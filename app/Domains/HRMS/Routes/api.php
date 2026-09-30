@@ -24,6 +24,11 @@ use App\Domains\HRMS\Controllers\Api\EmployeeExitApiController;
 use App\Domains\HRMS\Controllers\Api\PipApiController;
 use App\Domains\HRMS\Controllers\Api\BroadcastApiController;
 use App\Domains\HRMS\Controllers\Api\HelpdeskApiController;
+use App\Domains\HRMS\Controllers\Api\KraKpiApiController;
+use App\Domains\HRMS\Controllers\Api\RecruitmentApiController;
+use App\Domains\HRMS\Controllers\Api\EmployeeProfileRequestApiController;
+use App\Domains\HRMS\Controllers\Api\SopApiController;
+use App\Domains\HRMS\Controllers\Api\GoalApiController;
 use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
 /*
@@ -249,7 +254,24 @@ Route::prefix('api/hrms/assets')
     });
 
 // ==========================================
-// 7. EMPLOYEE DIRECTORY & PROFILE API ROUTES
+// 7A. EMPLOYEE PROFILE UPDATE REQUESTS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/employees/profile-requests')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.employees.profile-requests.')
+    ->group(function () {
+        Route::get('/summary', [EmployeeProfileRequestApiController::class, 'summary'])->name('summary');
+        Route::get('/my-requests', [EmployeeProfileRequestApiController::class, 'myRequests'])->name('my-requests');
+        Route::get('/', [EmployeeProfileRequestApiController::class, 'index'])->name('index');
+        Route::post('/', [EmployeeProfileRequestApiController::class, 'store'])->name('store');
+        Route::get('/{id}', [EmployeeProfileRequestApiController::class, 'show'])->name('show');
+        Route::post('/{id}/approve', [EmployeeProfileRequestApiController::class, 'approve'])->name('approve');
+        Route::post('/{id}/reject', [EmployeeProfileRequestApiController::class, 'reject'])->name('reject');
+        Route::delete('/{id}', [EmployeeProfileRequestApiController::class, 'destroy'])->name('destroy');
+    });
+
+// ==========================================
+// 7B. EMPLOYEE DIRECTORY & PROFILE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/employees')
     ->middleware(['auth:sanctum', 'throttle:60,1'])
@@ -558,16 +580,46 @@ Route::prefix('api/hrms/exits')
     ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.exits.')
     ->group(function () {
+        // Summary & Listing
+        Route::get('/summary', [EmployeeExitApiController::class, 'summary'])->name('summary');
         Route::get('/', [EmployeeExitApiController::class, 'index'])->name('index');
         Route::post('/initiate', [EmployeeExitApiController::class, 'initiate'])->name('initiate');
+
+        // Master Clearance Policy Templates (Offboarding Policies)
         Route::get('/clearance-templates', [EmployeeExitApiController::class, 'listTemplates'])->name('templates.index');
         Route::post('/clearance-templates', [EmployeeExitApiController::class, 'storeTemplate'])->name('templates.store');
-        Route::put('/clearance-templates/{template}', [EmployeeExitApiController::class, 'updateTemplate'])->name('templates.update');
-        Route::delete('/clearance-templates/{template}', [EmployeeExitApiController::class, 'destroyTemplate'])->name('templates.destroy');
+        Route::put('/clearance-templates/{id}', [EmployeeExitApiController::class, 'updateTemplate'])->name('templates.update');
+        Route::delete('/clearance-templates/categories/{category}', [EmployeeExitApiController::class, 'destroyCategory'])->name('templates.destroy-category');
+        Route::delete('/clearance-templates/{id}', [EmployeeExitApiController::class, 'destroyTemplate'])->name('templates.destroy');
         Route::post('/clearance-templates/reset', [EmployeeExitApiController::class, 'resetTemplates'])->name('templates.reset');
-        Route::post('/{exit}/clearances/adhoc', [EmployeeExitApiController::class, 'storeAdhocClearance'])->name('clearances.adhoc.store');
-        Route::delete('/clearances/{clearance}/adhoc', [EmployeeExitApiController::class, 'destroyAdhocClearance'])->name('clearances.adhoc.destroy');
-        Route::get('/{exit}', [EmployeeExitApiController::class, 'show'])->name('show');
+
+        // Clearance Execution & Ad-hoc points
+        Route::put('/clearances/{id}', [EmployeeExitApiController::class, 'updateClearance'])->name('clearances.update');
+        Route::delete('/clearances/{id}/adhoc', [EmployeeExitApiController::class, 'destroyAdhocClearance'])->name('clearances.adhoc.destroy');
+        Route::post('/{id}/clearances/adhoc', [EmployeeExitApiController::class, 'storeAdhocClearance'])->name('clearances.adhoc.store');
+        Route::put('/{id}/clearances/department/{department}', [EmployeeExitApiController::class, 'updateDepartmentClearances'])->name('clearances.department.batch-update');
+
+        // Approvals & Rejection
+        Route::post('/{id}/approve', [EmployeeExitApiController::class, 'approve'])->name('approve');
+        Route::post('/{id}/approve-hr', [EmployeeExitApiController::class, 'approve'])->name('approve-hr');
+        Route::post('/{id}/approve-manager', [EmployeeExitApiController::class, 'approveManager'])->name('approve-manager');
+        Route::post('/{id}/reject', [EmployeeExitApiController::class, 'reject'])->name('reject');
+
+        // Asset Handover
+        Route::post('/{id}/assets/{assetId}/return', [EmployeeExitApiController::class, 'returnAsset'])->name('assets.return');
+
+        // Full & Final (FnF) Settlement
+        Route::post('/{id}/fnf/recalculate', [EmployeeExitApiController::class, 'recalculateFnF'])->name('fnf.recalculate');
+        Route::post('/{id}/fnf/finalize', [EmployeeExitApiController::class, 'finalizeFnF'])->name('fnf.finalize');
+
+        // Exit Documents Generation
+        Route::get('/{id}/documents/relieving-letter', [EmployeeExitApiController::class, 'getRelievingLetter'])->name('documents.relieving-letter');
+        Route::get('/{id}/documents/experience-certificate', [EmployeeExitApiController::class, 'getExperienceCertificate'])->name('documents.experience-certificate');
+        Route::get('/{id}/documents/noc-certificate', [EmployeeExitApiController::class, 'getNocCertificate'])->name('documents.noc-certificate');
+        Route::get('/{id}/documents/fnf-statement', [EmployeeExitApiController::class, 'getFnfStatement'])->name('documents.fnf-statement');
+
+        // Show Single Exit
+        Route::get('/{id}', [EmployeeExitApiController::class, 'show'])->name('show');
     });
 
 // ==========================================
@@ -691,5 +743,175 @@ Route::prefix('api/hrms/helpdesk')
         Route::put('/kb/{id}', [HelpdeskApiController::class, 'updateKb'])->name('kb.update');
         Route::delete('/kb/{id}', [HelpdeskApiController::class, 'destroyKb'])->name('kb.destroy');
     });
+
+// ==========================================
+// 22. KRA & KPI PERFORMANCE API ROUTES
+// ==========================================
+Route::prefix('api/hrms/kra-kpi')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.kra-kpi.')
+    ->group(function () {
+        // Summary & Dashboard Hub
+        Route::get('/', [KraKpiApiController::class, 'summary'])->name('index');
+        Route::get('/summary', [KraKpiApiController::class, 'summary'])->name('summary');
+
+        // Appraisal Cycles
+        Route::get('/cycles', [KraKpiApiController::class, 'indexCycles'])->name('cycles.index');
+        Route::post('/cycles', [KraKpiApiController::class, 'storeCycle'])->name('cycles.store');
+        Route::get('/cycles/{id}', [KraKpiApiController::class, 'showCycle'])->name('cycles.show');
+        Route::put('/cycles/{id}', [KraKpiApiController::class, 'updateCycle'])->name('cycles.update');
+        Route::delete('/cycles/{id}', [KraKpiApiController::class, 'destroyCycle'])->name('cycles.destroy');
+
+        // KRA Focus Areas / Categories
+        Route::get('/categories', [KraKpiApiController::class, 'indexCategories'])->name('categories.index');
+        Route::post('/categories', [KraKpiApiController::class, 'storeCategory'])->name('categories.store');
+        Route::delete('/categories/{id}', [KraKpiApiController::class, 'destroyCategory'])->name('categories.destroy');
+
+        // KPI Master Metrics Library
+        Route::get('/kpi-masters', [KraKpiApiController::class, 'indexKpiMasters'])->name('kpi-masters.index');
+        Route::post('/kpi-masters', [KraKpiApiController::class, 'storeKpiMaster'])->name('kpi-masters.store');
+        Route::delete('/kpi-masters/{id}', [KraKpiApiController::class, 'destroyKpiMaster'])->name('kpi-masters.destroy');
+
+        // Role KPI Templates
+        Route::get('/templates', [KraKpiApiController::class, 'indexTemplates'])->name('templates.index');
+        Route::post('/templates', [KraKpiApiController::class, 'storeTemplate'])->name('templates.store');
+        Route::get('/templates/{id}', [KraKpiApiController::class, 'showTemplate'])->name('templates.show');
+        Route::put('/templates/{id}', [KraKpiApiController::class, 'updateTemplate'])->name('templates.update');
+        Route::delete('/templates/{id}', [KraKpiApiController::class, 'destroyTemplate'])->name('templates.destroy');
+        Route::post('/templates/assign', [KraKpiApiController::class, 'assignTemplate'])->name('templates.assign');
+
+        // Employee Scorecards / Goal Plans
+        Route::get('/scorecards', [KraKpiApiController::class, 'indexScorecards'])->name('scorecards.index');
+        Route::get('/scorecards/{id}', [KraKpiApiController::class, 'showScorecard'])->name('scorecards.show');
+        Route::delete('/scorecards/{id}', [KraKpiApiController::class, 'destroyScorecard'])->name('scorecards.destroy');
+
+        // Scorecard Goal Items & Progress
+        Route::post('/scorecards/{id}/items', [KraKpiApiController::class, 'addGoalItem'])->name('scorecards.items.store');
+        Route::delete('/items/{itemId}', [KraKpiApiController::class, 'destroyGoalItem'])->name('items.destroy');
+        Route::post('/items/{itemId}/progress', [KraKpiApiController::class, 'logProgress'])->name('items.progress');
+
+        // Goal Workflow: Submit & Approve Goals
+        Route::post('/scorecards/{id}/submit-goals', [KraKpiApiController::class, 'submitGoals'])->name('scorecards.submit-goals');
+        Route::post('/scorecards/{id}/approve-goals', [KraKpiApiController::class, 'approveGoals'])->name('scorecards.approve-goals');
+
+        // Appraisal Review Phases: Self, Manager, Calibration, Sign-off & PIP
+        Route::post('/scorecards/{id}/self-appraisal', [KraKpiApiController::class, 'submitSelfAppraisal'])->name('scorecards.self-appraisal');
+        Route::post('/scorecards/{id}/manager-appraisal', [KraKpiApiController::class, 'submitManagerAppraisal'])->name('scorecards.manager-appraisal');
+        Route::post('/scorecards/{id}/calibrate', [KraKpiApiController::class, 'calibrateAppraisal'])->name('scorecards.calibrate');
+        Route::post('/scorecards/{id}/sign-off', [KraKpiApiController::class, 'signOffAppraisal'])->name('scorecards.sign-off');
+        Route::post('/scorecards/{id}/trigger-pip', [KraKpiApiController::class, 'triggerPip'])->name('scorecards.trigger-pip');
+    });
+
+// ==========================================
+// 23. RECRUITMENT & ATS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/recruitment')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.recruitment.')
+    ->group(function () {
+        // Summary & Dashboard Funnel
+        Route::get('/', [RecruitmentApiController::class, 'summary'])->name('index');
+        Route::get('/summary', [RecruitmentApiController::class, 'summary'])->name('summary');
+
+        // Job Requisitions
+        Route::get('/requisitions', [RecruitmentApiController::class, 'indexRequisitions'])->name('requisitions.index');
+        Route::post('/requisitions', [RecruitmentApiController::class, 'storeRequisition'])->name('requisitions.store');
+        Route::get('/requisitions/{id}', [RecruitmentApiController::class, 'showRequisition'])->name('requisitions.show');
+        Route::put('/requisitions/{id}', [RecruitmentApiController::class, 'updateRequisition'])->name('requisitions.update');
+        Route::patch('/requisitions/{id}/status', [RecruitmentApiController::class, 'updateRequisitionStatus'])->name('requisitions.status');
+        Route::delete('/requisitions/{id}', [RecruitmentApiController::class, 'destroyRequisition'])->name('requisitions.destroy');
+
+        // Candidates Directory
+        Route::get('/candidates', [RecruitmentApiController::class, 'indexCandidates'])->name('candidates.index');
+        Route::post('/candidates', [RecruitmentApiController::class, 'storeCandidate'])->name('candidates.store');
+        Route::get('/candidates/{id}', [RecruitmentApiController::class, 'showCandidate'])->name('candidates.show');
+        Route::put('/candidates/{id}', [RecruitmentApiController::class, 'updateCandidate'])->name('candidates.update');
+        Route::delete('/candidates/{id}', [RecruitmentApiController::class, 'destroyCandidate'])->name('candidates.destroy');
+
+        // Pipeline / Applications Stage Workflow
+        Route::get('/pipeline/{requisitionId}', [RecruitmentApiController::class, 'getPipeline'])->name('pipeline');
+        Route::patch('/applications/{id}/stage', [RecruitmentApiController::class, 'updateApplicationStage'])->name('applications.stage');
+
+        // Interviews & Scorecards
+        Route::get('/interviews', [RecruitmentApiController::class, 'indexInterviews'])->name('interviews.index');
+        Route::post('/applications/{id}/interviews', [RecruitmentApiController::class, 'scheduleInterview'])->name('applications.interviews.store');
+        Route::post('/interviews/{id}/scorecard', [RecruitmentApiController::class, 'submitScorecard'])->name('interviews.scorecard');
+
+        // Job Offers & Onboarding Conversion
+        Route::get('/offers', [RecruitmentApiController::class, 'indexOffers'])->name('offers.index');
+        Route::post('/applications/{id}/offers', [RecruitmentApiController::class, 'createOffer'])->name('applications.offers.store');
+        Route::post('/offers/{id}/send-email', [RecruitmentApiController::class, 'sendOfferEmail'])->name('offers.send-email');
+        Route::post('/offers/{id}/convert-to-employee', [RecruitmentApiController::class, 'convertToEmployee'])->name('offers.convert-to-employee');
+    });
+
+// ==========================================
+// 24. SOP MANAGEMENT API ROUTES
+// ==========================================
+Route::prefix('api/hrms/sop')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.sop.')
+    ->group(function () {
+        // Summary & Dashboard Metrics
+        Route::get('/summary', [SopApiController::class, 'summary'])->name('summary');
+
+        // SOP Documents CRUD
+        Route::get('/documents', [SopApiController::class, 'index'])->name('documents.index');
+        Route::post('/documents', [SopApiController::class, 'store'])->name('documents.store');
+        Route::get('/documents/{id}', [SopApiController::class, 'show'])->name('documents.show');
+        Route::put('/documents/{id}', [SopApiController::class, 'update'])->name('documents.update');
+        Route::delete('/documents/{id}', [SopApiController::class, 'destroy'])->name('documents.destroy');
+
+        // Document Lifecycle Actions
+        Route::post('/documents/{id}/publish', [SopApiController::class, 'publish'])->name('documents.publish');
+        Route::post('/documents/{id}/archive', [SopApiController::class, 'archive'])->name('documents.archive');
+        Route::post('/documents/{id}/sync-assignments', [SopApiController::class, 'syncAssignments'])->name('documents.sync-assignments');
+        Route::post('/documents/{id}/bulk-remind', [SopApiController::class, 'bulkRemind'])->name('documents.bulk-remind');
+        Route::get('/documents/{id}/assignments', [SopApiController::class, 'documentAssignments'])->name('documents.assignments');
+
+        // Employee Sign-Off & "My SOPs" Workspace
+        Route::get('/my-sops', [SopApiController::class, 'mySops'])->name('my-sops');
+        Route::post('/assignments/{id}/acknowledge', [SopApiController::class, 'acknowledge'])->name('assignments.acknowledge');
+        Route::post('/assignments/{id}/remind', [SopApiController::class, 'remind'])->name('assignments.remind');
+
+        // Organization Overdue Roster
+        Route::get('/overdue-roster', [SopApiController::class, 'overdueRoster'])->name('overdue-roster');
+
+        // Categories Master CRUD
+        Route::get('/categories', [SopApiController::class, 'indexCategories'])->name('categories.index');
+        Route::post('/categories', [SopApiController::class, 'storeCategory'])->name('categories.store');
+        Route::put('/categories/{id}', [SopApiController::class, 'updateCategory'])->name('categories.update');
+        Route::delete('/categories/{id}', [SopApiController::class, 'destroyCategory'])->name('categories.destroy');
+    });
+
+// ==========================================
+// 25. GOALS & OKRS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/goals')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.goals.')
+    ->group(function () {
+        // Summary & Metrics
+        Route::get('/summary', [GoalApiController::class, 'summary'])->name('summary');
+
+        // Goals CRUD & Listings
+        Route::get('/', [GoalApiController::class, 'index'])->name('index');
+        Route::post('/', [GoalApiController::class, 'store'])->name('store');
+        Route::get('/alignment-tree', [GoalApiController::class, 'alignmentTree'])->name('alignment-tree');
+        Route::get('/my-goals', [GoalApiController::class, 'myGoals'])->name('my-goals');
+        Route::get('/{id}', [GoalApiController::class, 'show'])->name('show');
+        Route::put('/{id}', [GoalApiController::class, 'update'])->name('update');
+        Route::delete('/{id}', [GoalApiController::class, 'destroy'])->name('destroy');
+
+        // Check-in
+        Route::post('/{id}/check-in', [GoalApiController::class, 'checkIn'])->name('check-in');
+
+        // Cycles & Categories
+        Route::get('/cycles', [GoalApiController::class, 'indexCycles'])->name('cycles.index');
+        Route::get('/categories', [GoalApiController::class, 'indexCategories'])->name('categories.index');
+    });
+
+
+
+
 
 

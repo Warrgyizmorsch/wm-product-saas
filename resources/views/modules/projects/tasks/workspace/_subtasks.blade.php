@@ -1,15 +1,17 @@
 <div class="border rounded-3 p-3 mb-4">
     <div class="d-flex align-items-center justify-content-between mb-3">
         <h6 class="fw-bold text-dark mb-0"><i class="feather-check-square me-2 text-primary"></i>{{ __('projects.subtasks') }}</h6>
-        <span id="wsSubtasksProgress" class="badge bg-soft-secondary text-secondary fs-11"></span>
+        <x-ui.badge variant="secondary" soft id="wsSubtasksProgress" class="fs-11"></x-ui.badge>
     </div>
 
     <div id="wsSubtasksList" class="mb-2"></div>
 
     @if ($canManageTask)
-        <form id="wsSubtaskAddForm" class="d-flex gap-2" action="{{ route('projects.tasks.subtasks.store', [$project, $task]) }}">
+        <form id="wsSubtaskAddForm" class="d-flex gap-2 align-items-center" action="{{ route('projects.tasks.subtasks.store', [$project, $task]) }}">
             @csrf
-            <input type="text" name="title" class="form-control form-control-sm" placeholder="{{ __('projects.subtask_title_placeholder') }}" required>
+            <div class="flex-grow-1">
+                <x-ui.odoo-form-ui type="input" name="title" placeholder="{{ __('projects.subtask_title_placeholder') }}" :required="true" />
+            </div>
             <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">{{ __('projects.add') }}</button>
         </form>
     @endif

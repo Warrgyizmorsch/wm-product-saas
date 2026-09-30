@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Milestone extends BaseModel
@@ -30,6 +31,11 @@ class Milestone extends BaseModel
         self::STATUS_ON_HOLD,
         self::STATUS_COMPLETED,
         self::STATUS_CLOSED,
+    ];
+
+    protected $attributes = [
+        'status'                => self::STATUS_DRAFT,
+        'completion_percentage' => 0,
     ];
 
     protected $fillable = [
@@ -80,5 +86,10 @@ class Milestone extends BaseModel
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
+    }
+
+    public function documents(): MorphMany
+    {
+        return $this->morphMany(ProjectDocument::class, 'attachable');
     }
 }

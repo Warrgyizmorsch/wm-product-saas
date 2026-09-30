@@ -115,6 +115,64 @@
         font-size: 9px;
         color: #3b82f6;
     }
+
+    /* Single-line text truncation with ellipsis (...) for selects & inputs */
+    .odoo-table-select,
+    select.odoo-table-select,
+    select.odoo-form-control,
+    .odoo-form-control select,
+    #scorecardKpiSelectWrap select,
+    #scorecardKraSelectWrap select {
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        padding-right: 24px !important;
+        max-width: 100% !important;
+    }
+
+    /* Select2 container and single selection truncation */
+    .select2-container {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--single {
+        position: relative !important;
+        padding-right: 24px !important;
+        height: 30px !important;
+        min-height: 30px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        padding-left: 0 !important;
+        padding-right: 16px !important;
+        font-size: 13px !important;
+        color: #212529 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: block !important;
+        max-width: 100% !important;
+        line-height: normal !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+        position: absolute !important;
+        top: 50% !important;
+        right: 0 !important;
+        transform: translateY(-50%) !important;
+        width: 20px !important;
+        height: 20px !important;
+    }
+
+    /* Keep dropdown menu results showing complete text with wrapping */
+    .select2-container--bootstrap-5 .select2-results__option {
+        white-space: normal !important;
+        word-break: break-word !important;
+        line-height: 1.35 !important;
+        padding: 8px 12px !important;
+        font-size: 13px !important;
+    }
 </style>
 @endpush
 
@@ -564,23 +622,72 @@
 </div>
 
 <!-- MODAL: ADD GOAL ITEM TO SCORECARD -->
-<x-ui.modal id="addGoalItemModal" title="Add Custom KPI Goal to Scorecard" size="lg" :showFooter="false">
-    <form method="POST" action="{{ route('hrms.kra-kpi.goal-item.store', $plan->id) }}">
+<x-ui.modal id="addGoalItemModal" title="Add KPI Goal to Scorecard" size="lg" :showFooter="false">
+    <form id="addGoalItemForm" method="POST" action="{{ route('hrms.kra-kpi.goal-item.store', $plan->id) }}">
         @csrf
         <div class="row g-3">
             <div class="col-12">
-                <x-ui.odoo-form-ui type="input" label="KPI Title" name="title" placeholder="e.g., Average Response Time < 15 Mins" :required="true" />
+                <div id="scorecardKpiSelectWrap">
+                    <x-ui.odoo-form-ui type="select" label="KPI Metric" id="scorecardKpiSelect" :required="false">
+                        <option value="">-- Choose Standard KPI --</option>
+                        <option value="__custom__">+ Add Custom KPI (Type Manually)</option>
+                        @foreach($kpiMasters as $km)
+                            <option value="{{ $km->name }}"
+                                data-kpi-id="{{ $km->id }}"
+                                data-kra-id="{{ $km->kra_category_id }}"
+                                data-unit="{{ $km->unit }}"
+                                data-calc="{{ $km->calculation_type }}"
+                                data-target="{{ $km->default_target }}"
+                                data-weight="{{ $km->default_weightage }}">
+                                {{ $km->name }}
+                            </option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+                </div>
+                <!-- In-Place Custom Input Mode (Replaces select in the exact same field) -->
+                <div id="scorecardKpiInputWrap" class="d-none">
+                    <div class="odoo-form-group">
+                        <label class="odoo-form-label" for="scorecardCustomTitleInput">
+                            KPI Metric <span class="text-danger">*</span>
+                        </label>
+                        <div class="flex-grow-1 d-flex align-items-center gap-2">
+                            <input type="text" id="scorecardCustomTitleInput" class="odoo-form-control" placeholder="Type custom KPI goal title..." />
+                            <button type="button" class="btn btn-sm btn-light border px-2 py-0 text-muted" title="Switch back to Standard KPIs list" onclick="switchToScorecardKpiSelect()" style="height: 24px; font-size: 11px; white-space: nowrap;">
+                                <i class="feather-list me-1"></i>List
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" name="title" id="scorecardFinalTitleInput" required />
             </div>
             <div class="col-12">
-                <x-ui.odoo-form-ui type="select" label="KRA Focus" name="kra_category_id">
-                    <option value="">-- General Strategic Area --</option>
-                    @foreach($kraCategories as $kra)
-                        <option value="{{ $kra->id }}">{{ $kra->name }}</option>
-                    @endforeach
-                </x-ui.odoo-form-ui>
+                <div id="scorecardKraSelectWrap">
+                    <x-ui.odoo-form-ui type="select" label="KRA Strategic Focus" id="scorecardKraSelect" :required="false">
+                        <option value="">-- Choose KRA Focus --</option>
+                        <option value="__custom__">+ Add Custom KRA (Type Manually)</option>
+                        @foreach($kraCategories as $kra)
+                            <option value="{{ $kra->id }}">{{ $kra->name }}</option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+                </div>
+                <!-- In-Place Custom Input Mode for KRA -->
+                <div id="scorecardKraInputWrap" class="d-none">
+                    <div class="odoo-form-group">
+                        <label class="odoo-form-label" for="scorecardCustomKraInput">
+                            KRA Focus
+                        </label>
+                        <div class="flex-grow-1 d-flex align-items-center gap-2">
+                            <input type="text" id="scorecardCustomKraInput" class="odoo-form-control" placeholder="Type custom KRA focus area..." />
+                            <button type="button" class="btn btn-sm btn-light border px-2 py-0 text-muted" title="Switch back to KRA list" onclick="switchToScorecardKraSelect()" style="height: 24px; font-size: 11px; white-space: nowrap;">
+                                <i class="feather-list me-1"></i>List
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" name="kra_category_id" id="scorecardFinalKraInput" />
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="Unit of Measure" name="unit" :required="true">
+                <x-ui.odoo-form-ui type="select" label="Unit of Measure" name="unit" id="scorecardUnitSelect" :required="true">
                     <option value="percentage">Percentage (%)</option>
                     <option value="number">Numeric Count</option>
                     <option value="currency">Currency (₹ / $)</option>
@@ -589,17 +696,17 @@
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="Direction" name="calculation_type" :required="true">
+                <x-ui.odoo-form-ui type="select" label="Direction" name="calculation_type" id="scorecardCalcSelect" :required="true">
                     <option value="higher_is_better">Higher is Better</option>
                     <option value="lower_is_better">Lower is Better</option>
                     <option value="milestone">Milestone</option>
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="Target Goal" name="target" value="100.00" :required="true" />
+                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="Target Goal" name="target" id="scorecardTargetInput" value="100.00" :required="true" />
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="Weightage %" name="weightage" value="20.00" :required="true" />
+                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="Weightage %" name="weightage" id="scorecardWeightInput" value="20.00" :required="true" />
             </div>
             <div class="col-12">
                 <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="2" placeholder="Measurement criteria..." />
@@ -717,4 +824,137 @@
 </x-ui.modal>
 
 <x-ui.confirmation-modal />
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectWrap = document.getElementById('scorecardKpiSelectWrap');
+        const inputWrap = document.getElementById('scorecardKpiInputWrap');
+        const customInput = document.getElementById('scorecardCustomTitleInput');
+        const finalTitle = document.getElementById('scorecardFinalTitleInput');
+        const targetInput = document.getElementById('scorecardTargetInput');
+        const weightInput = document.getElementById('scorecardWeightInput');
+
+        const kraSelectWrap = document.getElementById('scorecardKraSelectWrap');
+        const kraInputWrap = document.getElementById('scorecardKraInputWrap');
+        const customKraInput = document.getElementById('scorecardCustomKraInput');
+        const finalKraInput = document.getElementById('scorecardFinalKraInput');
+
+        // Initialize select2 inside modal with dropdownParent
+        if (window.jQuery) {
+            $('#addGoalItemModal').on('shown.bs.modal', function() {
+                $(this).find('.odoo-select2, select').each(function() {
+                    $(this).select2({
+                        theme: 'bootstrap-5',
+                        dropdownParent: $('#addGoalItemModal'),
+                        width: '100%'
+                    });
+                });
+            });
+
+            $(document).on('change change.select2 select2:select', '#scorecardKpiSelect', function() {
+                handleScorecardKpiSelect(this);
+            });
+
+            $(document).on('change change.select2 select2:select', '#scorecardKraSelect', function() {
+                handleScorecardKraSelect(this);
+            });
+        }
+
+        window.handleScorecardKpiSelect = function(sel) {
+            const val = $(sel).val();
+
+            if (val === '__custom__') {
+                if (selectWrap) selectWrap.classList.add('d-none');
+                if (inputWrap) inputWrap.classList.remove('d-none');
+                if (customInput) {
+                    customInput.value = '';
+                    customInput.focus();
+                }
+                if (finalTitle) finalTitle.value = '';
+                return;
+            }
+
+            if (val) {
+                if (finalTitle) finalTitle.value = val;
+                const opt = sel.options ? sel.selectedOptions[0] : null;
+                if (opt) {
+                    if (opt.dataset.kraId && $('#scorecardKraSelect').length) {
+                        switchToScorecardKraSelect();
+                        $('#scorecardKraSelect').val(opt.dataset.kraId).trigger('change.select2');
+                        if (finalKraInput) finalKraInput.value = opt.dataset.kraId;
+                    }
+                    if (opt.dataset.unit && $('#scorecardUnitSelect').length) {
+                        $('#scorecardUnitSelect').val(opt.dataset.unit).trigger('change.select2');
+                    }
+                    if (opt.dataset.calc && $('#scorecardCalcSelect').length) {
+                        $('#scorecardCalcSelect').val(opt.dataset.calc).trigger('change.select2');
+                    }
+                    if (opt.dataset.target && targetInput) {
+                        targetInput.value = opt.dataset.target;
+                    }
+                    if (opt.dataset.weight && weightInput) {
+                        weightInput.value = opt.dataset.weight;
+                    }
+                }
+            } else {
+                if (finalTitle) finalTitle.value = '';
+            }
+        };
+
+        window.switchToScorecardKpiSelect = function() {
+            if (inputWrap) inputWrap.classList.add('d-none');
+            if (selectWrap) selectWrap.classList.remove('d-none');
+            if (window.jQuery && $('#scorecardKpiSelect').length) {
+                $('#scorecardKpiSelect').val('').trigger('change.select2');
+            }
+            if (customInput) customInput.value = '';
+            if (finalTitle) finalTitle.value = '';
+        };
+
+        window.handleScorecardKraSelect = function(sel) {
+            const val = $(sel).val();
+
+            if (val === '__custom__') {
+                if (kraSelectWrap) kraSelectWrap.classList.add('d-none');
+                if (kraInputWrap) kraInputWrap.classList.remove('d-none');
+                if (customKraInput) {
+                    customKraInput.value = '';
+                    customKraInput.focus();
+                }
+                if (finalKraInput) finalKraInput.value = '';
+                return;
+            }
+
+            if (val) {
+                if (finalKraInput) finalKraInput.value = val;
+            } else {
+                if (finalKraInput) finalKraInput.value = '';
+            }
+        };
+
+        window.switchToScorecardKraSelect = function() {
+            if (kraInputWrap) kraInputWrap.classList.add('d-none');
+            if (kraSelectWrap) kraSelectWrap.classList.remove('d-none');
+            if (window.jQuery && $('#scorecardKraSelect').length) {
+                $('#scorecardKraSelect').val('').trigger('change.select2');
+            }
+            if (customKraInput) customKraInput.value = '';
+            if (finalKraInput) finalKraInput.value = '';
+        };
+
+        if (customInput) {
+            customInput.addEventListener('input', function() {
+                if (finalTitle) finalTitle.value = this.value;
+            });
+        }
+
+        if (customKraInput) {
+            customKraInput.addEventListener('input', function() {
+                if (finalKraInput) finalKraInput.value = this.value;
+            });
+        }
+    });
+</script>
+@endpush
 @endsection

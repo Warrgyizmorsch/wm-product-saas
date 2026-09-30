@@ -242,80 +242,91 @@ erDiagram
 
 ---
 
-## 2. Target Future Data Structures
-
-> [!IMPORTANT]
-> The following schemas represent requirements-driven target specifications.
-> **DO NOT write migrations or alter database schema during this baseline phase.**
-> Exact column types and indexes will be finalized during their respective implementation phases.
-
----
-
-### 2.1 `project_time_logs` (Time Tracking & Timesheet)
+### 1.9 `project_time_logs`
 - **Purpose:** Records hours logged by users against tasks and projects for productivity and billing.
-- **Entity Model:** `App\Domains\Projects\Models\TimeLog` *(To be created in Phase 3)*
-- **Proposed Attributes:**
-  - `id`: bigint PK
-  - `tenant_id`, `company_id`, `branch_id` (Tenant Scopes)
-  - `project_id`: FK -> `projects(id)` ON DELETE CASCADE
-  - `task_id`: FK -> `project_tasks(id)` ON DELETE CASCADE
-  - `user_id`: FK -> `users(id)` ON DELETE CASCADE (resource logging time)
+- **Model:** [`App\Domains\Projects\Models\TimeLog`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Domains/Projects/Models/TimeLog.php)
+- **Primary Key:** `id` (bigint unsigned)
+- **Tenant Ownership:** `tenant_id`, `company_id`, `branch_id`
+- **Foreign Keys:**
+  - `project_id` -> `projects(id)` ON DELETE CASCADE
+  - `task_id` -> `project_tasks(id)` ON DELETE CASCADE
+  - `user_id` -> `users(id)` ON DELETE CASCADE
+  - `approved_by` -> `users(id)` ON DELETE SET NULL
+- **Key Columns:**
   - `log_date`: date
   - `start_time`: time, nullable
   - `end_time`: time, nullable
   - `hours`: decimal(8, 2)
   - `is_billable`: boolean, default true
-  - `hourly_rate`: decimal(12, 2), nullable (captured from `project_members.rate_per_hour` at log time)
+  - `hourly_rate`: decimal(12, 2), nullable (derived from `project_members.rate_per_hour`)
   - `description`: text, nullable
   - `approval_status`: string, default 'Pending' (`Pending`, `Approved`, `Rejected`)
-  - `approved_by`: FK -> `users(id)` ON DELETE SET NULL
   - `approved_at`: timestamp, nullable
   - `rejection_remarks`: text, nullable
   - `is_invoiced`: boolean, default false
-  - `invoice_id`: FK -> `invoices(id)` ON DELETE SET NULL (Sales Invoice linkage)
-- **Status:** **TO BE DESIGNED & IMPLEMENTED IN PHASE 3**
+  - `invoice_id`: unsignedBigInteger, nullable (future Sales Invoice link)
+- **Constraints & Indexes:**
+  - INDEX: `['tenant_id', 'project_id']`
+  - INDEX: `['tenant_id', 'task_id']`
+  - INDEX: `['tenant_id', 'user_id']`
+  - INDEX: `['tenant_id', 'approval_status']`
+  - INDEX: `['tenant_id', 'log_date']`
+- **Soft Deletes:** Yes (`deleted_at`)
+- **Status:** **ACTIVE / IN USE**
 
 ---
 
+## 2. Target Future Data Structures
+
+> [!IMPORTANT]
+> The following schemas represent requirements-driven target specifications.
+> Exact column types and indexes will be finalized during their respective implementation phases.
+
+
+
 ### 2.2 `project_issues` (Defect & Issue Management)
 - **Purpose:** Tracks project bugs, quality defects, and resolutions with retest verification.
-- **Entity Model:** `App\Domains\Projects\Models\Issue` *(To be created in Phase 4)*
-- **Proposed Attributes:**
+- **Entity Model:** `App\Domains\Projects\Models\Issue`
+- **Implemented Attributes:**
   - `id`: bigint PK
   - `tenant_id`, `company_id`, `branch_id`
   - `project_id`: FK -> `projects(id)` ON DELETE CASCADE
   - `task_id`: FK -> `project_tasks(id)` ON DELETE SET NULL (optional task link)
   - `issue_number`: string (e.g. `PRJ-0001-ISS-001`)
   - `title`: string
-  - `description`: text
+  - `steps_to_reproduce`: text, nullable
+  - `description`: text, nullable
   - `reporter_id`: FK -> `users(id)` ON DELETE SET NULL
   - `assignee_id`: FK -> `users(id)` ON DELETE SET NULL
-  - `priority`: string (`Low`, `Medium`, `High`, `Critical`)
+  - `priority`: string (`Low`, `Medium`, `High`, `Urgent`)
   - `severity`: string (`Minor`, `Major`, `Critical`)
   - `status`: string, default 'Open' (`Open`, `Assigned`, `In Progress`, `Resolved`, `Closed`)
   - `resolution_date`: timestamp, nullable
   - `resolution_notes`: text, nullable
-- **Status:** **TO BE DESIGNED & IMPLEMENTED IN PHASE 4**
+  - `retest_notes`: text, nullable
+  - `deleted_at`: timestamp, soft deletes
+- **Status:** **COMPLETED & VERIFIED (PHASE 4)**
 
 ---
 
 ### 2.3 `project_documents` (Project File Management)
 - **Purpose:** Central repository for project documentation, architecture blueprints, test cases, and file attachments.
-- **Entity Model:** `App\Domains\Projects\Models\Document` *(To be created in Phase 4)*
-- **Proposed Attributes:**
+- **Entity Model:** `App\Domains\Projects\Models\ProjectDocument`
+- **Implemented Attributes:**
   - `id`: bigint PK
   - `tenant_id`, `company_id`, `branch_id`
   - `project_id`: FK -> `projects(id)` ON DELETE CASCADE
   - `attachable_type`, `attachable_id`: nullable polymorphic relation (link to Task, Issue, or Milestone)
-  - `name`: string
-  - `file_path`: string (storage path)
+  - `title`: string, nullable (user-friendly display title)
+  - `file_path`: string (storage path on tenant disk)
   - `file_name`: string (original filename)
   - `file_size`: integer (bytes)
   - `mime_type`: string
-  - `category`: string (e.g., Requirement, Design, API, Test Case, Meeting Minutes, Attachment)
+  - `category`: string (`Requirement`, `Design`, `API`, `Test Case`, `Meeting Minutes`, `Attachment`)
   - `uploaded_by`: FK -> `users(id)` ON DELETE SET NULL
   - `remarks`: text, nullable
-- **Status:** **TO BE DESIGNED & IMPLEMENTED IN PHASE 4**
+  - `deleted_at`: timestamp, soft deletes
+- **Status:** **COMPLETED & VERIFIED (PHASE 4)**
 
 ---
 

@@ -155,7 +155,14 @@ class VendorApiController extends Controller
                 'purchaseOrders' => fn($q) => $q->latest()->limit(5),
                 'bills'          => fn($q) => $q->latest()->limit(5),
             ])
-            ->findOrFail($id);
+            ->find($id);
+
+        if (!$vendor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor not found',
+            ], 404);
+        }
 
         $totalPurchased = (float) PurchaseOrder::where('tenant_id', $tenantId)->where('vendor_id', $id)->sum('grand_total');
         $totalBilled    = (float) VendorBill::where('tenant_id', $tenantId)->where('vendor_id', $id)->sum('grand_total');
@@ -182,7 +189,14 @@ class VendorApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $vendor     = Vendor::where('tenant_id', $tenantId)->findOrFail($id);
+        $vendor     = Vendor::where('tenant_id', $tenantId)->find($id);
+
+        if (!$vendor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'name'             => ['sometimes', 'required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('vendors')->where('tenant_id', $tenantId)->ignore($vendor->id)],
@@ -221,7 +235,14 @@ class VendorApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $vendor     = Vendor::where('tenant_id', $tenantId)->findOrFail($id);
+        $vendor     = Vendor::where('tenant_id', $tenantId)->find($id);
+
+        if (!$vendor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor not found',
+            ], 404);
+        }
 
         $hasOrders = PurchaseOrder::where('tenant_id', $tenantId)->where('vendor_id', $id)->exists();
         if ($hasOrders) {
@@ -290,7 +311,14 @@ class VendorApiController extends Controller
     public function toggleStatus(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $vendor     = Vendor::where('tenant_id', $tenantId)->findOrFail($id);
+        $vendor     = Vendor::where('tenant_id', $tenantId)->find($id);
+
+        if (!$vendor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor not found',
+            ], 404);
+        }
 
         $vendor->status = $vendor->status === 'active' ? 'inactive' : 'active';
         $vendor->save();

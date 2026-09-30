@@ -115,7 +115,14 @@ class WarehouseApiController extends Controller
     {
         [$tenantId] = $this->resolveTenantContext();
 
-        $warehouse = Warehouse::where('tenant_id', $tenantId)->findOrFail($id);
+        $warehouse = Warehouse::where('tenant_id', $tenantId)->find($id);
+
+        if (!$warehouse) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Warehouse not found',
+            ], 404);
+        }
 
         $stockSummary = ProductWarehouseStock::where('warehouse_id', $id)
             ->with('product:id,name,sku,unit_cost')
@@ -136,7 +143,14 @@ class WarehouseApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $warehouse  = Warehouse::where('tenant_id', $tenantId)->findOrFail($id);
+        $warehouse  = Warehouse::where('tenant_id', $tenantId)->find($id);
+
+        if (!$warehouse) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Warehouse not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'name'           => ['sometimes', 'required', 'string', 'max:255'],
@@ -176,7 +190,14 @@ class WarehouseApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $warehouse  = Warehouse::where('tenant_id', $tenantId)->findOrFail($id);
+        $warehouse  = Warehouse::where('tenant_id', $tenantId)->find($id);
+
+        if (!$warehouse) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Warehouse not found',
+            ], 404);
+        }
 
         $hasStock = ProductWarehouseStock::where('warehouse_id', $id)->where('quantity', '>', 0)->exists();
         if ($hasStock) {

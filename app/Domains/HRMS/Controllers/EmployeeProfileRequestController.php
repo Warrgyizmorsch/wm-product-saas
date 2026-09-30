@@ -2,73 +2,28 @@
 
 namespace App\Domains\HRMS\Controllers;
 
-use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\EmployeeProfileUpdateRequest;
+use App\Domains\HRMS\Repositories\EmployeeProfileRequestRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class EmployeeProfileRequestController extends Controller
 {
+    public function __construct(
+        private readonly EmployeeProfileRequestRepositoryInterface $profileRequestRepository
+    ) {
+    }
+
     public function index(Request $request): View
     {
         $this->authorizeHrms('hrms.employees.view');
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
-        $status = strtolower(trim((string) $request->input('status', 'all')));
-        if (!in_array($status, ['all', 'pending', 'approved', 'rejected'], true)) {
-            $status = 'all';
-        }
-        $search = trim((string) $request->input('search', ''));
-        $departmentId = $request->input('department_id');
-        $sortBy = $request->input('sort_by', 'created_at');
-        $sortOrder = strtolower($request->input('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $data = $this->profileRequestRepository->getIndexData($request->all());
 
-        $query = EmployeeProfileUpdateRequest::query()
-            ->with(['employee.department', 'employee.designation', 'user', 'reviewer'])
-            ->when($tenantId, fn ($q) => $q->where('employee_profile_update_requests.tenant_id', $tenantId))
-            ->when($status !== 'all', fn ($q) => $q->where('employee_profile_update_requests.status', $status))
-            ->when(!empty($departmentId), function ($q) use ($departmentId) {
-                $q->whereHas('employee', function ($eq) use ($departmentId) {
-                    $eq->where('department_id', $departmentId);
-                });
-            })
-            ->when(!empty($search), function ($q) use ($search) {
-                $q->whereHas('employee', function ($eq) use ($search) {
-                    $eq->where('full_name', 'like', "%{$search}%")
-                       ->orWhere('employee_id', 'like', "%{$search}%")
-                       ->orWhere('office_email', 'like', "%{$search}%");
-                });
-            });
-
-        if ($sortBy === 'full_name') {
-            $query->join('employees', 'employee_profile_update_requests.employee_id', '=', 'employees.id')
-                  ->orderBy('employees.full_name', $sortOrder)
-                  ->select('employee_profile_update_requests.*');
-        } elseif (in_array($sortBy, ['created_at', 'reviewed_at', 'id'])) {
-            $query->orderBy('employee_profile_update_requests.' . $sortBy, $sortOrder);
-        } else {
-            $query->latest('employee_profile_update_requests.id');
-        }
-
-        $profileRequests = $query->paginate(15)->withQueryString();
-
-        $departments = \App\Domains\HRMS\Models\Department::when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->orderBy('name')
-            ->get();
-
-        return view('modules.hrms.employees.profile-requests.index', compact(
-            'profileRequests',
-            'status',
-            'search',
-            'departmentId',
-            'departments',
-            'sortBy',
-            'sortOrder'
-        ));
+        return view('modules.hrms.employees.profile-requests.index', $data);
     }
 
     public function approve(Request $request, EmployeeProfileUpdateRequest $profileRequest): RedirectResponse
@@ -84,43 +39,11 @@ class EmployeeProfileRequestController extends Controller
             return redirect()->back()->with('error', 'Associated employee record not found.');
         }
 
-        $changes = $profileRequest->changes ?? [];
-        $employeeUpdates = [];
+        $success = $this->profileRequestRepository->approveRequest($profileRequest);
 
-        foreach ($changes as $field => $data) {
-            $newVal = $data['new'] ?? null;
-            if ($newVal === '—') {
-                $newVal = null;
-            }
-
-            if ($field === 'photo') {
-                if ($newVal && Storage::disk('public')->exists($newVal)) {
-                    if ($employee->photo && Storage::disk('public')->exists($employee->photo)) {
-                        Storage::disk('public')->delete($employee->photo);
-                    }
-                    $permanentPath = 'employees/' . basename($newVal);
-                    Storage::disk('public')->move($newVal, $permanentPath);
-                    $employeeUpdates['photo'] = $permanentPath;
-                }
-            } else {
-                $employeeUpdates[$field] = $newVal;
-            }
-
-            if ($field === 'personal_mobile_number' && $employee->user) {
-                $employee->user->update(['phone' => $newVal]);
-            }
+        if (!$success) {
+            return redirect()->back()->with('error', 'Failed to process employee profile update.');
         }
-
-        if (!empty($employeeUpdates)) {
-            $employee->update($employeeUpdates);
-        }
-
-        $profileRequest->update([
-            'status' => 'approved',
-            'reviewed_by' => auth()->id(),
-            'reviewed_at' => now(),
-            'rejection_reason' => null,
-        ]);
 
         return redirect()->back()->with('success', "Profile edit request for {$employee->full_name} has been approved.");
     }
@@ -136,23 +59,26 @@ class EmployeeProfileRequestController extends Controller
         $employee = $profileRequest->employee;
         $reason = $request->input('rejection_reason', 'Changes rejected by HR administrator.');
 
-        $profileRequest->update([
-            'status' => 'rejected',
-            'rejection_reason' => $reason,
-            'reviewed_by' => auth()->id(),
-            'reviewed_at' => now(),
-        ]);
+        $this->profileRequestRepository->rejectRequest($profileRequest, $reason);
 
         return redirect()->back()->with('success', "Profile edit request for {$employee?->full_name} has been rejected.");
     }
 
     private function authorizeHrms(string $permission): void
     {
-        abort_unless(
-            app(AccessService::class)->allows(auth()->user(), $permission, [
-                'tenant_id' => auth()->user()?->tenant_id,
-            ]),
-            403
-        );
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+
+        $context = ['tenant_id' => $user->tenant_id];
+        $access = app(AccessService::class);
+
+        $allowed = $access->allows($user, $permission, $context)
+            || $access->allows($user, 'hrms.profile_requests.manage', $context)
+            || $access->allows($user, 'hr.settings.manage', $context)
+            || $access->allows($user, 'hrms.employees.manage', $context);
+
+        abort_unless($allowed, 403, 'Unauthorized action in Employee Profile Requests.');
     }
 }

@@ -10,6 +10,7 @@ return [
             ['label' => 'Dashboard', 'route' => 'accounting.dashboard', 'permission' => 'accounting.reports.view'],
             ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index', 'permission' => 'accounting.chart_of_accounts.view'],
             ['label' => 'Cost Centers', 'route' => 'accounting.cost-centers.index', 'permission' => 'accounting.cost_centers.view'],
+            ['label' => 'Ledger Groups', 'route' => 'accounting.ledger-groups.index', 'permission' => 'accounting.ledger_groups.view'],
             // Fixed Asset Register is gated by the HRMS asset-custody permission
             // server-side (AssetRegisterController uses HRMS's AssetPolicy), not a
             // fixed_assets.* permission — mirrors the actual authorize() check.
@@ -28,11 +29,15 @@ return [
             ['label' => 'Contra Vouchers', 'route' => 'accounting.vouchers.contra.index', 'permission' => 'accounting.vouchers.contra.view'],
             ['label' => 'Credit Notes', 'route' => 'accounting.vouchers.credit_note.index', 'permission' => 'accounting.vouchers.credit_note.view'],
             ['label' => 'Debit Notes', 'route' => 'accounting.vouchers.debit_note.index', 'permission' => 'accounting.vouchers.debit_note.view'],
+            ['label' => 'Purchase Vouchers', 'route' => 'accounting.vouchers.purchase.index', 'permission' => 'accounting.vouchers.purchase.view'],
+            ['label' => 'Sales Vouchers', 'route' => 'accounting.vouchers.sales.index', 'permission' => 'accounting.vouchers.sales.view'],
             ['label' => 'Bank Reconciliation', 'route' => 'accounting.bank-reconciliation.index', 'permission' => 'accounting.bank_reconciliation.view'],
             ['label' => 'Fiscal Years & Periods', 'route' => 'accounting.fiscal-years.index', 'permission' => 'accounting.fiscal_years.view'],
             ['label' => 'Tax Rates', 'route' => 'accounting.tax-rates.index', 'permission' => 'accounting.tax_rates.view'],
             ['label' => 'Exchange Rates', 'route' => 'accounting.exchange-rates.index', 'permission' => 'accounting.exchange_rates.view'],
             ['label' => 'Day Book', 'route' => 'accounting.reports.day-book', 'permission' => 'accounting.reports.view'],
+            ['label' => 'Cash Book', 'route' => 'accounting.reports.cash-book', 'permission' => 'accounting.reports.view'],
+            ['label' => 'Bank Book', 'route' => 'accounting.reports.bank-book', 'permission' => 'accounting.reports.view'],
             ['label' => 'Vouchers by Staff', 'route' => 'accounting.reports.vouchers-by-staff', 'permission' => 'accounting.reports.view'],
             ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance', 'permission' => 'accounting.reports.view'],
             ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger', 'permission' => 'accounting.reports.view'],

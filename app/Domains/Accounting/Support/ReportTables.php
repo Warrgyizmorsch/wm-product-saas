@@ -20,6 +20,8 @@ final class ReportTables
 {
     public const TITLES = [
         'day-book' => 'Day Book',
+        'cash-book' => 'Cash Book',
+        'bank-book' => 'Bank Book',
         'trial-balance' => 'Trial Balance',
         'general-ledger' => 'General Ledger',
         'party-ledger' => 'Party Ledger',
@@ -140,6 +142,31 @@ final class ReportTables
         }
 
         array_unshift($meta, ['Party', $d['party']->name.' ('.ucfirst((string) $d['partyType']).')']);
+
+        return ['meta' => $meta, 'sections' => [
+            $this->ledgerSection($d['ledger']['entries'], (float) $d['ledger']['opening'], (float) $d['ledger']['closing']),
+        ]];
+    }
+
+    private function cashBook(array $d): array
+    {
+        return $this->accountBook($d);
+    }
+
+    private function bankBook(array $d): array
+    {
+        return $this->accountBook($d);
+    }
+
+    private function accountBook(array $d): array
+    {
+        $meta = [['Period', $d['from']->format('d M Y').' – '.$d['to']->format('d M Y')]];
+
+        if (! $d['account']) {
+            return ['meta' => $meta, 'sections' => [$this->note('No cash or bank account is configured yet.')]];
+        }
+
+        array_unshift($meta, ['Account', $d['account']->code.' — '.$d['account']->name]);
 
         return ['meta' => $meta, 'sections' => [
             $this->ledgerSection($d['ledger']['entries'], (float) $d['ledger']['opening'], (float) $d['ledger']['closing']),

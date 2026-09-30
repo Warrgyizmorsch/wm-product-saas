@@ -52,13 +52,13 @@ class DatabaseSeeder extends Seeder
             CrmStatusMasterSeeder::class,
             AccountingChartOfAccountsSeeder::class,
             PaymentTermSeeder::class,
-            InventoryMasterDemoSeeder::class,
-            // Kept for future Poona Radiators demo usage:
-            // PoonaRadiatorsProductSeeder::class,
-            // PoonaRadiatorsProductionSeeder::class,
+            // InventoryMasterDemoSeeder::class,
+            // // Kept for future Poona Radiators demo usage:
+            // // PoonaRadiatorsProductSeeder::class,
+            // // PoonaRadiatorsProductionSeeder::class,
 
-            TableManufacturingProductSeeder::class,
-            TableManufacturingProductionSeeder::class,
+            // TableManufacturingProductSeeder::class,
+            // TableManufacturingProductionSeeder::class,
             HrmsDemoSeeder::class,
         ]);
 

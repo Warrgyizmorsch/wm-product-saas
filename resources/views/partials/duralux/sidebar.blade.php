@@ -185,6 +185,8 @@
             ['label' => 'Travel & Expenses', 'icon' => 'feather-navigation', 'route' => 'hrms.travel-expense.index'],
             ['label' => 'KRA & KPI Performance', 'icon' => 'feather-target', 'route' => 'hrms.kra-kpi.index'],
             $isHrAdmin ? ['label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index'] : null,
+            ['label' => 'Goal Management (OKRs)', 'icon' => 'feather-target', 'route' => 'hrms.goals.index'],
+            ['label' => 'SOP Management', 'icon' => 'feather-book-open', 'route' => 'hrms.sop.index'],
             ['label' => 'Broadcasts', 'icon' => 'feather-radio', 'route' => 'hrms.broadcasts.index'],
             ['label' => 'Helpdesk', 'icon' => 'feather-life-buoy', 'route' => 'hrms.helpdesk.tickets.index'],
             ['label' => 'Recruitment', 'icon' => 'feather-user-check', 'route' => 'hrms.recruitment.index'],

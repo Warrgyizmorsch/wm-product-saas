@@ -116,8 +116,11 @@
                                 <x-ui.odoo-form-ui type="select" name="status">
                                     <option value="">{{ __('crm.all_statuses') }}</option>
                                     @foreach($leadStatuses as $ls)
+                                        @php
+                                            $lsDisplayName = \Illuminate\Support\Facades\Lang::has('crm.statuses.' . $ls->name) ? __('crm.statuses.' . $ls->name) : $ls->name;
+                                        @endphp
                                         <option value="{{ $ls->name }}" {{ request('status') === $ls->name ? 'selected' : '' }}>
-                                            {{ __('crm.statuses.' . $ls->name) ?? $ls->name }}
+                                            {{ $lsDisplayName }}
                                         </option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
@@ -173,9 +176,10 @@
                     @foreach($leadStatuses as $ls)
                         @php
                             $statusKey = strtolower($ls->name);
+                            $lsDisplayName = \Illuminate\Support\Facades\Lang::has('crm.statuses.' . $ls->name) ? __('crm.statuses.' . $ls->name) : $ls->name;
                             $tabLabel = match($statusKey) {
                                 'new' => __('crm.tabs.untouched'),
-                                default => strtoupper(__('crm.statuses.' . $ls->name) ?? $ls->name),
+                                default => mb_strtoupper($lsDisplayName),
                             };
                         @endphp
                         <a href="{{ request()->fullUrlWithQuery(['status' => $ls->name, 'duplicates_only' => null]) }}"
@@ -351,11 +355,11 @@
                                                 @endfor
                                             </div>
                                             <span class="badge fs-10 ms-1 priority-badge-{{ $lead->id }} {{ $badgeClasses }}">
-                                                {{ $currentPriority ? (__('crm.priorities.' . $currentPriority) ?? $currentPriority) : 'Unset' }}
+                                                {{ $currentPriority ? (\Illuminate\Support\Facades\Lang::has('crm.priorities.' . $currentPriority) ? __('crm.priorities.' . $currentPriority) : $currentPriority) : 'Unset' }}
                                             </span>
                                         </div>
                                         @if($lead->segment && $lead->segment !== 'Select an Option')
-                                            <div><span class="text-muted">{{ __('crm.segment') }}:</span> <span class="fw-semibold text-dark">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span></div>
+                                            <div><span class="text-muted">{{ __('crm.segment') }}:</span> <span class="fw-semibold text-dark">{{ \Illuminate\Support\Facades\Lang::has('crm.segments.' . $lead->segment) ? __('crm.segments.' . $lead->segment) : $lead->segment }}</span></div>
                                         @endif
                                         @if((!$lead->source || $lead->source === 'Select an Option') && (!$lead->priority || $lead->priority === 'Select an Option') && (!$lead->segment || $lead->segment === 'Select an Option'))
                                             <span class="text-muted">—</span>

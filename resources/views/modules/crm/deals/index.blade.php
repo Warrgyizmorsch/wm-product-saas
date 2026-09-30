@@ -152,7 +152,7 @@
                 </x-ui.sort-dropdown>
 
                 <form method="GET" action="{{ route('crm.deals.index') }}" class="d-inline">
-                    <x-ui.filter :label="__('crm.filter_options')" offset="0, 5">
+                    <x-ui.filter :label="__('crm.filter')" offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                         <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>

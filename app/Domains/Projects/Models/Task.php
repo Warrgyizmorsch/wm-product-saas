@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Task extends BaseModel
@@ -110,4 +111,20 @@ class Task extends BaseModel
     {
         return $this->hasMany(TaskDependency::class, 'depends_on_task_id');
     }
+
+    public function timeLogs(): HasMany
+    {
+        return $this->hasMany(TimeLog::class, 'task_id');
+    }
+
+    public function issues(): HasMany
+    {
+        return $this->hasMany(Issue::class, 'task_id');
+    }
+
+    public function documents(): MorphMany
+    {
+        return $this->morphMany(ProjectDocument::class, 'attachable');
+    }
 }
+
