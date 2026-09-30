@@ -43,12 +43,22 @@ class LeadActivityController extends Controller
         $leads = Lead::where('tenant_id', $tenantId)->orderBy('company_name')->get();
         $users = \App\Models\User::orderBy('name')->get();
 
-        if ($request->has('google_connected') || $request->has('connected') || $request->has('user_id')) {
-            session(['google_calendar_connected' => true]);
+        $calService = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class);
+
+        if ($request->filled('auth_code') || $request->filled('code')) {
+            $authCode = $request->input('auth_code') ?: $request->input('code');
+            $calService->exchangeAuthCode($authCode);
+            return redirect()->route('crm.activities.index');
+        }
+        if ($request->filled('token') || $request->filled('access_token')) {
+            session(['google_token' => $request->input('token') ?: $request->input('access_token')]);
+            return redirect()->route('crm.activities.index');
+        }
+        if ($request->filled('user_id') || $request->filled('google_user_id')) {
+            session(['google_user_id' => $request->input('google_user_id') ?: $request->input('user_id')]);
         }
 
-        $calService = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class);
-        $isGoogleConnected = session('google_calendar_connected', false) || $calService->isAccountConnected(auth()->id());
+        $isGoogleConnected = $calService->isAccountConnected(auth()->id());
 
         return view('modules.crm.activities.index', compact('followups', 'leads', 'users', 'view', 'startDate', 'monthStart', 'monthEnd', 'isGoogleConnected'));
     }

@@ -34,6 +34,9 @@ class GoogleCalendarController extends Controller
             'deal_id' => 'nullable|exists:crm_deals,id',
             'attendees' => 'nullable|array',
             'attendees.*' => 'nullable|email',
+            'token' => 'nullable|string',
+            'access_token' => 'nullable|string',
+            'user_id' => 'nullable',
         ]);
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
@@ -67,14 +70,16 @@ class GoogleCalendarController extends Controller
 
         // Call Google Calendar Integration Service
         $result = $this->calendarService->createEvent([
-            'summary' => $validated['summary'],
-            'description' => $validated['description'] ?? '',
-            'start_time' => $startTime->toIso8601String(),
-            'end_time' => $endTime->toIso8601String(),
-            'attendees' => $attendees,
+            'summary'          => $validated['summary'],
+            'description'      => $validated['description'] ?? '',
+            'start_time'       => $startTime->toIso8601String(),
+            'end_time'         => $endTime->toIso8601String(),
+            'attendees'        => $attendees,
             'create_meet_link' => $createMeetLink,
-            'lead_id' => $validated['lead_id'] ?? null,
-            'deal_id' => $validated['deal_id'] ?? null,
+            'lead_id'          => $validated['lead_id'] ?? null,
+            'deal_id'          => $validated['deal_id'] ?? null,
+            'token'            => $validated['token'] ?? $validated['access_token'] ?? $request->input('token'),
+            'user_id'          => $validated['user_id'] ?? $request->input('user_id'),
         ]);
 
         // Save Followup Activity Record
@@ -148,16 +153,41 @@ class GoogleCalendarController extends Controller
      */
     public function fetchEvents(Request $request): JsonResponse
     {
-        $events = $this->calendarService->getUpcomingEvents(auth()->id(), 50);
+        $events = $this->calendarService->getUpcomingEvents(
+            $request->input('user_id') ? (int)$request->input('user_id') : auth()->id(),
+            50,
+            $request->input('token') ?: $request->input('access_token')
+        );
         return response()->json(['success' => true, 'events' => $events]);
     }
 
     /**
      * Redirect to Google OAuth authorization flow
      */
-    public function connectGoogleAccount()
+    public function connectGoogleAccount(Request $request)
     {
-        $authUrl = $this->calendarService->getAuthUrl('/crm/activities');
+        $redirectUrl = $request->input('next') ?: $request->headers->get('referer') ?: url('/crm/activities');
+        $authUrl = $this->calendarService->getAuthUrl($redirectUrl);
         return redirect()->away($authUrl);
+    }
+
+    /**
+     * Disconnect Google Account & Clear Session Tokens
+     */
+    public function disconnectGoogleAccount(Request $request)
+    {
+        $this->calendarService->disconnectAccount();
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Google Account disconnected successfully.',
+            ]);
+        }
+
+        $referer = $request->headers->get('referer');
+        $redirectUrl = $referer ? strtok($referer, '?') : route('crm.activities.index');
+
+        return redirect()->to($redirectUrl)->with('success', 'Google Account disconnected successfully.');
     }
 }

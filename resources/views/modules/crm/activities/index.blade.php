@@ -117,9 +117,14 @@
 
 @section('page-actions')
     @if(!empty($isGoogleConnected))
-        <span class="badge bg-success-subtle text-success border border-success-subtle py-1.5 px-3 fs-12 fw-bold me-2 align-middle" title="Google Account is Synced & Linked">
-            <i class="feather-check-circle me-1"></i>Google Calendar Synced
-        </span>
+        <div class="d-inline-flex align-items-center gap-1 me-2">
+            <span class="badge bg-success-subtle text-success border border-success-subtle py-1.5 px-3 fs-12 fw-bold align-middle" title="Google Account is Synced & Linked">
+                <i class="feather-check-circle me-1"></i>Google Calendar Synced
+            </span>
+            <a href="{{ route('crm.google-calendar.disconnect') }}" class="btn btn-outline-danger btn-sm py-1 px-2 fs-12 fw-semibold" title="Disconnect Google Account" onclick="return confirm('Disconnect Google Calendar account?')">
+                <i class="feather-log-out me-1"></i>Disconnect
+            </a>
+        </div>
     @else
         <a href="{{ route('crm.google-calendar.connect') }}" target="_blank" class="btn btn-outline-danger btn-sm fw-semibold me-2">
             <i class="feather-calendar me-1"></i>Connect Google Account
@@ -380,7 +385,12 @@
                     <i class="feather-check-circle fs-15 text-success"></i> 
                     <span><strong>Google Calendar Connected:</strong> Events & Google Meet links automatically sync with live push notifications.</span>
                 </div>
-                <span class="badge bg-success text-white fw-bold px-2 py-1"><i class="feather-zap me-1"></i>Active Sync</span>
+                <div class="d-flex align-items-center gap-1">
+                    <span class="badge bg-success text-white fw-bold px-2 py-1"><i class="feather-zap me-1"></i>Active Sync</span>
+                    <a href="{{ route('crm.google-calendar.disconnect') }}" class="btn btn-xs btn-outline-danger fw-bold px-2 py-1" onclick="return confirm('Disconnect Google Calendar account?')">
+                        <i class="feather-log-out me-1"></i>Disconnect
+                    </a>
+                </div>
             </div>
         @else
             <div class="alert alert-info border-0 bg-info-subtle text-info-emphasis d-flex align-items-center justify-content-between flex-wrap gap-2 rounded-3 py-2 px-3 mb-3 fs-12 fw-medium">

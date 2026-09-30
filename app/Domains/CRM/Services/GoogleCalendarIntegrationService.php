@@ -19,6 +19,65 @@ class GoogleCalendarIntegrationService
     }
 
     /**
+     * Exchange a one-time auth_code for a persistent bearer/session token
+     */
+    public function exchangeAuthCode(string $authCode): ?string
+    {
+        try {
+            $response = Http::timeout(10)->post($this->baseUrl . '/auth/token', [
+                'auth_code' => trim($authCode),
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $token = $data['token'] ?? $data['access_token'] ?? $data['session_token'] ?? (is_string($data) ? $data : null);
+                if ($token) {
+                    session(['google_token' => $token]);
+                    session(['google_calendar_connected' => true]);
+                    return $token;
+                }
+            } else {
+                Log::warning('Google Auth Code Exchange failed', ['status' => $response->status(), 'body' => $response->body()]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Google Auth Code Exchange exception: ' . $e->getMessage());
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve user_id and token from params, request, or session
+     */
+    public function resolveCredentials(?int $userId = null, ?string $token = null): array
+    {
+        $resolvedUserId = $userId 
+            ?? (request()?->filled('google_user_id') ? (int) request('google_user_id') : null)
+            ?? (request()?->filled('user_id') ? (int) request('user_id') : null)
+            ?? (session('google_user_id') ? (int) session('google_user_id') : null)
+            ?? auth()->id() 
+            ?? 1;
+
+        $resolvedToken = $token 
+            ?? request()?->input('google_token') 
+            ?? request()?->input('token') 
+            ?? request()?->input('access_token') 
+            ?? session('google_token') 
+            ?? session('google_access_token') 
+            ?? null;
+
+        // If no token yet but auth_code is available, exchange it now
+        if (empty($resolvedToken)) {
+            $authCode = request()?->input('auth_code') ?? request()?->input('code') ?? session('google_auth_code');
+            if (!empty($authCode)) {
+                $resolvedToken = $this->exchangeAuthCode($authCode);
+            }
+        }
+
+        return [$resolvedUserId, $resolvedToken];
+    }
+
+    /**
      * Get Google OAuth Login URL
      */
     public function getAuthUrl(?string $next = null): string
@@ -27,7 +86,7 @@ class GoogleCalendarIntegrationService
         if (!str_starts_with($redirectUrl, 'http')) {
             $redirectUrl = url($redirectUrl);
         }
-        $userId = auth()->id() ?? 1;
+        [$userId] = $this->resolveCredentials();
         return $this->baseUrl . '/auth/login?user_id=' . $userId . '&next=' . urlencode($redirectUrl);
     }
 
@@ -36,23 +95,40 @@ class GoogleCalendarIntegrationService
      */
     public function createEvent(array $params): array
     {
-        $userId = auth()->id() ?? 1;
+        [$userId, $token] = $this->resolveCredentials(
+            !empty($params['user_id']) ? (int)$params['user_id'] : null,
+            $params['token'] ?? $params['access_token'] ?? null
+        );
 
         $payload = [
-            'user_id' => $userId,
-            'summary' => $params['summary'] ?? 'CRM Scheduled Call',
-            'description' => $params['description'] ?? '',
-            'start_time' => Carbon::parse($params['start_time'])->toIso8601String(),
-            'end_time' => Carbon::parse($params['end_time'] ?? Carbon::parse($params['start_time'])->addMinutes(30))->toIso8601String(),
-            'attendees' => array_values(array_filter($params['attendees'] ?? [])),
-            'timezone' => $params['timezone'] ?? 'Asia/Kolkata',
+            'user_id'          => $userId,
+            'token'            => $token,
+            'access_token'     => $token,
+            'summary'          => $params['summary'] ?? 'CRM Scheduled Call',
+            'description'      => $params['description'] ?? '',
+            'start_time'       => Carbon::parse($params['start_time'])->toIso8601String(),
+            'end_time'         => Carbon::parse($params['end_time'] ?? Carbon::parse($params['start_time'])->addMinutes(30))->toIso8601String(),
+            'attendees'        => array_values(array_filter($params['attendees'] ?? [])),
+            'timezone'         => $params['timezone'] ?? 'Asia/Kolkata',
             'create_meet_link' => (bool) ($params['create_meet_link'] ?? false),
-            'deal_id' => !empty($params['deal_id']) ? (int) $params['deal_id'] : null,
+            'deal_id'          => !empty($params['deal_id']) ? (int) $params['deal_id'] : null,
         ];
 
         try {
-            $url = $this->baseUrl . '/workspace/calendar/create-event?user_id=' . $userId;
-            $response = Http::timeout(10)->post($url, $payload);
+            $queryParams = ['user_id' => $userId];
+            if (!empty($token)) {
+                $queryParams['token'] = $token;
+                $queryParams['access_token'] = $token;
+            }
+
+            $url = $this->baseUrl . '/workspace/calendar/create-event?' . http_build_query($queryParams);
+
+            $httpClient = Http::timeout(10);
+            if (!empty($token)) {
+                $httpClient = $httpClient->withToken($token);
+            }
+
+            $response = $httpClient->post($url, $payload);
 
             if ($response->successful()) {
                 $data = $response->json();
@@ -107,13 +183,26 @@ class GoogleCalendarIntegrationService
     /**
      * Get upcoming Google Calendar events
      */
-    public function getUpcomingEvents(?int $userId = null, int $limit = 20): array
+    public function getUpcomingEvents(?int $userId = null, int $limit = 20, ?string $token = null): array
     {
+        [$userId, $token] = $this->resolveCredentials($userId, $token);
+
         try {
-            $response = Http::timeout(5)->get($this->baseUrl . '/workspace/calendar/events', [
+            $queryParams = [
                 'user_id' => $userId,
-                'limit' => $limit
-            ]);
+                'limit'   => $limit,
+            ];
+            if (!empty($token)) {
+                $queryParams['token'] = $token;
+                $queryParams['access_token'] = $token;
+            }
+
+            $httpClient = Http::timeout(5);
+            if (!empty($token)) {
+                $httpClient = $httpClient->withToken($token);
+            }
+
+            $response = $httpClient->get($this->baseUrl . '/workspace/calendar/events', $queryParams);
 
             if ($response->successful()) {
                 return $response->json() ?? [];
@@ -128,21 +217,33 @@ class GoogleCalendarIntegrationService
     /**
      * Check if user's Google Account is connected and authorized
      */
-    public function isAccountConnected(?int $userId = null): bool
+    public function isAccountConnected(?int $userId = null, ?string $token = null): bool
     {
-        if (session('google_calendar_connected')) {
+        [$userId, $token] = $this->resolveCredentials($userId, $token);
+
+        if (empty($token)) {
+            session(['google_calendar_connected' => false]);
+            return false;
+        }
+
+        if (session('google_calendar_connected') === true) {
             return true;
         }
 
-        $userId = $userId ?? (auth()->id() ?? 1);
         try {
-            $response = Http::timeout(3)->get($this->baseUrl . '/workspace/calendar/events', [
+            $queryParams = [
                 'user_id' => $userId,
-                'limit' => 1
-            ]);
+                'limit'   => 1,
+                'token'   => $token,
+                'access_token' => $token,
+            ];
+
+            $httpClient = Http::timeout(3)->withToken($token);
+
+            $response = $httpClient->get($this->baseUrl . '/workspace/calendar/events', $queryParams);
             if ($response->successful()) {
                 $data = $response->json();
-                if (!empty($data['authenticated']) || !empty($data['connected']) || (isset($data['total']) && $data['total'] > 0)) {
+                if (!empty($data['authenticated']) || !empty($data['connected']) || (isset($data['total']) && $data['total'] > 0) || is_array($data)) {
                     session(['google_calendar_connected' => true]);
                     return true;
                 }
@@ -150,6 +251,25 @@ class GoogleCalendarIntegrationService
         } catch (\Throwable $e) {}
 
         return false;
+    }
+
+    /**
+     * Disconnect / logout user from Google integration
+     */
+    public function disconnectAccount(): void
+    {
+        session()->forget([
+            'google_token',
+            'google_access_token',
+            'google_auth_code',
+            'google_user_id',
+        ]);
+        session()->put('google_calendar_connected', false);
+        session()->save();
+
+        try {
+            Http::timeout(3)->get($this->baseUrl . '/auth/logout');
+        } catch (\Throwable $e) {}
     }
 
     /**

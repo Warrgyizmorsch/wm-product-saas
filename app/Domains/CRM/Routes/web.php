@@ -93,6 +93,8 @@ Route::prefix('crm')
             ->name('google-calendar.fetch-events');
         Route::get('google-calendar/connect', [GoogleCalendarController::class, 'connectGoogleAccount'])
             ->name('google-calendar.connect');
+        Route::match(['get', 'post'], 'google-calendar/disconnect', [GoogleCalendarController::class, 'disconnectGoogleAccount'])
+            ->name('google-calendar.disconnect');
         Route::get('leads/track-status', [LeadController::class, 'trackStatus'])
             ->name('leads.trackStatus');
         Route::get('leads/download-sample', [LeadController::class, 'downloadSample'])
