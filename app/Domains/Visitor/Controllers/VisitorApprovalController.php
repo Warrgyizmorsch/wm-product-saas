@@ -83,12 +83,46 @@ class VisitorApprovalController extends Controller
 
         $pass = VisitorPass::where('tenant_id', $tenantId)
             ->where('host_user_id', $userId)
+            ->with(['visitor', 'host'])
             ->findOrFail($id);
 
         $pass->update([
             'status'           => 'Approved',
             'rejection_reason' => null,
         ]);
+
+        $visitorName = $pass->visitor?->full_name ?? 'Visitor';
+        $hostName = auth()->user()?->name ?? 'Host';
+        $title = "Visitor Pass Approved";
+        $message = "{$hostName} approved entry for {$visitorName} ({$pass->pass_number}). You can now check them in.";
+
+        // 1. Notify Security / Admin / Reception Roles in DB (Topbar Bell)
+        \App\Services\Notification\NotificationService::sendToRoles(
+            roles: ['Security', 'Admin', 'Super', 'Receptionist', 'Manager'],
+            title: $title,
+            message: $message,
+            actionUrl: route('visitor.index'),
+            module: 'visitor',
+            type: 'approval_approved',
+            iconClass: 'feather-check-circle',
+            extraData: ['pass_id' => $pass->id, 'tenant_id' => $tenantId]
+        );
+
+        // 2. Real-time Pusher WebSockets Broadcast
+        \App\Services\Pusher\PusherBroadcastService::broadcast(
+            channels: ["visitor-tenant-{$tenantId}", "visitor-gate-desk"],
+            eventName: 'visitor.approved',
+            data: [
+                'pass_id'      => $pass->id,
+                'pass_number'  => $pass->pass_number,
+                'visitor_name' => $visitorName,
+                'host_name'    => $hostName,
+                'status'       => 'Approved',
+                'title'        => $title,
+                'message'      => $message,
+                'url'          => route('visitor.index'),
+            ]
+        );
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
@@ -114,12 +148,47 @@ class VisitorApprovalController extends Controller
 
         $pass = VisitorPass::where('tenant_id', $tenantId)
             ->where('host_user_id', $userId)
+            ->with(['visitor', 'host'])
             ->findOrFail($id);
 
         $pass->update([
             'status'           => 'Rejected',
             'rejection_reason' => $validated['rejection_reason'],
         ]);
+
+        $visitorName = $pass->visitor?->full_name ?? 'Visitor';
+        $hostName = auth()->user()?->name ?? 'Host';
+        $title = "Visitor Pass Rejected";
+        $message = "{$hostName} rejected entry for {$visitorName}. Reason: {$validated['rejection_reason']}";
+
+        // 1. Notify Security / Admin / Reception Roles in DB (Topbar Bell)
+        \App\Services\Notification\NotificationService::sendToRoles(
+            roles: ['Security', 'Admin', 'Super', 'Receptionist', 'Manager'],
+            title: $title,
+            message: $message,
+            actionUrl: route('visitor.index'),
+            module: 'visitor',
+            type: 'approval_rejected',
+            iconClass: 'feather-x-circle',
+            extraData: ['pass_id' => $pass->id, 'tenant_id' => $tenantId]
+        );
+
+        // 2. Real-time Pusher WebSockets Broadcast
+        \App\Services\Pusher\PusherBroadcastService::broadcast(
+            channels: ["visitor-tenant-{$tenantId}", "visitor-gate-desk"],
+            eventName: 'visitor.rejected',
+            data: [
+                'pass_id'          => $pass->id,
+                'pass_number'      => $pass->pass_number,
+                'visitor_name'     => $visitorName,
+                'host_name'        => $hostName,
+                'rejection_reason' => $validated['rejection_reason'],
+                'status'           => 'Rejected',
+                'title'            => $title,
+                'message'          => $message,
+                'url'              => route('visitor.index'),
+            ]
+        );
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([

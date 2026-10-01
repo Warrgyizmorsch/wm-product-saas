@@ -113,6 +113,44 @@ class VisitorController extends Controller
 
         $pass = $this->visitorService->createPass($validated, $tenantId, $companyId, $branchId);
 
+        // If Waiting Approval is selected and host is assigned, send Push Notification & Header notification to Host
+        if ($pass->status === 'Waiting Approval' && $pass->host_user_id) {
+            $visitorName = $pass->visitor?->full_name ?? 'A visitor';
+            $companyName = $pass->visitor?->company_name ? " ({$pass->visitor->company_name})" : '';
+            $title = "Visitor Approval Request";
+            $message = "{$visitorName}{$companyName} has arrived at {$pass->gate_number} for '{$pass->purpose}' and requires your approval.";
+
+            // 1. Insert DB Notification (Visible in Topbar Bell)
+            \App\Services\Notification\NotificationService::send(
+                user: $pass->host_user_id,
+                title: $title,
+                message: $message,
+                actionUrl: route('visitor.approvals.index'),
+                module: 'visitor',
+                type: 'approval_request',
+                iconClass: 'feather-user-check',
+                extraData: ['pass_id' => $pass->id, 'tenant_id' => $tenantId]
+            );
+
+            // 2. Real-time Pusher WebSockets Broadcast
+            \App\Services\Pusher\PusherBroadcastService::broadcast(
+                channels: ["user-{$pass->host_user_id}", "visitor-tenant-{$tenantId}"],
+                eventName: 'visitor.approval_request',
+                data: [
+                    'pass_id'      => $pass->id,
+                    'pass_number'  => $pass->pass_number,
+                    'visitor_name' => $visitorName,
+                    'company_name' => $pass->visitor?->company_name,
+                    'host_user_id' => $pass->host_user_id,
+                    'gate_number'  => $pass->gate_number,
+                    'purpose'      => $pass->purpose,
+                    'title'        => $title,
+                    'message'      => $message,
+                    'url'          => route('visitor.approvals.index'),
+                ]
+            );
+        }
+
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
