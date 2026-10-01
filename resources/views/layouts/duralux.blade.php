@@ -32,9 +32,20 @@
             if (savedSkin === 'app-skin-dark') {
                 document.documentElement.classList.add('app-skin-dark');
             }
+            // Header colour picker → one source of truth for the primary colour.
+            // Sets --bs-primary and its RGB triplet, because Bootstrap/theme
+            // styles (sidebar highlights, soft backgrounds) use rgba(var(--bs-primary-rgb), a).
+            window.erpApplyPrimaryColor = function (hex) {
+                var root = document.documentElement.style;
+                root.setProperty('--bs-primary', hex);
+                var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+                if (m) {
+                    root.setProperty('--bs-primary-rgb', parseInt(m[1], 16) + ', ' + parseInt(m[2], 16) + ', ' + parseInt(m[3], 16));
+                }
+            };
             var savedColor = localStorage.getItem('erp_primary_color');
             if (savedColor) {
-                document.documentElement.style.setProperty('--bs-primary', savedColor);
+                window.erpApplyPrimaryColor(savedColor);
             }
         })();
         window.AppCurrency = {
@@ -299,7 +310,7 @@
                 }
                 picker.on('input change', function () {
                     var color = $(this).val();
-                    document.documentElement.style.setProperty('--bs-primary', color);
+                    window.erpApplyPrimaryColor(color);
                     localStorage.setItem('erp_primary_color', color);
                     if (preview.length) {
                         preview.css('background-color', color);

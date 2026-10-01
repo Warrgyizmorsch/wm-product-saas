@@ -740,6 +740,11 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.journals.view', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'view'],
             ['name' => 'accounting.journals.post', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'post'],
             ['name' => 'accounting.journals.reverse', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'reverse'],
+            // Maker-checker: approving someone else's manual journal/voucher, and
+            // switching approvals on/off. Owner/admin only (via the all-permissions
+            // grant) — deliberately not given to 'accountant', the usual maker.
+            ['name' => 'accounting.journals.approve', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'approve'],
+            ['name' => 'accounting.approvals.configure', 'module' => 'accounting', 'entity' => 'approvals', 'action' => 'configure'],
             ['name' => 'accounting.tax_rates.view', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'view'],
             ['name' => 'accounting.tax_rates.create', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'create'],
             ['name' => 'accounting.tax_rates.update', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'update'],

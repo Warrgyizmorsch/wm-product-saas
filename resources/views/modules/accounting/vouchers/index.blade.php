@@ -28,7 +28,7 @@
         <form method="GET">
             <input type="hidden" name="search" value="{{ $filters['search'] ?? '' }}">
             <x-ui.select label="Status" name="status" :selected="$filters['status'] ?? ''" :options="[
-                '' => 'All', 'posted' => 'Posted', 'reversed' => 'Reversed',
+                '' => 'All', 'pending_approval' => 'Awaiting approval', 'posted' => 'Posted', 'rejected' => 'Rejected', 'reversed' => 'Reversed',
             ]" />
             <x-ui.select label="Posted by" name="posted_by" :selected="$filters['posted_by'] ?? ''" :options="['' => 'Anyone', 'system' => 'System (auto-posted)'] + $posters->pluck('name', 'id')->all()" />
             <x-ui.input label="From" name="from" type="date" :value="$filters['from'] ?? ''" />
@@ -111,13 +111,7 @@
                         <td class="text-muted text-truncate" style="max-width: 260px;">{{ $voucher->memo ?: '—' }}</td>
                         <td class="text-end">{{ number_format(max($voucher->total_debit, $voucher->total_credit), 2) }}</td>
                         <td>
-                            @if ($voucher->status === 'posted')
-                                <x-ui.badge variant="success" soft>Posted</x-ui.badge>
-                            @elseif ($voucher->status === 'reversed')
-                                <x-ui.badge variant="secondary" soft>Reversed</x-ui.badge>
-                            @else
-                                <x-ui.badge variant="warning" soft>Draft</x-ui.badge>
-                            @endif
+                            @include('modules.accounting.journals._status-badge', ['status' => $voucher->status])
                         </td>
                         <td class="text-end pe-4">
                             <x-ui.row-actions :view-url="route('accounting.vouchers.' . $type . '.show', $voucher)" class="justify-content-end" />

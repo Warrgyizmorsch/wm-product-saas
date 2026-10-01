@@ -28,7 +28,7 @@
         <form method="GET">
             <input type="hidden" name="search" value="{{ $filters['search'] ?? '' }}">
             <x-ui.select label="Status" name="status" :selected="$filters['status'] ?? ''" :options="[
-                '' => 'All', 'draft' => 'Draft', 'posted' => 'Posted', 'reversed' => 'Reversed',
+                '' => 'All', 'draft' => 'Draft', 'pending_approval' => 'Awaiting approval', 'posted' => 'Posted', 'rejected' => 'Rejected', 'reversed' => 'Reversed',
             ]" />
             <x-ui.select label="Source" name="source" :selected="$filters['source'] ?? ''" :options="[
                 '' => 'All', 'manual' => 'Manual', 'sales' => 'Sales', 'purchase' => 'Purchase',
@@ -123,13 +123,7 @@
                         <td class="text-end">{{ number_format($journal->total_debit, 2) }}</td>
                         <td class="text-end">{{ number_format($journal->total_credit, 2) }}</td>
                         <td>
-                            @if ($journal->status === 'posted')
-                                <x-ui.badge variant="success" soft>Posted</x-ui.badge>
-                            @elseif ($journal->status === 'reversed')
-                                <x-ui.badge variant="secondary" soft>Reversed</x-ui.badge>
-                            @else
-                                <x-ui.badge variant="warning" soft>Draft</x-ui.badge>
-                            @endif
+                            @include('modules.accounting.journals._status-badge', ['status' => $journal->status])
                         </td>
                         <td class="text-end pe-4">
                             <x-ui.row-actions :view-url="route('accounting.journals.show', $journal)" class="justify-content-end" />

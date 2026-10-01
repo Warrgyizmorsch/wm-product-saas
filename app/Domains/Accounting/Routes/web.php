@@ -32,6 +32,7 @@ use App\Domains\Accounting\Controllers\GstSummaryController;
 use App\Domains\Accounting\Controllers\Gstr1Controller;
 use App\Domains\Accounting\Controllers\Gstr3bController;
 use App\Domains\Accounting\Controllers\JournalController;
+use App\Domains\Accounting\Controllers\JournalApprovalController;
 use App\Domains\Accounting\Controllers\PartyLedgerController;
 use App\Domains\Accounting\Controllers\ProfitLossController;
 use App\Domains\Accounting\Controllers\ReportExportController;
@@ -128,6 +129,12 @@ Route::prefix('accounting')
         Route::post('journals', [JournalController::class, 'store'])->name('journals.store');
         Route::get('journals/{journal}', [JournalController::class, 'show'])->name('journals.show');
         Route::post('journals/{journal}/reverse', [JournalController::class, 'reverse'])->name('journals.reverse');
+
+        // Maker-checker queue for manual journals and vouchers.
+        Route::get('approvals', [JournalApprovalController::class, 'index'])->name('approvals.index');
+        Route::post('approvals/{journal}/approve', [JournalApprovalController::class, 'approve'])->name('approvals.approve');
+        Route::post('approvals/{journal}/reject', [JournalApprovalController::class, 'reject'])->name('approvals.reject');
+        Route::put('approvals/settings', [JournalApprovalController::class, 'updateSettings'])->name('approvals.settings');
 
         Route::get('reports/day-book', [DayBookController::class, 'index'])->name('reports.day-book');
         Route::get('reports/cash-book', [CashBookController::class, 'index'])->name('reports.cash-book');

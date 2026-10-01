@@ -49,6 +49,7 @@ class VoucherController extends Controller
                 'total' => Journal::query()->where('voucher_type', $type)->count(),
                 'posted' => Journal::query()->where('voucher_type', $type)->where('status', Journal::STATUS_POSTED)->count(),
                 'draft' => Journal::query()->where('voucher_type', $type)->where('status', Journal::STATUS_DRAFT)->count(),
+                'pending' => Journal::query()->where('voucher_type', $type)->where('status', Journal::STATUS_PENDING_APPROVAL)->count(),
                 'reversed' => Journal::query()->where('voucher_type', $type)->where('status', Journal::STATUS_REVERSED)->count(),
             ],
         ]);
@@ -97,13 +98,17 @@ class VoucherController extends Controller
                 'payment_method' => $validated['payment_method'] ?? null,
                 'reference_no' => $validated['reference_no'] ?? null,
                 'posted_by' => auth()->id(),
+                // Keyed in by a person: may wait for maker-checker approval.
+                'through_approval' => true,
             ]);
         } catch (InvalidArgumentException $e) {
             return back()->withErrors(['items' => $e->getMessage()])->withInput();
         }
 
         return redirect()->route("accounting.vouchers.{$type}.show", $journal)
-            ->with('success', VoucherType::label($type) . ' posted successfully.');
+            ->with('success', $journal->isPendingApproval()
+                ? VoucherType::label($type) . " {$journal->journal_number} saved and sent for approval. It will post once someone else approves it."
+                : VoucherType::label($type) . ' posted successfully.');
     }
 
     // Note: $journal must precede $type in this signature — 'journal' is a real
@@ -121,6 +126,9 @@ class VoucherController extends Controller
             'label' => VoucherType::label($type),
             'journal' => $this->vouchers->find($type, $journal->id),
             'canReverse' => $this->voucherPolicy->reverse($request->user(), $journal),
+            'canApprove' => $journal->isPendingApproval()
+                && $request->user()->can('approve', $journal)
+                && (int) $journal->posted_by !== (int) $request->user()->id,
         ]);
     }
 
