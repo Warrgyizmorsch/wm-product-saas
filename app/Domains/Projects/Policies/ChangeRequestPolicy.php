@@ -33,6 +33,10 @@ class ChangeRequestPolicy
 
     public function create(User $user, Project $project): bool
     {
+        if ($project->isClosed()) {
+            return false;
+        }
+
         return $this->access->allows($user, 'projects.changerequests.create', [
             'tenant_id' => $project->tenant_id,
             'owner_id'  => $project->owner_id,
@@ -43,6 +47,10 @@ class ChangeRequestPolicy
     {
         $project = $cr->project;
 
+        if ($project?->isClosed()) {
+            return false;
+        }
+
         return $this->access->allows($user, 'projects.changerequests.approve', [
             'tenant_id' => $project->tenant_id,
             'owner_id'  => $project->owner_id,
@@ -52,6 +60,10 @@ class ChangeRequestPolicy
     public function markImplemented(User $user, ChangeRequest $cr): bool
     {
         $project = $cr->project;
+
+        if ($project?->isClosed()) {
+            return false;
+        }
 
         return $this->access->allows($user, 'projects.changerequests.approve', [
             'tenant_id' => $project->tenant_id,
@@ -67,6 +79,10 @@ class ChangeRequestPolicy
     public function delete(User $user, ChangeRequest $cr): bool
     {
         $project = $cr->project;
+
+        if ($project?->isClosed()) {
+            return false;
+        }
 
         return $this->access->allows($user, 'projects.changerequests.create', [
             'tenant_id' => $project->tenant_id,

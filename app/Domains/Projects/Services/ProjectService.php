@@ -95,6 +95,10 @@ class ProjectService
 
         $this->assertTransitionAllowed($oldStatus, $newStatus, $errorField);
 
+        if ($newStatus === Project::STATUS_CLOSED && $newStatus !== $oldStatus) {
+            app(ProjectClosureService::class)->assertClosable($project);
+        }
+
         if ($newStatus === $oldStatus) {
             return $project;
         }
@@ -262,6 +266,10 @@ class ProjectService
         $newStatus = $data['status'] ?? $oldStatus;
 
         $this->assertTransitionAllowed($oldStatus, $newStatus);
+
+        if ($newStatus === Project::STATUS_CLOSED && $newStatus !== $oldStatus) {
+            app(ProjectClosureService::class)->assertClosable($project);
+        }
 
         return DB::transaction(function () use ($project, $data, $oldStatus, $newStatus) {
             if ($newStatus !== $oldStatus) {

@@ -176,12 +176,7 @@
             <i class="feather-flag fs-24"></i>
         </div>
         <div class="fs-15 fw-semibold text-dark mb-1">{{ __('projects.no_milestones_yet') }}</div>
-        <p class="fs-12 text-muted mb-3">{{ __('projects.no_milestones_yet_hint') }}</p>
-        @if ($canManageMilestones)
-            <button type="button" class="btn btn-primary btn-sm" onclick="startMilestoneInlineCreate()">
-                <i class="feather-plus me-1"></i>{{ __('projects.add_milestone') }}
-            </button>
-        @endif
+        <p class="fs-12 text-muted mb-0">{{ __('projects.no_milestones_yet_hint') }}</p>
     </div>
 @else
     <div class="text-center py-5">
@@ -211,6 +206,7 @@
 
 @if ($canManageMilestones)
     @include('modules.projects.milestones._modal')
+    @include('modules.projects.milestones._delete_modal')
     @include('modules.projects.milestones._drawer')
     @include('modules.projects.milestones._create-row')
 

@@ -483,20 +483,34 @@ Before entering the Architecture / Integration Validation gate or proposing any 
 
 ---
 
-### Phase 8: Controlled Project Closure — [PLANNED]
-- **Status:** **PLANNED**
-- **Objective:** Enforce strict business condition gates before a project can be marked closed.
-- **Initial Target Scope (Subject to Phase 8 Audit):**
-  1. **Database:** Migration adding closure columns (`closure_date`, `closure_status`, `client_approval_ref`, `final_remarks`) to `projects`.
-  2. **Closure Service:** Build `ProjectClosureService` that verifies all 5 closure gates:
-     - Zero open tasks or subtasks.
-     - Zero unresolved issues.
-     - Approved Client UAT Review.
-     - All approved time logs invoiced.
-     - Milestones completed.
-  3. **Closure UI:** Dedicated "Close Project" verification modal with blocker checklist.
-  4. **Read-Only / Archival State:** Project transitions to the approved Closed state and follows the ERP's established archival/read-only behavior, subject to Phase 8 audit.
-- **Exit Criteria:** Closure blocked if any gate fails; successful closure transitions status to `Closed` and archives project according to established ERP conventions.
+### Phase 8: Controlled Project Closure — [COMPLETED & FORMALLY VERIFIED]
+- **Status:** **COMPLETED & FORMALLY VERIFIED**
+- **Objective:** Enforce strict business condition gates before a project can be marked closed, and preserve read-only archival immutability.
+- **Phase 8A Audit & Phase 8B Approved Architecture Summary:**
+  1. **Five Condition Gates:**
+     - **Gate 1 (Tasks & Subtasks):** Zero open/in-progress tasks (`whereIn('status', ['Open', 'In Progress', 'Review'])`) and zero incomplete subtasks (`where('is_completed', false)`).
+     - **Gate 2 (Issues):** Zero unresolved issues (`whereNotIn('status', ['Resolved', 'Closed'])`).
+     - **Gate 3 (Governance & Sign-off):** Zero pending reviews (`where('status', 'Pending')`), zero pending change requests (`where('status', 'Pending')`), and if milestones exist, at least one approved review (`where('status', 'Approved')`) must exist (historical rework reviews do not block).
+     - **Gate 4 (Billing Settlement):** Zero approved billable time logs uninvoiced (`where('is_billable', true)->where('approval_status', 'Approved')->where('is_invoiced', false)`), zero pending time logs awaiting approval, and zero completed billable milestones uninvoiced (`where('billing_amount', '>', 0)->where('status', 'Completed')->where('is_invoiced', false)`). Non-billable approved logs and rejected logs do not block.
+     - **Gate 5 (Milestones):** All milestones must be in terminal state (`whereIn('status', ['Completed', 'Closed'])`).
+  2. **Read-Only Archival Immutability:** Child domain policies (`TaskPolicy`, `TimeLogPolicy`, `MilestonePolicy`, `IssuePolicy`, `ProjectReviewPolicy`, `ChangeRequestPolicy`) block mutating operations (`create`, `update`, `delete`, `approve`, `signoff`, etc.) when `$project->isClosed()`, while read-only inspection remains available. Project deletion is blocked in `ProjectPolicy::delete`.
+  3. **State Machine Safeguard:** `ProjectService::changeStatus()` enforces `assertClosable()` when transitioning to `STATUS_CLOSED`, preventing lifecycle bypass.
+- **Phase 8C Implementation Execution Summary:**
+  1. **Database Migration:** Created `2026_10_01_110000_add_closure_fields_to_projects_table.php` adding `closure_date`, `closure_status`, `client_approval_ref`, `final_remarks`, and `closed_by` with foreign keys and indexes.
+  2. **Models & Permissions:** Updated `Project` model with `CLOSURE_STATUSES`, `isClosed()`, and `closedBy()`. Added `projects.projects.close` permission to `RbacSeeder` for `tenant_owner` and `project_manager`.
+  3. **Domain Service:** Created `ProjectClosureService` implementing `evaluateGates()` (diagnostic matrix and localized blocker messages), `assertClosable()` (strict validation exceptions), and `close()` (row-locking transaction, status update, and activity audit `project.closed`).
+  4. **Controller & Form Request:** Created `CloseProjectRequest` and `ProjectClosureController` (`checkGates`, `close`) with JSON and redirect support. Registered routes `projects.closure.check` and `projects.close` in `app/Domains/Projects/Routes/web.php`.
+  5. **UI & Blade Integration:** Created `_close_project_modal.blade.php` utilizing standard `<x-ui.modal>` and `<x-ui.odoo-form-ui>` with real-time gate checklist diagnostics. Added "Close Project" action button and read-only archival banner to `show.blade.php`.
+  6. **Localization:** Complete parity across `lang/en/projects.php`, `lang/hi/projects.php`, and `lang/bg/projects.php` for all gate labels, checklist statuses, blocker alerts, and closure form inputs.
+  7. **Automated Verification:**
+     - `tests/Feature/ProjectClosureTest.php`: 16 automated feature tests passing 100% (288 assertions) covering all 5 gates, historical rework tolerance, unbilled/pending time log rules, child policy immutability, permission checks, state machine transition enforcement, full-form `PUT` update gate enforcement, and EN/HI/BG localization parity.
+     - **Regressions Verified:** `ProjectInlineFieldStatusTest` (18 tests, 46 assertions), `ProjectBillingTest` (7 tests, 36 assertions), `ProjectReviewTest` & `ChangeRequestTest` (23 tests, 100 assertions), `IssueTest` & `TaskTest` (22 tests, 75 assertions), `TimeLogTest` & `TimesheetApprovalTest` (12 tests, 30 assertions) — all passing 100%.
+  8. **Post-Implementation Audit Remediation (Verified):**
+     - Fixed `ProjectService::update()` to enforce `app(ProjectClosureService::class)->assertClosable($project)` on any transition to `Project::STATUS_CLOSED`, eliminating the bypass vector on the full-form `PUT /projects/{project}` route.
+     - Corrected blocker translation key references in `ProjectClosureService` to match canonical keys in `lang/{locale}/projects.php`.
+     - Added focused regression test `test_full_form_update_cannot_bypass_closure_gates` verifying that both direct `ProjectService::update()` and HTTP `PUT /projects/{project}` fail with validation errors when closure gates are unmet.
+- **Exit Criteria Met:** All closure condition gates enforced across both inline and full-form update paths; read-only archival protection verified across domain policies; 100% test pass rate with zero regressions; complete EN/HI/BG localization.
+- **Next Authorized Action:** **Phase 9A — Domain Events & Notifications Read-Only Requirements & Current-State Audit**.
 
 ---
 

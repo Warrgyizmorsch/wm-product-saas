@@ -169,11 +169,6 @@
                     <td colspan="7" class="text-center py-5 text-muted">
                         <i class="feather-folder fs-2 d-block mb-2 text-muted"></i>
                         <div class="fw-semibold">{{ __('projects.no_documents_found') }}</div>
-                        @if ($canUploadDocuments)
-                            <button type="button" class="btn btn-sm btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal">
-                                <i class="feather-upload me-1"></i>{{ __('projects.upload_document') }}
-                            </button>
-                        @endif
                     </td>
                 </tr>
             @endforelse

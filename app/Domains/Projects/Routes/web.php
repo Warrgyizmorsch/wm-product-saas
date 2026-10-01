@@ -4,6 +4,7 @@ use App\Domains\Projects\Controllers\IssueController;
 use App\Domains\Projects\Controllers\MilestoneController;
 use App\Domains\Projects\Controllers\ProjectActivityLogController;
 use App\Domains\Projects\Controllers\ProjectBillingController;
+use App\Domains\Projects\Controllers\ProjectClosureController;
 use App\Domains\Projects\Controllers\ProjectController;
 use App\Domains\Projects\Controllers\ProjectDocumentController;
 use App\Domains\Projects\Controllers\ProjectMemberController;
@@ -32,6 +33,7 @@ Route::prefix('projects')
         Route::get('lookups/owners', [ProjectController::class, 'searchOwners'])->name('lookups.owners');
 
         Route::get('milestones', [MilestoneController::class, 'index'])->name('milestones.index');
+        Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
         Route::get('timesheets/approval', [TimesheetApprovalController::class, 'index'])->name('timesheets.approval');
         Route::patch('timesheets/{timeLog}/approve', [TimesheetApprovalController::class, 'approve'])->name('timesheets.approve');
         Route::patch('timesheets/{timeLog}/reject', [TimesheetApprovalController::class, 'reject'])->name('timesheets.reject');
@@ -41,6 +43,9 @@ Route::prefix('projects')
         Route::put('{project}', [ProjectController::class, 'update'])->name('update');
         Route::patch('{project}/field', [ProjectController::class, 'updateField'])->name('field');
         Route::delete('{project}', [ProjectController::class, 'destroy'])->name('destroy');
+
+        Route::get('{project}/closure-check', [ProjectClosureController::class, 'checkGates'])->name('closure.check');
+        Route::post('{project}/close', [ProjectClosureController::class, 'close'])->name('close');
 
         Route::get('{project}/activity', [ProjectActivityLogController::class, 'index'])->name('activity');
 

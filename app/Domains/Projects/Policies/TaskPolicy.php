@@ -20,6 +20,10 @@ class TaskPolicy
 
     public function create(User $user, Project $project): bool
     {
+        if ($project->isClosed()) {
+            return false;
+        }
+
         return $this->authorizeOnProject($user, $project, 'projects.tasks.create');
     }
 
@@ -30,11 +34,19 @@ class TaskPolicy
 
     public function update(User $user, Task $task): bool
     {
+        if ($task->project?->isClosed()) {
+            return false;
+        }
+
         return $this->authorizeOnTask($user, $task, 'projects.tasks.update');
     }
 
     public function delete(User $user, Task $task): bool
     {
+        if ($task->project?->isClosed()) {
+            return false;
+        }
+
         return $this->authorizeOnTask($user, $task, 'projects.tasks.delete');
     }
 

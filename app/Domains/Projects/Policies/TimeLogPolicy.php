@@ -26,6 +26,10 @@ class TimeLogPolicy
 
     public function create(User $user, Project $project): bool
     {
+        if ($project->isClosed()) {
+            return false;
+        }
+
         return $this->access->allows($user, 'projects.timetracking.log', [
             'tenant_id' => $project->tenant_id,
             'owner_id'  => $project->owner_id,
@@ -43,12 +47,20 @@ class TimeLogPolicy
 
     public function update(User $user, TimeLog $timeLog): bool
     {
+        if ($timeLog->project?->isClosed()) {
+            return false;
+        }
+
         return $this->authorizeOnLog($user, $timeLog, 'projects.timetracking.log')
             || $this->authorizeOnLog($user, $timeLog, 'projects.tasks.update');
     }
 
     public function delete(User $user, TimeLog $timeLog): bool
     {
+        if ($timeLog->project?->isClosed()) {
+            return false;
+        }
+
         return $this->authorizeOnLog($user, $timeLog, 'projects.timetracking.log')
             || $this->authorizeOnLog($user, $timeLog, 'projects.tasks.delete');
     }
@@ -56,6 +68,10 @@ class TimeLogPolicy
     public function approve(User $user, TimeLog $timeLog): bool
     {
         $project = $timeLog->project;
+
+        if ($project?->isClosed()) {
+            return false;
+        }
 
         return $this->access->allows($user, 'projects.timetracking.approve', [
             'tenant_id' => $timeLog->tenant_id,

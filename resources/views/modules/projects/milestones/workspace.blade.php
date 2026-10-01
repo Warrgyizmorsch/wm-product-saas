@@ -62,6 +62,7 @@
 
     @if ($canManageMilestones)
         @include('modules.projects.milestones._modal')
+        @include('modules.projects.milestones._delete_modal')
         @include('modules.projects.milestones._drawer')
     @endif
 

@@ -33,6 +33,10 @@ class ProjectReviewPolicy
 
     public function create(User $user, Project $project): bool
     {
+        if ($project->isClosed()) {
+            return false;
+        }
+
         return $this->access->allows($user, 'projects.reviews.create', [
             'tenant_id' => $project->tenant_id,
             'owner_id'  => $project->owner_id,
@@ -43,6 +47,10 @@ class ProjectReviewPolicy
     {
         $project = $review->project;
 
+        if ($project?->isClosed()) {
+            return false;
+        }
+
         return $this->access->allows($user, 'projects.reviews.signoff', [
             'tenant_id' => $project->tenant_id,
             'owner_id'  => $project->owner_id,
@@ -52,6 +60,10 @@ class ProjectReviewPolicy
     public function delete(User $user, ProjectReview $review): bool
     {
         $project = $review->project;
+
+        if ($project?->isClosed()) {
+            return false;
+        }
 
         return $this->access->allows($user, 'projects.reviews.signoff', [
             'tenant_id' => $project->tenant_id,

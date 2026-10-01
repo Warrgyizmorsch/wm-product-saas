@@ -41,9 +41,8 @@
             ]],
             ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [
                 ['label' => __('ui.projects'), 'route' => 'projects.index'],
-                ['label' => __('projects.milestones'), 'route' => 'projects.milestones.index'],
-                'Tasks',
-                'Timesheets',
+                ['label' => __('projects.tasks'), 'route' => 'projects.tasks.index'],
+                ['label' => __('projects.timesheets'), 'route' => 'projects.timesheets.approval'],
             ]],
         ],
         __('ui.supply_chain') => [

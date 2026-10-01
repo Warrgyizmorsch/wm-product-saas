@@ -135,14 +135,27 @@ class MilestoneService
         });
     }
 
-    public function delete(Milestone $milestone): bool
+    public function delete(Milestone $milestone, string $taskAction = 'unlink'): bool
     {
-        return DB::transaction(function () use ($milestone) {
+        return DB::transaction(function () use ($milestone, $taskAction) {
+            $project = $milestone->project;
+
+            if ($taskAction === 'delete') {
+                $taskService = app(TaskService::class);
+                foreach ($milestone->tasks as $task) {
+                    $taskService->delete($task);
+                }
+            } else {
+                $milestone->tasks()->update(['milestone_id' => null]);
+            }
+
+            $milestone->taskLists()->update(['milestone_id' => null]);
+
             $this->activity->record(
-                $milestone->project,
+                $project,
                 'milestone.deleted',
                 "Milestone '{$milestone->name}' deleted",
-                null,
+                $taskAction === 'delete' ? 'Associated tasks were deleted' : 'Associated tasks were unlinked',
                 $milestone,
             );
 

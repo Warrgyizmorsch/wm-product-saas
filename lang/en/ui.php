@@ -78,6 +78,7 @@ return [
     'owner' => 'Owner',
     'password' => 'Password',
     'payroll_this_month' => 'Payroll This Month',
+    'refresh' => 'Refresh',
     'planned' => 'Planned',
     'platform' => 'Platform',
     'platform_admin' => 'Platform Admin',

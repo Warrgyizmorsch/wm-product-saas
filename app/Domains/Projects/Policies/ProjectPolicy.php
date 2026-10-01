@@ -44,9 +44,28 @@ class ProjectPolicy
 
     public function delete(User $user, Project $project): bool
     {
+        if ($project->isClosed()) {
+            return false;
+        }
+
         return $this->access->allows($user, 'projects.projects.delete', [
             'tenant_id' => $project->tenant_id,
             'owner_id' => $project->owner_id,
+        ]);
+    }
+
+    public function close(User $user, Project $project): bool
+    {
+        if ($project->isClosed()) {
+            return false;
+        }
+
+        return $this->access->allows($user, 'projects.projects.close', [
+            'tenant_id' => $project->tenant_id,
+            'owner_id'  => $project->owner_id,
+        ]) || $this->access->allows($user, 'projects.projects.update', [
+            'tenant_id' => $project->tenant_id,
+            'owner_id'  => $project->owner_id,
         ]);
     }
 

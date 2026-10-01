@@ -42,6 +42,9 @@
     </form>
 
     <x-slot name="footer">
+        <a id="milestoneDetailWorkspaceBtn" href="#" class="btn btn-outline-primary d-none">
+            <i class="feather-maximize-2 me-1"></i>{{ __('projects.open_workspace') }}
+        </a>
         <button type="button" class="btn btn-outline-danger" onclick="deleteCurrentMilestone()">
             <i class="feather feather-trash-2 me-1"></i>{{ __('projects.remove') }}
         </button>
@@ -94,6 +97,16 @@
             statusEl.textContent = '—';
         }
 
+        var workspaceBtn = document.getElementById('milestoneDetailWorkspaceBtn');
+        if (workspaceBtn) {
+            if (data.showUrl) {
+                workspaceBtn.href = data.showUrl;
+                workspaceBtn.classList.remove('d-none');
+            } else {
+                workspaceBtn.classList.add('d-none');
+            }
+        }
+
         var drawerEl = document.getElementById('milestoneDrawer');
         if (drawerEl && window.bootstrap) {
             bootstrap.Offcanvas.getOrCreateInstance(drawerEl).show();
@@ -128,10 +141,15 @@
     function deleteCurrentMilestone() {
         if (!currentMilestoneData || !currentMilestoneData.deleteUrl) return;
 
-        confirmAction(@js(__('projects.confirm_remove_milestone')), function () {
-            var form = document.getElementById('milestoneDeleteForm');
-            form.action = currentMilestoneData.deleteUrl;
-            form.submit();
-        });
+        hideMilestoneDetailsDrawer();
+        if (typeof openDeleteMilestoneModal === 'function') {
+            openDeleteMilestoneModal(currentMilestoneData.deleteUrl, currentMilestoneData.name, currentMilestoneData.tasksCount || 0);
+        } else {
+            confirmAction(@js(__('projects.confirm_remove_milestone')), function () {
+                var form = document.getElementById('milestoneDeleteForm');
+                form.action = currentMilestoneData.deleteUrl;
+                form.submit();
+            });
+        }
     }
 </script>

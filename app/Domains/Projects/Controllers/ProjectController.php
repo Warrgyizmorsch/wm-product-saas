@@ -241,6 +241,7 @@ class ProjectController extends Controller
             'canCreateCRs'        => $canCreateCRs,
             'canViewBilling'      => $canViewBilling,
             'canGenerateInvoice'  => $canGenerateInvoice,
+            'canCloseProject'     => auth()->user()->can('close', $project),
             'billingSummary'      => $billingSummary,
             'unbilledTimeLogs'    => $unbilledTimeLogs,
             'unbilledMilestones'  => $unbilledMilestones,

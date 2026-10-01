@@ -39,6 +39,33 @@
             <div class="mb-4"></div>
         @endif
 
+        @if ($project->isClosed())
+            <div class="alert alert-dark d-flex align-items-center mb-4 border-0 shadow-sm" role="alert" style="background: #f8fafc; border-left: 4px solid #475569 !important;">
+                <i class="feather-archive fs-3 me-3 text-secondary"></i>
+                <div class="flex-grow-1">
+                    <h6 class="alert-heading fw-bold mb-1 text-dark">{{ __('projects.project_is_closed') }}</h6>
+                    <p class="mb-0 fs-12 text-muted">
+                        {{ __('projects.project_is_closed_description') }}
+                        @if ($project->closure_date)
+                            — <strong>{{ __('projects.closed_on') }}:</strong> {{ $project->closure_date->format('d M Y') }}
+                        @endif
+                        @if ($project->closedBy)
+                            | <strong>{{ __('projects.closed_by') }}:</strong> {{ $project->closedBy->name }}
+                        @endif
+                        @if ($project->client_approval_ref)
+                            | <strong>{{ __('projects.client_approval_ref') }}:</strong> {{ $project->client_approval_ref }}
+                        @endif
+                    </p>
+                    @if ($project->final_remarks)
+                        <div class="mt-1 fs-12 text-secondary fst-italic">
+                            "{{ $project->final_remarks }}"
+                        </div>
+                    @endif
+                </div>
+                <span class="badge bg-secondary text-uppercase ms-3 px-3 py-2 fs-11">{{ __('projects.statuses.Closed') }}</span>
+            </div>
+        @endif
+
         {{-- Header Identity Row --}}
         @php
             $projectStatusVariant = match ($project->status) {
@@ -66,6 +93,11 @@
                 </x-ui.badge>
             </h4>
             <div class="d-flex flex-wrap align-items-center gap-2">
+                @if (!$project->isClosed() && $canCloseProject)
+                    <button type="button" class="btn btn-outline-danger project-header-activity-btn" data-bs-toggle="modal" data-bs-target="#modalCloseProject">
+                        <i class="feather-check-circle me-1"></i>{{ __('projects.close_project') }}
+                    </button>
+                @endif
                 <a href="javascript:void(0);" onclick="openActivityDrawer('{{ route('projects.activity', $project) }}')"
                     class="btn btn-primary project-header-activity-btn">
                     <i class="feather-activity me-2"></i>{{ __('projects.activity') }}
@@ -424,6 +456,9 @@
     @endif
     @if ($canViewBilling && $canGenerateInvoice)
         @include('modules.projects._generate_invoice_modal')
+    @endif
+    @if (!$project->isClosed() && $canCloseProject)
+        @include('modules.projects._close_project_modal')
     @endif
 
     @push('scripts')

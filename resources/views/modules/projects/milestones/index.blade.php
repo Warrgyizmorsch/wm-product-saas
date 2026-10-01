@@ -65,29 +65,25 @@
                         <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.due_date') }}</th>
                         <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.status') }}</th>
                         <th scope="col" style="width: 1%; white-space: nowrap;">{{ __('projects.completion_percentage') }}</th>
+                        <th scope="col" style="width: 1%; white-space: nowrap;" class="text-end">{{ __('projects.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($milestones as $milestone)
-                        <tr @if ($milestone->project) @can('update', $milestone) role="button" style="cursor: pointer;"
-                                onclick="openMilestoneDetailsDrawer({
-                                    id: {{ $milestone->id }},
-                                    updateUrl: @js(route('projects.milestones.update', [$milestone->project, $milestone->id])),
-                                    deleteUrl: @js(route('projects.milestones.destroy', [$milestone->project, $milestone->id])),
-                                    name: @js($milestone->name),
-                                    description: @js($milestone->description),
-                                    ownerId: @js($milestone->owner_id),
-                                    ownerName: @js($milestone->owner?->name),
-                                    startDate: @js($milestone->start_date?->format('Y-m-d')),
-                                    dueDate: @js($milestone->due_date?->format('Y-m-d')),
-                                    startDateDisplay: @js($milestone->start_date?->format('d/m/Y')),
-                                    dueDateDisplay: @js($milestone->due_date?->format('d/m/Y')),
-                                    status: @js($milestone->status),
-                                    completionPercentage: {{ $milestone->completion_percentage }}
-                                })"
-                            @endcan @endif>
+                        <tr @if ($milestone->project)
+                                class="cursor-pointer"
+                                onclick="window.location='{{ route('projects.milestones.show', [$milestone->project, $milestone]) }}'"
+                            @endif>
                             <td>
-                                <div class="fw-semibold text-dark">{{ $milestone->name }}</div>
+                                <div class="fw-semibold text-dark">
+                                    @if ($milestone->project)
+                                        <a href="{{ route('projects.milestones.show', [$milestone->project, $milestone]) }}" class="fw-semibold text-dark hover-primary text-decoration-none" onclick="event.stopPropagation();">
+                                            {{ $milestone->name }}
+                                        </a>
+                                    @else
+                                        {{ $milestone->name }}
+                                    @endif
+                                </div>
                                 @if ($milestone->description)
                                     <div class="fs-11 text-muted">{{ \Illuminate\Support\Str::limit($milestone->description, 60) }}</div>
                                 @endif
@@ -124,10 +120,43 @@
                                 @endif
                             </td>
                             <td>{{ $milestone->completion_percentage }}%</td>
+                            <td class="text-end" onclick="event.stopPropagation();">
+                                @if ($milestone->project)
+                                    <div class="d-inline-flex align-items-center gap-1">
+                                        <a href="{{ route('projects.milestones.show', [$milestone->project, $milestone]) }}" class="btn btn-sm btn-icon btn-light" title="{{ __('projects.view_milestone') }}">
+                                            <i class="feather-eye"></i>
+                                        </a>
+                                        @can('update', $milestone)
+                                            <button type="button" class="btn btn-sm btn-icon btn-light" title="{{ __('projects.milestone_details') }}"
+                                                onclick="openMilestoneDetailsDrawer({
+                                                    id: {{ $milestone->id }},
+                                                    showUrl: @js(route('projects.milestones.show', [$milestone->project, $milestone])),
+                                                    updateUrl: @js(route('projects.milestones.update', [$milestone->project, $milestone])),
+                                                    deleteUrl: @js(route('projects.milestones.destroy', [$milestone->project, $milestone])),
+                                                    name: @js($milestone->name),
+                                                    description: @js($milestone->description),
+                                                    ownerId: @js($milestone->owner_id),
+                                                    ownerName: @js($milestone->owner?->name),
+                                                    startDate: @js($milestone->start_date?->format('Y-m-d')),
+                                                    dueDate: @js($milestone->due_date?->format('Y-m-d')),
+                                                    startDateDisplay: @js($milestone->start_date?->format('d/m/Y')),
+                                                    dueDateDisplay: @js($milestone->due_date?->format('d/m/Y')),
+                                                    status: @js($milestone->status),
+                                                    completionPercentage: {{ $milestone->completion_percentage }},
+                                                    tasksCount: {{ $milestone->tasks_count ?? 0 }}
+                                                })">
+                                                <i class="feather-sidebar"></i>
+                                            </button>
+                                        @endcan
+                                    </div>
+                                @else
+                                    —
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-4">
+                            <td colspan="8" class="text-center text-muted py-4">
                                 <i class="feather-info me-2 fs-16"></i>{{ __('projects.no_milestones_found') }}
                             </td>
                         </tr>
@@ -144,5 +173,6 @@
     </div>
 
     @include('modules.projects.milestones._modal')
+    @include('modules.projects.milestones._delete_modal')
     @include('modules.projects.milestones._drawer')
 @endsection

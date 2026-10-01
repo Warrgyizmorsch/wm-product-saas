@@ -118,7 +118,7 @@
                     </li>
                     <li>
                         <a class="dropdown-item text-danger" href="javascript:void(0);"
-                           onclick="confirmAction(@js(__('projects.confirm_remove_milestone')), function () { document.getElementById('milestoneRowDeleteForm{{ $milestone->id }}').submit(); })">
+                           onclick="openDeleteMilestoneModal('{{ route('projects.milestones.destroy', [$project, $milestone->id]) }}', @js($milestone->name), {{ $rowTasksTotal }})">
                             <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
                         </a>
                     </li>
@@ -166,7 +166,7 @@
                     </li>
                     <li>
                         <a class="dropdown-item text-danger" href="javascript:void(0);"
-                           onclick="confirmAction(@js(__('projects.confirm_remove_milestone')), function () { document.getElementById('milestoneRowDeleteFormMobile{{ $milestone->id }}').submit(); })">
+                           onclick="openDeleteMilestoneModal('{{ route('projects.milestones.destroy', [$project, $milestone->id]) }}', @js($milestone->name), {{ $rowTasksTotal }})">
                             <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
                         </a>
                     </li>
