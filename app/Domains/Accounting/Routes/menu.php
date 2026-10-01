@@ -32,9 +32,13 @@ return [
             ['label' => 'Purchase Vouchers', 'route' => 'accounting.vouchers.purchase.index', 'permission' => 'accounting.vouchers.purchase.view'],
             ['label' => 'Sales Vouchers', 'route' => 'accounting.vouchers.sales.index', 'permission' => 'accounting.vouchers.sales.view'],
             ['label' => 'Bank Reconciliation', 'route' => 'accounting.bank-reconciliation.index', 'permission' => 'accounting.bank_reconciliation.view'],
+            ['label' => 'Bank Rules', 'route' => 'accounting.bank-rules.index', 'permission' => 'accounting.bank_reconciliation.view'],
             ['label' => 'Fiscal Years & Periods', 'route' => 'accounting.fiscal-years.index', 'permission' => 'accounting.fiscal_years.view'],
             ['label' => 'Tax Rates', 'route' => 'accounting.tax-rates.index', 'permission' => 'accounting.tax_rates.view'],
-            ['label' => 'Exchange Rates', 'route' => 'accounting.exchange-rates.index', 'permission' => 'accounting.exchange_rates.view'],
+            // Hidden: each tenant runs in a single base currency (organization default),
+            // so exchange rates feed nothing. Page, routes and rate sync remain reachable
+            // at /accounting/exchange-rates — uncomment to restore the menu entry.
+            // ['label' => 'Exchange Rates', 'route' => 'accounting.exchange-rates.index', 'permission' => 'accounting.exchange_rates.view'],
             ['label' => 'Day Book', 'route' => 'accounting.reports.day-book', 'permission' => 'accounting.reports.view'],
             ['label' => 'Cash Book', 'route' => 'accounting.reports.cash-book', 'permission' => 'accounting.reports.view'],
             ['label' => 'Bank Book', 'route' => 'accounting.reports.bank-book', 'permission' => 'accounting.reports.view'],
@@ -50,6 +54,7 @@ return [
             ['label' => 'GST Summary', 'route' => 'accounting.reports.gst-summary', 'permission' => 'accounting.reports.view'],
             ['label' => 'GSTR-1', 'route' => 'accounting.reports.gstr1', 'permission' => 'accounting.reports.view'],
             ['label' => 'GSTR-3B', 'route' => 'accounting.reports.gstr3b', 'permission' => 'accounting.reports.view'],
+            ['label' => 'Upload GST Returns', 'route' => 'accounting.gst-returns.gstr1', 'permission' => 'accounting.gst_returns.view'],
             ['label' => 'Audit Trail', 'route' => 'accounting.reports.audit-trail', 'permission' => 'accounting.reports.view'],
             // Budget vs Actual is the one report that checks accounting.budgets.view, not accounting.reports.view.
             ['label' => 'Budget vs Actual', 'route' => 'accounting.reports.budget-vs-actual', 'permission' => 'accounting.budgets.view'],

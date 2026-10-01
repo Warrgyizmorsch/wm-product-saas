@@ -39,14 +39,22 @@ class VoucherService
             throw new InvalidArgumentException("Unknown voucher type: {$voucherType}");
         }
 
-        $journal = $this->journals->post($lines, [
+        // tenant/company/branch and reference_* are optional: a voucher posted
+        // from another screen (e.g. bank reconciliation) passes them so the
+        // voucher lands in the right entity and links back to its source.
+        $journal = $this->journals->post($lines, array_filter([
+            'tenant_id' => $meta['tenant_id'] ?? null,
+            'company_id' => $meta['company_id'] ?? null,
+            'branch_id' => $meta['branch_id'] ?? null,
             'journal_date' => $meta['journal_date'] ?? now(),
             'source' => Journal::SOURCE_MANUAL,
             'voucher_type' => $voucherType,
             'journal_number_prefix' => VoucherType::prefix($voucherType),
+            'reference_type' => $meta['reference_type'] ?? null,
+            'reference_id' => $meta['reference_id'] ?? null,
             'memo' => $meta['memo'] ?? null,
             'posted_by' => $meta['posted_by'] ?? null,
-        ]);
+        ], fn ($value) => $value !== null));
 
         $this->voucherDetails->create([
             'tenant_id' => $journal->tenant_id,

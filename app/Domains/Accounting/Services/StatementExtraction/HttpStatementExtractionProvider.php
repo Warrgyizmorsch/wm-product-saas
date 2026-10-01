@@ -15,8 +15,18 @@ use Illuminate\Support\Facades\Http;
  * is sent as a Bearer token only when configured, so a future auth layer in
  * front of the API doesn't need a code change here.
  */
-class HttpStatementExtractionProvider implements StatementExtractionProvider
+class HttpStatementExtractionProvider implements StatementExtractionProvider, SupportsStatementPassword
 {
+    private ?string $password = null;
+
+    public function withPassword(?string $password): static
+    {
+        $copy = clone $this;
+        $copy->password = ($password === null || $password === '') ? null : $password;
+
+        return $copy;
+    }
+
     public function extract(string $absolutePath, string $mimeType): array
     {
         $url = config('services.statement_extraction.url');
@@ -35,9 +45,12 @@ class HttpStatementExtractionProvider implements StatementExtractionProvider
         }
 
         try {
-            $response = $request
-                ->attach('file', file_get_contents($absolutePath), basename($absolutePath))
-                ->post(rtrim($url, '/') . '/parse');
+            $request = $request->attach('file', file_get_contents($absolutePath), basename($absolutePath));
+
+            // The parser API takes the PDF password as a multipart field.
+            $response = $this->password !== null
+                ? $request->post(rtrim($url, '/') . '/parse', ['password' => $this->password])
+                : $request->post(rtrim($url, '/') . '/parse');
         } catch (ConnectionException $e) {
             throw new StatementExtractionException('Could not reach the statement extraction API: ' . $e->getMessage(), 0, $e);
         }
@@ -62,6 +75,7 @@ class HttpStatementExtractionProvider implements StatementExtractionProvider
             return [
                 'date' => (string) ($row['date'] ?? ''),
                 'description' => (string) ($row['description'] ?? ''),
+                'reference' => isset($row['reference']) ? (string) $row['reference'] : (isset($row['ref_no']) ? (string) $row['ref_no'] : null),
                 // API reports debit/credit as separate nullable fields; our
                 // convention is one signed amount (positive = inflow/credit).
                 'amount' => $credit > 0 ? $credit : -$debit,

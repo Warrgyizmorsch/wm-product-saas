@@ -40,7 +40,11 @@ class PostCustomerPaymentJournal
         }
 
         try {
-            $bank = $this->accounts->findByCode('1020', $payment->tenant_id);
+            // The bank/cash ledger the money actually went to (e.g. HDFC); older
+            // payments without one fall back to 1020 Bank Account as before.
+            $bank = $payment->bank_account_id
+                ? \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScope('tenant')->where('tenant_id', $payment->tenant_id)->whereKey($payment->bank_account_id)->first()
+                : $this->accounts->findByCode('1020', $payment->tenant_id);
             $creditCode = $isInvoiceAllocation ? '1100' : '2200';
             $creditAccount = $this->accounts->findByCode($creditCode, $payment->tenant_id);
 
@@ -70,6 +74,8 @@ class PostCustomerPaymentJournal
                 ],
             ], [
                 'tenant_id' => $payment->tenant_id,
+                'company_id' => $payment->company_id,
+                'branch_id' => $payment->branch_id,
                 'journal_date' => $payment->payment_date,
                 'source' => Journal::SOURCE_SALES,
                 'reference_type' => 'customer_payment',

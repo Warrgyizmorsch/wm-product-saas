@@ -96,6 +96,15 @@ class Journal extends BaseModel
         return $this->belongsTo(self::class, 'reversed_journal_id');
     }
 
+    /**
+     * On a reversal journal: the original journal it cancelled (the original
+     * points at its reversal through reversed_journal_id).
+     */
+    public function reversalOf(): HasOne
+    {
+        return $this->hasOne(self::class, 'reversed_journal_id');
+    }
+
     public function voucherDetail(): HasOne
     {
         return $this->hasOne(VoucherDetail::class, 'journal_id');

@@ -108,6 +108,16 @@ class JournalService
                 throw new InvalidArgumentException("Only posted journals can be reversed; journal is {$original->status}.");
             }
 
+            // A journal the bank has already cleared is part of a bank
+            // reconciliation; reversing it would silently break that
+            // reconciliation's statement. Unmatch it there first.
+            $reconciled = $original->entries->first(fn ($entry) => $entry->is_reconciled);
+            if ($reconciled !== null) {
+                throw new InvalidArgumentException(
+                    "Journal {$original->journal_number} is matched in bank reconciliation #{$reconciled->bank_reconciliation_id}. Unmatch it there before reversing."
+                );
+            }
+
             $reversalLines = $original->entries->map(fn ($entry) => [
                 'chart_of_account_id' => $entry->chart_of_account_id,
                 'cost_center_id' => $entry->cost_center_id,

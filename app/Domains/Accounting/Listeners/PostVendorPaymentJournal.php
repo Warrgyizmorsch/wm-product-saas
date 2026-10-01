@@ -28,8 +28,14 @@ class PostVendorPaymentJournal
         }
 
         try {
-            $bankCode = $payment->payment_method === 'Cash' ? '1010' : '1020';
-            $paymentAccount = $this->accounts->findByCode($bankCode, $payment->tenant_id);
+            // The bank/cash ledger the money actually left from; older payments
+            // without one fall back to 1010 Cash / 1020 Bank Account as before.
+            if ($payment->bank_account_id) {
+                $paymentAccount = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScope('tenant')->where('tenant_id', $payment->tenant_id)->whereKey($payment->bank_account_id)->first();
+            } else {
+                $bankCode = $payment->payment_method === 'Cash' ? '1010' : '1020';
+                $paymentAccount = $this->accounts->findByCode($bankCode, $payment->tenant_id);
+            }
 
             $isAdvance = $payment->payment_type === 'Advance';
             $debitCode = $isAdvance ? '1410' : '2010';
@@ -67,6 +73,8 @@ class PostVendorPaymentJournal
                 ],
             ], [
                 'tenant_id' => $payment->tenant_id,
+                'company_id' => $payment->company_id,
+                'branch_id' => $payment->branch_id,
                 'journal_date' => $payment->payment_date,
                 'source' => Journal::SOURCE_PURCHASE,
                 'reference_type' => 'vendor_payment',

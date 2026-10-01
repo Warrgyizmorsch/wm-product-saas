@@ -25,19 +25,29 @@ class BankReconciliation extends BaseModel
         'company_id',
         'branch_id',
         'chart_of_account_id',
+        'statement_from_date',
         'statement_date',
         'opening_balance',
         'closing_balance',
+        'book_balance',
         'status',
+        'brs_snapshot',
+        'notes',
         'completed_by',
         'completed_at',
+        'reopened_by',
+        'reopened_at',
     ];
 
     protected $casts = [
+        'statement_from_date' => 'date',
         'statement_date' => 'date',
         'opening_balance' => 'float',
         'closing_balance' => 'float',
+        'book_balance' => 'float',
+        'brs_snapshot' => 'array',
         'completed_at' => 'datetime',
+        'reopened_at' => 'datetime',
     ];
 
     public function chartOfAccount(): BelongsTo
@@ -58,6 +68,16 @@ class BankReconciliation extends BaseModel
     public function matchedJournalEntries(): HasMany
     {
         return $this->hasMany(JournalEntry::class, 'bank_reconciliation_id');
+    }
+
+    public function matches(): HasMany
+    {
+        return $this->hasMany(BankStatementMatch::class, 'bank_reconciliation_id');
+    }
+
+    public function reopenedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reopened_by');
     }
 
     public function completedBy(): BelongsTo
