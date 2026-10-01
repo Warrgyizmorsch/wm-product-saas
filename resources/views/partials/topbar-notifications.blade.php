@@ -350,6 +350,16 @@
     function handleLiveNotificationEvent(eventName, payload) {
         console.log('[Pusher Live Event]', eventName, payload);
 
+        // Deduplication Guard: Ignore if exact same event was handled within last 4 seconds
+        const dedupKey = 'notif_dedup_' + eventName + '_' + (payload.pass_id || payload.pass_number || '');
+        const lastHandled = window.sessionStorage.getItem(dedupKey);
+        const now = Date.now();
+        if (lastHandled && (now - parseInt(lastHandled)) < 4000) {
+            console.log('[Pusher] Duplicate event debounced:', eventName);
+            return;
+        }
+        try { window.sessionStorage.setItem(dedupKey, now.toString()); } catch (e) {}
+
         let type = 'general';
         if (eventName === 'visitor.approval_request') type = 'approval_request';
         if (eventName === 'visitor.approved') type = 'approved';

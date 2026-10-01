@@ -110,7 +110,7 @@ class VisitorApprovalController extends Controller
 
         // 2. Real-time Pusher WebSockets Broadcast
         \App\Services\Pusher\PusherBroadcastService::broadcast(
-            channels: ["visitor-tenant-{$tenantId}", "visitor-gate-desk"],
+            channels: ["visitor-tenant-{$tenantId}"],
             eventName: 'visitor.approved',
             data: [
                 'pass_id'      => $pass->id,
@@ -175,7 +175,7 @@ class VisitorApprovalController extends Controller
 
         // 2. Real-time Pusher WebSockets Broadcast
         \App\Services\Pusher\PusherBroadcastService::broadcast(
-            channels: ["visitor-tenant-{$tenantId}", "visitor-gate-desk"],
+            channels: ["visitor-tenant-{$tenantId}"],
             eventName: 'visitor.rejected',
             data: [
                 'pass_id'          => $pass->id,

@@ -132,9 +132,9 @@ class VisitorController extends Controller
                 extraData: ['pass_id' => $pass->id, 'tenant_id' => $tenantId]
             );
 
-            // 2. Real-time Pusher WebSockets Broadcast
+            // 2. Real-time Pusher WebSockets Broadcast to the assigned Host
             \App\Services\Pusher\PusherBroadcastService::broadcast(
-                channels: ["user-{$pass->host_user_id}", "visitor-tenant-{$tenantId}"],
+                channels: ["user-{$pass->host_user_id}"],
                 eventName: 'visitor.approval_request',
                 data: [
                     'pass_id'      => $pass->id,
