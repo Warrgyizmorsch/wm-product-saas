@@ -186,5 +186,10 @@ class Project extends BaseModel
     {
         return $this->hasMany(ChangeRequest::class, 'project_id');
     }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Sales\Models\Invoice::class, 'project_id');
+    }
 }
 

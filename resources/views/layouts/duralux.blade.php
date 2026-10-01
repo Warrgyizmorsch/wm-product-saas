@@ -229,6 +229,29 @@
             });
         });
 
+        // User format for Select2 with data-avatar support and fallback
+        window.userformat = function (user) {
+            if (!user.id) {
+                return user.text;
+            }
+            var avatar = '/assets/images/avatar/default.png';
+            if (user.element) {
+                var opt = $(user.element);
+                var dataAvatar = opt.data('avatar') || opt.attr('data-avatar');
+                if (dataAvatar) {
+                    avatar = dataAvatar;
+                } else if (opt.data('user')) {
+                    avatar = '/assets/images/avatar/' + opt.data('user') + '.png';
+                }
+            }
+            return $(
+                '<span class="hstack gap-2 align-items-center">' +
+                    '<img src="' + avatar + '" class="avatar-image avatar-sm object-fit-cover rounded-circle flex-shrink-0" style="width: 22px; height: 22px; border-radius: 50%;" onerror="this.onerror=null; this.src=\'/assets/images/avatar/default.png\';" /> ' +
+                    '<span>' + (user.text || '') + '</span>' +
+                '</span>'
+            );
+        };
+
         // Select2 search focus fix inside Bootstrap modals
         $(document).on('show.bs.modal', '.modal', function () {
             var modal = $(this);

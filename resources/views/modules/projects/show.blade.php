@@ -309,7 +309,7 @@
 
         {{-- Tab Navigation --}}
         @php
-            $allowedTabs = ['summary', 'milestones', 'timeline', 'issues', 'documents', 'reviews'];
+            $allowedTabs = ['summary', 'milestones', 'timeline', 'issues', 'documents', 'reviews', 'billing'];
             $activeProjectTab = in_array(request('tab'), $allowedTabs, true)
                 ? request('tab')
                 : (in_array(old('_milestone_form'), ['add', 'edit'], true)
@@ -353,6 +353,16 @@
                     'active' => $activeProjectTab === 'reviews',
                 ];
             }
+
+            if ($canViewBilling) {
+                $invoicesCount = $billingSummary['invoices_count'] ?? 0;
+                $projectDetailTabs[] = [
+                    'id'     => 'tab-billing',
+                    'label'  => __('projects.billing') . ($invoicesCount > 0 ? ' (' . $invoicesCount . ')' : ''),
+                    'icon'   => 'feather-file-text',
+                    'active' => $activeProjectTab === 'billing',
+                ];
+            }
         @endphp
         <x-ui.horizontal-tabs id="projectDetailsTabs" :tabs="$projectDetailTabs" :syncUrl="true" />
 
@@ -388,6 +398,12 @@
                     @include('modules.projects._reviews')
                 </div>
             @endif
+            @if ($canViewBilling)
+                <div class="tab-pane fade {{ $activeProjectTab === 'billing' ? 'show active' : '' }}" id="tab-billing"
+                    role="tabpanel" aria-labelledby="tab-billing-tab">
+                    @include('modules.projects._billing')
+                </div>
+            @endif
         </div>
 
         <x-ui.drawer id="activityLogDrawer" title="Activity History" position="end" style="width: 480px; max-width: 100%;">
@@ -405,6 +421,9 @@
     @endif
     @if ($canUploadDocuments)
         @include('modules.projects.documents._upload_modal')
+    @endif
+    @if ($canViewBilling && $canGenerateInvoice)
+        @include('modules.projects._generate_invoice_modal')
     @endif
 
     @push('scripts')

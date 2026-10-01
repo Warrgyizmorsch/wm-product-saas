@@ -210,9 +210,9 @@ The design specification is the **canonical PM UI/UX/component reference**. The 
 All future AI agents working in this repository must strictly adhere to the following 21 governance rules:
 
 1. **Read Roadmap First:** Inspect `docs/project-management/IMPLEMENTATION_ROADMAP.md` before initiating any Project Management task.
-2. **Determine Last Completed Phase:** Identify the last completed and verified major phase (`Phase 4 — Issue Management & Project Documents`).
-3. **Determine Next Major Phase:** Identify the next major phase in the canonical sequence (`Phase 5 — Client Review / UAT & Change Requests`).
-4. **Determine Next Authorized Action:** Perform only the next authorized step (`Phase 5A — Read-Only Requirements / Current-State Audit`) for the next phase. Phase 5A is strictly a read-only discovery/current-state/gap audit; architecture and integration decisions must happen only in the following Architecture / Integration Validation gate.
+2. **Determine Last Completed Phase:** Identify the last completed and verified major phase (`Phase 7 — Billing & Sales Invoice Integration`).
+3. **Determine Next Major Phase:** Identify the next major phase in the canonical sequence (`Phase 8 — Controlled Project Closure`).
+4. **Determine Next Authorized Action:** Perform only the next authorized step (`Phase 8A — Read-Only Requirements / Current-State Audit`) for the next phase. Phase 8A is strictly a read-only discovery/current-state/gap audit; architecture and integration decisions must happen only in the following Architecture / Integration Validation gate.
 5. **No Automatic Implementation:** Do not automatically start implementation of the next phase. A phase remains `NOT STARTED` until explicitly authorized.
 6. **Follow Lifecycle Gates:** Strictly observe the progression: `NOT STARTED` $\to$ `AUDIT` $\to$ `ARCHITECTURE` $\to$ `PLAN` $\to$ `APPROVAL` $\to$ `IMPLEMENTATION` $\to$ `TESTING` $\to$ `VERIFICATION` $\to$ `COMPLETED`.
 7. **Maintenance Is Not a Phase:** Do not create or track ad-hoc maintenance, UI cleanup, visual polish, or minor bug fixes as roadmap phases.
@@ -417,24 +417,69 @@ Before entering the Architecture / Integration Validation gate or proposing any 
 
 ---
 
-### Phase 7: Billing & Sales Invoice Integration — [PLANNED]
-- **Status:** **PLANNED**
-- **Objective:** Connect approved billable time and completed milestones directly into ERP Sales Invoices.
+### Phase 7: Billing & Sales Invoice Integration — [COMPLETED & FORMALLY VERIFIED]
+- **Status:** **COMPLETED & FORMALLY VERIFIED**
+- **Objective:** Connect approved billable time and completed milestones directly into standard ERP Sales Invoices via clean delegation, strict double-billing prevention, and complete auditability.
 - **Architectural Boundary & Invoicing Flow:**
   ```
+  Project Management Module (App\Domains\Projects\Services\ProjectBillingService)
+      ↓ Identifies & locks eligible billable work (approved time logs, completed milestones)
+      ↓ Prepares billing line items with work descriptions & resolves active Service Product
+  Sales Module (App\Domains\Sales\Services\SalesInvoiceCreationService)
+      ↓ Exclusively owns: Sequential numbering (INV-XXXX), GST type resolution, line math,
+      ↓ persistence of Invoice & InvoiceItem in 'Draft' status (InvoicePosted NOT fired here)
   Project Management Module
-      ↓ (calculates & identifies billable project hours & milestone deliverables)
-  Sales Module (App\Domains\Sales\Services\InvoiceService)
-      ↓ (generates standard Sales Invoice with linked lines & customer reference)
-  Accounting Module
-      ↓ (posts general ledger journals and tracks payment receipts)
+      ↓ Marks source TimeLogs and Milestones as invoiced (is_invoiced = true, invoice_id set)
+      ↓ Records project activity logs ('project.invoice_generated')
+  Standard Sales Flow (App\Domains\Sales\Controllers\InvoiceController::post)
+      ↓ Transitions Draft → Posted, dispatches InvoicePosted event, posts to General Ledger
   ```
-- **Initial Target Scope (Subject to Phase 7 Audit):**
-  1. **Billing Service:** Build `ProjectBillingService` that queries unbilled approved time logs (for T&M contracts) and completed milestones (for milestone contracts).
-  2. **Sales Invoice Bridge:** Integrate with `App\Domains\Sales\Services\InvoiceService` to generate standard Sales Invoices. The Sales module remains the sole owner of Sales Invoice creation.
-  3. **Billed Status Tracking:** Record billing linkage using fields and contracts verified during Phase 7 architecture validation (preventing duplicate billing).
-  4. **UI View:** Billing tab on Project Detail displaying invoice history, outstanding amounts, and payment status.
-- **Exit Criteria:** Invoices generate cleanly in Sales module with general ledger auto-posting; double-billing is prevented.
+
+#### Phase 7A Audit & 7B Architecture Decisions (Artifact: `phase7_implementation_plan.md`)
+- **Preserved Core Boundaries:** PM never computes tenant invoice numbers, never manages GST state codes directly, and never dispatches `InvoicePosted`. Sales owns invoice numbering, tax calculation, and posting lifecycles.
+- **Service Product Integration:** No PM-owned product-master duplication; references existing active Inventory catalog (`products.item_type = 'Service'`).
+- **Data Model Extensions:**
+  - Migrated `project_id` foreign key on `invoices` table (`2026_10_01_100000_add_project_id_to_invoices_table.php`).
+  - Added `billing_amount`, `is_invoiced`, `invoice_id` to `project_milestones` (`2026_10_01_100100_add_billing_fields_to_project_milestones_table.php`).
+  - Added composite indexes on `project_time_logs` (`2026_10_01_100200_add_billing_indexes_to_project_time_logs_table.php`).
+
+#### Phase 7C Implementation Execution Summary:
+- **Database & Models:**
+  - `App\Domains\Sales\Models\Invoice`: Added `project_id` to fillables; added `project()`, `timeLogs()`, and `milestones()` relations.
+  - `App\Domains\Projects\Models\Project`: Added `invoices()` relation.
+  - `App\Domains\Projects\Models\Milestone`: Added `billing_amount`, `is_invoiced`, `invoice_id` to fillables/casts; added `invoice()` relation.
+  - `App\Domains\Projects\Models\TimeLog`: Added `invoice()` relation.
+- **Domain Services:**
+  - `SalesInvoiceCreationService`: Transactionally generates `Draft` invoices with sequential numbers (`INV-XXXX`), GST type determination (`cgst_sgst` vs `igst`), line item persistence, and subtotal/tax rollups. Does NOT fire `InvoicePosted`.
+  - `ProjectBillingService`: Manages unbilled queries, live calculation preview (`previewInvoice`), pessimistic work locking (`lockForUpdate`), double-billing validation guards, delegation to Sales, and source record updates.
+- **RBAC & Authorization:**
+  - Added `projects.billing.view` and `projects.billing.generate_invoice` to `database/seeders/RbacSeeder.php`.
+  - Enforced in `ProjectPolicy` (`viewBilling`, `generateInvoice`) using `AccessService`.
+- **Controllers & Web Routes:**
+  - Created `GenerateProjectInvoiceRequest` with deliverable validation rules.
+  - Created `ProjectBillingController` (`index`, `preview`, `store`).
+  - Registered web routes under `projects/{project}/billing` (`index`, `preview`, `store`).
+- **UI & Blade Integration:**
+  - Sixth tab `tab-billing` integrated in `show.blade.php`, `_billing.blade.php`, and `_generate_invoice_modal.blade.php`.
+  - Features 4 KPI cards (Invoiced Total, Outstanding, Billable Time, Milestone Deliverables), `<x-ui.odoo-form-ui type="table">` invoice ledger with status badges, action dropdown linking to Sales view/print/post, and live interactive deliverable selection modal.
+- **Localization Parity:**
+  - 34 billing translation keys added with 100% key and placeholder parity across `lang/en/projects.php`, `lang/hi/projects.php`, and `lang/bg/projects.php`.
+- **Automated Verification:**
+  - Automated feature test suite `tests/Feature/ProjectBillingTest.php` passed 100% (7 tests, 36 assertions):
+    1. `test_can_fetch_unbilled_approved_time_logs_and_completed_milestones` (PASSED)
+    2. `test_can_generate_draft_sales_invoice_for_billable_time_logs` (PASSED)
+    3. `test_can_generate_draft_sales_invoice_for_completed_milestones` (PASSED)
+    4. `test_double_billing_is_strictly_rejected` (PASSED)
+    5. `test_posting_draft_invoice_via_sales_controller_fires_invoice_posted` (PASSED)
+    6. `test_unauthorized_user_cannot_generate_invoice` (PASSED)
+    7. `test_multi_tenant_isolation_on_billing` (PASSED)
+  - Regression test suites (`ProjectScheduleTest`, `ChangeRequestTest`, `ProjectReviewTest`) passed 100% (36 tests, 141 assertions).
+- **Exit Criteria Met:**
+  - Invoices generate in Sales module in `Draft` status without premature `InvoicePosted` firing;
+  - Posting draft invoice via standard Sales controller triggers `InvoicePosted` and GL journal creation;
+  - Double-billing is strictly rejected with row locking;
+  - Full translation parity across EN/HI/BG.
+- **Next Authorized Action:** **Phase 8A — Controlled Project Closure Read-Only Requirements & Current-State Audit**.
 
 ---
 

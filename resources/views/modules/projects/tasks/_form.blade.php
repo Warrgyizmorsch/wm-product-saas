@@ -20,7 +20,8 @@
     select2Selector="user" :errorText="$errors->first('assignee_id')">
     <option value="">{{ __('projects.select_user') }}</option>
     @foreach ($activeMembers as $memberOption)
-        <option value="{{ $memberOption->user_id }}" @selected((int) old('assignee_id') === $memberOption->user_id)>
+        <option value="{{ $memberOption->user_id }}" @selected((int) old('assignee_id') === $memberOption->user_id)
+                data-avatar="{{ $memberOption->user?->avatar_url }}">
             {{ $memberOption->user?->name }}
         </option>
     @endforeach
@@ -29,7 +30,8 @@
     select2Selector="user" :errorText="$errors->first('reviewer_id')">
     <option value="">{{ __('projects.select_user') }}</option>
     @foreach ($activeMembers as $memberOption)
-        <option value="{{ $memberOption->user_id }}" @selected((int) old('reviewer_id') === $memberOption->user_id)>
+        <option value="{{ $memberOption->user_id }}" @selected((int) old('reviewer_id') === $memberOption->user_id)
+                data-avatar="{{ $memberOption->user?->avatar_url }}">
             {{ $memberOption->user?->name }}
         </option>
     @endforeach

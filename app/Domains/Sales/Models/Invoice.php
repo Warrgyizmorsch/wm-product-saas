@@ -18,6 +18,7 @@ class Invoice extends BaseModel
         'company_id',
         'branch_id',
         'customer_id',
+        'project_id',
         'sales_order_id',
         'material_requirement_id',
         'invoice_number',
@@ -114,6 +115,21 @@ class Invoice extends BaseModel
     public function dispatchOrders(): HasMany
     {
         return $this->hasMany(DispatchOrder::class, 'invoice_id');
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Projects\Models\Project::class);
+    }
+
+    public function timeLogs(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Projects\Models\TimeLog::class);
+    }
+
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Projects\Models\Milestone::class);
     }
 
     public function allocations(): HasMany

@@ -3,6 +3,7 @@
 use App\Domains\Projects\Controllers\IssueController;
 use App\Domains\Projects\Controllers\MilestoneController;
 use App\Domains\Projects\Controllers\ProjectActivityLogController;
+use App\Domains\Projects\Controllers\ProjectBillingController;
 use App\Domains\Projects\Controllers\ProjectController;
 use App\Domains\Projects\Controllers\ProjectDocumentController;
 use App\Domains\Projects\Controllers\ProjectMemberController;
@@ -181,6 +182,15 @@ Route::prefix('projects')
                 Route::get('/', [ProjectScheduleController::class, 'index'])->name('index');
                 Route::get('data', [ProjectScheduleController::class, 'data'])->name('data');
                 Route::match(['post', 'patch'], 'tasks/{task}/reschedule', [ProjectScheduleController::class, 'reschedule'])->name('reschedule');
+            });
+
+        Route::prefix('{project}/billing')
+            ->as('billing.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::get('/', [ProjectBillingController::class, 'index'])->name('index');
+                Route::post('preview', [ProjectBillingController::class, 'preview'])->name('preview');
+                Route::post('invoices', [ProjectBillingController::class, 'store'])->name('store');
             });
 
     });

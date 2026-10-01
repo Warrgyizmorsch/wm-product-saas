@@ -123,4 +123,9 @@ class TimeLog extends BaseModel
     {
         return $query->where('approval_status', self::STATUS_REJECTED);
     }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Sales\Models\Invoice::class, 'invoice_id');
+    }
 }
