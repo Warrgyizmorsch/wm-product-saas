@@ -260,7 +260,11 @@ class VendorBillController extends Controller
         if (!$bill) abort(404);
         $this->authorize('update', $bill);
 
-        $res = $this->billService->applyAdvanceCredit($bill, $tenantId);
+        try {
+            $res = $this->billService->applyAdvanceCredit($bill, $tenantId);
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->route('purchase.bills.show', $id)->with('error', $e->getMessage());
+        }
         if ($res) {
             return redirect()->route('purchase.bills.show', $id)
                 ->with('success', 'Vendor Advance Credit applied successfully!');

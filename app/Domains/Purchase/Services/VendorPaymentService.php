@@ -22,6 +22,10 @@ class VendorPaymentService
         $bill = $billId ? $this->billRepo->find($billId) : null;
         $paymentType = $bill ? 'Bill Payment' : 'Advance';
 
+        if ($bill?->isOnHold()) {
+            throw new \InvalidArgumentException("Bill {$bill->bill_number} is on hold for a PO/GRN mismatch and cannot be paid until it is released.");
+        }
+
         $payment = DB::transaction(function () use ($validated, $bill, $paymentType, $tenantId) {
             $paymentNumber = $this->paymentRepo->getNextPaymentNumber($tenantId);
 
@@ -121,6 +125,10 @@ class VendorPaymentService
 
                 if ($bill === null || (int) $bill->vendor_id !== (int) $data['vendor_id']) {
                     throw new \InvalidArgumentException("Bill #{$billId} does not belong to this vendor.");
+                }
+
+                if ($bill->isOnHold()) {
+                    throw new \InvalidArgumentException("Bill {$bill->bill_number} is on hold for a PO/GRN mismatch and cannot be paid until it is released.");
                 }
 
                 if ((int) round($apply * 100) > (int) round((float) $bill->due_amount * 100)) {

@@ -15,6 +15,7 @@ return [
             ['label' => 'purchase.purchase_orders', 'default' => 'Purchase Orders', 'route' => 'purchase.orders.index', 'permission' => 'purchase.orders.view'],
             ['label' => 'purchase.landed_cost_vouchers', 'default' => 'Landed Cost Vouchers', 'route' => 'purchase.landed-costs.index', 'permission' => 'purchase.landed_costs.view'],
             ['label' => 'purchase.vendor_bills', 'default' => 'Vendor Bills', 'route' => 'purchase.bills.index', 'permission' => 'purchase.bills.view'],
+            ['label' => 'purchase.bill_matching', 'default' => 'Bill Matching', 'route' => 'purchase.bill-matching.index', 'permission' => 'purchase.bills.view'],
             ['label' => 'purchase.vendor_payments', 'default' => 'Vendor Payments', 'route' => 'purchase.payments.index', 'permission' => 'purchase.payments.view'],
             ['label' => 'purchase.advance_payments', 'default' => 'Advance Payments', 'route' => 'purchase.advances.index', 'permission' => 'purchase.advances.view'],
             ['label' => 'purchase.purchase_returns', 'default' => 'Purchase Returns', 'route' => 'purchase.returns.index', 'permission' => 'purchase.returns.view'],

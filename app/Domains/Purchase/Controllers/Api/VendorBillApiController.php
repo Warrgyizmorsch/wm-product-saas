@@ -179,6 +179,9 @@ class VendorBillApiController extends Controller
                 VendorBillItem::create($itemData);
             }
 
+            // 3-way match against the PO/GRN on the header; may put it On Hold.
+            app(\App\Domains\Purchase\Services\ThreeWayMatchService::class)->apply($vb);
+
             return $vb->load(['items.product', 'vendor']);
         });
 
@@ -239,6 +242,14 @@ class VendorBillApiController extends Controller
                 'success' => false,
                 'message' => 'Validation error',
                 'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        // A bill held by 3-way match can only be released (web screen) or cancelled.
+        if ($bill->isOnHold() && $request->input('status') !== 'Cancelled') {
+            return response()->json([
+                'success' => false,
+                'message' => "Bill {$bill->bill_number} is on hold for a PO/GRN mismatch. Release it before changing its status.",
             ], 422);
         }
 
@@ -446,6 +457,13 @@ class VendorBillApiController extends Controller
                 'success' => false,
                 'message' => 'Vendor Bill not found',
             ], 404);
+        }
+
+        if ($bill->isOnHold()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Bill {$bill->bill_number} is on hold for a PO/GRN mismatch. Release it before applying advance.",
+            ], 422);
         }
 
         $validator = Validator::make($request->all(), [

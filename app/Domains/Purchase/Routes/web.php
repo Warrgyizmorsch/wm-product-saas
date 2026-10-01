@@ -7,6 +7,7 @@ use App\Domains\Purchase\Controllers\PurchaseOrderController;
 use App\Domains\Purchase\Controllers\GoodsReceiptNoteController;
 use App\Domains\Purchase\Controllers\PurchaseAdvancePaymentController;
 use App\Domains\Purchase\Controllers\VendorBillController;
+use App\Domains\Purchase\Controllers\BillMatchingController;
 use App\Domains\Purchase\Controllers\VendorPaymentController;
 use App\Domains\Purchase\Controllers\PurchaseReturnController;
 
@@ -61,6 +62,10 @@ Route::prefix('purchase')
         Route::get('bills/create-service', [VendorBillController::class, 'createService'])->name('bills.create-service');
         Route::post('bills/store-service', [VendorBillController::class, 'storeService'])->name('bills.store-service');
         Route::post('bills/{bill}/apply-advance', [VendorBillController::class, 'applyAdvance'])->name('bills.apply-advance');
+        // 3-way match (PO ↔ GRN ↔ bill): exceptions queue, settings, releasing held bills.
+        Route::get('bill-matching', [BillMatchingController::class, 'index'])->name('bill-matching.index');
+        Route::put('bill-matching/settings', [BillMatchingController::class, 'updateSettings'])->name('bill-matching.settings');
+        Route::post('bills/{bill}/release-hold', [BillMatchingController::class, 'release'])->name('bills.release-hold');
         Route::resource('bills', VendorBillController::class);
         Route::get('payments/export', [VendorPaymentController::class, 'export'])->name('payments.export');
         Route::resource('payments', VendorPaymentController::class);

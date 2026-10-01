@@ -111,6 +111,17 @@ class VendorPaymentApiController extends Controller
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
         $validated = $validator->validated();
 
+        $heldBill = VendorBill::where('tenant_id', $tenantId)
+            ->whereIn('id', array_column($validated['allocations'] ?? [], 'vendor_bill_id'))
+            ->where('status', VendorBill::STATUS_ON_HOLD)
+            ->value('bill_number');
+        if ($heldBill) {
+            return response()->json([
+                'success' => false,
+                'message' => "Bill {$heldBill} is on hold for a PO/GRN mismatch and cannot be paid until it is released.",
+            ], 422);
+        }
+
         $payment = DB::transaction(function () use ($validated, $tenantId, $companyId, $branchId) {
             $lastId    = (VendorPayment::where('tenant_id', $tenantId)->max('id') ?? 0) + 1;
             $payNumber = 'VPAY-' . str_pad((string)$lastId, 5, '0', STR_PAD_LEFT);

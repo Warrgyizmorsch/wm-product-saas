@@ -3462,6 +3462,16 @@ class HrmsDemoSeeder extends Seeder
 
         // ==========================================
         // 22. SOP (Standard Operating Procedure) Management Seeding
+        // Authors/approvers for the SOP, goal and later records below (users created in step 12).
+        $sopUser = fn (string $email) => User::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('email', $email)->first()
+            ?? User::withoutGlobalScopes()->where('tenant_id', $tenant->id)->orderBy('id')->first();
+        $users = [
+            'super_admin' => $sopUser('superadmin@warrg.com'),
+            'hr_head' => $sopUser('hr.manager@warrg.com'),
+            'company_admin' => $sopUser('admin@demo.com'),
+            'sales_manager' => $sopUser('sales.manager@warrg.com'),
+        ];
+
         // ==========================================
         $catIT = SopCategory::create([
             'tenant_id' => $tenant->id,
@@ -3812,7 +3822,7 @@ class HrmsDemoSeeder extends Seeder
             'goal_cycle_id'       => $cycleQ1->id,
             'goal_category_id'    => $catTech->id,
             'owner_type'          => 'department',
-            'department_id'       => $deptTech->id ?? $deptOperations->id,
+            'department_id'       => $deptEng->id,
             'visibility'          => 'public',
             'priority'            => 'critical',
             'start_date'          => Carbon::now()->startOfQuarter(),

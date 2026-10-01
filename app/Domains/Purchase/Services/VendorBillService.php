@@ -24,7 +24,8 @@ class VendorBillService
     public function __construct(
         protected VendorBillRepository $billRepo,
         protected JournalService $journalService,
-        protected ChartOfAccountRepositoryInterface $accountRepo
+        protected ChartOfAccountRepositoryInterface $accountRepo,
+        protected ThreeWayMatchService $matcher,
     ) {}
 
     public function storeBill(array $validated, int $tenantId): VendorBill
@@ -377,6 +378,12 @@ class VendorBillService
                 ]);
             }
 
+            // 3-way match (PO ↔ GRN ↔ bill). In 'hold' mode a bill with
+            // exceptions stays On Hold: no GL posting until it is released.
+            if ($this->matcher->apply($bill)) {
+                return $bill;
+            }
+
             // Dispatch BillPosted event to automatically trigger Accounting GL Journal Posting
             event(new \App\Domains\Purchase\Events\BillPosted($bill));
             app(\App\Domains\Accounting\Listeners\PostPurchaseBillJournal::class)->handle(new \App\Domains\Purchase\Events\BillPosted($bill));
@@ -408,6 +415,10 @@ class VendorBillService
 
     public function applyAdvanceCredit(VendorBill $bill, int $tenantId): bool
     {
+        if ($bill->isOnHold()) {
+            throw new \InvalidArgumentException("Bill {$bill->bill_number} is on hold for a PO/GRN mismatch. Release it before applying advance.");
+        }
+
         return DB::transaction(function () use ($bill, $tenantId) {
             $due = (float) $bill->due_amount;
             if ($due <= 0) {

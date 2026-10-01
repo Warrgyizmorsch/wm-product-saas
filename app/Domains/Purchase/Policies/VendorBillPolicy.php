@@ -39,4 +39,23 @@ class VendorBillPolicy
             'tenant_id' => $bill->tenant_id,
         ]);
     }
+
+    /**
+     * Release a bill held by 3-way match so it posts and becomes payable.
+     * "Not the person who entered it" is enforced in ThreeWayMatchService.
+     */
+    public function releaseHold(User $user, ?VendorBill $bill = null): bool
+    {
+        return $this->access->allows($user, 'purchase.bills.release_hold', [
+            'tenant_id' => $bill?->tenant_id ?? $user->tenant_id,
+        ]);
+    }
+
+    /** Change the 3-way match mode and tolerances for the tenant. */
+    public function configureMatching(User $user): bool
+    {
+        return $this->access->allows($user, 'purchase.bills.match_configure', [
+            'tenant_id' => $user->tenant_id,
+        ]);
+    }
 }

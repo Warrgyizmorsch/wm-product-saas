@@ -11,6 +11,7 @@ return array (
   'pending_grns' => 'Pending GRNs',
   'all_goods_receipts' => 'All Goods Receipts',
   'vendor_bills' => 'Vendor Bills',
+  'bill_matching' => 'Bill Matching',
   'vendor_payments' => 'Vendor Payments',
   'action' => 'Action',
   'actions' => 'Actions',

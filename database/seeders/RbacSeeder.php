@@ -675,6 +675,10 @@ class RbacSeeder extends Seeder
             ['name' => 'purchase.bills.view', 'module' => 'purchase', 'entity' => 'bills', 'action' => 'view'],
             ['name' => 'purchase.bills.create', 'module' => 'purchase', 'entity' => 'bills', 'action' => 'create'],
             ['name' => 'purchase.bills.edit', 'module' => 'purchase', 'entity' => 'bills', 'action' => 'edit'],
+            // 3-way match: release a bill held for PO/GRN mismatch, and set the
+            // matching mode/tolerances. Owner/admin only via the all-permissions grant.
+            ['name' => 'purchase.bills.release_hold', 'module' => 'purchase', 'entity' => 'bills', 'action' => 'release_hold'],
+            ['name' => 'purchase.bills.match_configure', 'module' => 'purchase', 'entity' => 'bills', 'action' => 'match_configure'],
             ['name' => 'purchase.approvals.manage', 'module' => 'purchase', 'entity' => 'approvals', 'action' => 'manage'],
             ['name' => 'purchase.vendors.view', 'module' => 'purchase', 'entity' => 'vendors', 'action' => 'view'],
             ['name' => 'purchase.vendors.create', 'module' => 'purchase', 'entity' => 'vendors', 'action' => 'create'],

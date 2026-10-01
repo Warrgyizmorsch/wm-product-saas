@@ -12,7 +12,8 @@
             <i class="feather-arrow-left me-2"></i>{{ __('purchase.back_to_bills') }}
         </a>
 
-        @if($bill->due_amount > 0)
+        {{-- A bill held by 3-way match can't be paid or offset until released. --}}
+        @if($bill->due_amount > 0 && !$bill->isOnHold())
             @php
                 $availAdvAction = max($availableAdvance ?? 0, $bill->goodsReceiptNote?->purchaseOrder?->total_advance_paid ?? 0);
             @endphp
@@ -32,6 +33,10 @@
 @endsection
 
 @section('content')
+    @include('modules.purchase.bill-matching._match-panel', [
+        'bill' => $bill,
+        'canRelease' => auth()->user()->can('releaseHold', $bill),
+    ])
 
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
         <!-- Status Bar -->
@@ -55,6 +60,7 @@
                         'Unpaid' => 'UNPAID',
                         'Posted' => 'POSTED',
                         'Cancelled' => 'CANCELLED',
+                        'On Hold' => 'ON HOLD',
                         default => strtoupper($bill->status),
                     };
                     $badgeClass = match($bill->status) {
@@ -62,6 +68,7 @@
                         'Partially Paid' => 'info',
                         'Unpaid' => 'danger',
                         'Posted', 'Draft' => 'warning',
+                        'On Hold' => 'primary',
                         'Cancelled' => 'secondary',
                         default => 'secondary',
                     };

@@ -11,6 +11,7 @@ return array (
   'pending_grns' => 'लंबित GRNs',
   'all_goods_receipts' => 'सभी माल रसीदें',
   'vendor_bills' => 'विक्रेता बिल',
+  'bill_matching' => 'बिल मिलान',
   'vendor_payments' => 'विक्रेता भुगतान',
   'action' => 'कार्रवाई',
   'actions' => 'कार्य',

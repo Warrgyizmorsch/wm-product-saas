@@ -97,7 +97,11 @@ class VendorPaymentController extends Controller
             $validated['vendor_bill_id'] = $validated['allocations'][0]['vendor_bill_id'];
         }
 
-        $payment = $this->paymentService->recordPayment($validated, $tenantId);
+        try {
+            $payment = $this->paymentService->recordPayment($validated, $tenantId);
+        } catch (\InvalidArgumentException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
 
         return redirect()->route('purchase.payments.index')
             ->with('success', "Payment {$payment->payment_number} recorded successfully.");
