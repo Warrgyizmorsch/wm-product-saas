@@ -55,6 +55,12 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown 
+            type="visitor-passes" 
+            exportRoute="{{ route('visitor.export') }}"
+            downloadTemplateRoute="{{ route('visitor.sample-template') }}"
+            importModalTarget="#importVisitorModal" />
+
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="offcanvas" data-bs-target="#newVisitorDrawer">
             {{ __('visitor.new_visitor_pass') }}
         </x-ui.button>
@@ -796,6 +802,9 @@
             </div>
         </form>
     </x-ui.drawer>
+
+    <!-- Smart Visual Import Modal (3-Step Column Mapping & Dry Run Importer) -->
+    @include('modules.visitor.partials.smart-import-modal')
 
 @endsection
 

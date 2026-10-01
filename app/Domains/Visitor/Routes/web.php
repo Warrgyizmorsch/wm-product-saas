@@ -23,6 +23,13 @@ Route::prefix('visitor')
         // Fast Lookup AJAX
         Route::get('/lookup', [VisitorController::class, 'lookup'])->name('lookup');
 
+        // Import & Export
+        Route::get('/export', [VisitorController::class, 'export'])->name('export');
+        Route::get('/sample-template', [VisitorController::class, 'downloadSample'])->name('sample-template');
+        Route::post('/import', [VisitorController::class, 'import'])->name('import');
+        Route::post('/import/parse', [VisitorController::class, 'parseImportFile'])->name('import.parse');
+        Route::post('/import/process', [VisitorController::class, 'processMappedImport'])->name('import.process');
+
         // 2. Passes Detail / Create
         Route::get('/passes/create', [VisitorPassController::class, 'create'])->name('passes.create');
         Route::post('/passes', [VisitorPassController::class, 'store'])->name('passes.store');

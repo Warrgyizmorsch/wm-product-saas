@@ -225,4 +225,129 @@ class VisitorController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Export Visitor Passes to Excel / CSV
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', Visitor::class);
+        [$tenantId] = $this->visitorService->resolveTenantContext();
+
+        $filters = $request->only([
+            'search', 'status', 'purpose', 'host_user_id', 'date_from', 'date_to', 'columns'
+        ]);
+
+        $fileName = 'visitor_passes_' . now()->format('Ymd_His') . '.xlsx';
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\VisitorPassExport($tenantId, $filters),
+            $fileName
+        );
+    }
+
+    /**
+     * Download Sample Visitor Pass Import Template
+     */
+    public function downloadSample()
+    {
+        $this->authorize('viewAny', Visitor::class);
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\VisitorPassTemplateExport(),
+            'visitor_pass_import_sample.xlsx'
+        );
+    }
+
+    /**
+     * Parse uploaded spreadsheet file for smart column mapping
+     */
+    public function parseImportFile(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('create', Visitor::class);
+        [$tenantId] = $this->visitorService->resolveTenantContext();
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:20480',
+        ]);
+
+        try {
+            $service = app(\App\Domains\Visitor\Services\VisitorImportMapperService::class);
+            $result = $service->parseFile($request->file('file'), $tenantId);
+
+            return response()->json([
+                'success' => true,
+                'data'    => $result,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Process mapped visitor pass rows (Dry run or Live commit)
+     */
+    public function processMappedImport(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('create', Visitor::class);
+        [$tenantId, $companyId, $branchId] = $this->visitorService->resolveTenantContext();
+
+        $request->validate([
+            'file_token' => 'required|string',
+            'mapping'    => 'required|array',
+            'options'    => 'nullable|array',
+        ]);
+
+        $options = (array)$request->input('options', []);
+        $isDryRun = !empty($options['is_dry_run']);
+
+        try {
+            $service = app(\App\Domains\Visitor\Services\VisitorImportMapperService::class);
+            $result = $service->processImport(
+                fileToken: (string)$request->input('file_token'),
+                mapping: (array)$request->input('mapping', []),
+                options: $options,
+                tenantId: $tenantId,
+                companyId: $companyId,
+                branchId: $branchId,
+                isDryRun: $isDryRun
+            );
+
+            return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Import Visitor Passes from Excel / CSV (Direct fallback)
+     */
+    public function import(Request $request)
+    {
+        $this->authorize('create', Visitor::class);
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+        ]);
+
+        try {
+            $import = new \App\Imports\VisitorPassImport($this->visitorService);
+            \Maatwebsite\Excel\Facades\Excel::import($import, $request->file('file'));
+
+            $message = "Import completed! Successfully created {$import->successCount} visitor passes.";
+            if ($import->failedCount > 0) {
+                $message .= " ({$import->failedCount} rows skipped due to invalid data).";
+            }
+
+            return redirect()->route('visitor.index')->with('success', $message);
+        } catch (\Exception $e) {
+            return redirect()->route('visitor.index')->withErrors(['file' => 'Import failed: ' . $e->getMessage()]);
+        }
+    }
 }
