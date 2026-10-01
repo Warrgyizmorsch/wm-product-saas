@@ -7,6 +7,8 @@ use App\Domains\Accounting\Models\JournalEntry;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
+use App\Domains\Accounting\Services\SystemAccountService;
+use App\Domains\Accounting\Support\SystemAccount;
 use App\Domains\Sales\Events\CustomerPaymentReceived;
 use Illuminate\Support\Facades\Log;
 
@@ -15,6 +17,7 @@ class PostCustomerPaymentJournal
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly SystemAccountService $systemAccounts,
         private readonly PostingFailureRecorder $failures,
     ) {
     }
@@ -44,9 +47,9 @@ class PostCustomerPaymentJournal
             // payments without one fall back to 1020 Bank Account as before.
             $bank = $payment->bank_account_id
                 ? \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScope('tenant')->where('tenant_id', $payment->tenant_id)->whereKey($payment->bank_account_id)->first()
-                : $this->accounts->findByCode('1020', $payment->tenant_id);
-            $creditCode = $isInvoiceAllocation ? '1100' : '2200';
-            $creditAccount = $this->accounts->findByCode($creditCode, $payment->tenant_id);
+                : $this->systemAccounts->get(SystemAccount::BANK, $payment->tenant_id);
+            $creditKey = $isInvoiceAllocation ? SystemAccount::AR : SystemAccount::ADVANCE_FROM_CUSTOMERS;
+            $creditAccount = $this->systemAccounts->get($creditKey, $payment->tenant_id);
 
             if (!$bank || !$creditAccount) {
                 $message = 'Missing chart of accounts (Bank/Accounts Receivable/Customer Advances), skipping auto-post';

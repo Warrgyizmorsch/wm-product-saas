@@ -130,23 +130,53 @@ body.app-skin-dark .badge.erp-badge .rounded-circle.bg-secondary,
 
 /* Tenant-uploaded branding logos can be any resolution/aspect ratio —
    constrain them so the sidebar brand slot never overflows/crops. */
+.nxl-navigation .m-header {
+    padding: 10px 20px;
+}
+
+html.minimenu .nxl-navigation .m-header {
+    padding: 10px 18px;
+    justify-content: center;
+}
+
 .erp-tenant-brand {
     display: flex;
     align-items: center;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
 }
 
+/* Fill the 80px brand slot: up to 60px tall and the full sidebar width. */
 .erp-brand-logo-full {
-    height: 32px;
+    height: 100%;
+    max-height: 60px;
     width: auto;
-    max-width: 160px;
+    max-width: 100%;
     object-fit: contain;
+    object-position: left center;
 }
 
 .erp-brand-logo-abbr {
-    height: 32px;
-    width: 32px;
+    height: 56px;
+    width: 56px;
+    max-width: 100%;
     object-fit: contain;
+}
+
+/* Text fallbacks when the tenant hasn't uploaded a logo. */
+.erp-brand-wordmark {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-brand-mark {
+    font-size: 26px;
+    font-weight: 700;
 }
 
 .loader-bg {
@@ -2252,4 +2282,21 @@ html.app-skin-dark .header-color-preview-circle {
 .btn-group > .btn-group:not(:first-child),
 .btn-group > .btn:not(:first-child) {
     margin-left: 5px;
+}
+
+/* Sticky footer: on short pages the content area grows to fill the screen
+   so the footer always sits at the bottom; on long pages it follows the content. */
+.nxl-container {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 80px);
+}
+
+.nxl-container > .nxl-content {
+    flex: 1 0 auto;
+}
+
+.nxl-container > .footer {
+    flex-shrink: 0;
+    margin-top: auto;
 }

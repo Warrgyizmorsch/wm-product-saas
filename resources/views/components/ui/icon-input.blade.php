@@ -40,7 +40,8 @@
     @endpush
 @endonce
 
-<div class="mb-3">
+<!-- <div class="mb-3"> -->
+<div>
     @if($label)
         <label for="{{ $attributes->get('id') ?? $name }}" class="form-label fw-semibold fs-13 text-dark mb-2">
             {{ $label }} @if($required)<span class="text-danger">*</span>@endif

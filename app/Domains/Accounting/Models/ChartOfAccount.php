@@ -128,6 +128,7 @@ class ChartOfAccount extends BaseModel
         'company_id',
         'branch_id',
         'code',
+        'system_key',
         'name',
         'type',
         'subtype',

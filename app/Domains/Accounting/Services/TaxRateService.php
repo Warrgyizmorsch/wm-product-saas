@@ -2,15 +2,16 @@
 
 namespace App\Domains\Accounting\Services;
 
-use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\TaxRate;
 use App\Domains\Accounting\Repositories\TaxRateRepositoryInterface;
+use App\Domains\Accounting\Support\SystemAccount;
 use Illuminate\Database\Eloquent\Collection;
 
 class TaxRateService
 {
     public function __construct(
         private readonly TaxRateRepositoryInterface $taxRates,
+        private readonly SystemAccountService $systemAccounts,
     ) {
     }
 
@@ -68,11 +69,7 @@ class TaxRateService
             return false;
         }
 
-        $accounts = ChartOfAccount::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->whereIn('code', ['2110', '2120', '2130', '1610', '1620', '1630'])
-            ->pluck('id', 'code');
+        $outputIgst = $this->systemAccounts->get(SystemAccount::OUTPUT_IGST, $tenantId);
 
         // Seeded as reference/output-side rates for now. Once TaxRate supports
         // components, each of these should decompose into two 9% legs (CGST+SGST)
@@ -87,7 +84,7 @@ class TaxRateService
                     'is_compound' => false,
                     'is_active' => true,
                     // Placeholder: points at Output IGST until component support exists.
-                    'tax_payable_account_id' => $accounts['2130'] ?? null,
+                    'tax_payable_account_id' => $outputIgst?->id,
                 ]
             );
         }

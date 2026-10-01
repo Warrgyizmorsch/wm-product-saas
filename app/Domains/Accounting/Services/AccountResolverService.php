@@ -5,13 +5,15 @@ namespace App\Domains\Accounting\Services;
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Support\AccountCode;
+use App\Domains\Accounting\Support\SystemAccount;
 use App\Domains\Inventory\Models\Product;
 use Illuminate\Support\Facades\Log;
 
 class AccountResolverService
 {
     public function __construct(
-        protected ChartOfAccountRepositoryInterface $accounts
+        protected ChartOfAccountRepositoryInterface $accounts,
+        protected SystemAccountService $systemAccounts,
     ) {}
 
     /**
@@ -57,9 +59,13 @@ class AccountResolverService
             }
         }
 
-        // 4. Fallback by Code
+        // 4. Fallback by Code. A default-template code is resolved through its
+        // system key first, so the fallback still finds the account after the
+        // tenant renumbers it.
         if ($fallbackCode !== null) {
-            $fallbackAccount = $this->accounts->findByCode($fallbackCode, $tenantId);
+            $fallbackKey = SystemAccount::keyForTemplateCode($fallbackCode);
+            $fallbackAccount = ($fallbackKey !== null ? $this->systemAccounts->get($fallbackKey, $tenantId) : null)
+                ?? $this->accounts->findByCode($fallbackCode, $tenantId);
             if ($fallbackAccount) {
                 return $fallbackAccount;
             }
@@ -172,7 +178,7 @@ class AccountResolverService
         // If product has a purchase account that resolves to a COGS subtype or code
         if ($productModel?->purchase_account) {
             $account = $this->resolveAccount($productModel->purchase_account, $tenantId);
-            if ($account && ($account->subtype === ChartOfAccount::SUBTYPE_COGS || $account->code === '5010')) {
+            if ($account && ($account->subtype === ChartOfAccount::SUBTYPE_COGS || ($account->system_key ?? SystemAccount::keyForTemplateCode((string) $account->code)) === SystemAccount::COGS)) {
                 return $account;
             }
         }

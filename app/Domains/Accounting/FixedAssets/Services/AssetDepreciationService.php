@@ -7,7 +7,8 @@ use App\Domains\Accounting\FixedAssets\Models\AssetDepreciationSchedule;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
-use App\Domains\Accounting\Support\AccountCode;
+use App\Domains\Accounting\Services\SystemAccountService;
+use App\Domains\Accounting\Support\SystemAccount;
 use App\Domains\HRMS\Models\Asset;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -27,13 +28,14 @@ class AssetDepreciationService
      * category without its own accounts; 5800 is still tried after 5400 for
      * tenants that created it by hand.
      */
-    private const FALLBACK_ACCUMULATED_DEPRECIATION_CODE = AccountCode::ACCUMULATED_DEPRECIATION;
-    private const FALLBACK_DEPRECIATION_EXPENSE_CODE = AccountCode::DEPRECIATION_EXPENSE;
+    private const FALLBACK_ACCUMULATED_DEPRECIATION_KEY = SystemAccount::ACCUMULATED_DEPRECIATION;
+    private const FALLBACK_DEPRECIATION_EXPENSE_KEY = SystemAccount::DEPRECIATION_EXPENSE;
     private const LEGACY_DEPRECIATION_EXPENSE_CODE = '5800';
 
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly SystemAccountService $systemAccounts,
     ) {
     }
 
@@ -219,14 +221,14 @@ class AssetDepreciationService
             $tenantId = $asset->tenant_id;
 
             $depreciationExpenseAccount = $category?->depreciationExpenseAccount
-                ?? $this->accounts->findByCode(self::FALLBACK_DEPRECIATION_EXPENSE_CODE, $tenantId)
+                ?? $this->systemAccounts->get(self::FALLBACK_DEPRECIATION_EXPENSE_KEY, $tenantId)
                 ?? $this->accounts->findByCode(self::LEGACY_DEPRECIATION_EXPENSE_CODE, $tenantId);
             $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount
-                ?? $this->accounts->findByCode(self::FALLBACK_ACCUMULATED_DEPRECIATION_CODE, $tenantId);
+                ?? $this->systemAccounts->get(self::FALLBACK_ACCUMULATED_DEPRECIATION_KEY, $tenantId);
 
             if ($depreciationExpenseAccount === null || $accumulatedDepreciationAccount === null) {
                 throw new InvalidArgumentException(
-                    "Cannot post depreciation for asset #{$asset->id}: depreciation expense / accumulated depreciation accounts are not configured (category or fallback codes " . self::FALLBACK_DEPRECIATION_EXPENSE_CODE . '/' . self::FALLBACK_ACCUMULATED_DEPRECIATION_CODE . ' not found).'
+                    "Cannot post depreciation for asset #{$asset->id}: depreciation expense / accumulated depreciation accounts are not configured (category or fallback codes " . SystemAccount::templateCode(self::FALLBACK_DEPRECIATION_EXPENSE_KEY) . '/' . SystemAccount::templateCode(self::FALLBACK_ACCUMULATED_DEPRECIATION_KEY) . ' not found).'
                 );
             }
 

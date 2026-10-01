@@ -136,13 +136,14 @@
 
         <div id="coaSystemNotice" style="display: none;">
             <x-ui.alert variant="warning" icon="feather-lock" class="fs-12 mb-3">
-                This is a system account and cannot be deleted, though its details can still be edited.
+                This is a system account. It can't be deleted and its code is locked, because automatic postings depend on it. The name and other details can still be edited.
             </x-ui.alert>
         </div>
 
         <div class="row">
             <div class="col-md-6">
-                <x-ui.input label="Code" name="code" id="coaCode" :value="old('code', $editingAccount?->code)" required="true" />
+                <x-ui.input label="Code" name="code" id="coaCode" :value="old('code', $editingAccount?->code)" required="true"
+                    :readonly="(bool) $editingAccount?->is_system" />
             </div>
             <div class="col-md-6">
                 <x-ui.input label="Name" name="name" id="coaName" :value="old('name', $editingAccount?->name)" required="true" />
@@ -260,6 +261,7 @@
                 $('#coaIsActive').prop('checked', data.isActive === '1');
                 $('#coaIsCashOrBank').prop('checked', data.isCashOrBank === '1');
                 $('#coaSystemNotice').toggle(data.isSystem === '1');
+                $('#coaCode').prop('readonly', data.isSystem === '1');
             });
 
             coaModal.addEventListener('hidden.bs.modal', function () {
@@ -271,6 +273,7 @@
                 $(coaModal).find('form')[0].reset();
                 $('#coaAccountId').val('');
                 $('#coaSystemNotice').hide();
+                $('#coaCode').prop('readonly', false);
                 filterSubtypes($('#coaType').val(), '');
             });
 

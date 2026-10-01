@@ -7,6 +7,8 @@ use App\Domains\Accounting\Models\JournalEntry;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
+use App\Domains\Accounting\Services\SystemAccountService;
+use App\Domains\Accounting\Support\SystemAccount;
 use App\Domains\Purchase\Events\VendorPaymentRecorded;
 use Illuminate\Support\Facades\Log;
 
@@ -15,6 +17,7 @@ class PostVendorPaymentJournal
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly SystemAccountService $systemAccounts,
         private readonly PostingFailureRecorder $failures,
     ) {
     }
@@ -33,13 +36,13 @@ class PostVendorPaymentJournal
             if ($payment->bank_account_id) {
                 $paymentAccount = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScope('tenant')->where('tenant_id', $payment->tenant_id)->whereKey($payment->bank_account_id)->first();
             } else {
-                $bankCode = $payment->payment_method === 'Cash' ? '1010' : '1020';
-                $paymentAccount = $this->accounts->findByCode($bankCode, $payment->tenant_id);
+                $bankKey = $payment->payment_method === 'Cash' ? SystemAccount::CASH : SystemAccount::BANK;
+                $paymentAccount = $this->systemAccounts->get($bankKey, $payment->tenant_id);
             }
 
             $isAdvance = $payment->payment_type === 'Advance';
-            $debitCode = $isAdvance ? '1410' : '2010';
-            $debitAccount = $this->accounts->findByCode($debitCode, $payment->tenant_id);
+            $debitKey = $isAdvance ? SystemAccount::ADVANCE_TO_SUPPLIERS : SystemAccount::AP;
+            $debitAccount = $this->systemAccounts->get($debitKey, $payment->tenant_id);
 
             if (!$paymentAccount || !$debitAccount) {
                 $message = 'Missing chart of accounts (Bank/Cash/Accounts Payable/Advance to Suppliers), skipping auto-post';
