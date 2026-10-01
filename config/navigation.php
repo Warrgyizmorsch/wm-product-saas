@@ -96,6 +96,7 @@ return [
         'hrms' => ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'description' => 'Employees, attendance, leave, payroll', 'color' => '#16A34A'],
         'accounting' => ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'description' => 'Ledgers, journals, tax, reports', 'color' => '#CA8A04'],
         'projects' => ['label' => 'Projects', 'icon' => 'feather-briefcase', 'description' => 'Projects, milestones, tasks', 'color' => '#4F46E5'],
+        'visitor' => ['label' => 'Visitor Management', 'icon' => 'feather-user-check', 'description' => 'Visitor passes, check-in, live headcount', 'color' => '#059669'],
         'admin' => ['label' => 'Administration', 'icon' => 'feather-shield', 'description' => 'Tenants, plans, users, roles, audit', 'color' => '#475569'],
     ],
 
@@ -120,6 +121,7 @@ return [
         'hrms' => 'hrms',
         'accounting' => 'accounting',
         'projects' => 'projects',
+        'visitor' => 'visitor',
         'platform' => 'admin',
         'access' => 'admin',
     ],

@@ -128,6 +128,20 @@
                 <i class="feather-grid me-1 text-primary" style="font-size: 9px;"></i>
                 {{ $tab['header'] ?? $tab['label'] }}
             </li>
+        @elseif(!empty($tab['url']) || !empty($tab['href']))
+            <li class="nav-item" role="presentation">
+                <a class="nav-link btn-badge-container {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
+                   id="{{ ($tab['id'] ?? 'tab-'.\Illuminate\Support\Str::slug($tab['label'] ?? 'item')) }}-tab"
+                   href="{{ $tab['url'] ?? $tab['href'] }}">
+                    @if(!empty($tab['icon']))
+                        <i class="{{ $tab['icon'] }} me-2"></i>
+                    @endif
+                    {{ $tab['label'] }}
+                    @if(isset($tab['badge']) && (int)$tab['badge'] > 0)
+                        <span class="btn-badge-count {{ $tab['badgeClass'] ?? '' }}">{{ $tab['badge'] }}</span>
+                    @endif
+                </a>
+            </li>
         @else
             <li class="nav-item" role="presentation">
                 <button class="nav-link btn-badge-container {{ ($tab['active'] ?? false) ? 'active' : '' }}" 

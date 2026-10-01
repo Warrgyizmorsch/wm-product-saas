@@ -22,7 +22,7 @@
      {{ $attributes->merge(['class' => '']) }}>
      
     <div class="offcanvas-header border-bottom">
-        <h5 class="offcanvas-title" id="{{ $id }}Label">{{ $title }}</h5>
+        <h5 class="offcanvas-title d-flex align-items-center" id="{{ $id }}Label">{!! $title !!}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
     
