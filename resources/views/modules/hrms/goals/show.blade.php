@@ -6,7 +6,7 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.goals.index') }}" class="border fw-semibold">
+        <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.goals.index', ['active_tab' => request('from_tab', ($isHrAdmin ? 'company_goals' : 'my_team_goals'))]) }}" class="border fw-semibold">
             Back to Goals
         </x-ui.button>
         <x-ui.button variant="primary" icon="feather-check-square" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" class="fw-bold">
@@ -19,6 +19,65 @@
         @endif
     </div>
 @endsection
+
+@push('styles')
+<style>
+    .avatar-initials {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background-color: rgba(var(--bs-primary-rgb), 0.12) !important;
+        color: var(--bs-primary) !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 12px;
+        flex-shrink: 0;
+    }
+    .goal-theme-badge-subtle {
+        background-color: rgba(var(--bs-primary-rgb), 0.12) !important;
+        color: var(--bs-primary) !important;
+        border: 1px solid rgba(var(--bs-primary-rgb), 0.28) !important;
+    }
+    .badge.bg-primary {
+        background-color: var(--bs-primary) !important;
+        color: #ffffff !important;
+    }
+    .badge.bg-primary-subtle {
+        background-color: rgba(var(--bs-primary-rgb), 0.12) !important;
+        color: var(--bs-primary) !important;
+        border: 1px solid rgba(var(--bs-primary-rgb), 0.28) !important;
+    }
+    .text-primary {
+        color: var(--bs-primary) !important;
+    }
+    .progress-bar.bg-primary {
+        background-color: var(--bs-primary) !important;
+    }
+    .subgoal-item-card {
+        border: 1px solid #e5e7eb;
+        background-color: #ffffff;
+        border-radius: 8px;
+        transition: all 0.2s ease-in-out;
+    }
+    .subgoal-item-card:hover {
+        border-color: rgba(var(--bs-primary-rgb), 0.4);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+        transform: translateY(-1px);
+    }
+    .subgoal-item-title {
+        color: #1f2937;
+        font-weight: 600;
+        font-size: 13px;
+        line-height: 1.4;
+        transition: color 0.15s ease;
+    }
+    .subgoal-item-title:hover {
+        color: var(--bs-primary);
+    }
+</style>
+@endpush
 
 @section('content')
 <div class="container-fluid p-0">
@@ -43,11 +102,12 @@
             <div class="card border rounded-3 shadow-sm bg-white mb-4">
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div class="d-flex align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
                             <span class="badge bg-primary text-white fs-12 fw-bold px-2.5 py-1">{{ $goal->code }}</span>
                             @if($goal->category)
-                                <span class="badge rounded-pill text-white" style="background-color: {{ $goal->category->color }}; font-size: 11px;">
-                                    {{ $goal->category->name }}
+                                <span class="badge goal-theme-badge-subtle fs-11 fw-semibold d-inline-flex align-items-center gap-1.5 py-1 px-2.5">
+                                    <i class="feather-target" style="font-size: 13px; line-height: 1; flex-shrink: 0;"></i>
+                                    <span>{{ $goal->category->name }}</span>
                                 </span>
                             @endif
                             <span class="badge bg-light text-muted border fs-11">{{ $goal->cycle?->name ?? 'General' }}</span>
@@ -279,20 +339,88 @@
 
             <!-- Sub-Goals / Child Goals Card -->
             @if($goal->childGoals->isNotEmpty())
-                <div class="card border rounded-3 shadow-sm bg-white">
-                    <div class="card-header bg-light py-3">
-                        <span class="fw-bold text-dark fs-13"><i class="feather-git-pull-request text-primary me-1.5"></i> Cascaded Sub-Goals ({{ $goal->childGoals->count() }})</span>
+                <div class="card border rounded-3 shadow-sm bg-white mb-4">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center py-3 border-bottom">
+                        <span class="fw-bold text-dark fs-13 d-flex align-items-center">
+                            <i class="feather-git-pull-request text-primary me-2 fs-15"></i> Cascaded Sub-Goals
+                        </span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill fs-11 px-2.5 py-0.5 fw-bold">
+                            {{ $goal->childGoals->count() }}
+                        </span>
                     </div>
-                    <div class="card-body p-3">
+                    <div class="card-body p-3 d-flex flex-column gap-2.5">
                         @foreach($goal->childGoals as $child)
-                            <div class="p-2.5 bg-light-subtle rounded border mb-2">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <a href="{{ route('hrms.goals.show', $child->id) }}" class="fw-bold text-dark fs-12 text-decoration-none">
+                            <div class="subgoal-item-card p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                        <span class="badge bg-light text-muted border fs-10 fw-bold px-2 py-0.5">{{ $child->code }}</span>
+                                        @if($child->category)
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 fw-semibold px-2 py-0.5">
+                                                {{ $child->category->name }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div>
+                                        @if($child->health_status === 'on_track')
+                                            <span class="badge bg-success-subtle text-success fs-10 fw-semibold px-2 py-0.5">🟢 On Track</span>
+                                        @elseif($child->health_status === 'at_risk')
+                                            <span class="badge bg-warning-subtle text-warning fs-10 fw-semibold px-2 py-0.5">🟡 At Risk</span>
+                                        @elseif($child->health_status === 'behind')
+                                            <span class="badge bg-danger-subtle text-danger fs-10 fw-semibold px-2 py-0.5">🔴 Behind</span>
+                                        @else
+                                            <span class="badge bg-info-subtle text-info fs-10 fw-semibold px-2 py-0.5">🔵 Completed</span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="mb-2.5">
+                                    <a href="{{ route('hrms.goals.show', ['goal' => $child->id, 'from_tab' => request('from_tab', ($isHrAdmin ? 'company_goals' : 'my_team_goals'))]) }}" class="subgoal-item-title text-decoration-none text-truncate-2 d-block">
                                         {{ $child->title }}
                                     </a>
-                                    <span class="fw-bold text-primary fs-11">{{ number_format($child->progress_percentage, 0) }}%</span>
                                 </div>
-                                <small class="text-muted fs-10">👤 {{ $child->employee?->full_name ?? ($child->department?->name ?? 'Team') }}</small>
+
+                                <div class="d-flex justify-content-between align-items-center mb-1.5 fs-11">
+                                    <span class="text-muted fw-semibold">Progress</span>
+                                    <span class="fw-bold text-primary font-monospace">{{ number_format($child->progress_percentage, 0) }}%</span>
+                                </div>
+                                <div class="progress mb-2.5" style="height: 6px; background-color: #f1f5f9; border-radius: 4px;">
+                                    <div class="progress-bar {{ $child->health_status === 'behind' ? 'bg-danger' : ($child->health_status === 'at_risk' ? 'bg-warning' : 'bg-primary') }}" 
+                                         style="width: {{ min(100, max(0, $child->progress_percentage)) }}%; border-radius: 4px;"></div>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center pt-2 border-top border-light-subtle">
+                                    @php
+                                        $childEmps = $child->employees->isNotEmpty() ? $child->employees : ($child->employee ? collect([$child->employee]) : collect());
+                                    @endphp
+
+                                    @if($childEmps->isNotEmpty())
+                                        <div class="d-flex align-items-center gap-2" title="{{ $childEmps->pluck('full_name')->join(', ') }}">
+                                            <div class="avatar-initials rounded-circle border border-2 border-white shadow-xs" style="width: 24px; height: 24px; font-size: 10px;">
+                                                {{ strtoupper(substr($childEmps->first()->full_name, 0, 1)) }}
+                                            </div>
+                                            <div class="d-flex flex-column text-truncate" style="max-width: 140px;">
+                                                <small class="text-dark fs-11 fw-semibold text-truncate leading-tight">
+                                                    {{ $childEmps->first()->full_name }}
+                                                </small>
+                                                <span class="text-muted" style="font-size: 9.5px;">{{ $childEmps->first()->department?->name ?? 'Team Member' }}</span>
+                                            </div>
+                                            @if($childEmps->count() > 1)
+                                                <span class="badge bg-primary text-white rounded-pill px-1.5 py-0.5" style="font-size: 8.5px;">+{{ $childEmps->count() - 1 }}</span>
+                                            @endif
+                                        </div>
+                                    @elseif($child->department)
+                                        <div class="d-flex align-items-center gap-1.5">
+                                            <i class="feather-users text-muted fs-12"></i>
+                                            <small class="text-muted fs-11 fw-semibold">{{ $child->department->name }}</small>
+                                        </div>
+                                    @else
+                                        <small class="text-muted fs-11">Organization</small>
+                                    @endif
+
+                                    <a href="{{ route('hrms.goals.show', ['goal' => $child->id, 'from_tab' => request('from_tab', ($isHrAdmin ? 'company_goals' : 'my_team_goals'))]) }}" class="btn btn-xs btn-light border py-1 px-2.5 text-primary fs-11 fw-semibold text-decoration-none shadow-none rounded-2">
+                                        View <i class="feather-arrow-right ms-1"></i>
+                                    </a>
+                                </div>
                             </div>
                         @endforeach
                     </div>
@@ -355,17 +483,49 @@
             <div class="row g-4 mb-3">
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="input" label="Objective Title" name="title" value="{{ $goal->title }}" :required="true" />
-                    <x-ui.odoo-form-ui type="select" label="Goal Cycle" name="goal_cycle_id">
-                        <option value="">Choose Goal Cycle...</option>
-                        @foreach($cycles as $c)
-                            <option value="{{ $c->id }}" {{ $goal->goal_cycle_id == $c->id ? 'selected' : '' }}>{{ $c->name }}</option>
-                        @endforeach
-                    </x-ui.odoo-form-ui>
-                    <x-ui.odoo-form-ui type="select" label="Strategic Pillar" name="goal_category_id">
-                        @foreach($categories as $cat)
-                            <option value="{{ $cat->id }}" {{ $goal->goal_category_id == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
-                        @endforeach
-                    </x-ui.odoo-form-ui>
+                    <!-- GOAL CYCLE WITH INLINE CUSTOM ADD -->
+                    <div class="odoo-form-group mb-2">
+                        <label class="odoo-form-label">Goal Cycle</label>
+                        <div class="flex-grow-1">
+                            <div class="cycle-select-wrap d-flex align-items-center" style="width: 100%;">
+                                <select name="goal_cycle_id" class="odoo-form-control goal-cycle-select select2" style="width: 100%;" onchange="handleEditGoalCycleSelect(this)">
+                                    <option value="">Choose Goal Cycle...</option>
+                                    <option value="__custom__">+ Add Custom Goal Cycle (Type Manually)</option>
+                                    @foreach($cycles as $c)
+                                        <option value="{{ $c->id }}" {{ $goal->goal_cycle_id == $c->id ? 'selected' : '' }}>{{ $c->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="cycle-input-wrap d-none align-items-center gap-1">
+                                <input type="text" name="custom_goal_cycle" class="odoo-form-control cycle-title-input" placeholder="Type custom goal cycle name..." />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToEditGoalCycleSelect(this)" style="height: 24px; font-size: 11px; white-space: nowrap;">
+                                    <i class="feather-list"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STRATEGIC PILLAR WITH INLINE CUSTOM ADD -->
+                    <div class="odoo-form-group mb-2">
+                        <label class="odoo-form-label">Strategic Pillar</label>
+                        <div class="flex-grow-1">
+                            <div class="pillar-select-wrap d-flex align-items-center" style="width: 100%;">
+                                <select name="goal_category_id" class="odoo-form-control goal-pillar-select select2" style="width: 100%;" onchange="handleEditGoalPillarSelect(this)">
+                                    <option value="">Choose Strategic Pillar...</option>
+                                    <option value="__custom__">+ Add Custom Strategic Pillar (Type Manually)</option>
+                                    @foreach($categories as $cat)
+                                        <option value="{{ $cat->id }}" {{ $goal->goal_category_id == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="pillar-input-wrap d-none align-items-center gap-1">
+                                <input type="text" name="custom_goal_category" class="odoo-form-control pillar-title-input" placeholder="Type custom strategic pillar name..." />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToEditGoalPillarSelect(this)" style="height: 24px; font-size: 11px; white-space: nowrap;">
+                                    <i class="feather-list"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Scope" name="owner_type">
@@ -406,3 +566,122 @@
 </x-ui.modal>
 @endif
 @endsection
+
+@push('scripts')
+<script>
+    window.handleEditGoalCycleSelect = function(selectEl) {
+        const $sel = $(selectEl);
+        const container = selectEl.closest('.odoo-form-group') || selectEl.parentElement;
+        if (!container) return;
+
+        const selectWrap = container.querySelector('.cycle-select-wrap');
+        const inputWrap = container.querySelector('.cycle-input-wrap');
+        const titleInput = container.querySelector('.cycle-title-input');
+        const val = $sel.val();
+
+        if (val === '__custom__') {
+            if (selectWrap) selectWrap.classList.add('d-none');
+            if (inputWrap) {
+                inputWrap.classList.remove('d-none');
+                inputWrap.classList.add('d-flex');
+            }
+            if (titleInput) {
+                titleInput.value = '';
+                titleInput.focus();
+            }
+        }
+    };
+
+    window.switchToEditGoalCycleSelect = function(btn) {
+        const container = btn.closest('.odoo-form-group') || btn.parentElement;
+        if (!container) return;
+
+        const selectWrap = container.querySelector('.cycle-select-wrap');
+        const inputWrap = container.querySelector('.cycle-input-wrap');
+        const titleInput = container.querySelector('.cycle-title-input');
+        const $select = $(container).find('.goal-cycle-select');
+
+        if (titleInput) titleInput.value = '';
+        if (inputWrap) {
+            inputWrap.classList.add('d-none');
+            inputWrap.classList.remove('d-flex');
+        }
+        if (selectWrap) {
+            selectWrap.classList.remove('d-none');
+            selectWrap.classList.add('d-flex');
+        }
+        if ($select.length) {
+            $select.val('').trigger('change.select2');
+        }
+    };
+
+    window.handleEditGoalPillarSelect = function(selectEl) {
+        const $sel = $(selectEl);
+        const container = selectEl.closest('.odoo-form-group') || selectEl.parentElement;
+        if (!container) return;
+
+        const selectWrap = container.querySelector('.pillar-select-wrap');
+        const inputWrap = container.querySelector('.pillar-input-wrap');
+        const titleInput = container.querySelector('.pillar-title-input');
+        const val = $sel.val();
+
+        if (val === '__custom__') {
+            if (selectWrap) selectWrap.classList.add('d-none');
+            if (inputWrap) {
+                inputWrap.classList.remove('d-none');
+                inputWrap.classList.add('d-flex');
+            }
+            if (titleInput) {
+                titleInput.value = '';
+                titleInput.focus();
+            }
+        }
+    };
+
+    window.switchToEditGoalPillarSelect = function(btn) {
+        const container = btn.closest('.odoo-form-group') || btn.parentElement;
+        if (!container) return;
+
+        const selectWrap = container.querySelector('.pillar-select-wrap');
+        const inputWrap = container.querySelector('.pillar-input-wrap');
+        const titleInput = container.querySelector('.pillar-title-input');
+        const $select = $(container).find('.goal-pillar-select');
+
+        if (titleInput) titleInput.value = '';
+        if (inputWrap) {
+            inputWrap.classList.add('d-none');
+            inputWrap.classList.remove('d-flex');
+        }
+        if (selectWrap) {
+            selectWrap.classList.remove('d-none');
+            selectWrap.classList.add('d-flex');
+        }
+        if ($select.length) {
+            $select.val('').trigger('change.select2');
+        }
+    };
+
+    if (window.jQuery) {
+        $('#editGoalModal').on('shown.bs.modal', function() {
+            const $modal = $(this);
+            $modal.find('.goal-cycle-select, .goal-pillar-select').each(function() {
+                if (!$(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2({
+                        theme: 'bootstrap-5',
+                        dropdownParent: $modal,
+                        width: '100%'
+                    });
+                }
+            });
+        });
+
+        $(document).on('change change.select2 select2:select', '#editGoalModal .goal-cycle-select', function() {
+            handleEditGoalCycleSelect(this);
+        });
+
+        $(document).on('change change.select2 select2:select', '#editGoalModal .goal-pillar-select', function() {
+            handleEditGoalPillarSelect(this);
+        });
+    }
+</script>
+@endpush
