@@ -10,11 +10,12 @@
 
 | Attribute | State |
 |---|---|
-| **Last Completed Major Phase** | **Phase 4 — Issue Management & Project Documents** (Status: Completed & Formally Verified) |
-| **Current Major Phase** | **None** — between major phases (no major implementation phase currently in progress) |
-| **Next Major Phase** | **Phase 5 — Client Review / UAT & Change Requests** |
-| **Phase 5 Status** | **PLANNED** |
-| **Next Authorized Action** | **Phase 5A — Read-Only Requirements / Current-State Audit** |
+| **Last Completed Major Phase** | **Phase 6 — Timeline, Scheduling, Gantt & Critical Path** (Status: Completed & Formally Verified) |
+| **Current Major Phase** | **Phase 7 — Billing & Sales Invoice Integration** (Lifecycle Gate: Discovery & Read-Only Audit) |
+| **Next Major Phase** | **Phase 7 — Billing & Sales Invoice Integration** |
+| **Phase 6 Status** | **COMPLETED & FORMALLY VERIFIED** |
+| **Phase 7A Status** | **PENDING READ-ONLY DISCOVERY** |
+| **Next Authorized Action** | **Phase 7A — Billing & Sales Invoice Integration Read-Only Audit & Architectural Alignment** |
 
 
 > [!IMPORTANT]
@@ -363,27 +364,56 @@ Before entering the Architecture / Integration Validation gate or proposing any 
 
 ---
 
-### Phase 5: Client Review / UAT & Change Requests — [PLANNED]
-- **Status:** **PLANNED**
+### Phase 5: Client Review / UAT & Change Requests — [COMPLETED & FORMALLY VERIFIED]
+- **Status:** **COMPLETED & FORMALLY VERIFIED**
 - **Objective:** Implement formal client sign-off and scope change governance.
-- **Initial Target Scope (Subject to Phase 5 Audit):**
-  1. **UAT Database:** Migration creating `project_reviews` (project_id, reviewer_id, review_date, status, comments, sign-off evidence).
-  2. **UAT Service & Gatekeeper:** Build `ProjectReviewService` blocking review creation until 100% of milestones are `Completed`.
-  3. **Change Requests Database:** Migration creating `project_change_requests` (cr_number, project_id, requestor, impact_days, impact_budget_amount, impact_hours, status).
-  4. **Change Request Service:** Logic to automatically adjust project budget and create child tasks upon CR approval.
-  5. **UI Views:** UAT review modal/screen and Change Request management tab on Project Detail.
-- **Exit Criteria:** UAT cannot be started with open milestones; "Rework Required" triggers CR creation; approved CRs adjust project budget.
+- **Delivered Capabilities:**
+  1. **Database Schema:** `project_reviews` and `project_change_requests` tables created with strict tenant isolation, foreign keys, cascade/nullOnDelete constraints, soft deletes, and composite performance indexes.
+  2. **Domain Models & Invariants:**
+     - `ProjectReview` with relationships (`project`, `reviewer`, `creator`, `changeRequests`, polymorphic `documents`).
+     - `ChangeRequest` with relationships (`project`, `review`, `requester`, `approver`, `creator`).
+     - `Project::reviews()` and `Project::changeRequests()` relationships added.
+  3. **Domain Services:**
+     - `ProjectReviewService`: Enforces 100% completed milestone prerequisite (minimum 1 milestone), single pending review invariant, sign-off transition (`Pending` -> `Approved` / `Rework Required`), and polymorphic evidence upload.
+     - `ChangeRequestService`: Enforces UAT-rework linkage validation (requires `Rework Required` review on same project, at most 1 active CR per rework review), separation of duties on approval, transactional row-locked project budget increments (`budget_amount`, `budget_hours`), pre/post budget activity logging, rejection remarks, and authorized `markImplemented()` action.
+  4. **Authorization & RBAC:** Granular permissions registered in `RbacSeeder` (`projects.reviews.view`, `projects.reviews.create`, `projects.reviews.signoff`, `projects.changerequests.view`, `projects.changerequests.create`, `projects.changerequests.approve`) with policies `ProjectReviewPolicy` and `ChangeRequestPolicy` integrated via `AccessService`.
+  5. **UI & Blade Integration:** Fifth tab `tab-reviews` integrated in `show.blade.php` and `_reviews.blade.php` using `<x-ui.odoo-form-ui type="table">`, standard modals for Review creation, Sign-off, CR creation, CR rejection, and Evidence upload with status badges.
+  6. **Localization:** Complete English, Bulgarian, and Hindi translations in `projects.php` for all review/CR statuses, labels, actions, impact badges, and activity title templates with 100% key and placeholder parity.
+  7. **Testing:** 27 new automated feature tests across `ProjectReviewTest`, `ChangeRequestTest`, and `ProjectPhase5LocalizationTest` with 951 assertions passing 100%, plus 34 regression tests green.
+- **Exit Criteria Met:** Reviews require 100% completed milestones; creation always starts in `Pending`; "Rework Required" enforces CR linkage; approved CRs transactionally roll up budget and hours with activity audit; zero regressions.
+- **Next Authorized Action:** **Phase 6B — Architecture Validation & Implementation Plan** (Phase 6A Audit Completed).
 
 ---
 
-### Phase 6: Timeline, Scheduling, Gantt & Critical Path — [PLANNED]
-- **Status:** **PLANNED**
+### Phase 6: Timeline, Scheduling, Gantt & Critical Path — [APPROVED FOR IMPLEMENTATION]
+- **Status:** **COMPLETED & FORMALLY VERIFIED**
 - **Objective:** Provide interactive timeline visualization and automated schedule calculation.
-- **Initial Target Scope (Subject to Phase 6 Audit):**
-  1. **Gantt Component:** Integrate lightweight frontend Gantt renderer in `resources/views/modules/projects/timeline.blade.php`, evaluating native HTML5 Drag & Drop Timeline architecture first.
-  2. **Scheduling Service:** Build `ProjectScheduleService` calculating Critical Path (Early Start/Finish, Late Start/Finish, Slack/Float).
-  3. **AJAX Date Shifting:** Implement endpoint to shift dependent task dates when predecessor bars are moved in the Gantt UI.
-- **Exit Criteria:** Gantt renders real project milestones, tasks, and dependency links; critical path is highlighted; date changes persist.
+- **Phase 6A Read-Only Audit Findings Summary:**
+  1. **Frontend Gantt Architecture:** Audited `resources/views/modules/production/schedules/dispatch-board.blade.php`. Reusing the native ERP HTML5 Drag & Drop timeline pattern avoids external license encumbrances (`dhtmlx`) or bundle weight (`frappe-gantt`). Milestone workspace already has placeholder tab `_timeline.blade.php` ready for conversion.
+  2. **Scheduling Engine:** Identified need for `ProjectScheduleService` to execute a two-pass Critical Path Method (CPM) calculation: Forward Pass (Early Start/Finish), Backward Pass (Late Start/Finish), and Total Float/Slack ($TF = LS - ES$). Zero-slack tasks will be classified as Critical Path.
+  3. **Date Shifting / Ripple Scheduling:** Evaluated `shift_mode` semantics (`ripple` cascades to all transitive downstream successors; `isolated` moves only target task and blocks on constraint violations).
+  4. **Data Model & Dependencies:** `project_task_dependencies` schema and models inspected. Dependency types (`Finish-to-Start`, `Start-to-Start`, `Finish-to-Finish`, `Start-to-Finish`) are active; cycle detection is hardened in `TaskDependencyService`.
+  5. **Authorization:** Scoped via `AccessService` using `projects.projects.view` / `projects.tasks.view` for schedule viewing, and `projects.tasks.update` / `projects.projects.update` for schedule mutations.
+
+#### Phase 6B Approved Architecture & Plan Summary (Artifact: `phase6_implementation_plan.md`)
+- **Validated Architectural Boundaries:**
+  1. **Zero External Libraries:** Native HTML5 Drag & Drop timeline grid with Day/Week/Month ticks, styled with ERP CSS tokens, and curved SVG overlay lines for dependency links.
+  2. **Dynamic CPM Engine:** `ProjectScheduleService` calculates ES/EF/LS/LF and total float on-the-fly using exact PDM discrete calendar day bounds; no stale denormalized columns on `project_tasks`.
+  3. **Dependency Migration:** Added `lag_days` (integer, default 0) to `project_task_dependencies` table via migration.
+  4. **Dual Shift Modes:** `ripple` mode pushes downstream transitive successors transactionally with row locks (`lockForUpdate`) and activity logging; `isolated` mode rejects constraint-violating moves with 422 errors. Completed downstream tasks are safeguarded from unauthorized auto-shifts.
+  5. **Blade Integration:** Reusable `_timeline.blade.php` embedded in both Project Show (`tab-timeline`) and Milestone Workspace (`tab-timeline`), plus standalone view `timeline.blade.php`.
+  6. **Security & Isolation:** Permissions checked via `AccessService`; multi-tenant scoping enforced across all queries.
+  7. **Testing Scope:** Comprehensive automated feature tests in `ProjectScheduleTest.php` covering CPM math, all 4 dependency types with lag/lead, isolated/ripple shifts, and tenant isolation (13 tests passing, 41 assertions).
+
+#### Phase 6C Implementation Execution Summary:
+- **Database & Model:** Created and migrated `2026_09_30_150000_add_lag_days_to_project_task_dependencies_table.php`. Updated `TaskDependency` model, `TaskDependencyRepository`, `TaskDependencyService`, and `StoreTaskDependencyRequest` with `lag_days`.
+- **Domain Service:** Created `ProjectScheduleService` implementing topological sort (Kahn's algorithm), forward pass ($ES, EF$), backward pass ($LF, LS$), total/free float ($TF$), critical path identification ($TF \le 0$), isolated boundary validation, and ripple BFS cascade with completed-task protection.
+- **Controller & Routes:** Added `RescheduleTaskRequest`, `ProjectScheduleController` (`index`, `data`, `reschedule`), and web routes under `projects/{project}/timeline`.
+- **UI & Gantt Visualization:** Built `_timeline.blade.php` with native HTML5 Drag & Drop, Day/Week/Month scale toggles, critical path highlighting, and dynamic SVG connector overlay paths with directional arrowheads for FS, SS, FF, and SF dependencies. Integrated into Project Show (`tab-timeline`), Milestone Workspace (`workspace/_timeline.blade.php`), and standalone `timeline.blade.php`.
+- **Localization:** Added full translation keys across `lang/en/projects.php`, `lang/hi/projects.php`, and `lang/bg/projects.php`.
+- **Automated Verification:** Verified via `php artisan test tests/Feature/ProjectScheduleTest.php` (13 tests passed, 41 assertions) and regression tests `tests/Feature/TaskDependencyTest.php` & `TaskDependencyEnforcementTest.php` (19 tests passed, 48 assertions).
+- **Next Authorized Action:** **Phase 7A — Billing & Sales Invoice Integration Read-Only Audit & Architectural Alignment**.
+- **Exit Criteria:** Fully verified and passed.
 
 ---
 

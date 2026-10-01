@@ -58,14 +58,59 @@ class GoalService
 
             $code = !empty($data['code']) ? trim($data['code']) : $this->generateGoalCode($tenantId);
 
+            // Handle Custom / On-the-fly Goal Cycle
+            if (!empty($data['custom_goal_cycle'])) {
+                $cycleName = trim($data['custom_goal_cycle']);
+                $cycle = GoalCycle::firstOrCreate(
+                    ['tenant_id' => $tenantId, 'name' => $cycleName],
+                    [
+                        'company_id'  => $data['company_id'] ?? $user?->company_id,
+                        'code'        => 'CYC-' . strtoupper(Str::random(4)),
+                        'start_date'  => now()->startOfYear()->toDateString(),
+                        'end_date'    => now()->endOfYear()->toDateString(),
+                        'status'      => 'active',
+                        'description' => 'Custom created goal cycle',
+                    ]
+                );
+                $data['goal_cycle_id'] = $cycle->id;
+            } elseif (($data['goal_cycle_id'] ?? null) === '__custom__') {
+                $data['goal_cycle_id'] = null;
+            }
+
+            // Handle Custom / On-the-fly Strategic Pillar
+            if (!empty($data['custom_goal_category'])) {
+                $catName = trim($data['custom_goal_category']);
+                $cat = GoalCategory::firstOrCreate(
+                    ['tenant_id' => $tenantId, 'name' => $catName],
+                    [
+                        'company_id'  => $data['company_id'] ?? $user?->company_id,
+                        'code'        => 'CAT-' . strtoupper(Str::random(4)),
+                        'color'       => '#852d3c',
+                        'icon'        => 'feather-target',
+                        'status'      => 'active',
+                        'description' => 'Custom created strategic pillar',
+                    ]
+                );
+                $data['goal_category_id'] = $cat->id;
+            } elseif (($data['goal_category_id'] ?? null) === '__custom__') {
+                $data['goal_category_id'] = null;
+            }
+
             $employeeIds = [];
             if (!empty($data['employee_ids']) && is_array($data['employee_ids'])) {
                 $employeeIds = array_values(array_filter(array_map('intval', $data['employee_ids'])));
-            } elseif (!empty($data['employee_id'])) {
+            } elseif (!empty($data['employee_id']) && is_numeric($data['employee_id'])) {
                 $employeeIds = [(int) $data['employee_id']];
             }
 
-            $primaryEmployeeId = !empty($data['employee_id']) ? (int) $data['employee_id'] : (!empty($employeeIds) ? $employeeIds[0] : null);
+            $primaryEmployeeId = !empty($data['employee_id']) && is_numeric($data['employee_id']) 
+                ? (int) $data['employee_id'] 
+                : (!empty($employeeIds) ? $employeeIds[0] : null);
+
+            $goalCycleId = !empty($data['goal_cycle_id']) && is_numeric($data['goal_cycle_id']) ? (int) $data['goal_cycle_id'] : null;
+            $goalCategoryId = !empty($data['goal_category_id']) && is_numeric($data['goal_category_id']) ? (int) $data['goal_category_id'] : null;
+            $departmentId = !empty($data['department_id']) && is_numeric($data['department_id']) ? (int) $data['department_id'] : null;
+            $parentGoalId = !empty($data['parent_goal_id']) && is_numeric($data['parent_goal_id']) ? (int) $data['parent_goal_id'] : null;
 
             $goal = Goal::create([
                 'tenant_id'           => $tenantId,
@@ -73,17 +118,17 @@ class GoalService
                 'code'                => $code,
                 'title'               => $data['title'],
                 'description'         => $data['description'] ?? null,
-                'goal_cycle_id'       => $data['goal_cycle_id'] ?? null,
-                'goal_category_id'    => $data['goal_category_id'] ?? null,
+                'goal_cycle_id'       => $goalCycleId,
+                'goal_category_id'    => $goalCategoryId,
                 'owner_type'          => $data['owner_type'] ?? 'employee',
-                'department_id'       => $data['department_id'] ?? null,
+                'department_id'       => $departmentId,
                 'employee_id'         => $primaryEmployeeId,
-                'parent_goal_id'      => $data['parent_goal_id'] ?? null,
+                'parent_goal_id'      => $parentGoalId,
                 'visibility'          => $data['visibility'] ?? 'public',
                 'priority'            => $data['priority'] ?? 'medium',
-                'start_date'          => $data['start_date'] ?? null,
-                'due_date'            => $data['due_date'] ?? null,
-                'weightage'           => $data['weightage'] ?? 100.00,
+                'start_date'          => !empty($data['start_date']) ? $data['start_date'] : null,
+                'due_date'            => !empty($data['due_date']) ? $data['due_date'] : null,
+                'weightage'           => !empty($data['weightage']) ? (float) $data['weightage'] : 100.00,
                 'progress_percentage' => 0.00,
                 'health_status'       => $data['health_status'] ?? 'on_track',
                 'status'              => $data['status'] ?? 'active',
@@ -150,22 +195,78 @@ class GoalService
                 $employeeIds = array_values(array_filter(array_map('intval', $data['employee_ids'])));
             }
 
-            $primaryEmployeeId = !empty($data['employee_id']) ? (int) $data['employee_id'] : ($employeeIds && count($employeeIds) > 0 ? $employeeIds[0] : $goal->employee_id);
+            // Handle Custom / On-the-fly Goal Cycle
+            if (!empty($data['custom_goal_cycle'])) {
+                $cycleName = trim($data['custom_goal_cycle']);
+                $cycle = GoalCycle::firstOrCreate(
+                    ['tenant_id' => $goal->tenant_id, 'name' => $cycleName],
+                    [
+                        'company_id'  => $goal->company_id,
+                        'code'        => 'CYC-' . strtoupper(Str::random(4)),
+                        'start_date'  => now()->startOfYear()->toDateString(),
+                        'end_date'    => now()->endOfYear()->toDateString(),
+                        'status'      => 'active',
+                        'description' => 'Custom created goal cycle',
+                    ]
+                );
+                $data['goal_cycle_id'] = $cycle->id;
+            } elseif (($data['goal_cycle_id'] ?? null) === '__custom__') {
+                $data['goal_cycle_id'] = null;
+            }
+
+            // Handle Custom / On-the-fly Strategic Pillar
+            if (!empty($data['custom_goal_category'])) {
+                $catName = trim($data['custom_goal_category']);
+                $cat = GoalCategory::firstOrCreate(
+                    ['tenant_id' => $goal->tenant_id, 'name' => $catName],
+                    [
+                        'company_id'  => $goal->company_id,
+                        'code'        => 'CAT-' . strtoupper(Str::random(4)),
+                        'color'       => '#852d3c',
+                        'icon'        => 'feather-target',
+                        'status'      => 'active',
+                        'description' => 'Custom created strategic pillar',
+                    ]
+                );
+                $data['goal_category_id'] = $cat->id;
+            } elseif (($data['goal_category_id'] ?? null) === '__custom__') {
+                $data['goal_category_id'] = null;
+            }
+
+            $primaryEmployeeId = !empty($data['employee_id']) && is_numeric($data['employee_id']) 
+                ? (int) $data['employee_id'] 
+                : ($employeeIds && count($employeeIds) > 0 ? $employeeIds[0] : $goal->employee_id);
+
+            $goalCycleId = array_key_exists('goal_cycle_id', $data) 
+                ? (!empty($data['goal_cycle_id']) && is_numeric($data['goal_cycle_id']) ? (int) $data['goal_cycle_id'] : null) 
+                : $goal->goal_cycle_id;
+
+            $goalCategoryId = array_key_exists('goal_category_id', $data) 
+                ? (!empty($data['goal_category_id']) && is_numeric($data['goal_category_id']) ? (int) $data['goal_category_id'] : null) 
+                : $goal->goal_category_id;
+
+            $departmentId = array_key_exists('department_id', $data) 
+                ? (!empty($data['department_id']) && is_numeric($data['department_id']) ? (int) $data['department_id'] : null) 
+                : $goal->department_id;
+
+            $parentGoalId = array_key_exists('parent_goal_id', $data) 
+                ? (!empty($data['parent_goal_id']) && is_numeric($data['parent_goal_id']) ? (int) $data['parent_goal_id'] : null) 
+                : $goal->parent_goal_id;
 
             $goal->update([
                 'title'            => $data['title'] ?? $goal->title,
                 'description'      => array_key_exists('description', $data) ? $data['description'] : $goal->description,
-                'goal_cycle_id'    => $data['goal_cycle_id'] ?? $goal->goal_cycle_id,
-                'goal_category_id' => $data['goal_category_id'] ?? $goal->goal_category_id,
+                'goal_cycle_id'    => $goalCycleId,
+                'goal_category_id' => $goalCategoryId,
                 'owner_type'       => $data['owner_type'] ?? $goal->owner_type,
-                'department_id'    => $data['department_id'] ?? $goal->department_id,
+                'department_id'    => $departmentId,
                 'employee_id'      => $primaryEmployeeId,
-                'parent_goal_id'   => $data['parent_goal_id'] ?? $goal->parent_goal_id,
+                'parent_goal_id'   => $parentGoalId,
                 'visibility'       => $data['visibility'] ?? $goal->visibility,
                 'priority'         => $data['priority'] ?? $goal->priority,
-                'start_date'       => $data['start_date'] ?? $goal->start_date,
-                'due_date'         => $data['due_date'] ?? $goal->due_date,
-                'weightage'        => $data['weightage'] ?? $goal->weightage,
+                'start_date'       => array_key_exists('start_date', $data) ? (!empty($data['start_date']) ? $data['start_date'] : null) : $goal->start_date,
+                'due_date'         => array_key_exists('due_date', $data) ? (!empty($data['due_date']) ? $data['due_date'] : null) : $goal->due_date,
+                'weightage'        => array_key_exists('weightage', $data) ? (!empty($data['weightage']) ? (float) $data['weightage'] : 100.00) : $goal->weightage,
                 'health_status'    => $data['health_status'] ?? $goal->health_status,
                 'status'           => $data['status'] ?? $goal->status,
             ]);

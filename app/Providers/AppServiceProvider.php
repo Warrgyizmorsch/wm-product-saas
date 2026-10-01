@@ -265,6 +265,16 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(
+            \App\Domains\HRMS\Repositories\GoalRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\GoalRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\Feedback360RepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\Feedback360Repository::class
+        );
+
+        $this->app->bind(
             \App\Domains\HRMS\Repositories\DocumentRepositoryInterface::class,
             \App\Domains\HRMS\Repositories\DocumentRepository::class
         );
@@ -368,6 +378,18 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Domains\Projects\Repositories\ProjectDocumentRepositoryInterface::class,
             \App\Domains\Projects\Repositories\ProjectDocumentRepository::class
+        );
+
+        // ── Projects: Review / UAT ────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\ProjectReviewRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\ProjectReviewRepository::class
+        );
+
+        // ── Projects: Change Request ──────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\ChangeRequestRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\ChangeRequestRepository::class
         );
 
 
@@ -858,6 +880,16 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Projects\Models\ProjectDocument::class,
             \App\Domains\Projects\Policies\ProjectDocumentPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\ProjectReview::class,
+            \App\Domains\Projects\Policies\ProjectReviewPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\ChangeRequest::class,
+            \App\Domains\Projects\Policies\ChangeRequestPolicy::class
         );
 
 

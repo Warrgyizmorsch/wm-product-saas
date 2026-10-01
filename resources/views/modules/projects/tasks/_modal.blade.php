@@ -44,7 +44,7 @@
         setTaskFieldValue('task_due_date', data.dueDate || '');
         setTaskFieldValue('task_estimated_hours', data.estimatedHours || '');
         setTaskFieldValue('task_priority', data.priority || 'Medium');
-        setTaskSelect('task_task_list_id', data.taskListId);
+        setTaskSelect('task_task_list_id', data.taskListId, data.taskListName);
         setTaskSelect('task_assignee_id', data.assigneeId);
         setTaskSelect('task_reviewer_id', data.reviewerId);
 
@@ -59,12 +59,47 @@
         if (el) el.value = value;
     }
 
-    function setTaskSelect(id, value) {
+    function setTaskSelect(id, value, fallbackText) {
         var el = document.getElementById(id);
         if (!el) return;
+
+        if (value) {
+            var existingOption = el.querySelector('option[value="' + value + '"]');
+            if (!existingOption) {
+                var optionText = fallbackText;
+                if (!optionText) {
+                    var card = document.querySelector('[data-task-list-id="' + value + '"]')
+                        || document.querySelector('#taskListCard' + value);
+                    if (card) {
+                        var title = card.querySelector('.task-list-title, h5, h6, [data-task-list-name]');
+                        if (title) optionText = title.textContent.trim();
+                    }
+                }
+                var newOption = document.createElement('option');
+                newOption.value = value;
+                newOption.textContent = optionText || ('Task List #' + value);
+                el.appendChild(newOption);
+            }
+        }
+
         el.value = value || '';
         if (window.jQuery && jQuery(el).data('select2')) {
             jQuery(el).trigger('change');
         }
     }
+
+    window.addTaskListOption = function (id, name) {
+        var el = document.getElementById('task_task_list_id');
+        if (!el || !id) return;
+        var existing = el.querySelector('option[value="' + id + '"]');
+        if (!existing) {
+            var opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = name || ('Task List #' + id);
+            el.appendChild(opt);
+            if (window.jQuery && jQuery(el).data('select2')) {
+                jQuery(el).trigger('change.select2');
+            }
+        }
+    };
 </script>

@@ -6,6 +6,9 @@ use App\Domains\Projects\Controllers\ProjectActivityLogController;
 use App\Domains\Projects\Controllers\ProjectController;
 use App\Domains\Projects\Controllers\ProjectDocumentController;
 use App\Domains\Projects\Controllers\ProjectMemberController;
+use App\Domains\Projects\Controllers\ProjectReviewController;
+use App\Domains\Projects\Controllers\ProjectScheduleController;
+use App\Domains\Projects\Controllers\ChangeRequestController;
 use App\Domains\Projects\Controllers\SubTaskController;
 use App\Domains\Projects\Controllers\TaskController;
 use App\Domains\Projects\Controllers\TaskDependencyController;
@@ -142,6 +145,42 @@ Route::prefix('projects')
                 Route::get('{document}/preview', [ProjectDocumentController::class, 'preview'])->name('preview');
                 Route::get('{document}/download', [ProjectDocumentController::class, 'download'])->name('download');
                 Route::delete('{document}', [ProjectDocumentController::class, 'destroy'])->name('destroy');
+            });
+
+        Route::prefix('{project}/reviews')
+            ->as('reviews.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::get('/', [ProjectReviewController::class, 'index'])->name('index');
+                Route::post('/', [ProjectReviewController::class, 'store'])->name('store');
+                Route::match(['post', 'patch'], '{review}/signoff', [ProjectReviewController::class, 'signoff'])->name('signoff');
+                Route::get('{review}/signoff', fn ($project) => redirect()->to(route('projects.show', $project) . '?tab=reviews'));
+                Route::delete('{review}', [ProjectReviewController::class, 'destroy'])->name('destroy');
+            });
+
+        Route::prefix('{project}/change-requests')
+            ->as('change-requests.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::get('/', [ChangeRequestController::class, 'index'])->name('index');
+                Route::post('/', [ChangeRequestController::class, 'store'])->name('store');
+                Route::match(['post', 'patch'], '{changeRequest}/approve', [ChangeRequestController::class, 'approve'])->name('approve');
+                Route::get('{changeRequest}/approve', fn ($project) => redirect()->to(route('projects.show', $project) . '?tab=reviews'));
+                Route::match(['post', 'patch'], '{changeRequest}/reject', [ChangeRequestController::class, 'reject'])->name('reject');
+                Route::get('{changeRequest}/reject', fn ($project) => redirect()->to(route('projects.show', $project) . '?tab=reviews'));
+                Route::match(['post', 'patch'], '{changeRequest}/implement', [ChangeRequestController::class, 'markImplemented'])->name('implement');
+                Route::get('{changeRequest}/implement', fn ($project) => redirect()->to(route('projects.show', $project) . '?tab=reviews'));
+                Route::match(['post', 'patch'], '{changeRequest}/mark-implemented', [ChangeRequestController::class, 'markImplemented'])->name('mark-implemented');
+                Route::delete('{changeRequest}', [ChangeRequestController::class, 'destroy'])->name('destroy');
+            });
+
+        Route::prefix('{project}/timeline')
+            ->as('timeline.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::get('/', [ProjectScheduleController::class, 'index'])->name('index');
+                Route::get('data', [ProjectScheduleController::class, 'data'])->name('data');
+                Route::match(['post', 'patch'], 'tasks/{task}/reschedule', [ProjectScheduleController::class, 'reschedule'])->name('reschedule');
             });
 
     });

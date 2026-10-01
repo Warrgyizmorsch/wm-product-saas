@@ -83,7 +83,7 @@
             @endif
 
             @if ($canCreateTasks)
-                <button type="button" class="btn btn-outline-primary btn-sm text-nowrap" onclick="openTaskModal('add', { taskListId: {{ $taskList->id }} })">
+                <button type="button" class="btn btn-outline-primary btn-sm text-nowrap" onclick="openTaskModal('add', { taskListId: {{ $taskList->id }}, taskListName: @js($taskList->name) })">
                     <i class="feather-plus me-1"></i>{{ __('projects.add_task') }}
                 </button>
             @endif

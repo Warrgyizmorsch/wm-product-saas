@@ -40,6 +40,7 @@ class TaskDrawerPayload
         return $task->dependencies->map(fn ($dependency) => [
             'id'             => $dependency->id,
             'dependencyType' => $dependency->dependency_type ?: 'Finish-to-Start',
+            'lagDays'        => (int) ($dependency->lag_days ?? 0),
             'label'          => ($dependency->dependsOn?->task_code . ' — ' . $dependency->dependsOn?->title),
             'deleteUrl'      => route('projects.tasks.dependencies.destroy', [$project, $task, $dependency]),
         ])->values()->all();

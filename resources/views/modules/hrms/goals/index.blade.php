@@ -18,14 +18,29 @@
         width: 36px;
         height: 36px;
         border-radius: 50%;
-        background-color: rgba(var(--bs-primary-rgb), 0.1);
-        color: var(--bs-primary);
+        background-color: rgba(var(--bs-primary-rgb), 0.12) !important;
+        color: var(--bs-primary) !important;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 700;
         font-size: 12px;
         flex-shrink: 0;
+    }
+    .badge.bg-primary {
+        background-color: var(--bs-primary) !important;
+        color: #ffffff !important;
+    }
+    .badge.bg-primary-subtle {
+        background-color: rgba(var(--bs-primary-rgb), 0.12) !important;
+        color: var(--bs-primary) !important;
+        border: 1px solid rgba(var(--bs-primary-rgb), 0.28) !important;
+    }
+    .text-primary {
+        color: var(--bs-primary) !important;
+    }
+    .progress-bar.bg-primary {
+        background-color: var(--bs-primary) !important;
     }
 
     /* Goal Alignment Tree Styling */
@@ -124,11 +139,17 @@
                     </div>
 
                     <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
-                        <!-- Search Input -->
-                        <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 200px; max-width: 260px; height: 38px;">
+                        <!-- Search Input Form (Matches standard HRMS pattern: Auto-submits on type, loads URL parameter & keeps cursor) -->
+                        <form method="GET" action="{{ route('hrms.goals.index') }}" id="companyGoalsSearchForm" class="d-flex align-items-center bg-light border rounded px-3 py-1 m-0" style="min-width: 250px; height: 38px !important; box-sizing: border-box !important;">
+                            <input type="hidden" name="active_tab" value="company_goals">
+                            @if(request()->filled('cycle_id')) <input type="hidden" name="cycle_id" value="{{ request('cycle_id') }}"> @endif
+                            @if(request()->filled('category_id')) <input type="hidden" name="category_id" value="{{ request('category_id') }}"> @endif
+                            @if(request()->filled('health_status')) <input type="hidden" name="health_status" value="{{ request('health_status') }}"> @endif
+                            @if(request()->filled('status')) <input type="hidden" name="status" value="{{ request('status') }}"> @endif
+                            @if(request()->filled('sort')) <input type="hidden" name="sort" value="{{ request('sort') }}"> @endif
                             <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                            <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-13 goal-search-input" placeholder="Search goals, owner..." value="{{ request('search') }}" style="box-shadow: none; height: 32px;" autocomplete="off">
-                        </div>
+                            <input type="text" name="search" id="companyGoalSearchInput" class="w-100 border-0 bg-transparent p-0 fs-13 goal-search-input" placeholder="Search goals, owner, code, pillar..." value="{{ request('search') }}" autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
+                        </form>
 
                         <!-- Sort Dropdown -->
                         <x-ui.sort-dropdown label="Sort">
@@ -222,48 +243,55 @@
                     </div>
                 @else
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
+                        <table class="table table-hover align-middle mb-0" id="companyGoalsTable">
                             <thead class="table-light text-muted fs-11 text-uppercase fw-bold">
                                 <tr>
-                                    <th style="width: 120px;">Code / Horizon</th>
+                                    <th style="width: 140px;">Code / Horizon</th>
                                     <th>Objective & Strategic Pillar</th>
                                     <th style="width: 180px;">Owner / Scope</th>
-                                    <th style="width: 150px;">Key Results</th>
-                                    <th style="width: 180px;">Progress & Health</th>
-                                    <th style="width: 120px;" class="text-end">Actions</th>
+                                    <th style="width: 140px;">Key Results</th>
+                                    <th style="width: 160px;">Progress & Health</th>
+                                    <th style="width: 120px;" class="text-end pe-3">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="companyGoalsTableBody">
                                 @foreach($companyGoals as $g)
-                                <tr>
-                                    <td>
+                                <tr class="company-goal-row">
+                                    <td class="align-top py-3">
                                         <div class="fw-bold text-dark fs-12">{{ $g->code }}</div>
-                                        <small class="text-muted fs-11">{{ $g->cycle?->name ?? 'General' }}</small>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex align-items-start gap-2">
-                                            @if($g->category)
-                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 fw-semibold mt-0.5">
-                                                    {{ $g->category->name }}
-                                                </span>
-                                            @endif
-                                            <div>
-                                                <a href="{{ route('hrms.goals.show', $g->id) }}" class="fw-bold text-primary text-decoration-none fs-13 d-block">
-                                                    {{ $g->title }}
-                                                </a>
-                                                @if($g->description)
-                                                    <small class="text-muted fs-11 d-block text-truncate" style="max-width: 380px;">{{ $g->description }}</small>
-                                                @endif
-                                            </div>
+                                        <div class="text-muted fs-11 mt-1 text-wrap" style="max-width: 130px; word-break: break-word; line-height: 1.35;">
+                                            {{ $g->cycle?->name ?? 'General' }}
                                         </div>
                                     </td>
-                                    <td>
+                                    <td class="align-top py-3">
+                                        <div class="d-flex flex-column gap-1">
+                                            <div>
+                                                <a href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'company_goals']) }}" class="fw-bold text-primary text-decoration-none fs-13 d-block text-wrap" style="line-height: 1.35; word-break: break-word;">
+                                                    {{ $g->title }}
+                                                </a>
+                                            </div>
+                                            @if($g->category)
+                                                <div class="mt-0.5">
+                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-11 fw-semibold d-inline-flex align-items-center gap-1.5 py-1 px-2.5 text-wrap text-start">
+                                                        <i class="feather-target" style="font-size: 13px; line-height: 1; flex-shrink: 0;"></i>
+                                                        <span>{{ $g->category->name }}</span>
+                                                    </span>
+                                                </div>
+                                            @endif
+                                            @if($g->description)
+                                                <div class="text-muted fs-11 mt-1 text-wrap" style="line-height: 1.4; word-break: break-word;">
+                                                    {{ $g->description }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td class="align-top py-3">
                                         @if($g->owner_type === 'company')
                                             <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-11">
                                                 <i class="feather-globe me-1"></i> Organization-Wide
                                             </span>
                                         @elseif($g->owner_type === 'department')
-                                            <span class="badge bg-light text-dark border fs-11">
+                                            <span class="badge bg-light text-dark border fs-11 text-wrap text-start">
                                                 <i class="feather-users me-1"></i> {{ $g->department?->name ?? 'Dept Goal' }}
                                             </span>
                                         @else
@@ -271,24 +299,48 @@
                                                 $assignedEmps = $g->employees->isNotEmpty() ? $g->employees : ($g->employee ? collect([$g->employee]) : collect());
                                             @endphp
                                             @if($assignedEmps->count() > 1)
-                                                <span class="badge bg-light text-dark border fs-11" title="{{ $assignedEmps->pluck('full_name')->join(', ') }}">
-                                                    <i class="feather-user me-1 text-primary"></i> {{ $assignedEmps->first()->full_name }} <span class="badge bg-primary text-white rounded-pill px-1.5 py-0.5 ms-1" style="font-size: 9px;">+{{ $assignedEmps->count() - 1 }}</span>
-                                                </span>
+                                                <div class="d-flex align-items-center gap-1.5" title="{{ $assignedEmps->pluck('full_name')->join(', ') }}">
+                                                    <div class="d-flex align-items-center">
+                                                        @foreach($assignedEmps->take(3) as $idx => $emp)
+                                                            <div class="avatar-initials rounded-circle border border-2 border-white shadow-xs" 
+                                                                 style="width: 26px; height: 26px; font-size: 10px; margin-left: {{ $idx > 0 ? '-8px' : '0' }}; z-index: {{ 10 - $idx }};" 
+                                                                 title="{{ $emp->full_name }}">
+                                                                {{ strtoupper(substr($emp->full_name, 0, 1)) }}
+                                                            </div>
+                                                        @endforeach
+                                                        @if($assignedEmps->count() > 3)
+                                                            <div class="avatar-initials rounded-circle border border-2 border-white shadow-xs bg-light text-muted" 
+                                                                 style="width: 26px; height: 26px; font-size: 10px; margin-left: -8px; z-index: 5;"
+                                                                 title="+{{ $assignedEmps->count() - 3 }} more">
+                                                                +{{ $assignedEmps->count() - 3 }}
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                    <span class="text-dark fs-12 fw-semibold text-truncate" style="max-width: 95px;">
+                                                        {{ $assignedEmps->first()->full_name }}
+                                                    </span>
+                                                    <span class="badge bg-primary text-white rounded-pill px-1.5 py-0.5" style="font-size: 9px;">+{{ $assignedEmps->count() - 1 }}</span>
+                                                </div>
                                             @elseif($assignedEmps->count() === 1)
-                                                <span class="badge bg-light text-dark border fs-11">
-                                                    <i class="feather-user me-1 text-primary"></i> {{ $assignedEmps->first()->full_name }}
-                                                </span>
+                                                <div class="d-flex align-items-center gap-1.5" title="{{ $assignedEmps->first()->full_name }}">
+                                                    <div class="avatar-initials rounded-circle border border-2 border-white shadow-xs" style="width: 26px; height: 26px; font-size: 10px;">
+                                                        {{ strtoupper(substr($assignedEmps->first()->full_name, 0, 1)) }}
+                                                    </div>
+                                                    <span class="text-dark fs-12 fw-semibold text-truncate" style="max-width: 120px;">
+                                                        {{ $assignedEmps->first()->full_name }}
+                                                    </span>
+                                                </div>
                                             @else
                                                 <span class="badge bg-light text-muted border fs-11">Individual</span>
                                             @endif
                                         @endif
                                     </td>
-                                    <td>
-                                        <span class="badge bg-light text-dark border">
+                                    <td class="align-top py-3">
+                                        <span class="badge bg-light text-dark border fs-11">
                                             <i class="feather-list me-1 text-primary"></i> {{ $g->keyResults->count() }} Key Results
                                         </span>
                                     </td>
-                                    <td>
+                                    <td class="align-top py-3">
                                         <div class="d-flex justify-content-between align-items-center mb-1">
                                             <span class="fw-bold fs-12 text-dark">{{ number_format($g->progress_percentage, 0) }}%</span>
                                             @if($g->health_status === 'on_track')
@@ -306,9 +358,9 @@
                                                  role="progressbar" style="width: {{ min(100, max(0, $g->progress_percentage)) }}%"></div>
                                         </div>
                                     </td>
-                                    <td class="text-end">
+                                    <td class="align-top py-3 text-end pe-3" style="white-space: nowrap;">
                                         <div class="d-flex align-items-center justify-content-end gap-1">
-                                            <x-ui.icon-btn href="{{ route('hrms.goals.show', $g->id) }}" icon="feather-eye" variant="soft-primary" size="sm" title="View Objective" />
+                                            <x-ui.icon-btn href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'company_goals']) }}" icon="feather-eye" variant="soft-primary" size="sm" title="View Objective" />
                                             <button type="button" class="btn btn-sm btn-light border text-primary" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" onclick="prepareCheckIn({{ $g->id }}, '{{ addslashes($g->title) }}', {{ json_encode($g->keyResults) }})" title="Quick Check-in">
                                                 <i class="feather-check-square fs-13"></i>
                                             </button>
@@ -340,11 +392,17 @@
                     </div>
 
                     <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
-                        <!-- Search Input -->
-                        <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 200px; max-width: 260px; height: 38px;">
+                        <!-- Search Input Form (Matches standard HRMS pattern: Auto-submits on type, loads URL parameter & keeps cursor) -->
+                        <form method="GET" action="{{ route('hrms.goals.index') }}" id="myTeamGoalsSearchForm" class="d-flex align-items-center bg-light border rounded px-3 py-1 m-0" style="min-width: 250px; height: 38px !important; box-sizing: border-box !important;">
+                            <input type="hidden" name="active_tab" value="my_team_goals">
+                            @if(request()->filled('cycle_id')) <input type="hidden" name="cycle_id" value="{{ request('cycle_id') }}"> @endif
+                            @if(request()->filled('category_id')) <input type="hidden" name="category_id" value="{{ request('category_id') }}"> @endif
+                            @if(request()->filled('health_status')) <input type="hidden" name="health_status" value="{{ request('health_status') }}"> @endif
+                            @if(request()->filled('status')) <input type="hidden" name="status" value="{{ request('status') }}"> @endif
+                            @if(request()->filled('sort')) <input type="hidden" name="sort" value="{{ request('sort') }}"> @endif
                             <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                            <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-13 goal-search-input" placeholder="Search goals, owner..." value="{{ request('search') }}" style="box-shadow: none; height: 32px;" autocomplete="off">
-                        </div>
+                            <input type="text" name="search" id="myTeamGoalSearchInput" class="w-100 border-0 bg-transparent p-0 fs-13 goal-search-input" placeholder="Search goals, owner, code, pillar..." value="{{ request('search') }}" autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
+                        </form>
 
                         <!-- Sort Dropdown -->
                         <x-ui.sort-dropdown label="Sort">
@@ -437,35 +495,38 @@
                         <p class="text-muted fs-13 mb-0">Create goals aligned with strategic company pillars to track and report your progress.</p>
                     </div>
                 @else
-                    <div class="row g-3">
+                    <div class="row g-3" id="myTeamGoalsGrid">
                         @foreach($myTeamGoals as $g)
-                        <div class="col-md-6 col-lg-4">
-                            <div class="card border rounded-3 shadow-none h-100 bg-white hover-shadow transition-all">
+                        <div class="col-md-6 col-lg-4 my-team-goal-card">
+                            <div class="card rounded-3 h-100 bg-white hover-shadow transition-all" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,0.05);">
                                 <div class="card-body p-3.5 d-flex flex-column justify-content-between">
                                     <div>
                                         <!-- Header Pills -->
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <div class="d-flex align-items-center gap-1.5 flex-wrap">
-                                                <span class="badge bg-light text-muted border fs-10 fw-bold">{{ $g->code }}</span>
+                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                            <div class="d-flex flex-column gap-2 align-items-start">
+                                                <span class="badge bg-light text-muted border fs-10 fw-bold px-2 py-1">{{ $g->code }}</span>
                                                 @if($g->category)
-                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 fw-semibold">
-                                                        {{ $g->category->name }}
+                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 fw-semibold d-inline-flex align-items-center gap-1.5 py-1 px-2 text-wrap text-start">
+                                                        <i class="feather-target" style="font-size: 11px; line-height: 1;"></i>
+                                                        <span>{{ $g->category->name }}</span>
                                                     </span>
                                                 @endif
                                             </div>
-                                            @if($g->health_status === 'on_track')
-                                                <span class="badge bg-success-subtle text-success fs-10">🟢 On Track</span>
-                                            @elseif($g->health_status === 'at_risk')
-                                                <span class="badge bg-warning-subtle text-warning fs-10">🟡 At Risk</span>
-                                            @elseif($g->health_status === 'behind')
-                                                <span class="badge bg-danger-subtle text-danger fs-10">🔴 Behind</span>
-                                            @else
-                                                <span class="badge bg-info-subtle text-info fs-10">🔵 Completed</span>
-                                            @endif
+                                            <div>
+                                                @if($g->health_status === 'on_track')
+                                                    <span class="badge bg-success-subtle text-success fs-10 fw-semibold">🟢 On Track</span>
+                                                @elseif($g->health_status === 'at_risk')
+                                                    <span class="badge bg-warning-subtle text-warning fs-10 fw-semibold">🟡 At Risk</span>
+                                                @elseif($g->health_status === 'behind')
+                                                    <span class="badge bg-danger-subtle text-danger fs-10 fw-semibold">🔴 Behind</span>
+                                                @else
+                                                    <span class="badge bg-info-subtle text-info fs-10 fw-semibold">🔵 Completed</span>
+                                                @endif
+                                            </div>
                                         </div>
 
                                         <!-- Title -->
-                                        <a href="{{ route('hrms.goals.show', $g->id) }}" class="fw-bold text-dark text-decoration-none fs-14 mb-1.5 d-block text-truncate-2">
+                                        <a href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'my_team_goals']) }}" class="fw-bold text-dark text-decoration-none fs-14 mb-3 d-block text-truncate-2" style="line-height: 1.4;">
                                             {{ $g->title }}
                                         </a>
 
@@ -481,17 +542,21 @@
 
                                         <!-- Key Results Summary List -->
                                         @if($g->keyResults->isNotEmpty())
-                                            <div class="bg-light p-2.5 rounded-3 mb-3">
-                                                <div class="text-muted fw-bold text-uppercase fs-10 mb-1.5" style="letter-spacing: 0.04em;">Key Results ({{ $g->keyResults->count() }})</div>
-                                                @foreach($g->keyResults->take(2) as $kr)
-                                                    <div class="d-flex justify-content-between align-items-center fs-11 mb-1">
-                                                        <span class="text-dark text-truncate me-2" style="max-width: 180px;">{{ $kr->title }}</span>
-                                                        <span class="fw-bold text-primary">{{ number_format($kr->current_value, 0) }} / {{ number_format($kr->target_value, 0) }} {{ $kr->unit }}</span>
-                                                    </div>
-                                                @endforeach
-                                                @if($g->keyResults->count() > 2)
-                                                    <div class="text-muted fs-10 mt-1">+ {{ $g->keyResults->count() - 2 }} more results</div>
-                                                @endif
+                                            <div class="bg-light p-3 rounded-3 my-3 border border-light-subtle">
+                                                <div class="text-muted fw-bold text-uppercase fs-10 mb-2" style="letter-spacing: 0.04em;">
+                                                    <i class="feather-list text-primary me-1"></i>Key Results ({{ $g->keyResults->count() }})
+                                                </div>
+                                                <div class="d-flex flex-column gap-2">
+                                                    @foreach($g->keyResults->take(2) as $kr)
+                                                        <div class="d-flex justify-content-between align-items-center fs-11">
+                                                            <span class="text-dark text-truncate me-2" style="max-width: 170px;" title="{{ $kr->title }}">{{ $kr->title }}</span>
+                                                            <span class="fw-bold text-primary font-monospace flex-shrink-0">{{ number_format($kr->current_value, 0) }} / {{ number_format($kr->target_value, 0) }} {{ $kr->unit }}</span>
+                                                        </div>
+                                                    @endforeach
+                                                    @if($g->keyResults->count() > 2)
+                                                        <div class="text-muted fs-10 pt-1 border-top border-light-subtle">+ {{ $g->keyResults->count() - 2 }} more results</div>
+                                                    @endif
+                                                </div>
                                             </div>
                                         @endif
                                     </div>
@@ -557,7 +622,7 @@
                                                 <button type="button" class="btn btn-xs btn-light border fw-semibold text-dark shadow-none py-1 px-2 fs-11" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" onclick="prepareCheckIn({{ $g->id }}, '{{ addslashes($g->title) }}', {{ json_encode($g->keyResults) }})">
                                                     <i class="feather-plus text-primary me-1"></i> Check-in
                                                 </button>
-                                                <x-ui.icon-btn href="{{ route('hrms.goals.show', $g->id) }}" icon="feather-arrow-right" variant="soft-primary" size="sm" title="View Objective" />
+                                                <x-ui.icon-btn href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'my_team_goals']) }}" icon="feather-arrow-right" variant="soft-primary" size="sm" title="View Objective" />
                                             </div>
                                         </div>
                                     </div>
@@ -600,7 +665,7 @@
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="badge bg-primary text-white fs-11">{{ $node['code'] }}</span>
-                                            <a href="{{ route('hrms.goals.show', $node['id']) }}" class="fw-bold text-dark fs-14 text-decoration-none">
+                                            <a href="{{ route('hrms.goals.show', ['goal' => $node['id'], 'from_tab' => 'alignment_tree']) }}" class="fw-bold text-dark fs-14 text-decoration-none">
                                                 {{ $node['title'] }}
                                             </a>
                                             <span class="badge bg-light text-dark border fs-11">🏢 {{ $node['owner_name'] }}</span>
@@ -615,7 +680,7 @@
                                                     <div class="progress-bar bg-primary" style="width: {{ $node['progress_percentage'] }}%"></div>
                                                 </div>
                                             </div>
-                                            <a href="{{ route('hrms.goals.show', $node['id']) }}" class="btn btn-sm btn-light border"><i class="feather-arrow-right"></i></a>
+                                            <a href="{{ route('hrms.goals.show', ['goal' => $node['id'], 'from_tab' => 'alignment_tree']) }}" class="btn btn-sm btn-light border"><i class="feather-arrow-right"></i></a>
                                         </div>
                                     </div>
 
@@ -629,7 +694,7 @@
                                                         <div class="d-flex justify-content-between align-items-center">
                                                             <div class="d-flex align-items-center gap-2">
                                                                 <span class="badge bg-info text-white fs-10">{{ $child['code'] }}</span>
-                                                                <a href="{{ route('hrms.goals.show', $child['id']) }}" class="fw-semibold text-dark fs-13 text-decoration-none">
+                                                                <a href="{{ route('hrms.goals.show', ['goal' => $child['id'], 'from_tab' => 'alignment_tree']) }}" class="fw-semibold text-dark fs-13 text-decoration-none">
                                                                     {{ $child['title'] }}
                                                                 </a>
                                                                 <span class="badge bg-white text-muted border fs-10">👥 {{ $child['owner_name'] }}</span>
@@ -646,7 +711,7 @@
                                                                         <div class="p-2 bg-white rounded border d-flex justify-content-between align-items-center">
                                                                             <div class="d-flex align-items-center gap-2">
                                                                                 <span class="badge bg-secondary text-white fs-9">{{ $grandChild['code'] }}</span>
-                                                                                <a href="{{ route('hrms.goals.show', $grandChild['id']) }}" class="fs-12 text-dark text-decoration-none">
+                                                                                <a href="{{ route('hrms.goals.show', ['goal' => $grandChild['id'], 'from_tab' => 'alignment_tree']) }}" class="fs-12 text-dark text-decoration-none">
                                                                                     {{ $grandChild['title'] }}
                                                                                 </a>
                                                                                 <span class="text-muted fs-11">👤 {{ $grandChild['owner_name'] }}</span>
@@ -683,35 +748,38 @@
                 <div class="row g-4">
                     <!-- Cycles Master -->
                     <div class="col-lg-6">
-                        <div class="card border rounded-3 shadow-none">
-                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2.5">
+                        <div class="card rounded-3 shadow-sm h-100 bg-white" style="border: 1px solid #e2e8f0;">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2.5 border-bottom">
                                 <span class="fw-bold text-dark fs-13"><i class="feather-calendar me-1.5 text-primary"></i> Goal Cycles & Time Horizons</span>
                                 <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createCycleModal">
                                     New Cycle
                                 </x-ui.button>
                             </div>
                             <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle mb-0">
-                                        <thead class="table-light text-muted fs-11 text-uppercase">
+                                <div class="table-responsive" style="overflow-x: hidden;">
+                                    <table class="table table-hover align-middle mb-0 w-100" style="table-layout: fixed;">
+                                        <thead class="table-light text-muted fs-11 text-uppercase fw-bold">
                                             <tr>
-                                                <th class="ps-3 py-2">Cycle Name</th>
-                                                <th class="py-2">Period</th>
-                                                <th class="py-2">Status</th>
-                                                <th class="pe-3 py-2 text-end">Action</th>
+                                                <th class="ps-3 py-2" style="width: 58%;">Cycle & Time Horizon</th>
+                                                <th class="py-2" style="width: 26%;">Status</th>
+                                                <th class="pe-3 py-2 text-end" style="width: 16%;">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             @forelse($cycles as $c)
                                             <tr>
-                                                <td class="ps-3 py-2.5 fw-bold text-dark fs-13">{{ $c->name }}</td>
-                                                <td class="py-2.5 text-muted fs-11">{{ $c->start_date?->format('M d, Y') }} - {{ $c->end_date?->format('M d, Y') }}</td>
-                                                <td class="py-2.5">
-                                                    <span class="badge {{ $c->status === 'active' ? 'bg-success-subtle text-success' : 'bg-light text-muted border' }} fs-10">
+                                                <td class="ps-3 py-2.5">
+                                                    <div class="fw-bold text-dark fs-13 text-wrap" style="line-height: 1.35; word-break: break-word;">{{ $c->name }}</div>
+                                                    <div class="text-muted fs-11 mt-0.5 text-wrap">
+                                                        <i class="feather-calendar me-1 text-muted"></i>{{ $c->start_date?->format('M d, Y') }} - {{ $c->end_date?->format('M d, Y') }}
+                                                    </div>
+                                                </td>
+                                                <td class="py-2.5 align-middle">
+                                                    <span class="badge {{ $c->status === 'active' ? 'bg-success-subtle text-success' : 'bg-light text-muted border' }} fs-10 fw-semibold">
                                                         {{ strtoupper($c->status) }}
                                                     </span>
                                                 </td>
-                                                <td class="pe-3 py-2.5 text-end">
+                                                <td class="pe-3 py-2.5 text-end align-middle">
                                                     <form method="POST" action="{{ route('hrms.goals.cycle.destroy', $c->id) }}" class="d-inline" onsubmit="return confirm('Delete this cycle?')">
                                                         @csrf
                                                         @method('DELETE')
@@ -721,7 +789,7 @@
                                             </tr>
                                             @empty
                                             <tr>
-                                                <td colspan="4" class="text-center py-4 text-muted fs-13">
+                                                <td colspan="3" class="text-center py-4 text-muted fs-13">
                                                     <i class="feather-calendar fs-24 d-block mb-2 text-muted opacity-50"></i>
                                                     No goal cycles configured yet.
                                                 </td>
@@ -736,33 +804,34 @@
 
                     <!-- Strategic Categories Master -->
                     <div class="col-lg-6">
-                        <div class="card border rounded-3 shadow-none">
-                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2.5">
+                        <div class="card rounded-3 shadow-sm h-100 bg-white" style="border: 1px solid #e2e8f0;">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2.5 border-bottom">
                                 <span class="fw-bold text-dark fs-13"><i class="feather-target me-1.5 text-primary"></i> Strategic Pillars & Categories</span>
                                 <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createCategoryModal">
                                     New Pillar
                                 </x-ui.button>
                             </div>
                             <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle mb-0">
-                                        <thead class="table-light text-muted fs-11 text-uppercase">
+                                <div class="table-responsive" style="overflow-x: hidden;">
+                                    <table class="table table-hover align-middle mb-0 w-100" style="table-layout: fixed;">
+                                        <thead class="table-light text-muted fs-11 text-uppercase fw-bold">
                                             <tr>
-                                                <th class="ps-3 py-2">Strategic Pillar</th>
-                                                <th class="py-2">Pillar Code</th>
-                                                <th class="pe-3 py-2 text-end">Action</th>
+                                                <th class="ps-3 py-2" style="width: 58%;">Strategic Pillar</th>
+                                                <th class="py-2" style="width: 26%;">Pillar Code</th>
+                                                <th class="pe-3 py-2 text-end" style="width: 16%;">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             @forelse($categories as $cat)
                                             <tr>
                                                 <td class="ps-3 py-2.5">
-                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 fw-semibold fs-11">
-                                                        {{ $cat->name }}
+                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 fw-semibold fs-11 text-wrap text-start d-inline-flex align-items-center gap-1.5" style="line-height: 1.35; word-break: break-word;">
+                                                        <i class="feather-target" style="font-size: 11px; flex-shrink: 0;"></i>
+                                                        <span>{{ $cat->name }}</span>
                                                     </span>
                                                 </td>
-                                                <td class="py-2.5 text-muted fs-12 font-monospace">{{ $cat->code }}</td>
-                                                <td class="pe-3 py-2.5 text-end">
+                                                <td class="py-2.5 text-muted fs-12 font-monospace align-middle">{{ $cat->code }}</td>
+                                                <td class="pe-3 py-2.5 text-end align-middle">
                                                     <form method="POST" action="{{ route('hrms.goals.category.destroy', $cat->id) }}" class="d-inline" onsubmit="return confirm('Delete this category?')">
                                                         @csrf
                                                         @method('DELETE')
@@ -806,18 +875,49 @@
             <div class="row g-4 mb-4">
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="input" label="Objective Title" name="title" placeholder="e.g. Accelerate Enterprise SaaS Pipeline Expansion" :required="true" />
-                    <x-ui.odoo-form-ui type="select" label="Goal Cycle" name="goal_cycle_id">
-                        <option value="">Choose Goal Cycle...</option>
-                        @foreach($cycles as $c)
-                            <option value="{{ $c->id }}" {{ $selectedCycleId == $c->id ? 'selected' : '' }}>{{ $c->name }} ({{ strtoupper($c->status) }})</option>
-                        @endforeach
-                    </x-ui.odoo-form-ui>
-                    <x-ui.odoo-form-ui type="select" label="Strategic Pillar" name="goal_category_id">
-                        <option value="">Choose Strategic Pillar...</option>
-                        @foreach($categories as $cat)
-                            <option value="{{ $cat->id }}">{{ $cat->name }}</option>
-                        @endforeach
-                    </x-ui.odoo-form-ui>
+                    <!-- GOAL CYCLE WITH INLINE CUSTOM ADD -->
+                    <div class="odoo-form-group mb-2">
+                        <label class="odoo-form-label">Goal Cycle</label>
+                        <div class="flex-grow-1">
+                            <div class="cycle-select-wrap d-flex align-items-center" style="width: 100%;">
+                                <select name="goal_cycle_id" class="odoo-form-control goal-cycle-select select2" style="width: 100%;" onchange="handleGoalCycleSelect(this)">
+                                    <option value="">Choose Goal Cycle...</option>
+                                    <option value="__custom__">+ Add Custom Goal Cycle (Type Manually)</option>
+                                    @foreach($cycles as $c)
+                                        <option value="{{ $c->id }}" {{ ($selectedCycleId ? $selectedCycleId == $c->id : ($c->status === 'active' || $loop->first)) ? 'selected' : '' }}>{{ $c->name }} ({{ strtoupper($c->status) }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="cycle-input-wrap d-none align-items-center gap-1">
+                                <input type="text" name="custom_goal_cycle" class="odoo-form-control cycle-title-input" placeholder="Type custom goal cycle name..." />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToGoalCycleSelect(this)" style="height: 24px; font-size: 11px; white-space: nowrap;">
+                                    <i class="feather-list"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STRATEGIC PILLAR WITH INLINE CUSTOM ADD -->
+                    <div class="odoo-form-group mb-2">
+                        <label class="odoo-form-label">Strategic Pillar</label>
+                        <div class="flex-grow-1">
+                            <div class="pillar-select-wrap d-flex align-items-center" style="width: 100%;">
+                                <select name="goal_category_id" class="odoo-form-control goal-pillar-select select2" style="width: 100%;" onchange="handleGoalPillarSelect(this)">
+                                    <option value="">Choose Strategic Pillar...</option>
+                                    <option value="__custom__">+ Add Custom Strategic Pillar (Type Manually)</option>
+                                    @foreach($categories as $cat)
+                                        <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="pillar-input-wrap d-none align-items-center gap-1">
+                                <input type="text" name="custom_goal_category" class="odoo-form-control pillar-title-input" placeholder="Type custom strategic pillar name..." />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToGoalPillarSelect(this)" style="height: 24px; font-size: 11px; white-space: nowrap;">
+                                    <i class="feather-list"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Scope" name="owner_type" id="ownerTypeSelect" onchange="handleOwnerTypeChange(this.value)">
@@ -1166,6 +1266,11 @@
                 krSelect.appendChild(opt);
             });
         }
+        if (typeof $ !== 'undefined' && $(krSelect).hasClass('select2-hidden-accessible')) {
+            $(krSelect).trigger('change.select2');
+        }
+        var newValInput = document.getElementById('checkInNewValue');
+        if (newValInput) newValInput.value = '';
         updateKrInputUnit(krSelect);
     }
 
@@ -1199,21 +1304,155 @@
         }
     }
 
-    // Search enter handler
-    document.querySelectorAll('.goal-search-input').forEach(function (input) {
-        input.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                var pane = input.closest('.tab-pane');
-                var form = pane ? pane.querySelector('.goalFilterForm') : document.querySelector('.goalFilterForm');
-                var hiddenSearch = pane ? pane.querySelector('.filter_search_hidden') : document.querySelector('.filter_search_hidden');
-                if (form && hiddenSearch) {
-                    hiddenSearch.value = input.value;
-                    form.submit();
-                }
+    // Standard HRMS Auto-Search with URL parameter loading & end-cursor focus retention
+    const activeTabPane = document.querySelector('.tab-pane.show.active') || document.querySelector('.tab-pane.active');
+    const activeSearchInput = activeTabPane ? activeTabPane.querySelector('.goal-search-input') : document.querySelector('.goal-search-input');
+    
+    // Auto-focus search input if search query is present and position cursor at the end
+    if (activeSearchInput && activeSearchInput.value) {
+        activeSearchInput.focus();
+        const len = activeSearchInput.value.length;
+        activeSearchInput.setSelectionRange(len, len);
+    }
+
+    let goalSearchDebounceTimer;
+    // Auto-search on typing with debounce (submits form, loads URL parameters & queries across all tables)
+    $(document).on('input', '.goal-search-input', function() {
+        const input = $(this);
+        const form = input.closest('form');
+        clearTimeout(goalSearchDebounceTimer);
+        goalSearchDebounceTimer = setTimeout(function() {
+            if (form.length) {
+                form.submit();
             }
-        });
+        }, 500);
     });
+
+    // Instant search on pressing Enter key
+    $(document).on('keydown', '.goal-search-input', function(e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+            e.preventDefault();
+            clearTimeout(goalSearchDebounceTimer);
+            $(this).closest('form').submit();
+        }
+    });
+
+    // Smart Goal Cycle & Strategic Pillar Select Handlers
+    window.handleGoalCycleSelect = function(selectEl) {
+        const $sel = $(selectEl);
+        const container = selectEl.closest('.odoo-form-group') || selectEl.parentElement;
+        if (!container) return;
+
+        const selectWrap = container.querySelector('.cycle-select-wrap');
+        const inputWrap = container.querySelector('.cycle-input-wrap');
+        const titleInput = container.querySelector('.cycle-title-input');
+        const val = $sel.val();
+
+        if (val === '__custom__') {
+            if (selectWrap) selectWrap.classList.add('d-none');
+            if (inputWrap) {
+                inputWrap.classList.remove('d-none');
+                inputWrap.classList.add('d-flex');
+            }
+            if (titleInput) {
+                titleInput.value = '';
+                titleInput.focus();
+            }
+        }
+    };
+
+    window.switchToGoalCycleSelect = function(btn) {
+        const container = btn.closest('.odoo-form-group') || btn.parentElement;
+        if (!container) return;
+
+        const selectWrap = container.querySelector('.cycle-select-wrap');
+        const inputWrap = container.querySelector('.cycle-input-wrap');
+        const titleInput = container.querySelector('.cycle-title-input');
+        const $select = $(container).find('.goal-cycle-select');
+
+        if (titleInput) titleInput.value = '';
+        if (inputWrap) {
+            inputWrap.classList.add('d-none');
+            inputWrap.classList.remove('d-flex');
+        }
+        if (selectWrap) {
+            selectWrap.classList.remove('d-none');
+            selectWrap.classList.add('d-flex');
+        }
+        if ($select.length) {
+            $select.val('').trigger('change.select2');
+        }
+    };
+
+    window.handleGoalPillarSelect = function(selectEl) {
+        const $sel = $(selectEl);
+        const container = selectEl.closest('.odoo-form-group') || selectEl.parentElement;
+        if (!container) return;
+
+        const selectWrap = container.querySelector('.pillar-select-wrap');
+        const inputWrap = container.querySelector('.pillar-input-wrap');
+        const titleInput = container.querySelector('.pillar-title-input');
+        const val = $sel.val();
+
+        if (val === '__custom__') {
+            if (selectWrap) selectWrap.classList.add('d-none');
+            if (inputWrap) {
+                inputWrap.classList.remove('d-none');
+                inputWrap.classList.add('d-flex');
+            }
+            if (titleInput) {
+                titleInput.value = '';
+                titleInput.focus();
+            }
+        }
+    };
+
+    window.switchToGoalPillarSelect = function(btn) {
+        const container = btn.closest('.odoo-form-group') || btn.parentElement;
+        if (!container) return;
+
+        const selectWrap = container.querySelector('.pillar-select-wrap');
+        const inputWrap = container.querySelector('.pillar-input-wrap');
+        const titleInput = container.querySelector('.pillar-title-input');
+        const $select = $(container).find('.goal-pillar-select');
+
+        if (titleInput) titleInput.value = '';
+        if (inputWrap) {
+            inputWrap.classList.add('d-none');
+            inputWrap.classList.remove('d-flex');
+        }
+        if (selectWrap) {
+            selectWrap.classList.remove('d-none');
+            selectWrap.classList.add('d-flex');
+        }
+        if ($select.length) {
+            $select.val('').trigger('change.select2');
+        }
+    };
+
+    // Ensure select2 is initialized in createGoalModal
+    if (window.jQuery) {
+        $('#createGoalModal').on('shown.bs.modal', function() {
+            const $modal = $(this);
+            $modal.find('.goal-cycle-select, .goal-pillar-select').each(function() {
+                if (!$(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2({
+                        theme: 'bootstrap-5',
+                        dropdownParent: $modal,
+                        width: '100%'
+                    });
+                }
+            });
+        });
+
+        $(document).on('change change.select2 select2:select', '.goal-cycle-select', function() {
+            handleGoalCycleSelect(this);
+        });
+
+        $(document).on('change change.select2 select2:select', '.goal-pillar-select', function() {
+            handleGoalPillarSelect(this);
+        });
+    }
 
     // Sync active tab with URL query state
     document.querySelectorAll('#goalTabs [data-bs-toggle="tab"]').forEach(function(tab) {

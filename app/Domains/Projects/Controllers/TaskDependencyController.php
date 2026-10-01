@@ -31,8 +31,9 @@ class TaskDependencyController extends Controller
 
         $validated = $request->validated();
         $type = $validated['dependency_type'] ?? TaskDependency::TYPE_FINISH_TO_START;
+        $lagDays = isset($validated['lag_days']) ? (int) $validated['lag_days'] : 0;
 
-        $this->dependencies->create($task, (int) $validated['depends_on_task_id'], $type);
+        $this->dependencies->create($task, (int) $validated['depends_on_task_id'], $type, $lagDays);
 
         return $this->respond($request, $project, $task, __('projects.dependency_added'));
     }

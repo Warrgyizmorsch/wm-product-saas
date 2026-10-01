@@ -274,13 +274,17 @@ Inspect the existing **Production BOM module** (`resources/views/modules/product
 
 ---
 
-### 3.9 UAT & Change Request Views *(Target Phase 5)*
-- **UAT Sign-off Screen:**
-  - Milestone completion checklist table using `<x-ui.odoo-form-ui type="table">` verifying 100% completion.
-  - Client sign-off form using `<x-ui.odoo-form-ui>` with reviewer name, review date, and status selection (`Approved` / `Rework Required`).
-- **Change Request Workspace:**
-  - Change Request grid using `<x-ui.odoo-form-ui type="table">`: CR Number (`PRJ-0001-CR-001`), Requestor, Description, Impact Analysis breakdown (Schedule days delta, Budget amount delta, Hours delta).
-  - Approval action buttons (`<x-ui.button>`) for Project Manager / Tenant Owner.
+### 3.9 UAT & Change Request Views *(Phase 5 — Completed)*
+- **UAT Sign-off Screen (`projects/_reviews.blade.php`):**
+  - Milestone readiness check banner indicating milestone completion readiness.
+  - Active and Historical UAT review tables using `<x-ui.odoo-form-ui type="table">` with Review Date, Status badge, Reviewer, Sign-off Ref, Comments, Evidence count, and Sign-off action button.
+  - Client sign-off modal using `<x-ui.modal>` and `<x-ui.odoo-form-ui>` with status selection (`Approved` / `Rework Required`), external sign-off reference, and remarks.
+  - Evidence upload and preview modal via polymorphic `ProjectDocument`.
+- **Change Request Workspace (`projects/_reviews.blade.php`):**
+  - Change Request table using `<x-ui.odoo-form-ui type="table">`: CR Number (`PRJ-0001-CR-001`), Title & Description, Review Link pill, Requestor, Impact Analysis pills (Schedule days, Budget amount, Hours), Status badge, Approver, and Action dropdowns.
+  - CR Create modal supporting both standalone CRs and linked rework CRs.
+  - Approval, Rejection (with mandatory remarks modal), and Implemented transition actions.
+- **Status:** **FULLY IMPLEMENTED (PHASE 5).**
 
 ---
 

@@ -36,6 +36,7 @@ use App\Domains\HRMS\Controllers\RecruitmentController;
 use App\Domains\HRMS\Controllers\KraKpiController;
 use App\Domains\HRMS\Controllers\SopController;
 use App\Domains\HRMS\Controllers\GoalController;
+use App\Domains\HRMS\Controllers\Feedback360Controller;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -660,5 +661,38 @@ Route::prefix('hrms')
             Route::delete('/cycle/{cycle}', [GoalController::class, 'destroyCycle'])->name('cycle.destroy');
             Route::post('/category/store', [GoalController::class, 'storeCategory'])->name('category.store');
             Route::delete('/category/{category}', [GoalController::class, 'destroyCategory'])->name('category.destroy');
+        });
+
+        // 360-Degree Feedback Module
+        Route::prefix('feedback-360')->name('feedback360.')->group(function (): void {
+            Route::get('/', [Feedback360Controller::class, 'index'])->name('index');
+            
+            // Cycles Management
+            Route::post('/cycles/store', [Feedback360Controller::class, 'storeCycle'])->name('cycles.store');
+            Route::get('/cycles/{id}', [Feedback360Controller::class, 'showCycle'])->name('cycles.show');
+            Route::put('/cycles/{id}', [Feedback360Controller::class, 'updateCycle'])->name('cycles.update');
+            Route::delete('/cycles/{id}', [Feedback360Controller::class, 'destroyCycle'])->name('cycles.destroy');
+            Route::post('/cycles/{id}/launch', [Feedback360Controller::class, 'launchCycle'])->name('cycles.launch');
+            Route::post('/cycles/{id}/participants', [Feedback360Controller::class, 'addParticipants'])->name('cycles.participants');
+            Route::post('/cycles/{id}/bulk-remind', [Feedback360Controller::class, 'bulkRemind'])->name('cycles.bulk-remind');
+
+            // Peer Nominations & Approvals
+            Route::post('/participants/{participantId}/nominate-peers', [Feedback360Controller::class, 'nominatePeers'])->name('participants.nominate-peers');
+            Route::post('/nominations/{nominationId}/approve', [Feedback360Controller::class, 'approveNomination'])->name('nominations.approve');
+            Route::post('/nominations/batch-approve', [Feedback360Controller::class, 'batchApproveNominations'])->name('nominations.batch-approve');
+
+            // Review Submission Workspace
+            Route::get('/review/{nominationId}', [Feedback360Controller::class, 'reviewWorkspace'])->name('review');
+            Route::post('/review/{nominationId}', [Feedback360Controller::class, 'submitReview'])->name('review.submit');
+
+            // 360 Assessment Report & Calibration
+            Route::get('/report/{participantId}', [Feedback360Controller::class, 'report'])->name('report');
+            Route::post('/report/{participantId}/publish', [Feedback360Controller::class, 'publishReport'])->name('report.publish');
+
+            // Competency & Question Bank Masters
+            Route::post('/competencies/store', [Feedback360Controller::class, 'storeCompetency'])->name('competencies.store');
+            Route::delete('/competencies/{id}', [Feedback360Controller::class, 'destroyCompetency'])->name('competencies.destroy');
+            Route::post('/questions/store', [Feedback360Controller::class, 'storeQuestion'])->name('questions.store');
+            Route::delete('/questions/{id}', [Feedback360Controller::class, 'destroyQuestion'])->name('questions.destroy');
         });
     });
