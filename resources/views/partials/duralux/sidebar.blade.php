@@ -45,6 +45,10 @@
                 'Tasks',
                 'Timesheets',
             ]],
+            ['label' => __('visitor.visitor_management') ?: 'Visitor Management', 'icon' => 'feather-user-check', 'url' => '#', 'children' => [
+                ['label' => __('visitor.gate_desk') ?: 'Gate Desk (Visitor Logs)', 'route' => 'visitor.index'],
+                ['label' => __('visitor.my_approvals') ?: 'My Approvals', 'route' => 'visitor.approvals.index'],
+            ]],
         ],
         __('ui.supply_chain') => [
             ['label' => 'Supply Chain Dashboard', 'icon' => 'feather-grid', 'route' => 'supply-chain.dashboard'],
