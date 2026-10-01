@@ -29,6 +29,7 @@ use App\Domains\HRMS\Controllers\Api\RecruitmentApiController;
 use App\Domains\HRMS\Controllers\Api\EmployeeProfileRequestApiController;
 use App\Domains\HRMS\Controllers\Api\SopApiController;
 use App\Domains\HRMS\Controllers\Api\GoalApiController;
+use App\Domains\HRMS\Controllers\Api\Feedback360ApiController;
 use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
 /*
@@ -893,7 +894,7 @@ Route::prefix('api/hrms/goals')
         // Summary & Metrics
         Route::get('/summary', [GoalApiController::class, 'summary'])->name('summary');
 
-        // Goals CRUD & Listings
+        // Goals CRUD & Tree
         Route::get('/', [GoalApiController::class, 'index'])->name('index');
         Route::post('/', [GoalApiController::class, 'store'])->name('store');
         Route::get('/alignment-tree', [GoalApiController::class, 'alignmentTree'])->name('alignment-tree');
@@ -902,13 +903,40 @@ Route::prefix('api/hrms/goals')
         Route::put('/{id}', [GoalApiController::class, 'update'])->name('update');
         Route::delete('/{id}', [GoalApiController::class, 'destroy'])->name('destroy');
 
-        // Check-in
+        // Check-ins
         Route::post('/{id}/check-in', [GoalApiController::class, 'checkIn'])->name('check-in');
 
-        // Cycles & Categories
+        // Goal Cycles Master
         Route::get('/cycles', [GoalApiController::class, 'indexCycles'])->name('cycles.index');
+        Route::post('/cycles', [GoalApiController::class, 'storeCycle'])->name('cycles.store');
+        Route::delete('/cycles/{id}', [GoalApiController::class, 'destroyCycle'])->name('cycles.destroy');
+
+        // Goal Strategic Categories / Pillars Master
         Route::get('/categories', [GoalApiController::class, 'indexCategories'])->name('categories.index');
+        Route::post('/categories', [GoalApiController::class, 'storeCategory'])->name('categories.store');
+        Route::delete('/categories/{id}', [GoalApiController::class, 'destroyCategory'])->name('categories.destroy');
     });
+
+// ==========================================
+// 26. 360-DEGREE FEEDBACK API ROUTES
+// ==========================================
+Route::prefix('api/hrms/feedback-360')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.feedback360.')
+    ->group(function () {
+        // Summary & Listing
+        Route::get('/', [Feedback360ApiController::class, 'index'])->name('index');
+        Route::post('/cycles', [Feedback360ApiController::class, 'store'])->name('cycles.store');
+        Route::get('/cycles/{id}', [Feedback360ApiController::class, 'show'])->name('cycles.show');
+
+        // Review Workspace & Submit
+        Route::get('/review/{nominationId}', [Feedback360ApiController::class, 'reviewWorkspace'])->name('review.workspace');
+        Route::post('/review/{nominationId}', [Feedback360ApiController::class, 'submitReview'])->name('review.submit');
+
+        // 360 Report Analytics
+        Route::get('/report/{participantId}', [Feedback360ApiController::class, 'report'])->name('report');
+    });
+
 
 
 

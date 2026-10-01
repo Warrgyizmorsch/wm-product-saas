@@ -265,6 +265,16 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(
+            \App\Domains\HRMS\Repositories\GoalRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\GoalRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\Feedback360RepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\Feedback360Repository::class
+        );
+
+        $this->app->bind(
             \App\Domains\HRMS\Repositories\DocumentRepositoryInterface::class,
             \App\Domains\HRMS\Repositories\DocumentRepository::class
         );
