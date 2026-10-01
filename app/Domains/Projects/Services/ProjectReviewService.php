@@ -2,6 +2,8 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Projects\Events\ProjectReviewRequested;
+use App\Domains\Projects\Events\ProjectReviewSignedOff;
 use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\ProjectDocument;
@@ -116,6 +118,8 @@ class ProjectReviewService
                 ]
             );
 
+            event(new ProjectReviewRequested($review, $actor));
+
             return $review;
         });
     }
@@ -188,6 +192,8 @@ class ProjectReviewService
                     'sign_off_ref' => $updated->sign_off_ref,
                 ]
             );
+
+            event(new ProjectReviewSignedOff($updated, $actor));
 
             return $updated;
         });

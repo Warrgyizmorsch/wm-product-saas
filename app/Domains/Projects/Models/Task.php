@@ -92,6 +92,21 @@ class Task extends BaseModel
         return $this->belongsTo(User::class, 'assignee_id');
     }
 
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assignee_id');
+    }
+
+    public function getAssignedToAttribute(): ?int
+    {
+        return $this->assignee_id ? (int) $this->assignee_id : null;
+    }
+
+    public function setAssignedToAttribute($value): void
+    {
+        $this->attributes['assignee_id'] = $value;
+    }
+
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewer_id');

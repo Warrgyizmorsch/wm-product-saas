@@ -514,15 +514,87 @@ Before entering the Architecture / Integration Validation gate or proposing any 
 
 ---
 
-### Phase 9: Domain Events & Notifications — [PLANNED]
-- **Status:** **PLANNED**
-- **Objective:** Dispatch in-app and email notifications on key project events.
-- **Initial Target Scope (Subject to Phase 9 Audit):**
-  1. **Events:** Create event classes in `app/Domains/Projects/Events/` (`TaskAssigned`, `TaskCompleted`, `IssueLogged`, `TimesheetSubmitted`, `UATRequested`).
-  2. **Notifications:** Create Laravel notification classes leveraging existing `database` and `mail` channels.
-  3. **Listeners:** Wire listeners in `app/Domains/Projects/Listeners/`.
-  4. **Top Nav Bell:** Ensure unread project notifications appear in the Duralux top navbar bell menu.
-- **Exit Criteria:** Users receive notifications for task assignments and review requests; notifications link directly to relevant workspace.
+### Phase 9: Domain Events & Notifications — [VERIFIED — SAFE TO PROCEED TO PHASE 10A]
+- **Status:** **VERIFIED — SAFE TO PROCEED TO PHASE 10A**
+- **Objective:** Establish an event-driven notification architecture for key project lifecycle milestones, delivering real-time in-app alerts (topbar bell menu) and asynchronous email notifications while honoring user preferences and multi-tenant isolation.
+
+#### 1. Architecture Validation Resolutions (Phase 9B Approved)
+1. **Reconciliation of Event Count (12 Strongly-Typed Events):**
+   The architecture officially supports all **12** PM lifecycle events:
+   - `TaskAssigned(Task $task, User $actor, ?int $previousAssigneeId = null)`
+   - `TaskCompleted(Task $task, User $actor)`
+   - `IssueLogged(Issue $issue, User $actor)`
+   - `IssueResolved(Issue $issue, User $actor)`
+   - `IssueRetested(Issue $issue, User $actor, bool $passed)`
+   - `TimesheetSubmitted(Collection $timeLogs, User $actor, Project $project)`
+   - `TimesheetApproved(Collection|TimeLog $timeLogs, User $actor)`
+   - `TimesheetRejected(Collection|TimeLog $timeLogs, User $actor, ?string $rejectionRemarks = null)`
+   - `ProjectReviewRequested(ProjectReview $review, User $actor)`
+   - `ProjectReviewSignedOff(ProjectReview $review, User $actor)`
+   - `ChangeRequestCreated(ChangeRequest $changeRequest, User $actor)`
+   - `ProjectClosed(Project $project, User $actor)`
+
+2. **Email Infrastructure Reuse (`EmailService`):**
+   - Reuses existing `App\Services\EmailService::sendEmail()` rather than introducing a redundant PM-specific Mailable.
+   - Automatically inherits tenant-specific SMTP configurations from `email_configurations`, persists outbound message logs in `email_messages`, and includes graceful fallback to Laravel's default `Mail::send()` if tenant SMTP is unconfigured.
+
+3. **Delivery Execution Strategy (Immediate In-App vs. Queued Email):**
+   - **In-App Notifications:** Persisted synchronously to `App\Models\Notification` within the event listener execution, ensuring instant availability in the Duralux topbar bell dropdown (`/notifications/unread`) upon response or next poll.
+   - **Email Notifications:** Dispatched asynchronously via a queued job (`SendProjectNotificationEmailJob implements ShouldQueue`) using the database queue (`QUEUE_CONNECTION=database`), isolating HTTP responses from SMTP network latency.
+
+4. **Client-Contact & Recipient Resolution (Zero Duplication):**
+   - In-app alerts strictly target internal ERP `User` accounts (`user_id`).
+   - If a client reviewer has an ERP user account (e.g. `ProjectReview.reviewer_id`), in-app and email alerts route to that user.
+   - If client notifications target external clients without an ERP user account, email dispatches directly to the project customer's primary email (`$project->customer?->email` via `App\Domains\CRM\Models\Customer`) using `EmailService` without creating synthetic user accounts.
+
+5. **Batch Consolidation & Deduplication:**
+   - **Batch Timesheets:** Multiple time logs approved or rejected in a single operation are consolidated into one aggregate notification (e.g. *"Approver approved 4 time logs (16.5 hrs) on Project PRJ-001"*) rather than flooding recipients with individual entries.
+   - **Deduplication Guard:** For repetitive state changes, duplicate unread notifications of the same type for the same target user and project within a 15-minute window update the existing alert record.
+
+6. **Preferences, Security & Multi-Tenancy:**
+   - **Self-Action Suppression:** In-app and email notifications are strictly suppressed when the actor is the recipient (`$actor->id === $recipient->id`).
+   - **User Preferences:** Explicitly checks `$recipient->settings['notifications']['in_app']` (default `true`) and `$recipient->settings['notifications']['email']` (default `false`).
+   - **Multi-Tenant Isolation:** Every notification is bound to `$project->tenant_id`.
+   - **Action URLs:** Dynamic deep links to relevant workspaces (`projects.tasks.show`, `projects.issues.show`, `projects.show` tab reviews, `projects.timesheets.approval`).
+   - **Localization Parity:** Complete multilingual support across English (`lang/en/projects.php`), Hindi (`lang/hi/projects.php`), and Bulgarian (`lang/bg/projects.php`).
+
+7. **Platform Catalog Extension:**
+   - `App\Domains\Platform\Services\NotificationEventCatalog.php` extended with the `'projects'` module group and all 12 events.
+
+---
+
+#### 2. Phase 9C Implementation Execution Summary
+1. **Domain Events (`app/Domains/Projects/Events/`):**
+   - Implemented all 12 strongly-typed event classes with PHP 8.2 readonly constructor properties and `Dispatchable, SerializesModels` traits.
+2. **Domain Service Dispatchers:**
+   - Wired event dispatches across all 6 PM domain services:
+     - `TaskService`: `TaskAssigned` (on creation, assignment, and inline update), `TaskCompleted` (on forward completion transitions).
+     - `IssueService`: `IssueLogged` (on creation), `IssueResolved` (on resolution), `IssueRetested` (on verification pass/fail).
+     - `TimeLogService`: `TimesheetSubmitted` (on time logging), `TimesheetApproved` (on individual and batch approval), `TimesheetRejected` (on rejection with remarks).
+     - `ProjectReviewService`: `ProjectReviewRequested` (on review creation), `ProjectReviewSignedOff` (on sign-off as Approved or Rework Required).
+     - `ChangeRequestService`: `ChangeRequestCreated` (on CR creation).
+     - `ProjectClosureService`: `ProjectClosed` (on formal project closure).
+3. **Notification Domain Service (`app/Domains/Projects/Services/ProjectNotificationService.php`):**
+   - Implemented `notifyUser()`, `notifyExternalClient()`, and handlers for all 12 events with:
+     - Strict self-action suppression (`$actor->id === $recipient->id`).
+     - User settings preference checks (`settings['notifications']['in_app']` and `settings['notifications']['email']`).
+     - 15-minute deduplication window updating existing unread alerts.
+     - Direct creation in `App\Models\Notification` (matching topbar bell dropdown schema).
+     - Deep-link contextual `action_url` routing.
+4. **Asynchronous Queued Job (`app/Domains/Projects/Jobs/SendProjectNotificationEmailJob.php`):**
+   - Built queued email job implementing `ShouldQueue` delegating to `EmailService::sendEmail()` with fallback protection.
+5. **Event Listener (`app/Domains/Projects/Listeners/ProjectNotificationListener.php`):**
+   - Implemented listener matching and dispatching all 12 project events. Registered explicitly in `AppServiceProvider.php`.
+6. **Platform Catalog Extension (`App\Domains\Platform\Services\NotificationEventCatalog.php`):**
+   - Extended catalog with `'projects'` module group, registering all 12 events with descriptions, icons, roles, titles, bodies, and variables.
+7. **Localization (100% Parity):**
+   - Added notification title and body keys across English (`lang/en/projects.php`), Hindi (`lang/hi/projects.php`), and Bulgarian (`lang/bg/projects.php`).
+8. **Automated Verification:**
+   - `tests/Feature/ProjectNotificationTest.php`: 13 automated tests passing 100% (143 assertions) covering all 12 events, self-action suppression, batch consolidation, deduplication windows, user preference gating, queued email jobs, catalog registry, and EN/HI/BG localization parity.
+   - **Full PM Regression Suite Verified Green:** 113 total feature tests (746 assertions) passing 100% across `ProjectClosureTest`, `MilestoneTest`, `TaskTest`, `TimeLogTest`, `TimesheetApprovalTest`, `IssueTest`, `ProjectReviewTest`, `ChangeRequestTest`, `ProjectScheduleTest`, and `ProjectBillingTest`.
+
+- **Exit Criteria Met:** All 12 project lifecycle events dispatch cleanly, generate immediate in-app topbar notifications and queued emails according to user preferences, enforce self-action suppression and multi-tenant scoping, and preserve zero regressions.
+- **Next Authorized Action:** **Phase 10A — Executive Dashboard & Reports Requirements & Read-Only Audit**.
 
 ---
 

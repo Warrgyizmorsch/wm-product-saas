@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Projects\Events\ProjectClosed;
 use App\Domains\Projects\Models\ChangeRequest;
 use App\Domains\Projects\Models\Issue;
 use App\Domains\Projects\Models\Milestone;
@@ -249,6 +250,8 @@ class ProjectClosureService
                     'closed_by'           => $closer->id,
                 ]
             );
+
+            event(new ProjectClosed($freshProject, $closer));
 
             return $freshProject;
         });

@@ -2,10 +2,13 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Projects\Events\TaskAssigned;
+use App\Domains\Projects\Events\TaskCompleted;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\Task;
 use App\Domains\Projects\Models\TaskList;
 use App\Domains\Projects\Repositories\TaskRepositoryInterface;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -70,6 +73,10 @@ class TaskService
         return DB::transaction(function () use ($project, $data) {
             $taskList = TaskList::findOrFail($data['task_list_id']);
 
+            if (isset($data['assigned_to']) && !isset($data['assignee_id'])) {
+                $data['assignee_id'] = $data['assigned_to'];
+            }
+
             $data['project_id'] = $project->id;
             $data['tenant_id'] = $project->tenant_id;
             $data['milestone_id'] = $taskList->milestone_id;
@@ -90,6 +97,14 @@ class TaskService
                 null,
                 $task,
             );
+
+            $assigneeId = $task->assignee_id ?? $task->assigned_to ?? $data['assignee_id'] ?? $data['assigned_to'] ?? null;
+            if (!empty($assigneeId)) {
+                $actor = auth()->user() ?? $project->manager ?? $project->owner ?? User::first();
+                if ($actor) {
+                    event(new TaskAssigned($task, $actor));
+                }
+            }
 
             return $task;
         });
@@ -129,6 +144,13 @@ class TaskService
                 $task,
             );
 
+            if (array_key_exists('status', $data) && $data['status'] === Task::STATUS_COMPLETED && $oldStatus !== Task::STATUS_COMPLETED) {
+                $actor = auth()->user() ?? $project?->manager ?? User::first();
+                if ($actor) {
+                    event(new TaskCompleted($task, $actor));
+                }
+            }
+
             return $task;
         });
     }
@@ -142,7 +164,9 @@ class TaskService
     public function updateField(Task $task, string $field, mixed $value): mixed
     {
         return DB::transaction(function () use ($task, $field, $value) {
-            $task = $this->tasks->update($task->id, [$field => $value]);
+            $normalizedField = $field === 'assigned_to' ? 'assignee_id' : $field;
+            $previousAssigneeId = $task->assignee_id ?? $task->assigned_to;
+            $task = $this->tasks->update($task->id, [$normalizedField => $value]);
 
             $this->activity->record(
                 $task->project,
@@ -152,7 +176,14 @@ class TaskService
                 $task,
             );
 
-            return $task->{$field};
+            if (in_array($field, ['assignee_id', 'assigned_to'], true) && !empty($value) && (int) $value !== (int) $previousAssigneeId) {
+                $actor = auth()->user() ?? $task->project?->manager ?? User::first();
+                if ($actor) {
+                    event(new TaskAssigned($task, $actor, $previousAssigneeId));
+                }
+            }
+
+            return $task->{$normalizedField};
         });
     }
 
@@ -237,6 +268,13 @@ class TaskService
                 ['old' => $oldStatus, 'new' => $newStatus],
             );
 
+            if ($newStatus === Task::STATUS_COMPLETED) {
+                $actor = auth()->user() ?? $updatedTask->project?->manager ?? User::first();
+                if ($actor) {
+                    event(new TaskCompleted($updatedTask, $actor));
+                }
+            }
+
             return $updatedTask;
         });
     }
@@ -244,6 +282,10 @@ class TaskService
     public function assign(Task $task, array $data): Task
     {
         return DB::transaction(function () use ($task, $data) {
+            if (isset($data['assigned_to']) && !isset($data['assignee_id'])) {
+                $data['assignee_id'] = $data['assigned_to'];
+            }
+            $previousAssigneeId = $task->assignee_id ?? $task->assigned_to;
             $task = $this->tasks->update($task->id, $data);
 
             $this->activity->record(
@@ -253,6 +295,14 @@ class TaskService
                 null,
                 $task,
             );
+
+            $newAssigneeId = $task->assignee_id ?? $task->assigned_to ?? $data['assignee_id'] ?? $data['assigned_to'] ?? null;
+            if (!empty($newAssigneeId) && (int) $newAssigneeId !== (int) $previousAssigneeId) {
+                $actor = auth()->user() ?? $task->project?->manager ?? User::first();
+                if ($actor) {
+                    event(new TaskAssigned($task, $actor, $previousAssigneeId));
+                }
+            }
 
             return $task;
         });
