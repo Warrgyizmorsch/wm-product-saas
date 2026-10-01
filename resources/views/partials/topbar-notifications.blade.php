@@ -257,13 +257,14 @@
     setTimeout(checkDesktopPermissionState, 1000);
 
     // Show Native Desktop / Browser Push Notification
-    function showBrowserDesktopNotification(title, body, url, icon) {
+    function showBrowserDesktopNotification(title, body, url, icon, tag) {
         if ('Notification' in window && Notification.permission === 'granted') {
             try {
+                const notifTag = tag || ('visitor-alert-' + (title || '').toLowerCase().replace(/[^a-z0-9]/g, ''));
                 const n = new Notification(title, {
                     body: body,
                     icon: icon || '/assets/images/favicon.ico',
-                    tag: 'visitor-notification-' + Date.now(),
+                    tag: notifTag,
                     requireInteraction: true
                 });
                 n.onclick = function() {
@@ -350,31 +351,37 @@
     function handleLiveNotificationEvent(eventName, payload) {
         console.log('[Pusher Live Event]', eventName, payload);
 
-        // Deduplication Guard: Ignore if exact same event was handled within last 4 seconds
-        const dedupKey = 'notif_dedup_' + eventName + '_' + (payload.pass_id || payload.pass_number || '');
-        const lastHandled = window.sessionStorage.getItem(dedupKey);
+        const notifUniqueId = payload.pass_id || payload.pass_number || 'default';
+        const notifTag = 'visitor_pass_' + notifUniqueId;
+        const dedupKey = 'notif_dedup_' + eventName + '_' + notifUniqueId;
+        
+        // Multi-Tab Shared Deduplication using localStorage
+        const lastHandled = window.localStorage.getItem(dedupKey);
         const now = Date.now();
-        if (lastHandled && (now - parseInt(lastHandled)) < 4000) {
-            console.log('[Pusher] Duplicate event debounced:', eventName);
+        const isDuplicateAcrossTabs = lastHandled && (now - parseInt(lastHandled)) < 4000;
+
+        // Update header bell counter on all tabs
+        if (typeof fetchSystemNotifications === 'function') {
+            fetchSystemNotifications();
+        }
+
+        // If another tab already showed the desktop alert and audio chime within 4s, stop here
+        if (isDuplicateAcrossTabs) {
+            console.log('[Pusher] Cross-tab duplicate debounced:', eventName);
             return;
         }
-        try { window.sessionStorage.setItem(dedupKey, now.toString()); } catch (e) {}
+        try { window.localStorage.setItem(dedupKey, now.toString()); } catch (e) {}
 
         let type = 'general';
         if (eventName === 'visitor.approval_request') type = 'approval_request';
         if (eventName === 'visitor.approved') type = 'approved';
         if (eventName === 'visitor.rejected') type = 'rejected';
 
-        // 1. Play Audio Chime
+        // 1. Play Audio Chime (Only once across all tabs)
         playNotificationSound(type);
 
         // 2. Flash Tab Title when outside the tab
         flashTabTitle(payload.title || 'Visitor Alert');
-
-        // 3. Refresh Header Bell Dropdown & Badge Count
-        if (typeof fetchSystemNotifications === 'function') {
-            fetchSystemNotifications();
-        }
 
         // 3. Show Floating On-Screen Toast
         showFloatingPushToast({
@@ -384,11 +391,13 @@
             action_url: payload.action_url || payload.url || null
         });
 
-        // 4. Trigger Native OS / Desktop Notification
+        // 4. Trigger Native OS / Desktop Notification (Coalesced via unique tag)
         showBrowserDesktopNotification(
             payload.title || 'Visitor Management',
             payload.message || 'You have a new visitor notification.',
-            payload.action_url || payload.url || null
+            payload.action_url || payload.url || null,
+            null,
+            notifTag
         );
 
         // 5. If user is currently on approvals or gate desk page, trigger auto-refresh if function exists
