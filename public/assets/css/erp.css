@@ -1,5 +1,7 @@
 :root {
     --bs-primary: #6337fa;
+    /* Keep in step with --bs-primary (the layout's erpApplyPrimaryColor() updates both). */
+    --bs-primary-rgb: 99, 55, 250;
     /* Shared radius & shadow scale (consumed by x-ui.* components) */
     --erp-radius-sm: 6px;
     --erp-radius: 8px;
@@ -276,7 +278,7 @@ html.minimenu .nxl-navigation .m-header {
 }
 
 .erp-module-link:hover {
-    border-color: #3454d1;
+    border-color: var(--bs-primary);
     background-color: #f8faff;
 }
 
@@ -412,8 +414,8 @@ html.minimenu .nxl-navigation .m-header {
 }
 
 .erp-domain-tile:hover {
-    border-color: #3454d1;
-    color: #3454d1;
+    border-color: var(--bs-primary);
+    color: var(--bs-primary);
 }
 
 @media (max-width: 1199.98px) {
@@ -634,7 +636,7 @@ html.minimenu .nxl-navigation .m-header {
     height: 32px;
     background-color: #f0f2f5;
     border-radius: 6px;
-    color: #3454d1;
+    color: var(--bs-primary);
 }
 
 .table-date-content {
@@ -1956,8 +1958,8 @@ html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--multiple 
 }
 
 html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
-    background-color: rgba(52, 84, 209, 0.2) !important;
-    border-color: rgba(52, 84, 209, 0.4) !important;
+    background-color: rgba(var(--bs-primary-rgb), 0.2) !important;
+    border-color: rgba(var(--bs-primary-rgb), 0.4) !important;
     color: #93c5fd !important;
 }
 
@@ -2299,4 +2301,59 @@ html.app-skin-dark .header-color-preview-circle {
 .nxl-container > .footer {
     flex-shrink: 0;
     margin-top: auto;
+}
+
+/* ==========================================
+   PRIMARY COLOUR SYNC
+   The header colour picker sets --bs-primary; the Duralux theme and Bootstrap
+   hard-code their blue (#3454d1) in these utilities, so they ignored it.
+   Point them at --bs-primary so every primary control matches the header.
+   ========================================== */
+.text-primary {
+    color: var(--bs-primary) !important;
+}
+
+.bg-primary {
+    background-color: var(--bs-primary) !important;
+}
+
+.avatar-text.bg-primary {
+    box-shadow: 0 10px 10px -1px color-mix(in srgb, var(--bs-primary) 30%, transparent) !important;
+}
+
+.bg-soft-primary {
+    background-color: color-mix(in srgb, var(--bs-primary) 9%, transparent) !important;
+}
+
+.border-primary {
+    border-color: var(--bs-primary) !important;
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--bs-primary);
+    --bs-btn-border-color: var(--bs-primary);
+    --bs-btn-hover-bg: var(--bs-primary);
+    --bs-btn-hover-border-color: var(--bs-primary);
+    --bs-btn-active-bg: var(--bs-primary);
+    --bs-btn-active-border-color: var(--bs-primary);
+    --bs-btn-disabled-color: var(--bs-primary);
+}
+
+.alert-primary {
+    --bs-alert-color: color-mix(in srgb, var(--bs-primary) 75%, #000);
+    --bs-alert-bg: color-mix(in srgb, var(--bs-primary) 10%, #fff);
+    --bs-alert-border-color: color-mix(in srgb, var(--bs-primary) 22%, #fff);
+}
+
+/* Every checkbox/radio and input focus ring, not only the x-ui ones. */
+.form-check-input:checked {
+    background-color: var(--bs-primary) !important;
+    border-color: var(--bs-primary) !important;
+}
+
+.form-check-input:focus,
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--bs-primary) 15%, transparent);
 }

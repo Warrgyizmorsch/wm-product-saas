@@ -20,6 +20,13 @@ class Journal extends BaseModel
     public const STATUS_DRAFT = 'draft';
     public const STATUS_POSTED = 'posted';
     public const STATUS_REVERSED = 'reversed';
+    // Maker-checker: entered but not yet in the ledger, waiting for a second
+    // person. Rejected ones stay for the record and never post.
+    public const STATUS_PENDING_APPROVAL = 'pending_approval';
+    public const STATUS_REJECTED = 'rejected';
+
+    /** Statuses that count in the ledger and every report. */
+    public const LEDGER_STATUSES = [self::STATUS_POSTED, self::STATUS_REVERSED];
 
     public const SOURCE_MANUAL = 'manual';
     public const SOURCE_SALES = 'sales';
@@ -61,6 +68,11 @@ class Journal extends BaseModel
         'total_credit',
         'posted_by',
         'posted_at',
+        'approved_by',
+        'approved_at',
+        'rejected_by',
+        'rejected_at',
+        'rejection_reason',
     ];
 
     protected $casts = [
@@ -69,6 +81,8 @@ class Journal extends BaseModel
         'total_credit' => 'float',
         'exchange_rate' => 'float',
         'posted_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     public function period(): BelongsTo
@@ -89,6 +103,22 @@ class Journal extends BaseModel
     public function postedBy(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'posted_by')->withoutGlobalScope('tenant');
+    }
+
+    /** The checker who approved it (maker-checker). */
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'approved_by')->withoutGlobalScope('tenant');
+    }
+
+    public function rejectedBy(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'rejected_by')->withoutGlobalScope('tenant');
+    }
+
+    public function isPendingApproval(): bool
+    {
+        return $this->status === self::STATUS_PENDING_APPROVAL;
     }
 
     public function reversedJournal(): BelongsTo
@@ -128,5 +158,10 @@ class Journal extends BaseModel
     public function scopePosted(Builder $query): void
     {
         $query->where('status', self::STATUS_POSTED);
+    }
+
+    public function scopePendingApproval(Builder $query): void
+    {
+        $query->where('status', self::STATUS_PENDING_APPROVAL);
     }
 }

@@ -40,6 +40,7 @@ class JournalController extends Controller
                 'total' => Journal::query()->count(),
                 'posted' => Journal::query()->where('status', Journal::STATUS_POSTED)->count(),
                 'draft' => Journal::query()->where('status', Journal::STATUS_DRAFT)->count(),
+                'pending' => Journal::query()->where('status', Journal::STATUS_PENDING_APPROVAL)->count(),
                 'reversed' => Journal::query()->where('status', Journal::STATUS_REVERSED)->count(),
             ],
         ]);
@@ -71,7 +72,8 @@ class JournalController extends Controller
         ]);
 
         try {
-            $journal = $this->journals->post($validated['items'], [
+            // submit(): posts now, or holds for maker-checker approval.
+            $journal = $this->journals->submit($validated['items'], [
                 'journal_date' => $validated['journal_date'],
                 'memo' => $validated['memo'] ?? null,
                 'source' => Journal::SOURCE_MANUAL,
@@ -82,7 +84,9 @@ class JournalController extends Controller
         }
 
         return redirect()->route('accounting.journals.show', $journal)
-            ->with('success', 'Journal posted successfully.');
+            ->with('success', $journal->isPendingApproval()
+                ? "Journal {$journal->journal_number} saved and sent for approval. It will post once someone else approves it."
+                : 'Journal posted successfully.');
     }
 
     public function show(Journal $journal): View
@@ -91,6 +95,9 @@ class JournalController extends Controller
 
         return view('modules.accounting.journals.show', [
             'journal' => $this->journals->find($journal->id),
+            'canApprove' => $journal->isPendingApproval()
+                && auth()->user()->can('approve', $journal)
+                && (int) $journal->posted_by !== (int) auth()->id(),
         ]);
     }
 

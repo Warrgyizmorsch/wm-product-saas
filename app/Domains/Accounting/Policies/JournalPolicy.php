@@ -37,6 +37,26 @@ class JournalPolicy
         ]);
     }
 
+    /**
+     * Maker-checker: approve or reject someone else's pending manual journal
+     * or voucher. The "not your own entry" rule is enforced in
+     * JournalService::approve(), since it holds whatever the permission says.
+     */
+    public function approve(User $user, ?Journal $journal = null): bool
+    {
+        return $this->access->allows($user, 'accounting.journals.approve', [
+            'tenant_id' => $journal?->tenant_id ?? $user->tenant_id,
+        ]);
+    }
+
+    /** Turn maker-checker on/off and set its threshold for the tenant. */
+    public function configureApprovals(User $user): bool
+    {
+        return $this->access->allows($user, 'accounting.approvals.configure', [
+            'tenant_id' => $user->tenant_id,
+        ]);
+    }
+
     public function reverse(User $user, Journal $journal): bool
     {
         return $this->access->allows($user, 'accounting.journals.reverse', [

@@ -23,6 +23,7 @@ return [
             ['label' => 'Asset Revaluations', 'route' => 'accounting.fixed-assets.revaluations.index', 'permission' => 'fixed_assets.revaluation.create'],
             ['label' => 'Budgets', 'route' => 'accounting.budgets.index', 'permission' => 'accounting.budgets.view'],
             ['label' => 'Journals', 'route' => 'accounting.journals.index', 'permission' => 'accounting.journals.view'],
+            ['label' => 'Pending Approvals', 'route' => 'accounting.approvals.index', 'permission' => 'accounting.journals.approve'],
             ['label' => 'Posting Failures', 'route' => 'accounting.posting-failures.index', 'permission' => 'accounting.journals.view'],
             ['label' => 'Payment Vouchers', 'route' => 'accounting.vouchers.payment.index', 'permission' => 'accounting.vouchers.payment.view'],
             ['label' => 'Receipt Vouchers', 'route' => 'accounting.vouchers.receipt.index', 'permission' => 'accounting.vouchers.receipt.view'],
