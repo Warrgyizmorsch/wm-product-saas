@@ -46,6 +46,8 @@ class ExportRegistry
             'stock-transactions' => StockTransactionExport::availableColumns(),
             'material-requests' => MaterialRequestExport::availableColumns(),
             'batches' => BatchExport::availableColumns(),
+            // Visitor Management
+            'visitor-passes' => VisitorPassExport::availableColumns(),
             default => [],
         };
     }
@@ -92,6 +94,8 @@ class ExportRegistry
             'stock-transactions' => 'Stock Movement Ledger',
             'material-requests' => 'Production Material Requisition Slips',
             'batches' => 'Batches & Expiry Tracking',
+            // Visitor Management
+            'visitor-passes' => 'Visitor Gate Passes & Logs',
             default => ucfirst(str_replace('-', ' ', $type)),
         };
     }

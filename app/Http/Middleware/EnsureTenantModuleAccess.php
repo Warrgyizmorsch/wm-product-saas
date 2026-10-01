@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 class EnsureTenantModuleAccess
 {
     public const GATED_MODULES = [
-        'crm', 'inventory', 'sales', 'purchase', 'production', 'hrms', 'accounting', 'projects',
+        'crm', 'inventory', 'sales', 'purchase', 'production', 'hrms', 'accounting', 'projects', 'visitor',
     ];
 
     public function handle(Request $request, Closure $next): Response
