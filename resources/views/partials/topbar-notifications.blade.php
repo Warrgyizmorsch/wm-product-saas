@@ -9,10 +9,15 @@
     <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-notifications-menu">
         <div class="d-flex justify-content-between align-items-center notifications-head">
             <h6 class="fw-bold text-dark mb-0">{{ __('ui.notifications') }}</h6>
-            <a href="javascript:void(0);" id="markAllNotificationsReadBtn" class="fs-11 text-success text-end ms-auto">
-                <i class="feather-check"></i>
-                <span>{{ __('ui.mark_as_read') }}</span>
-            </a>
+            <div class="d-flex align-items-center gap-2 ms-auto">
+                <a href="javascript:void(0);" onclick="requestDesktopNotificationPermission()" id="enableDesktopAlertsBtn" style="display: none;" class="badge bg-soft-primary text-primary border border-primary px-2 py-0.5 fs-10 text-decoration-none" title="Allow OS Desktop Alerts">
+                    <i class="feather-bell"></i> Enable Desktop Alerts
+                </a>
+                <a href="javascript:void(0);" id="markAllNotificationsReadBtn" class="fs-11 text-success text-end">
+                    <i class="feather-check"></i>
+                    <span>{{ __('ui.mark_as_read') }}</span>
+                </a>
+            </div>
         </div>
 
         <div id="notificationListContainer" style="max-height: 360px; overflow-y: auto;">
@@ -204,12 +209,52 @@
         }
     }
 
+    let originalTitle = document.title;
+    let titleInterval = null;
+
+    // Flash tab title when user is on another tab/app
+    function flashTabTitle(alertText) {
+        if (titleInterval) clearInterval(titleInterval);
+        let isOriginal = false;
+        titleInterval = setInterval(() => {
+            document.title = isOriginal ? originalTitle : '🔔 ' + alertText;
+            isOriginal = !isOriginal;
+        }, 1000);
+
+        const stopFlashing = () => {
+            if (titleInterval) {
+                clearInterval(titleInterval);
+                titleInterval = null;
+                document.title = originalTitle;
+            }
+            window.removeEventListener('focus', stopFlashing);
+            document.removeEventListener('mousemove', stopFlashing);
+        };
+
+        window.addEventListener('focus', stopFlashing);
+        document.addEventListener('mousemove', stopFlashing);
+    }
+
     // Request Desktop Notification Permission
-    function requestDesktopPermission() {
-        if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission();
+    window.requestDesktopNotificationPermission = function() {
+        if ('Notification' in window) {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    const btn = document.getElementById('enableDesktopAlertsBtn');
+                    if (btn) btn.style.display = 'none';
+                    showBrowserDesktopNotification('Notifications Enabled!', 'You will now receive instant desktop alerts even when outside this tab.');
+                }
+            });
+        }
+    };
+
+    function checkDesktopPermissionState() {
+        if ('Notification' in window && Notification.permission !== 'granted') {
+            const btn = document.getElementById('enableDesktopAlertsBtn');
+            if (btn) btn.style.display = 'inline-flex';
         }
     }
+    setTimeout(checkDesktopPermissionState, 1000);
 
     // Show Native Desktop / Browser Push Notification
     function showBrowserDesktopNotification(title, body, url, icon) {
@@ -218,7 +263,8 @@
                 const n = new Notification(title, {
                     body: body,
                     icon: icon || '/assets/images/favicon.ico',
-                    tag: 'visitor-notification-' + Date.now()
+                    tag: 'visitor-notification-' + Date.now(),
+                    requireInteraction: true
                 });
                 n.onclick = function() {
                     window.focus();
@@ -312,7 +358,10 @@
         // 1. Play Audio Chime
         playNotificationSound(type);
 
-        // 2. Refresh Header Bell Dropdown & Badge Count
+        // 2. Flash Tab Title when outside the tab
+        flashTabTitle(payload.title || 'Visitor Alert');
+
+        // 3. Refresh Header Bell Dropdown & Badge Count
         if (typeof fetchSystemNotifications === 'function') {
             fetchSystemNotifications();
         }

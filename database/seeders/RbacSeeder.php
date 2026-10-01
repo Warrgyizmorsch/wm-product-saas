@@ -388,7 +388,7 @@ class RbacSeeder extends Seeder
             'accounting.exchange_rates.view' => $permissions['accounting.exchange_rates.view'],
             'accounting.exchange_rates.create' => $permissions['accounting.exchange_rates.create'],
             'accounting.exchange_rates.update' => $permissions['accounting.exchange_rates.update'],
-            'accounting.exchange_rates.sync' => $permissions['accounting.exchange_rates.sync'],
+            // 'accounting.exchange_rates.sync' => $permissions['accounting.exchange_rates.sync'],
             'fixed_assets.categories.view' => $permissions['fixed_assets.categories.view'],
             'fixed_assets.categories.create' => $permissions['fixed_assets.categories.create'],
             'fixed_assets.categories.edit' => $permissions['fixed_assets.categories.edit'],
@@ -434,6 +434,31 @@ class RbacSeeder extends Seeder
             'fixed_assets.disposal.view' => $permissions['fixed_assets.disposal.view'],
             'audit.logs.view' => $permissions['audit.logs.view'],
         ], RolePermission::SCOPE_TENANT);
+
+        // Security Guard & Receptionist have full operational access to visitor management
+        foreach (['security', 'receptionist'] as $secRole) {
+            $this->grant($roles[$secRole], [
+                'visitor.visitors.view' => $permissions['visitor.visitors.view'],
+                'visitor.visitors.create' => $permissions['visitor.visitors.create'],
+                'visitor.visitors.update' => $permissions['visitor.visitors.update'],
+                'visitor.passes.view' => $permissions['visitor.passes.view'],
+                'visitor.passes.create' => $permissions['visitor.passes.create'],
+                'visitor.passes.update' => $permissions['visitor.passes.update'],
+                'visitor.passes.checkin' => $permissions['visitor.passes.checkin'],
+                'visitor.passes.checkout' => $permissions['visitor.passes.checkout'],
+                'visitor.passes.approve' => $permissions['visitor.passes.approve'],
+                'visitor.passes.reject' => $permissions['visitor.passes.reject'],
+            ], RolePermission::SCOPE_TENANT);
+        }
+
+        // All departmental managers can view and approve visitor requests
+        foreach (['hr_manager', 'sales_manager', 'production_manager', 'inventory_manager', 'purchase_manager', 'accountant'] as $mgrRole) {
+            $this->grant($roles[$mgrRole], [
+                'visitor.passes.view' => $permissions['visitor.passes.view'],
+                'visitor.passes.approve' => $permissions['visitor.passes.approve'],
+                'visitor.passes.reject' => $permissions['visitor.passes.reject'],
+            ], RolePermission::SCOPE_TENANT);
+        }
 
         $this->assignDemoAdmin($roles['tenant_owner']);
     }
@@ -833,6 +858,8 @@ class RbacSeeder extends Seeder
             ['slug' => 'hr_manager', 'name' => 'HR Manager', 'tenant_id' => null, 'level' => 40],
             ['slug' => 'accountant', 'name' => 'Accountant', 'tenant_id' => null, 'level' => 40],
             ['slug' => 'auditor', 'name' => 'Auditor', 'tenant_id' => null, 'level' => 80],
+            ['slug' => 'security', 'name' => 'Security Guard', 'tenant_id' => null, 'level' => 60],
+            ['slug' => 'receptionist', 'name' => 'Receptionist', 'tenant_id' => null, 'level' => 60],
             ['slug' => 'read_only', 'name' => 'Read Only User', 'tenant_id' => null, 'level' => 90],
         ];
 
