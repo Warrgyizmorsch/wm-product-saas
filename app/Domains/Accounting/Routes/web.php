@@ -28,6 +28,7 @@ use App\Domains\Accounting\Controllers\DayBookController;
 use App\Domains\Accounting\Controllers\FiscalYearController;
 use App\Domains\Accounting\Controllers\GeneralLedgerController;
 use App\Domains\Accounting\Controllers\GstReturnController;
+use App\Domains\Accounting\Controllers\Gstr2bReconciliationController;
 use App\Domains\Accounting\Controllers\GstSummaryController;
 use App\Domains\Accounting\Controllers\Gstr1Controller;
 use App\Domains\Accounting\Controllers\Gstr3bController;
@@ -159,6 +160,11 @@ Route::prefix('accounting')
         Route::post('gst-returns/gstr1/export', [GstReturnController::class, 'export'])->name('gst-returns.gstr1.export');
         Route::post('gst-returns/gstr1/status', [GstReturnController::class, 'updateStatus'])->name('gst-returns.gstr1.status');
         Route::get('gst-returns/filings/{filing}/download', [GstReturnController::class, 'downloadFiling'])->name('gst-returns.filings.download');
+        Route::get('gst-returns/gstr2b', [Gstr2bReconciliationController::class, 'index'])->name('gst-returns.gstr2b.index');
+        Route::post('gst-returns/gstr2b', [Gstr2bReconciliationController::class, 'store'])->name('gst-returns.gstr2b.store');
+        Route::get('gst-returns/gstr2b/{import}', [Gstr2bReconciliationController::class, 'show'])->whereNumber('import')->name('gst-returns.gstr2b.show');
+        Route::post('gst-returns/gstr2b/{import}/rematch', [Gstr2bReconciliationController::class, 'rematch'])->whereNumber('import')->name('gst-returns.gstr2b.rematch');
+        Route::delete('gst-returns/gstr2b/{import}', [Gstr2bReconciliationController::class, 'destroy'])->whereNumber('import')->name('gst-returns.gstr2b.destroy');
         Route::get('reports/audit-trail', [AccountingAuditLogController::class, 'index'])->name('reports.audit-trail');
         Route::get('reports/budget-vs-actual', [BudgetVsActualController::class, 'index'])->name('reports.budget-vs-actual');
 

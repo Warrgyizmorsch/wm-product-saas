@@ -56,6 +56,7 @@ return [
             ['label' => 'GSTR-1', 'route' => 'accounting.reports.gstr1', 'permission' => 'accounting.reports.view'],
             ['label' => 'GSTR-3B', 'route' => 'accounting.reports.gstr3b', 'permission' => 'accounting.reports.view'],
             ['label' => 'Upload GST Returns', 'route' => 'accounting.gst-returns.gstr1', 'permission' => 'accounting.gst_returns.view'],
+            ['label' => 'GSTR-2B Reconciliation', 'route' => 'accounting.gst-returns.gstr2b.index', 'permission' => 'accounting.gst_returns.view'],
             ['label' => 'Audit Trail', 'route' => 'accounting.reports.audit-trail', 'permission' => 'accounting.reports.view'],
             // Budget vs Actual is the one report that checks accounting.budgets.view, not accounting.reports.view.
             ['label' => 'Budget vs Actual', 'route' => 'accounting.reports.budget-vs-actual', 'permission' => 'accounting.budgets.view'],

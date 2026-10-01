@@ -226,6 +226,7 @@
     <script src="{{ asset('assets/vendors/js/daterangepicker.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+    <script src="{{ asset('assets/js/erp-searchable-select.js') }}?v={{ @filemtime(public_path('assets/js/erp-searchable-select.js')) }}"></script>
     <script src="{{ asset('assets/vendors/js/nxlNavigation.min.js') }}"></script>
     <script src="{{ asset('assets/js/common-init.min.js') }}"></script>
     <script>

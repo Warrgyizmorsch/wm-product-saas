@@ -12,23 +12,29 @@
     <x-ui.card class="mb-4">
         <x-ui.filter-toolbar formId="partyLedgerForm" :resetUrl="route('accounting.reports.party-ledger')" searchLabel="View">
             <x-ui.filter-field label="Party" col="col-md-4">
-                <select id="partySelect" class="form-select erp-premium-select">
+                <select id="partySelect" class="form-select erp-premium-select" data-searchable>
                     <option value="">Select Customer / Vendor / Transporter...</option>
-                    <optgroup label="Customers">
-                        @foreach ($customers as $customer)
-                            <option value="customer:{{ $customer->id }}" @selected($partyType === 'customer' && $partyId == $customer->id)>{{ $customer->name }}</option>
-                        @endforeach
-                    </optgroup>
-                    <optgroup label="Vendors">
-                        @foreach ($vendors as $vendor)
-                            <option value="vendor:{{ $vendor->id }}" @selected($partyType === 'vendor' && $partyId == $vendor->id)>{{ $vendor->name }}</option>
-                        @endforeach
-                    </optgroup>
-                    <optgroup label="Transporters">
-                        @foreach ($transporters as $transporter)
-                            <option value="vendor:{{ $transporter->vendor_id }}" @selected($partyType === 'vendor' && $partyId == $transporter->vendor_id)>{{ $transporter->name }} (via Vendor Ledger)</option>
-                        @endforeach
-                    </optgroup>
+                    @if (count($customers))
+                        <optgroup label="Customers">
+                            @foreach ($customers as $customer)
+                                <option value="customer:{{ $customer->id }}" @selected($partyType === 'customer' && $partyId == $customer->id)>{{ $customer->name }}</option>
+                            @endforeach
+                        </optgroup>
+                    @endif
+                    @if (count($vendors))
+                        <optgroup label="Vendors">
+                            @foreach ($vendors as $vendor)
+                                <option value="vendor:{{ $vendor->id }}" @selected($partyType === 'vendor' && $partyId == $vendor->id)>{{ $vendor->name }}</option>
+                            @endforeach
+                        </optgroup>
+                    @endif
+                    @if (count($transporters))
+                        <optgroup label="Transporters">
+                            @foreach ($transporters as $transporter)
+                                <option value="vendor:{{ $transporter->vendor_id }}" @selected($partyType === 'vendor' && $partyId == $transporter->vendor_id)>{{ $transporter->name }} (via Vendor Ledger)</option>
+                            @endforeach
+                        </optgroup>
+                    @endif
                 </select>
                 <input type="hidden" name="party_type" id="partyTypeInput" value="{{ $partyType }}">
                 <input type="hidden" name="party_id" id="partyIdInput" value="{{ $partyId }}">
