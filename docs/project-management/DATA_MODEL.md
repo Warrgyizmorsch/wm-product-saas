@@ -331,38 +331,57 @@ erDiagram
 ---
 
 ### 2.4 `project_reviews` (Client Review / UAT)
-- **Purpose:** Captures formal client acceptance testing sign-offs.
-- **Entity Model:** `App\Domains\Projects\Models\ProjectReview` *(To be created in Phase 5)*
-- **Proposed Attributes:**
-  - `id`: bigint PK
-  - `tenant_id`, `company_id`, `branch_id`
-  - `project_id`: FK -> `projects(id)` ON DELETE CASCADE
-  - `reviewer_id`: FK -> `users(id)` ON DELETE SET NULL (or external contact record)
+- **Purpose:** Captures formal client acceptance testing sign-offs and rework directives.
+- **Entity Model:** [`App\Domains\Projects\Models\ProjectReview`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Domains/Projects/Models/ProjectReview.php)
+- **Primary Key:** `id` (bigint unsigned)
+- **Tenant Ownership:** `tenant_id`, `company_id`, `branch_id`
+- **Foreign Keys:**
+  - `project_id` -> `projects(id)` ON DELETE CASCADE
+  - `reviewer_id` -> `users(id)` ON DELETE SET NULL
+  - `created_by` -> `users(id)` ON DELETE SET NULL
+- **Key Columns:**
+  - `reviewer_name`: string, nullable (external client contact name)
   - `review_date`: date
-  - `status`: string (`Pending`, `Approved`, `Rework Required`)
+  - `status`: string, default 'Pending' (`Pending`, `Approved`, `Rework Required`)
+  - `sign_off_ref`: string, nullable (client PO / sign-off certificate reference)
   - `comments`: text, nullable
-  - `sign_off_evidence`: string, nullable
-- **Status:** **TO BE DESIGNED & IMPLEMENTED IN PHASE 5**
+- **Constraints & Indexes:**
+  - INDEX: `['tenant_id', 'project_id']`
+  - INDEX: `['tenant_id', 'status']`
+- **Evidence Storage:** Polymorphic `ProjectDocument` (`attachable_type = ProjectReview::class`, `attachable_id = review.id`)
+- **Soft Deletes:** Yes (`deleted_at`)
+- **Status:** **COMPLETED & VERIFIED (PHASE 5)**
 
 ---
 
 ### 2.5 `project_change_requests` (Scope & Budget Adjustments)
 - **Purpose:** Governs formal additions or alterations to project scope, budget, or timelines.
-- **Entity Model:** `App\Domains\Projects\Models\ChangeRequest` *(To be created in Phase 5)*
-- **Proposed Attributes:**
-  - `id`: bigint PK
-  - `tenant_id`, `company_id`, `branch_id`
-  - `project_id`: FK -> `projects(id)` ON DELETE CASCADE
-  - `cr_number`: string (`PRJ-0001-CR-001`)
-  - `requested_by`: FK -> `users(id)` ON DELETE SET NULL
+- **Entity Model:** [`App\Domains\Projects\Models\ChangeRequest`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Domains/Projects/Models/ChangeRequest.php)
+- **Primary Key:** `id` (bigint unsigned)
+- **Tenant Ownership:** `tenant_id`, `company_id`, `branch_id`
+- **Foreign Keys:**
+  - `project_id` -> `projects(id)` ON DELETE CASCADE
+  - `project_review_id` -> `project_reviews(id)` ON DELETE SET NULL (nullable UAT rework linkage)
+  - `requested_by` -> `users(id)` ON DELETE SET NULL
+  - `approved_by` -> `users(id)` ON DELETE SET NULL
+  - `created_by` -> `users(id)` ON DELETE SET NULL
+- **Key Columns:**
+  - `cr_number`: string (e.g. `PRJ-0001-CR-001`)
+  - `title`: string
   - `description`: text
   - `impact_schedule_days`: integer, default 0
   - `impact_budget_amount`: decimal(15, 2), default 0.00
   - `impact_budget_hours`: decimal(10, 2), default 0.00
   - `status`: string, default 'Pending' (`Pending`, `Approved`, `Rejected`, `Implemented`)
-  - `approved_by`: FK -> `users(id)` ON DELETE SET NULL
   - `approved_at`: timestamp, nullable
-- **Status:** **TO BE DESIGNED & IMPLEMENTED IN PHASE 5**
+  - `rejection_remarks`: text, nullable
+- **Constraints & Indexes:**
+  - UNIQUE: `['tenant_id', 'cr_number']`
+  - INDEX: `['tenant_id', 'project_id']`
+  - INDEX: `['tenant_id', 'status']`
+  - INDEX: `['project_review_id']`
+- **Soft Deletes:** Yes (`deleted_at`)
+- **Status:** **COMPLETED & VERIFIED (PHASE 5)**
 
 ---
 

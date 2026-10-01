@@ -370,6 +370,18 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Repositories\ProjectDocumentRepository::class
         );
 
+        // ── Projects: Review / UAT ────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\ProjectReviewRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\ProjectReviewRepository::class
+        );
+
+        // ── Projects: Change Request ──────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\ChangeRequestRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\ChangeRequestRepository::class
+        );
+
 
         // ── Accounting: Chart of Accounts ─────────────────────────────────────
         $this->app->bind(
@@ -858,6 +870,16 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Projects\Models\ProjectDocument::class,
             \App\Domains\Projects\Policies\ProjectDocumentPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\ProjectReview::class,
+            \App\Domains\Projects\Policies\ProjectReviewPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\ChangeRequest::class,
+            \App\Domains\Projects\Policies\ChangeRequestPolicy::class
         );
 
 

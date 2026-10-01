@@ -141,6 +141,24 @@
                 return;
             }
 
+            if (result.data && result.data.id) {
+                var taskListName = result.data.name || name;
+                if (typeof window.addTaskListOption === 'function') {
+                    window.addTaskListOption(result.data.id, taskListName);
+                } else {
+                    var select = document.getElementById('task_task_list_id');
+                    if (select && !select.querySelector('option[value="' + result.data.id + '"]')) {
+                        var opt = document.createElement('option');
+                        opt.value = result.data.id;
+                        opt.textContent = taskListName;
+                        select.appendChild(opt);
+                        if (window.jQuery && jQuery(select).data('select2')) {
+                            jQuery(select).trigger('change.select2');
+                        }
+                    }
+                }
+            }
+
             replaceWithRealRow(card, result.data.html);
         }).catch(function () {
             showGeneralError(card, 'Network error — please try again.');

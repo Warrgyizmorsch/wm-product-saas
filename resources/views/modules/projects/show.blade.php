@@ -309,18 +309,21 @@
 
         {{-- Tab Navigation --}}
         @php
-            $allowedTabs = ['summary', 'milestones', 'issues', 'documents'];
+            $allowedTabs = ['summary', 'milestones', 'timeline', 'issues', 'documents', 'reviews'];
             $activeProjectTab = in_array(request('tab'), $allowedTabs, true)
                 ? request('tab')
                 : (in_array(old('_milestone_form'), ['add', 'edit'], true)
                     ? 'milestones'
                     : (old('_issue_form')
                         ? 'issues'
-                        : (old('_document_form') ? 'documents' : 'summary')));
+                        : (old('_document_form')
+                            ? 'documents'
+                            : (old('_review_form') || old('_cr_form') ? 'reviews' : 'summary'))));
 
             $projectDetailTabs = [
                 ['id' => 'tab-summary', 'label' => __('projects.summary'), 'icon' => 'feather-grid', 'active' => $activeProjectTab === 'summary'],
                 ['id' => 'tab-milestones', 'label' => __('projects.milestones'), 'icon' => 'feather-flag', 'active' => $activeProjectTab === 'milestones'],
+                ['id' => 'tab-timeline', 'label' => __('projects.timeline'), 'icon' => 'feather-calendar', 'active' => $activeProjectTab === 'timeline'],
             ];
 
             if ($canViewIssues) {
@@ -340,8 +343,18 @@
                     'active' => $activeProjectTab === 'documents',
                 ];
             }
+
+            if ($canViewReviews || $canViewCRs) {
+                $reviewsTotalCount = $reviews->count() + $changeRequests->count();
+                $projectDetailTabs[] = [
+                    'id' => 'tab-reviews',
+                    'label' => __('projects.reviews_and_cr') . ($reviewsTotalCount > 0 ? ' (' . $reviewsTotalCount . ')' : ''),
+                    'icon' => 'feather-check-circle',
+                    'active' => $activeProjectTab === 'reviews',
+                ];
+            }
         @endphp
-        <x-ui.horizontal-tabs id="projectDetailsTabs" :tabs="$projectDetailTabs" />
+        <x-ui.horizontal-tabs id="projectDetailsTabs" :tabs="$projectDetailTabs" :syncUrl="true" />
 
         <div class="tab-content mt-3">
             <div class="tab-pane fade {{ $activeProjectTab === 'summary' ? 'show active' : '' }}" id="tab-summary"
@@ -353,6 +366,10 @@
                 role="tabpanel" aria-labelledby="tab-milestones-tab">
                 @include('modules.projects._milestones')
             </div>
+            <div class="tab-pane fade {{ $activeProjectTab === 'timeline' ? 'show active' : '' }}" id="tab-timeline"
+                role="tabpanel" aria-labelledby="tab-timeline-tab">
+                @include('modules.projects._timeline', ['project' => $project, 'milestoneId' => null, 'milestones' => $milestones])
+            </div>
             @if ($canViewIssues)
                 <div class="tab-pane fade {{ $activeProjectTab === 'issues' ? 'show active' : '' }}" id="tab-issues"
                     role="tabpanel" aria-labelledby="tab-issues-tab">
@@ -363,6 +380,12 @@
                 <div class="tab-pane fade {{ $activeProjectTab === 'documents' ? 'show active' : '' }}" id="tab-documents"
                     role="tabpanel" aria-labelledby="tab-documents-tab">
                     @include('modules.projects._documents')
+                </div>
+            @endif
+            @if ($canViewReviews || $canViewCRs)
+                <div class="tab-pane fade {{ $activeProjectTab === 'reviews' ? 'show active' : '' }}" id="tab-reviews"
+                    role="tabpanel" aria-labelledby="tab-reviews-tab">
+                    @include('modules.projects._reviews')
                 </div>
             @endif
         </div>

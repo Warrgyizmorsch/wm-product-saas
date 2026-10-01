@@ -22,9 +22,9 @@ class TaskDependencyService
         return $this->dependencies->getForTask($task->id);
     }
 
-    public function create(Task $task, int $dependsOnTaskId, string $dependencyType = TaskDependency::TYPE_FINISH_TO_START): TaskDependency
+    public function create(Task $task, int $dependsOnTaskId, string $dependencyType = TaskDependency::TYPE_FINISH_TO_START, int $lagDays = 0): TaskDependency
     {
-        return DB::transaction(function () use ($task, $dependsOnTaskId, $dependencyType) {
+        return DB::transaction(function () use ($task, $dependsOnTaskId, $dependencyType, $lagDays) {
             if ($task->id === $dependsOnTaskId) {
                 throw ValidationException::withMessages([
                     'depends_on_task_id' => 'A task cannot depend on itself.',
@@ -57,6 +57,7 @@ class TaskDependencyService
                 'task_id'            => $task->id,
                 'depends_on_task_id' => $dependsOnTaskId,
                 'dependency_type'    => $dependencyType,
+                'lag_days'           => $lagDays,
             ]);
 
             $this->activity->record(

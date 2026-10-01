@@ -34,6 +34,12 @@ class StoreTaskDependencyRequest extends FormRequest
                 'string',
                 Rule::in(TaskDependency::TYPES),
             ],
+            'lag_days' => [
+                'nullable',
+                'integer',
+                'min:-365',
+                'max:365',
+            ],
         ];
     }
 
