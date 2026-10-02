@@ -1,3 +1,4 @@
+{{-- Older KPI API kept for existing screens; renders the design-system KPI tile (x-ui.kpi-card). --}}
 @props([
     'title' => '',
     'value' => '0',
@@ -10,55 +11,46 @@
 ])
 
 @php
-    $trendClass = match ($trendDirection) {
-        'up' => 'text-success',
-        'down' => 'text-danger',
-        default => 'text-muted',
+    $tone = match ($color) {
+        'success', 'teal' => 'positive',
+        'danger' => 'negative',
+        'warning' => 'pending',
+        'info' => 'info',
+        'primary' => 'brand',
+        default => 'neutral',
     };
-    $trendIcon = match ($trendDirection) {
-        'up' => 'feather-arrow-up-right',
-        'down' => 'feather-arrow-down-right',
-        default => 'feather-minus',
+    $trendTone = match ($trendDirection) {
+        'up' => 'positive',
+        'down' => 'negative',
+        default => 'neutral',
+    };
+    $trendArrow = match ($trendDirection) {
+        'up' => '▲',
+        'down' => '▼',
+        default => '•',
     };
 @endphp
 
-<div {{ $attributes->merge(['class' => 'card stretch stretch-full border-0 shadow-sm mb-3']) }}>
-    <div class="card-body {{ $variant === 'compact' ? 'p-3' : 'p-4' }}">
-        <div class="d-flex align-items-center justify-content-between">
-            <div class="d-flex align-items-center gap-3">
-                <div
-                    class="avatar-text avatar-lg bg-soft-{{ $color }} text-{{ $color }} rounded-3 d-flex align-items-center justify-content-center">
-                    <i class="{{ $icon }} fs-4"></i>
-                </div>
-                <div>
-                    <span class="fs-12 text-uppercase text-muted fw-semibold d-block mb-1">{{ $title }}</span>
-                    <h3 class="fw-bold mb-0 text-dark">{{ $value }}</h3>
-                    @if ($subtitle)
-                        <span class="fs-12 text-muted d-block mt-1">{{ $subtitle }}</span>
-                    @endif
-                </div>
-            </div>
+<x-ui.kpi-card
+    :title="$title"
+    :value="$value"
+    :icon="$icon"
+    :tone="$tone"
+    :subtitle="$subtitle"
+    :attributes="$attributes->class(['mb-3', 'p-3' => $variant === 'compact'])"
+>
+    @isset($chart)
+        <div class="mt-3">{{ $chart }}</div>
+    @endisset
 
+    @if ($trend || isset($footer))
+        <x-slot:footer>
             @if ($trend)
-                <div class="text-end">
-                    <span
-                        class="badge bg-soft-{{ $trendDirection === 'up' ? 'success' : ($trendDirection === 'down' ? 'danger' : 'secondary') }} {{ $trendClass }} fw-bold px-2 py-1 fs-12">
-                        <i class="{{ $trendIcon }} me-1"></i>{{ $trend }}
-                    </span>
-                </div>
+                <x-ui.chip :tone="$trendTone">{{ $trendArrow }} {{ $trend }}</x-ui.chip>
             @endif
-        </div>
-
-        @if (isset($chart))
-            <div class="mt-3">
-                {{ $chart }}
-            </div>
-        @endif
-
-        @if (isset($footer))
-            <div class="pt-3 mt-3 border-top fs-12 text-muted">
-                {{ $footer }}
-            </div>
-        @endif
-    </div>
-</div>
+            @isset($footer)
+                <span>{{ $footer }}</span>
+            @endisset
+        </x-slot:footer>
+    @endif
+</x-ui.kpi-card>

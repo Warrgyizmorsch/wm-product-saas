@@ -1,7 +1,7 @@
-<x-ui.card title="Budget Alerts" bodyClass="p-0" class="accounting-dense mb-3" stretch>
-    <x-slot:headerAction>
+<x-ui.section title="Budget Alerts" class="accounting-dense mb-3 h-100" flush>
+    <x-slot:actions>
         <a href="{{ route('accounting.reports.budget-vs-actual') }}" class="fs-12">Budget vs Actual <i class="feather-arrow-right"></i></a>
-    </x-slot:headerAction>
+    </x-slot:actions>
     <x-ui.table hoverable>
         <tbody class="fs-13 text-dark">
             @forelse ($budgetAlerts as $alert)
@@ -23,4 +23,4 @@
             @endforelse
         </tbody>
     </x-ui.table>
-</x-ui.card>
+</x-ui.section>

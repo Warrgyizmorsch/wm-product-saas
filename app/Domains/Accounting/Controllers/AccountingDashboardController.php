@@ -2,6 +2,7 @@
 
 namespace App\Domains\Accounting\Controllers;
 
+use App\Domains\Accounting\Models\AccountingPeriod;
 use App\Domains\Accounting\Models\CostCenter;
 use App\Domains\Accounting\Services\AccountingDashboardService;
 use App\Domains\Accounting\Support\DashboardPeriod;
@@ -73,6 +74,10 @@ class AccountingDashboardController extends Controller
             'costCenters' => CostCenter::query()->active()->orderBy('code')->get(['id', 'code', 'name']),
             'companyCount' => Company::query()->count(),
             'canPostJournals' => $this->access->allows($user, 'accounting.journals.post', ['tenant_id' => $user->tenant_id]),
+            // "Books closed: Sep 2026" — the last period nobody can post into any more.
+            'booksClosedThrough' => ($closed = AccountingPeriod::query()
+                ->whereIn('status', [AccountingPeriod::STATUS_CLOSED, AccountingPeriod::STATUS_LOCKED])
+                ->max('end_date')) ? Carbon::parse($closed) : null,
             'query' => array_filter($filters, fn ($value) => $value !== null && $value !== ''),
         ]);
     }

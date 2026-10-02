@@ -1,7 +1,7 @@
-<x-ui.card title="GST &amp; TDS" bodyClass="p-0" class="accounting-dense mb-3" stretch>
-    <x-slot:headerAction>
+<x-ui.section title="GST & TDS" class="accounting-dense mb-3 h-100" flush>
+    <x-slot:actions>
         <a href="{{ route('accounting.reports.gst-summary') }}" class="fs-12">GST Summary <i class="feather-arrow-right"></i></a>
-    </x-slot:headerAction>
+    </x-slot:actions>
     <x-ui.table>
         <tbody class="fs-13 text-dark">
             <tr class="table-light"><td class="ps-4 fw-semibold" colspan="2">Return for {{ $gst['return_month'] }}</td></tr>
@@ -26,4 +26,4 @@
             <tr><td class="ps-4">TDS payable</td><td class="text-end pe-4">{{ $money($tdsPayable) }}</td></tr>
         </tbody>
     </x-ui.table>
-</x-ui.card>
+</x-ui.section>

@@ -43,12 +43,14 @@ class DashboardService
             ],
         ],
         'accounting' => [
-            // For the people running the business: health and cash first.
+            // For the people running the business — arranged like ui-reference/code.html:
+            // KPIs, the trend with approvals and bank accounts beside it, then the ledger.
             'overview' => [
                 'accounting.kpi_revenue', 'accounting.kpi_expenses', 'accounting.kpi_net_profit', 'accounting.kpi_cash',
-                'accounting.trend_detail', 'accounting.financial_health',
+                'accounting.trend_detail', 'accounting.pending_approvals', 'accounting.cash_balances',
+                'accounting.recent_journals',
                 'accounting.receivables_aging', 'accounting.payables_aging',
-                'accounting.cash_forecast', 'accounting.expense_mix',
+                'accounting.cash_forecast', 'accounting.expense_mix', 'accounting.financial_health',
                 'accounting.report_links',
             ],
             // For the people keeping the books: the close checklist and compliance first.
@@ -354,7 +356,9 @@ class DashboardService
     }
 
     /**
-     * Packs widgets left to right, wrapping at the grid width.
+     * Packs widgets in order, each into the highest free spot it fits (leftmost on a tie),
+     * so a short widget can stack beside a tall one — e.g. two 4-wide cards next to an
+     * 8-wide chart. Rows of equal-height widgets come out exactly left to right.
      *
      * @param list<string> $keys
      * @param callable(string): bool $wanted
@@ -362,25 +366,28 @@ class DashboardService
      */
     private function lay(array $keys, callable $wanted): array
     {
-        $x = $y = $rowHeight = 0;
+        $skyline = array_fill(0, self::COLUMNS, 0);   // filled height of each column
         $widgets = [];
 
         foreach ($keys as $key) {
-            if ($this->registry->find($key) === null || ! $wanted($key)) {
+            $def = $this->registry->find($key);
+
+            if ($def === null || ! $wanted($key)) {
                 continue;
             }
 
-            $def = $this->registry->find($key);
+            $w = min(self::COLUMNS, $def['w']);
+            [$bestX, $bestY] = [0, PHP_INT_MAX];
 
-            if ($x + $def['w'] > self::COLUMNS) {
-                $x = 0;
-                $y += $rowHeight;
-                $rowHeight = 0;
+            for ($x = 0; $x + $w <= self::COLUMNS; $x++) {
+                $y = max(array_slice($skyline, $x, $w));
+                if ($y < $bestY) {
+                    [$bestX, $bestY] = [$x, $y];
+                }
             }
 
-            $widgets[] = ['id' => $key, 'key' => $key, 'x' => $x, 'y' => $y, 'w' => $def['w'], 'h' => $def['h'], 'config' => []];
-            $x += $def['w'];
-            $rowHeight = max($rowHeight, $def['h']);
+            $widgets[] = ['id' => $key, 'key' => $key, 'x' => $bestX, 'y' => $bestY, 'w' => $w, 'h' => $def['h'], 'config' => []];
+            array_splice($skyline, $bestX, $w, array_fill(0, $w, $bestY + $def['h']));
         }
 
         return $widgets;

@@ -5,6 +5,7 @@
 use App\Core\Dashboard\WidgetContext;
 use App\Domains\Accounting\Services\AccountingDashboardService;
 use App\Domains\Accounting\Services\Dashboard\PartyBalances;
+use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Support\DashboardPeriod;
 use Illuminate\Support\Carbon;
 
@@ -99,19 +100,32 @@ return [
         'description' => 'Profit for the period against the one before.', 'data' => $block('kpi', ['which' => 'net_profit'])],
     $page + ['key' => 'accounting.kpi_cash', 'title' => 'Cash & Bank', 'icon' => 'feather-briefcase', 'w' => 3, 'h' => 2,
         'description' => 'Cash and bank balance with the runway.', 'data' => $block('kpi', ['which' => 'cash'])],
-    $page + ['key' => 'accounting.trend_detail', 'title' => 'Income vs Expense (6 months)', 'icon' => 'feather-bar-chart-2', 'w' => 8, 'h' => 7,
+    $page + ['key' => 'accounting.trend_detail', 'title' => 'Income vs Expense (6 months)', 'icon' => 'feather-bar-chart-2', 'w' => 8, 'h' => 9,
         'description' => 'Six months of income and expense, with gross profit.',
         'data' => $block('trend', [], fn (array $s) => array_sum($s['trend']['income']) != 0 || array_sum($s['trend']['expense']) != 0 ? [[
             'id' => 'acc-trend-chart', 'format' => ['axis' => 0, 'tooltip' => 2],
             'options' => [
-                'chart' => ['type' => 'bar', 'height' => 300, 'toolbar' => ['show' => false], 'fontFamily' => 'inherit'],
+                'chart' => ['type' => 'bar', 'height' => 280, 'toolbar' => ['show' => false], 'fontFamily' => 'inherit'],
                 'series' => [['name' => 'Income', 'data' => $s['trend']['income']], ['name' => 'Expense', 'data' => $s['trend']['expense']]],
-                'xaxis' => ['categories' => $s['trend']['labels']],
-                'colors' => ['#17c666', '#ea4d4d'],
-                'plotOptions' => ['bar' => ['columnWidth' => '45%', 'borderRadius' => 3]],
-                'legend' => ['position' => 'top', 'horizontalAlign' => 'right'],
+                'xaxis' => ['categories' => $s['trend']['labels'], 'axisBorder' => ['color' => '#CBD5E1'], 'axisTicks' => ['show' => false]],
+                // ui-reference: emerald income vs rose expense, hairline dashed gridlines, no vertical lines.
+                'colors' => ['#10B981', '#F43F5E'],
+                'grid' => ['borderColor' => '#F1F5F9', 'strokeDashArray' => 4, 'xaxis' => ['lines' => ['show' => false]]],
+                'plotOptions' => ['bar' => ['columnWidth' => '38%', 'borderRadius' => 2]],
+                'dataLabels' => ['enabled' => false],
+                'legend' => ['show' => false],   // the card draws its own legend
             ],
         ]] : [])],
+    ['permission' => 'accounting.journals.approve'] + $page + ['key' => 'accounting.pending_approvals', 'title' => 'Pending Approvals', 'icon' => 'feather-check-square', 'w' => 4, 'h' => 5,
+        'description' => 'Journals and vouchers waiting for a second person to approve.',
+        'data' => fn (WidgetContext $c): array => [
+            'html' => view('modules.accounting.dashboard.widgets.approvals', [
+                'pending' => app(JournalService::class)->pendingApproval(3),
+                'userId' => (int) $c->user->id,
+                'money' => $money,
+            ])->render(),
+            'charts' => [],
+        ]],
     $page + ['key' => 'accounting.financial_health', 'title' => 'Financial Health', 'icon' => 'feather-heart', 'w' => 4, 'h' => 7,
         'description' => 'Margins, liquidity ratios, working capital and runway.', 'data' => $block('health')],
     $page + ['key' => 'accounting.receivables_aging', 'title' => 'Receivables Aging', 'icon' => 'feather-arrow-down-left', 'w' => 6, 'h' => 8,
@@ -139,9 +153,9 @@ return [
         'description' => 'Budget lines at or over 80% used.', 'data' => $block('budgets')],
     $page + ['key' => 'accounting.bank_reconciliation', 'title' => 'Bank Reconciliation', 'icon' => 'feather-credit-card', 'w' => 6, 'h' => 4,
         'description' => 'Which bank accounts are due for reconciliation.', 'data' => $block('bank')],
-    $page + ['key' => 'accounting.recent_journals', 'title' => 'Recent Journals', 'icon' => 'feather-book-open', 'w' => 7, 'h' => 6,
+    $page + ['key' => 'accounting.recent_journals', 'title' => 'Recent Ledger Postings', 'icon' => 'feather-book-open', 'w' => 12, 'h' => 8,
         'description' => 'The latest posted journals.', 'data' => $block('journals')],
-    $page + ['key' => 'accounting.cash_balances', 'title' => 'Cash & Bank Balances', 'icon' => 'feather-dollar-sign', 'w' => 5, 'h' => 5,
+    $page + ['key' => 'accounting.cash_balances', 'title' => 'Cash & Bank Accounts', 'icon' => 'feather-dollar-sign', 'w' => 4, 'h' => 4,
         'description' => 'Balance of each cash and bank account.', 'data' => $block('balances')],
     $page + ['key' => 'accounting.report_links', 'title' => 'Reports', 'icon' => 'feather-file-text', 'w' => 12, 'h' => 3,
         'description' => 'Shortcuts to every accounting report.', 'data' => $block('reports')],

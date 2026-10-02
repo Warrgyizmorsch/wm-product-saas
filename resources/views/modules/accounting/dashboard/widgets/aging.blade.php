@@ -6,10 +6,10 @@
     ];
     $side = $sides[$which];
 @endphp
-<x-ui.card :title="$side['title'] . ' Aging'" class="mb-3" stretch>
-    <x-slot:headerAction>
+<x-ui.section :title="$side['title'] . ' Aging'" class="mb-3 h-100">
+    <x-slot:actions>
         <a href="{{ route($side['route']) }}" class="fs-12">Full report <i class="feather-arrow-right"></i></a>
-    </x-slot:headerAction>
+    </x-slot:actions>
     <div class="d-flex flex-wrap gap-4 mb-2 fs-13 text-muted">
         <span>Outstanding <strong class="text-dark">{{ $money($side['data']['total']) }}</strong></span>
         <span>Overdue <strong class="{{ $side['data']['overdue'] > 0 ? 'text-danger' : 'text-dark' }}">{{ $money($side['data']['overdue']) }}</strong></span>
@@ -31,4 +31,4 @@
     @else
         <div class="text-center py-5 text-muted"><i class="feather-check-circle fs-1 mb-2 d-block"></i>Nothing outstanding.</div>
     @endif
-</x-ui.card>
+</x-ui.section>

@@ -1,4 +1,4 @@
-<x-ui.card title="Reports">
+<x-ui.section title="Reports" class="mb-3 h-100">
     <div class="row g-2 fs-13">
         @foreach ([
             'Profit & Loss' => 'accounting.reports.profit-loss',
@@ -19,4 +19,4 @@
             </div>
         @endforeach
     </div>
-</x-ui.card>
+</x-ui.section>
