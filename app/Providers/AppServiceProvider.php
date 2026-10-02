@@ -1052,6 +1052,21 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Policies\BroadcastPolicy::class
         );
 
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\SopDocument::class,
+            \App\Domains\HRMS\Policies\SopPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Goal::class,
+            \App\Domains\HRMS\Policies\GoalPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Feedback360Cycle::class,
+            \App\Domains\HRMS\Policies\Feedback360Policy::class
+        );
+
         // ── Fixed Asset Policies ────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\AssetCategory::class,

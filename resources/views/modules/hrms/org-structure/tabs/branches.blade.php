@@ -129,7 +129,7 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <form action="{{ route('hrms.branch.destroy', $br->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_branch') }}', { title: 'Delete Branch', variant: 'danger', confirmButtonText: 'Delete' });">
+                                <form action="{{ route('hrms.branch.destroy', $br->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_branch') }}', { title: '{{ __('hrms.org.delete_branch') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end align-items-center">
@@ -243,9 +243,9 @@
                     let statusEl = document.getElementById('modal_view_branch_status');
                     if (statusEl) {
                         if (branch.status === true || branch.status === 1 || branch.status === '1') {
-                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success fw-bold fs-13">Active</span>';
+                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success fw-bold fs-13">{{ __('hrms.employees.frm_status_active') }}</span>';
                         } else {
-                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger fw-bold fs-13">Inactive</span>';
+                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger fw-bold fs-13">{{ __('hrms.employees.frm_status_inactive') }}</span>';
                         }
                     }
                 });
@@ -263,13 +263,24 @@
                     if (codeEl) codeEl.value = branch.code || '';
                     
                     let buEl = document.getElementById('edit_branch_bu_id');
-                    if (buEl) buEl.value = branch.business_unit_id || '';
+                    if (buEl) {
+                        buEl.value = branch.business_unit_id || '';
+                        $(buEl).trigger('change');
+                    }
                     
                     let companyEl = document.getElementById('edit_branch_company_id');
-                    if (companyEl) companyEl.value = branch.company_id || '';
+                    if (companyEl) {
+                        companyEl.value = branch.company_id || '';
+                        $(companyEl).trigger('change');
+                    }
                     
                     let managerEl = document.getElementById('edit_branch_manager_id');
-                    if (managerEl) managerEl.value = branch.manager_employee_id || '';
+                    if (managerEl) {
+                        $(managerEl).val(branch.manager_employee_id || '');
+                        if ($(managerEl).hasClass('select2-hidden-accessible')) {
+                            $(managerEl).trigger('change.select2');
+                        }
+                    }
                     
                     let phoneEl = document.getElementById('edit_branch_phone');
                     if (phoneEl) phoneEl.value = branch.phone || '';
@@ -278,13 +289,22 @@
                     if (emailEl) emailEl.value = branch.email || '';
                     
                     let countryEl = document.getElementById('edit_branch_country');
-                    if (countryEl) countryEl.value = branch.country || '';
+                    if (countryEl) {
+                        countryEl.value = branch.country || '';
+                        $(countryEl).trigger('change');
+                    }
                     
                     let stateEl = document.getElementById('edit_branch_state');
-                    if (stateEl) stateEl.value = branch.state || '';
+                    if (stateEl) {
+                        stateEl.value = branch.state || '';
+                        $(stateEl).trigger('change');
+                    }
                     
                     let cityEl = document.getElementById('edit_branch_city');
-                    if (cityEl) cityEl.value = branch.city || '';
+                    if (cityEl) {
+                        cityEl.value = branch.city || '';
+                        $(cityEl).trigger('change');
+                    }
                     
                     let postalEl = document.getElementById('edit_branch_postal_code');
                     if (postalEl) postalEl.value = branch.postal_code || '';
@@ -295,6 +315,7 @@
                     let statusSelect = document.getElementById('edit_branch_status');
                     if (statusSelect) {
                         statusSelect.value = (branch.status === true || branch.status === 1 || branch.status === '1') ? '1' : '0';
+                        $(statusSelect).trigger('change');
                     }
                     
                     let form = document.getElementById('branch_edit_form');

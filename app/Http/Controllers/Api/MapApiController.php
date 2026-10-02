@@ -15,12 +15,11 @@ class MapApiController extends Controller
      */
     public function config(): JsonResponse
     {
-        $key = config('services.google_maps.key');
-        
         return response()->json([
-            'google_maps_api_key' => $key,
-            'maps_configured'     => !empty($key),
-            'maps_libraries'      => ['places', 'marker', 'visualization'],
+            'map_engine'          => 'leaflet_osm',
+            'maps_configured'     => true,
+            'tile_layer_url'      => 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            'tile_attribution'    => '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             'risk_pin_colors'     => [
                 'High'   => '#ef4444',
                 'Medium' => '#f59e0b',
@@ -32,7 +31,7 @@ class MapApiController extends Controller
 
     /**
      * GET /api/maps/geocode
-     * Proxies geocoding requests to Google Geocoding API with Nominatim fallback.
+     * Proxies geocoding requests to OpenStreetMap Nominatim.
      */
     public function geocode(Request $request): JsonResponse
     {
@@ -41,47 +40,29 @@ class MapApiController extends Controller
         ]);
 
         $address = $request->input('address');
-        $key = config('services.google_maps.key');
-        
-        if (!empty($key)) {
-            $response = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
-                'address' => $address,
-                'key'     => $key
+
+        try {
+            $nomResponse = Http::withHeaders([
+                'User-Agent' => 'WM-Product-SaaS/1.0 (ERP HRMS)'
+            ])->timeout(8)->get('https://nominatim.openstreetmap.org/search', [
+                'q'              => $address,
+                'format'         => 'json',
+                'addressdetails' => 1,
+                'limit'          => 1
             ]);
 
-            if ($response->successful()) {
-                $data = $response->json();
-                if (($data['status'] ?? '') === 'OK' && !empty($data['results'])) {
-                    $result = $data['results'][0];
-                    $location = $result['geometry']['location'];
-
-                    return response()->json([
-                        'latitude'          => $location['lat'],
-                        'longitude'         => $location['lng'],
-                        'formatted_address' => $result['formatted_address'],
-                        'place_id'          => $result['place_id']
-                    ]);
-                }
+            if ($nomResponse->successful() && !empty($nomResponse->json())) {
+                $first = $nomResponse->json()[0];
+                return response()->json([
+                    'success'           => true,
+                    'latitude'          => (float)$first['lat'],
+                    'longitude'         => (float)$first['lon'],
+                    'formatted_address' => $first['display_name'],
+                    'place_id'          => (string)($first['place_id'] ?? '')
+                ]);
             }
-        }
-
-        // Nominatim Fallback
-        $nomResponse = Http::withHeaders([
-            'User-Agent' => 'WM-Product-SaaS/1.0'
-        ])->get('https://nominatim.openstreetmap.org/search', [
-            'q'      => $address,
-            'format' => 'json',
-            'limit'  => 1
-        ]);
-
-        if ($nomResponse->successful() && !empty($nomResponse->json())) {
-            $first = $nomResponse->json()[0];
-            return response()->json([
-                'latitude'          => (float)$first['lat'],
-                'longitude'         => (float)$first['lon'],
-                'formatted_address' => $first['display_name'],
-                'place_id'          => (string)($first['place_id'] ?? '')
-            ]);
+        } catch (\Exception $e) {
+            // Graceful fallback
         }
 
         return response()->json([
@@ -92,7 +73,7 @@ class MapApiController extends Controller
 
     /**
      * GET /api/maps/autocomplete
-     * Proxies autocomplete requests to Google Places Autocomplete API with Nominatim fallback.
+     * Proxies autocomplete requests to OpenStreetMap Nominatim.
      */
     public function autocomplete(Request $request): JsonResponse
     {
@@ -102,62 +83,45 @@ class MapApiController extends Controller
         ]);
 
         $query = $request->input('query');
-        $key = config('services.google_maps.key');
+        $params = [
+            'q'              => $query,
+            'format'         => 'json',
+            'addressdetails' => 1,
+            'limit'          => 6
+        ];
 
-        if (!empty($key)) {
-            $params = [
-                'input' => $query,
-                'key'   => $key
-            ];
-
-            if ($request->filled('country')) {
-                $params['components'] = 'country:' . $request->input('country');
-            }
-
-            $response = Http::get('https://maps.googleapis.com/maps/api/place/autocomplete/json', $params);
-
-            if ($response->successful()) {
-                $data = $response->json();
-                if (($data['status'] ?? '') === 'OK' && !empty($data['predictions'])) {
-                    $predictions = collect($data['predictions'])->map(function ($p) {
-                        return [
-                            'description' => $p['description'],
-                            'place_id'    => $p['place_id']
-                        ];
-                    });
-
-                    return response()->json([
-                        'predictions' => $predictions
-                    ]);
-                }
-            }
+        if ($request->filled('country')) {
+            $params['countrycodes'] = strtolower($request->input('country'));
         }
 
-        // Nominatim Fallback
-        $nomResponse = Http::withHeaders([
-            'User-Agent' => 'WM-Product-SaaS/1.0'
-        ])->get('https://nominatim.openstreetmap.org/search', [
-            'q'      => $query,
-            'format' => 'json',
-            'limit'  => 5
-        ]);
+        try {
+            $nomResponse = Http::withHeaders([
+                'User-Agent' => 'WM-Product-SaaS/1.0 (ERP HRMS)'
+            ])->timeout(6)->get('https://nominatim.openstreetmap.org/search', $params);
 
-        if ($nomResponse->successful()) {
-            $predictions = collect($nomResponse->json())->map(function ($item) {
-                return [
-                    'description' => $item['display_name'],
-                    'place_id'    => (string)($item['place_id'] ?? ''),
-                    'lat'         => (float)$item['lat'],
-                    'lon'         => (float)$item['lon']
-                ];
-            });
+            if ($nomResponse->successful()) {
+                $predictions = collect($nomResponse->json())->map(function ($item) {
+                    return [
+                        'description'  => $item['display_name'],
+                        'display_name' => $item['display_name'],
+                        'place_id'     => (string)($item['place_id'] ?? ''),
+                        'lat'          => (float)$item['lat'],
+                        'lon'          => (float)$item['lon'],
+                        'lng'          => (float)$item['lon']
+                    ];
+                });
 
-            return response()->json([
-                'predictions' => $predictions
-            ]);
+                return response()->json([
+                    'success'     => true,
+                    'predictions' => $predictions
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Graceful fallback
         }
 
         return response()->json([
+            'success'     => false,
             'predictions' => []
         ]);
     }

@@ -50,7 +50,7 @@ class SalaryStructureController extends Controller
 
         $redirectUrl = route('hrms.salary-structure.index');
         if (!empty($validated['pay_group_id'])) {
-            $redirectUrl .= '?pay_group_id=' . $validated['pay_group_id'] . '&active_tab=structures';
+            $redirectUrl .= '?pay_group_id=' . $validated['pay_group_id'] . '&tab=structures';
         }
 
         return redirect($redirectUrl)->with('success', __('hrms.salary.structure_created_success'));
@@ -73,7 +73,7 @@ class SalaryStructureController extends Controller
 
         $redirectUrl = route('hrms.salary-structure.index');
         if ($salaryStructure->pay_group_id) {
-            $redirectUrl .= '?pay_group_id=' . $salaryStructure->pay_group_id . '&active_tab=structures';
+            $redirectUrl .= '?pay_group_id=' . $salaryStructure->pay_group_id . '&tab=structures';
         }
 
         return redirect($redirectUrl)->with('success', __('hrms.salary.structure_updated_success'));
@@ -88,7 +88,7 @@ class SalaryStructureController extends Controller
 
         $redirectUrl = route('hrms.salary-structure.index');
         if ($payGroupId) {
-            $redirectUrl .= '?pay_group_id=' . $payGroupId . '&active_tab=structures';
+            $redirectUrl .= '?pay_group_id=' . $payGroupId . '&tab=structures';
         }
 
         return redirect($redirectUrl)->with('success', __('hrms.salary.structure_deleted_success'));
@@ -141,8 +141,8 @@ class SalaryStructureController extends Controller
 
         $redirectUrl = route('hrms.salary-structure.index');
         if (!empty($validated['pay_group_id'])) {
-            $tab = $request->input('redirect_tab', $validated['is_adhoc'] ? 'components-adhoc' : 'components-recurring');
-            $redirectUrl .= '?pay_group_id=' . $validated['pay_group_id'] . '&active_tab=' . $tab;
+            $subtab = $validated['is_adhoc'] ? 'adhoc' : 'recurring';
+            $redirectUrl .= '?pay_group_id=' . $validated['pay_group_id'] . '&tab=components&subtab=' . $subtab;
         }
 
         return redirect($redirectUrl)->with('success', __('hrms.salary.component_created_success'));
@@ -173,8 +173,8 @@ class SalaryStructureController extends Controller
 
         $redirectUrl = route('hrms.salary-structure.index');
         if ($salaryComponent->pay_group_id) {
-            $tab = $salaryComponent->is_adhoc ? 'components-adhoc' : 'components-recurring';
-            $redirectUrl .= '?pay_group_id=' . $salaryComponent->pay_group_id . '&active_tab=' . $tab;
+            $subtab = $salaryComponent->is_adhoc ? 'adhoc' : 'recurring';
+            $redirectUrl .= '?pay_group_id=' . $salaryComponent->pay_group_id . '&tab=components&subtab=' . $subtab;
         }
 
         return redirect($redirectUrl)->with('success', __('hrms.salary.component_updated_success'));
@@ -191,8 +191,8 @@ class SalaryStructureController extends Controller
 
         $redirectUrl = route('hrms.salary-structure.index');
         if ($payGroupId) {
-            $tab = $isAdhoc ? 'components-adhoc' : 'components-recurring';
-            $redirectUrl .= '?pay_group_id=' . $payGroupId . '&active_tab=' . $tab;
+            $subtab = $isAdhoc ? 'adhoc' : 'recurring';
+            $redirectUrl .= '?pay_group_id=' . $payGroupId . '&tab=components&subtab=' . $subtab;
         }
 
         return redirect($redirectUrl)->with('success', __('hrms.salary.component_deleted_success'));
@@ -222,7 +222,7 @@ class SalaryStructureController extends Controller
             'status'      => $status,
         ]);
 
-        return redirect()->route('hrms.salary-structure.index')->with('success', 'Pay group created successfully.');
+        return redirect()->route('hrms.salary-structure.index')->with('success', __('hrms.salary.pay_group_created_success'));
     }
 
     public function updatePayGroup(Request $request, PayGroup $payGroup)
@@ -245,19 +245,23 @@ class SalaryStructureController extends Controller
             'status'      => $status,
         ]);
 
-        return redirect()->route('hrms.salary-structure.index')->with('success', 'Pay group updated successfully.');
+        return redirect()->route('hrms.salary-structure.index')->with('success', __('hrms.salary.pay_group_updated_success'));
     }
 
     public function updatePayGroupRules(Request $request, PayGroup $payGroup)
     {
         $this->authorize('update', SalaryStructure::class);
 
-        // Checkboxes return nothing if unchecked, so we merge explicit booleans
+        $rules = $payGroup->payroll_rules ?? [];
+
+        // Checkboxes return nothing if unchecked, so we merge explicit booleans and default fallbacks
         $request->merge([
-            'enable_pf'              => $request->has('enable_pf'),
+            'enable_pf'              => $request->has('enable_pf') ? $request->boolean('enable_pf') : ($rules['enable_pf'] ?? true),
             'restrict_pf_ceiling'    => $request->has('restrict_pf_ceiling'),
-            'enable_esi'             => $request->has('enable_esi'),
+            'pf_wage_ceiling'        => $request->filled('pf_wage_ceiling') ? (float)$request->input('pf_wage_ceiling') : ($rules['pf_wage_ceiling'] ?? 15000.00),
+            'enable_esi'             => $request->has('enable_esi') ? $request->boolean('enable_esi') : ($rules['enable_esi'] ?? true),
             'restrict_esi_threshold' => $request->has('restrict_esi_threshold'),
+            'esi_gross_threshold'    => $request->filled('esi_gross_threshold') ? (float)$request->input('esi_gross_threshold') : ($rules['esi_gross_threshold'] ?? 21000.00),
         ]);
 
         $validated = $request->validate([
@@ -265,10 +269,12 @@ class SalaryStructureController extends Controller
             'lop_splicing_rule'      => 'required|in:proportionate_gross,basic_hra_only',
             'attendance_lock_day'    => 'required|integer|min:1|max:31',
             'variable_lock_day'      => 'required|integer|min:1|max:31',
-            'enable_pf'              => 'required|boolean',
+            'enable_pf'              => 'nullable|boolean',
             'restrict_pf_ceiling'    => 'required|boolean',
-            'enable_esi'             => 'required|boolean',
+            'pf_wage_ceiling'        => 'nullable|numeric|min:0',
+            'enable_esi'             => 'nullable|boolean',
             'restrict_esi_threshold' => 'required|boolean',
+            'esi_gross_threshold'    => 'nullable|numeric|min:0',
         ]);
 
         $payGroup->update([
@@ -278,7 +284,7 @@ class SalaryStructureController extends Controller
         return redirect()->route('hrms.salary-structure.index', [
             'pay_group_id' => $payGroup->id,
             'tab'          => 'rules'
-        ])->with('success', 'Payroll rules updated successfully.');
+        ])->with('success', __('hrms.salary.rules_updated_success'));
     }
 
     public function destroyPayGroup(PayGroup $payGroup)
@@ -287,7 +293,7 @@ class SalaryStructureController extends Controller
 
         $payGroup->delete();
 
-        return redirect()->route('hrms.salary-structure.index')->with('success', 'Pay group deleted successfully.');
+        return redirect()->route('hrms.salary-structure.index')->with('success', __('hrms.salary.pay_group_deleted_success'));
     }
 }
 

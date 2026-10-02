@@ -356,18 +356,18 @@
                                         </div>
  
                                         <!-- Actions Dropdown for Pay Group -->
-                                        <form action="{{ route('hrms.salary-structure.pay-group.destroy', $selectedPayGroup->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_pay_group_confirm') }}', { title: 'Delete Pay Group', variant: 'danger', confirmButtonText: 'Delete' });">
+                                        <form action="{{ route('hrms.salary-structure.pay-group.destroy', $selectedPayGroup->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_pay_group_confirm') }}', { title: '{{ __('hrms.salary.delete') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                             @csrf
                                             @method('DELETE')
                                             <x-ui.action-dropdown>
                                                 <li>
                                                     <a class="dropdown-item edit-pay-group-btn" href="javascript:void(0)" data-pay-group="{{ base64_encode($selectedPayGroup->toJson()) }}">
-                                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.org.edit_pay_group') }}
+                                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.common.edit') }}
                                                     </a>
                                                 </li>
                                                 <li>
                                                     <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.org.delete_pay_group') }}
+                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.common.delete') }}
                                                     </button>
                                                 </li>
                                             </x-ui.action-dropdown>
@@ -394,7 +394,7 @@
                                         </li>
                                         <li class="nav-item" role="presentation">
                                             <button class="nav-link {{ request()->get('tab') === 'rules' ? 'active' : '' }} px-4 py-3" id="rules-tab" data-bs-toggle="tab" data-bs-target="#rules-pane" type="button" role="tab" aria-controls="rules-pane" aria-selected="false">
-                                                <i class="feather-settings me-2"></i>{{ __('Payroll Rules') }}
+                                                <i class="feather-settings me-2"></i>{{ __('hrms.salary.payroll_rules') }}
                                             </button>
                                         </li>
                                     </ul>
@@ -563,7 +563,21 @@
 
             // Automatically activate the correct tab if passed in query string (handles redirects after submit)
             const urlParams = new URLSearchParams(window.location.search);
-            const tabParam = urlParams.get('tab');
+            let tabParam = urlParams.get('tab');
+            let subtabParam = urlParams.get('subtab');
+
+            // Handle legacy active_tab parameter if present
+            const legacyActiveTab = urlParams.get('active_tab');
+            if (!tabParam && legacyActiveTab) {
+                if (legacyActiveTab.startsWith('components')) {
+                    tabParam = 'components';
+                    if (legacyActiveTab.includes('adhoc')) subtabParam = 'adhoc';
+                    if (legacyActiveTab.includes('recurring')) subtabParam = 'recurring';
+                } else {
+                    tabParam = legacyActiveTab;
+                }
+            }
+
             if (tabParam) {
                 const tabButton = document.getElementById(tabParam + '-tab');
                 if (tabButton) {
@@ -571,11 +585,9 @@
                 }
             }
 
-            const subtabParam = urlParams.get('subtab');
             if (subtabParam) {
                 const subtabButton = document.getElementById(subtabParam + '-subtab');
                 if (subtabButton) {
-                    // Slight delay to ensure the parent tab pane is fully shown first
                     setTimeout(() => {
                         subtabButton.click();
                     }, 50);

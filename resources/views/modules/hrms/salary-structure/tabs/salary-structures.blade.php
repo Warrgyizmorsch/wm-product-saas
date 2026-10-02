@@ -167,7 +167,7 @@
                                                 </a>
                                             </li>
                                             <li>
-                                                <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_structure_confirm') }}', { title: 'Delete Salary Structure', variant: 'danger', confirmButtonText: 'Delete' });">
+                                                <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_structure_confirm') }}', { title: '{{ __('hrms.salary.delete') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item text-danger">
@@ -302,64 +302,63 @@
                     <div class="mt-4">
                         <div class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-3">
                             <h6 class="fw-bold mb-0">{{ __('hrms.salary.configure_rules') }}</h6>
-                            <button type="button" class="btn btn-sm btn-outline-primary fw-semibold fs-11 px-2.5 py-1" data-bs-toggle="modal" data-bs-target="#quickAddComponentModal">
-                                <i class="feather-plus me-1"></i>Add Component
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-semibold fs-11 px-2.5 py-1" onclick="addNewComponentRow('add')">
+                                <i class="feather-plus me-1"></i>{{ __('hrms.salary.add_component') }}
                             </button>
                         </div>
-                        <div class="table-responsive border rounded bg-light">
-                            <table class="table table-sm table-hover align-middle mb-0" style="font-size: 13px;">
+                        <div class="border rounded bg-white" style="overflow: visible;">
+                            <table class="table table-sm align-middle mb-0 w-100" style="font-size: 13px; table-layout: fixed;">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>{{ __('hrms.org.component_name') }}</th>
-                                        <th>{{ __('hrms.org.type') }}</th>
-                                        <th>{{ __('hrms.salary.calculation_rule') }}</th>
-                                        <th width="160">{{ __('hrms.salary.rule_value') }}</th>
+                                        <th style="width: 33%;">{{ __('hrms.org.component_name') }}</th>
+                                        <th style="width: 17%;">{{ __('hrms.org.type') }}</th>
+                                        <th style="width: 30%;">{{ __('hrms.salary.calculation_rule') }}</th>
+                                        <th style="width: 20%;" class="text-end pe-3">{{ __('hrms.salary.rule_value') }}</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="add_structure_components_tbody">
                                     @forelse($recurringComponentsForStructure as $comp)
                                         @php
-                                            $cCode = strtoupper($comp->code);
-                                            $cName = strtolower($comp->name);
-                                            
-                                            $isBasic = in_array($cCode, ['BASIC', 'BASIC_PAY']) || \Illuminate\Support\Str::contains($cName, 'basic');
-                                            $isDefaultBalancing = !$isBasic && (
-                                                in_array($cCode, ['OTHER', 'OTHER_ALLOWANCE', 'SA', 'SPECIAL_ALLOWANCE', 'BALANCING']) || 
-                                                \Illuminate\Support\Str::contains($cName, ['other', 'special allowance', 'balancing', 'remainder'])
-                                            );
+                                             $cCode = strtoupper($comp->code);
+                                             $cName = strtolower($comp->name);
+                                             
+                                             $isBasic = in_array($cCode, ['BASIC', 'BASIC_PAY']) || \Illuminate\Support\Str::contains($cName, 'basic');
+                                             $isDefaultBalancing = !$isBasic && (
+                                                 in_array($cCode, ['OTHER', 'OTHER_ALLOWANCE', 'SA', 'SPECIAL_ALLOWANCE', 'BALANCING']) || 
+                                                 \Illuminate\Support\Str::contains($cName, ['other', 'special allowance', 'balancing', 'remainder'])
+                                             );
                                         @endphp
                                         <tr>
-                                            <td>
-                                                <span class="fw-bold">{{ $comp->name }}</span>
-                                                <code class="ms-1">{{ $comp->code }}</code>
+                                            <td style="width: 33%;">
+                                                <span class="fw-bold text-dark">{{ $comp->name }}</span>
+                                                <code class="ms-1 text-muted" style="font-size: 11px;">{{ $comp->code }}</code>
                                             </td>
-                                            <td>
+                                            <td style="width: 17%;">
                                                 @if($comp->type == 'earning')
                                                     <span class="badge bg-soft-success text-success">{{ __('hrms.org.earning') }}</span>
                                                 @else
                                                     <span class="badge bg-soft-warning text-warning">{{ __('hrms.org.deduction') }}</span>
                                                 @endif
                                             </td>
-                                            <td>
-                                                    <x-ui.odoo-form-ui type="select"
-                                                            name="components[{{ $comp->id }}][calculation_type]"
-                                                            class="add-calc-type-select"
-                                                            data-comp-id="{{ $comp->id }}"
-                                                            id="add-calc-type-{{ $comp->id }}"
-                                                            onchange="handleCalcTypeChange('add', {{ $comp->id }})">
-                                                        <option value="not_included" @selected(!$isDefaultBalancing)>{{ __('hrms.salary.not_included') }}</option>
-                                                        <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
-                                                        <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
-                                                        <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
-                                                        <option value="balancing" @selected($isDefaultBalancing)>Auto-calculated (Balancing component)</option>
-                                                    </x-ui.odoo-form-ui>
+                                            <td style="width: 30%; position: relative;">
+                                                <select name="components[{{ $comp->id }}][calculation_type]"
+                                                        class="odoo-table-select add-calc-type-select odoo-select2-table"
+                                                        data-comp-id="{{ $comp->id }}"
+                                                        id="add-calc-type-{{ $comp->id }}"
+                                                        onchange="handleCalcTypeChange('add', {{ $comp->id }})">
+                                                    <option value="not_included" @selected(!$isDefaultBalancing)>{{ __('hrms.salary.not_included') }}</option>
+                                                    <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
+                                                    <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
+                                                    <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
+                                                    <option value="balancing" @selected($isDefaultBalancing)>{{ __('hrms.salary.auto_calculated_balancing') }}</option>
+                                                </select>
                                             </td>
-                                            <td>
+                                            <td style="width: 20%;" class="pe-3">
                                                 <x-ui.odoo-form-ui type="input"
                                                        inputType="number"
                                                        step="0.01"
                                                        name="components[{{ $comp->id }}][value]"
-                                                       class="add-value-input"
+                                                       class="add-value-input text-end"
                                                        id="add-value-{{ $comp->id }}"
                                                        placeholder="0.00"
                                                        :disabled="true" />
@@ -421,54 +420,53 @@
                     <div class="mt-4">
                         <div class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-3">
                             <h6 class="fw-bold mb-0">{{ __('hrms.salary.configure_rules') }}</h6>
-                            <button type="button" class="btn btn-sm btn-outline-primary fw-semibold fs-11 px-2.5 py-1" data-bs-toggle="modal" data-bs-target="#quickAddComponentModal">
-                                <i class="feather-plus me-1"></i>Add Component
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-semibold fs-11 px-2.5 py-1" onclick="addNewComponentRow('edit')">
+                                <i class="feather-plus me-1"></i>{{ __('hrms.salary.add_component') }}
                             </button>
                         </div>
-                        <div class="table-responsive border rounded bg-light">
-                            <table class="table table-sm table-hover align-middle mb-0" style="font-size: 13px;">
+                        <div class="border rounded bg-white" style="overflow: visible;">
+                            <table class="table table-sm align-middle mb-0 w-100" style="font-size: 13px; table-layout: fixed;">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>{{ __('hrms.org.component_name') }}</th>
-                                        <th>{{ __('hrms.org.type') }}</th>
-                                        <th>{{ __('hrms.salary.calculation_rule') }}</th>
-                                        <th width="160">{{ __('hrms.salary.rule_value') }}</th>
+                                        <th style="width: 33%;">{{ __('hrms.org.component_name') }}</th>
+                                        <th style="width: 17%;">{{ __('hrms.org.type') }}</th>
+                                        <th style="width: 30%;">{{ __('hrms.salary.calculation_rule') }}</th>
+                                        <th style="width: 20%;" class="text-end pe-3">{{ __('hrms.salary.rule_value') }}</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="edit_structure_components_tbody">
                                     @foreach($recurringComponentsForStructure as $comp)
                                         <tr>
-                                            <td>
-                                                <span class="fw-bold">{{ $comp->name }}</span>
-                                                <code class="ms-1">{{ $comp->code }}</code>
+                                            <td style="width: 33%;">
+                                                <span class="fw-bold text-dark">{{ $comp->name }}</span>
+                                                <code class="ms-1 text-muted" style="font-size: 11px;">{{ $comp->code }}</code>
                                             </td>
-                                            <td>
+                                            <td style="width: 17%;">
                                                 @if($comp->type == 'earning')
                                                     <span class="badge bg-soft-success text-success">{{ __('hrms.org.earning') }}</span>
                                                 @else
                                                     <span class="badge bg-soft-warning text-warning">{{ __('hrms.org.deduction') }}</span>
                                                 @endif
                                             </td>
-                                            <td>
-                                                    <x-ui.odoo-form-ui type="select"
-                                                            name="components[{{ $comp->id }}][calculation_type]"
-                                                            class="edit-calc-type-select"
-                                                            data-comp-id="{{ $comp->id }}"
-                                                            id="edit-calc-type-{{ $comp->id }}"
-                                                            onchange="handleCalcTypeChange('edit', {{ $comp->id }})">
-                                                        <option value="not_included">{{ __('hrms.salary.not_included') }}</option>
-                                                        <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
-                                                        <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
-                                                        <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
-                                                        <option value="balancing">Auto-calculated (Balancing component)</option>
-                                                    </x-ui.odoo-form-ui>
+                                            <td style="width: 30%; position: relative;">
+                                                <select name="components[{{ $comp->id }}][calculation_type]"
+                                                        class="odoo-table-select edit-calc-type-select odoo-select2-table"
+                                                        data-comp-id="{{ $comp->id }}"
+                                                        id="edit-calc-type-{{ $comp->id }}"
+                                                        onchange="handleCalcTypeChange('edit', {{ $comp->id }})">
+                                                    <option value="not_included">{{ __('hrms.salary.not_included') }}</option>
+                                                    <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
+                                                    <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
+                                                    <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
+                                                    <option value="balancing">{{ __('hrms.salary.auto_calculated_balancing') }}</option>
+                                                </select>
                                             </td>
-                                            <td>
+                                            <td style="width: 20%;" class="pe-3">
                                                 <x-ui.odoo-form-ui type="input"
                                                        inputType="number"
                                                        step="0.01"
                                                        name="components[{{ $comp->id }}][value]"
-                                                       class="edit-value-input"
+                                                       class="edit-value-input text-end"
                                                        id="edit-value-{{ $comp->id }}"
                                                        placeholder="0.00"
                                                        :disabled="true" />
@@ -490,9 +488,14 @@
 </div>
 
 <!-- CTC CALCULATOR DRAWER -->
-<x-ui.drawer id="ctcCalculatorDrawer" title="{{ __('hrms.salary.ctc_calculator_simulator') }}" position="end" :close-on-outside-click="true" style="width: 540px; max-width: 100%;">
+<x-ui.drawer id="ctcCalculatorDrawer" title="{{ __('hrms.salary.ctc_calculator_simulator') }}" position="end" :close-on-outside-click="true" style="width: 580px; max-width: 100%;">
+    <style>
+        #ctcCalculatorDrawer .offcanvas-body {
+            overflow-x: hidden !important;
+        }
+    </style>
     <div class="mb-4">
-        <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('hrms.salary.yearly_ctc') }}" name="sim_ctc" id="sim_ctc" placeholder="e.g. 600000" onkeyup="calculateSimulator()" onchange="calculateSimulator()" />
+        <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('hrms.salary.yearly_ctc') }}" name="sim_ctc" id="sim_ctc" placeholder="e.g. 600000" oninput="calculateSimulator()" onkeyup="calculateSimulator()" onchange="calculateSimulator()" />
         <small class="text-muted d-block mt-1" style="margin-left: 170px;">{{ __('hrms.salary.simulator_help') }}</small>
     </div>
 
@@ -504,14 +507,20 @@
             <span id="sim-slab-name" class="badge bg-soft-primary text-primary px-3 py-1 fw-bold fs-12"></span>
         </div>
 
-        <div class="table-responsive border rounded bg-white">
-            <table class="table table-sm table-hover mb-0 align-middle" style="font-size: 13px;">
+        <div class="border rounded bg-white overflow-hidden">
+            <table class="table table-sm table-hover mb-0 align-middle w-100" style="font-size: 13px; table-layout: fixed;">
+                <colgroup>
+                    <col style="width: 38%;">
+                    <col style="width: 18%;">
+                    <col style="width: 22%;">
+                    <col style="width: 22%;">
+                </colgroup>
                 <thead class="table-light">
                     <tr>
-                        <th>{{ __('hrms.salary.component') }}</th>
-                        <th>{{ __('hrms.org.type') }}</th>
-                        <th class="text-end">{{ __('hrms.salary.monthly') }}</th>
-                        <th class="text-end">{{ __('hrms.salary.yearly') }}</th>
+                        <th class="ps-3 py-2 text-start">{{ __('hrms.salary.component') }}</th>
+                        <th class="py-2 text-start">{{ __('hrms.org.type') }}</th>
+                        <th class="py-2 text-end">{{ __('hrms.salary.monthly') }}</th>
+                        <th class="pe-3 py-2 text-end">{{ __('hrms.salary.yearly') }}</th>
                     </tr>
                 </thead>
                 <tbody id="sim-results-body">
@@ -524,40 +533,6 @@
         <x-ui.button variant="light" data-bs-dismiss="offcanvas">{{ __('hrms.salary.close_panel') }}</x-ui.button>
     </x-slot>
 </x-ui.drawer>
-
-<!-- QUICK ADD COMPONENT MODAL -->
-<x-ui.modal id="quickAddComponentModal" title="<i class='feather-plus-circle text-primary me-2'></i>Add New Salary Component" size="md" :centered="true" :showFooter="false">
-    <form id="quickAddComponentForm" action="{{ route('hrms.salary-structure.store') }}" method="POST">
-        @csrf
-        <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
-        <input type="hidden" name="redirect_tab" value="structures">
-        <input type="hidden" name="is_adhoc" value="0">
-        <input type="hidden" name="status" value="1">
-        
-        <div class="mb-3">
-            <x-ui.modal-form-ui type="input" label="Component Name" name="name" placeholder="e.g. Special Allowance" :required="true" />
-        </div>
-        <div class="row g-3 mb-3">
-            <div class="col-md-6">
-                <x-ui.modal-form-ui type="input" label="Component Code" name="code" placeholder="e.g. SA" :required="true" />
-            </div>
-            <div class="col-md-6">
-                <x-ui.modal-form-ui type="select" label="Component Type" name="type" :required="true">
-                    <option value="earning">Earning (+)</option>
-                    <option value="deduction">Deduction (-)</option>
-                </x-ui.modal-form-ui>
-            </div>
-        </div>
-        <div class="mb-3">
-            <x-ui.modal-form-ui type="input" label="Description" name="description" placeholder="Brief component description" />
-        </div>
-
-        <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top">
-            <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-primary px-4 fw-bold"><i class="feather-check-circle me-1"></i> Create Component</button>
-        </div>
-    </form>
-</x-ui.modal>
 
 @push('scripts')
 <script>
@@ -576,86 +551,128 @@
         }
     }
 
-    // Handle Quick Add Component form submission via AJAX (keeps parent Salary Structure modal open)
-    $(document).on('submit', '#quickAddComponentForm', function(e) {
-        e.preventDefault();
-        let form = $(this);
-        let submitBtn = form.find('button[type="submit"]');
-        let originalBtnText = submitBtn.html();
-        submitBtn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i> Creating...');
+    let inlineComponentCounter = 0;
 
-        $.ajax({
-            url: form.attr('action'),
-            method: 'POST',
-            data: form.serialize(),
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            success: function(response) {
-                submitBtn.prop('disabled', false).html(originalBtnText);
-                if (response.success) {
-                    $('#quickAddComponentModal').modal('hide');
-                    form[0].reset();
-
-                    if (response.component) {
-                        let c = response.component;
-                        let isEarning = c.type === 'earning';
-                        let badgeClass = isEarning ? 'bg-soft-success text-success' : 'bg-soft-warning text-warning';
-                        let badgeLabel = isEarning ? '{{ __("hrms.org.earning") }}' : '{{ __("hrms.org.deduction") }}';
-
-                        let newRowHtml = `
-                            <tr>
-                                <td>
-                                    <span class="fw-bold">${c.name}</span>
-                                    <code class="ms-1">${c.code}</code>
-                                </td>
-                                <td>
-                                    <span class="badge ${badgeClass}">${badgeLabel}</span>
-                                </td>
-                                <td>
-                                    <select name="components[${c.id}][calculation_type]" 
-                                            class="form-select form-select-sm add-calc-type-select" 
-                                            data-comp-id="${c.id}" 
-                                            id="add-calc-type-${c.id}" 
-                                            onchange="handleCalcTypeChange('add', ${c.id})">
-                                        <option value="not_included">{{ __("hrms.salary.not_included") }}</option>
-                                        <option value="fixed">{{ __("hrms.salary.fixed_amount") }}</option>
-                                        <option value="percentage_of_ctc">{{ __("hrms.salary.percentage_of_ctc") }}</option>
-                                        <option value="percentage_of_basic">{{ __("hrms.salary.percentage_of_basic") }}</option>
-                                        <option value="balancing">Auto-calculated (Balancing component)</option>
-                                    </select>
-                                </td>
-                                <td>
-                                    <input type="number" step="0.01" 
-                                           name="components[${c.id}][value]" 
-                                           class="form-control form-control-sm add-value-input" 
-                                           id="add-value-${c.id}" 
-                                           placeholder="0.00" disabled>
-                                </td>
-                            </tr>
-                        `;
-
-                        $('#addSalaryStructureModal tbody tr:has(td[colspan]), #editSalaryStructureModal tbody tr:has(td[colspan])').remove();
-                        $('#addSalaryStructureModal tbody, #editSalaryStructureModal tbody').append(newRowHtml);
-                    }
-
-                    if (typeof toastr !== 'undefined') {
-                        toastr.success(response.message || 'Component created successfully!');
-                    }
-                }
-            },
-            error: function(xhr) {
-                submitBtn.prop('disabled', false).html(originalBtnText);
-                let errorMsg = 'Error creating component.';
-                if (xhr.responseJSON && xhr.responseJSON.errors) {
-                    errorMsg = Object.values(xhr.responseJSON.errors).flat().join('\n');
-                } else if (xhr.responseJSON && xhr.responseJSON.message) {
-                    errorMsg = xhr.responseJSON.message;
-                }
-                alert(errorMsg);
+    // Initialize Select2 dropdowns bound directly to their parent table cells
+    function initTableSelect2($container) {
+        if (!$.fn.select2) return;
+        $container.find('select.odoo-select2-table').each(function() {
+            var $el = $(this);
+            if ($el.data('select2')) {
+                $el.select2('destroy');
             }
+            $el.select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                minimumResultsForSearch: Infinity,
+                dropdownParent: $el.parent()
+            });
         });
-    });
+    }
+
+    // Dynamically appends an editable new component row directly inside the structure table
+    function addNewComponentRow(modalPrefix) {
+        inlineComponentCounter++;
+        const rowId = 'new_' + inlineComponentCounter;
+        const tbodyId = modalPrefix === 'add' ? '#add_structure_components_tbody' : '#edit_structure_components_tbody';
+        const tbody = $(tbodyId);
+
+        // Remove empty state placeholder row if present
+        tbody.find('tr:has(td[colspan])').remove();
+
+        const newRowHtml = `
+            <tr class="inline-component-row border-bottom" id="${modalPrefix}-row-${rowId}" style="background-color: #fbfcfe;">
+                <td style="width: 33%;">
+                    <div class="d-flex flex-column">
+                        <input type="text" 
+                               name="components[${rowId}][name]" 
+                               class="odoo-table-input fw-semibold" 
+                               placeholder="e.g. Special Allowance" 
+                               required 
+                               oninput="autoGenerateComponentCode(this, '${modalPrefix}', '${rowId}')">
+                        <div class="d-flex align-items-center gap-1 mt-1">
+                            <span class="text-muted" style="font-size: 10px; font-weight: 600;">CODE:</span>
+                            <input type="text" 
+                                   name="components[${rowId}][code]" 
+                                   id="${modalPrefix}-code-${rowId}" 
+                                   class="odoo-table-input text-uppercase py-0 px-1" 
+                                   style="width: 80px; font-size: 11px; height: 18px;" 
+                                   placeholder="CODE" 
+                                   required 
+                                   onchange="this.dataset.manuallyEdited='true'">
+                        </div>
+                    </div>
+                </td>
+                <td style="width: 17%; position: relative;">
+                    <select name="components[${rowId}][type]" 
+                            id="${modalPrefix}-type-${rowId}" 
+                            class="odoo-table-select odoo-select2-table fw-medium">
+                        <option value="earning">{{ __("hrms.org.earning") }} (+)</option>
+                        <option value="deduction">{{ __("hrms.org.deduction") }} (-)</option>
+                    </select>
+                </td>
+                <td style="width: 30%; position: relative;">
+                    <select name="components[${rowId}][calculation_type]" 
+                            class="odoo-table-select odoo-select2-table ${modalPrefix}-calc-type-select" 
+                            data-comp-id="${rowId}" 
+                            id="${modalPrefix}-calc-type-${rowId}" 
+                            onchange="handleCalcTypeChange('${modalPrefix}', '${rowId}')">
+                        <option value="fixed">{{ __("hrms.salary.fixed_amount") }}</option>
+                        <option value="percentage_of_ctc">{{ __("hrms.salary.percentage_of_ctc") }}</option>
+                        <option value="percentage_of_basic">{{ __("hrms.salary.percentage_of_basic") }}</option>
+                        <option value="balancing">{{ __("hrms.salary.auto_calculated_balancing") }}</option>
+                        <option value="not_included">{{ __("hrms.salary.not_included") }}</option>
+                    </select>
+                </td>
+                <td style="width: 20%;" class="pe-3">
+                    <div class="d-flex align-items-center justify-content-end gap-1">
+                        <input type="number" 
+                               step="0.01" 
+                               name="components[${rowId}][value]" 
+                               class="odoo-table-input text-end ${modalPrefix}-value-input" 
+                               id="${modalPrefix}-value-${rowId}" 
+                               placeholder="0.00" 
+                               style="width: 75px;" 
+                               required>
+                        <button type="button" 
+                                class="btn btn-icon btn-sm btn-soft-danger rounded-circle" 
+                                title="{{ __('hrms.salary.remove_component') }}" 
+                                style="width: 26px; height: 26px; min-width: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center;"
+                                onclick="$(this).closest('tr').remove();">
+                            <i class="feather-trash-2 fs-12"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        tbody.append(newRowHtml);
+        // Initialize Select2 on the newly added row
+        initTableSelect2($(`#${modalPrefix}-row-${rowId}`));
+        // Focus the component name input immediately
+        $(`#${modalPrefix}-row-${rowId} input[name="components[${rowId}][name]"]`).focus();
+    }
+
+    // Auto-generates a clean uppercase alphanumeric code from the component name unless manually edited
+    function autoGenerateComponentCode(nameInput, modalPrefix, rowId) {
+        const codeInput = document.getElementById(`${modalPrefix}-code-${rowId}`);
+        if (!codeInput || codeInput.dataset.manuallyEdited === 'true') return;
+
+        const val = nameInput.value.trim();
+        if (!val) {
+            codeInput.value = '';
+            return;
+        }
+        const cleaned = val.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+        const words = cleaned.split(/\s+/);
+        let code = '';
+        if (words.length > 1) {
+            code = words.map(w => w[0]).join('').toUpperCase();
+        } else {
+            code = cleaned.substring(0, 6).toUpperCase();
+        }
+        codeInput.value = code;
+    }
 
     // Enable/disable rule value fields depending on the selected calculation type
     function handleCalcTypeChange(prefix, compId) {
@@ -672,8 +689,35 @@
 
     // Modal populate edit scripts & detail toggles
     $(document).ready(function() {
-        // Load initial simulator values
-        calculateSimulator();
+        // Setup CTC calculator drawer events
+        $('#ctcCalculatorDrawer').on('shown.bs.offcanvas', function () {
+            $('#sim_ctc').trigger('focus');
+            if ($('#sim_ctc').val() && $('#sim_ctc').val().trim() !== '') {
+                calculateSimulator();
+            }
+        });
+
+        $(document).on('input keyup change', '#sim_ctc', function() {
+            calculateSimulator();
+        });
+
+        // Initialize Select2 for modal table selects when modal is shown
+        $('#addSalaryStructureModal').on('shown.bs.modal', function() {
+            initTableSelect2($(this));
+        });
+        $('#editSalaryStructureModal').on('shown.bs.modal', function() {
+            initTableSelect2($(this));
+        });
+
+        // Ensure calculation type change enables/disables the value input
+        $(document).on('change', '.add-calc-type-select', function() {
+            let compId = $(this).data('comp-id');
+            if (compId !== undefined) handleCalcTypeChange('add', compId);
+        });
+        $(document).on('change', '.edit-calc-type-select', function() {
+            let compId = $(this).data('comp-id');
+            if (compId !== undefined) handleCalcTypeChange('edit', compId);
+        });
 
         // Toggle structure components details row
         $(document).on('click', '.toggle-structure-details', function(e) {
@@ -699,6 +743,11 @@
         $(document).on('click', '.add-structure-trigger', function() {
             let pgId = $(this).attr('data-pay-group-id');
             $('#add_structure_pay_group_id').val(pgId);
+            // Clean up any dynamic rows from previous add modal sessions
+            $('#add_structure_components_tbody .inline-component-row').remove();
+            // Reset existing selects
+            $('.add-calc-type-select').val('not_included').trigger('change');
+            $('.add-value-input').val('').prop('disabled', true);
         });
 
         // Use robust event delegation for the edit handler
@@ -735,8 +784,11 @@
             $('#edit_max_ctc').val(max_ctc);
             $('#edit_status').val(status);
 
+            // Clean up any dynamic rows from previous edit sessions
+            $('#edit_structure_components_tbody .inline-component-row').remove();
+
             // Reset all selects to not_included and disable inputs
-            $('.edit-calc-type-select').val('not_included');
+            $('.edit-calc-type-select').val('not_included').trigger('change');
             $('.edit-value-input').val('').prop('disabled', true);
 
             // Populate rules from items database
@@ -745,7 +797,7 @@
                     let select = $(`#edit-calc-type-${item.salary_component_id}`);
                     let input = $(`#edit-value-${item.salary_component_id}`);
                     
-                    select.val(item.calculation_type);
+                    select.val(item.calculation_type).trigger('change');
                     if (item.calculation_type !== 'not_included' && item.calculation_type !== 'balancing') {
                         input.val(parseFloat(item.value)).prop('disabled', false);
                     }
@@ -869,21 +921,33 @@
 
     // Real-time client-side calculator
     function calculateSimulator() {
-        let ctc = parseFloat($('#sim_ctc').val());
-        if (isNaN(ctc) || ctc < 0) {
-            $('#sim-error-msg').text('{{ __('hrms.salary.enter_valid_ctc') }}').show();
+        let rawVal = $('#sim_ctc').val();
+        if (rawVal === undefined || rawVal === null || rawVal.trim() === '') {
+            $('#sim-error-msg').hide();
+            $('#sim-results-card').hide();
+            return;
+        }
+
+        let ctc = parseFloat(rawVal);
+        if (isNaN(ctc) || ctc <= 0) {
+            $('#sim-error-msg').html('<i class="feather-alert-circle me-2"></i>{{ __('hrms.salary.enter_valid_ctc') }}').show();
             $('#sim-results-card').hide();
             return;
         }
 
         let structures = @json($allStructuresForSimulator ?? collect());
+        if (!Array.isArray(structures)) {
+            structures = Object.values(structures);
+        }
+
         let matched = null;
 
         // Loop through structures and check matching min_ctc <= CTC <= max_ctc
         for (let s of structures) {
-            let min = parseFloat(s.min_ctc);
-            let max = parseFloat(s.max_ctc);
-            if (ctc >= min && ctc <= max && s.status) {
+            let min = parseFloat(s.min_ctc) || 0;
+            let max = parseFloat(s.max_ctc) || 0;
+            let isActive = s.status == 1 || s.status === true || s.status === '1';
+            if (ctc >= min && ctc <= max && isActive) {
                 matched = s;
                 break;
             }
@@ -902,52 +966,77 @@
         let rows = [];
 
         // Sort items by evaluation sort_order
-        let items = matched.items.slice().sort((a, b) => a.sort_order - b.sort_order);
+        let items = (matched.items || []).slice().sort((a, b) => (parseInt(a.sort_order) || 0) - (parseInt(b.sort_order) || 0));
 
-        // First pass: Calculate all non-balancing items
+        // 1. Calculate Basic first if exists and is not balancing
         for (let item of items) {
-            if (item.calculation_type === 'balancing') continue;
+            if (item.calculation_type === 'balancing' || item.calculation_type === 'not_included') continue;
+            let code = item.component ? (item.component.code || '').toLowerCase() : '';
+            let name = item.component ? (item.component.name || '').toLowerCase() : '';
+            if (code === 'basic' || name === 'basic' || name === 'basic salary') {
+                let itemVal = parseFloat(item.value) || 0;
+                if (item.calculation_type === 'fixed') {
+                    basicYearly = itemVal;
+                } else if (item.calculation_type === 'percentage_of_ctc') {
+                    basicYearly = (itemVal / 100) * ctc;
+                }
+                break;
+            }
+        }
+
+        // 2. First pass: Calculate all non-balancing, included items
+        for (let item of items) {
+            if (item.calculation_type === 'balancing' || item.calculation_type === 'not_included') continue;
 
             let valYearly = 0;
             let ruleText = '';
+            let itemVal = parseFloat(item.value) || 0;
 
             if (item.calculation_type === 'fixed') {
-                valYearly = parseFloat(item.value);
+                valYearly = itemVal;
                 ruleText = `{{ __('hrms.salary.fixed_amount') }}: ₹${valYearly.toLocaleString('en-IN')}`;
             } else if (item.calculation_type === 'percentage_of_ctc') {
-                valYearly = (parseFloat(item.value) / 100) * ctc;
-                ruleText = `${parseFloat(item.value)}% {{ __('hrms.salary.of_ctc') }}`;
+                valYearly = (itemVal / 100) * ctc;
+                ruleText = `${itemVal}% {{ __('hrms.salary.of_ctc') }}`;
             } else if (item.calculation_type === 'percentage_of_basic') {
-                valYearly = (parseFloat(item.value) / 100) * basicYearly;
-                ruleText = `${parseFloat(item.value)}% {{ __('hrms.salary.of_basic') }}`;
+                valYearly = (itemVal / 100) * basicYearly;
+                ruleText = `${itemVal}% {{ __('hrms.salary.of_basic') }}`;
             }
 
-            if (item.component.code.toLowerCase() === 'basic') {
+            let compName = item.component ? item.component.name : ('Component #' + item.salary_component_id);
+            let compCode = item.component ? item.component.code : '';
+            let compType = item.component ? item.component.type : 'earning';
+
+            if (compCode && compCode.toLowerCase() === 'basic') {
                 basicYearly = valYearly;
             }
 
             totalAllocatedYearly += valYearly;
 
             rows.push({
-                name: item.component.name,
-                code: item.component.code,
-                type: item.component.type,
+                name: compName,
+                code: compCode,
+                type: compType,
                 rule: ruleText,
                 yearly: valYearly,
                 monthly: valYearly / 12
             });
         }
 
-        // Second pass: Calculate balancing item
+        // 3. Second pass: Calculate balancing item
         for (let item of items) {
-            if (item.calculation_type !== 'balancing') continue;
+            if (item.calculation_type !== 'balancing' && item.calculation_type !== 'not_included') continue;
+            if (item.calculation_type === 'not_included') continue;
 
             let valYearly = Math.max(0, ctc - totalAllocatedYearly);
+            let compName = item.component ? item.component.name : ('Component #' + item.salary_component_id);
+            let compCode = item.component ? item.component.code : '';
+            let compType = item.component ? item.component.type : 'earning';
 
             rows.push({
-                name: item.component.name,
-                code: item.component.code,
-                type: item.component.type,
+                name: compName,
+                code: compCode,
+                type: compType,
                 rule: '{{ __('hrms.salary.remaining_balance') }}',
                 yearly: valYearly,
                 monthly: valYearly / 12
@@ -957,39 +1046,35 @@
         // Render rows
         let tbody = $('#sim-results-body');
         tbody.empty();
-        let totalYearly = 0;
-        let totalMonthly = 0;
 
-        rows.forEach((r, idx) => {
+        rows.forEach((r) => {
             let typeBadge = r.type === 'earning' 
                 ? '<span class="badge bg-soft-success text-success">{{ __('hrms.org.earning') }}</span>' 
                 : '<span class="badge bg-soft-danger text-danger">{{ __('hrms.org.deduction') }}</span>';
 
             tbody.append(`
                 <tr>
-                    <td>
-                        <div class="fw-bold">${r.name}</div>
-                        <code style="font-size: 11px;">${r.code}</code>
+                    <td class="ps-3 py-2">
+                        <div class="fw-bold text-dark text-truncate" title="${r.name}">${r.name}</div>
+                        ${r.code ? `<code style="font-size: 11px;">${r.code}</code>` : ''}
                     </td>
-                    <td>${typeBadge}</td>
-                    <td class="text-end fw-semibold">₹${(r.monthly).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                    <td class="text-end fw-semibold">₹${(r.yearly).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="py-2">${typeBadge}</td>
+                    <td class="py-2 text-end fw-semibold text-dark">₹${(r.monthly).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="pe-3 py-2 text-end fw-semibold text-dark">₹${(r.yearly).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 </tr>
             `);
-
-            totalYearly += r.yearly;
-            totalMonthly += r.monthly;
         });
 
-        // Gross Salary is equal to the total Cost to Company (CTC) before employee deductions
-        let grossYearly = totalYearly;
-        let grossMonthly = totalMonthly;
-        
+        let grossYearly = 0;
+        let grossMonthly = 0;
         let deductionsYearly = 0;
         let deductionsMonthly = 0;
 
         rows.forEach(r => {
-            if (r.type === 'deduction') {
+            if (r.type === 'earning') {
+                grossYearly += r.yearly;
+                grossMonthly += r.monthly;
+            } else if (r.type === 'deduction') {
                 deductionsYearly += r.yearly;
                 deductionsMonthly += r.monthly;
             }
@@ -1001,19 +1086,19 @@
         // Add summary rows
         tbody.append(`
             <tr class="table-light fw-bold border-top">
-                <td colspan="2">{{ __('hrms.salary.gross_salary_ctc') }}</td>
-                <td class="text-end text-success">₹${grossMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td class="text-end text-success">₹${grossYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td colspan="2" class="ps-3 py-2 text-dark">{{ __('hrms.salary.gross_salary_ctc') }}</td>
+                <td class="py-2 text-end text-success">₹${grossMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="pe-3 py-2 text-end text-success">₹${grossYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
             <tr class="table-light fw-bold">
-                <td colspan="2">{{ __('hrms.salary.total_deductions') }}</td>
-                <td class="text-end text-danger">₹${deductionsMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td class="text-end text-danger">₹${deductionsYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td colspan="2" class="ps-3 py-2 text-dark">{{ __('hrms.salary.total_deductions') }}</td>
+                <td class="py-2 text-end text-danger">₹${deductionsMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="pe-3 py-2 text-end text-danger">₹${deductionsYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
             <tr class="fw-bold border-top border-bottom" style="background-color: rgba(30, 64, 175, 0.08) !important;">
-                <td colspan="2"><span class="text-primary">{{ __('hrms.salary.net_salary') }}</span></td>
-                <td class="text-end text-primary">₹${netMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td class="text-end text-primary">₹${netYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td colspan="2" class="ps-3 py-2"><span class="text-primary">{{ __('hrms.salary.net_salary') }}</span></td>
+                <td class="py-2 text-end text-primary">₹${netMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="pe-3 py-2 text-end text-primary">₹${netYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
         `);
 

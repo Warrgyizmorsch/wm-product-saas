@@ -6,12 +6,8 @@
 
 @push('styles')
 @once
-<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
-<style>
-    .pac-container {
-        z-index: 9999 !important;
-    }
-</style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 @endonce
 @endpush
 
@@ -1038,25 +1034,27 @@ const runWfhReqSetup = () => {
             };
 
             const renderResults = (results) => {
-                currentResults = results;
+                currentResults = Array.isArray(results) ? results : [];
                 dropdown.innerHTML = '';
                 selectedIndex = -1;
                 updateDropdownPosition();
 
-                if (!results || results.length === 0) {
+                if (!currentResults || currentResults.length === 0) {
                     dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">No locations found</div>';
                     dropdown.style.display = 'block';
                     return;
                 }
 
-                results.forEach((item, index) => {
+                currentResults.forEach((item, index) => {
+                    const name = item.display_name || item.description || '';
+                    const mainName = name.split(',')[0] || name;
                     const div = document.createElement('div');
                     div.className = 'p-2 border-bottom cursor-pointer nominatim-item text-truncate d-flex align-items-center gap-2';
                     div.style.cssText = 'cursor: pointer; transition: background 0.15s ease; border-color: #f1f5f9 !important; background: #ffffff; text-align: left;';
                     div.innerHTML = `<i class="feather-map-pin text-primary flex-shrink-0" style="font-size: 12px;"></i>
                                      <div class="text-truncate">
-                                         <div class="fw-semibold text-dark text-truncate" style="font-size: 11px;">${escapeHtml(item.display_name.split(',')[0])}</div>
-                                         <div class="text-muted fs-10 text-truncate">${escapeHtml(item.display_name)}</div>
+                                         <div class="fw-semibold text-dark text-truncate" style="font-size: 11px;">${escapeHtml(mainName)}</div>
+                                         <div class="text-muted fs-10 text-truncate">${escapeHtml(name)}</div>
                                      </div>`;
 
                     div.addEventListener('mouseenter', () => { highlightItem(index); });
@@ -1081,13 +1079,14 @@ const runWfhReqSetup = () => {
             const selectItem = (index) => {
                 if (index >= 0 && index < currentResults.length) {
                     const item = currentResults[index];
-                    inputEl.value = item.display_name;
+                    const displayName = item.display_name || item.description || '';
+                    inputEl.value = displayName;
                     closeDropdown();
                     if (typeof onSelectCallback === 'function') {
                         onSelectCallback({
                             lat: parseFloat(item.lat),
-                            lng: parseFloat(item.lon),
-                            formatted_address: item.display_name
+                            lng: parseFloat(item.lon || item.lng),
+                            formatted_address: displayName
                         });
                     }
                 }
@@ -1102,12 +1101,23 @@ const runWfhReqSetup = () => {
                 }
 
                 debounceTimer = setTimeout(() => {
-                    fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                    fetch('/api/maps/autocomplete?query=' + encodeURIComponent(query))
                         .then(res => res.json())
-                        .then(data => renderResults(data))
-                        .catch(err => {
-                            console.error('Nominatim search error:', err);
-                            closeDropdown();
+                        .then(data => {
+                            if (data && data.success && Array.isArray(data.predictions) && data.predictions.length > 0) {
+                                renderResults(data.predictions);
+                            } else {
+                                fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                                    .then(res => res.json())
+                                    .then(osmData => renderResults(osmData))
+                                    .catch(() => closeDropdown());
+                            }
+                        })
+                        .catch(() => {
+                            fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                                .then(res => res.json())
+                                .then(osmData => renderResults(osmData))
+                                .catch(() => closeDropdown());
                         });
                 }, 300);
             });
@@ -1142,7 +1152,7 @@ const runWfhReqSetup = () => {
     let reqWfhMarker = null;
 
     const initWfhReqMapPicker = () => {
-        if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+        if (typeof L === 'undefined') {
             setTimeout(initWfhReqMapPicker, 100);
             return;
         }
@@ -1151,44 +1161,43 @@ const runWfhReqSetup = () => {
         const latInput = $('#wfh_req_latitude');
         const lngInput = $('#wfh_req_longitude');
         
-        if (!document.getElementById(mapContainerId)) return;
+        const mapContainer = document.getElementById(mapContainerId);
+        if (!mapContainer) return;
 
         let initialLat = parseFloat(latInput.val()) || 28.6139; // Default center
         let initialLng = parseFloat(lngInput.val()) || 77.2090;
-        const initialPos = { lat: initialLat, lng: initialLng };
         
         if (reqWfhMap) {
-            google.maps.event.trigger(reqWfhMap, 'resize');
-            reqWfhMap.setCenter(initialPos);
+            reqWfhMap.invalidateSize();
+            reqWfhMap.setView([initialLat, initialLng], reqWfhMap.getZoom() || 13);
+            if (reqWfhMarker) {
+                reqWfhMarker.setLatLng([initialLat, initialLng]);
+            }
             return;
         }
 
-        reqWfhMap = new google.maps.Map(document.getElementById(mapContainerId), {
-            center: initialPos,
-            zoom: 13,
-            mapTypeControl: false,
-            fullscreenControl: false,
-            streetViewControl: false
-        });
+        reqWfhMap = L.map(mapContainerId).setView([initialLat, initialLng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(reqWfhMap);
 
-        reqWfhMarker = new google.maps.Marker({
-            position: initialPos,
-            map: reqWfhMap,
+        reqWfhMarker = L.marker([initialLat, initialLng], {
             draggable: true
-        });
+        }).addTo(reqWfhMap);
 
         // Update inputs on marker drag
-        reqWfhMarker.addListener('dragend', function() {
-            const position = reqWfhMarker.getPosition();
-            latInput.val(position.lat().toFixed(8));
-            lngInput.val(position.lng().toFixed(8));
+        reqWfhMarker.on('dragend', function(e) {
+            const position = e.target.getLatLng();
+            latInput.val(position.lat.toFixed(8));
+            lngInput.val(position.lng.toFixed(8));
         });
 
         // Update marker and inputs on map click
-        reqWfhMap.addListener('click', function(e) {
-            reqWfhMarker.setPosition(e.latLng);
-            latInput.val(e.latLng.lat().toFixed(8));
-            lngInput.val(e.latLng.lng().toFixed(8));
+        reqWfhMap.on('click', function(e) {
+            reqWfhMarker.setLatLng(e.latlng);
+            latInput.val(e.latlng.lat.toFixed(8));
+            lngInput.val(e.latlng.lng.toFixed(8));
         });
 
         // Update map when inputs change manually
@@ -1196,9 +1205,8 @@ const runWfhReqSetup = () => {
             const lat = parseFloat(latInput.val());
             const lng = parseFloat(lngInput.val());
             if (!isNaN(lat) && !isNaN(lng)) {
-                const latlng = { lat: lat, lng: lng };
-                reqWfhMarker.setPosition(latlng);
-                reqWfhMap.setCenter(latlng);
+                reqWfhMarker.setLatLng([lat, lng]);
+                reqWfhMap.setView([lat, lng], reqWfhMap.getZoom() || 14);
             }
         };
 
@@ -1209,13 +1217,13 @@ const runWfhReqSetup = () => {
         const searchInputEl = document.getElementById('wfh_req_map_search');
         if (searchInputEl && window.initNominatimAutocomplete) {
             window.initNominatimAutocomplete(searchInputEl, function(place) {
-                const pos = { lat: place.lat, lng: place.lng };
-                reqWfhMap.setCenter(pos);
-                reqWfhMap.setZoom(15);
-                reqWfhMarker.setPosition(pos);
+                const lat = parseFloat(place.lat);
+                const lng = parseFloat(place.lng);
+                reqWfhMap.setView([lat, lng], 15);
+                reqWfhMarker.setLatLng([lat, lng]);
 
-                latInput.val(place.lat.toFixed(8));
-                lngInput.val(place.lng.toFixed(8));
+                latInput.val(lat.toFixed(8));
+                lngInput.val(lng.toFixed(8));
             });
 
             // Prevent form submission when pressing enter on search box
@@ -1296,11 +1304,9 @@ const runWfhReqSetup = () => {
                     $('#wfh_req_latitude').val(lat.toFixed(8));
                     $('#wfh_req_longitude').val(lng.toFixed(8));
                     
-                    const latlng = { lat: lat, lng: lng };
                     if (reqWfhMap && reqWfhMarker) {
-                        reqWfhMarker.setPosition(latlng);
-                        reqWfhMap.setCenter(latlng);
-                        reqWfhMap.setZoom(15);
+                        reqWfhMarker.setLatLng([lat, lng]);
+                        reqWfhMap.setView([lat, lng], 15);
                     } else {
                         // Auto-open map to show detected location
                         const mapWrap = document.getElementById('wfh_req_map_wrap');
@@ -1308,9 +1314,8 @@ const runWfhReqSetup = () => {
                             window.toggleWfhReqMap();
                             setTimeout(() => {
                                 if (reqWfhMap && reqWfhMarker) {
-                                    reqWfhMarker.setPosition(latlng);
-                                    reqWfhMap.setCenter(latlng);
-                                    reqWfhMap.setZoom(15);
+                                    reqWfhMarker.setLatLng([lat, lng]);
+                                    reqWfhMap.setView([lat, lng], 15);
                                 }
                             }, 600);
                         }

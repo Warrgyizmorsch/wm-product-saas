@@ -419,8 +419,10 @@ class SalaryStructureApiController extends Controller
             $request->merge([
                 'enable_pf'              => $request->exists('enable_pf') ? filter_var($request->input('enable_pf'), FILTER_VALIDATE_BOOLEAN) : ($rules['enable_pf'] ?? true),
                 'restrict_pf_ceiling'    => $request->exists('restrict_pf_ceiling') ? filter_var($request->input('restrict_pf_ceiling'), FILTER_VALIDATE_BOOLEAN) : ($rules['restrict_pf_ceiling'] ?? true),
+                'pf_wage_ceiling'        => $request->filled('pf_wage_ceiling') ? (float)$request->input('pf_wage_ceiling') : ($rules['pf_wage_ceiling'] ?? 15000.00),
                 'enable_esi'             => $request->exists('enable_esi') ? filter_var($request->input('enable_esi'), FILTER_VALIDATE_BOOLEAN) : ($rules['enable_esi'] ?? true),
                 'restrict_esi_threshold' => $request->exists('restrict_esi_threshold') ? filter_var($request->input('restrict_esi_threshold'), FILTER_VALIDATE_BOOLEAN) : ($rules['restrict_esi_threshold'] ?? true),
+                'esi_gross_threshold'    => $request->filled('esi_gross_threshold') ? (float)$request->input('esi_gross_threshold') : ($rules['esi_gross_threshold'] ?? 21000.00),
             ]);
 
             $validator = Validator::make($request->all(), [
@@ -428,10 +430,12 @@ class SalaryStructureApiController extends Controller
                 'lop_splicing_rule'      => 'required|in:proportionate_gross,basic_hra_only',
                 'attendance_lock_day'    => 'required|integer|min:1|max:31',
                 'variable_lock_day'      => 'required|integer|min:1|max:31',
-                'enable_pf'              => 'required|boolean',
+                'enable_pf'              => 'nullable|boolean',
                 'restrict_pf_ceiling'    => 'required|boolean',
-                'enable_esi'             => 'required|boolean',
+                'pf_wage_ceiling'        => 'nullable|numeric|min:0',
+                'enable_esi'             => 'nullable|boolean',
                 'restrict_esi_threshold' => 'required|boolean',
+                'esi_gross_threshold'    => 'nullable|numeric|min:0',
             ]);
 
             if ($validator->fails()) {
@@ -827,8 +831,13 @@ class SalaryStructureApiController extends Controller
                             $value = 0.00;
                         }
 
+                        $realComponentId = $this->resolveComponentId($componentId, $componentData, $companyId, $payGroupId);
+                        if (!$realComponentId) {
+                            continue;
+                        }
+
                         $sortOrder = 2;
-                        $comp = SalaryComponent::find($componentId);
+                        $comp = SalaryComponent::find($realComponentId);
                         if ($comp) {
                             if (strtolower($comp->code) === 'basic') {
                                 $sortOrder = 1;
@@ -841,7 +850,7 @@ class SalaryStructureApiController extends Controller
 
                         SalaryStructureItem::create([
                             'salary_structure_id' => $structure->id,
-                            'salary_component_id' => $componentId,
+                            'salary_component_id' => $realComponentId,
                             'calculation_type'   => $calcType,
                             'value'              => $value,
                             'sort_order'         => $sortOrder,
@@ -952,8 +961,13 @@ class SalaryStructureApiController extends Controller
                             $value = 0.00;
                         }
 
+                        $realComponentId = $this->resolveComponentId($componentId, $componentData, $companyId, $payGroupId);
+                        if (!$realComponentId) {
+                            continue;
+                        }
+
                         $sortOrder = 2;
-                        $comp = SalaryComponent::find($componentId);
+                        $comp = SalaryComponent::find($realComponentId);
                         if ($comp) {
                             if (strtolower($comp->code) === 'basic') {
                                 $sortOrder = 1;
@@ -966,7 +980,7 @@ class SalaryStructureApiController extends Controller
 
                         SalaryStructureItem::create([
                             'salary_structure_id' => $model->id,
-                            'salary_component_id' => $componentId,
+                            'salary_component_id' => $realComponentId,
                             'calculation_type'   => $calcType,
                             'value'              => $value,
                             'sort_order'         => $sortOrder,
@@ -1006,5 +1020,41 @@ class SalaryStructureApiController extends Controller
         } catch (Throwable $e) {
             return $this->sendError('Failed to delete structure: ' . $e->getMessage(), 500);
         }
+    }
+
+    protected function resolveComponentId(mixed $componentId, array $itemData, ?int $companyId, ?int $payGroupId): ?int
+    {
+        if (is_numeric($componentId) && (int)$componentId > 0) {
+            return (int)$componentId;
+        }
+
+        if (!empty($itemData['name'])) {
+            $code = !empty($itemData['code']) 
+                ? strtoupper(trim($itemData['code'])) 
+                : strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $itemData['name']), 0, 8));
+
+            $existing = SalaryComponent::where('company_id', $companyId)
+                ->where('code', $code)
+                ->first();
+
+            if ($existing) {
+                return $existing->id;
+            }
+
+            $newComponent = SalaryComponent::create([
+                'company_id'       => $companyId ?? (Company::first()?->id ?? 1),
+                'pay_group_id'     => $payGroupId,
+                'name'             => trim($itemData['name']),
+                'code'             => $code,
+                'type'             => in_array($itemData['type'] ?? '', ['earning', 'deduction']) ? $itemData['type'] : 'earning',
+                'calculation_type' => in_array($itemData['calculation_type'] ?? '', ['fixed', 'percentage_of_basic', 'percentage_of_ctc', 'balancing']) ? $itemData['calculation_type'] : 'fixed',
+                'is_adhoc'         => false,
+                'status'           => true,
+            ]);
+
+            return $newComponent->id;
+        }
+
+        return null;
     }
 }

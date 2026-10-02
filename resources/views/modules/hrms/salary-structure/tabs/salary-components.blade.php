@@ -152,7 +152,7 @@
                                         @endif
                                     </td>
                                     <td class="text-end">
-                                        <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.destroy', ['salaryComponent' => $sc->id]) : route('hrms.salary-component.destroy', ['salaryComponent' => $sc->id]) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_component_confirm') }}', { title: 'Delete Salary Component', variant: 'danger', confirmButtonText: 'Delete' });">
+                                        <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.destroy', ['salaryComponent' => $sc->id]) : route('hrms.salary-component.destroy', ['salaryComponent' => $sc->id]) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_component_confirm') }}', { title: '{{ __('hrms.salary.delete') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                             @csrf
                                             @method('DELETE')
                                             <x-ui.action-dropdown>
@@ -314,7 +314,7 @@
                                         @endif
                                     </td>
                                     <td class="text-end">
-                                        <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.destroy', ['salaryComponent' => $sc->id]) : route('hrms.salary-component.destroy', ['salaryComponent' => $sc->id]) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_component_confirm') }}', { title: 'Delete Salary Component', variant: 'danger', confirmButtonText: 'Delete' });">
+                                        <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.destroy', ['salaryComponent' => $sc->id]) : route('hrms.salary-component.destroy', ['salaryComponent' => $sc->id]) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_component_confirm') }}', { title: '{{ __('hrms.salary.delete') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                             @csrf
                                             @method('DELETE')
                                             <x-ui.action-dropdown>

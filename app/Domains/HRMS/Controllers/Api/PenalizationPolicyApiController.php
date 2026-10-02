@@ -52,7 +52,8 @@ class PenalizationPolicyApiController extends Controller
 
         return $user->hasHrPermission('hr.settings.manage')
             || $user->hasHrPermission('hr.attendance.manage')
-            || $user->hasHrPermission('hrms.penalties.manage');
+            || $user->hasHrPermission('hrms.penalties.manage')
+            || $user->hasHrPermission('hrms.penalization_policies.manage');
     }
 
     /**

@@ -22,7 +22,8 @@
     $isEmployeeSelfService = $isEmployeeSelfService ?? !$isHrOrAdmin;
 @endphp
 @once
-<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 @endonce
 
 <div class="employee-form-container">
@@ -638,7 +639,7 @@ const runEmployeeFormSetup = () => {
                     const leftPos = inputEl.offsetLeft;
                     const widthPos = inputEl.offsetWidth;
 
-                    dropdown.style.cssText = `position: absolute; top: ${topPos}px; left: ${leftPos}px; width: ${widthPos}px; max-height: 160px; overflow-y: auto; z-index: 99999; display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important; background: #ffffff; border-radius: 6px;`;
+                    dropdown.style.cssText = `position: absolute; top: ${topPos}px; left: ${leftPos}px; width: ${widthPos}px; max-height: 200px; overflow-y: auto; z-index: 99999; display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important; background: #ffffff; border-radius: 6px;`;
                 };
 
                 let debounceTimer = null;
@@ -658,25 +659,27 @@ const runEmployeeFormSetup = () => {
                 };
 
                 const renderResults = (results) => {
-                    currentResults = results;
+                    currentResults = Array.isArray(results) ? results : [];
                     dropdown.innerHTML = '';
                     selectedIndex = -1;
                     updateDropdownPosition();
 
-                    if (!results || results.length === 0) {
+                    if (!currentResults || currentResults.length === 0) {
                         dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">No locations found</div>';
                         dropdown.style.display = 'block';
                         return;
                     }
 
-                    results.forEach((item, index) => {
+                    currentResults.forEach((item, index) => {
+                        const name = item.display_name || item.description || '';
+                        const mainName = name.split(',')[0] || name;
                         const div = document.createElement('div');
                         div.className = 'p-2 border-bottom cursor-pointer nominatim-item text-truncate d-flex align-items-center gap-2';
                         div.style.cssText = 'cursor: pointer; transition: background 0.15s ease; border-color: #f1f5f9 !important; background: #ffffff; text-align: left;';
                         div.innerHTML = `<i class="feather-map-pin text-primary flex-shrink-0" style="font-size: 12px;"></i>
                                          <div class="text-truncate">
-                                             <div class="fw-semibold text-dark text-truncate" style="font-size: 11px;">${escapeHtml(item.display_name.split(',')[0])}</div>
-                                             <div class="text-muted fs-10 text-truncate">${escapeHtml(item.display_name)}</div>
+                                             <div class="fw-semibold text-dark text-truncate" style="font-size: 11px;">${escapeHtml(mainName)}</div>
+                                             <div class="text-muted fs-10 text-truncate">${escapeHtml(name)}</div>
                                          </div>`;
 
                         div.addEventListener('mouseenter', () => { highlightItem(index); });
@@ -701,13 +704,14 @@ const runEmployeeFormSetup = () => {
                 const selectItem = (index) => {
                     if (index >= 0 && index < currentResults.length) {
                         const item = currentResults[index];
-                        inputEl.value = item.display_name;
+                        const displayName = item.display_name || item.description || '';
+                        inputEl.value = displayName;
                         closeDropdown();
                         if (typeof onSelectCallback === 'function') {
                             onSelectCallback({
                                 lat: parseFloat(item.lat),
-                                lng: parseFloat(item.lon),
-                                formatted_address: item.display_name
+                                lng: parseFloat(item.lon || item.lng),
+                                formatted_address: displayName
                             });
                         }
                     }
@@ -722,12 +726,23 @@ const runEmployeeFormSetup = () => {
                     }
 
                     debounceTimer = setTimeout(() => {
-                        fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                        fetch('/api/maps/autocomplete?query=' + encodeURIComponent(query))
                             .then(res => res.json())
-                            .then(data => renderResults(data))
-                            .catch(err => {
-                                console.error('Nominatim search error:', err);
-                                closeDropdown();
+                            .then(data => {
+                                if (data && data.success && Array.isArray(data.predictions) && data.predictions.length > 0) {
+                                    renderResults(data.predictions);
+                                } else {
+                                    fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                                        .then(res => res.json())
+                                        .then(osmData => renderResults(osmData))
+                                        .catch(() => closeDropdown());
+                                }
+                            })
+                            .catch(() => {
+                                fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                                    .then(res => res.json())
+                                    .then(osmData => renderResults(osmData))
+                                    .catch(() => closeDropdown());
                             });
                     }, 300);
                 });
@@ -763,7 +778,7 @@ const runEmployeeFormSetup = () => {
         let wfhMarker = null;
 
         const initWfhMapPicker = () => {
-            if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+            if (typeof L === 'undefined') {
                 setTimeout(initWfhMapPicker, 100);
                 return;
             }
@@ -772,44 +787,43 @@ const runEmployeeFormSetup = () => {
             const latInput = $('#' + prefix + '_wfh_latitude');
             const lngInput = $('#' + prefix + '_wfh_longitude');
             
-            if (!document.getElementById(mapContainerId)) return;
+            const mapContainer = document.getElementById(mapContainerId);
+            if (!mapContainer) return;
 
             let initialLat = parseFloat(latInput.val()) || 28.6139; // Default to New Delhi or a sensible center
             let initialLng = parseFloat(lngInput.val()) || 77.2090;
-            const initialPos = { lat: initialLat, lng: initialLng };
             
             if (wfhMap) {
-                google.maps.event.trigger(wfhMap, 'resize');
-                wfhMap.setCenter(initialPos);
+                wfhMap.invalidateSize();
+                wfhMap.setView([initialLat, initialLng], wfhMap.getZoom() || 13);
+                if (wfhMarker) {
+                    wfhMarker.setLatLng([initialLat, initialLng]);
+                }
                 return;
             }
 
-            wfhMap = new google.maps.Map(document.getElementById(mapContainerId), {
-                center: initialPos,
-                zoom: 13,
-                mapTypeControl: false,
-                fullscreenControl: false,
-                streetViewControl: false
-            });
+            wfhMap = L.map(mapContainerId).setView([initialLat, initialLng], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(wfhMap);
 
-            wfhMarker = new google.maps.Marker({
-                position: initialPos,
-                map: wfhMap,
+            wfhMarker = L.marker([initialLat, initialLng], {
                 draggable: true
-            });
+            }).addTo(wfhMap);
 
             // Update inputs on marker drag
-            wfhMarker.addListener('dragend', function() {
-                const position = wfhMarker.getPosition();
-                latInput.val(position.lat().toFixed(8));
-                lngInput.val(position.lng().toFixed(8));
+            wfhMarker.on('dragend', function(e) {
+                const position = e.target.getLatLng();
+                latInput.val(position.lat.toFixed(8));
+                lngInput.val(position.lng.toFixed(8));
             });
 
             // Update marker and inputs on map click
-            wfhMap.addListener('click', function(e) {
-                wfhMarker.setPosition(e.latLng);
-                latInput.val(e.latLng.lat().toFixed(8));
-                lngInput.val(e.latLng.lng().toFixed(8));
+            wfhMap.on('click', function(e) {
+                wfhMarker.setLatLng(e.latlng);
+                latInput.val(e.latlng.lat.toFixed(8));
+                lngInput.val(e.latlng.lng.toFixed(8));
             });
 
             // Update map when inputs change manually
@@ -817,9 +831,8 @@ const runEmployeeFormSetup = () => {
                 const lat = parseFloat(latInput.val());
                 const lng = parseFloat(lngInput.val());
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    const latlng = { lat: lat, lng: lng };
-                    wfhMarker.setPosition(latlng);
-                    wfhMap.setCenter(latlng);
+                    wfhMarker.setLatLng([lat, lng]);
+                    wfhMap.setView([lat, lng], wfhMap.getZoom() || 14);
                 }
             };
 
@@ -830,13 +843,13 @@ const runEmployeeFormSetup = () => {
             const searchInputEl = document.getElementById(prefix + '_wfh_map_search');
             if (searchInputEl && window.initNominatimAutocomplete) {
                 window.initNominatimAutocomplete(searchInputEl, function(place) {
-                    const pos = { lat: place.lat, lng: place.lng };
-                    wfhMap.setCenter(pos);
-                    wfhMap.setZoom(15);
-                    wfhMarker.setPosition(pos);
+                    const lat = parseFloat(place.lat);
+                    const lng = parseFloat(place.lng);
+                    wfhMap.setView([lat, lng], 15);
+                    wfhMarker.setLatLng([lat, lng]);
 
-                    latInput.val(place.lat.toFixed(8));
-                    lngInput.val(place.lng.toFixed(8));
+                    latInput.val(lat.toFixed(8));
+                    lngInput.val(lng.toFixed(8));
                 });
 
                 // Prevent form submission when pressing enter on search box
@@ -893,11 +906,9 @@ const runEmployeeFormSetup = () => {
                     $('#' + prefix + '_wfh_latitude').val(lat.toFixed(8));
                     $('#' + prefix + '_wfh_longitude').val(lng.toFixed(8));
                     
-                    const latlng = { lat: lat, lng: lng };
                     if (wfhMap && wfhMarker) {
-                        wfhMarker.setPosition(latlng);
-                        wfhMap.setCenter(latlng);
-                        wfhMap.setZoom(15);
+                        wfhMarker.setLatLng([lat, lng]);
+                        wfhMap.setView([lat, lng], 15);
                     } else {
                         // If map isn't open yet, auto-open it so user sees the detected location
                         const mapWrap = document.getElementById(prefix + '_wfh_map_wrap');
@@ -905,9 +916,8 @@ const runEmployeeFormSetup = () => {
                             window['toggleWfhMapPicker_' + prefix]();
                             setTimeout(() => {
                                 if (wfhMap && wfhMarker) {
-                                    wfhMarker.setPosition(latlng);
-                                    wfhMap.setCenter(latlng);
-                                    wfhMap.setZoom(15);
+                                    wfhMarker.setLatLng([lat, lng]);
+                                    wfhMap.setView([lat, lng], 15);
                                 }
                             }, 600);
                         }
