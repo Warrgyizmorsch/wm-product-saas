@@ -68,7 +68,7 @@
                 <th>{{ __('projects.due_date') ?: 'Planned Due' }}</th>
                 <th>{{ __('projects.actual_completion') ?: 'Actual Finish' }}</th>
                 <th class="text-center">{{ __('projects.schedule_slippage') ?: 'Slippage' }}</th>
-                <th class="text-end">{{ __('projects.planned_cost') ?: 'Planned Cost ($)' }}</th>
+                <th class="text-end">{{ __('projects.planned_cost') ?: 'Planned Cost' }} ({{ active_currency_symbol() }})</th>
                 <th class="text-center pe-3">{{ __('projects.completion_percent') ?: 'Progress' }}</th>
             </tr>
         </thead>
@@ -100,7 +100,7 @@
                             <span class="badge bg-soft-success text-success fs-11">0d</span>
                         @endif
                     </td>
-                    <td class="text-end fw-semibold">${{ number_format((float) ($m->planned_cost ?? 0), 2) }}</td>
+                    <td class="text-end fw-semibold">{{ format_currency($m->planned_cost ?? 0) }}</td>
                     <td class="text-center pe-3">
                         <span class="badge bg-soft-info text-info">{{ $m->completion_percentage ?? 0 }}%</span>
                     </td>

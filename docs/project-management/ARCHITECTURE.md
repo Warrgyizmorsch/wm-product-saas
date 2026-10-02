@@ -195,6 +195,8 @@ Future coding agents must reuse established shared components rather than creati
 | **Accounting / GL** | [`App\Domains\Accounting`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Domains/Accounting) | Handled automatically through standard Sales Invoice auto-posting. |
 | **Notifications** | Laravel native database channel on `User` | Use the `Notifiable` trait. Do NOT install separate packages. |
 | **Inline Editing** | [`HandlesInlineFieldUpdates`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Support/InlineEdit/HandlesInlineFieldUpdates.php) | Use standard inline-edit schema and `x-ui.inline-edit` Blade component. |
+| **Dynamic Currency** | `format_currency()`, `active_currency_symbol()`, `window.AppCurrency` | Reuses ERP Production currency engine. Never hardcode currency codes or symbols. |
+| **Approval UX** | Production alert banners & action buttons | Reuses standard alert wrappers (`bg-soft-warning`, `bg-soft-info`) and role-based signoff CTAs. |
 
 ---
 

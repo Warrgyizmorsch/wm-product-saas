@@ -106,8 +106,8 @@
                     <span class="badge bg-soft-success text-success fs-11 fw-bold">{{ $kpis->cost_consumption_percent ?? 0 }}%</span>
                 </div>
                 <div class="d-flex align-items-baseline gap-2 mb-2">
-                    <span class="fs-24 fw-bold text-dark">${{ number_format($kpis->total_incurred_cost, 2) }}</span>
-                    <span class="fs-12 text-muted">/ ${{ number_format($kpis->total_budget_amount, 2) }}</span>
+                    <span class="fs-24 fw-bold text-dark">{{ format_currency($kpis->total_incurred_cost) }}</span>
+                    <span class="fs-12 text-muted">/ {{ format_currency($kpis->total_budget_amount) }}</span>
                 </div>
                 <div class="progress" style="height: 6px;">
                     <div class="progress-bar {{ ($kpis->cost_consumption_percent ?? 0) > 100 ? 'bg-danger' : (($kpis->cost_consumption_percent ?? 0) > 85 ? 'bg-warning' : 'bg-success') }}"
@@ -156,7 +156,7 @@
                     </div>
                 </div>
                 <div class="fs-11 text-muted">
-                    {{ __('projects.unbilled_approved') ?: 'Unbilled Approved' }}: <strong class="text-dark">{{ number_format($kpis->unbilled_approved_hours, 1) }}h (${{ number_format($kpis->unbilled_amount, 2) }})</strong>
+                    {{ __('projects.unbilled_approved') ?: 'Unbilled Approved' }}: <strong class="text-dark">{{ number_format($kpis->unbilled_approved_hours, 1) }}h ({{ format_currency($kpis->unbilled_amount) }})</strong>
                 </div>
             </x-ui.card>
         </div>

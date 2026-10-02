@@ -111,7 +111,7 @@ flowchart LR
      ```bash
      php artisan test --filter=Project
      ```
-   - All 133 existing tests must continue to pass.
+   - All 230 existing tests must continue to pass.
    - Write new test cases covering all new business rules, edge cases, and authorization checks.
 5. **MANUAL E2E VALIDATION:**
    - Validate UI flows via browser subagent or local HTTP checks.
@@ -124,7 +124,11 @@ flowchart LR
 ## 6. Testing Rules
 
 - **Zero Regression Tolerance:**
-  - The Project Management suite currently passes 133 tests with 393 assertions. A pull request or agent run that breaks any of these tests is invalid.
+  - The Project Management suite currently passes 230 tests with 3,117 assertions. A pull request or agent run that breaks any of these tests is invalid.
+- **Dynamic Tenant Currency Convention:**
+  - Never hardcode currency symbols (`$`, `₹`, `USD`). Always use `format_currency($amount)` for amounts and `active_currency_symbol()` for column headers/labels, matching the Production module.
+- **Approval UX Standard:**
+  - Pending approval states must render standardized localized alert banners (`alert alert-warning border-warning bg-soft-warning` / `alert alert-info border-info bg-soft-info`) with role-gated sign-off action buttons matching Production BOM/Routing conventions.
 - **Coverage Requirement for New Features:**
   - Every new Service method must have unit test coverage.
   - Every new route/controller endpoint must have feature test coverage testing:

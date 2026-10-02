@@ -276,13 +276,10 @@ erDiagram
 
 ---
 
-## 2. Target Future Data Structures
+## 2. Additional Implemented Data Structures (Phases 3–8)
 
-> [!IMPORTANT]
-> The following schemas represent requirements-driven target specifications.
-> Exact column types and indexes will be finalized during their respective implementation phases.
-
-
+> [!NOTE]
+> All entities below have been fully migrated, implemented, and verified in active code. Zero additional migrations are planned or required.
 
 ### 2.2 `project_issues` (Defect & Issue Management)
 - **Purpose:** Tracks project bugs, quality defects, and resolutions with retest verification.
@@ -332,7 +329,7 @@ erDiagram
 
 ### 2.4 `project_reviews` (Client Review / UAT)
 - **Purpose:** Captures formal client acceptance testing sign-offs and rework directives.
-- **Entity Model:** [`App\Domains\Projects\Models\ProjectReview`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Domains/Projects/Models/ProjectReview.php)
+- **Entity Model:** [`App\Domains\Projects\Models\ProjectReview`](file:///c:/Users/windo\Documents\GitHub\wm-product-saas\app\Domains\Projects\Models\ProjectReview.php)
 - **Primary Key:** `id` (bigint unsigned)
 - **Tenant Ownership:** `tenant_id`, `company_id`, `branch_id`
 - **Foreign Keys:**
@@ -356,7 +353,7 @@ erDiagram
 
 ### 2.5 `project_change_requests` (Scope & Budget Adjustments)
 - **Purpose:** Governs formal additions or alterations to project scope, budget, or timelines.
-- **Entity Model:** [`App\Domains\Projects\Models\ChangeRequest`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Domains/Projects/Models/ChangeRequest.php)
+- **Entity Model:** [`App\Domains\Projects\Models\ChangeRequest`](file:///c:/Users/windo\Documents\GitHub\wm-product-saas\app\Domains\Projects\Models\ChangeRequest.php)
 - **Primary Key:** `id` (bigint unsigned)
 - **Tenant Ownership:** `tenant_id`, `company_id`, `branch_id`
 - **Foreign Keys:**
@@ -388,18 +385,18 @@ erDiagram
 ### 2.6 Project Billing Bridge (Sales Invoicing)
 - **Architecture Standard:** **DO NOT create a separate `project_invoices` table.**
 - **Implementation Strategy:**
-  - Reuse [`App\Domains\Sales\Models\Invoice`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Domains/Sales/Models/Invoice.php).
-  - Add nullable `project_id` foreign key to `invoices` (or create a polymorphic link `invoiceable`).
-  - Bridge table/lines: Invoice line items link back to `project_time_logs` (for T&M billing) or `project_milestones` (for milestone billing).
-- **Status:** **TO BE DESIGNED & IMPLEMENTED IN PHASE 7**
+  - Reuses [`App\Domains\Sales\Models\Invoice`](file:///c:/Users/windo\Documents\GitHub\wm-product-saas\app\Domains\Sales\Models\Invoice.php).
+  - Uses `invoices.project_id` link and `project_time_logs.invoice_id` foreign key.
+  - Billing calculates approved unbilled time logs and completed milestones, generating standard Sales Invoices with dynamic tenant currency formatting.
+- **Status:** **COMPLETED & VERIFIED (PHASE 7)**
 
 ---
 
 ### 2.7 Project Closure Columns on `projects`
 - **Purpose:** Supports formal operational project closeout.
-- **Additive Migration on `projects` Table:**
+- **Implemented Columns on `projects` Table:**
   - `closure_date`: date, nullable
   - `closure_status`: string, nullable (`Completed`, `Terminated`, `Handed Over`)
   - `client_approval_ref`: string, nullable (reference to approved UAT sign-off)
   - `final_remarks`: text, nullable
-- **Status:** **TO BE DESIGNED & IMPLEMENTED IN PHASE 8**
+- **Status:** **COMPLETED & VERIFIED (PHASE 8)**

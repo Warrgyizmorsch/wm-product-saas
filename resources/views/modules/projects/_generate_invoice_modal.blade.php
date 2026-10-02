@@ -46,7 +46,7 @@
                     @else
                         @foreach ($serviceProducts as $prod)
                             <option value="{{ $prod->id }}" @selected((int) old('service_product_id') === $prod->id)>
-                                {{ $prod->name }} ({{ $prod->sku }}) — Rate: ₹{{ number_format((float)$prod->selling_price, 2) }}
+                                {{ $prod->name }} ({{ $prod->sku }}) — Rate: {{ format_currency($prod->selling_price) }}
                             </option>
                         @endforeach
                     @endif
@@ -95,8 +95,8 @@
                                 <th>{{ __('projects.member') }}</th>
                                 <th>{{ __('projects.date') }}</th>
                                 <th class="text-end">{{ __('projects.hours') }}</th>
-                                <th class="text-end">{{ __('projects.rate') }}</th>
-                                <th class="text-end pe-3">{{ __('projects.amount') }}</th>
+                                <th class="text-end">{{ __('projects.rate') }} ({{ active_currency_symbol() }})</th>
+                                <th class="text-end pe-3">{{ __('projects.amount') }} ({{ active_currency_symbol() }})</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -113,8 +113,8 @@
                                     <td>{{ $log->user?->name ?? '—' }}</td>
                                     <td>{{ $log->log_date ? $log->log_date->format('d/m/Y') : '—' }}</td>
                                     <td class="text-end">{{ number_format((float)$log->hours, 2) }}</td>
-                                    <td class="text-end">₹{{ number_format((float)($log->hourly_rate ?? 0), 2) }}</td>
-                                    <td class="text-end pe-3 fw-bold">₹{{ number_format($amount, 2) }}</td>
+                                    <td class="text-end">{{ format_currency($log->hourly_rate ?? 0) }}</td>
+                                    <td class="text-end pe-3 fw-bold">{{ format_currency($amount) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -152,7 +152,7 @@
                                 </th>
                                 <th>{{ __('projects.milestone') }}</th>
                                 <th>{{ __('projects.description') }}</th>
-                                <th class="text-end pe-3">{{ __('projects.billing_amount') }}</th>
+                                <th class="text-end pe-3">{{ __('projects.billing_amount') }} ({{ active_currency_symbol() }})</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -164,7 +164,7 @@
                                     </td>
                                     <td class="fw-semibold text-dark">{{ $ms->name }}</td>
                                     <td class="text-muted">{{ Str::limit($ms->description ?? '—', 50) }}</td>
-                                    <td class="text-end pe-3 fw-bold text-primary">₹{{ number_format((float)$ms->billing_amount, 2) }}</td>
+                                    <td class="text-end pe-3 fw-bold text-primary">{{ format_currency($ms->billing_amount) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -181,7 +181,7 @@
             </div>
             <div class="text-end">
                 <span class="text-muted fs-12 d-block">{{ __('projects.estimated_subtotal') }}</span>
-                <span class="fw-bold fs-16 text-primary" id="txtSelectedSubtotal">₹0.00</span>
+                <span class="fw-bold fs-16 text-primary" id="txtSelectedSubtotal">{{ format_currency(0) }}</span>
             </div>
         </div>
 
@@ -232,7 +232,11 @@ document.addEventListener('DOMContentLoaded', function () {
             txtCount.textContent = template.replace(':count', count);
         }
         if (txtSubtotal) {
-            txtSubtotal.textContent = '₹' + subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (window.AppCurrency && typeof window.AppCurrency.format === 'function') {
+                txtSubtotal.textContent = window.AppCurrency.format(subtotal);
+            } else {
+                txtSubtotal.textContent = @json(active_currency_symbol()) + subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
         }
         if (btnSubmit) {
             btnSubmit.disabled = (count === 0);

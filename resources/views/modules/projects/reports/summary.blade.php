@@ -98,7 +98,7 @@
                 <th>{{ __('projects.priority') ?: 'Priority' }}</th>
                 <th>{{ __('projects.start_date') ?: 'Start' }}</th>
                 <th>{{ __('projects.end_date') ?: 'End' }}</th>
-                <th class="text-end">{{ __('projects.budget_amount') ?: 'Budget ($)' }}</th>
+                <th class="text-end">{{ __('projects.budget_amount') ?: 'Budget' }} ({{ active_currency_symbol() }})</th>
                 <th class="text-end">{{ __('projects.budget_hours') ?: 'Budget (h)' }}</th>
                 <th class="text-center pe-3">{{ __('projects.progress') ?: 'Progress' }}</th>
             </tr>
@@ -129,7 +129,7 @@
                     </td>
                     <td>{{ $p->start_date?->format('d M Y') ?? '—' }}</td>
                     <td>{{ $p->end_date?->format('d M Y') ?? '—' }}</td>
-                    <td class="text-end fw-semibold">${{ number_format((float) ($p->budget_amount ?? 0), 2) }}</td>
+                    <td class="text-end fw-semibold">{{ format_currency($p->budget_amount ?? 0) }}</td>
                     <td class="text-end">{{ number_format((float) ($p->budget_hours ?? 0), 1) }}h</td>
                     <td class="text-center pe-3">
                         <div class="d-flex align-items-center justify-content-center gap-1">

@@ -39,7 +39,7 @@ class ProjectReportExport implements FromCollection, ShouldAutoSize, WithEvents,
         return match ($this->reportType) {
             'summary' => [
                 'Project Code', 'Project Name', 'Client', 'Owner', 'Status', 'Priority',
-                'Start Date', 'End Date', 'Budget Amount', 'Budget Hours', 'Progress %',
+                'Start Date', 'End Date', 'Budget Amount (' . active_currency_symbol() . ')', 'Budget Hours', 'Progress %',
             ],
             'task-status' => [
                 'Task #', 'Title', 'Project', 'Milestone', 'Assignee', 'Priority',
@@ -51,7 +51,7 @@ class ProjectReportExport implements FromCollection, ShouldAutoSize, WithEvents,
             ],
             'timesheet-billability' => [
                 'Date', 'Member', 'Project Code', 'Project Name', 'Task', 'Hours Logged',
-                'Billable', 'Hourly Rate', 'Billable Amount', 'Approval Status', 'Invoiced',
+                'Billable', 'Hourly Rate (' . active_currency_symbol() . ')', 'Billable Amount (' . active_currency_symbol() . ')', 'Approval Status', 'Invoiced',
             ],
             'issue-defect-density' => [
                 'Issue #', 'Title', 'Project Code', 'Project Name', 'Task', 'Severity',
@@ -59,11 +59,11 @@ class ProjectReportExport implements FromCollection, ShouldAutoSize, WithEvents,
             ],
             'milestone-variance' => [
                 'Milestone Name', 'Project Code', 'Project Name', 'Status', 'Start Date',
-                'Planned Due Date', 'Actual Completion Date', 'Schedule Slippage (Days)', 'Planned Cost', 'Completion %',
+                'Planned Due Date', 'Actual Completion Date', 'Schedule Slippage (Days)', 'Planned Cost (' . active_currency_symbol() . ')', 'Completion %',
             ],
             'budget-cost' => [
-                'Project Code', 'Project Name', 'Client', 'Status', 'Base Budget ($)',
-                'Approved CRs ($)', 'Revised Budget ($)', 'Actual Cost ($)', 'Cost Variance ($)',
+                'Project Code', 'Project Name', 'Client', 'Status', 'Base Budget (' . active_currency_symbol() . ')',
+                'Approved CRs (' . active_currency_symbol() . ')', 'Revised Budget (' . active_currency_symbol() . ')', 'Actual Cost (' . active_currency_symbol() . ')', 'Cost Variance (' . active_currency_symbol() . ')',
                 'Base Hours', 'Approved CR Hours', 'Revised Hours', 'Actual Hours', 'Hours Variance',
             ],
             default => ['Column 1', 'Column 2'],

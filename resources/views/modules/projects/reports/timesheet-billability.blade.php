@@ -97,8 +97,8 @@
                 <th>{{ __('projects.task') ?: 'Task' }}</th>
                 <th class="text-end">{{ __('projects.hours') ?: 'Hours' }}</th>
                 <th class="text-center">{{ __('projects.billable') ?: 'Billable' }}</th>
-                <th class="text-end">{{ __('projects.hourly_rate') ?: 'Rate ($)' }}</th>
-                <th class="text-end">{{ __('projects.billable_amount') ?: 'Amount ($)' }}</th>
+                <th class="text-end">{{ __('projects.hourly_rate') ?: 'Rate' }} ({{ active_currency_symbol() }})</th>
+                <th class="text-end">{{ __('projects.billable_amount') ?: 'Amount' }} ({{ active_currency_symbol() }})</th>
                 <th class="text-center">{{ __('projects.approval') ?: 'Approval' }}</th>
                 <th class="text-center pe-3">{{ __('projects.invoice_status') ?: 'Invoiced' }}</th>
             </tr>
@@ -125,8 +125,8 @@
                             <x-ui.badge variant="secondary" soft>{{ __('projects.no') ?: 'No' }}</x-ui.badge>
                         @endif
                     </td>
-                    <td class="text-end text-muted">${{ number_format($rate, 2) }}</td>
-                    <td class="text-end fw-semibold">${{ number_format($amount, 2) }}</td>
+                    <td class="text-end text-muted">{{ format_currency($rate) }}</td>
+                    <td class="text-end fw-semibold">{{ format_currency($amount) }}</td>
                     <td class="text-center">
                         <x-ui.badge variant="{{ $tl->approval_status === 'Approved' ? 'success' : ($tl->approval_status === 'Rejected' ? 'danger' : 'warning') }}" soft>
                             {{ ucfirst($tl->approval_status) }}

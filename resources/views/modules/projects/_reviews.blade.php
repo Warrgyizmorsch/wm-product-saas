@@ -29,6 +29,45 @@
     </div>
 @endif
 
+{{-- Pending UAT Review Approval Banner (Production Standard Approval UX) --}}
+@if ($pendingReview)
+    <div class="alert alert-warning border-warning bg-soft-warning d-flex align-items-center justify-content-between p-3 mb-4 rounded shadow-sm" role="alert">
+        <div class="d-flex align-items-center">
+            <div class="avatar-text avatar-md bg-warning text-white me-3 d-flex align-items-center justify-content-center rounded" style="width: 38px; height: 38px;">
+                <i class="feather-clock fs-18"></i>
+            </div>
+            <div>
+                <h6 class="alert-heading fw-bold mb-1 text-dark">{{ __('projects.pending_uat_review_title', ['default' => 'Client UAT Review Pending Approval']) }}</h6>
+                <p class="fs-12 mb-0 text-muted">{{ __('projects.pending_uat_review_desc', ['default' => 'A formal UAT review cycle is awaiting review and sign-off before project closure can proceed.']) }}</p>
+            </div>
+        </div>
+        @if (auth()->user()->can('signoff', $pendingReview))
+            <button type="button" class="btn btn-warning text-dark btn-sm fw-semibold" onclick="openSignOffModal({{ $pendingReview->id }})">
+                <i class="feather-check-square me-1"></i>{{ __('projects.sign_off') }}
+            </button>
+        @endif
+    </div>
+@endif
+
+{{-- Pending Change Requests Approval Banner (Production Standard Approval UX) --}}
+@php
+    $pendingCrCount = $changeRequests->where('status', \App\Domains\Projects\Models\ChangeRequest::STATUS_PENDING)->count();
+@endphp
+@if ($pendingCrCount > 0)
+    <div class="alert alert-info border-info bg-soft-info d-flex align-items-center justify-content-between p-3 mb-4 rounded shadow-sm" role="alert">
+        <div class="d-flex align-items-center">
+            <div class="avatar-text avatar-md bg-info text-white me-3 d-flex align-items-center justify-content-center rounded" style="width: 38px; height: 38px;">
+                <i class="feather-alert-circle fs-18"></i>
+            </div>
+            <div>
+                <h6 class="alert-heading fw-bold mb-1 text-dark">{{ __('projects.pending_cr_approval_title', ['default' => 'Change Requests Awaiting Approval']) }}</h6>
+                <p class="fs-12 mb-0 text-muted">{{ __('projects.pending_cr_approval_desc', ['default' => ':count change request(s) require project leadership review and budget authorization.', 'count' => $pendingCrCount]) }}</p>
+            </div>
+        </div>
+        <span class="badge bg-info text-white fs-12 px-3 py-2">{{ $pendingCrCount }} {{ __('projects.pending') }}</span>
+    </div>
+@endif
+
 {{-- Section A: Client Reviews / UAT --}}
 <div class="card mb-4 border shadow-none">
     <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
@@ -199,7 +238,7 @@
                             </td>
                             <td>
                                 <div class="fs-12">
-                                    <div><strong>+{{ number_format((float) $cr->impact_budget_amount, 2) }}</strong></div>
+                                    <div><strong>+{{ format_currency($cr->impact_budget_amount) }}</strong></div>
                                     <div class="text-muted">+{{ number_format((float) $cr->impact_budget_hours, 1) }} hrs · +{{ $cr->impact_schedule_days }} d</div>
                                 </div>
                             </td>
@@ -406,7 +445,7 @@
             </div>
 
             <div class="col-12 col-md-6">
-                <label class="form-label fw-bold fs-12 text-uppercase text-muted">{{ __('projects.impact_budget_amount') }}</label>
+                <label class="form-label fw-bold fs-12 text-uppercase text-muted">{{ __('projects.impact_budget_amount') }} ({{ active_currency_symbol() }})</label>
                 <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" min="0" name="impact_budget_amount" :value="old('impact_budget_amount', '0.00')" />
             </div>
 

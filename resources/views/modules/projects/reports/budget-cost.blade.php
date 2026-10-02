@@ -68,11 +68,11 @@
                 <th class="ps-3">{{ __('projects.code') ?: 'Code' }}</th>
                 <th>{{ __('projects.project_name') ?: 'Project' }}</th>
                 <th>{{ __('projects.client') ?: 'Client' }}</th>
-                <th class="text-end">{{ __('projects.base_budget') ?: 'Base Budget' }}</th>
-                <th class="text-end">{{ __('projects.cr_budget') ?: 'Approved CRs' }}</th>
-                <th class="text-end">{{ __('projects.revised_budget') ?: 'Revised Budget' }}</th>
-                <th class="text-end">{{ __('projects.actual_cost') ?: 'Actual Cost' }}</th>
-                <th class="text-end">{{ __('projects.cost_variance') ?: 'Cost Variance' }}</th>
+                <th class="text-end">{{ __('projects.base_budget') ?: 'Base Budget' }} ({{ active_currency_symbol() }})</th>
+                <th class="text-end">{{ __('projects.cr_budget') ?: 'Approved CRs' }} ({{ active_currency_symbol() }})</th>
+                <th class="text-end">{{ __('projects.revised_budget') ?: 'Revised Budget' }} ({{ active_currency_symbol() }})</th>
+                <th class="text-end">{{ __('projects.actual_cost') ?: 'Actual Cost' }} ({{ active_currency_symbol() }})</th>
+                <th class="text-end">{{ __('projects.cost_variance') ?: 'Cost Variance' }} ({{ active_currency_symbol() }})</th>
                 <th class="text-end">{{ __('projects.revised_hours') ?: 'Rev. Hours' }}</th>
                 <th class="text-end pe-3">{{ __('projects.actual_hours') ?: 'Act. Hours' }}</th>
             </tr>
@@ -91,12 +91,12 @@
                     </td>
                     <td class="fw-semibold text-dark">{{ $r['name'] }}</td>
                     <td class="text-muted">{{ $r['client_name'] }}</td>
-                    <td class="text-end text-muted">${{ number_format($r['base_budget_amount'], 2) }}</td>
-                    <td class="text-end text-info">${{ number_format($r['cr_budget_amount'], 2) }}</td>
-                    <td class="text-end fw-semibold text-dark">${{ number_format($r['revised_budget_amount'], 2) }}</td>
-                    <td class="text-end fw-bold text-dark">${{ number_format($r['actual_cost'], 2) }}</td>
+                    <td class="text-end text-muted">{{ format_currency($r['base_budget_amount']) }}</td>
+                    <td class="text-end text-info">{{ format_currency($r['cr_budget_amount']) }}</td>
+                    <td class="text-end fw-semibold text-dark">{{ format_currency($r['revised_budget_amount']) }}</td>
+                    <td class="text-end fw-bold text-dark">{{ format_currency($r['actual_cost']) }}</td>
                     <td class="text-end fw-bold {{ $isOverCost ? 'text-danger' : 'text-success' }}">
-                        ${{ number_format($r['cost_variance'], 2) }}
+                        {{ format_currency($r['cost_variance']) }}
                         @if ($r['cost_burn_percent'] !== null)
                             <span class="fs-11 fw-normal text-muted d-block">({{ $r['cost_burn_percent'] }}%)</span>
                         @endif

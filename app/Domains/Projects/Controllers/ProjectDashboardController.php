@@ -83,8 +83,8 @@ class ProjectDashboardController extends Controller
                 fputcsv($file, ['Completed Projects', $kpis->completed_projects]);
                 fputcsv($file, ['On Hold Projects', $kpis->on_hold_projects]);
                 fputcsv($file, ['Portfolio Health Score %', $kpis->portfolio_health_score . '%']);
-                fputcsv($file, ['Total Budget ($)', number_format($kpis->total_budget_amount, 2)]);
-                fputcsv($file, ['Total Incurred Cost ($)', number_format($kpis->total_incurred_cost, 2)]);
+                fputcsv($file, ['Total Budget (' . active_currency_symbol() . ')', number_format($kpis->total_budget_amount, 2)]);
+                fputcsv($file, ['Total Incurred Cost (' . active_currency_symbol() . ')', number_format($kpis->total_incurred_cost, 2)]);
                 fputcsv($file, ['Budget Consumed %', ($kpis->cost_consumption_percent ?? 0) . '%']);
                 fputcsv($file, ['Total Budget Hours', number_format($kpis->total_budget_hours, 2)]);
                 fputcsv($file, ['Total Tracked Hours', number_format($kpis->total_tracked_hours, 2)]);
@@ -94,7 +94,7 @@ class ProjectDashboardController extends Controller
                 fputcsv($file, ['Open Issues', $kpis->open_issues_count]);
                 fputcsv($file, ['Critical Defects', $kpis->critical_issues_count]);
                 fputcsv($file, ['Unbilled Approved Hours', number_format($kpis->unbilled_approved_hours, 2)]);
-                fputcsv($file, ['Unbilled Amount ($)', number_format($kpis->unbilled_amount, 2)]);
+                fputcsv($file, ['Unbilled Amount (' . active_currency_symbol() . ')', number_format($kpis->unbilled_amount, 2)]);
                 fputcsv($file, []);
                 fputcsv($file, ['Active Projects Health', 'Client', 'Health Status', 'Progress %', 'Budget Hours', 'Actual Hours']);
                 foreach ($healthList as $p) {

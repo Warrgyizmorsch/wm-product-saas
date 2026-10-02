@@ -288,17 +288,37 @@ Inspect the existing **Production BOM module** (`resources/views/modules/product
 
 ---
 
-### 3.10 Project Billing Screen *(Target Phase 7)*
-- **Billing Summary View:**
+### 3.10 Project Billing Screen *(Phase 7 — Completed)*
+- **Billing Summary View (`projects/_billing.blade.php`):**
   - Table using `<x-ui.odoo-form-ui type="table">` aggregating unbilled approved timesheets and unbilled completed milestones.
-  - "Generate Invoice" action button (`<x-ui.button>`) triggering standard Sales Invoice generation.
+  - "Generate Invoice" action button (`<x-ui.button>`) triggering standard Sales Invoice generation modal (`_generate_invoice_modal.blade.php`).
   - Table of generated Sales Invoices (`<x-ui.odoo-form-ui type="table">`) with direct links to view, send, or receive payment.
+  - Dynamic Currency: All rates, amounts, and subtotal calculations format dynamically via `format_currency()` and `window.AppCurrency.format()`.
+- **Status:** **FULLY IMPLEMENTED (PHASE 7).**
 
 ---
 
-### 3.11 Executive Dashboard & Reports *(Target Phase 10)*
-- **Global Project Dashboard (`projects/dashboard.blade.php`):** Portfolio KPI widgets (`<x-ui.card>`, `<x-ui.stat-widget>`) for Total Active Projects, Overall Health, Budget Consumed vs Planned, Overdue Deliverables, Open Critical Defects.
-- **Seven Dedicated Reports (`projects/reports/*.blade.php`):** Clean, printable, filterable tabular reports rendered via `<x-ui.odoo-form-ui type="table">` with `<x-ui.filter>` and CSV/Excel export buttons (`<x-ui.button>`).
+### 3.11 Executive Dashboard & Reports *(Phase 10 — Completed)*
+- **Global Project Dashboard (`projects/dashboard.blade.php`):** Portfolio KPI widgets (`<x-ui.stat-widget>`) for Total Projects, Active Projects, Portfolio Health Score %, Total Budget, Incurred Cost, Hours Consumption, and Open Defects.
+- **Seven Dedicated Reports (`projects/reports/*.blade.php`):** Clean, printable, filterable tabular reports rendered via `<x-ui.odoo-form-ui type="table">` with `<x-ui.filter>` and CSV/Excel export buttons.
+- **Status:** **FULLY IMPLEMENTED (PHASE 10).**
+
+---
+
+### 3.12 Dynamic Tenant Currency UI Standards *(Post-Completion Pass — Completed)*
+- **Unified Currency Engine:** PM reuses the ERP Production currency infrastructure (`app/helpers.php` and `resources/views/layouts/duralux.blade.php`):
+  - PHP Views: `format_currency($amount)` for all amounts, and `active_currency_symbol()` for table headers and input labels.
+  - JavaScript Modals: `window.AppCurrency.format(baseAmount)` for client-side recalculated totals.
+  - Exports: `ProjectReportExport` and `ProjectDashboardController` dynamically insert `active_currency_symbol()` in column headers.
+  - Zero hardcoded currency symbols (`$`, `₹`, `USD`) across all PM views and templates.
+
+---
+
+### 3.13 Production-Consistent Approval UX *(Post-Completion Pass — Completed)*
+- **Standardized Notification Banners:** Any project entity entering a pending approval state displays a styled alert box matching Production BOM/Routing conventions:
+  - Yellow/Warning (`alert alert-warning border-warning bg-soft-warning`): Used for pending UAT reviews and pending change requests awaiting sign-off.
+  - Avatar Icon + Bold Title: Highlights pending approver role (e.g. Project Manager / Tenant Owner).
+  - Explicit Action CTAs: Direct "Sign Off Review" or "Review CR" buttons with server-side policy guards (`@can('signoff', $review)` / `@can('approve', $cr)`).
 
 ---
 
