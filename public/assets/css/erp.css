@@ -2396,3 +2396,125 @@ html.app-skin-dark .header-color-preview-circle {
 .modal .select2-container--open .select2-dropdown { z-index: 1061; }
 /* A select2 inside a flex filter bar should not collapse to nothing. */
 .d-flex > .select2-container { min-width: 160px; }
+
+/* ==========================================
+   SELECT2 CLEAR (CROSS) & REMOVE BUTTON POLISH
+   ========================================== */
+.select2-container .select2-selection--single .select2-selection__clear,
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear,
+.select2-container--default .select2-selection--single .select2-selection__clear,
+.select2-container--classic .select2-selection--single .select2-selection__clear {
+    position: absolute !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    right: 28px !important;
+    width: 18px !important;
+    height: 18px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    font-family: inherit !important;
+    line-height: 1 !important;
+    color: #64748b !important;
+    background-color: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 4 !important;
+    transition: all 0.15s ease-in-out !important;
+    text-indent: 0 !important;
+    overflow: visible !important;
+    float: none !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.select2-container .select2-selection--single .select2-selection__clear:hover,
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear:hover,
+.select2-container--default .select2-selection--single .select2-selection__clear:hover,
+.select2-container--classic .select2-selection--single .select2-selection__clear:hover {
+    color: #ef4444 !important;
+    background-color: #fee2e2 !important;
+    border-color: #fca5a5 !important;
+    transform: translateY(-50%) scale(1.1) !important;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.15) !important;
+}
+
+.select2-container .select2-selection--single .select2-selection__clear > span,
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear > span {
+    display: inline-block !important;
+    line-height: 1 !important;
+    margin-top: -1px !important;
+}
+
+/* Ensure single select rendered text never overlaps clear cross button or dropdown arrow */
+.select2-container .select2-selection--single .select2-selection__rendered,
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered,
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    padding-right: 52px !important;
+}
+
+/* Small / Compact Select2 (e.g. erp-s2-sm, tables, form-select-sm) */
+.select2-container .select2-selection.erp-s2-sm .select2-selection__clear,
+.form-select-sm ~ .select2-container .select2-selection__clear,
+.form-control-sm ~ .select2-container .select2-selection__clear,
+.table .select2-container .select2-selection__clear {
+    right: 24px !important;
+    width: 16px !important;
+    height: 16px !important;
+    font-size: 12px !important;
+}
+
+.select2-container .select2-selection.erp-s2-sm .select2-selection__rendered,
+.form-select-sm ~ .select2-container .select2-selection__rendered,
+.table .select2-container .select2-selection__rendered {
+    padding-right: 44px !important;
+}
+
+/* Multi-select choice clear cross badge */
+.select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove,
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 15px !important;
+    height: 15px !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+    color: #64748b !important;
+    background-color: #f1f5f9 !important;
+    border-radius: 50% !important;
+    margin-right: 5px !important;
+    transition: all 0.15s ease !important;
+    cursor: pointer !important;
+    border: none !important;
+    text-indent: 0 !important;
+    padding: 0 !important;
+}
+
+.select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove:hover,
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+    color: #ef4444 !important;
+    background-color: #fee2e2 !important;
+}
+
+/* Dark mode adjustments */
+html.app-skin-dark .select2-container .select2-selection--single .select2-selection__clear,
+body.app-skin-dark .select2-container .select2-selection--single .select2-selection__clear,
+[data-bs-theme="dark"] .select2-container .select2-selection--single .select2-selection__clear {
+    color: #94a3b8 !important;
+    background-color: #334155 !important;
+    border-color: #475569 !important;
+}
+
+html.app-skin-dark .select2-container .select2-selection--single .select2-selection__clear:hover,
+body.app-skin-dark .select2-container .select2-selection--single .select2-selection__clear:hover,
+[data-bs-theme="dark"] .select2-container .select2-selection--single .select2-selection__clear:hover {
+    color: #f87171 !important;
+    background-color: rgba(239, 68, 68, 0.25) !important;
+    border-color: #ef4444 !important;
+}
+

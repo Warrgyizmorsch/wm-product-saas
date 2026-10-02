@@ -272,6 +272,15 @@
         <x-ui.button href="{{ route('visitor.index') }}" variant="primary" icon="feather-arrow-left">
             {{ __('visitor.back_to_list') }}
         </x-ui.button>
+        @if($pass->source_module === 'crm' && $pass->source_reference_id)
+            <x-ui.button href="{{ route('crm.leads.show', $pass->source_reference_id) }}" variant="primary" icon="feather-trending-up">
+                {{ __('visitor.view_lead') }} ({{ $pass->source_reference_no }})
+            </x-ui.button>
+        @else
+            <x-ui.button type="button" variant="primary" icon="feather-user-plus" data-bs-toggle="modal" data-bs-target="#convertToLeadModalShow">
+                {{ __('visitor.convert_to_lead') }}
+            </x-ui.button>
+        @endif
         <x-ui.button type="button" variant="primary" icon="feather-printer" onclick="window.print()">
             {{ __('visitor.print_pass') }}
         </x-ui.button>
@@ -286,6 +295,13 @@
         <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm rounded-3 mb-3 d-flex align-items-center no-print" role="alert">
             <i class="feather-check-circle fs-18 text-success me-2"></i>
             <div>{{ session('success') }}</div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+    @if(session('info'))
+        <div class="alert alert-info alert-dismissible fade show border-0 shadow-sm rounded-3 mb-3 d-flex align-items-center no-print" role="alert">
+            <i class="feather-info fs-18 text-info me-2"></i>
+            <div>{{ session('info') }}</div>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
@@ -306,6 +322,11 @@
             <span class="badge bg-light text-dark border px-2 py-0.5 fs-11">
                 {{ $pass->visitor_type ?? 'Client' }}
             </span>
+            @if($pass->source_module === 'crm' && $pass->source_reference_id)
+                <a href="{{ route('crm.leads.show', $pass->source_reference_id) }}" class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 fs-11 text-decoration-none fw-bold" title="{{ __('visitor.linked_lead') }}">
+                    <i class="feather-trending-up me-1"></i> {{ $pass->source_reference_no ?: 'CRM Lead' }}
+                </a>
+            @endif
         </div>
 
         <!-- Step Chevron Flow -->
@@ -455,6 +476,32 @@
                         {{ __('visitor.unblock_visitor') }}
                     </x-ui.button>
                 </form>
+            </div>
+        @endif
+
+        <!-- Linked CRM Lead Banner -->
+        @if($pass->source_module === 'crm' && $pass->source_reference_id)
+            <div class="bg-primary-subtle border-bottom border-primary-subtle p-3 d-flex flex-wrap align-items-center justify-content-between gap-2 no-print">
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary text-white p-2 rounded-circle me-2.5 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                        <i class="feather-trending-up fs-16"></i>
+                    </div>
+                    <div>
+                        <strong class="d-block text-primary fs-13">{{ __('visitor.linked_lead') }}: {{ $pass->source_reference_no }}</strong>
+                        <span class="fs-12 text-muted">
+                            Status: <strong class="text-dark">{{ $pass->linkedLead?->status ?? 'Active' }}</strong>
+                            <span class="mx-1">•</span>
+                            Owner: <strong class="text-dark">{{ $pass->linkedLead?->owner?->name ?? 'Sales Team' }}</strong>
+                            @if($pass->linkedLead?->product_names && $pass->linkedLead->product_names !== '—')
+                                <span class="mx-1">•</span>
+                                Products: <strong class="text-dark">{{ $pass->linkedLead->product_names }}</strong>
+                            @endif
+                        </span>
+                    </div>
+                </div>
+                <x-ui.button href="{{ route('crm.leads.show', $pass->source_reference_id) }}" variant="primary" size="sm" icon="feather-external-link">
+                    {{ __('visitor.view_lead') }}
+                </x-ui.button>
             </div>
         @endif
 
@@ -643,6 +690,76 @@
                         </div>
                     </div>
                 </div>
+
+                @if($pass->purpose === 'Product Inquiry' || !empty($pass->notes) || ($pass->source_module === 'crm' && $pass->source_reference_id))
+                    <div class="col-12">
+                        <div class="metric-tile" style="background: #f8fafc; border-left: 3px solid var(--bs-primary);">
+                            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                <div class="tile-label"><i class="feather-shopping-bag me-1 text-primary"></i> {{ __('visitor.front_desk_inquiry') }}</div>
+                                @if($pass->source_module === 'crm' && $pass->source_reference_id)
+                                    <a href="{{ route('crm.leads.show', $pass->source_reference_id) }}" class="badge bg-success text-white px-2 py-0.5 text-decoration-none fs-10 fw-bold">
+                                        <i class="feather-check-circle me-1"></i> Converted: {{ $pass->source_reference_no }}
+                                    </a>
+                                @else
+                                    <button type="button" class="btn btn-xs btn-primary fw-semibold px-2 py-0.5 fs-10" data-bs-toggle="modal" data-bs-target="#convertToLeadModalShow">
+                                        <i class="feather-user-plus me-1"></i> {{ __('visitor.convert_to_lead') }}
+                                    </button>
+                                @endif
+                            </div>
+                            <div class="fs-13 text-dark mb-1">
+                                {{ $pass->notes ?: 'Product inquiry and requirements logged at Front Desk.' }}
+                            </div>
+                            @php
+                                $leadItems = $pass->linkedLead?->product_items;
+                            @endphp
+                            @if(!empty($leadItems) && is_array($leadItems))
+                                <div class="d-flex flex-wrap gap-2 mt-2.5 pt-2.5 border-top">
+                                    @foreach($leadItems as $item)
+                                        @php
+                                            $pModel = $products->firstWhere('id', $item['product_id'] ?? null);
+                                            $imgUrl = $pModel ? ($pModel->main_image_url ?: ($pModel->image_path ? asset('storage/'.$pModel->image_path) : '')) : '';
+                                        @endphp
+                                        @if($pModel)
+                                            <div class="d-inline-flex align-items-center bg-white border rounded-3 p-1 pe-2.5 shadow-xs gap-2">
+                                                @if($imgUrl)
+                                                    <div class="product-thumb-wrapper position-relative border rounded-2 bg-light d-flex align-items-center justify-content-center cursor-pointer shadow-xs" 
+                                                         style="width: 32px; height: 32px; overflow: hidden; transition: all 0.2s ease;" 
+                                                         onclick="openProductImageZoom(this)" 
+                                                         title="Click to zoom image"
+                                                         data-full-image="{{ $imgUrl }}"
+                                                         data-product-name="{{ $pModel->name }}"
+                                                         data-product-sku="{{ $pModel->sku ?? '' }}">
+                                                        <img src="{{ $imgUrl }}" class="w-100 h-100 object-fit-cover" alt="Product" onerror="this.src='/assets/images/icons/1.png';">
+                                                        <div class="zoom-badge position-absolute top-0 end-0 bg-dark bg-opacity-75 text-white d-flex align-items-center justify-content-center" style="width: 12px; height: 12px; font-size: 7px; border-bottom-left-radius: 3px;">
+                                                            <i class="feather-maximize-2"></i>
+                                                        </div>
+                                                    </div>
+                                                @else
+                                                    <div class="avatar-xs bg-light text-muted rounded-2 d-flex align-items-center justify-content-center border" style="width: 32px; height: 32px;">
+                                                        <i class="feather-box fs-12"></i>
+                                                    </div>
+                                                @endif
+                                                <div class="lh-sm">
+                                                    <span class="fs-12 fw-bold text-dark d-block">{{ $pModel->name }}</span>
+                                                    @if($pModel->sku)
+                                                        <span class="fs-10 text-muted font-monospace">{{ $pModel->sku }}</span>
+                                                    @endif
+                                                </div>
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1.5 px-2 py-0.5 fs-10 fw-bold">
+                                                    Qty: {{ $item['quantity'] ?? 1 }}
+                                                </span>
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            @elseif($pass->linkedLead && $pass->linkedLead->product_names && $pass->linkedLead->product_names !== '—')
+                                <div class="fs-11 text-muted mt-1">
+                                    <i class="feather-package me-1 text-primary"></i> Interested Items: <strong class="text-dark">{{ $pass->linkedLead->product_names }}</strong>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @endif
             </div>
 
             <!-- Declared Belongings / Assets -->
@@ -729,9 +846,23 @@
                     <span class="mx-2">•</span>
                     Fee: <strong class="text-dark">{{ format_currency($pass->pass_fee) }}</strong>
                 @endif
+                @if($pass->source_module === 'crm' && $pass->source_reference_id)
+                    <span class="mx-2">•</span>
+                    <i class="feather-trending-up text-primary me-0.5"></i> CRM: <strong class="text-primary">{{ $pass->source_reference_no }}</strong>
+                @endif
             </div>
             
             <div class="d-flex flex-wrap align-items-center gap-2">
+                @if($pass->source_module === 'crm' && $pass->source_reference_id)
+                    <x-ui.button href="{{ route('crm.leads.show', $pass->source_reference_id) }}" variant="primary" icon="feather-trending-up" size="sm">
+                        {{ __('visitor.view_lead') }}
+                    </x-ui.button>
+                @else
+                    <x-ui.button type="button" variant="primary" icon="feather-user-plus" size="sm" data-bs-toggle="modal" data-bs-target="#convertToLeadModalShow">
+                        {{ __('visitor.convert_to_lead') }}
+                    </x-ui.button>
+                @endif
+
                 @if($pass->status === 'Expected' || $pass->status === 'Approved' || $pass->status === 'Arrived')
                     <form action="{{ route('visitor.passes.check-in', $pass->id) }}" method="POST" class="d-inline">
                         @csrf
@@ -775,6 +906,169 @@
 
     </div>
 
+</div>
+
+<!-- Modal: Convert Walk-in Visitor to CRM Lead -->
+<x-ui.modal 
+    id="convertToLeadModalShow" 
+    title="<i class='feather-user-plus text-success me-2'></i> {{ __('visitor.convert_lead_modal_title') }}" 
+    centered 
+    :showFooter="false">
+    <form id="convertToLeadFormShow" method="POST" action="{{ route('visitor.passes.convert-lead', $pass->id) }}">
+        @csrf
+        <div class="mb-3 p-3 bg-light rounded-3 border">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="fs-11 text-muted text-uppercase fw-bold">Visitor Gate Pass</span>
+                <span class="badge bg-white text-dark border font-monospace fs-11">{{ $pass->pass_number }}</span>
+            </div>
+            <div class="fs-14 text-dark fw-bold">{{ $pass->visitor?->full_name ?? 'Walk-in Visitor' }}</div>
+            <div class="fs-12 text-muted">{{ $pass->visitor?->company_name ?: ($pass->visitor?->full_name . ' (Individual Walk-in)') }}</div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.lead_owner') }}</label>
+            <select name="lead_owner_id" class="form-select fs-13">
+                @foreach($hosts ?? [] as $host)
+                    <option value="{{ $host->id }}" {{ $host->id == ($pass->host_user_id ?: auth()->id()) ? 'selected' : '' }}>
+                        {{ $host->name }} ({{ $host->email }})
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.lead_type') }}</label>
+                <select name="lead_type" class="form-select fs-13">
+                    <option value="hot">🔥 Hot Lead</option>
+                    <option value="warm" selected>⚡ Warm Lead</option>
+                    <option value="cold">❄️ Cold Lead</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label fw-bold fs-12 text-dark">Priority</label>
+                <select name="priority" class="form-select fs-13">
+                    <option value="Urgent">Urgent</option>
+                    <option value="High">High</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="Low">Low</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Product & Quantity Items Repeater -->
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label fw-bold fs-12 text-dark mb-0">
+                    <i class="feather-package text-primary me-1"></i> {{ __('visitor.product_and_quantity') }}
+                </label>
+                <button type="button" class="btn btn-xs btn-outline-primary fw-semibold px-2 py-0.5 fs-11" onclick="addProductItemRow('#modalProductItemsTableShow')" style="border-radius: 6px;">
+                    <i class="feather-plus me-0.5"></i> {{ __('visitor.add_product_row') }}
+                </button>
+            </div>
+
+            <div class="border rounded-3 bg-white p-2 shadow-sm">
+                <table class="table table-sm table-borderless align-middle mb-0" id="modalProductItemsTableShow">
+                    <thead>
+                        <tr class="border-bottom text-muted fs-11" style="background-color: #f8fafc;">
+                            <th style="width: 66%; font-weight: 600;" class="py-1 ps-2">{{ __('visitor.interested_products') }}</th>
+                            <th style="width: 24%; font-weight: 600;" class="py-1 text-center">{{ __('visitor.quantity') }}</th>
+                            <th style="width: 10%; font-weight: 600;" class="py-1 text-center"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="product-item-row border-bottom border-light">
+                            <td class="py-1.5 ps-1 pe-1">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="product-thumb-wrapper position-relative flex-shrink-0 border rounded-2 bg-light d-flex align-items-center justify-content-center cursor-pointer shadow-xs" 
+                                         style="width: 34px; height: 34px; overflow: hidden; transition: all 0.2s ease;" 
+                                         onclick="openProductImageZoom(this)"
+                                         title="Click to zoom image"
+                                         data-full-image=""
+                                         data-product-name=""
+                                         data-product-sku="">
+                                        <img src="/assets/images/icons/1.png" 
+                                             class="product-row-thumb w-100 h-100 object-fit-cover d-none" 
+                                             alt="Product"
+                                             onerror="this.src='/assets/images/icons/1.png';">
+                                        <i class="feather-box product-placeholder-icon text-muted fs-14"></i>
+                                        <div class="product-zoom-hint position-absolute inset-0 bg-dark bg-opacity-40 d-flex align-items-center justify-content-center opacity-0 hover-opacity-100 transition-all rounded-2" style="width:100%; height:100%; top:0; left:0;">
+                                            <i class="feather-maximize-2 text-white" style="font-size: 10px;"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-grow-1" style="min-width: 0;">
+                                        <select name="product_items[0][product_id]" class="form-select form-select-sm fs-12 product-item-select" onchange="handleProductSelectionChange(this)">
+                                            <option value="" data-image="">— {{ __('visitor.select_products') }} —</option>
+                                            @foreach($products ?? [] as $prod)
+                                                <option value="{{ $prod->id }}" 
+                                                        data-image="{{ $prod->main_image_url ?: ($prod->image_path ? asset('storage/'.$prod->image_path) : '') }}"
+                                                        data-name="{{ $prod->name }}"
+                                                        data-sku="{{ $prod->sku ?? '' }}">
+                                                    {{ $prod->name }} {{ $prod->sku ? "({$prod->sku})" : '' }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-1.5 px-1 text-center">
+                                <input type="number" name="product_items[0][quantity]" class="form-control form-control-sm text-center fw-bold fs-12" value="1" min="1" step="1">
+                            </td>
+                            <td class="py-1.5 ps-1 pe-2 text-center">
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeProductItemRow(this)" title="Remove">
+                                    <i class="feather-trash-2 fs-13"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.inquiry_notes') }}</label>
+            <textarea name="requirement" rows="3" class="form-control fs-13" placeholder="Enter specific customer requirements, requested quantities, or pricing discussion...">{{ $pass->notes }}</textarea>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold fs-12 text-dark">Next Follow-up Date</label>
+            <input type="date" name="next_followup_date" class="form-control fs-13" value="{{ now()->addDays(2)->format('Y-m-d') }}">
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
+            <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">{{ __('crm.cancel') ?? 'Cancel' }}</button>
+            <button type="submit" class="btn btn-success px-3 fw-bold">
+                <i class="feather-check-circle me-1"></i> Create CRM Lead
+            </button>
+        </div>
+    </form>
+</x-ui.modal>
+
+<!-- Product Image Zoom / Lightbox Modal -->
+<div class="modal fade" id="productImageZoomModal" tabindex="-1" aria-hidden="true" style="z-index: 1080;">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg overflow-hidden rounded-4">
+            <div class="modal-header border-bottom py-2.5 px-3 bg-light">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="avatar-xs bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width:28px; height:28px;">
+                        <i class="feather-image fs-13"></i>
+                    </div>
+                    <div>
+                        <h6 class="modal-title fs-14 fw-bold text-dark mb-0" id="zoomModalProductName">Product Image Preview</h6>
+                        <small class="text-muted fs-11 font-monospace" id="zoomModalProductSku"></small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3 text-center bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="min-height: 380px; max-height: 75vh;">
+                <img id="zoomModalImage" src="" alt="Product Large Preview" class="img-fluid rounded-3 shadow-sm object-fit-contain" style="max-height: 70vh; max-width: 100%; transition: transform 0.2s ease;">
+            </div>
+            <div class="modal-footer py-2 px-3 bg-light border-top d-flex justify-content-between align-items-center">
+                <span class="fs-11 text-muted"><i class="feather-info me-1"></i> High-resolution product catalog asset</span>
+                <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Reject Modal for Show View -->
@@ -841,6 +1135,122 @@
 
 @push('scripts')
 <script>
+    const productOptionsHtml = `@foreach($products ?? [] as $prod)<option value="{{ $prod->id }}" data-image="{{ $prod->main_image_url ?: ($prod->image_path ? asset('storage/'.$prod->image_path) : '') }}" data-name="{{ addslashes($prod->name) }}" data-sku="{{ addslashes($prod->sku ?? '') }}">{{ addslashes($prod->name) }} {{ $prod->sku ? "(".addslashes($prod->sku).")" : "" }}</option>@endforeach`;
+
+    function addProductItemRow(tableId) {
+        const tbody = document.querySelector(tableId + ' tbody');
+        if (!tbody) return;
+        const rowIndex = tbody.querySelectorAll('tr').length;
+        const tr = document.createElement('tr');
+        tr.className = 'product-item-row border-bottom border-light';
+        tr.innerHTML = `
+            <td class="py-1.5 ps-1 pe-1">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="product-thumb-wrapper position-relative flex-shrink-0 border rounded-2 bg-light d-flex align-items-center justify-content-center cursor-pointer shadow-xs" 
+                         style="width: 34px; height: 34px; overflow: hidden; transition: all 0.2s ease;" 
+                         onclick="openProductImageZoom(this)"
+                         title="Click to zoom image"
+                         data-full-image=""
+                         data-product-name=""
+                         data-product-sku="">
+                        <img src="/assets/images/icons/1.png" 
+                             class="product-row-thumb w-100 h-100 object-fit-cover d-none" 
+                             alt="Product"
+                             onerror="this.src='/assets/images/icons/1.png';">
+                        <i class="feather-box product-placeholder-icon text-muted fs-14"></i>
+                        <div class="product-zoom-hint position-absolute inset-0 bg-dark bg-opacity-40 d-flex align-items-center justify-content-center opacity-0 hover-opacity-100 transition-all rounded-2" style="width:100%; height:100%; top:0; left:0;">
+                            <i class="feather-maximize-2 text-white" style="font-size: 10px;"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1" style="min-width: 0;">
+                        <select name="product_items[${rowIndex}][product_id]" class="form-select form-select-sm fs-12 product-item-select" onchange="handleProductSelectionChange(this)">
+                            <option value="" data-image="">— {{ __('visitor.select_products') }} —</option>
+                            ${productOptionsHtml}
+                        </select>
+                    </div>
+                </div>
+            </td>
+            <td class="py-1.5 px-1 text-center">
+                <input type="number" name="product_items[${rowIndex}][quantity]" class="form-control form-control-sm text-center fw-bold fs-12" value="1" min="1" step="1">
+            </td>
+            <td class="py-1.5 ps-1 pe-2 text-center">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeProductItemRow(this)" title="Remove">
+                    <i class="feather-trash-2 fs-13"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        if (window.erpSearchableSelect && window.erpSearchableSelect.enhance) {
+            window.erpSearchableSelect.enhance(tr);
+        }
+    }
+
+    function handleProductSelectionChange(selectEl) {
+        const selectedOption = selectEl.options[selectEl.selectedIndex];
+        const imageUrl = selectedOption ? selectedOption.getAttribute('data-image') : '';
+        const productName = selectedOption ? (selectedOption.getAttribute('data-name') || selectedOption.text) : '';
+        const productSku = selectedOption ? (selectedOption.getAttribute('data-sku') || '') : '';
+        
+        const row = selectEl.closest('tr');
+        if (!row) return;
+        
+        const thumbImg = row.querySelector('.product-row-thumb');
+        const placeholderIcon = row.querySelector('.product-placeholder-icon');
+        const thumbWrapper = row.querySelector('.product-thumb-wrapper');
+        
+        if (thumbImg && thumbWrapper) {
+            if (imageUrl && imageUrl.trim() !== '') {
+                thumbImg.src = imageUrl;
+                thumbImg.classList.remove('d-none');
+                if (placeholderIcon) placeholderIcon.classList.add('d-none');
+                thumbWrapper.setAttribute('data-full-image', imageUrl);
+                thumbWrapper.setAttribute('data-product-name', productName);
+                thumbWrapper.setAttribute('data-product-sku', productSku);
+                thumbWrapper.classList.add('border-primary');
+                thumbWrapper.style.cursor = 'zoom-in';
+            } else {
+                thumbImg.classList.add('d-none');
+                if (placeholderIcon) placeholderIcon.classList.remove('d-none');
+                thumbWrapper.removeAttribute('data-full-image');
+                thumbWrapper.removeAttribute('data-product-name');
+                thumbWrapper.removeAttribute('data-product-sku');
+                thumbWrapper.classList.remove('border-primary');
+                thumbWrapper.style.cursor = 'default';
+            }
+        }
+    }
+
+    function openProductImageZoom(wrapperEl) {
+        const fullImage = wrapperEl.getAttribute('data-full-image');
+        if (!fullImage) return;
+        
+        const name = wrapperEl.getAttribute('data-product-name') || 'Product Image Preview';
+        const sku = wrapperEl.getAttribute('data-product-sku') || '';
+        
+        document.getElementById('zoomModalProductName').textContent = name;
+        document.getElementById('zoomModalProductSku').textContent = sku ? 'SKU: ' + sku : '';
+        document.getElementById('zoomModalImage').src = fullImage;
+        
+        const zoomModal = new bootstrap.Modal(document.getElementById('productImageZoomModal'));
+        zoomModal.show();
+    }
+
+    function removeProductItemRow(btn) {
+        const row = btn.closest('tr');
+        const tbody = row.parentElement;
+        if (tbody.querySelectorAll('tr').length > 1) {
+            row.remove();
+        } else {
+            const select = row.querySelector('select');
+            const qty = row.querySelector('input[type="number"]');
+            if (select) {
+                select.value = '';
+                handleProductSelectionChange(select);
+            }
+            if (qty) qty.value = 1;
+        }
+    }
+
     function openRejectModalShow(passId) {
         const modal = new bootstrap.Modal(document.getElementById('rejectPassModalShow'));
         modal.show();

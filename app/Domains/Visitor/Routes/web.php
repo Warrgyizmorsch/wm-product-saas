@@ -39,10 +39,11 @@ Route::prefix('visitor')
         Route::post('/import/parse', [VisitorController::class, 'parseImportFile'])->name('import.parse');
         Route::post('/import/process', [VisitorController::class, 'processMappedImport'])->name('import.process');
 
-        // 2. Passes Detail / Create
+        // 2. Passes Detail / Create / Convert
         Route::get('/passes/create', [VisitorPassController::class, 'create'])->name('passes.create');
         Route::post('/passes', [VisitorPassController::class, 'store'])->name('passes.store');
         Route::get('/passes/{pass}', [VisitorPassController::class, 'show'])->name('passes.show');
+        Route::post('/passes/{pass}/convert-lead', [VisitorPassController::class, 'convertToLead'])->name('passes.convert-lead');
 
         // 3. My Approvals (Employee / Host Self-Service)
         Route::get('/approvals', [VisitorApprovalController::class, 'index'])->name('approvals.index');

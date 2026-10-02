@@ -4,6 +4,11 @@
 @section('page-title', __('crm.dashboard.title'))
 @section('breadcrumb', __('crm.dashboard.breadcrumb'))
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+@endpush
+
 @section('page-actions')
     <div class="d-flex align-items-center gap-2 flex-wrap">
         {{-- Export Dropdown --}}
@@ -64,7 +69,7 @@
             
             <div class="col-xl-2 col-md-3 col-sm-6">
                 <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="preset"><i class="feather-calendar me-1"></i>{{ __('crm.dashboard.time_period') }}</label>
-                <select name="preset" id="preset" class="form-select form-select-sm border-gray-300" onchange="this.form.submit()">
+                <select name="preset" id="preset" class="form-select form-select-sm border-gray-300" data-select2-selector="default">
                     <option value="today" @selected($preset === 'today')>{{ __('crm.dashboard.today') }}</option>
                     <option value="this_month" @selected($preset === 'this_month')>{{ __('crm.dashboard.this_month') }}</option>
                     <option value="last_month" @selected($preset === 'last_month')>{{ __('crm.dashboard.last_month') }}</option>
@@ -78,7 +83,7 @@
             @if ($companies->count() > 1)
                 <div class="col-xl-2 col-md-3 col-sm-6">
                     <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="company_scope"><i class="feather-briefcase me-1"></i>{{ __('crm.dashboard.company_scope') }}</label>
-                    <select name="company_scope" id="company_scope" class="form-select form-select-sm border-gray-300" onchange="this.form.submit()">
+                    <select name="company_scope" id="company_scope" class="form-select form-select-sm border-gray-300" data-select2-selector="default">
                         <option value="current" @selected($companyScope === 'current')>{{ __('crm.dashboard.selected_company') }}</option>
                         <option value="all" @selected($companyScope === 'all')>{{ __('crm.dashboard.all_companies_consolidated') }}</option>
                     </select>
@@ -87,7 +92,7 @@
 
             <div class="col-xl-2 col-md-3 col-sm-6">
                 <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="owner_id"><i class="feather-user me-1"></i>{{ __('crm.dashboard.sales_representative') }}</label>
-                <select name="owner_id" id="owner_id" class="form-select form-select-sm border-gray-300" onchange="this.form.submit()">
+                <select name="owner_id" id="owner_id" class="form-select form-select-sm border-gray-300" data-select2-selector="default">
                     <option value="">{{ __('crm.dashboard.all_sales_reps') }}</option>
                     @foreach ($salesOwners as $owner)
                         <option value="{{ $owner->id }}" @selected((string)$ownerId === (string)$owner->id)>{{ $owner->name }}</option>
@@ -97,7 +102,7 @@
 
             <div class="col-xl-2 col-md-3 col-sm-6">
                 <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="lead_type"><i class="feather-tag me-1"></i>{{ __('crm.dashboard.category') }}</label>
-                <select name="lead_type" id="lead_type" class="form-select form-select-sm border-gray-300" onchange="this.form.submit()">
+                <select name="lead_type" id="lead_type" class="form-select form-select-sm border-gray-300" data-select2-selector="default">
                     <option value="">{{ __('crm.dashboard.all_categories') }}</option>
                     <option value="B2B" @selected($leadType === 'B2B')>{{ __('crm.dashboard.b2b_wholesale') }}</option>
                     <option value="B2C" @selected($leadType === 'B2C')>{{ __('crm.dashboard.b2c_retail') }}</option>
@@ -699,6 +704,15 @@
 @endpush
 
 @push('scripts')
+<script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+<script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+<script>
+    $(document).ready(function() {
+        $('#preset, #company_scope, #owner_id, #lead_type').on('change', function() {
+            $('#crm-filter-form').submit();
+        });
+    });
+</script>
 @if ($activeView === 'overview')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>

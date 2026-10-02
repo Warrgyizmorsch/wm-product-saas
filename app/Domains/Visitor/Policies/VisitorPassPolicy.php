@@ -41,6 +41,16 @@ class VisitorPassPolicy
         ]);
     }
 
+    public function update(User $user, VisitorPass $pass): bool
+    {
+        return $this->access->allows($user, 'visitor.passes.create', [
+            'tenant_id' => $pass->tenant_id,
+        ]) || $this->access->allows($user, 'visitor.passes.view', [
+            'tenant_id' => $pass->tenant_id,
+            'host_id'   => $pass->host_user_id,
+        ]);
+    }
+
     public function checkOut(User $user, VisitorPass $pass): bool
     {
         return $this->access->allows($user, 'visitor.passes.checkout', [

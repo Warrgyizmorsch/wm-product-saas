@@ -134,8 +134,41 @@ class VisitorPassController extends Controller
     public function show(VisitorPass $pass)
     {
         $this->authorize('view', $pass);
-        $pass->load(['visitor', 'host', 'belongings']);
-        return view('modules.visitor.passes.show', compact('pass'));
+        $pass->load(['visitor', 'host', 'belongings', 'linkedLead']);
+        
+        [$tenantId] = $this->visitorService->resolveTenantContext();
+        $hosts = \App\Models\User::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'email']);
+        $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->with(['primaryImage', 'images'])->orderBy('name')->get();
+
+        return view('modules.visitor.passes.show', compact('pass', 'hosts', 'products'));
+    }
+
+    public function convertToLead(Request $request, VisitorPass $pass)
+    {
+        $this->authorize('update', $pass);
+
+        if ($pass->source_module === 'crm' && $pass->source_reference_id) {
+            return redirect()->route('crm.leads.show', $pass->source_reference_id)
+                ->with('info', "Pass #{$pass->pass_number} is already linked to CRM Lead #{$pass->source_reference_no}");
+        }
+
+        $validated = $request->validate([
+            'lead_owner_id'               => 'nullable|exists:users,id',
+            'lead_type'                   => 'nullable|string|in:hot,warm,cold',
+            'priority'                    => 'nullable|string|in:Low,Medium,High,Urgent',
+            'product_ids'                 => 'nullable|array',
+            'product_ids.*'               => 'integer',
+            'product_items'               => 'nullable|array',
+            'product_items.*.product_id'  => 'nullable|integer',
+            'product_items.*.quantity'    => 'nullable|numeric|min:0.01',
+            'requirement'                 => 'nullable|string|max:2000',
+            'next_followup_date'          => 'nullable|date',
+        ]);
+
+        $lead = $this->visitorService->convertToLead($pass, $validated);
+
+        return redirect()->route('crm.leads.show', $lead->id)
+            ->with('success', __('visitor.lead_converted_success') . " ({$lead->lead_number})");
     }
 
     public function checkIn(VisitorPass $pass)
