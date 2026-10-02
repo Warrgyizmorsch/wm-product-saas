@@ -26,6 +26,50 @@
         color: #475569;
         border: 1px solid #cbd5e1;
     }
+    .btn-soft-success {
+        background-color: #d1fae5 !important;
+        color: #065f46 !important;
+        border: 1px solid #a7f3d0 !important;
+        transition: all 0.2s ease;
+    }
+    .btn-soft-success:hover {
+        background-color: #10b981 !important;
+        color: #ffffff !important;
+        border-color: #10b981 !important;
+    }
+    .btn-soft-danger {
+        background-color: #fee2e2 !important;
+        color: #991b1b !important;
+        border: 1px solid #fecaca !important;
+        transition: all 0.2s ease;
+    }
+    .btn-soft-danger:hover {
+        background-color: #ef4444 !important;
+        color: #ffffff !important;
+        border-color: #ef4444 !important;
+    }
+    .btn-soft-info {
+        background-color: #e0f2fe !important;
+        color: #0369a1 !important;
+        border: 1px solid #bae6fd !important;
+        transition: all 0.2s ease;
+    }
+    .btn-soft-info:hover {
+        background-color: #0284c7 !important;
+        color: #ffffff !important;
+        border-color: #0284c7 !important;
+    }
+    .btn-soft-warning {
+        background-color: #fef3c7 !important;
+        color: #92400e !important;
+        border: 1px solid #fde68a !important;
+        transition: all 0.2s ease;
+    }
+    .btn-soft-warning:hover {
+        background-color: #f59e0b !important;
+        color: #ffffff !important;
+        border-color: #f59e0b !important;
+    }
 </style>
 @endpush
 
@@ -194,13 +238,13 @@
             <x-ui.odoo-form-ui type="table" id="approvalTable" class="mb-0">
                 <thead>
                     <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 15%; background-color: #e8ecf1 !important;">{{ __('visitor.pass_number') }}</th>
-                        <th style="width: 20%; background-color: #e8ecf1 !important;">{{ __('visitor.visitor_name') }}</th>
-                        <th style="width: 15%; background-color: #e8ecf1 !important;">{{ __('visitor.company') }}</th>
-                        <th style="width: 15%; background-color: #e8ecf1 !important;">{{ __('visitor.purpose_of_visit') }}</th>
+                        <th style="width: 14%; background-color: #e8ecf1 !important;">{{ __('visitor.pass_number') }}</th>
+                        <th style="width: 18%; background-color: #e8ecf1 !important;">{{ __('visitor.visitor_name') }}</th>
+                        <th style="width: 13%; background-color: #e8ecf1 !important;">{{ __('visitor.company') }}</th>
+                        <th style="width: 13%; background-color: #e8ecf1 !important;">{{ __('visitor.purpose_of_visit') }}</th>
                         <th style="width: 12%; background-color: #e8ecf1 !important;">{{ __('visitor.expected_time') }}</th>
-                        <th style="width: 10%; background-color: #e8ecf1 !important;">{{ __('visitor.status') }}</th>
-                        <th style="width: 13%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('visitor.actions') }}</th>
+                        <th style="width: 9%; background-color: #e8ecf1 !important;">{{ __('visitor.status') }}</th>
+                        <th style="width: 21%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('visitor.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -270,29 +314,45 @@
                                     </div>
                                 @endif
                             </td>
-                            <td class="text-end pe-3">
-                                <div class="d-inline-flex align-items-center gap-1">
+                            <!-- Actions Column (Common Component x-ui.button with Spacing) -->
+                            <td class="text-end pe-3" style="white-space: nowrap;">
+                                <div class="hstack gap-2 justify-content-end flex-nowrap">
                                     @if($pass->status === 'Waiting Approval')
                                         <!-- Approve Button Form -->
-                                        <form method="POST" action="{{ route('visitor.approvals.approve', $pass->id) }}" class="d-inline">
+                                        <form method="POST" action="{{ route('visitor.approvals.approve', $pass->id) }}" class="d-inline-flex m-0 p-0">
                                             @csrf
-                                            <button type="submit" class="btn btn-sm btn-success px-2 py-1 fs-12 fw-semibold" title="{{ __('visitor.approve_pass') }}">
-                                                <i class="feather-check me-1"></i> {{ __('visitor.approve') }}
-                                            </button>
+                                            <x-ui.button variant="success" size="sm" type="submit" icon="feather-check">
+                                                {{ __('visitor.approve') }}
+                                            </x-ui.button>
                                         </form>
 
-                                        <!-- Reject Button (Opens Modal) -->
-                                        <button type="button" 
-                                                class="btn btn-sm btn-outline-danger px-2 py-1 fs-12 fw-semibold" 
-                                                onclick="openRejectModal({{ $pass->id }}, '{{ addslashes($pass->visitor?->full_name ?? '') }}', '{{ $pass->pass_number }}')"
-                                                title="{{ __('visitor.reject_pass') }}">
-                                            <i class="feather-x me-1"></i> {{ __('visitor.reject') }}
-                                        </button>
+                                        <!-- Reject Button -->
+                                        <x-ui.button variant="danger" size="sm" type="button" icon="feather-x" onclick="openRejectModal({{ $pass->id }}, '{{ addslashes($pass->visitor?->full_name ?? '') }}', '{{ $pass->pass_number }}')">
+                                            {{ __('visitor.reject') }}
+                                        </x-ui.button>
+                                    @elseif($pass->status === 'Checked-In')
+                                        <!-- Start Meeting Button -->
+                                        <form method="POST" action="{{ route('visitor.passes.start-meeting', $pass->id) }}" class="d-inline-flex m-0 p-0">
+                                            @csrf
+                                            <x-ui.button variant="info" size="sm" type="submit" icon="feather-users" class="text-white">
+                                                {{ __('visitor.start_meeting') }}
+                                            </x-ui.button>
+                                        </form>
+
+                                        <!-- Extend Stay Button -->
+                                        <x-ui.button variant="warning" size="sm" type="button" icon="feather-clock" class="text-dark" onclick="openExtendModal({{ $pass->id }}, '{{ $pass->pass_number }}', {{ $pass->expected_duration_minutes ?: 60 }})">
+                                            +Time
+                                        </x-ui.button>
+                                    @elseif($pass->status === 'Meeting in Progress')
+                                        <!-- Extend Stay Button -->
+                                        <x-ui.button variant="warning" size="sm" type="button" icon="feather-clock" class="text-dark" onclick="openExtendModal({{ $pass->id }}, '{{ $pass->pass_number }}', {{ $pass->expected_duration_minutes ?: 60 }})">
+                                            {{ __('visitor.extend_visit') }}
+                                        </x-ui.button>
                                     @endif
 
-                                    <a href="{{ route('visitor.passes.show', $pass->id) }}" class="btn btn-sm btn-light border px-2 py-1 fs-12 text-muted" title="{{ __('visitor.view_pass') }}">
-                                        <i class="feather-eye"></i>
-                                    </a>
+                                    <!-- View Pass Details Button -->
+                                    <x-ui.button variant="light" size="sm" href="{{ route('visitor.passes.show', $pass->id) }}" icon="feather-eye" title="{{ __('visitor.view_pass') }}" class="border">
+                                    </x-ui.button>
                                 </div>
                             </td>
                         </tr>
@@ -311,55 +371,76 @@
         </div>
 
         {{-- Pagination --}}
-        @if($passes->hasPages())
-            <div class="px-3 py-3 border-top d-flex align-items-center justify-content-between">
-                <div class="text-muted fs-12">
-                    Showing {{ $passes->firstItem() }} to {{ $passes->lastItem() }} of {{ $passes->total() }} records
-                </div>
-                <div>
-                    {{ $passes->links() }}
-                </div>
-            </div>
-        @endif
+        <div class="pt-3">
+            <x-ui.pagination
+                :currentPage="$passes->currentPage()"
+                :totalPages="$passes->lastPage()"
+                :totalResults="$passes->total()"
+                :perPage="$passes->perPage()" />
+        </div>
 
     </div>
 
     <!-- Reject Confirmation Modal -->
-    <div class="modal fade" id="rejectPassModal" tabindex="-1" aria-labelledby="rejectPassModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg rounded-3">
-                <form id="rejectPassForm" method="POST" action="">
-                    @csrf
-                    <div class="modal-header bg-danger text-white border-0 py-3">
-                        <h6 class="modal-title fw-bold" id="rejectPassModalLabel">
-                            <i class="feather-alert-octagon me-2"></i> {{ __('visitor.reject_pass') }}
-                        </h6>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body p-4">
-                        <div class="mb-3">
-                            <p class="fs-13 text-dark mb-1">
-                                Visitor: <strong id="rejectVisitorName" class="text-dark"></strong> (<span id="rejectPassNumber" class="text-muted"></span>)
-                            </p>
-                            <p class="fs-12 text-muted">
-                                {{ __('visitor.enter_rejection_reason') }}
-                            </p>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.rejection_reason') }} <span class="text-danger">*</span></label>
-                            <textarea name="rejection_reason" id="rejection_reason_input" class="form-control fs-13" rows="3" placeholder="{{ __('visitor.enter_rejection_reason') }}" required></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer border-top bg-light py-2">
-                        <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('crm.cancel') ?? 'Cancel' }}</button>
-                        <button type="submit" class="btn btn-sm btn-danger px-3 fw-semibold">
-                            <i class="feather-x me-1"></i> {{ __('visitor.reject') }}
-                        </button>
-                    </div>
-                </form>
+    <x-ui.modal 
+        id="rejectPassModal" 
+        title="<i class='feather-alert-octagon text-danger me-2'></i> {{ __('visitor.reject_pass') }}" 
+        centered 
+        :showFooter="false">
+        <form id="rejectPassForm" method="POST" action="">
+            @csrf
+            <div class="mb-3">
+                <p class="fs-13 text-dark mb-1">
+                    Visitor: <strong id="rejectVisitorName" class="text-dark"></strong> (<span id="rejectPassNumber" class="text-muted"></span>)
+                </p>
+                <p class="fs-12 text-muted">
+                    {{ __('visitor.enter_rejection_reason') }}
+                </p>
             </div>
-        </div>
-    </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.rejection_reason') }} <span class="text-danger">*</span></label>
+                <textarea name="rejection_reason" id="rejection_reason_input" class="form-control fs-13" rows="3" placeholder="{{ __('visitor.enter_rejection_reason') }}" required></textarea>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
+                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">{{ __('crm.cancel') ?? 'Cancel' }}</button>
+                <button type="submit" class="btn btn-danger px-3 fw-semibold">
+                    <i class="feather-x me-1"></i> {{ __('visitor.reject') }}
+                </button>
+            </div>
+        </form>
+    </x-ui.modal>
+
+    <!-- Extend Visit Modal for Host -->
+    <x-ui.modal 
+        id="extendVisitModal" 
+        title="<i class='feather-clock text-warning me-2'></i> {{ __('visitor.extend_visit') }} - <span id='extendPassNumber'></span>" 
+        centered 
+        :showFooter="false">
+        <form id="extendVisitForm" method="POST" action="">
+            @csrf
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.extend_minutes') }} <span class="text-danger">*</span></label>
+                <select name="extend_minutes" class="form-select fs-13" required>
+                    <option value="30">+30 Minutes</option>
+                    <option value="60" selected>+60 Minutes (1 Hour)</option>
+                    <option value="120">+120 Minutes (2 Hours)</option>
+                    <option value="240">+240 Minutes (4 Hours)</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">Reason / Remarks</label>
+                <textarea name="extend_notes" class="form-control fs-13" rows="2" placeholder="Meeting prolonged, additional discussion..."></textarea>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
+                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">{{ __('crm.cancel') ?? 'Cancel' }}</button>
+                <button type="submit" class="btn btn-warning px-3 fw-semibold">
+                    <i class="feather-clock me-1"></i> Extend Stay
+                </button>
+            </div>
+        </form>
+    </x-ui.modal>
 
 @endsection
 
@@ -374,6 +455,12 @@
         
         const modal = new bootstrap.Modal(document.getElementById('rejectPassModal'));
         modal.show();
+    }
+
+    function openExtendModal(id, passNo, currentDuration) {
+        document.getElementById('extendVisitForm').action = '/visitor/passes/' + id + '/extend';
+        document.getElementById('extendPassNumber').textContent = passNo;
+        new bootstrap.Modal(document.getElementById('extendVisitModal')).show();
     }
 </script>
 @endpush

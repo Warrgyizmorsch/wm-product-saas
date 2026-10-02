@@ -26,6 +26,7 @@ class Visitor extends Model
         'email',
         'company_name',
         'designation',
+        'visitor_type',
         'id_proof_type',
         'id_proof_number',
         'photo_url',
@@ -33,6 +34,8 @@ class Visitor extends Model
         'is_blacklisted',
         'blacklist_reason',
         'metadata',
+        'source_contact_type',
+        'source_contact_id',
     ];
 
     protected function casts(): array

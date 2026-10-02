@@ -17,10 +17,19 @@ Route::prefix('visitor')
         // 1. Gate Desk / Main Operational Overview
         Route::get('/', [VisitorController::class, 'index'])->name('index');
         Route::post('/', [VisitorController::class, 'store'])->name('store');
+        
+        // Pass Operational Actions
         Route::post('/passes/{id}/check-in', [VisitorController::class, 'checkIn'])->name('passes.check-in');
         Route::post('/passes/{id}/check-out', [VisitorController::class, 'checkOut'])->name('passes.check-out');
+        Route::post('/passes/{id}/mark-arrived', [VisitorController::class, 'markArrived'])->name('passes.mark-arrived');
+        Route::post('/passes/{id}/start-meeting', [VisitorController::class, 'startMeeting'])->name('passes.start-meeting');
+        Route::post('/passes/{id}/notify-host', [VisitorController::class, 'notifyHostManual'])->name('passes.notify-host');
+        Route::post('/passes/{id}/deny-entry', [VisitorController::class, 'denyEntry'])->name('passes.deny-entry');
+        Route::post('/passes/{id}/extend', [VisitorController::class, 'extendVisit'])->name('passes.extend');
+        Route::post('/passes/{id}/report-incident', [VisitorController::class, 'reportIncident'])->name('passes.report-incident');
+        Route::post('/visitors/{id}/toggle-blacklist', [VisitorController::class, 'toggleBlacklist'])->name('visitors.toggle-blacklist');
 
-        // Fast Lookup AJAX
+        // Fast Lookup AJAX (Phone, Email, Company)
         Route::get('/lookup', [VisitorController::class, 'lookup'])->name('lookup');
 
         // Import & Export

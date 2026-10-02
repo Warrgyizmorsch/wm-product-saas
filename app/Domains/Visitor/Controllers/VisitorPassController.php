@@ -78,32 +78,50 @@ class VisitorPassController extends Controller
         [$tenantId, $companyId, $branchId] = $this->visitorService->resolveTenantContext();
 
         $validated = $request->validate([
-            'full_name'           => 'required|string|max:255',
-            'phone'               => 'required|string|max:30',
-            'email'               => 'nullable|email|max:255',
-            'company_name'        => 'nullable|string|max:255',
-            'designation'         => 'nullable|string|max:100',
-            'id_proof_type'       => 'nullable|string|max:50',
-            'id_proof_number'     => 'nullable|string|max:100',
-            'photo_url'           => 'nullable|string',
-            'host_user_id'        => 'nullable|exists:users,id',
-            'purpose'             => 'required|string|max:100',
-            'entry_type'          => 'nullable|string|max:50',
-            'gate_number'         => 'nullable|string|max:50',
-            'fee_amount'          => 'nullable|numeric|min:0',
-            'item_type'           => 'nullable|string|max:100',
-            'serial_number'       => 'nullable|string|max:100',
-            'expected_arrival_at' => 'nullable|date',
-            'check_in_now'        => 'nullable|boolean',
-            'status'              => 'nullable|string|in:Expected,Waiting Approval,Approved,Checked-In',
-            'notes'               => 'nullable|string|max:1000',
+            'full_name'                 => 'required|string|max:255',
+            'phone'                     => 'required|string|max:30',
+            'email'                     => 'nullable|email|max:255',
+            'company_name'              => 'nullable|string|max:255',
+            'designation'               => 'nullable|string|max:100',
+            'visitor_type'              => 'nullable|string|in:Client,Vendor,Candidate,Service,Guest',
+            'id_proof_type'             => 'nullable|string|max:50',
+            'id_proof_number'           => 'nullable|string|max:100',
+            'id_verification_status'    => 'nullable|string|in:Pending,Verified,Exempted,Failed',
+            'photo_url'                 => 'nullable|string',
+            'host_user_id'              => 'nullable|exists:users,id',
+            'department_id'             => 'nullable|integer',
+            'purpose'                   => 'required|string|max:100',
+            'entry_type'                => 'nullable|string|max:50',
+            'gate_number'               => 'nullable|string|max:50',
+            'fee_amount'                => 'nullable|numeric|min:0',
+            'expected_duration_minutes' => 'nullable|integer|min:5|max:1440',
+            'accompanying_count'        => 'nullable|integer|min:0|max:50',
+            'accompanying_names'        => 'nullable|string|max:1000',
+            'vehicle_type'              => 'nullable|string|max:50',
+            'vehicle_number'            => 'nullable|string|max:50',
+            'parking_slot'              => 'nullable|string|max:50',
+            'badge_number'              => 'nullable|string|max:50',
+            'badge_printed'             => 'nullable|boolean',
+            'nda_safety_acknowledged'   => 'nullable|boolean',
+            'restricted_area_access'    => 'nullable|boolean',
+            'gate_pass_reference'       => 'nullable|string|max:100',
+            'item_type'                 => 'nullable|string|max:100',
+            'serial_number'             => 'nullable|string|max:100',
+            'is_returnable'             => 'nullable|boolean',
+            'belonging_gate_pass'       => 'nullable|string|max:100',
+            'expected_arrival_at'       => 'nullable|date',
+            'check_in_now'              => 'nullable|boolean',
+            'status'                    => 'nullable|string|in:Expected,Arrived,Waiting Approval,Approved,Checked-In',
+            'notes'                     => 'nullable|string|max:1000',
         ]);
 
         if (!empty($validated['item_type'])) {
             $validated['belongings'] = [
                 [
-                    'item_type'     => $validated['item_type'],
-                    'serial_number' => $validated['serial_number'] ?? null,
+                    'item_type'        => $validated['item_type'],
+                    'serial_number'    => $validated['serial_number'] ?? null,
+                    'is_returnable'    => isset($validated['is_returnable']) ? (bool)$validated['is_returnable'] : true,
+                    'gate_pass_number' => $validated['belonging_gate_pass'] ?? null,
                 ]
             ];
         }
@@ -116,6 +134,7 @@ class VisitorPassController extends Controller
     public function show(VisitorPass $pass)
     {
         $this->authorize('view', $pass);
+        $pass->load(['visitor', 'host', 'belongings']);
         return view('modules.visitor.passes.show', compact('pass'));
     }
 
@@ -136,6 +155,8 @@ class VisitorPassController extends Controller
             'check_in_at' => now(),
         ]);
 
+        $this->visitorService->notifyHost($pass, 'checked_in');
+
         return redirect()->back()->with('success', 'Visitor checked in successfully.');
     }
 
@@ -146,6 +167,8 @@ class VisitorPassController extends Controller
             'status'       => 'Checked-Out',
             'check_out_at' => now(),
         ]);
+
+        $this->visitorService->notifyHost($pass, 'checked_out');
 
         return redirect()->back()->with('success', 'Visitor checked out successfully.');
     }
