@@ -103,6 +103,12 @@ use App\Domains\HRMS\Models\GoalCategory;
 use App\Domains\HRMS\Models\Goal;
 use App\Domains\HRMS\Models\GoalKeyResult;
 use App\Domains\HRMS\Models\GoalCheckIn;
+use App\Domains\HRMS\Models\Feedback360Cycle;
+use App\Domains\HRMS\Models\Feedback360Competency;
+use App\Domains\HRMS\Models\Feedback360Question;
+use App\Domains\HRMS\Models\Feedback360Participant;
+use App\Domains\HRMS\Models\Feedback360Nomination;
+use App\Domains\HRMS\Models\Feedback360Response;
 use App\Domains\Production\Models\ProductionShift;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -131,6 +137,12 @@ class HrmsDemoSeeder extends Seeder
 
         // 1. Truncate all related HRMS tables safely
         $tablesToTruncate = [
+            'feedback_360_responses',
+            'feedback_360_nominations',
+            'feedback_360_participants',
+            'feedback_360_questions',
+            'feedback_360_competencies',
+            'feedback_360_cycles',
             'sop_version_histories',
             'sop_assignments',
             'sop_sections',
@@ -2959,7 +2971,7 @@ class HrmsDemoSeeder extends Seeder
             'category_id' => $helpCatIt->id,
             'title' => 'Connecting to Warrgyizmorsch Secure Office Wi-Fi & VPN',
             'slug' => 'connecting-to-office-wifi-and-vpn',
-            'content' => '<h3>Warrgyizmorsch Office Network Guide</h3><p>Follow these steps to configure the WPA3-Enterprise Wi-Fi profile on your company MacBook or Windows laptop:</p><ol><li>Select <strong>WRG-Corp-Secure</strong> Wi-Fi SSID.</li><li>Enter your official office email and SSO domain password.</li><li>Accept the root SSL security certificate.</li></ol>',
+            'content' => '<p class="lead fw-semibold text-primary mb-3">Warrgyizmorsch Global Office Network & Remote Gateway Access Guide</p><p>Follow these steps to configure the WPA3-Enterprise Wi-Fi profile on your company MacBook or Windows laptop:</p><ol class="ps-3 mb-3"><li>Select <strong>WRG-Corp-Secure</strong> from your network list.</li><li>Enter your official office email address and SSO password.</li><li>Accept and trust the root security certificate when prompted.</li></ol><p>For remote work, launch the WireGuard / OpenVPN client with your assigned configuration profile.</p>',
             'view_count' => 142,
             'is_published' => true,
         ]);
@@ -2969,7 +2981,7 @@ class HrmsDemoSeeder extends Seeder
             'category_id' => $helpCatPayroll->id,
             'title' => 'How to Submit Income Tax Declarations & Rent Receipts',
             'slug' => 'submitting-income-tax-declarations-and-rent-receipts',
-            'content' => '<h3>Annual Tax Declaration Guidelines</h3><p>Log in to your Employee Self Service portal, navigate to <strong>Payroll > My Tax Declarations</strong>, and upload your 80C, 80D, and HRA rent receipts before the 15th of the month.</p>',
+            'content' => '<p class="lead fw-semibold text-primary mb-3">Annual Income Tax Investment & Exemption Guidelines</p><p>All employees under the Old Tax Regime must submit their statutory investment proofs through the ESS portal before the monthly cutoff date.</p><p><strong>Step-by-Step Submission:</strong></p><ol class="ps-3 mb-3"><li>Navigate to <strong>HRMS &gt; Payroll &gt; Tax Declarations</strong>.</li><li>Upload valid receipts for Section 80C (PPF, ELSS, Life Insurance), Section 80D (Health Insurance), and monthly HRA rent receipts with landlord PAN.</li><li>Verify the computed exemption summary and click <strong>Submit Declaration</strong>.</li></ol><p class="text-muted small"><em>Note: Deductions will be adjusted in the upcoming payroll cycle once HR approves the uploaded proofs.</em></p>',
             'view_count' => 289,
             'is_published' => true,
         ]);
@@ -3897,7 +3909,212 @@ class HrmsDemoSeeder extends Seeder
             'check_in_date'      => Carbon::now()->subDays(1),
         ]);
 
-        $this->command?->info('HrmsDemoSeeder successfully completed! All 13 roles, complete employee forms, attendance history, salary structures, leave plans, fixed assets, recruitment, helpdesk, PIP, broadcasts, KRA/KPI scorecards, exit clearances, SOP management, travel expenses, and Goals & OKRs are seeded with real-world data.');
+        // 30. 360° Multi-Rater Feedback Reviews & Real Scores
+        $feedbackCycle = Feedback360Cycle::create([
+            'tenant_id'                   => $tenant->id,
+            'company_id'                  => $company->id,
+            'name'                        => 'Q3-Q4 360° Leadership & Peer Performance Review 2026',
+            'code'                        => '360-REV-2026-H2',
+            'description'                 => 'Comprehensive multi-rater appraisal evaluating core technical excellence, cross-functional collaboration, ownership, and client empathy.',
+            'start_date'                  => Carbon::parse('2026-10-01'),
+            'end_date'                    => Carbon::parse('2026-12-31'),
+            'nomination_deadline'         => Carbon::parse('2026-10-25'),
+            'submission_deadline'         => Carbon::parse('2026-11-30'),
+            'status'                      => 'in_progress',
+            'is_peer_anonymous'           => true,
+            'is_direct_report_anonymous'  => true,
+            'min_peer_nominations'        => 2,
+            'max_peer_nominations'        => 5,
+            'allow_self_nomination'       => true,
+            'require_manager_approval'    => true,
+            'created_by'                  => $users['company_admin']->id,
+        ]);
+
+        // Competencies
+        $compTech = Feedback360Competency::create([
+            'tenant_id'   => $tenant->id,
+            'company_id'  => $company->id,
+            'cycle_id'    => $feedbackCycle->id,
+            'name'        => 'SaaS Architecture & Technical Excellence',
+            'code'        => 'COMP-TECH',
+            'category'    => 'Technical Excellence',
+            'description' => 'Clean code standards, multi-tenant safety, performance optimization, and architectural reliability.',
+            'weightage'   => 100.00,
+            'is_active'   => true,
+        ]);
+
+        $compTeam = Feedback360Competency::create([
+            'tenant_id'   => $tenant->id,
+            'company_id'  => $company->id,
+            'cycle_id'    => $feedbackCycle->id,
+            'name'        => 'Team Collaboration & Mentorship',
+            'code'        => 'COMP-TEAM',
+            'category'    => 'Interpersonal',
+            'description' => 'Active knowledge sharing, constructive PR code reviews, empathy, and supporting junior teammates.',
+            'weightage'   => 100.00,
+            'is_active'   => true,
+        ]);
+
+        $compOwner = Feedback360Competency::create([
+            'tenant_id'   => $tenant->id,
+            'company_id'  => $company->id,
+            'cycle_id'    => $feedbackCycle->id,
+            'name'        => 'Ownership & Delivery Discipline',
+            'code'        => 'COMP-OWN',
+            'category'    => 'Operational Excellence',
+            'description' => 'Proactive problem resolution, taking accountability for releases, and adhering to sprint commitments.',
+            'weightage'   => 100.00,
+            'is_active'   => true,
+        ]);
+
+        // Questions
+        $qTech1 = Feedback360Question::create([
+            'tenant_id'            => $tenant->id,
+            'competency_id'        => $compTech->id,
+            'cycle_id'             => $feedbackCycle->id,
+            'question_text'        => 'How effectively does this employee write scalable, clean, and well-tested backend code?',
+            'question_type'        => 'rating_scale',
+            'target_reviewer_type' => 'all',
+            'is_required'          => true,
+            'sort_order'           => 1,
+        ]);
+
+        $qTech2 = Feedback360Question::create([
+            'tenant_id'            => $tenant->id,
+            'competency_id'        => $compTech->id,
+            'cycle_id'             => $feedbackCycle->id,
+            'question_text'        => 'Does the employee follow multi-tenant data isolation and security best practices?',
+            'question_type'        => 'rating_scale',
+            'target_reviewer_type' => 'all',
+            'is_required'          => true,
+            'sort_order'           => 2,
+        ]);
+
+        $qTeam1 = Feedback360Question::create([
+            'tenant_id'            => $tenant->id,
+            'competency_id'        => $compTeam->id,
+            'cycle_id'             => $feedbackCycle->id,
+            'question_text'        => 'How constructively does this person conduct peer code reviews and offer helpful guidance?',
+            'question_type'        => 'rating_scale',
+            'target_reviewer_type' => 'all',
+            'is_required'          => true,
+            'sort_order'           => 3,
+        ]);
+
+        $qOwner1 = Feedback360Question::create([
+            'tenant_id'            => $tenant->id,
+            'competency_id'        => $compOwner->id,
+            'cycle_id'             => $feedbackCycle->id,
+            'question_text'        => 'Takes complete ownership of assigned sub-modules and proactively communicates blockers.',
+            'question_type'        => 'rating_scale',
+            'target_reviewer_type' => 'all',
+            'is_required'          => true,
+            'sort_order'           => 4,
+        ]);
+
+        $qOpen1 = Feedback360Question::create([
+            'tenant_id'            => $tenant->id,
+            'competency_id'        => null,
+            'cycle_id'             => $feedbackCycle->id,
+            'question_text'        => 'What is this individual\'s greatest strength and standout contribution to the team?',
+            'description'          => 'Highlight key achievements, qualities, and positive behaviors.',
+            'question_type'        => 'text',
+            'target_reviewer_type' => 'all',
+            'is_required'          => false,
+            'sort_order'           => 5,
+        ]);
+
+        $qOpen2 = Feedback360Question::create([
+            'tenant_id'            => $tenant->id,
+            'competency_id'        => null,
+            'cycle_id'             => $feedbackCycle->id,
+            'question_text'        => 'What are 1-2 actionable growth areas where this person can level up?',
+            'description'          => 'Provide constructive, forward-looking advice for technical or leadership growth.',
+            'question_type'        => 'text',
+            'target_reviewer_type' => 'all',
+            'is_required'          => false,
+            'sort_order'           => 6,
+        ]);
+
+        // Target Participant: Rahul Sharma (Software Engineer)
+        $targetEmployee = $employees[14] ?? $employees[0];
+        $managerEmployee = $employees[13] ?? $employees[1];
+        $peerEmployee1 = $employees[15] ?? $employees[2];
+        $peerEmployee2 = $employees[16] ?? $employees[3];
+
+        $participant = Feedback360Participant::create([
+            'tenant_id'            => $tenant->id,
+            'cycle_id'             => $feedbackCycle->id,
+            'employee_id'          => $targetEmployee->id,
+            'manager_id'           => $managerEmployee->id,
+            'status'               => 'in_progress',
+            'self_score'           => 4.5,
+            'manager_score'        => 4.6,
+            'peer_score'           => 4.4,
+            'direct_report_score'  => null,
+            'overall_score'        => 4.5,
+            'manager_summary'      => 'Rahul has shown stellar progress in backend API architecture and high sprint velocity.',
+            'development_plan'     => 'Focus on distributed cache invalidation strategies and end-to-end integration test coverage.',
+        ]);
+
+        // Reviewer Nominations & Completed Responses
+        // 1. Self Review
+        $nomSelf = Feedback360Nomination::create([
+            'tenant_id'      => $tenant->id,
+            'cycle_id'       => $feedbackCycle->id,
+            'participant_id' => $participant->id,
+            'reviewer_id'    => $targetEmployee->id,
+            'reviewer_type'  => 'self',
+            'status'         => 'completed',
+            'submitted_at'   => Carbon::now()->subDays(5),
+        ]);
+
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech1->id, 'rating_value' => 4.5]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech2->id, 'rating_value' => 5.0]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTeam1->id, 'rating_value' => 4.0]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.5]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOpen1->id, 'text_value' => 'Successfully refactored HRMS repository layer and improved database query execution times by 40%.']);
+
+        // 2. Manager Review
+        $nomManager = Feedback360Nomination::create([
+            'tenant_id'      => $tenant->id,
+            'cycle_id'       => $feedbackCycle->id,
+            'participant_id' => $participant->id,
+            'reviewer_id'    => $managerEmployee->id,
+            'reviewer_type'  => 'manager',
+            'status'         => 'completed',
+            'submitted_at'   => Carbon::now()->subDays(2),
+        ]);
+
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech1->id, 'rating_value' => 5.0]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech2->id, 'rating_value' => 4.5]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTeam1->id, 'rating_value' => 4.5]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.5]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen1->id, 'text_value' => 'Rahul exhibits exceptional technical grit, consistently delivering zero-defect pull requests.']);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen2->id, 'text_value' => 'Encouraged to take on lead architecture roles in upcoming cross-module services.']);
+
+        // 3. Peer Review 1
+        $nomPeer1 = Feedback360Nomination::create([
+            'tenant_id'      => $tenant->id,
+            'cycle_id'       => $feedbackCycle->id,
+            'participant_id' => $participant->id,
+            'reviewer_id'    => $peerEmployee1->id,
+            'reviewer_type'  => 'peer',
+            'status'         => 'completed',
+            'submitted_at'   => Carbon::now()->subDay(),
+        ]);
+
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech1->id, 'rating_value' => 4.5]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech2->id, 'rating_value' => 4.0]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTeam1->id, 'rating_value' => 5.0]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.0]);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOpen1->id, 'text_value' => 'Always approachable, provides thorough and respectful code review feedback.']);
+
+        $participant->recalculateScores();
+
+        Schema::enableForeignKeyConstraints();
+
+        $this->command?->info('HrmsDemoSeeder successfully completed! All 13 roles, complete employee forms, attendance history, salary structures, leave plans, fixed assets, recruitment, helpdesk, PIP, broadcasts, KRA/KPI scorecards, 360° Multi-Rater Feedback, exit clearances, SOP management, travel expenses, and Goals & OKRs are seeded with real-world data.');
     }
 }
 

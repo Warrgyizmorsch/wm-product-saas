@@ -458,6 +458,7 @@ Route::prefix('api/hrms/attendance')
         Route::post('/manual', [AttendanceApiController::class, 'storeManual'])->name('manual.store');
         Route::delete('/date/{date}', [AttendanceApiController::class, 'destroyDate'])->name('destroy-date');
         Route::post('/track-location', [AttendanceApiController::class, 'trackLocation'])->name('track-location');
+        Route::get('/employee/{employee}', [AttendanceApiController::class, 'getEmployeeLocationLogs'])->name('employee-logs');
     });
 
 // Public Webhook route for ADMS devices
@@ -924,17 +925,34 @@ Route::prefix('api/hrms/feedback-360')
     ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.feedback360.')
     ->group(function () {
-        // Summary & Listing
+        // 1. Hub Summary & Cycles Listing
         Route::get('/', [Feedback360ApiController::class, 'index'])->name('index');
         Route::post('/cycles', [Feedback360ApiController::class, 'store'])->name('cycles.store');
         Route::get('/cycles/{id}', [Feedback360ApiController::class, 'show'])->name('cycles.show');
+        Route::put('/cycles/{id}', [Feedback360ApiController::class, 'update'])->name('cycles.update');
+        Route::delete('/cycles/{id}', [Feedback360ApiController::class, 'destroy'])->name('cycles.destroy');
+        Route::post('/cycles/{id}/launch', [Feedback360ApiController::class, 'launch'])->name('cycles.launch');
+        Route::post('/cycles/{id}/participants', [Feedback360ApiController::class, 'addParticipants'])->name('cycles.participants');
+        Route::post('/cycles/{id}/bulk-remind', [Feedback360ApiController::class, 'bulkRemind'])->name('cycles.bulk-remind');
 
-        // Review Workspace & Submit
+        // 2. Peer Nominations & Approvals
+        Route::post('/participants/{participantId}/nominate-peers', [Feedback360ApiController::class, 'nominatePeers'])->name('participants.nominate-peers');
+        Route::post('/nominations/{nominationId}/approve', [Feedback360ApiController::class, 'approveNomination'])->name('nominations.approve');
+        Route::post('/nominations/batch-approve', [Feedback360ApiController::class, 'batchApproveNominations'])->name('nominations.batch-approve');
+
+        // 3. Review Workspace & Evaluation Submission
         Route::get('/review/{nominationId}', [Feedback360ApiController::class, 'reviewWorkspace'])->name('review.workspace');
         Route::post('/review/{nominationId}', [Feedback360ApiController::class, 'submitReview'])->name('review.submit');
 
-        // 360 Report Analytics
+        // 4. 360 Assessment Report & Calibration
         Route::get('/report/{participantId}', [Feedback360ApiController::class, 'report'])->name('report');
+        Route::post('/report/{participantId}/publish', [Feedback360ApiController::class, 'publishReport'])->name('report.publish');
+
+        // 5. Competencies & Question Bank Masters
+        Route::post('/competencies', [Feedback360ApiController::class, 'storeCompetency'])->name('competencies.store');
+        Route::delete('/competencies/{id}', [Feedback360ApiController::class, 'destroyCompetency'])->name('competencies.destroy');
+        Route::post('/questions', [Feedback360ApiController::class, 'storeQuestion'])->name('questions.store');
+        Route::delete('/questions/{id}', [Feedback360ApiController::class, 'destroyQuestion'])->name('questions.destroy');
     });
 
 

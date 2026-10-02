@@ -133,6 +133,11 @@ class AttendanceApiController extends Controller
      */
     private function transformAttendance(Attendance $att): array
     {
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+        $isOwner = $employee && (int)$att->employee_id === (int)$employee->id;
+        $isToday = $att->date && $att->date->isToday();
+
         return [
             'id'                  => $att->id,
             'employee_id'         => $att->employee_id,
@@ -149,6 +154,14 @@ class AttendanceApiController extends Controller
             'formatted_work_time' => $att->formatted_work_hours,
             'formatted_break_time'=> $att->formatted_break_hours,
             'breaks_count'        => $att->breaks->count(),
+            'capabilities'        => [
+                'can_view'          => true,
+                'can_clock_in'      => $isOwner && $isToday && empty($att->check_in),
+                'can_clock_out'     => $isOwner && $isToday && !empty($att->check_in) && empty($att->check_out),
+                'can_start_break'   => $isOwner && $isToday && !empty($att->check_in) && empty($att->check_out),
+                'can_regularize'    => ($isOwner || $isHrAdmin) && !empty($att->id),
+                'can_edit'          => $isHrAdmin,
+            ],
         ];
     }
 
@@ -781,5 +794,130 @@ class AttendanceApiController extends Controller
         );
 
         return $this->sendSuccess($result, 'Location log recorded');
+    }
+
+    /**
+     * GET /api/hrms/attendance/employee/{employee}
+     * Retrieve concise attendance details and periodic location logs for an employee.
+     */
+    public function getEmployeeLocationLogs(Request $request, int|string $employeeId): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $employee = Employee::find($employeeId);
+        if (!$employee) {
+            return $this->sendError('Employee not found.', 404);
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin && $authEmployee && (int)$employee->id !== (int)$authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only view your own attendance logs.', 403);
+        }
+
+        $startDate = $request->query('start_date') ?? $request->query('from');
+        $endDate   = $request->query('end_date') ?? $request->query('to');
+        $month     = $request->query('month'); // e.g. 2026-09
+        $singleDate = $request->query('date');
+
+        // If month is provided, resolve start & end date
+        if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->format('Y-m-d');
+            $endDate   = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->format('Y-m-d');
+        }
+
+        // Multi-day / Date Range query
+        if ($startDate && $endDate) {
+            $attendances = Attendance::where('employee_id', $employee->id)
+                ->whereBetween('date', [$startDate, $endDate])
+                ->with(['locationLogs' => fn($q) => $q->orderBy('created_at', 'asc')])
+                ->orderBy('date', 'desc')
+                ->get();
+
+            $history = $attendances->map(function ($attendance) {
+                $locationLogs = $attendance->locationLogs->map(function ($log) {
+                    return [
+                        'lat'  => (float) $log->latitude,
+                        'lng'  => (float) $log->longitude,
+                        'time' => $log->created_at ? $log->created_at->format('h:i A') : '',
+                    ];
+                })->values()->toArray();
+
+                return [
+                    'date'                => $attendance->date ? $attendance->date->format('Y-m-d') : null,
+                    'status'              => $attendance->status ?? 'present',
+                    'location_type'       => $attendance->location_type ?? 'office',
+                    'check_in'            => $attendance->check_in ? $attendance->check_in->format('H:i:s') : null,
+                    'check_in_latitude'   => $attendance->check_in_latitude ? (float)$attendance->check_in_latitude : null,
+                    'check_in_longitude'  => $attendance->check_in_longitude ? (float)$attendance->check_in_longitude : null,
+                    'check_out'           => $attendance->check_out ? $attendance->check_out->format('H:i:s') : null,
+                    'check_out_latitude'  => $attendance->check_out_latitude ? (float)$attendance->check_out_latitude : null,
+                    'check_out_longitude' => $attendance->check_out_longitude ? (float)$attendance->check_out_longitude : null,
+                    'location_logs'       => $locationLogs,
+                ];
+            })->values()->toArray();
+
+            return $this->sendSuccess([
+                'employee_id'   => (int) $employee->id,
+                'employee_name' => $employee->full_name,
+                'start_date'    => $startDate,
+                'end_date'      => $endDate,
+                'total_records' => count($history),
+                'history'       => $history,
+            ], 'Attendance history and location logs retrieved successfully');
+        }
+
+        // Single Date Query (defaults to today if not provided)
+        $date = $singleDate ?: Carbon::today()->format('Y-m-d');
+
+        $attendance = Attendance::where('employee_id', $employee->id)
+            ->where('date', $date)
+            ->with(['locationLogs' => fn($q) => $q->orderBy('created_at', 'asc')])
+            ->first();
+
+        if (!$attendance) {
+            return $this->sendSuccess([
+                'employee_id'         => (int) $employee->id,
+                'employee_name'       => $employee->full_name,
+                'date'                => $date,
+                'status'              => 'absent',
+                'location_type'       => null,
+                'check_in'            => null,
+                'check_in_latitude'   => null,
+                'check_in_longitude'  => null,
+                'check_out'           => null,
+                'check_out_latitude'  => null,
+                'check_out_longitude' => null,
+                'location_logs'       => [],
+            ], 'Attendance log retrieved successfully');
+        }
+
+        $locationLogs = $attendance->locationLogs->map(function ($log) {
+            return [
+                'lat'  => (float) $log->latitude,
+                'lng'  => (float) $log->longitude,
+                'time' => $log->created_at ? $log->created_at->format('h:i A') : '',
+            ];
+        })->values()->toArray();
+
+        $data = [
+            'employee_id'         => (int) $employee->id,
+            'employee_name'       => $employee->full_name,
+            'date'                => $attendance->date ? $attendance->date->format('Y-m-d') : $date,
+            'status'              => $attendance->status ?? 'present',
+            'location_type'       => $attendance->location_type ?? 'office',
+            'check_in'            => $attendance->check_in ? $attendance->check_in->format('H:i:s') : null,
+            'check_in_latitude'   => $attendance->check_in_latitude ? (float) $attendance->check_in_latitude : null,
+            'check_in_longitude'  => $attendance->check_in_longitude ? (float) $attendance->check_in_longitude : null,
+            'check_out'           => $attendance->check_out ? $attendance->check_out->format('H:i:s') : null,
+            'check_out_latitude'  => $attendance->check_out_latitude ? (float) $attendance->check_out_latitude : null,
+            'check_out_longitude' => $attendance->check_out_longitude ? (float) $attendance->check_out_longitude : null,
+            'location_logs'       => $locationLogs,
+        ];
+
+        return $this->sendSuccess($data, 'Attendance and location logs retrieved successfully');
     }
 }

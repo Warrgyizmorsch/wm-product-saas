@@ -12,6 +12,7 @@ use App\Domains\HRMS\Models\Feedback360Participant;
 use App\Domains\HRMS\Models\Feedback360Question;
 use App\Domains\HRMS\Models\Feedback360Response;
 use App\Models\User;
+use App\Services\Notification\NotificationService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -39,151 +40,11 @@ class Feedback360Repository implements Feedback360RepositoryInterface
     }
 
     /**
-     * Ensure default standard competencies and questions exist for the tenant.
+     * Ensure default standard competencies and questions exist for the tenant (Disabled: only user-defined data).
      */
     protected function ensureDefaultCompetenciesAndQuestions(int $tenantId, ?int $companyId = null): void
     {
-        $existingCount = Feedback360Competency::where('tenant_id', $tenantId)->count();
-        if ($existingCount > 0) {
-            return;
-        }
-
-        $defaultCompetencies = [
-            [
-                'name' => 'Leadership & Strategic Vision',
-                'code' => 'COMP-LEAD',
-                'category' => 'Leadership',
-                'description' => 'Inspires team members, sets clear direction, and aligns everyday work with organizational goals.',
-                'questions' => [
-                    [
-                        'text' => 'Effectively communicates team vision, priorities, and roadmap.',
-                        'type' => 'rating_scale',
-                    ],
-                    [
-                        'text' => 'Empowers others, delegates appropriately, and provides coaching & constructive feedback.',
-                        'type' => 'rating_scale',
-                    ],
-                ],
-            ],
-            [
-                'name' => 'Teamwork & Collaboration',
-                'code' => 'COMP-TEAM',
-                'category' => 'Interpersonal',
-                'description' => 'Builds productive cross-functional relationships, actively listens, and supports fellow teammates.',
-                'questions' => [
-                    [
-                        'text' => 'Collaborates openly and constructively with cross-functional team members.',
-                        'type' => 'rating_scale',
-                    ],
-                    [
-                        'text' => 'Shares knowledge freely and helps teammates overcome obstacles.',
-                        'type' => 'rating_scale',
-                    ],
-                ],
-            ],
-            [
-                'name' => 'Execution & Technical Excellence',
-                'code' => 'COMP-EXEC',
-                'category' => 'Functional Excellence',
-                'description' => 'Consistently delivers high-quality work on time with strong attention to detail and accountability.',
-                'questions' => [
-                    [
-                        'text' => 'Consistently meets project deadlines with reliable, high-standard deliverables.',
-                        'type' => 'rating_scale',
-                    ],
-                    [
-                        'text' => 'Demonstrates deep domain knowledge and solves complex problems effectively.',
-                        'type' => 'rating_scale',
-                    ],
-                ],
-            ],
-            [
-                'name' => 'Communication & Transparency',
-                'code' => 'COMP-COMM',
-                'category' => 'Interpersonal',
-                'description' => 'Communicates clearly, concisely, and with empathy across all channels and levels.',
-                'questions' => [
-                    [
-                        'text' => 'Presents ideas and status updates with clarity, brevity, and empathy.',
-                        'type' => 'rating_scale',
-                    ],
-                    [
-                        'text' => 'Actively listens to diverse viewpoints and handles conflict constructively.',
-                        'type' => 'rating_scale',
-                    ],
-                ],
-            ],
-            [
-                'name' => 'Continuous Growth & Core Values',
-                'code' => 'COMP-CULT',
-                'category' => 'Core Values',
-                'description' => 'Embodies company values, demonstrates integrity, and proactively pursues professional development.',
-                'questions' => [
-                    [
-                        'text' => 'Exemplifies core company values, integrity, and ethical conduct in all situations.',
-                        'type' => 'rating_scale',
-                    ],
-                    [
-                        'text' => 'Proactively seeks feedback and adapts positively to organizational changes.',
-                        'type' => 'rating_scale',
-                    ],
-                ],
-            ],
-        ];
-
-        DB::transaction(function () use ($defaultCompetencies, $tenantId, $companyId) {
-            $sort = 1;
-            foreach ($defaultCompetencies as $cData) {
-                $comp = Feedback360Competency::create([
-                    'tenant_id'   => $tenantId,
-                    'company_id'  => $companyId,
-                    'name'        => $cData['name'],
-                    'code'        => $cData['code'],
-                    'category'    => $cData['category'],
-                    'description' => $cData['description'],
-                    'weightage'   => 100.00,
-                    'is_active'   => true,
-                ]);
-
-                foreach ($cData['questions'] as $qData) {
-                    Feedback360Question::create([
-                        'tenant_id'            => $tenantId,
-                        'competency_id'        => $comp->id,
-                        'cycle_id'             => null, // global
-                        'question_text'        => $qData['text'],
-                        'question_type'        => $qData['type'],
-                        'target_reviewer_type' => 'all',
-                        'is_required'          => true,
-                        'sort_order'           => $sort++,
-                    ]);
-                }
-            }
-
-            // Also add standard qualitative open-ended questions
-            Feedback360Question::create([
-                'tenant_id'            => $tenantId,
-                'competency_id'        => null,
-                'cycle_id'             => null,
-                'question_text'        => 'What are this individual\'s greatest strengths and standout contributions?',
-                'description'          => 'Highlight key achievements, qualities, and positive behaviors.',
-                'question_type'        => 'text',
-                'target_reviewer_type' => 'all',
-                'is_required'          => false,
-                'sort_order'           => $sort++,
-            ]);
-
-            Feedback360Question::create([
-                'tenant_id'            => $tenantId,
-                'competency_id'        => null,
-                'cycle_id'             => null,
-                'question_text'        => 'What are 1-2 actionable areas where this individual can grow or improve?',
-                'description'          => 'Provide constructive, forward-looking advice for professional development.',
-                'question_type'        => 'text',
-                'target_reviewer_type' => 'all',
-                'is_required'          => false,
-                'sort_order'           => $sort++,
-            ]);
-        });
+        // No hardcoded seed data; only user-created competencies and questions are displayed.
     }
 
     /**
@@ -191,11 +52,19 @@ class Feedback360Repository implements Feedback360RepositoryInterface
      */
     public function getIndexData(array $inputs, ?User $user, int $tenantId): array
     {
-        $this->ensureDefaultCompetenciesAndQuestions($tenantId);
-
         $currentEmployee = $this->resolveEmployee($user, $tenantId);
-        $isHrAdmin = true;
-        $isManager = true;
+        $isHrAdmin = (bool) ($user && (
+            $user->is_admin ||
+            in_array(strtolower($user->role ?? ''), ['admin', 'super_admin', 'super admin', 'hr', 'hr_admin']) ||
+            $user->hasHrPermission('hrms.performance.manage') ||
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.feedback_360.manage') ||
+            $user->hasHrPermission('hrms.employees.view')
+        ));
+        $isManager = (bool) ($user && (
+            $isHrAdmin ||
+            ($currentEmployee && \App\Domains\HRMS\Models\Employee::where('tenant_id', $tenantId)->where('reporting_manager_id', $currentEmployee->id)->exists())
+        ));
 
         $activeTab = $inputs['active_tab'] ?? 'cycles';
 
@@ -230,6 +99,17 @@ class Feedback360Repository implements Feedback360RepositoryInterface
         }
 
         $cycles = $cycleQuery->paginate(12)->appends($inputs);
+        $cycles->getCollection()->transform(function ($c) use ($isHrAdmin) {
+            $c->capabilities = [
+                'can_view'             => true,
+                'can_edit'             => $isHrAdmin,
+                'can_delete'           => $isHrAdmin,
+                'can_launch'           => $isHrAdmin,
+                'can_add_participants' => $isHrAdmin,
+                'can_bulk_remind'      => $isHrAdmin,
+            ];
+            return $c;
+        });
 
         // 2. Reviews dataset (only active cycles in 'in_progress' or 'review' stages are actionable for reviewers)
         if ($currentEmployee) {
@@ -243,6 +123,14 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                 ->latest('id')
                 ->get();
 
+            $myPendingReviews->transform(function ($review) use ($currentEmployee) {
+                $review->capabilities = [
+                    'can_view'            => true,
+                    'can_submit_feedback' => ($currentEmployee && $review->reviewer_id === $currentEmployee->id && in_array($review->status, ['approved', 'in_progress'])),
+                ];
+                return $review;
+            });
+
             $mySubmittedReviews = Feedback360Nomination::where('tenant_id', $tenantId)
                 ->where('reviewer_id', $currentEmployee->id)
                 ->where('status', 'completed')
@@ -252,12 +140,28 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                 ->take(20)
                 ->get();
 
+            $mySubmittedReviews->transform(function ($review) {
+                $review->capabilities = [
+                    'can_view'            => true,
+                    'can_submit_feedback' => false,
+                ];
+                return $review;
+            });
+
             $myEvaluations = Feedback360Participant::where('tenant_id', $tenantId)
                 ->where('employee_id', $currentEmployee->id)
                 ->whereHas('cycle')
                 ->with(['cycle', 'manager', 'nominations.reviewer'])
                 ->latest('id')
                 ->get();
+
+            $myEvaluations->transform(function ($eval) use ($currentEmployee) {
+                $eval->capabilities = [
+                    'can_view'           => true,
+                    'can_nominate_peers' => ($currentEmployee && $eval->employee_id === $currentEmployee->id && ($eval->cycle->allow_self_nomination ?? true) && in_array($eval->cycle->status ?? '', ['nomination', 'draft'])),
+                ];
+                return $eval;
+            });
         } else {
             $myPendingReviews = Feedback360Nomination::where('tenant_id', $tenantId)
                 ->whereIn('status', ['approved', 'in_progress'])
@@ -363,7 +267,23 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             ->findOrFail($id);
 
         $currentEmployee = $this->resolveEmployee($user, $tenantId);
-        $isHrAdmin = true;
+        $isHrAdmin = (bool) ($user && (
+            $user->is_admin ||
+            in_array(strtolower($user->role ?? ''), ['admin', 'super_admin', 'super admin', 'hr', 'hr_admin']) ||
+            $user->hasHrPermission('hrms.performance.manage') ||
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.feedback_360.manage') ||
+            $user->hasHrPermission('hrms.employees.view')
+        ));
+
+        $cycle->capabilities = [
+            'can_view'             => true,
+            'can_edit'             => $isHrAdmin,
+            'can_delete'           => $isHrAdmin,
+            'can_launch'           => $isHrAdmin,
+            'can_add_participants' => $isHrAdmin,
+            'can_bulk_remind'      => $isHrAdmin,
+        ];
 
         $participants = Feedback360Participant::where('tenant_id', $tenantId)
             ->where('cycle_id', $cycle->id)
@@ -375,6 +295,15 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             ])
             ->latest('id')
             ->get();
+
+        $participants->transform(function ($p) use ($currentEmployee, $cycle, $isHrAdmin) {
+            $p->capabilities = [
+                'can_view'           => true,
+                'can_nominate_peers' => $isHrAdmin || ($currentEmployee && $p->employee_id === $currentEmployee->id && ($cycle->allow_self_nomination ?? true) && in_array($cycle->status ?? '', ['nomination', 'draft'])),
+                'can_publish_report' => $isHrAdmin,
+            ];
+            return $p;
+        });
 
         $questions = Feedback360Question::where('tenant_id', $tenantId)
             ->where(function ($q) use ($cycle) {
@@ -917,6 +846,19 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                 'nominated_by'  => $participant->employee_id,
             ]);
 
+            // Notify Peer Reviewer of nomination
+            if ($nom->reviewer_id) {
+                NotificationService::sendToEmployee(
+                    employee: $nom->reviewer_id,
+                    title: 'Nominated for 360° Peer Feedback',
+                    message: "You have been nominated to provide 360° feedback for {$participant->employee?->full_name} ({$cycle->name}).",
+                    actionUrl: route('hrms.feedback360.review', $nom->id),
+                    module: 'hrms',
+                    type: 'feedback360',
+                    iconClass: 'feather-users'
+                );
+            }
+
             $created[] = $nom;
         }
 
@@ -1023,6 +965,15 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                         $participant->status = 'in_progress';
                     }
                     $participant->recalculateScores();
+
+                    // Notify Cycle Admins / HR of Review Submission
+                    NotificationService::sendToHrAdmins(
+                        title: '360° Review Submitted',
+                        message: "A 360° evaluation was completed for {$participant->employee?->full_name} ({$cycle?->name}).",
+                        actionUrl: route('hrms.feedback360.cycles.show', $cycle->id),
+                        type: 'feedback360',
+                        iconClass: 'feather-check-circle'
+                    );
                 }
             }
 
@@ -1048,6 +999,19 @@ class Feedback360Repository implements Feedback360RepositoryInterface
         $participant->published_by     = $user?->id;
         $participant->save();
 
+        // Notify Employee of published 360 Feedback Report
+        if ($participant->employee_id) {
+            NotificationService::sendToEmployee(
+                employee: $participant->employee_id,
+                title: '360° Feedback Assessment Published',
+                message: "Your comprehensive 360° multi-rater evaluation report for {$participant->cycle?->name} is now published.",
+                actionUrl: route('hrms.feedback360.report', $participant->id),
+                module: 'hrms',
+                type: 'feedback360',
+                iconClass: 'feather-award'
+            );
+        }
+
         return $participant;
     }
 
@@ -1061,7 +1025,20 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             ->whereIn('status', ['approved', 'in_progress'])
             ->get();
 
-        // In production, triggers system notification / email dispatch
+        foreach ($pending as $nom) {
+            if ($nom->reviewer_id) {
+                NotificationService::sendToEmployee(
+                    employee: $nom->reviewer_id,
+                    title: 'Reminder: 360° Feedback Due Soon',
+                    message: "Please complete your pending 360° evaluation for {$nom->employee?->full_name} ({$nom->cycle?->name}).",
+                    actionUrl: route('hrms.feedback360.review', $nom->id),
+                    module: 'hrms',
+                    type: 'feedback360',
+                    iconClass: 'feather-clock'
+                );
+            }
+        }
+
         return $pending->count();
     }
 
@@ -1070,7 +1047,7 @@ class Feedback360Repository implements Feedback360RepositoryInterface
      */
     public function storeCompetency(array $data, int $tenantId, ?User $user = null): Feedback360Competency
     {
-        return Feedback360Competency::create([
+        $comp = Feedback360Competency::create([
             'tenant_id'   => $tenantId,
             'company_id'  => $data['company_id'] ?? null,
             'cycle_id'    => !empty($data['cycle_id']) ? (int) $data['cycle_id'] : null,
@@ -1081,6 +1058,29 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             'weightage'   => (float) ($data['weightage'] ?? 100.00),
             'is_active'   => true,
         ]);
+
+        // Automatically store child questions if provided in the unified form
+        if (!empty($data['questions']) && is_array($data['questions'])) {
+            $order = Feedback360Question::where('tenant_id', $tenantId)->max('sort_order') ?? 0;
+            foreach ($data['questions'] as $qData) {
+                if (is_array($qData) && !empty($qData['question_text'])) {
+                    $order++;
+                    Feedback360Question::create([
+                        'tenant_id'            => $tenantId,
+                        'competency_id'        => $comp->id,
+                        'cycle_id'             => $comp->cycle_id,
+                        'question_text'        => trim($qData['question_text']),
+                        'description'          => $qData['description'] ?? null,
+                        'question_type'        => $qData['question_type'] ?? 'rating_scale',
+                        'target_reviewer_type' => $qData['target_reviewer_type'] ?? 'all',
+                        'is_required'          => isset($qData['is_required']) ? (bool) $qData['is_required'] : true,
+                        'sort_order'           => $order,
+                    ]);
+                }
+            }
+        }
+
+        return $comp->load('questions');
     }
 
     /**
@@ -1089,6 +1089,7 @@ class Feedback360Repository implements Feedback360RepositoryInterface
     public function deleteCompetency(int $id, int $tenantId): bool
     {
         $comp = Feedback360Competency::where('tenant_id', $tenantId)->findOrFail($id);
+        $comp->questions()->delete();
         return (bool) $comp->delete();
     }
 

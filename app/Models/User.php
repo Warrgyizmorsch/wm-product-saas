@@ -149,6 +149,36 @@ class User extends Authenticatable
         return $this->belongsTo(\App\Domains\HRMS\Models\Branch::class);
     }
 
+    public function syncWithEmployee(?\App\Domains\HRMS\Models\Employee $employee = null): void
+    {
+        $employee = $employee ?: ($this->relationLoaded('employee') ? $this->employee : \App\Domains\HRMS\Models\Employee::resolveForUser($this));
+        if (! $employee) {
+            return;
+        }
+
+        $updates = [];
+
+        if ($employee->company_id && $this->company_id !== $employee->company_id) {
+            $updates['company_id'] = $employee->company_id;
+        }
+        if ($employee->branch_id && $this->branch_id !== $employee->branch_id) {
+            $updates['branch_id'] = $employee->branch_id;
+        }
+        if ($employee->department_id && $this->department_id !== $employee->department_id) {
+            $updates['department_id'] = $employee->department_id;
+        }
+        if ($employee->personal_mobile_number && empty($this->phone)) {
+            $updates['phone'] = $employee->personal_mobile_number;
+        }
+        if ($employee->photo && empty($this->avatar)) {
+            $updates['avatar'] = $employee->photo;
+        }
+
+        if (! empty($updates)) {
+            $this->forceFill($updates)->saveQuietly();
+        }
+    }
+
     protected static function booted(): void
     {
         static::saved(function (self $user) {

@@ -175,6 +175,20 @@ class EmployeeExitApiController extends Controller
         $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
         $exits = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
+        $exits->getCollection()->transform(function ($exit) use ($currentEmployee, $isHrAdmin) {
+            $isOwner = $currentEmployee && (int)$exit->employee_id === (int)$currentEmployee->id;
+            $isPending = in_array($exit->status, ['pending_approval', 'submitted', 'in_clearance']);
+            $exit->capabilities = [
+                'can_view'            => true,
+                'can_approve_manager' => ($isHrAdmin || ($currentEmployee && $exit->employee && $exit->employee->reporting_manager_id === $currentEmployee->id)) && $isPending,
+                'can_approve_hr'      => $isHrAdmin && $isPending,
+                'can_clear'           => $isHrAdmin,
+                'can_settle_fnf'      => $isHrAdmin && in_array($exit->status, ['in_clearance', 'approved', 'completed']),
+                'can_cancel'          => ($isOwner || $isHrAdmin) && $isPending,
+            ];
+            return $exit;
+        });
+
         return $this->sendSuccess($exits, 'Exits list retrieved successfully.');
     }
 
@@ -274,6 +288,17 @@ class EmployeeExitApiController extends Controller
         if (!$isHrAdmin && $employee && $exit->employee_id !== $employee->id) {
             return $this->sendError('Unauthorized action. You can only view your own exit record.', 403);
         }
+
+        $isOwner = $employee && (int)$exit->employee_id === (int)$employee->id;
+        $isPending = in_array($exit->status, ['pending_approval', 'submitted', 'in_clearance']);
+        $exit->capabilities = [
+            'can_view'            => true,
+            'can_approve_manager' => ($isHrAdmin || ($employee && $exit->employee && $exit->employee->reporting_manager_id === $employee->id)) && $isPending,
+            'can_approve_hr'      => $isHrAdmin && $isPending,
+            'can_clear'           => $isHrAdmin || ($employee && $exit->clearances->contains('assigned_to_user_id', auth()->id())),
+            'can_settle_fnf'      => $isHrAdmin && in_array($exit->status, ['in_clearance', 'approved', 'completed']),
+            'can_cancel'          => ($isOwner || $isHrAdmin) && $isPending,
+        ];
 
         return $this->sendSuccess($exit, 'Exit details retrieved successfully.');
     }

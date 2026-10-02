@@ -178,6 +178,21 @@ class RecruitmentApiController extends Controller
         $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
         $requisitions = $query->paginate($perPage);
 
+        $canUpdate = $this->authorizePermission('hrms.recruitment.update');
+        $canDelete = $this->authorizePermission('hrms.recruitment.delete');
+        $canCreate = $this->authorizePermission('hrms.recruitment.create');
+
+        $requisitions->getCollection()->transform(function ($req) use ($canUpdate, $canDelete, $canCreate) {
+            $req->capabilities = [
+                'can_view'                 => true,
+                'can_edit'                 => $canUpdate,
+                'can_delete'               => $canDelete,
+                'can_create_candidate'     => $canCreate,
+                'can_schedule_interview'   => $canUpdate,
+            ];
+            return $req;
+        });
+
         return $this->sendSuccess($requisitions, 'Job requisitions retrieved.');
     }
 
@@ -242,6 +257,14 @@ class RecruitmentApiController extends Controller
         if (!$requisition) {
             return $this->sendError('Job Requisition not found.', 404);
         }
+
+        $requisition->capabilities = [
+            'can_view'                 => true,
+            'can_edit'                 => $this->authorizePermission('hrms.recruitment.update'),
+            'can_delete'               => $this->authorizePermission('hrms.recruitment.delete'),
+            'can_create_candidate'     => $this->authorizePermission('hrms.recruitment.create'),
+            'can_schedule_interview'   => $this->authorizePermission('hrms.recruitment.update'),
+        ];
 
         return $this->sendSuccess($requisition, 'Job Requisition details retrieved.');
     }
@@ -404,6 +427,22 @@ class RecruitmentApiController extends Controller
         $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
         $candidates = $query->paginate($perPage);
 
+        $canUpdate = $this->authorizePermission('hrms.recruitment.update');
+        $canDelete = $this->authorizePermission('hrms.recruitment.delete');
+
+        $candidates->getCollection()->transform(function ($c) use ($canUpdate, $canDelete) {
+            $c->capabilities = [
+                'can_view'               => true,
+                'can_edit'               => $canUpdate,
+                'can_delete'             => $canDelete,
+                'can_schedule_interview' => $canUpdate,
+                'can_score'              => true,
+                'can_create_offer'       => $canUpdate,
+                'can_hire'               => $canUpdate,
+            ];
+            return $c;
+        });
+
         return $this->sendSuccess($candidates, 'Candidates retrieved.');
     }
 
@@ -469,6 +508,19 @@ class RecruitmentApiController extends Controller
         if (!$candidate) {
             return $this->sendError('Candidate not found.', 404);
         }
+
+        $canUpdate = $this->authorizePermission('hrms.recruitment.update');
+        $canDelete = $this->authorizePermission('hrms.recruitment.delete');
+
+        $candidate->capabilities = [
+            'can_view'               => true,
+            'can_edit'               => $canUpdate,
+            'can_delete'             => $canDelete,
+            'can_schedule_interview' => $canUpdate,
+            'can_score'              => true,
+            'can_create_offer'       => $canUpdate,
+            'can_hire'               => $canUpdate,
+        ];
 
         return $this->sendSuccess($candidate, 'Candidate profile retrieved.');
     }

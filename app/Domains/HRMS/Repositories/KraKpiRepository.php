@@ -15,6 +15,7 @@ use App\Domains\HRMS\Models\KpiTemplateItem;
 use App\Domains\HRMS\Models\KraCategory;
 use App\Domains\HRMS\Models\PerformanceImprovementPlan;
 use App\Domains\HRMS\Services\KraKpiService;
+use App\Services\Notification\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -200,6 +201,16 @@ class KraKpiRepository implements KraKpiRepositoryInterface
 
         $isOwner = $currentEmployee && $currentEmployee->id === $plan->employee_id;
         $isManager = $currentEmployee && $currentEmployee->id === $plan->manager_id;
+
+        $plan->capabilities = [
+            'can_view'             => true,
+            'can_self_appraise'    => $isOwner && in_array($plan->status, ['draft', 'goal_setting', 'self_review', 'active']),
+            'can_manager_appraise' => ($isManager || $isHrOrAdmin) && in_array($plan->status, ['submitted', 'manager_review', 'in_review']),
+            'can_calibrate'        => $isHrOrAdmin && in_array($plan->status, ['manager_reviewed', 'calibration', 'in_review']),
+            'can_sign_off'         => ($isOwner || $isManager || $isHrOrAdmin) && in_array($plan->status, ['calibrated', 'completed']),
+            'can_edit'             => $isHrOrAdmin || ($isOwner && in_array($plan->status, ['draft', 'goal_setting'])),
+            'can_delete'           => $isHrOrAdmin,
+        ];
 
         $activePip = null;
         if ($plan->pip_triggered) {
@@ -530,6 +541,20 @@ class KraKpiRepository implements KraKpiRepositoryInterface
 
         $this->kraKpiService->recalculatePlanScore($plan);
 
+        // Notify Reporting Manager of Self-Appraisal Submission
+        $manager = $plan->manager ?? $plan->employee?->reportingManager;
+        if ($manager) {
+            NotificationService::sendToEmployee(
+                employee: $manager,
+                title: 'Self-Appraisal Submitted',
+                message: "{$plan->employee?->full_name} submitted their self-appraisal for {$plan->appraisalCycle?->name}. Awaiting your evaluation.",
+                actionUrl: route('hrms.kra-kpi.show', $plan->id),
+                module: 'hrms',
+                type: 'performance',
+                iconClass: 'feather-check-circle'
+            );
+        }
+
         return $plan;
     }
 
@@ -561,6 +586,27 @@ class KraKpiRepository implements KraKpiRepositoryInterface
 
         $this->kraKpiService->recalculatePlanScore($plan);
 
+        // Notify Employee and HR Committee
+        if ($plan->employee_id) {
+            NotificationService::sendToEmployee(
+                employee: $plan->employee_id,
+                title: 'Manager Appraisal Completed',
+                message: "Your manager completed evaluation and competency scoring for {$plan->appraisalCycle?->name}.",
+                actionUrl: route('hrms.kra-kpi.show', $plan->id),
+                module: 'hrms',
+                type: 'performance',
+                iconClass: 'feather-award'
+            );
+        }
+
+        NotificationService::sendToHrAdmins(
+            title: 'Appraisal Ready for Calibration',
+            message: "Manager evaluation completed for {$plan->employee?->full_name} ({$plan->plan_number}). Ready for score normalization.",
+            actionUrl: route('hrms.kra-kpi.show', $plan->id),
+            type: 'performance',
+            iconClass: 'feather-sliders'
+        );
+
         return $plan;
     }
 
@@ -578,6 +624,19 @@ class KraKpiRepository implements KraKpiRepositoryInterface
         $plan->calibrated_at = Carbon::now();
         $plan->save();
 
+        // Notify Employee to review calibrated score and sign off
+        if ($plan->employee_id) {
+            NotificationService::sendToEmployee(
+                employee: $plan->employee_id,
+                title: 'Appraisal Calibrated — Sign-Off Required',
+                message: "Your final appraisal score ({$plan->final_score}%) and grade ({$plan->final_grade}) are published. Please review and sign off.",
+                actionUrl: route('hrms.kra-kpi.show', $plan->id),
+                module: 'hrms',
+                type: 'performance',
+                iconClass: 'feather-check-square'
+            );
+        }
+
         return $plan;
     }
 
@@ -591,6 +650,28 @@ class KraKpiRepository implements KraKpiRepositoryInterface
         $plan->status = 'signed_off';
         $plan->signed_off_at = Carbon::now();
         $plan->save();
+
+        // Notify Manager and HR of completed appraisal
+        $manager = $plan->manager ?? $plan->employee?->reportingManager;
+        if ($manager) {
+            NotificationService::sendToEmployee(
+                employee: $manager,
+                title: 'Appraisal Signed Off & Completed',
+                message: "{$plan->employee?->full_name} has digitally acknowledged and signed off their appraisal for {$plan->appraisalCycle?->name}.",
+                actionUrl: route('hrms.kra-kpi.show', $plan->id),
+                module: 'hrms',
+                type: 'performance',
+                iconClass: 'feather-check-circle'
+            );
+        }
+
+        NotificationService::sendToHrAdmins(
+            title: 'Appraisal Completed & Signed Off',
+            message: "{$plan->employee?->full_name} completed and signed off scorecard #{$plan->plan_number}.",
+            actionUrl: route('hrms.kra-kpi.show', $plan->id),
+            type: 'performance',
+            iconClass: 'feather-check-circle'
+        );
 
         return $plan;
     }

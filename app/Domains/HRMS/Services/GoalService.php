@@ -9,6 +9,7 @@ use App\Domains\HRMS\Models\GoalCheckIn;
 use App\Domains\HRMS\Models\GoalCycle;
 use App\Domains\HRMS\Models\GoalKeyResult;
 use App\Models\User;
+use App\Services\Notification\NotificationService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Database\Schema\Blueprint;
@@ -176,6 +177,28 @@ class GoalService
 
                 $goal->load('keyResults');
                 $goal->recalculateProgress();
+            }
+
+            // Dispatch notification to assigned employees
+            try {
+                $goal->loadMissing(['employees', 'employee']);
+                $assigned = $goal->employees;
+                if ($assigned->isEmpty() && $goal->employee) {
+                    $assigned = collect([$goal->employee]);
+                }
+                foreach ($assigned as $assignedEmp) {
+                    NotificationService::sendToEmployee(
+                        $assignedEmp,
+                        'New Goal / OKR Assigned',
+                        "You have been assigned to goal: {$goal->title} ({$goal->code}).",
+                        route('hrms.goals.show', $goal->id),
+                        'hrms',
+                        'goal_assigned',
+                        'feather-target'
+                    );
+                }
+            } catch (\Throwable $e) {
+                // Notification dispatch failure shouldn't break goal creation
             }
 
             return $goal;
@@ -396,6 +419,29 @@ class GoalService
                 'blockers'           => $data['blockers'] ?? null,
                 'check_in_date'      => now(),
             ]);
+
+            // Dispatch notification on milestone completion (100%) or at-risk warning
+            try {
+                if ($goal->progress_percentage >= 100.0 && $prevProg < 100.0) {
+                    NotificationService::sendToHrAdmins(
+                        'Goal 100% Completed',
+                        "Goal '{$goal->title}' ({$goal->code}) has reached 100% completion.",
+                        route('hrms.goals.show', $goal->id),
+                        'goal_completed',
+                        'feather-award'
+                    );
+                } elseif (in_array($goal->health_status, ['at_risk', 'behind'])) {
+                    NotificationService::sendToHrAdmins(
+                        'Goal At-Risk Alert',
+                        "Goal '{$goal->title}' has been flagged as " . strtoupper(str_replace('_', ' ', $goal->health_status)) . " during check-in.",
+                        route('hrms.goals.show', $goal->id),
+                        'goal_at_risk',
+                        'feather-alert-triangle'
+                    );
+                }
+            } catch (\Throwable $e) {
+                // Ignore notification error
+            }
 
             return $checkIn;
         });

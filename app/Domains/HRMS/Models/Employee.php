@@ -139,6 +139,15 @@ class Employee extends BaseModel
                 }
             }
         });
+
+        static::saved(function (self $employee) {
+            if ($employee->user_id) {
+                $user = $employee->user ?: \App\Models\User::find($employee->user_id);
+                if ($user && method_exists($user, 'syncWithEmployee')) {
+                    $user->syncWithEmployee($employee);
+                }
+            }
+        });
     }
 
     public function user(): BelongsTo

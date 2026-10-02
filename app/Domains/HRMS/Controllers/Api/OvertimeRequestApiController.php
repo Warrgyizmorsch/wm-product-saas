@@ -127,6 +127,23 @@ class OvertimeRequestApiController extends Controller
 
         $data = $this->overtimeRepository->getIndexData($request->all());
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
+        if (isset($data['requests']) && method_exists($data['requests'], 'getCollection')) {
+            $data['requests']->getCollection()->transform(function ($req) use ($employee, $isHrAdmin) {
+                $isOwner = $employee && (int)$req->employee_id === (int)$employee->id;
+                $isPending = $req->status === 'pending';
+                $req->capabilities = [
+                    'can_view'    => true,
+                    'can_approve' => $isHrAdmin && $isPending,
+                    'can_reject'  => $isHrAdmin && $isPending,
+                    'can_cancel'  => ($isOwner || $isHrAdmin) && $isPending,
+                ];
+                return $req;
+            });
+        }
+
         return $this->sendSuccess($data['requests'], 'Overtime requests retrieved successfully');
     }
 
@@ -148,6 +165,15 @@ class OvertimeRequestApiController extends Controller
         if (!$isHrAdmin && $overtimeRequest->employee_id !== $employee?->id) {
             return $this->sendError('Unauthorized access to overtime request.', 403);
         }
+
+        $isOwner = $employee && (int)$overtimeRequest->employee_id === (int)$employee->id;
+        $isPending = $overtimeRequest->status === 'pending';
+        $overtimeRequest->capabilities = [
+            'can_view'    => true,
+            'can_approve' => $isHrAdmin && $isPending,
+            'can_reject'  => $isHrAdmin && $isPending,
+            'can_cancel'  => ($isOwner || $isHrAdmin) && $isPending,
+        ];
 
         return $this->sendSuccess($overtimeRequest, 'Overtime request details loaded');
     }

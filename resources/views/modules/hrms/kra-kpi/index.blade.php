@@ -450,7 +450,7 @@
                                 </x-ui.button>
                             </div>
                             <div class="d-flex flex-column gap-2">
-                                @foreach($kraCategories as $kra)
+                                @forelse($kraCategories as $kra)
                                     <div class="px-3 py-2.5 rounded-2 border d-flex justify-content-between align-items-center bg-light">
                                         <div class="d-flex align-items-center ps-1">
                                             <div style="width: 12px; height: 12px; border-radius: 50%; background-color: {{ $kra->color }}; flex-shrink: 0; margin-right: 12px;"></div>
@@ -467,7 +467,15 @@
                                             @endif
                                         </div>
                                     </div>
-                                @endforeach
+                                @empty
+                                    <div class="text-center py-4 border rounded-2 bg-light">
+                                        <i class="feather-layers text-muted fs-20 d-block mb-1"></i>
+                                        <span class="text-muted fs-12 d-block mb-2">No KRA focus areas yet.</span>
+                                        <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createKraModal" class="fw-bold">
+                                            Add First KRA
+                                        </x-ui.button>
+                                    </div>
+                                @endforelse
                             </div>
                         </div>
                     </div>
@@ -878,10 +886,7 @@
                     <h6 class="fw-bold text-dark mb-0">KPI Goals in this Template (Weightage sum should be 100%)</h6>
                     <small class="text-muted">Select standard KPIs from library or type custom goals. Values auto-fill on selection.</small>
                 </div>
-                <div class="d-flex gap-2">
-                    <x-ui.button type="button" variant="light" size="sm" icon="feather-plus-circle" class="border fw-semibold text-primary" data-bs-toggle="modal" data-bs-target="#createKpiMasterModal">
-                        + New Library KPI
-                    </x-ui.button>
+                <div>
                     <x-ui.button type="button" variant="light" size="sm" icon="feather-plus" id="addTemplateRowBtn" class="border fw-semibold">
                         Add Goal Row
                     </x-ui.button>

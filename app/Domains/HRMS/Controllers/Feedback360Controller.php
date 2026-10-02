@@ -364,19 +364,21 @@ class Feedback360Controller extends Controller
         [$tenantId, $user] = $this->resolveContext();
 
         $request->validate([
-            'name'        => 'required|string|max:150',
-            'code'        => 'nullable|string|max:50',
-            'category'    => 'required|string|max:100',
-            'cycle_id'    => 'nullable|exists:feedback_360_cycles,id',
-            'description' => 'nullable|string|max:1000',
-            'weightage'   => 'nullable|numeric|min:1|max:100',
+            'name'                      => 'required|string|max:150',
+            'code'                      => 'nullable|string|max:50',
+            'category'                  => 'required|string|max:100',
+            'cycle_id'                  => 'nullable|exists:feedback_360_cycles,id',
+            'description'               => 'nullable|string|max:1000',
+            'weightage'                 => 'nullable|numeric|min:1|max:100',
+            'questions'                 => 'nullable|array',
+            'questions.*.question_text' => 'nullable|string|max:500',
         ]);
 
         try {
             $this->feedbackRepository->storeCompetency($request->all(), $tenantId, $user);
 
             return redirect()->route('hrms.feedback360.index', ['active_tab' => 'competencies_questions'])
-                ->with('success', 'Competency created successfully.');
+                ->with('success', 'Competency and questions saved successfully.');
         } catch (Exception $e) {
             return redirect()->back()->with('error', 'Failed to create competency: ' . $e->getMessage());
         }
