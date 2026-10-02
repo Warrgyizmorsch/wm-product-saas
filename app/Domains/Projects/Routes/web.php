@@ -6,8 +6,10 @@ use App\Domains\Projects\Controllers\ProjectActivityLogController;
 use App\Domains\Projects\Controllers\ProjectBillingController;
 use App\Domains\Projects\Controllers\ProjectClosureController;
 use App\Domains\Projects\Controllers\ProjectController;
+use App\Domains\Projects\Controllers\ProjectDashboardController;
 use App\Domains\Projects\Controllers\ProjectDocumentController;
 use App\Domains\Projects\Controllers\ProjectMemberController;
+use App\Domains\Projects\Controllers\ProjectReportController;
 use App\Domains\Projects\Controllers\ProjectReviewController;
 use App\Domains\Projects\Controllers\ProjectScheduleController;
 use App\Domains\Projects\Controllers\ChangeRequestController;
@@ -23,6 +25,26 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('projects')
     ->as('projects.')
     ->group(function (): void {
+        Route::get('dashboard', [ProjectDashboardController::class, 'index'])->name('dashboard');
+        Route::get('dashboard/export/{format}', [ProjectDashboardController::class, 'export'])
+            ->name('dashboard.export')
+            ->whereIn('format', ['csv', 'xlsx']);
+
+        Route::prefix('reports')->as('reports.')->group(function (): void {
+            Route::get('/', [ProjectReportController::class, 'index'])->name('index');
+            Route::get('summary', [ProjectReportController::class, 'summary'])->name('summary');
+            Route::get('task-status', [ProjectReportController::class, 'taskStatus'])->name('task-status');
+            Route::get('resource-utilization', [ProjectReportController::class, 'resourceUtilization'])->name('resource-utilization');
+            Route::get('timesheet-billability', [ProjectReportController::class, 'timesheetBillability'])->name('timesheet-billability');
+            Route::get('issue-defect-density', [ProjectReportController::class, 'issueDefectDensity'])->name('issue-defect-density');
+            Route::get('milestone-variance', [ProjectReportController::class, 'milestoneVariance'])->name('milestone-variance');
+            Route::get('budget-cost', [ProjectReportController::class, 'budgetCost'])->name('budget-cost');
+            Route::get('{report}/export/{format}', [ProjectReportController::class, 'export'])
+                ->name('export')
+                ->whereIn('report', ['summary', 'task-status', 'resource-utilization', 'timesheet-billability', 'issue-defect-density', 'milestone-variance', 'budget-cost'])
+                ->whereIn('format', ['xlsx', 'csv']);
+        });
+
         Route::get('/', [ProjectController::class, 'index'])->name('index');
         Route::post('/', [ProjectController::class, 'store'])->name('store');
         Route::post('bulk-action', [ProjectController::class, 'bulkAction'])->name('bulk-action');

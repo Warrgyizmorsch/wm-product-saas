@@ -81,8 +81,8 @@
         @if($resetUrl)
             <div class="dropdown-divider my-3"></div>
             <div class="d-flex gap-2">
-                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">{{ $submitLabel }}</x-ui.button>
-                <x-ui.button href="{{ $resetUrl }}" variant="light" size="sm"
+                <x-ui.button type="submit" variant="primary" class="flex-grow-1">{{ $submitLabel }}</x-ui.button>
+                <x-ui.button href="{{ $resetUrl }}" variant="light"
                     class="border flex-grow-1">{{ $resetLabel }}</x-ui.button>
             </div>
         @endif

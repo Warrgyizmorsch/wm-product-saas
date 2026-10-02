@@ -40,9 +40,12 @@
                 ['label' => 'Quotation Approval', 'route' => 'crm.approvals.quotations.index'],
             ]],
             ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [
+                ['label' => __('projects.executive_dashboard') ?: 'Executive Dashboard', 'route' => 'projects.dashboard'],
                 ['label' => __('ui.projects'), 'route' => 'projects.index'],
+                ['label' => __('projects.milestones') ?: 'Milestones', 'route' => 'projects.milestones.index'],
                 ['label' => __('projects.tasks'), 'route' => 'projects.tasks.index'],
                 ['label' => __('projects.timesheets'), 'route' => 'projects.timesheets.approval'],
+                ['label' => __('projects.reports') ?: 'Reports', 'route' => 'projects.reports.index'],
             ]],
             ['label' => __('visitor.visitor_management') ?: 'Visitor Management', 'icon' => 'feather-user-check', 'url' => '#', 'children' => [
                 ['label' => __('visitor.gate_desk') ?: 'Gate Desk (Visitor Logs)', 'route' => 'visitor.index'],
