@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'company' => ResolveCompany::class,
             'branch' => ResolveBranch::class,
             'module.access' => EnsureTenantModuleAccess::class,
+            'billing.active' => \App\Http\Middleware\EnsureBillingActive::class,
             'production.api.secret' => \App\Http\Middleware\ProductionApiSecretMiddleware::class,
             'production.api.tenant' => \App\Http\Middleware\ProductionTenantEnforcementMiddleware::class,
             'production.api.idempotency' => \App\Http\Middleware\ProductionIdempotencyMiddleware::class,

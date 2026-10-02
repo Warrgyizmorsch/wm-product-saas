@@ -71,6 +71,7 @@ class SubscriptionLifecycleTest extends TestCase
         $this->withHeader('X-Tenant', 'acme');
 
         $gateway = new FakeSubscriptionGateway();
+        FakeSubscriptionGateway::$remote = null;
         app(PaymentGatewayManager::class)->register($gateway);
         PlatformSetting::set('active_payment_gateway', $gateway->identifier());
     }
@@ -521,6 +522,196 @@ class SubscriptionLifecycleTest extends TestCase
             ->assertSee('billed yearly')
             ->assertSee('Subscription: Pro');
     }
+
+    public function test_cancelling_stops_renewals_at_period_end_and_keeps_access_until_then(): void
+    {
+        $subscription = $this->liveSubscription();
+
+        $this->actingAs($this->owner)->post(route('platform.subscription.cancel'))
+            ->assertRedirect(route('platform.subscription.index'))
+            ->assertSessionHas('success', fn ($m) => str_contains($m, $subscription->current_end->format('d M Y')));
+
+        $this->assertSame([['cancel_subscription', true]], FakeSubscriptionGateway::$calls);
+        $subscription->refresh();
+        $this->assertNotNull($subscription->cancel_requested_at);
+        $this->assertSame(TenantSubscription::STATUS_ACTIVE, $subscription->status);
+        $this->assertSame(Tenant::SUBSCRIPTION_ACTIVE, $this->tenant->fresh()->subscription_status);
+        $this->assertTrue(TenantModule::query()->where('module', 'inventory')->sole()->isActive());
+
+        $this->actingAs($this->owner)->get(route('platform.subscription.index'))
+            ->assertOk()->assertSee('Cancelled — you won')->assertDontSee('Cancel subscription</button>', false);
+
+        // Can't cancel twice or change a cancelled subscription.
+        $this->actingAs($this->owner)->post(route('platform.subscription.cancel'))->assertSessionHas('error');
+        $this->subscribe(['seats' => 8])->assertStatus(422)->assertJson(['message' => 'Your subscription is cancelled and ends on '.$subscription->current_end->format('d M Y').' — you can subscribe again after that.']);
+        Carbon::setTestNow();
+    }
+
+    public function test_cancelling_drops_a_booked_downgrade(): void
+    {
+        $subscription = $this->liveSubscription();
+        $this->subscribe(['modules' => []])->assertOk()->assertJson(['scheduled' => true]);
+
+        $this->actingAs($this->owner)->post(route('platform.subscription.cancel'))->assertSessionHas('success');
+
+        $this->assertSame(['cancel'], FakeSubscriptionGateway::$calls[1]);
+        $this->assertSame(['cancel_subscription', true], FakeSubscriptionGateway::$calls[2]);
+        $this->assertNull($subscription->fresh()->pending_change);
+        Carbon::setTestNow();
+    }
+
+    public function test_a_failing_subscription_cannot_be_cancelled(): void
+    {
+        $subscription = $this->liveSubscription();
+        $subscription->update(['status' => TenantSubscription::STATUS_PENDING, 'grace_ends_at' => now()->addDays(7)]);
+
+        $this->actingAs($this->owner)->post(route('platform.subscription.cancel'))
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'ends on its own'));
+
+        $this->assertSame([], FakeSubscriptionGateway::$calls);
+        Carbon::setTestNow();
+    }
+
+    public function test_users_without_billing_rights_cannot_cancel(): void
+    {
+        $this->liveSubscription();
+
+        $this->actingAs(User::query()->where('email', 'two@acme.test')->sole())
+            ->post(route('platform.subscription.cancel'))
+            ->assertForbidden();
+
+        $this->assertSame([], FakeSubscriptionGateway::$calls);
+        Carbon::setTestNow();
+    }
+
+    public function test_the_tenant_is_locked_to_billing_once_the_cancelled_period_ends(): void
+    {
+        $subscription = $this->liveSubscription();
+        $this->actingAs($this->owner)->post(route('platform.subscription.cancel'));
+
+        // Razorpay fires `cancelled` at cycle end; our run before then changes nothing.
+        $this->webhook('cancelled', $subscription)->assertOk();
+        $this->assertSame(Tenant::SUBSCRIPTION_CANCELLED, $this->tenant->fresh()->subscription_status);
+        $this->artisan('billing:reconcile-subscriptions')->assertSuccessful();
+        $this->assertFalse($this->tenant->fresh()->isBillingLocked());
+
+        Carbon::setTestNow($subscription->current_end->addMinute());
+        $this->artisan('billing:reconcile-subscriptions')
+            ->expectsOutputToContain('suspended 1 tenant(s)')
+            ->assertSuccessful();
+
+        $tenant = $this->tenant->fresh();
+        $this->assertSame(Tenant::SUBSCRIPTION_SUSPENDED, $tenant->subscription_status);
+        $this->assertSame(Tenant::STATUS_ACTIVE, $tenant->status, 'users can still sign in');
+        $this->assertFalse(TenantModule::query()->where('module', 'inventory')->sole()->isActive(), 'recurring add-ons stop with the subscription');
+
+        // No longer billed, so not free to reinstall.
+        $this->actingAs($this->owner)->post(route('platform.modules.reinstall', 'inventory'))->assertSessionHas('error');
+        $this->assertFalse(TenantModule::query()->where('module', 'inventory')->sole()->isActive());
+        Carbon::setTestNow();
+    }
+
+    public function test_grace_running_out_cancels_on_the_gateway_and_locks_the_tenant(): void
+    {
+        $subscription = $this->liveSubscription();
+        $this->webhook('pending', $subscription)->assertOk();
+        $graceEnds = $subscription->fresh()->grace_ends_at;
+
+        Carbon::setTestNow($graceEnds->subMinute());
+        $this->artisan('billing:reconcile-subscriptions')->assertSuccessful();
+        $this->assertSame(Tenant::SUBSCRIPTION_PAST_DUE, $this->tenant->fresh()->subscription_status);
+
+        Carbon::setTestNow($graceEnds->addMinute());
+        $this->artisan('billing:reconcile-subscriptions')->assertSuccessful();
+
+        $this->assertSame([['cancel_subscription', false]], FakeSubscriptionGateway::$calls);
+        $this->assertSame(TenantSubscription::STATUS_CANCELLED, $subscription->fresh()->status);
+        $this->assertTrue($this->tenant->fresh()->isBillingLocked());
+
+        // Razorpay's own `cancelled` webhook arriving afterwards keeps the lock.
+        $this->webhook('cancelled', $subscription)->assertOk();
+        $this->assertTrue($this->tenant->fresh()->isBillingLocked());
+        Carbon::setTestNow();
+    }
+
+    public function test_a_locked_tenant_can_only_reach_billing(): void
+    {
+        $this->tenant->update(['subscription_status' => Tenant::SUBSCRIPTION_SUSPENDED]);
+
+        $this->actingAs($this->owner)->get(route('dashboard'))
+            ->assertRedirect(route('platform.subscription.index'));
+        $this->actingAs($this->owner)->get(route('platform.subscription.index'))
+            ->assertOk()->assertSee('Your subscription has lapsed.');
+        $this->actingAs($this->owner)->get(route('platform.billing.checkout'))->assertOk();
+
+        $member = User::query()->where('email', 'two@acme.test')->sole();
+        $this->actingAs($member)->get(route('dashboard'))
+            ->assertStatus(402)->assertSee('subscription has lapsed');
+        $this->actingAs($member)->getJson(route('dashboard'))
+            ->assertStatus(402)->assertJson(['message' => 'Your subscription has lapsed — renew it to use the workspace again. Your data is safe.']);
+    }
+
+    public function test_subscribing_again_lifts_the_lock(): void
+    {
+        $this->tenant->update(['subscription_status' => Tenant::SUBSCRIPTION_SUSPENDED]);
+
+        $this->subscribe(['seats' => 3, 'modules' => []])->assertOk();
+        $subscription = TenantSubscription::query()->sole();
+        $subscription->update(['gateway' => 'razorpay']);
+        $this->verify($subscription->fresh())->assertRedirect(route('platform.billing.checkout'));
+
+        $tenant = $this->tenant->fresh();
+        $this->assertFalse($tenant->isBillingLocked());
+        $this->assertSame(Tenant::SUBSCRIPTION_ACTIVE, $tenant->subscription_status);
+        $this->assertSame(3, $tenant->max_users);
+        $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
+    }
+
+    public function test_reconcile_catches_a_missed_renewal(): void
+    {
+        $subscription = $this->liveSubscription();
+        $nextEnd = $subscription->current_end->addYear();
+        FakeSubscriptionGateway::$remote = [
+            'status' => 'active',
+            'current_start' => $subscription->current_end->getTimestamp(),
+            'current_end' => $nextEnd->getTimestamp(),
+        ];
+
+        $this->artisan('billing:reconcile-subscriptions')
+            ->expectsOutputToContain('Synced 1 subscription(s)')
+            ->assertSuccessful();
+
+        $this->assertTrue($subscription->fresh()->current_end->equalTo($nextEnd));
+        $this->assertTrue($this->tenant->fresh()->plan_expires_at->equalTo($nextEnd));
+
+        // Nothing new the next time round.
+        $this->artisan('billing:reconcile-subscriptions')->expectsOutputToContain('Synced 0 subscription(s)');
+        Carbon::setTestNow();
+    }
+
+    public function test_reconcile_catches_a_missed_payment_failure(): void
+    {
+        $subscription = $this->liveSubscription();
+        FakeSubscriptionGateway::$remote = ['status' => 'halted', 'current_start' => null, 'current_end' => null];
+
+        $this->artisan('billing:reconcile-subscriptions')->assertSuccessful();
+
+        $subscription->refresh();
+        $this->assertSame(TenantSubscription::STATUS_HALTED, $subscription->status);
+        $this->assertTrue($subscription->grace_ends_at->equalTo(now()->addDays(7)));
+        $this->assertSame(Tenant::SUBSCRIPTION_PAST_DUE, $this->tenant->fresh()->subscription_status);
+        Carbon::setTestNow();
+    }
+
+    public function test_an_abandoned_checkout_expiring_never_locks_the_tenant(): void
+    {
+        $subscription = $this->startedSubscription();
+
+        $this->webhook('cancelled', $subscription)->assertOk();
+
+        $this->assertFalse($this->tenant->fresh()->isBillingLocked());
+        $this->assertNotSame(Tenant::SUBSCRIPTION_CANCELLED, $this->tenant->fresh()->subscription_status);
+    }
 }
 
 /** Creates subscriptions without the network; ids are predictable. */
@@ -529,8 +720,11 @@ class FakeSubscriptionGateway implements PaymentGateway
     /** When set, createSubscription() throws like the SDK does on an API error. */
     public static ?string $failWith = null;
 
-    /** Subscription changes sent to the gateway: ['schedule', perSeatTotal, seats] | ['cancel']. */
+    /** Subscription changes sent to the gateway: ['schedule', perSeatTotal, seats] | ['cancel'] | ['cancel_subscription', atCycleEnd]. */
     public static array $calls = [];
+
+    /** What fetchSubscription() reports; null = whatever the local row says. */
+    public static ?array $remote = null;
 
     public function identifier(): string
     {
@@ -624,5 +818,19 @@ class FakeSubscriptionGateway implements PaymentGateway
     public function cancelScheduledSubscriptionChange(TenantSubscription $subscription): void
     {
         self::$calls[] = ['cancel'];
+    }
+
+    public function cancelSubscription(TenantSubscription $subscription, bool $atCycleEnd): void
+    {
+        self::$calls[] = ['cancel_subscription', $atCycleEnd];
+    }
+
+    public function fetchSubscription(TenantSubscription $subscription): array
+    {
+        return self::$remote ?? [
+            'status' => $subscription->status,
+            'current_start' => $subscription->current_start?->getTimestamp(),
+            'current_end' => $subscription->current_end?->getTimestamp(),
+        ];
     }
 }

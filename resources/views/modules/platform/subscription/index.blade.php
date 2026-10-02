@@ -13,6 +13,16 @@
         $checkoutAvailable = collect($planPrices)->contains(fn ($p) => $p['monthly'] !== null || $p['yearly'] !== null);
     @endphp
 
+    @if ($tenant->isBillingLocked())
+        <div class="alert alert-warning d-flex align-items-center gap-2 mb-4">
+            <i class="feather-lock"></i>
+            <div>
+                <strong>Your subscription has lapsed.</strong>
+                Choose a plan and pay to reopen the workspace for everyone — all your data is still here.
+            </div>
+        </div>
+    @endif
+
     <x-ui.card class="mb-4">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
@@ -24,7 +34,9 @@
                         @if ($liveSubscription)
                             {{ $liveSubscription->seats }} users &middot; billed {{ $liveSubscription->cycle }}
                             &middot; ₹{{ number_format($liveSubscription->total / 100, 2) }} incl. GST
-                            @if ($liveSubscription->current_end)
+                            @if ($liveSubscription->isCancelling())
+                                <span class="d-block text-warning">Cancelled — you won't be charged again. Everything stays available until {{ $liveSubscription->current_end?->format('d M Y') }}.</span>
+                            @elseif ($liveSubscription->current_end)
                                 &middot; renews {{ $liveSubscription->current_end->format('d M Y') }}
                             @endif
                             @if ($liveSubscription->grace_ends_at)
@@ -44,7 +56,18 @@
                         <a href="{{ route('platform.billing.checkout') }}" class="btn btn-primary btn-sm mb-2">Choose plan, users &amp; add-ons</a>
                     @endcan
                 @endif
-                <div>Status: <x-ui.badge variant="{{ $tenant->subscription_status === 'active' ? 'success' : 'warning' }}" soft>{{ ucfirst($tenant->subscription_status ?? 'trial') }}</x-ui.badge></div>
+                @if ($liveSubscription && $liveSubscription->status === \App\Domains\Platform\Models\TenantSubscription::STATUS_ACTIVE && ! $liveSubscription->isCancelling())
+                    @can('updateSubscription', $tenant)
+                        <form action="{{ route('platform.subscription.cancel') }}" method="POST" id="cancelSubscriptionForm" class="mb-2">
+                            @csrf
+                            <button type="button" class="btn btn-light border btn-sm"
+                                onclick="confirmAction({title: 'Cancel subscription', message: 'Renewals stop and you won\'t be charged again. Everyone keeps full access until {{ $liveSubscription->current_end?->format('d M Y') }}; after that only billing is available until you subscribe again. Your data is never deleted. This can\'t be undone.', variant: 'danger', confirmText: 'Cancel subscription'}, function() { document.getElementById('cancelSubscriptionForm').submit(); })">
+                                Cancel subscription
+                            </button>
+                        </form>
+                    @endcan
+                @endif
+                <div>Status: <x-ui.badge variant="{{ $tenant->subscription_status === 'active' ? 'success' : 'warning' }}" soft>{{ \App\Models\Tenant::subscriptionStatuses()[$tenant->subscription_status] ?? ucfirst($tenant->subscription_status ?? 'trial') }}</x-ui.badge></div>
                 @if ($tenant->plan_started_at)
                     <div class="mt-1">Since {{ $tenant->plan_started_at->format('d M Y') }}</div>
                 @endif

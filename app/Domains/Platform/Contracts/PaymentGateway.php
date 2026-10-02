@@ -131,4 +131,19 @@ interface PaymentGateway
 
     /** Drops a change booked with scheduleSubscriptionChange() that hasn't taken effect yet. */
     public function cancelScheduledSubscriptionChange(TenantSubscription $subscription): void;
+
+    /**
+     * Stops the subscription's renewals: at the end of the paid period
+     * ($atCycleEnd, the tenant cancelling) or right away (grace ran out).
+     */
+    public function cancelSubscription(TenantSubscription $subscription, bool $atCycleEnd): void;
+
+    /**
+     * The subscription as the gateway sees it now, for the reconcile job to
+     * catch up on missed webhooks. `status` uses the webhook event names:
+     * created, authenticated, active, pending, halted, cancelled, completed.
+     *
+     * @return array{status: string, current_start: ?int, current_end: ?int}
+     */
+    public function fetchSubscription(TenantSubscription $subscription): array;
 }

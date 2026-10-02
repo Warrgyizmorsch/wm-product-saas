@@ -205,4 +205,23 @@ class SubscriptionController extends Controller
         return redirect()->route('platform.subscription.index')
             ->with('success', 'Payment verified — your plan has been updated.');
     }
+
+    /** Stops renewals; the paid period stays usable (TenantSubscriptionService::cancel). */
+    public function cancel(): RedirectResponse
+    {
+        $tenant = tenant();
+
+        $this->authorize('updateSubscription', $tenant);
+
+        try {
+            $subscription = $this->subscriptions->cancel($tenant);
+        } catch (RuntimeException $e) {
+            return redirect()->route('platform.subscription.index')->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('platform.subscription.index')->with('success', sprintf(
+            'Your subscription is cancelled. You won\'t be charged again, and you can keep using everything until %s.',
+            $subscription->current_end?->format('d M Y'),
+        ));
+    }
 }

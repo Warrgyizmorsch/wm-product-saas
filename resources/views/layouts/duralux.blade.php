@@ -210,6 +210,14 @@
             </div>
 
             <div class="main-content">
+                @if (tenant()?->subscription_status === \App\Models\Tenant::SUBSCRIPTION_PAST_DUE && auth()->user()?->tenant_id !== null)
+                    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+                        <span><i class="feather-alert-triangle me-2"></i>Your subscription renewal payment failed. Please renew soon to keep using the workspace — your data is safe.</span>
+                        @can('viewSubscription', tenant())
+                            <a href="{{ route('platform.subscription.index') }}" class="btn btn-sm btn-warning">Go to billing</a>
+                        @endcan
+                    </div>
+                @endif
                 @yield('content')
             </div>
         </div>

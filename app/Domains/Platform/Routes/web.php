@@ -81,6 +81,8 @@ Route::prefix('platform')
             ->name('subscription.checkout');
         Route::post('subscription/verify', [SubscriptionController::class, 'verify'])
             ->name('subscription.verify');
+        Route::post('subscription/cancel', [SubscriptionController::class, 'cancel'])
+            ->name('subscription.cancel');
 
         Route::get('currencies', [CurrencyController::class, 'index'])
             ->name('currencies.index');

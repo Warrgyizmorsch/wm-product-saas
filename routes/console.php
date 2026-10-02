@@ -15,3 +15,8 @@ Schedule::command('accounting:sync-exchange-rates')
     ->dailyAt('17:00')
     ->timezone('Europe/Berlin')
     ->withoutOverlapping();
+
+// Missed Razorpay webhooks, grace-period expiry and ended cancellations.
+Schedule::command('billing:reconcile-subscriptions')
+    ->hourly()
+    ->withoutOverlapping();

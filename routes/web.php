@@ -40,7 +40,7 @@ Route::middleware(['tenant'])->group(function (): void {
         Route::post('/crm/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'handleWebhook'])->name('crm.whatsapp.webhook');
     });
 
-    Route::middleware(['auth', 'company', 'branch'])->group(function (): void {
+    Route::middleware(['auth', 'company', 'branch', 'billing.active'])->group(function (): void {
         Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
         Route::get('/tenant-switch/{tenant:slug}', TenantSwitchController::class)
@@ -102,7 +102,7 @@ Route::middleware(['tenant'])->group(function (): void {
         });
     });
 
-    Route::middleware(['auth:sanctum', 'company', 'branch'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'company', 'branch', 'billing.active'])->group(function (): void {
         foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/api.php'))) as $moduleApiRoutes) {
             if (str_contains($moduleApiRoutes, 'Production')) {
                 continue;
