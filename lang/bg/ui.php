@@ -73,6 +73,7 @@ return [
     'owner' => 'Отговорник',
     'password' => 'Парола',
     'payroll_this_month' => 'Заплати този месец',
+    'refresh' => 'Опресняване',
     'planned' => 'Планирано',
     'platform' => 'Платформа',
     'platform_admin' => 'Администриране',

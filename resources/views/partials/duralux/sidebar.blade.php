@@ -41,9 +41,8 @@
             ]],
             ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [
                 ['label' => __('ui.projects'), 'route' => 'projects.index'],
-                ['label' => __('projects.milestones'), 'route' => 'projects.milestones.index'],
-                'Tasks',
-                'Timesheets',
+                ['label' => __('projects.tasks'), 'route' => 'projects.tasks.index'],
+                ['label' => __('projects.timesheets'), 'route' => 'projects.timesheets.approval'],
             ]],
             ['label' => __('visitor.visitor_management') ?: 'Visitor Management', 'icon' => 'feather-user-check', 'url' => '#', 'children' => [
                 ['label' => __('visitor.gate_desk') ?: 'Gate Desk (Visitor Logs)', 'route' => 'visitor.index'],

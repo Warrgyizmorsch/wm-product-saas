@@ -26,7 +26,8 @@
         select2Selector="user" :errorText="$errors->first('owner_id')">
         <option value="">{{ __('projects.select_user') }}</option>
         @foreach ($activeMemberOptions as $memberOption)
-            <option value="{{ $memberOption->id }}" @selected((int) old('owner_id') === $memberOption->id)>
+            <option value="{{ $memberOption->id }}" @selected((int) old('owner_id') === $memberOption->id)
+                    data-avatar="{{ $memberOption->avatar_url }}">
                 {{ $memberOption->name }}
             </option>
         @endforeach

@@ -91,7 +91,7 @@
                     </li>
                     <li>
                         <a class="dropdown-item text-danger" href="javascript:void(0);"
-                           onclick="confirmAction(@js(__('projects.confirm_remove_milestone')), function () { document.getElementById('milestoneWorkspaceDeleteForm').submit(); })">
+                           onclick="openDeleteMilestoneModal('{{ route('projects.milestones.destroy', [$project, $milestone]) }}', @js($milestone->name), {{ $milestone->tasks()->count() }})">
                             <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
                         </a>
                     </li>

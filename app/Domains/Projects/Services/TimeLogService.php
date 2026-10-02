@@ -2,6 +2,9 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Projects\Events\TimesheetApproved;
+use App\Domains\Projects\Events\TimesheetRejected;
+use App\Domains\Projects\Events\TimesheetSubmitted;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\ProjectMember;
 use App\Domains\Projects\Models\Task;
@@ -83,6 +86,8 @@ class TimeLogService
                     'is_billable' => (bool) $log->is_billable,
                 ]
             );
+
+            event(new TimesheetSubmitted($log, $user, $project));
 
             return $log;
         });
@@ -171,6 +176,8 @@ class TimeLogService
                 );
             }
 
+            event(new TimesheetApproved($approved, $approver));
+
             return $approved;
         });
     }
@@ -215,6 +222,8 @@ class TimeLogService
                     ]
                 );
             }
+
+            event(new TimesheetRejected($rejected, $approver, $remarks));
 
             return $rejected;
         });

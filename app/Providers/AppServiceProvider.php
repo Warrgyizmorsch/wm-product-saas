@@ -572,6 +572,28 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Listeners\CreateAssetFromGrnLine::class
         );
 
+        // ── Project Management Event Notifications ───────────────────────────
+        foreach ([
+            \App\Domains\Projects\Events\TaskAssigned::class,
+            \App\Domains\Projects\Events\TaskCompleted::class,
+            \App\Domains\Projects\Events\IssueLogged::class,
+            \App\Domains\Projects\Events\IssueResolved::class,
+            \App\Domains\Projects\Events\IssueRetested::class,
+            \App\Domains\Projects\Events\TimesheetSubmitted::class,
+            \App\Domains\Projects\Events\TimesheetApproved::class,
+            \App\Domains\Projects\Events\TimesheetRejected::class,
+            \App\Domains\Projects\Events\ProjectReviewRequested::class,
+            \App\Domains\Projects\Events\ProjectReviewSignedOff::class,
+            \App\Domains\Projects\Events\ChangeRequestCreated::class,
+            \App\Domains\Projects\Events\ProjectClosed::class,
+        ] as $projectEventClass) {
+            \Illuminate\Support\Facades\Event::listen(
+                $projectEventClass,
+                \App\Domains\Projects\Listeners\ProjectNotificationListener::class
+            );
+        }
+
+
         // ── Accounting dashboard cache: any journal change can move a figure ──
         $flushAccountingDashboard = function ($model): void {
             if ($model->tenant_id) {

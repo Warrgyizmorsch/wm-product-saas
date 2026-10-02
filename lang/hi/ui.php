@@ -73,6 +73,7 @@ return [
     'owner' => 'स्वामी',
     'password' => 'पासवर्ड',
     'payroll_this_month' => 'इस महीने पेरोल',
+    'refresh' => 'ताज़ा करें',
     'planned' => 'योजना में',
     'platform' => 'प्लेटफॉर्म',
     'platform_admin' => 'प्लेटफॉर्म एडमिन',

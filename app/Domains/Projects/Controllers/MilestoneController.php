@@ -277,11 +277,13 @@ class MilestoneController extends Controller
             ->with('success', __('projects.milestone_updated'));
     }
 
-    public function destroy(Project $project, Milestone $milestone): RedirectResponse
+    public function destroy(Request $request, Project $project, Milestone $milestone): RedirectResponse
     {
         $this->authorize('delete', $milestone);
 
-        $this->milestones->delete($milestone);
+        $taskAction = $request->input('task_action', 'unlink');
+
+        $this->milestones->delete($milestone, $taskAction);
 
         return redirect()
             ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'milestones']))

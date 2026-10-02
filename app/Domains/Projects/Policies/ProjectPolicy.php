@@ -44,9 +44,56 @@ class ProjectPolicy
 
     public function delete(User $user, Project $project): bool
     {
+        if ($project->isClosed()) {
+            return false;
+        }
+
         return $this->access->allows($user, 'projects.projects.delete', [
             'tenant_id' => $project->tenant_id,
             'owner_id' => $project->owner_id,
         ]);
+    }
+
+    public function close(User $user, Project $project): bool
+    {
+        if ($project->isClosed()) {
+            return false;
+        }
+
+        return $this->access->allows($user, 'projects.projects.close', [
+            'tenant_id' => $project->tenant_id,
+            'owner_id'  => $project->owner_id,
+        ]) || $this->access->allows($user, 'projects.projects.update', [
+            'tenant_id' => $project->tenant_id,
+            'owner_id'  => $project->owner_id,
+        ]);
+    }
+
+    public function viewBilling(User $user, Project $project): bool
+    {
+        return $this->access->allows($user, 'projects.billing.view', [
+            'tenant_id' => $project->tenant_id,
+            'owner_id'  => $project->owner_id,
+        ]) || $this->access->allows($user, 'projects.projects.view', [
+            'tenant_id' => $project->tenant_id,
+            'owner_id'  => $project->owner_id,
+        ]);
+    }
+
+    public function generateInvoice(User $user, Project $project): bool
+    {
+        $hasProjectScope = $this->access->allows($user, 'projects.billing.generate_invoice', [
+            'tenant_id' => $project->tenant_id,
+            'owner_id'  => $project->owner_id,
+        ]) || $this->access->allows($user, 'projects.projects.update', [
+            'tenant_id' => $project->tenant_id,
+            'owner_id'  => $project->owner_id,
+        ]);
+
+        $hasSalesScope = $this->access->allows($user, 'sales.invoices.create', [
+            'tenant_id' => $project->tenant_id,
+        ]);
+
+        return $hasProjectScope && $hasSalesScope;
     }
 }

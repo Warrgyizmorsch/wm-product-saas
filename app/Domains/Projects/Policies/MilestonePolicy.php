@@ -15,6 +15,10 @@ class MilestonePolicy
 
     public function manage(User $user, Project $project): bool
     {
+        if ($project->isClosed()) {
+            return false;
+        }
+
         return $this->access->allows($user, 'projects.milestones.manage', [
             'tenant_id' => $project->tenant_id,
             'owner_id' => $project->owner_id,
@@ -23,6 +27,10 @@ class MilestonePolicy
 
     public function update(User $user, Milestone $milestone): bool
     {
+        if ($milestone->project?->isClosed()) {
+            return false;
+        }
+
         return $this->access->allows($user, 'projects.milestones.manage', [
             'tenant_id' => $milestone->tenant_id,
             'owner_id' => $milestone->project?->owner_id,

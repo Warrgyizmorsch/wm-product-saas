@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Projects\Events\ChangeRequestCreated;
 use App\Domains\Projects\Models\ChangeRequest;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\ProjectReview;
@@ -102,6 +103,8 @@ class ChangeRequestService
                     'impact_schedule_days' => (int) $cr->impact_schedule_days,
                 ]
             );
+
+            event(new ChangeRequestCreated($cr, $requester));
 
             return $cr;
         });

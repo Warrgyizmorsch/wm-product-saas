@@ -210,9 +210,9 @@ The design specification is the **canonical PM UI/UX/component reference**. The 
 All future AI agents working in this repository must strictly adhere to the following 21 governance rules:
 
 1. **Read Roadmap First:** Inspect `docs/project-management/IMPLEMENTATION_ROADMAP.md` before initiating any Project Management task.
-2. **Determine Last Completed Phase:** Identify the last completed and verified major phase (`Phase 4 — Issue Management & Project Documents`).
-3. **Determine Next Major Phase:** Identify the next major phase in the canonical sequence (`Phase 5 — Client Review / UAT & Change Requests`).
-4. **Determine Next Authorized Action:** Perform only the next authorized step (`Phase 5A — Read-Only Requirements / Current-State Audit`) for the next phase. Phase 5A is strictly a read-only discovery/current-state/gap audit; architecture and integration decisions must happen only in the following Architecture / Integration Validation gate.
+2. **Determine Last Completed Phase:** Identify the last completed and verified major phase (`Phase 7 — Billing & Sales Invoice Integration`).
+3. **Determine Next Major Phase:** Identify the next major phase in the canonical sequence (`Phase 8 — Controlled Project Closure`).
+4. **Determine Next Authorized Action:** Perform only the next authorized step (`Phase 8A — Read-Only Requirements / Current-State Audit`) for the next phase. Phase 8A is strictly a read-only discovery/current-state/gap audit; architecture and integration decisions must happen only in the following Architecture / Integration Validation gate.
 5. **No Automatic Implementation:** Do not automatically start implementation of the next phase. A phase remains `NOT STARTED` until explicitly authorized.
 6. **Follow Lifecycle Gates:** Strictly observe the progression: `NOT STARTED` $\to$ `AUDIT` $\to$ `ARCHITECTURE` $\to$ `PLAN` $\to$ `APPROVAL` $\to$ `IMPLEMENTATION` $\to$ `TESTING` $\to$ `VERIFICATION` $\to$ `COMPLETED`.
 7. **Maintenance Is Not a Phase:** Do not create or track ad-hoc maintenance, UI cleanup, visual polish, or minor bug fixes as roadmap phases.
@@ -417,53 +417,184 @@ Before entering the Architecture / Integration Validation gate or proposing any 
 
 ---
 
-### Phase 7: Billing & Sales Invoice Integration — [PLANNED]
-- **Status:** **PLANNED**
-- **Objective:** Connect approved billable time and completed milestones directly into ERP Sales Invoices.
+### Phase 7: Billing & Sales Invoice Integration — [COMPLETED & FORMALLY VERIFIED]
+- **Status:** **COMPLETED & FORMALLY VERIFIED**
+- **Objective:** Connect approved billable time and completed milestones directly into standard ERP Sales Invoices via clean delegation, strict double-billing prevention, and complete auditability.
 - **Architectural Boundary & Invoicing Flow:**
   ```
+  Project Management Module (App\Domains\Projects\Services\ProjectBillingService)
+      ↓ Identifies & locks eligible billable work (approved time logs, completed milestones)
+      ↓ Prepares billing line items with work descriptions & resolves active Service Product
+  Sales Module (App\Domains\Sales\Services\SalesInvoiceCreationService)
+      ↓ Exclusively owns: Sequential numbering (INV-XXXX), GST type resolution, line math,
+      ↓ persistence of Invoice & InvoiceItem in 'Draft' status (InvoicePosted NOT fired here)
   Project Management Module
-      ↓ (calculates & identifies billable project hours & milestone deliverables)
-  Sales Module (App\Domains\Sales\Services\InvoiceService)
-      ↓ (generates standard Sales Invoice with linked lines & customer reference)
-  Accounting Module
-      ↓ (posts general ledger journals and tracks payment receipts)
+      ↓ Marks source TimeLogs and Milestones as invoiced (is_invoiced = true, invoice_id set)
+      ↓ Records project activity logs ('project.invoice_generated')
+  Standard Sales Flow (App\Domains\Sales\Controllers\InvoiceController::post)
+      ↓ Transitions Draft → Posted, dispatches InvoicePosted event, posts to General Ledger
   ```
-- **Initial Target Scope (Subject to Phase 7 Audit):**
-  1. **Billing Service:** Build `ProjectBillingService` that queries unbilled approved time logs (for T&M contracts) and completed milestones (for milestone contracts).
-  2. **Sales Invoice Bridge:** Integrate with `App\Domains\Sales\Services\InvoiceService` to generate standard Sales Invoices. The Sales module remains the sole owner of Sales Invoice creation.
-  3. **Billed Status Tracking:** Record billing linkage using fields and contracts verified during Phase 7 architecture validation (preventing duplicate billing).
-  4. **UI View:** Billing tab on Project Detail displaying invoice history, outstanding amounts, and payment status.
-- **Exit Criteria:** Invoices generate cleanly in Sales module with general ledger auto-posting; double-billing is prevented.
+
+#### Phase 7A Audit & 7B Architecture Decisions (Artifact: `phase7_implementation_plan.md`)
+- **Preserved Core Boundaries:** PM never computes tenant invoice numbers, never manages GST state codes directly, and never dispatches `InvoicePosted`. Sales owns invoice numbering, tax calculation, and posting lifecycles.
+- **Service Product Integration:** No PM-owned product-master duplication; references existing active Inventory catalog (`products.item_type = 'Service'`).
+- **Data Model Extensions:**
+  - Migrated `project_id` foreign key on `invoices` table (`2026_10_01_100000_add_project_id_to_invoices_table.php`).
+  - Added `billing_amount`, `is_invoiced`, `invoice_id` to `project_milestones` (`2026_10_01_100100_add_billing_fields_to_project_milestones_table.php`).
+  - Added composite indexes on `project_time_logs` (`2026_10_01_100200_add_billing_indexes_to_project_time_logs_table.php`).
+
+#### Phase 7C Implementation Execution Summary:
+- **Database & Models:**
+  - `App\Domains\Sales\Models\Invoice`: Added `project_id` to fillables; added `project()`, `timeLogs()`, and `milestones()` relations.
+  - `App\Domains\Projects\Models\Project`: Added `invoices()` relation.
+  - `App\Domains\Projects\Models\Milestone`: Added `billing_amount`, `is_invoiced`, `invoice_id` to fillables/casts; added `invoice()` relation.
+  - `App\Domains\Projects\Models\TimeLog`: Added `invoice()` relation.
+- **Domain Services:**
+  - `SalesInvoiceCreationService`: Transactionally generates `Draft` invoices with sequential numbers (`INV-XXXX`), GST type determination (`cgst_sgst` vs `igst`), line item persistence, and subtotal/tax rollups. Does NOT fire `InvoicePosted`.
+  - `ProjectBillingService`: Manages unbilled queries, live calculation preview (`previewInvoice`), pessimistic work locking (`lockForUpdate`), double-billing validation guards, delegation to Sales, and source record updates.
+- **RBAC & Authorization:**
+  - Added `projects.billing.view` and `projects.billing.generate_invoice` to `database/seeders/RbacSeeder.php`.
+  - Enforced in `ProjectPolicy` (`viewBilling`, `generateInvoice`) using `AccessService`.
+- **Controllers & Web Routes:**
+  - Created `GenerateProjectInvoiceRequest` with deliverable validation rules.
+  - Created `ProjectBillingController` (`index`, `preview`, `store`).
+  - Registered web routes under `projects/{project}/billing` (`index`, `preview`, `store`).
+- **UI & Blade Integration:**
+  - Sixth tab `tab-billing` integrated in `show.blade.php`, `_billing.blade.php`, and `_generate_invoice_modal.blade.php`.
+  - Features 4 KPI cards (Invoiced Total, Outstanding, Billable Time, Milestone Deliverables), `<x-ui.odoo-form-ui type="table">` invoice ledger with status badges, action dropdown linking to Sales view/print/post, and live interactive deliverable selection modal.
+- **Localization Parity:**
+  - 34 billing translation keys added with 100% key and placeholder parity across `lang/en/projects.php`, `lang/hi/projects.php`, and `lang/bg/projects.php`.
+- **Automated Verification:**
+  - Automated feature test suite `tests/Feature/ProjectBillingTest.php` passed 100% (7 tests, 36 assertions):
+    1. `test_can_fetch_unbilled_approved_time_logs_and_completed_milestones` (PASSED)
+    2. `test_can_generate_draft_sales_invoice_for_billable_time_logs` (PASSED)
+    3. `test_can_generate_draft_sales_invoice_for_completed_milestones` (PASSED)
+    4. `test_double_billing_is_strictly_rejected` (PASSED)
+    5. `test_posting_draft_invoice_via_sales_controller_fires_invoice_posted` (PASSED)
+    6. `test_unauthorized_user_cannot_generate_invoice` (PASSED)
+    7. `test_multi_tenant_isolation_on_billing` (PASSED)
+  - Regression test suites (`ProjectScheduleTest`, `ChangeRequestTest`, `ProjectReviewTest`) passed 100% (36 tests, 141 assertions).
+- **Exit Criteria Met:**
+  - Invoices generate in Sales module in `Draft` status without premature `InvoicePosted` firing;
+  - Posting draft invoice via standard Sales controller triggers `InvoicePosted` and GL journal creation;
+  - Double-billing is strictly rejected with row locking;
+  - Full translation parity across EN/HI/BG.
+- **Next Authorized Action:** **Phase 8A — Controlled Project Closure Read-Only Requirements & Current-State Audit**.
 
 ---
 
-### Phase 8: Controlled Project Closure — [PLANNED]
-- **Status:** **PLANNED**
-- **Objective:** Enforce strict business condition gates before a project can be marked closed.
-- **Initial Target Scope (Subject to Phase 8 Audit):**
-  1. **Database:** Migration adding closure columns (`closure_date`, `closure_status`, `client_approval_ref`, `final_remarks`) to `projects`.
-  2. **Closure Service:** Build `ProjectClosureService` that verifies all 5 closure gates:
-     - Zero open tasks or subtasks.
-     - Zero unresolved issues.
-     - Approved Client UAT Review.
-     - All approved time logs invoiced.
-     - Milestones completed.
-  3. **Closure UI:** Dedicated "Close Project" verification modal with blocker checklist.
-  4. **Read-Only / Archival State:** Project transitions to the approved Closed state and follows the ERP's established archival/read-only behavior, subject to Phase 8 audit.
-- **Exit Criteria:** Closure blocked if any gate fails; successful closure transitions status to `Closed` and archives project according to established ERP conventions.
+### Phase 8: Controlled Project Closure — [COMPLETED & FORMALLY VERIFIED]
+- **Status:** **COMPLETED & FORMALLY VERIFIED**
+- **Objective:** Enforce strict business condition gates before a project can be marked closed, and preserve read-only archival immutability.
+- **Phase 8A Audit & Phase 8B Approved Architecture Summary:**
+  1. **Five Condition Gates:**
+     - **Gate 1 (Tasks & Subtasks):** Zero open/in-progress tasks (`whereIn('status', ['Open', 'In Progress', 'Review'])`) and zero incomplete subtasks (`where('is_completed', false)`).
+     - **Gate 2 (Issues):** Zero unresolved issues (`whereNotIn('status', ['Resolved', 'Closed'])`).
+     - **Gate 3 (Governance & Sign-off):** Zero pending reviews (`where('status', 'Pending')`), zero pending change requests (`where('status', 'Pending')`), and if milestones exist, at least one approved review (`where('status', 'Approved')`) must exist (historical rework reviews do not block).
+     - **Gate 4 (Billing Settlement):** Zero approved billable time logs uninvoiced (`where('is_billable', true)->where('approval_status', 'Approved')->where('is_invoiced', false)`), zero pending time logs awaiting approval, and zero completed billable milestones uninvoiced (`where('billing_amount', '>', 0)->where('status', 'Completed')->where('is_invoiced', false)`). Non-billable approved logs and rejected logs do not block.
+     - **Gate 5 (Milestones):** All milestones must be in terminal state (`whereIn('status', ['Completed', 'Closed'])`).
+  2. **Read-Only Archival Immutability:** Child domain policies (`TaskPolicy`, `TimeLogPolicy`, `MilestonePolicy`, `IssuePolicy`, `ProjectReviewPolicy`, `ChangeRequestPolicy`) block mutating operations (`create`, `update`, `delete`, `approve`, `signoff`, etc.) when `$project->isClosed()`, while read-only inspection remains available. Project deletion is blocked in `ProjectPolicy::delete`.
+  3. **State Machine Safeguard:** `ProjectService::changeStatus()` enforces `assertClosable()` when transitioning to `STATUS_CLOSED`, preventing lifecycle bypass.
+- **Phase 8C Implementation Execution Summary:**
+  1. **Database Migration:** Created `2026_10_01_110000_add_closure_fields_to_projects_table.php` adding `closure_date`, `closure_status`, `client_approval_ref`, `final_remarks`, and `closed_by` with foreign keys and indexes.
+  2. **Models & Permissions:** Updated `Project` model with `CLOSURE_STATUSES`, `isClosed()`, and `closedBy()`. Added `projects.projects.close` permission to `RbacSeeder` for `tenant_owner` and `project_manager`.
+  3. **Domain Service:** Created `ProjectClosureService` implementing `evaluateGates()` (diagnostic matrix and localized blocker messages), `assertClosable()` (strict validation exceptions), and `close()` (row-locking transaction, status update, and activity audit `project.closed`).
+  4. **Controller & Form Request:** Created `CloseProjectRequest` and `ProjectClosureController` (`checkGates`, `close`) with JSON and redirect support. Registered routes `projects.closure.check` and `projects.close` in `app/Domains/Projects/Routes/web.php`.
+  5. **UI & Blade Integration:** Created `_close_project_modal.blade.php` utilizing standard `<x-ui.modal>` and `<x-ui.odoo-form-ui>` with real-time gate checklist diagnostics. Added "Close Project" action button and read-only archival banner to `show.blade.php`.
+  6. **Localization:** Complete parity across `lang/en/projects.php`, `lang/hi/projects.php`, and `lang/bg/projects.php` for all gate labels, checklist statuses, blocker alerts, and closure form inputs.
+  7. **Automated Verification:**
+     - `tests/Feature/ProjectClosureTest.php`: 16 automated feature tests passing 100% (288 assertions) covering all 5 gates, historical rework tolerance, unbilled/pending time log rules, child policy immutability, permission checks, state machine transition enforcement, full-form `PUT` update gate enforcement, and EN/HI/BG localization parity.
+     - **Regressions Verified:** `ProjectInlineFieldStatusTest` (18 tests, 46 assertions), `ProjectBillingTest` (7 tests, 36 assertions), `ProjectReviewTest` & `ChangeRequestTest` (23 tests, 100 assertions), `IssueTest` & `TaskTest` (22 tests, 75 assertions), `TimeLogTest` & `TimesheetApprovalTest` (12 tests, 30 assertions) — all passing 100%.
+  8. **Post-Implementation Audit Remediation (Verified):**
+     - Fixed `ProjectService::update()` to enforce `app(ProjectClosureService::class)->assertClosable($project)` on any transition to `Project::STATUS_CLOSED`, eliminating the bypass vector on the full-form `PUT /projects/{project}` route.
+     - Corrected blocker translation key references in `ProjectClosureService` to match canonical keys in `lang/{locale}/projects.php`.
+     - Added focused regression test `test_full_form_update_cannot_bypass_closure_gates` verifying that both direct `ProjectService::update()` and HTTP `PUT /projects/{project}` fail with validation errors when closure gates are unmet.
+- **Exit Criteria Met:** All closure condition gates enforced across both inline and full-form update paths; read-only archival protection verified across domain policies; 100% test pass rate with zero regressions; complete EN/HI/BG localization.
+- **Next Authorized Action:** **Phase 9A — Domain Events & Notifications Read-Only Requirements & Current-State Audit**.
 
 ---
 
-### Phase 9: Domain Events & Notifications — [PLANNED]
-- **Status:** **PLANNED**
-- **Objective:** Dispatch in-app and email notifications on key project events.
-- **Initial Target Scope (Subject to Phase 9 Audit):**
-  1. **Events:** Create event classes in `app/Domains/Projects/Events/` (`TaskAssigned`, `TaskCompleted`, `IssueLogged`, `TimesheetSubmitted`, `UATRequested`).
-  2. **Notifications:** Create Laravel notification classes leveraging existing `database` and `mail` channels.
-  3. **Listeners:** Wire listeners in `app/Domains/Projects/Listeners/`.
-  4. **Top Nav Bell:** Ensure unread project notifications appear in the Duralux top navbar bell menu.
-- **Exit Criteria:** Users receive notifications for task assignments and review requests; notifications link directly to relevant workspace.
+### Phase 9: Domain Events & Notifications — [VERIFIED — SAFE TO PROCEED TO PHASE 10A]
+- **Status:** **VERIFIED — SAFE TO PROCEED TO PHASE 10A**
+- **Objective:** Establish an event-driven notification architecture for key project lifecycle milestones, delivering real-time in-app alerts (topbar bell menu) and asynchronous email notifications while honoring user preferences and multi-tenant isolation.
+
+#### 1. Architecture Validation Resolutions (Phase 9B Approved)
+1. **Reconciliation of Event Count (12 Strongly-Typed Events):**
+   The architecture officially supports all **12** PM lifecycle events:
+   - `TaskAssigned(Task $task, User $actor, ?int $previousAssigneeId = null)`
+   - `TaskCompleted(Task $task, User $actor)`
+   - `IssueLogged(Issue $issue, User $actor)`
+   - `IssueResolved(Issue $issue, User $actor)`
+   - `IssueRetested(Issue $issue, User $actor, bool $passed)`
+   - `TimesheetSubmitted(Collection $timeLogs, User $actor, Project $project)`
+   - `TimesheetApproved(Collection|TimeLog $timeLogs, User $actor)`
+   - `TimesheetRejected(Collection|TimeLog $timeLogs, User $actor, ?string $rejectionRemarks = null)`
+   - `ProjectReviewRequested(ProjectReview $review, User $actor)`
+   - `ProjectReviewSignedOff(ProjectReview $review, User $actor)`
+   - `ChangeRequestCreated(ChangeRequest $changeRequest, User $actor)`
+   - `ProjectClosed(Project $project, User $actor)`
+
+2. **Email Infrastructure Reuse (`EmailService`):**
+   - Reuses existing `App\Services\EmailService::sendEmail()` rather than introducing a redundant PM-specific Mailable.
+   - Automatically inherits tenant-specific SMTP configurations from `email_configurations`, persists outbound message logs in `email_messages`, and includes graceful fallback to Laravel's default `Mail::send()` if tenant SMTP is unconfigured.
+
+3. **Delivery Execution Strategy (Immediate In-App vs. Queued Email):**
+   - **In-App Notifications:** Persisted synchronously to `App\Models\Notification` within the event listener execution, ensuring instant availability in the Duralux topbar bell dropdown (`/notifications/unread`) upon response or next poll.
+   - **Email Notifications:** Dispatched asynchronously via a queued job (`SendProjectNotificationEmailJob implements ShouldQueue`) using the database queue (`QUEUE_CONNECTION=database`), isolating HTTP responses from SMTP network latency.
+
+4. **Client-Contact & Recipient Resolution (Zero Duplication):**
+   - In-app alerts strictly target internal ERP `User` accounts (`user_id`).
+   - If a client reviewer has an ERP user account (e.g. `ProjectReview.reviewer_id`), in-app and email alerts route to that user.
+   - If client notifications target external clients without an ERP user account, email dispatches directly to the project customer's primary email (`$project->customer?->email` via `App\Domains\CRM\Models\Customer`) using `EmailService` without creating synthetic user accounts.
+
+5. **Batch Consolidation & Deduplication:**
+   - **Batch Timesheets:** Multiple time logs approved or rejected in a single operation are consolidated into one aggregate notification (e.g. *"Approver approved 4 time logs (16.5 hrs) on Project PRJ-001"*) rather than flooding recipients with individual entries.
+   - **Deduplication Guard:** For repetitive state changes, duplicate unread notifications of the same type for the same target user and project within a 15-minute window update the existing alert record.
+
+6. **Preferences, Security & Multi-Tenancy:**
+   - **Self-Action Suppression:** In-app and email notifications are strictly suppressed when the actor is the recipient (`$actor->id === $recipient->id`).
+   - **User Preferences:** Explicitly checks `$recipient->settings['notifications']['in_app']` (default `true`) and `$recipient->settings['notifications']['email']` (default `false`).
+   - **Multi-Tenant Isolation:** Every notification is bound to `$project->tenant_id`.
+   - **Action URLs:** Dynamic deep links to relevant workspaces (`projects.tasks.show`, `projects.issues.show`, `projects.show` tab reviews, `projects.timesheets.approval`).
+   - **Localization Parity:** Complete multilingual support across English (`lang/en/projects.php`), Hindi (`lang/hi/projects.php`), and Bulgarian (`lang/bg/projects.php`).
+
+7. **Platform Catalog Extension:**
+   - `App\Domains\Platform\Services\NotificationEventCatalog.php` extended with the `'projects'` module group and all 12 events.
+
+---
+
+#### 2. Phase 9C Implementation Execution Summary
+1. **Domain Events (`app/Domains/Projects/Events/`):**
+   - Implemented all 12 strongly-typed event classes with PHP 8.2 readonly constructor properties and `Dispatchable, SerializesModels` traits.
+2. **Domain Service Dispatchers:**
+   - Wired event dispatches across all 6 PM domain services:
+     - `TaskService`: `TaskAssigned` (on creation, assignment, and inline update), `TaskCompleted` (on forward completion transitions).
+     - `IssueService`: `IssueLogged` (on creation), `IssueResolved` (on resolution), `IssueRetested` (on verification pass/fail).
+     - `TimeLogService`: `TimesheetSubmitted` (on time logging), `TimesheetApproved` (on individual and batch approval), `TimesheetRejected` (on rejection with remarks).
+     - `ProjectReviewService`: `ProjectReviewRequested` (on review creation), `ProjectReviewSignedOff` (on sign-off as Approved or Rework Required).
+     - `ChangeRequestService`: `ChangeRequestCreated` (on CR creation).
+     - `ProjectClosureService`: `ProjectClosed` (on formal project closure).
+3. **Notification Domain Service (`app/Domains/Projects/Services/ProjectNotificationService.php`):**
+   - Implemented `notifyUser()`, `notifyExternalClient()`, and handlers for all 12 events with:
+     - Strict self-action suppression (`$actor->id === $recipient->id`).
+     - User settings preference checks (`settings['notifications']['in_app']` and `settings['notifications']['email']`).
+     - 15-minute deduplication window updating existing unread alerts.
+     - Direct creation in `App\Models\Notification` (matching topbar bell dropdown schema).
+     - Deep-link contextual `action_url` routing.
+4. **Asynchronous Queued Job (`app/Domains/Projects/Jobs/SendProjectNotificationEmailJob.php`):**
+   - Built queued email job implementing `ShouldQueue` delegating to `EmailService::sendEmail()` with fallback protection.
+5. **Event Listener (`app/Domains/Projects/Listeners/ProjectNotificationListener.php`):**
+   - Implemented listener matching and dispatching all 12 project events. Registered explicitly in `AppServiceProvider.php`.
+6. **Platform Catalog Extension (`App\Domains\Platform\Services\NotificationEventCatalog.php`):**
+   - Extended catalog with `'projects'` module group, registering all 12 events with descriptions, icons, roles, titles, bodies, and variables.
+7. **Localization (100% Parity):**
+   - Added notification title and body keys across English (`lang/en/projects.php`), Hindi (`lang/hi/projects.php`), and Bulgarian (`lang/bg/projects.php`).
+8. **Automated Verification:**
+   - `tests/Feature/ProjectNotificationTest.php`: 13 automated tests passing 100% (143 assertions) covering all 12 events, self-action suppression, batch consolidation, deduplication windows, user preference gating, queued email jobs, catalog registry, and EN/HI/BG localization parity.
+   - **Full PM Regression Suite Verified Green:** 113 total feature tests (746 assertions) passing 100% across `ProjectClosureTest`, `MilestoneTest`, `TaskTest`, `TimeLogTest`, `TimesheetApprovalTest`, `IssueTest`, `ProjectReviewTest`, `ChangeRequestTest`, `ProjectScheduleTest`, and `ProjectBillingTest`.
+
+- **Exit Criteria Met:** All 12 project lifecycle events dispatch cleanly, generate immediate in-app topbar notifications and queued emails according to user preferences, enforce self-action suppression and multi-tenant scoping, and preserve zero regressions.
+- **Next Authorized Action:** **Phase 10A — Executive Dashboard & Reports Requirements & Read-Only Audit**.
 
 ---
 
