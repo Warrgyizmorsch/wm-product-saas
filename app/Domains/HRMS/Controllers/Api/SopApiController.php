@@ -225,6 +225,14 @@ class SopApiController extends Controller
                     'acknowledged_count'        => $ackCount,
                     'compliance_rate'           => $complianceRate,
                     'my_acknowledgment_status'  => $myStatus,
+                    'capabilities'              => [
+                        'can_view'         => true,
+                        'can_edit'         => $isHrOrAdmin,
+                        'can_delete'       => $isHrOrAdmin,
+                        'can_publish'      => $isHrOrAdmin,
+                        'can_assign'       => $isHrOrAdmin,
+                        'can_acknowledge'  => ($myStatus === 'pending'),
+                    ],
                     'created_at'                => $doc->created_at?->format('Y-m-d H:i:s'),
                 ];
             });
@@ -350,6 +358,14 @@ class SopApiController extends Controller
                     'total_assigned'     => $totalAssigned,
                     'acknowledged_count' => $ackCount,
                     'compliance_rate'    => $complianceRate,
+                ],
+                'capabilities'              => [
+                    'can_view'         => true,
+                    'can_edit'         => $isHrOrAdmin,
+                    'can_delete'       => $isHrOrAdmin,
+                    'can_publish'      => $isHrOrAdmin,
+                    'can_assign'       => $isHrOrAdmin,
+                    'can_acknowledge'  => ($myAssignment && $myAssignment['status'] === 'pending'),
                 ],
                 'sections'                  => $sections,
                 'version_histories'         => $versions,

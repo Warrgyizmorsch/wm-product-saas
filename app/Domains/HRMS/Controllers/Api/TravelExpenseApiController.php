@@ -171,6 +171,10 @@ class TravelExpenseApiController extends Controller
      */
     private function transformTravelRequest(TravelRequest $tr, bool $detailed = false): array
     {
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+        $isOwner = $employee && (int)$tr->employee_id === (int)$employee->id;
+        $isPending = in_array($tr->status, ['draft', 'submitted', 'pending']);
+
         $data = [
             'id'               => $tr->id,
             'purpose'          => $tr->purpose,
@@ -180,6 +184,14 @@ class TravelExpenseApiController extends Controller
             'estimated_budget' => floatval($tr->estimated_budget),
             'approved_budget'  => $tr->approved_budget !== null ? floatval($tr->approved_budget) : null,
             'status'           => $tr->status,
+            'capabilities'     => [
+                'can_view'     => true,
+                'can_edit'     => ($isOwner && $tr->status === 'draft') || $isAdmin,
+                'can_delete'   => ($isOwner && $tr->status === 'draft') || $isAdmin,
+                'can_approve'  => $isAdmin && in_array($tr->status, ['submitted', 'pending']),
+                'can_reject'   => $isAdmin && in_array($tr->status, ['submitted', 'pending']),
+                'can_cancel'   => ($isOwner || $isAdmin) && $isPending,
+            ],
             'created_at'       => $tr->created_at?->toDateTimeString(),
         ];
 
@@ -231,12 +243,21 @@ class TravelExpenseApiController extends Controller
      */
     private function transformCashAdvance(CashAdvance $ca, bool $detailed = false): array
     {
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+        $isOwner = $employee && (int)$ca->employee_id === (int)$employee->id;
+
         $data = [
             'id'              => $ca->id,
             'amount'          => floatval($ca->amount),
             'approved_amount' => $ca->approved_amount !== null ? floatval($ca->approved_amount) : null,
             'purpose'         => $ca->purpose,
             'status'          => $ca->status,
+            'capabilities'    => [
+                'can_view'     => true,
+                'can_approve'  => $isAdmin && in_array($ca->status, ['submitted', 'pending']),
+                'can_reject'   => $isAdmin && in_array($ca->status, ['submitted', 'pending']),
+                'can_disburse' => $isAdmin && $ca->status === 'approved',
+            ],
             'created_at'      => $ca->created_at?->toDateTimeString(),
         ];
 
@@ -280,6 +301,9 @@ class TravelExpenseApiController extends Controller
      */
     private function transformExpenseReport(ExpenseReport $er, bool $detailed = false): array
     {
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+        $isOwner = $employee && (int)$er->employee_id === (int)$employee->id;
+
         $data = [
             'id'                         => $er->id,
             'title'                      => $er->title,
@@ -290,6 +314,14 @@ class TravelExpenseApiController extends Controller
             'approved_net_reimbursement' => $er->approved_net_reimbursement !== null ? floatval($er->approved_net_reimbursement) : null,
             'status'                     => $er->status,
             'payout_channel'             => $er->payout_channel,
+            'capabilities'               => [
+                'can_view'    => true,
+                'can_edit'    => ($isOwner && $er->status === 'draft') || $isAdmin,
+                'can_delete'  => ($isOwner && $er->status === 'draft') || $isAdmin,
+                'can_approve' => $isAdmin && in_array($er->status, ['submitted', 'pending']),
+                'can_reject'  => $isAdmin && in_array($er->status, ['submitted', 'pending']),
+                'can_pay'     => $isAdmin && $er->status === 'approved',
+            ],
             'created_at'                 => $er->created_at?->toDateTimeString(),
         ];
 

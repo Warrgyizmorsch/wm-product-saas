@@ -10,6 +10,7 @@ use App\Domains\HRMS\Models\KpiTemplate;
 use App\Domains\HRMS\Models\PerformanceImprovementPlan;
 use App\Domains\HRMS\Models\PipObjective;
 use App\Domains\HRMS\Models\KraCategory;
+use App\Services\Notification\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -201,161 +202,7 @@ class KraKpiService
             });
         }
 
-        // 1. Seed default KRA categories if none exist
-        if (KraCategory::where('tenant_id', $tenantId)->count() === 0) {
-            $defaultCategories = [
-                ['name' => 'Financial & Growth', 'code' => 'FIN', 'color' => '#10b981', 'description' => 'Revenue generation, cost optimization, and budget adherence.'],
-                ['name' => 'Customer & Market', 'code' => 'CUST', 'color' => '#3b82f6', 'description' => 'Client satisfaction, NPS, retention, and service delivery.'],
-                ['name' => 'Operational Excellence', 'code' => 'OPS', 'color' => '#f59e0b', 'description' => 'Quality, productivity, on-time milestones, and process efficiency.'],
-                ['name' => 'People & Learning', 'code' => 'PPL', 'color' => '#8b5cf6', 'description' => 'Skill development, leadership, team mentorship, and core values.'],
-            ];
-
-            foreach ($defaultCategories as $cat) {
-                KraCategory::create(array_merge($cat, ['tenant_id' => $tenantId, 'status' => 'active']));
-            }
-        }
-
-        // 2. Seed default Appraisal Cycle if none exist
-        if (AppraisalCycle::where('tenant_id', $tenantId)->count() === 0) {
-            $annualCycle = AppraisalCycle::create([
-                'tenant_id' => $tenantId,
-                'name' => 'Annual Performance Review FY 2026-27',
-                'code' => 'FY26-27-ANNUAL',
-                'period_type' => 'annual',
-                'start_date' => Carbon::parse('2026-04-01'),
-                'end_date' => Carbon::parse('2027-03-31'),
-                'goal_setting_deadline' => Carbon::parse('2026-05-15'),
-                'self_review_deadline' => Carbon::parse('2027-02-28'),
-                'manager_review_deadline' => Carbon::parse('2027-03-15'),
-                'status' => 'in_progress',
-                'goal_weightage_percent' => 70.00,
-                'competency_weightage_percent' => 30.00,
-                'description' => 'Standard company-wide annual appraisal evaluation cycle covering core functional goals and organizational values.',
-            ]);
-
-            AppraisalCycle::create([
-                'tenant_id' => $tenantId,
-                'name' => 'Q3 Performance & Growth Cycle',
-                'code' => 'Q3-2026',
-                'period_type' => 'quarterly',
-                'start_date' => Carbon::parse('2026-10-01'),
-                'end_date' => Carbon::parse('2026-12-31'),
-                'status' => 'goal_setting',
-                'goal_weightage_percent' => 80.00,
-                'competency_weightage_percent' => 20.00,
-                'description' => 'Mid-year quarterly alignment checkpoint.',
-            ]);
-
-            // 3. Seed Standard KPI Master Library
-            $kras = KraCategory::where('tenant_id', $tenantId)->get()->keyBy('name');
-            $opsId = $kras->get('Operational Excellence')?->id;
-            $finId = $kras->get('Financial & Growth')?->id;
-            $custId = $kras->get('Customer & Market')?->id;
-            $pplId = $kras->get('People & Learning')?->id;
-
-            $kpis = [
-                ['name' => 'Production Bug Escape Rate', 'code' => 'KPI-BUG', 'kra_category_id' => $opsId, 'unit' => 'percentage', 'calculation_type' => 'lower_is_better', 'default_target' => 2.0, 'default_weightage' => 25.0, 'description' => 'Target bug escape rate under 2% per release cycle.'],
-                ['name' => 'Sprint Velocity & Feature Delivery', 'code' => 'KPI-VEL', 'kra_category_id' => $opsId, 'unit' => 'percentage', 'calculation_type' => 'higher_is_better', 'default_target' => 95.0, 'default_weightage' => 30.0, 'description' => 'On-time delivery rate of planned sprint user stories.'],
-                ['name' => 'Customer Satisfaction & CSAT', 'code' => 'KPI-CSAT', 'kra_category_id' => $custId, 'unit' => 'percentage', 'calculation_type' => 'higher_is_better', 'default_target' => 90.0, 'default_weightage' => 25.0, 'description' => 'Average customer happiness and SLA rating.'],
-                ['name' => 'Mentorship & Knowledge Sharing', 'code' => 'KPI-PPL', 'kra_category_id' => $pplId, 'unit' => 'boolean', 'calculation_type' => 'milestone', 'default_target' => 1.0, 'default_weightage' => 20.0, 'description' => 'Conduct at least 2 team workshops or mentor junior peers.'],
-                ['name' => 'Quarterly Revenue Milestone', 'code' => 'KPI-REV', 'kra_category_id' => $finId, 'unit' => 'currency', 'calculation_type' => 'higher_is_better', 'default_target' => 500000.0, 'default_weightage' => 40.0, 'description' => 'Closed deals value quota per quarter.'],
-            ];
-
-            foreach ($kpis as $kpi) {
-                KpiMaster::create(array_merge($kpi, ['tenant_id' => $tenantId, 'status' => 'active']));
-            }
-
-            // 4. Seed Standard Template Pack
-            $template = KpiTemplate::create([
-                'tenant_id' => $tenantId,
-                'name' => 'Software Engineering Team Scorecard',
-                'description' => 'Standard template with quality, velocity, customer, and mentoring metrics.',
-                'status' => 'active',
-            ]);
-
-            $masterItems = KpiMaster::where('tenant_id', $tenantId)->take(4)->get();
-            foreach ($masterItems as $m) {
-                KpiTemplateItem::create([
-                    'tenant_id' => $tenantId,
-                    'kpi_template_id' => $template->id,
-                    'kra_category_id' => $m->kra_category_id,
-                    'kpi_master_id' => $m->id,
-                    'title' => $m->name,
-                    'description' => $m->description,
-                    'unit' => $m->unit,
-                    'calculation_type' => $m->calculation_type,
-                    'target' => $m->default_target,
-                    'weightage' => $m->default_weightage,
-                ]);
-            }
-
-            // 5. Seed Real Scorecards for Existing Employees
-            $employees = Employee::where('tenant_id', $tenantId)->take(4)->get();
-            if ($employees->isNotEmpty()) {
-                $statusFlows = ['approved', 'self_reviewed', 'manager_reviewed', 'calibrated'];
-
-                foreach ($employees as $idx => $emp) {
-                    $flow = $statusFlows[$idx % count($statusFlows)];
-                    $plan = $this->assignTemplateToEmployee($emp->id, $annualCycle->id, $template->id, $tenantId);
-
-                    // Add progress data & ratings based on stage
-                    if ($flow === 'approved') {
-                        $plan->status = 'approved';
-                        $plan->approved_at = Carbon::now()->subDays(10);
-                        $item = $plan->items()->first();
-                        if ($item) {
-                            $item->actual = 1.5;
-                            $item->save();
-                            GoalProgressLog::create([
-                                'tenant_id' => $tenantId,
-                                'employee_goal_item_id' => $item->id,
-                                'employee_id' => $emp->id,
-                                'previous_value' => null,
-                                'current_value' => 1.5,
-                                'notes' => 'Q1 sprint quality review achieved 1.5% escape rate.',
-                            ]);
-                        }
-                    } elseif ($flow === 'self_reviewed') {
-                        $plan->status = 'self_reviewed';
-                        $plan->employee_comments = 'Consistently hit sprint delivery targets and conducted 2 knowledge transfer workshops.';
-                        $plan->self_reviewed_at = Carbon::now()->subDays(2);
-                        foreach ($plan->items as $item) {
-                            $item->self_rating = 4.2;
-                            $item->self_comment = 'Delivered all sprint features ahead of schedule.';
-                            $item->save();
-                        }
-                    } elseif ($flow === 'manager_reviewed') {
-                        $plan->status = 'manager_reviewed';
-                        $plan->employee_comments = 'Successfully delivered major platform features.';
-                        $plan->manager_comments = 'Outstanding technical contributions. Highly recommended for Senior Lead promotion.';
-                        $plan->promotion_recommended = true;
-                        $plan->competency_score = 92.0;
-                        $plan->manager_reviewed_at = Carbon::now()->subDay();
-                        foreach ($plan->items as $item) {
-                            $item->self_rating = 4.5;
-                            $item->manager_rating = 4.7;
-                            $item->manager_comment = 'Exceeded quality expectations.';
-                            $item->save();
-                        }
-                    } elseif ($flow === 'calibrated') {
-                        // Create one low performer example (< 60%) to test the 1-Click PIP Bridge!
-                        $plan->status = 'calibrated';
-                        $plan->employee_comments = 'Faced challenges in sprint delivery due to scope changes.';
-                        $plan->manager_comments = 'Repeatedly missed project deadlines and quality criteria.';
-                        $plan->competency_score = 50.0;
-                        $plan->hr_comments = 'Performance fell below standard threshold. Placed under review.';
-                        foreach ($plan->items as $item) {
-                            $item->self_rating = 2.5;
-                            $item->manager_rating = 2.0;
-                            $item->manager_comment = 'Needs immediate improvement on bug prevention.';
-                            $item->save();
-                        }
-                    }
-
-                    $this->recalculatePlanScore($plan);
-                }
-            }
-        }
+        // Auto-seeding disabled: only user-defined KRAs, KPIs, Cycles and Plans will be tracked.
     }
     public function calculateItemScore(EmployeeGoalItem $item): float
     {
@@ -577,6 +424,18 @@ class KraKpiService
             }
 
             $this->recalculatePlanScore($plan);
+
+            // Notify Employee of Assigned Goal Sheet
+            NotificationService::sendToEmployee(
+                employee: $employee,
+                title: 'New Performance Goal Sheet Assigned',
+                message: "A new KPI goal scorecard ({$planNumber}) has been assigned to you for {$plan->appraisalCycle?->name}.",
+                actionUrl: route('hrms.kra-kpi.show', $plan->id),
+                module: 'hrms',
+                type: 'performance',
+                iconClass: 'feather-target'
+            );
+
             return $plan;
         });
     }
@@ -657,6 +516,29 @@ class KraKpiService
 
             $plan->pip_triggered = true;
             $plan->save();
+
+            // Notify Employee and Supervisor of PIP Action Plan
+            NotificationService::sendToEmployee(
+                employee: $employee,
+                title: 'Performance Improvement Plan (PIP) Initiated',
+                message: "A 60-day Performance Improvement Plan (#{$pipNumber}) has been initiated. Review your objectives and support guidelines.",
+                actionUrl: route('hrms.pip.show', $pip->id),
+                module: 'hrms',
+                type: 'pip',
+                iconClass: 'feather-alert-triangle'
+            );
+
+            if ($pip->manager_id) {
+                NotificationService::sendToEmployee(
+                    employee: $pip->manager_id,
+                    title: 'PIP Supervised Action Plan Assigned',
+                    message: "You are assigned as supervisor for {$employee?->full_name}'s PIP (#{$pipNumber}).",
+                    actionUrl: route('hrms.pip.show', $pip->id),
+                    module: 'hrms',
+                    type: 'pip',
+                    iconClass: 'feather-user-check'
+                );
+            }
 
             return $pip;
         });

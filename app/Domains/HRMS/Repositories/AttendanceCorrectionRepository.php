@@ -54,6 +54,11 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
         return $data;
     }
 
+    public function getSingleCorrection(AttendanceCorrection $correction): array
+    {
+        return $this->transformCorrection($correction);
+    }
+
     public function getIndexData(array $inputs, ?User $user, int $tenantId): array
     {
         $query = AttendanceCorrection::where('tenant_id', $tenantId)

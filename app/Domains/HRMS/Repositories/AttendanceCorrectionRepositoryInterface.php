@@ -10,6 +10,8 @@ interface AttendanceCorrectionRepositoryInterface
 {
     public function getIndexData(array $inputs, ?User $user, int $tenantId): array;
 
+    public function getSingleCorrection(AttendanceCorrection $correction): array;
+
     public function storeCorrection(array $validated, ?User $user, int $tenantId): array;
 
     public function approve(AttendanceCorrection $correction, ?User $user): array;

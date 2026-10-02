@@ -603,6 +603,21 @@ class KraKpiApiController extends Controller
         $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
         $scorecards = $query->latest()->paginate($perPage);
 
+        $scorecards->getCollection()->transform(function ($sc) use ($currentEmployee, $isHrOrAdmin) {
+            $isOwner = $currentEmployee && (int)$sc->employee_id === (int)$currentEmployee->id;
+            $isManager = $currentEmployee && (int)$sc->manager_id === (int)$currentEmployee->id;
+            $sc->capabilities = [
+                'can_view'             => true,
+                'can_self_appraise'    => $isOwner && in_array($sc->status, ['draft', 'goal_setting', 'self_review', 'active']),
+                'can_manager_appraise' => ($isManager || $isHrOrAdmin) && in_array($sc->status, ['submitted', 'manager_review', 'in_review']),
+                'can_calibrate'        => $isHrOrAdmin && in_array($sc->status, ['manager_reviewed', 'calibration', 'in_review']),
+                'can_sign_off'         => ($isOwner || $isManager || $isHrOrAdmin) && in_array($sc->status, ['calibrated', 'completed']),
+                'can_edit'             => $isHrOrAdmin || ($isOwner && in_array($sc->status, ['draft', 'goal_setting'])),
+                'can_delete'           => $isHrOrAdmin,
+            ];
+            return $sc;
+        });
+
         return $this->sendSuccess($scorecards, 'Scorecards retrieved.');
     }
 

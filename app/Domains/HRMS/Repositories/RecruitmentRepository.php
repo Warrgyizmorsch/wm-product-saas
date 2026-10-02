@@ -14,6 +14,7 @@ use App\Domains\HRMS\Models\JobOffer;
 use App\Domains\HRMS\Models\JobRequisition;
 use App\Models\User;
 use App\Services\EmailService;
+use App\Services\Notification\NotificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -323,6 +324,39 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             $application->update(['current_stage' => $stageMapping[$validated['round_number']], 'stage_updated_at' => now()]);
         }
 
+        // Dispatch interview notifications
+        try {
+            $application->loadMissing('candidate', 'requisition');
+            $candidateName = $application->candidate?->full_name ?? 'Candidate';
+            $jobTitle = $application->requisition?->job_title ?? 'Requisition';
+            $pipelineUrl = route('hrms.recruitment.pipeline', $application->requisition_id ?? 1);
+
+            if (!empty($validated['interviewer_employee_id'])) {
+                $interviewer = Employee::find($validated['interviewer_employee_id']);
+                if ($interviewer) {
+                    NotificationService::sendToEmployee(
+                        $interviewer,
+                        'Interview Scheduled — ' . $validated['round_name'],
+                        "You are assigned to conduct {$validated['round_name']} for {$candidateName} ({$jobTitle}) on {$validated['scheduled_at']}.",
+                        $pipelineUrl,
+                        'hrms',
+                        'interview_assigned',
+                        'feather-calendar'
+                    );
+                }
+            }
+
+            NotificationService::sendToHrAdmins(
+                'Interview Scheduled',
+                "Interview ({$validated['round_name']}) scheduled for candidate {$candidateName} for {$jobTitle}.",
+                $pipelineUrl,
+                'interview_scheduled_hr',
+                'feather-calendar'
+            );
+        } catch (\Throwable $e) {
+            // Suppress notification errors
+        }
+
         return $interview;
     }
 
@@ -350,6 +384,23 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
                 'rejection_reason' => 'Failed Interview Round: ' . $interview->round_name,
                 'stage_updated_at' => now(),
             ]);
+        }
+
+        // Dispatch scorecard submission notification
+        try {
+            $interview->loadMissing('application.candidate', 'application.requisition');
+            $candidateName = $interview->application?->candidate?->full_name ?? 'Candidate';
+            $pipelineUrl = route('hrms.recruitment.pipeline', $interview->application?->requisition_id ?? 1);
+
+            NotificationService::sendToHrAdmins(
+                'Interview Scorecard Submitted',
+                "Scorecard submitted for {$candidateName} ({$interview->round_name}) with recommendation: " . strtoupper($validated['recommendation']) . ".",
+                $pipelineUrl,
+                'scorecard_submitted_hr',
+                'feather-file-check'
+            );
+        } catch (\Throwable $e) {
+            // Suppress notification errors
         }
 
         return $scorecard;
@@ -474,6 +525,23 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             'current_stage' => 'offer_sent',
             'stage_updated_at' => now(),
         ]);
+
+        // Dispatch Job Offer notification to HR Admins
+        try {
+            $application->loadMissing('candidate', 'requisition');
+            $candidateName = $application->candidate?->full_name ?? 'Candidate';
+            $pipelineUrl = route('hrms.recruitment.pipeline', $application->requisition_id ?? 1);
+
+            NotificationService::sendToHrAdmins(
+                'Job Offer Generated',
+                "Official Job Offer #{$code} generated for {$candidateName} (Annual CTC: $" . number_format((float)$validated['offered_annual_ctc'], 2) . ").",
+                $pipelineUrl,
+                'job_offer_created',
+                'feather-file-text'
+            );
+        } catch (\Throwable $e) {
+            // Suppress notification errors
+        }
 
         return $offer;
     }
@@ -660,6 +728,19 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
                     $req->update(['status' => 'closed']);
                 }
             }
+        }
+
+        // Dispatch notification to HR Admins
+        try {
+            NotificationService::sendToHrAdmins(
+                'Candidate Converted to Employee',
+                "Candidate {$candidate->full_name} has been successfully hired and provisioned as an Employee.",
+                route('hrms.employees.index'),
+                'candidate_hired',
+                'feather-user-check'
+            );
+        } catch (\Throwable $e) {
+            // Suppress notification errors
         }
 
         return [

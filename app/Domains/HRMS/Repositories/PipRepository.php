@@ -185,26 +185,31 @@ class PipRepository implements PipRepositoryInterface
 
     public function acknowledge(int $id, string $signatureData, int $tenantId): PerformanceImprovementPlan
     {
-        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($id);
+        $plan = PerformanceImprovementPlan::with(['employee', 'manager'])->where('tenant_id', $tenantId)->findOrFail($id);
         $plan->update([
             'employee_acknowledged_at' => Carbon::now(),
             'employee_signature' => $signatureData,
         ]);
+
+        try {
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                'PIP Acknowledged by Employee',
+                "Employee {$plan->employee?->full_name} has digitally acknowledged PIP #{$plan->pip_number}.",
+                route('hrms.pip.show', $plan->id),
+                'pip_acknowledged',
+                'feather-check-square'
+            );
+        } catch (\Throwable $e) {
+            // Suppress notification errors
+        }
+
         return $plan;
     }
 
     public function conclude(int $id, array $validated, int $tenantId): PerformanceImprovementPlan
     {
         $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($id);
-
-        $plan->update([
-            'status' => $validated['final_outcome'],
-            'concluded_at' => Carbon::now(),
-            'exit_action' => $validated['exit_action'] ?? null,
-            'exit_notes' => $validated['exit_notes'] ?? null,
-        ]);
-
-        return $plan;
+        return $this->pipService->evaluateFinalOutcome($plan, $validated);
     }
 
     public function storeCategory(array $validated, int $tenantId): PipCategory

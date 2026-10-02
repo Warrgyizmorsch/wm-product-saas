@@ -38,8 +38,8 @@
 
                     <h2 class="fw-bold text-dark mb-4">{{ $article->title }}</h2>
 
-                    <div class="article-content text-dark fs-6 leading-relaxed mb-5" style="white-space: pre-line;">
-                        {{ $article->content }}
+                    <div class="article-content text-dark fs-6 leading-relaxed mb-5">
+                        {!! $article->content !!}
                     </div>
 
                     <!-- Helpful Footer Box -->

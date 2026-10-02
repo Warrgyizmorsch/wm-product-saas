@@ -249,6 +249,12 @@ class GoalApiController extends Controller
                     'key_results_count'   => $g->keyResults->count(),
                     'due_date'            => $g->due_date?->format('Y-m-d'),
                     'status'              => $g->status,
+                    'capabilities'        => [
+                        'can_view'     => true,
+                        'can_edit'     => $isHrAdmin || ($currentEmployee && ($g->employee_id === $currentEmployee->id || $assignedEmps->contains('id', $currentEmployee->id))),
+                        'can_delete'   => $isHrAdmin,
+                        'can_check_in' => $isHrAdmin || ($currentEmployee && ($g->employee_id === $currentEmployee->id || $assignedEmps->contains('id', $currentEmployee->id))),
+                    ],
                 ];
             });
 
@@ -346,6 +352,12 @@ class GoalApiController extends Controller
                 'key_results'         => $keyResults,
                 'recent_check_ins'    => $checkIns,
                 'cascaded_sub_goals'  => $subGoals,
+                'capabilities'        => [
+                    'can_view'     => true,
+                    'can_edit'     => $isHrAdmin || ($currentEmployee && ($goal->employee_id === $currentEmployee->id || $assignedEmps->contains('id', $currentEmployee->id))),
+                    'can_delete'   => $isHrAdmin,
+                    'can_check_in' => $isHrAdmin || ($currentEmployee && ($goal->employee_id === $currentEmployee->id || $assignedEmps->contains('id', $currentEmployee->id))),
+                ],
             ];
 
             return $this->sendSuccess($response, 'Goal details loaded successfully.');

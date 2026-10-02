@@ -162,6 +162,18 @@ class LeaveEncashmentApiController extends Controller
 
         $encashments = $query->orderBy('created_at', 'desc')->paginate($request->integer('per_page', 10));
 
+        $encashments->getCollection()->transform(function ($enc) use ($employee, $isHrAdmin) {
+            $isOwner = $employee && (int)$enc->employee_id === (int)$employee->id;
+            $isPending = $enc->status === 'pending';
+            $enc->capabilities = [
+                'can_view'    => true,
+                'can_approve' => $isHrAdmin && $isPending,
+                'can_reject'  => $isHrAdmin && $isPending,
+                'can_cancel'  => ($isOwner || $isHrAdmin) && $isPending,
+            ];
+            return $enc;
+        });
+
         return $this->sendSuccess($encashments, 'Leave encashment requests retrieved successfully');
     }
 
@@ -187,6 +199,15 @@ class LeaveEncashmentApiController extends Controller
         if (!$isHrAdmin && $encashment->employee_id !== $employee?->id) {
             return $this->sendError('Unauthorized access to leave encashment request.', 403);
         }
+
+        $isOwner = $employee && (int)$encashment->employee_id === (int)$employee->id;
+        $isPending = $encashment->status === 'pending';
+        $encashment->capabilities = [
+            'can_view'    => true,
+            'can_approve' => $isHrAdmin && $isPending,
+            'can_reject'  => $isHrAdmin && $isPending,
+            'can_cancel'  => ($isOwner || $isHrAdmin) && $isPending,
+        ];
 
         return $this->sendSuccess($encashment, 'Leave encashment details loaded');
     }

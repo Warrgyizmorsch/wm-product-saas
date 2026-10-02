@@ -58,6 +58,10 @@
             border-radius: 8px !important;
             padding: 10px 14px !important;
         }
+        #createCompetencyModal .odoo-form-label {
+            width: 155px !important;
+            white-space: nowrap !important;
+        }
     </style>
 @endpush
 
@@ -195,8 +199,8 @@
                                 </x-ui.odoo-form-ui>
 
                                 <div class="pt-2 d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">Apply Filters</button>
-                                    <a href="{{ route('hrms.feedback360.index', ['active_tab' => 'cycles']) }}" class="btn btn-light border btn-sm w-100">Reset</a>
+                                    <x-ui.button type="submit" variant="primary" size="sm" class="w-100 fw-bold">Apply Filters</x-ui.button>
+                                    <x-ui.button variant="light" size="sm" href="{{ route('hrms.feedback360.index', ['active_tab' => 'cycles']) }}" class="w-100 border">Reset</x-ui.button>
                                 </div>
                             </form>
                         </x-ui.filter>
@@ -669,52 +673,53 @@
                         <h5 class="fw-bold text-dark mb-0 fs-16">Competencies & Question Bank</h5>
                         <small class="text-muted">Standard criteria used for multi-rater feedback evaluations and radar analysis</small>
                     </div>
-                    <div class="d-flex gap-2">
-                        <x-ui.button variant="light" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createQuestionModal" class="border">
-                            Add Question
-                        </x-ui.button>
-                        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createCompetencyModal">
-                            Add Competency
+                    <div>
+                        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createCompetencyModal" class="fw-bold">
+                            Add Competency & Questions
                         </x-ui.button>
                     </div>
                 </div>
 
                 <div class="row g-3">
-                    @foreach($competencies as $comp)
+                    @forelse($competencies as $comp)
                         <div class="col-xl-6 col-12">
-                            <div class="card border shadow-none p-3 h-100 review-card">
+                            <div class="card border shadow-sm p-3.5 review-card" style="border-radius: 12px !important;">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div>
-                                        <div class="d-flex align-items-center gap-1.5 flex-wrap mb-1">
-                                            <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-0.5 fs-11 fw-semibold">
-                                                {{ $comp->category }}
+                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 fs-11 fw-semibold">
+                                            {{ $comp->category }}
+                                        </span>
+                                        @if($comp->cycle_id)
+                                            <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill px-2.5 py-1 fs-11 fw-semibold">
+                                                <i class="feather-target me-1"></i>{{ $comp->cycle?->name }}
                                             </span>
-                                            @if($comp->cycle_id)
-                                                <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill px-2 py-0.5 fs-11 fw-semibold">
-                                                    <i class="feather-target me-1"></i>{{ $comp->cycle?->name }}
-                                                </span>
-                                            @else
-                                                <span class="badge bg-light text-muted border rounded-pill px-2 py-0.5 fs-11 fw-semibold">
-                                                    <i class="feather-globe me-1"></i>Global (All Cycles)
-                                                </span>
-                                            @endif
-                                        </div>
-                                        <h6 class="fw-bold text-dark mb-0 fs-14">{{ $comp->name }}</h6>
-                                        <code class="fs-11">{{ $comp->code }}</code>
+                                        @else
+                                            <span class="badge bg-light text-muted border rounded-pill px-2.5 py-1 fs-11 fw-medium">
+                                                <i class="feather-globe me-1"></i>Global (All Cycles)
+                                            </span>
+                                        @endif
                                     </div>
-                                    <x-ui.button variant="light" size="sm" icon="feather-trash-2" class="text-danger border shadow-xs" title="Delete Competency" data-bs-toggle="modal" data-bs-target="#deleteCompModal{{ $comp->id }}">
-                                    </x-ui.button>
+                                    <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" title="Delete Competency" data-bs-toggle="modal" data-bs-target="#deleteCompModal{{ $comp->id }}" />
                                 </div>
 
+                                <div class="mb-1.5">
+                                    <h6 class="fw-bold text-dark mb-1 fs-15">{{ $comp->name }}</h6>
+                                    <span class="badge bg-secondary-subtle text-secondary font-monospace fs-10 px-2 py-0.5 rounded">{{ $comp->code }}</span>
+                                </div>
+
+                                @if($comp->description)
+                                    <p class="text-muted fs-12 mb-2 lh-base">{{ $comp->description }}</p>
+                                @endif
+
                                 <!-- Delete Competency Confirmation Modal -->
-                                <x-ui.modal id="deleteCompModal{{ $comp->id }}" title="Delete Competency" size="sm" :centered="true" :showFooter="false">
+                                <x-ui.modal id="deleteCompModal{{ $comp->id }}" title="Delete Competency" size="sm" :centered="true" :static="true" :showFooter="false">
                                     <div class="text-center py-2">
                                         <div class="avatar-initials bg-danger-subtle text-danger mx-auto mb-3" style="width: 48px; height: 48px; font-size: 18px;">
                                             <i class="feather-trash-2"></i>
                                         </div>
                                         <h6 class="fw-bold text-dark mb-1">Delete Competency?</h6>
                                         <p class="text-muted fs-12 mb-3">
-                                            Are you sure you want to remove <strong>{{ $comp->name }}</strong> and its questions?
+                                            Are you sure you want to remove <strong>{{ $comp->name }}</strong> and its evaluation questions?
                                         </p>
                                         <form action="{{ route('hrms.feedback360.competencies.destroy', $comp->id) }}" method="POST">
                                             @csrf
@@ -727,29 +732,61 @@
                                     </div>
                                 </x-ui.modal>
 
-                                <p class="text-muted fs-12 mb-3">{{ $comp->description }}</p>
-
-                                <div class="border-top pt-2">
-                                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1.5">Questions ({{ $comp->questions->count() }})</span>
-                                    <ul class="list-unstyled mb-0 fs-12">
+                                <div class="border-top pt-2.5 mt-2">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="text-muted fs-11 fw-bold text-uppercase d-inline-flex align-items-center gap-1">
+                                            <i class="feather-help-circle text-primary"></i> Evaluation Questions
+                                        </span>
+                                        <span class="badge bg-light text-secondary border rounded-pill fs-10 px-2 py-0.5">
+                                            {{ $comp->questions->count() }} prompts
+                                        </span>
+                                    </div>
+                                    <div class="d-flex flex-column gap-1.5 mt-1.5">
                                         @forelse($comp->questions as $q)
-                                            <li class="d-flex justify-content-between align-items-center py-1.5 border-bottom-dashed">
-                                                <span class="text-dark"><i class="feather-help-circle text-primary me-1.5"></i>{{ $q->question_text }}</span>
-                                                <form action="{{ route('hrms.feedback360.questions.destroy', $q->id) }}" method="POST" class="d-inline m-0">
+                                            <div class="p-2 rounded border d-flex align-items-center justify-content-between gap-2" style="background-color: #f8fafc; border-color: #e2e8f0 !important;">
+                                                <div class="d-flex align-items-start gap-2 flex-grow-1 min-w-0">
+                                                    <i class="feather-check-circle text-primary mt-0.5 fs-13 flex-shrink-0"></i>
+                                                    <div class="min-w-0">
+                                                        <span class="text-dark fs-12 fw-medium d-block lh-sm text-break">{{ $q->question_text }}</span>
+                                                        <div class="d-flex align-items-center gap-1.5 mt-1">
+                                                            <span class="badge bg-white text-muted border fs-10 px-1.5 py-0.5 rounded">
+                                                                {{ $q->question_type === 'rating_scale' ? '1 - 5 Rating Scale' : 'Open Text Comment' }}
+                                                            </span>
+                                                            @if($q->target_reviewer_type && $q->target_reviewer_type !== 'all')
+                                                                <span class="badge bg-info-subtle text-info border border-info-subtle fs-10 px-1.5 py-0.5 rounded">
+                                                                    {{ ucfirst(str_replace('_', ' ', $q->target_reviewer_type)) }}
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <form action="{{ route('hrms.feedback360.questions.destroy', $q->id) }}" method="POST" class="d-inline m-0 flex-shrink-0">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <x-ui.button variant="light" size="sm" type="submit" icon="feather-x" class="text-danger border" title="Remove question">
-                                                    </x-ui.button>
+                                                    <x-ui.icon-btn type="submit" icon="feather-x" variant="soft-danger" size="sm" title="Remove question" />
                                                 </form>
-                                            </li>
+                                            </div>
                                         @empty
-                                            <li class="text-muted fst-italic">No specific rating questions linked yet.</li>
+                                            <div class="text-muted fs-11 fst-italic py-2 text-center bg-light rounded">No questions linked to this competency yet.</div>
                                         @endforelse
-                                    </ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    @endforeach
+                    @empty
+                        <div class="col-12">
+                            <div class="text-center py-5 border rounded-3 bg-light">
+                                <div class="avatar-initials bg-primary-subtle text-primary mx-auto mb-3" style="width: 52px; height: 52px; font-size: 20px;">
+                                    <i class="feather-award"></i>
+                                </div>
+                                <h6 class="fw-bold text-dark mb-1">No Competencies Found</h6>
+                                <p class="text-muted fs-12 mb-3">Define organizational competencies and question sets to start 360 evaluations.</p>
+                                <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createCompetencyModal" class="fw-bold">
+                                    Create First Competency
+                                </x-ui.button>
+                            </div>
+                        </div>
+                    @endforelse
 
                     @php
                         $openQuestions = $questions->whereNull('competency_id');
@@ -757,39 +794,56 @@
 
                     @if($openQuestions->isNotEmpty())
                         <div class="col-xl-6 col-12">
-                            <div class="card border shadow-none p-3 h-100 review-card bg-light-subtle">
+                            <div class="card border shadow-sm p-3.5 review-card" style="border-radius: 12px !important; background-color: #fafbfd !important;">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div>
-                                        <div class="d-flex align-items-center gap-1.5 flex-wrap mb-1">
-                                            <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-0.5 fs-11 fw-semibold">
-                                                Qualitative & Open-Ended
-                                            </span>
-                                            <span class="badge bg-light text-muted border rounded-pill px-2 py-0.5 fs-11 fw-semibold">
-                                                <i class="feather-globe me-1"></i>Global
-                                            </span>
-                                        </div>
-                                        <h6 class="fw-bold text-dark mb-0 fs-14">General Written Feedback Questions</h6>
-                                        <code class="fs-11">GENERAL-TEXT</code>
+                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2.5 py-1 fs-11 fw-semibold">
+                                            Qualitative & Open-Ended
+                                        </span>
+                                        <span class="badge bg-light text-muted border rounded-pill px-2.5 py-1 fs-11 fw-medium">
+                                            <i class="feather-globe me-1"></i>Global
+                                        </span>
                                     </div>
                                 </div>
 
-                                <p class="text-muted fs-12 mb-3">Open-ended questions presented to all reviewers to collect qualitative comments and actionable growth recommendations.</p>
+                                <div class="mb-1.5">
+                                    <h6 class="fw-bold text-dark mb-1 fs-15">General Written Feedback Questions</h6>
+                                    <span class="badge bg-secondary-subtle text-secondary font-monospace fs-10 px-2 py-0.5 rounded">GENERAL-TEXT</span>
+                                </div>
 
-                                <div class="border-top pt-2">
-                                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1.5">Questions ({{ $openQuestions->count() }})</span>
-                                    <ul class="list-unstyled mb-0 fs-12">
+                                <p class="text-muted fs-12 mb-2 lh-base">Open-ended prompts presented to all reviewers to collect qualitative feedback and growth recommendations.</p>
+
+                                <div class="border-top pt-2.5 mt-2">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="text-muted fs-11 fw-bold text-uppercase d-inline-flex align-items-center gap-1">
+                                            <i class="feather-message-square text-info"></i> Open Comment Prompts
+                                        </span>
+                                        <span class="badge bg-light text-secondary border rounded-pill fs-10 px-2 py-0.5">
+                                            {{ $openQuestions->count() }} prompts
+                                        </span>
+                                    </div>
+                                    <div class="d-flex flex-column gap-1.5 mt-1.5">
                                         @foreach($openQuestions as $oq)
-                                            <li class="d-flex justify-content-between align-items-center py-1.5 border-bottom-dashed">
-                                                <span class="text-dark"><i class="feather-message-square text-info me-1.5"></i>{{ $oq->question_text }}</span>
-                                                <form action="{{ route('hrms.feedback360.questions.destroy', $oq->id) }}" method="POST" class="d-inline m-0">
+                                            <div class="p-2 rounded border d-flex align-items-center justify-content-between gap-2" style="background-color: #ffffff; border-color: #e2e8f0 !important;">
+                                                <div class="d-flex align-items-start gap-2 flex-grow-1 min-w-0">
+                                                    <i class="feather-message-square text-info mt-0.5 fs-13 flex-shrink-0"></i>
+                                                    <div class="min-w-0">
+                                                        <span class="text-dark fs-12 fw-medium d-block lh-sm text-break">{{ $oq->question_text }}</span>
+                                                        <div class="d-flex align-items-center gap-1.5 mt-1">
+                                                            <span class="badge bg-light text-muted border fs-10 px-1.5 py-0.5 rounded">
+                                                                Open Text
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <form action="{{ route('hrms.feedback360.questions.destroy', $oq->id) }}" method="POST" class="d-inline m-0 flex-shrink-0">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <x-ui.button variant="light" size="sm" type="submit" icon="feather-x" class="text-danger border" title="Remove question">
-                                                    </x-ui.button>
+                                                    <x-ui.icon-btn type="submit" icon="feather-x" variant="soft-danger" size="sm" title="Remove question" />
                                                 </form>
-                                            </li>
+                                            </div>
                                         @endforeach
-                                    </ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -879,31 +933,111 @@
 </x-ui.modal>
 
 <!-- ========================================================================= -->
-<!-- MODAL: CREATE COMPETENCY -->
+<!-- MODAL: CREATE COMPETENCY & EVALUATION QUESTIONS (UNIFIED FORM) -->
 <!-- ========================================================================= -->
-<x-ui.modal id="createCompetencyModal" title="Add Competency to Library" size="md" :centered="true" :showFooter="false">
-    <form action="{{ route('hrms.feedback360.competencies.store') }}" method="POST">
+<x-ui.modal id="createCompetencyModal" title="Add Competency & Evaluation Questions" size="xl" :centered="true" :static="true" :showFooter="false">
+    <form action="{{ route('hrms.feedback360.competencies.store') }}" method="POST" id="createCompetencyWithQuestionsForm">
         @csrf
-        <div class="d-flex flex-column gap-3">
-            <x-ui.odoo-form-ui type="input" label="Competency Name" name="name" placeholder="e.g. Strategic Thinking & Vision" :required="true" />
-            
-            <x-ui.odoo-form-ui type="input" label="Category" name="category" placeholder="e.g. Leadership / Core Values" :required="true" />
-            
-            <x-ui.odoo-form-ui type="select" label="Feedback Cycle Scope" name="cycle_id" :searchable="true" helperText="Assign to a specific feedback cycle or select Global to apply across all company cycles.">
-                <option value="">🌐 Global (All Feedback Cycles)</option>
-                @foreach($cycles as $c)
-                    <option value="{{ $c->id }}">🎯 {{ $c->name }}</option>
-                @endforeach
-            </x-ui.odoo-form-ui>
+        <div class="row g-3">
+            <div class="col-md-7">
+                <x-ui.odoo-form-ui type="input" label="Competency Name" name="name" placeholder="e.g. Continuous Growth & Core Values" :required="true" />
+            </div>
+            <div class="col-md-5">
+                <x-ui.odoo-form-ui type="input" label="Category" name="category" placeholder="e.g. Core Values / Leadership" :required="true" />
+            </div>
+            <div class="col-md-7">
+                <x-ui.odoo-form-ui type="select" label="Feedback Cycle Scope" name="cycle_id" helperText="Assign to a specific cycle or keep Global for all company cycles.">
+                    <option value="">🌐 Global (All Feedback Cycles)</option>
+                    @foreach($cycles as $c)
+                        <option value="{{ $c->id }}">🎯 {{ $c->name }}</option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
+            </div>
+            <div class="col-md-5">
+                <x-ui.odoo-form-ui type="input" label="Code (Optional)" name="code" placeholder="e.g. COMP-CULT" />
+            </div>
+            <div class="col-12">
+                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="2" placeholder="Define expected behaviors and standards for this competency..." />
+            </div>
+        </div>
 
-            <x-ui.odoo-form-ui type="input" label="Code" name="code" placeholder="e.g. COMP-STRAT" />
-            
-            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="3" placeholder="Define expected behaviors and standards for this competency..." />
+        <!-- Dynamic Questions Section -->
+        <div class="mt-4 pt-3 border-top">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6 class="fw-bold text-dark mb-0 fs-13">Evaluation Questions for this Competency</h6>
+                    <span class="text-muted fs-11">Add rating scale statements or open text prompts evaluated under this competency.</span>
+                </div>
+                <x-ui.button type="button" variant="light" size="sm" icon="feather-plus" id="addCompQuestionRowBtn" class="border fw-semibold shadow-xs">
+                    Add Question Row
+                </x-ui.button>
+            </div>
+
+            <div class="table-responsive border rounded bg-white">
+                <table class="table table-hover align-middle mb-0" id="compQuestionsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 48%; min-width: 300px;" class="ps-3 py-2.5 text-uppercase fs-11 fw-bold text-muted">Question Statement / Prompt <span class="text-danger">*</span></th>
+                            <th style="width: 26%; min-width: 190px;" class="py-2.5 text-uppercase fs-11 fw-bold text-muted">Question Type</th>
+                            <th style="width: 20%; min-width: 180px;" class="py-2.5 text-uppercase fs-11 fw-bold text-muted">Target Rater</th>
+                            <th style="width: 6%; min-width: 55px;" class="text-center pe-3 py-2.5 text-uppercase fs-11 fw-bold text-muted">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="compQuestionsTbody">
+                        <tr>
+                            <td class="ps-3 py-2.5">
+                                <input type="text" name="questions[0][question_text]" class="odoo-table-input fs-13" placeholder="e.g. Exemplifies core company values, integrity, and ethical conduct..." required>
+                            </td>
+                            <td class="py-2.5">
+                                <x-ui.odoo-form-ui type="select" name="questions[0][question_type]" :searchable="true">
+                                    <option value="rating_scale" selected>Rating Scale (1 - 5 Points)</option>
+                                    <option value="text">Open-Ended Text Comment</option>
+                                </x-ui.odoo-form-ui>
+                            </td>
+                            <td class="py-2.5">
+                                <x-ui.odoo-form-ui type="select" name="questions[0][target_reviewer_type]" :searchable="true">
+                                    <option value="all" selected>All Reviewer Types</option>
+                                    <option value="manager">Manager Only</option>
+                                    <option value="peer">Peers Only</option>
+                                    <option value="direct_report">Direct Reports Only</option>
+                                    <option value="self">Self Review Only</option>
+                                </x-ui.odoo-form-ui>
+                            </td>
+                            <td class="text-center pe-3 py-2.5">
+                                <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" class="delete-comp-q-row" title="Remove question row" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="ps-3 py-2.5">
+                                <input type="text" name="questions[1][question_text]" class="odoo-table-input fs-13" placeholder="e.g. Proactively seeks feedback and adapts positively to organizational changes...">
+                            </td>
+                            <td class="py-2.5">
+                                <x-ui.odoo-form-ui type="select" name="questions[1][question_type]" :searchable="true">
+                                    <option value="rating_scale" selected>Rating Scale (1 - 5 Points)</option>
+                                    <option value="text">Open-Ended Text Comment</option>
+                                </x-ui.odoo-form-ui>
+                            </td>
+                            <td class="py-2.5">
+                                <x-ui.odoo-form-ui type="select" name="questions[1][target_reviewer_type]" :searchable="true">
+                                    <option value="all" selected>All Reviewer Types</option>
+                                    <option value="manager">Manager Only</option>
+                                    <option value="peer">Peers Only</option>
+                                    <option value="direct_report">Direct Reports Only</option>
+                                    <option value="self">Self Review Only</option>
+                                </x-ui.odoo-form-ui>
+                            </td>
+                            <td class="text-center pe-3 py-2.5">
+                                <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" class="delete-comp-q-row" title="Remove question row" />
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
             <x-ui.button variant="light" size="sm" class="border" data-bs-dismiss="modal">Discard</x-ui.button>
-            <x-ui.button variant="primary" size="sm" type="submit" class="fw-bold">Save Competency</x-ui.button>
+            <x-ui.button variant="primary" size="sm" type="submit" icon="feather-check" class="fw-bold px-3">Save Competency & Questions</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
@@ -1090,5 +1224,88 @@
         </form>
     </x-ui.modal>
 @endforeach
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let qRowIndex = 2;
+    const addBtn = document.getElementById('addCompQuestionRowBtn');
+    const tbody = document.getElementById('compQuestionsTbody');
+
+    function initCompModalSelect2() {
+        if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+            $('#createCompetencyModal .odoo-select2').each(function() {
+                var $select = $(this);
+                if (!$select.hasClass('select2-hidden-accessible')) {
+                    $select.select2({
+                        theme: "bootstrap-5",
+                        width: "100%",
+                        dropdownParent: $('#createCompetencyModal')
+                    });
+                }
+            });
+        }
+    }
+
+    if (typeof jQuery !== 'undefined') {
+        $('#createCompetencyModal').on('shown.bs.modal', function () {
+            initCompModalSelect2();
+        });
+    }
+
+    if (addBtn && tbody) {
+        addBtn.addEventListener('click', function() {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="ps-3 py-2.5">
+                    <input type="text" name="questions[${qRowIndex}][question_text]" class="odoo-table-input fs-13" placeholder="e.g. Demonstrates strong analytical and problem-solving skills..." required>
+                </td>
+                <td class="py-2.5">
+                    <select name="questions[${qRowIndex}][question_type]" class="odoo-table-select odoo-select2">
+                        <option value="rating_scale" selected>Rating Scale (1 - 5 Points)</option>
+                        <option value="text">Open-Ended Text Comment</option>
+                    </select>
+                </td>
+                <td class="py-2.5">
+                    <select name="questions[${qRowIndex}][target_reviewer_type]" class="odoo-table-select odoo-select2">
+                        <option value="all" selected>All Reviewer Types</option>
+                        <option value="manager">Manager Only</option>
+                        <option value="peer">Peers Only</option>
+                        <option value="direct_report">Direct Reports Only</option>
+                        <option value="self">Self Review Only</option>
+                    </select>
+                </td>
+                <td class="text-center pe-3 py-2.5">
+                    <button type="button" class="btn erp-icon-btn erp-icon-btn--danger btn-sm delete-comp-q-row" title="Remove question row">
+                        <i class="feather-trash-2"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+            qRowIndex++;
+            if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+                $(tr).find('.odoo-select2').select2({
+                    theme: "bootstrap-5",
+                    width: "100%",
+                    dropdownParent: $('#createCompetencyModal')
+                });
+            }
+        });
+
+        tbody.addEventListener('click', function(e) {
+            const delBtn = e.target.closest('.delete-comp-q-row');
+            if (delBtn) {
+                const tr = delBtn.closest('tr');
+                if (tbody.querySelectorAll('tr').length > 1) {
+                    tr.remove();
+                } else {
+                    tr.querySelector('input').value = '';
+                }
+            }
+        });
+    }
+});
+</script>
+@endpush
 
 @endsection

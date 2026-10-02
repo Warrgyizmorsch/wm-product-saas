@@ -166,6 +166,19 @@ class LeaveRequestApiController extends Controller
 
         $requests = $query->orderBy('created_at', 'desc')->paginate($request->integer('per_page', 10));
 
+        $requests->getCollection()->transform(function ($req) use ($employee, $isHrAdmin) {
+            $isOwner = $employee && (int)$req->employee_id === (int)$employee->id;
+            $isPending = $req->status === 'pending';
+            $req->capabilities = [
+                'can_view'     => true,
+                'can_approve'  => $isHrAdmin && $isPending,
+                'can_reject'   => $isHrAdmin && $isPending,
+                'can_cancel'   => ($isOwner || $isHrAdmin) && $isPending,
+                'can_withdraw' => $isOwner && $isPending,
+            ];
+            return $req;
+        });
+
         return $this->sendSuccess($requests, 'Leave requests retrieved successfully');
     }
 
@@ -193,6 +206,16 @@ class LeaveRequestApiController extends Controller
         if (!$isHrAdmin && $leaveRequest->employee_id !== $employee?->id) {
             return $this->sendError('Unauthorized access to leave request.', 403);
         }
+
+        $isOwner = $employee && (int)$leaveRequest->employee_id === (int)$employee->id;
+        $isPending = $leaveRequest->status === 'pending';
+        $leaveRequest->capabilities = [
+            'can_view'     => true,
+            'can_approve'  => $isHrAdmin && $isPending,
+            'can_reject'   => $isHrAdmin && $isPending,
+            'can_cancel'   => ($isOwner || $isHrAdmin) && $isPending,
+            'can_withdraw' => $isOwner && $isPending,
+        ];
 
         return $this->sendSuccess($leaveRequest, 'Leave request details loaded');
     }

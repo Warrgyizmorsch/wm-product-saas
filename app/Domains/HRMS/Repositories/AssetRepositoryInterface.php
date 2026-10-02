@@ -40,5 +40,17 @@ interface AssetRepositoryInterface
 
     public function updateRequest(AssetRequest $assetRequest, array $validated): bool;
 
-    public function deleteRequest(AssetRequest $assetRequest): bool;
+    public function storeAssetItem(array $validated): AssetItem;
+
+    public function export(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
+
+    public function import(\Illuminate\Http\UploadedFile $file): array;
+
+    public function downloadTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
+
+    public function exportCategories(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
+
+    public function importCategories(\Illuminate\Http\UploadedFile $file): array;
+
+    public function downloadCategoriesTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
 }

@@ -474,6 +474,212 @@ class AssetRepository implements AssetRepositoryInterface
         return true;
     }
 
+    public function storeAssetItem(array $validated): AssetItem
+    {
+        $category = AssetCategory::findOrFail($validated['asset_category_id']);
+        return AssetItem::create([
+            'company_id'        => $category->company_id,
+            'asset_category_id' => $category->id,
+            'name'              => $validated['name'],
+            'description'       => $validated['description'] ?? null,
+        ]);
+    }
+
+    public function export(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $assets = Asset::with(['category', 'assignedEmployee', 'company'])->get();
+        $headers = ['Asset Code', 'Name', 'Category', 'Company', 'Brand', 'Model Number', 'Serial Number', 'Condition', 'Status', 'Assigned To'];
+
+        $rows = [];
+        foreach ($assets as $asset) {
+            $rows[] = [
+                $asset->asset_code ?? '',
+                $asset->name ?? '',
+                $asset->category?->name ?? '',
+                $asset->company?->company_name ?? '',
+                $asset->brand ?? '',
+                $asset->model_number ?? '',
+                $asset->serial_number ?? '',
+                $asset->condition ?? 'good',
+                $asset->status ?? 'available',
+                $asset->assignedEmployee?->full_name ?? '',
+            ];
+        }
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $rows, 'assets_export_' . date('Ymd_His') . '.xlsx');
+    }
+
+    public function import(\Illuminate\Http\UploadedFile $file): array
+    {
+        $ext = strtolower($file->getClientOriginalExtension());
+        $path = $file->getRealPath();
+        $rows = [];
+
+        if (in_array($ext, ['xlsx', 'xls'])) {
+            try {
+                $rows = \App\Domains\HRMS\Helpers\XlsxHelper::import($path);
+            } catch (\Throwable $e) {
+                return ['success' => false, 'message' => 'Failed to parse Excel file: ' . $e->getMessage()];
+            }
+        } else {
+            if (($handle = fopen($path, 'r')) !== false) {
+                while (($data = fgetcsv($handle)) !== false) {
+                    $rows[] = $data;
+                }
+                fclose($handle);
+            }
+        }
+
+        if (empty($rows)) {
+            return ['success' => false, 'message' => 'The uploaded file is empty.'];
+        }
+
+        $header = array_shift($rows);
+        $headerNormalized = array_map(fn($col) => strtolower(trim((string)$col)), $header);
+
+        $nameIdx = array_search('name', $headerNormalized);
+        $codeIdx = array_search('asset code', $headerNormalized);
+        if ($codeIdx === false) $codeIdx = array_search('asset_code', $headerNormalized);
+        $categoryIdx = array_search('category', $headerNormalized);
+        if ($categoryIdx === false) $categoryIdx = array_search('category_id', $headerNormalized);
+
+        if ($nameIdx === false || $codeIdx === false) {
+            return ['success' => false, 'message' => 'Invalid template. Required columns: "Asset Code" and "Name".'];
+        }
+
+        $count = 0;
+        $tenantId = tenant_id() ?? 1;
+
+        foreach ($rows as $row) {
+            $code = trim((string)($row[$codeIdx] ?? ''));
+            $name = trim((string)($row[$nameIdx] ?? ''));
+            if (empty($code) || empty($name)) continue;
+
+            $categoryId = null;
+            if ($categoryIdx !== false && !empty($row[$categoryIdx])) {
+                $catVal = trim((string)$row[$categoryIdx]);
+                $cat = is_numeric($catVal) 
+                    ? AssetCategory::find($catVal) 
+                    : AssetCategory::where('name', $catVal)->first();
+                $categoryId = $cat?->id;
+            }
+
+            Asset::updateOrCreate(
+                ['asset_code' => $code, 'tenant_id' => $tenantId],
+                [
+                    'name' => $name,
+                    'asset_category_id' => $categoryId,
+                    'status' => 'available',
+                    'condition' => 'good',
+                ]
+            );
+            $count++;
+        }
+
+        return ['success' => true, 'message' => "Successfully imported {$count} assets."];
+    }
+
+    public function downloadTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $headers = ['Asset Code', 'Name', 'Category', 'Brand', 'Model Number', 'Serial Number', 'Condition', 'Status'];
+        $sample = [
+            ['AST-001', 'Dell Latitude Laptop', 'IT Hardware', 'Dell', 'Latitude 5420', 'SN12345678', 'good', 'available'],
+            ['AST-002', 'Ergonomic Office Chair', 'Furniture', 'Featherlite', 'Optima', '', 'good', 'available'],
+        ];
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $sample, 'asset_import_template.xlsx');
+    }
+
+    public function exportCategories(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $categories = AssetCategory::with('company')->get();
+        $headers = ['ID', 'Category Name', 'Code', 'Company', 'Description'];
+
+        $rows = [];
+        foreach ($categories as $cat) {
+            $rows[] = [
+                $cat->id,
+                $cat->name ?? '',
+                $cat->code ?? '',
+                $cat->company?->company_name ?? '',
+                $cat->description ?? '',
+            ];
+        }
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $rows, 'asset_categories_export_' . date('Ymd_His') . '.xlsx');
+    }
+
+    public function importCategories(\Illuminate\Http\UploadedFile $file): array
+    {
+        $ext = strtolower($file->getClientOriginalExtension());
+        $path = $file->getRealPath();
+        $rows = [];
+
+        if (in_array($ext, ['xlsx', 'xls'])) {
+            try {
+                $rows = \App\Domains\HRMS\Helpers\XlsxHelper::import($path);
+            } catch (\Throwable $e) {
+                return ['success' => false, 'message' => 'Failed to parse Excel file: ' . $e->getMessage()];
+            }
+        } else {
+            if (($handle = fopen($path, 'r')) !== false) {
+                while (($data = fgetcsv($handle)) !== false) {
+                    $rows[] = $data;
+                }
+                fclose($handle);
+            }
+        }
+
+        if (empty($rows)) {
+            return ['success' => false, 'message' => 'The uploaded file is empty.'];
+        }
+
+        $header = array_shift($rows);
+        $headerNormalized = array_map(fn($col) => strtolower(trim((string)$col)), $header);
+
+        $nameIdx = array_search('category name', $headerNormalized);
+        if ($nameIdx === false) $nameIdx = array_search('name', $headerNormalized);
+        $codeIdx = array_search('code', $headerNormalized);
+        $descIdx = array_search('description', $headerNormalized);
+
+        if ($nameIdx === false) {
+            return ['success' => false, 'message' => 'Invalid template. Required column: "Category Name" or "Name".'];
+        }
+
+        $count = 0;
+        $tenantId = tenant_id() ?? 1;
+
+        foreach ($rows as $row) {
+            $name = trim((string)($row[$nameIdx] ?? ''));
+            if (empty($name)) continue;
+
+            $code = $codeIdx !== false ? trim((string)($row[$codeIdx] ?? '')) : null;
+            $desc = $descIdx !== false ? trim((string)($row[$descIdx] ?? '')) : null;
+
+            AssetCategory::updateOrCreate(
+                ['name' => $name, 'tenant_id' => $tenantId],
+                [
+                    'code' => $code ?: strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $name), 0, 10)),
+                    'description' => $desc,
+                ]
+            );
+            $count++;
+        }
+
+        return ['success' => true, 'message' => "Successfully imported {$count} asset categories."];
+    }
+
+    public function downloadCategoriesTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $headers = ['Category Name', 'Code', 'Description'];
+        $sample = [
+            ['IT Hardware', 'IT_HW', 'Laptops, desktops, monitors, and networking devices'],
+            ['Furniture', 'FURN', 'Chairs, desks, conference tables'],
+        ];
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $sample, 'asset_categories_template.xlsx');
+    }
+
     public function storeRequest(array $validated): AssetRequest
     {
         return AssetRequest::create($validated);

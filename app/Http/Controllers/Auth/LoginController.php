@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -60,6 +61,10 @@ class LoginController extends Controller
                 ->onlyInput('email');
         }
 
+        if ($user) {
+            $user->syncWithEmployee();
+        }
+
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard'));
@@ -101,14 +106,108 @@ class LoginController extends Controller
         if ($user->role_id && !$user->role) {
             $user->role = $user->primaryRole?->name;
         }
-        $token = $user->createToken('api-token')->plainTextToken;
         $employee = \App\Domains\HRMS\Models\Employee::resolveForUser($user);
+        if ($employee) {
+            $user->syncWithEmployee($employee);
+        }
+        $user->unsetRelation('employee');
+        $user->loadMissing('primaryRole');
+        $token = $user->createToken('api-token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
+            'user'        => $user,
             'employee_id' => $employee?->id,
-            'token' => $token,
+            'token'       => $token,
         ]);
+    }
+
+    /**
+     * Authenticated endpoint to return current user profile, roles, permissions, and employee info.
+     */
+    public function apiMe(Request $request): \Illuminate\Http\JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        if ($user->role_id && !$user->role) {
+            $user->role = $user->primaryRole?->name;
+        }
+
+        $employee = \App\Domains\HRMS\Models\Employee::resolveForUser($user);
+        if ($employee) {
+            $employee->loadMissing(['department', 'designation']);
+        }
+
+        return response()->json($this->buildAuthPayload($user, $employee));
+    }
+
+    /**
+     * Build standard user authorization profile for API responses.
+     */
+    protected function buildAuthPayload(User $user, ?\App\Domains\HRMS\Models\Employee $employee): array
+    {
+        $accessService = app(\App\Services\Access\AccessService::class);
+        $roleIds = $accessService->effectiveRoleIds($user, $user->tenant_id);
+
+        $roles = \App\Models\Access\Role::whereIn('id', $roleIds)->pluck('name')->toArray();
+        if (empty($roles) && !empty($user->role)) {
+            $roles = [$user->role];
+        }
+
+        $isPlatformAdmin = (bool) (
+            $user->is_admin
+            || in_array('super_admin', \App\Models\Access\Role::whereIn('id', $roleIds)->pluck('slug')->toArray())
+            || in_array(strtolower($user->role ?? ''), ['admin', 'super_admin', 'super admin'])
+        );
+
+        $permissions = [];
+        if ($isPlatformAdmin) {
+            $permissions = ['*'];
+        } elseif (!empty($roleIds)) {
+            $permissions = \App\Models\Access\RolePermission::whereIn('role_id', $roleIds)
+                ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
+                ->pluck('permissions.name')
+                ->unique()
+                ->values()
+                ->toArray();
+        }
+
+        $isManager = false;
+        if ($employee) {
+            $isManager = \App\Domains\HRMS\Models\Employee::where('tenant_id', $employee->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : 1) ?? 1)
+                ->where('reporting_manager_id', $employee->id)
+                ->exists();
+        }
+
+        $accessibleModules = $accessService->allowedModulesFor($user) ?? ['hrms', 'purchase', 'sales', 'crm', 'inventory', 'accounting', 'production', 'projects'];
+
+        $payload = [
+            'user' => [
+                'id'        => $user->id,
+                'tenant_id' => $user->tenant_id,
+                'name'      => $user->name,
+                'email'     => $user->email,
+                'role'      => $user->role,
+                'avatar'    => $user->avatar_url,
+            ],
+            'employee' => $employee ? [
+                'id'               => $employee->id,
+                'employee_id'      => $employee->employee_id ?? null,
+                'name'             => $employee->full_name,
+                'email'            => $employee->office_email ?? $employee->personal_email ?? $user->email,
+                'department_id'    => $employee->department_id,
+                'department_name'  => $employee->department?->name,
+                'designation_id'   => $employee->designation_id,
+                'designation_name' => $employee->designation?->name,
+            ] : null,
+            'roles'              => $roles,
+            'is_manager'         => $isManager,
+            'is_admin'           => $isPlatformAdmin,
+            'permissions'        => $permissions,
+            'accessible_modules' => $accessibleModules,
+        ];
+
+        return $payload;
     }
 
     public function apiLogout(Request $request): \Illuminate\Http\JsonResponse

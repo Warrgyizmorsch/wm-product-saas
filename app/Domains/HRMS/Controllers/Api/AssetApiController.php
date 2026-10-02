@@ -166,7 +166,10 @@ class AssetApiController extends Controller
             default: $query->orderBy('asset_code', 'asc'); break;
         }
 
-        $assets = $query->paginate($request->integer('per_page', 10))->through(function ($asset) {
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+
+        $assets = $query->paginate($request->integer('per_page', 10))->through(function ($asset) use ($isHrAdmin, $employee) {
             return [
                 'id'                  => $asset->id,
                 'asset_code'          => $asset->asset_code,
@@ -196,6 +199,13 @@ class AssetApiController extends Controller
                     'name'          => trim(($asset->assignedEmployee->first_name ?? '') . ' ' . ($asset->assignedEmployee->last_name ?? '')),
                     'email'         => $asset->assignedEmployee->office_email ?? $asset->assignedEmployee->personal_email ?? null,
                 ] : null,
+                'capabilities'        => [
+                    'can_view'     => true,
+                    'can_edit'     => $isHrAdmin,
+                    'can_delete'   => $isHrAdmin,
+                    'can_allocate' => $isHrAdmin && in_array($asset->status, ['available', 'in_stock']),
+                    'can_return'   => $isHrAdmin && ($asset->status === 'allocated' || !empty($asset->assigned_employee_id)),
+                ],
                 'created_at'          => $asset->created_at ? (is_string($asset->created_at) ? $asset->created_at : $asset->created_at->toIso8601String()) : null,
             ];
         });
@@ -209,10 +219,19 @@ class AssetApiController extends Controller
             return $authError;
         }
 
+        $isHrAdmin = $this->isHrAdmin();
         $asset = Asset::with(['company', 'category', 'assignedEmployee', 'allocations.employee'])->find($id);
         if (!$asset) {
             return $this->sendError("Asset with ID '{$id}' not found.", 404);
         }
+
+        $asset->capabilities = [
+            'can_view'     => true,
+            'can_edit'     => $isHrAdmin,
+            'can_delete'   => $isHrAdmin,
+            'can_allocate' => $isHrAdmin && in_array($asset->status, ['available', 'in_stock']),
+            'can_return'   => $isHrAdmin && ($asset->status === 'allocated' || !empty($asset->assigned_employee_id)),
+        ];
 
         return $this->sendSuccess($asset, 'Asset details loaded');
     }
