@@ -9,15 +9,10 @@
     <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-notifications-menu">
         <div class="d-flex justify-content-between align-items-center notifications-head">
             <h6 class="fw-bold text-dark mb-0">{{ __('ui.notifications') }}</h6>
-            <div class="d-flex align-items-center gap-2 ms-auto">
-                <a href="javascript:void(0);" onclick="requestDesktopNotificationPermission()" id="enableDesktopAlertsBtn" style="display: none;" class="badge bg-soft-primary text-primary border border-primary px-2 py-0.5 fs-10 text-decoration-none" title="Allow OS Desktop Alerts">
-                    <i class="feather-bell"></i> Enable Desktop Alerts
-                </a>
-                <a href="javascript:void(0);" id="markAllNotificationsReadBtn" class="fs-11 text-success text-end">
-                    <i class="feather-check"></i>
-                    <span>{{ __('ui.mark_as_read') }}</span>
-                </a>
-            </div>
+            <a href="javascript:void(0);" id="markAllNotificationsReadBtn" class="fs-11 text-success text-end ms-auto">
+                <i class="feather-check"></i>
+                <span>{{ __('ui.mark_as_read') }}</span>
+            </a>
         </div>
 
         <div id="notificationListContainer" style="max-height: 360px; overflow-y: auto;">
@@ -235,26 +230,11 @@
         document.addEventListener('mousemove', stopFlashing);
     }
 
-    // Request Desktop Notification Permission
-    window.requestDesktopNotificationPermission = function() {
-        if ('Notification' in window) {
-            Notification.requestPermission().then(permission => {
-                if (permission === 'granted') {
-                    const btn = document.getElementById('enableDesktopAlertsBtn');
-                    if (btn) btn.style.display = 'none';
-                    showBrowserDesktopNotification('Notifications Enabled!', 'You will now receive instant desktop alerts even when outside this tab.');
-                }
-            });
-        }
-    };
-
-    function checkDesktopPermissionState() {
-        if ('Notification' in window && Notification.permission !== 'granted') {
-            const btn = document.getElementById('enableDesktopAlertsBtn');
-            if (btn) btn.style.display = 'inline-flex';
+    function requestDesktopPermission() {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
         }
     }
-    setTimeout(checkDesktopPermissionState, 1000);
 
     // Show Native Desktop / Browser Push Notification
     function showBrowserDesktopNotification(title, body, url, icon, tag) {
@@ -416,21 +396,29 @@
                 forceTLS: true
             });
 
+            const visitorEvents = [
+                'visitor.approval_request',
+                'visitor.approved',
+                'visitor.rejected',
+                'visitor.checked_in',
+                'visitor.arrived',
+                'visitor.pre_registered',
+                'visitor.meeting_started',
+                'visitor.checked_out',
+                'visitor.visit_extended',
+                'visitor.incident_reported',
+                'visitor.host_ping'
+            ];
+
             // 1. User Channel (Host specific alerts)
             if (currentUserId > 0) {
                 const userChannelName = 'user-' + currentUserId;
                 const userChannel = pusher.subscribe(userChannelName);
 
-                userChannel.bind('visitor.approval_request', function(data) {
-                    handleLiveNotificationEvent('visitor.approval_request', data);
-                });
-
-                userChannel.bind('visitor.approved', function(data) {
-                    handleLiveNotificationEvent('visitor.approved', data);
-                });
-
-                userChannel.bind('visitor.rejected', function(data) {
-                    handleLiveNotificationEvent('visitor.rejected', data);
+                visitorEvents.forEach(ev => {
+                    userChannel.bind(ev, function(data) {
+                        handleLiveNotificationEvent(ev, data);
+                    });
                 });
             }
 
@@ -439,16 +427,10 @@
                 const tenantChannelName = 'visitor-tenant-' + currentTenantId;
                 const tenantChannel = pusher.subscribe(tenantChannelName);
 
-                tenantChannel.bind('visitor.approval_request', function(data) {
-                    handleLiveNotificationEvent('visitor.approval_request', data);
-                });
-
-                tenantChannel.bind('visitor.approved', function(data) {
-                    handleLiveNotificationEvent('visitor.approved', data);
-                });
-
-                tenantChannel.bind('visitor.rejected', function(data) {
-                    handleLiveNotificationEvent('visitor.rejected', data);
+                visitorEvents.forEach(ev => {
+                    tenantChannel.bind(ev, function(data) {
+                        handleLiveNotificationEvent(ev, data);
+                    });
                 });
             }
 

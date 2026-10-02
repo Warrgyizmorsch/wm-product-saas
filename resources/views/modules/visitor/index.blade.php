@@ -26,29 +26,66 @@
         color: #475569;
         border: 1px solid #cbd5e1;
     }
-    .crm-status-tab {
-        display: inline-flex;
-        align-items: center;
-        padding: 10px 16px;
-        font-size: 12px;
+    .odoo-field-group {
+        margin-bottom: 8px;
+    }
+    .odoo-field-label {
+        font-size: 11.5px;
         font-weight: 700;
+        color: #475569;
         text-transform: uppercase;
-        letter-spacing: 0.3px;
-        color: #64748b;
-        text-decoration: none;
-        white-space: nowrap;
-        border-bottom: 3px solid transparent;
-        margin-bottom: -1px;
+        letter-spacing: 0.4px;
+        margin-bottom: 2px;
+        display: block;
+    }
+    .odoo-field-control {
+        border: none !important;
+        border-bottom: 1.5px solid #cbd5e1 !important;
+        border-radius: 0 !important;
+        padding: 5px 2px !important;
+        background-color: transparent !important;
+        font-size: 13.5px !important;
+        color: #1e293b !important;
+        width: 100% !important;
+        outline: none !important;
+        box-shadow: none !important;
+        transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out !important;
+    }
+    .odoo-field-control:focus {
+        border-bottom-color: var(--bs-primary) !important;
+        box-shadow: 0 1px 0 0 var(--bs-primary) !important;
+    }
+    .odoo-field-control.is-invalid,
+    input.odoo-field-control.is-invalid,
+    select.odoo-field-control.is-invalid,
+    textarea.odoo-field-control.is-invalid {
+        border-bottom-color: #dc3545 !important;
+        box-shadow: 0 1px 0 0 #dc3545 !important;
+    }
+    .invalid-feedback.dynamic-error-feedback {
+        display: block !important;
+        font-size: 11.5px !important;
+        font-weight: 500 !important;
+        color: #dc3545 !important;
+        margin-top: 3px !important;
+    }
+    .visitor-type-card {
+        cursor: pointer;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 12px;
         transition: all 0.2s ease;
+        background: #ffffff;
     }
-    .crm-status-tab:hover {
-        color: var(--bs-primary);
-        background-color: color-mix(in srgb, var(--bs-primary) 6%, transparent);
+    .visitor-type-card:hover {
+        border-color: var(--bs-primary);
+        background: color-mix(in srgb, var(--bs-primary) 4%, transparent);
     }
-    .crm-status-tab.active {
+    .visitor-type-card.active {
+        border-color: var(--bs-primary);
+        background: color-mix(in srgb, var(--bs-primary) 8%, transparent);
+        font-weight: 700;
         color: var(--bs-primary);
-        border-bottom-color: var(--bs-primary);
-        background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent);
     }
 </style>
 @endpush
@@ -77,8 +114,15 @@
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm rounded-3 mb-3 d-flex align-items-center" role="alert">
+            <i class="feather-alert-octagon fs-18 text-danger me-2"></i>
+            <div>{{ session('error') }}</div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
 
-    <!-- 1. Stats Widgets (Common x-ui.stat-widget) -->
+    <!-- 1. Stats Widgets (Standard x-ui.stat-widget) -->
     <div class="row g-3 mb-3">
         <div class="col-sm-6 col-xl-3">
             <x-ui.stat-widget 
@@ -86,6 +130,14 @@
                 value="{{ $stats['active_inside'] ?? 0 }}" 
                 icon="feather-user-check" 
                 color="success" 
+                variant="compact" />
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <x-ui.stat-widget 
+                title="{{ __('visitor.overstay_alerts') }}" 
+                value="{{ $stats['overstayed_count'] ?? 0 }}" 
+                icon="feather-alert-triangle" 
+                color="{{ ($stats['overstayed_count'] ?? 0) > 0 ? 'danger' : 'secondary' }}" 
                 variant="compact" />
         </div>
         <div class="col-sm-6 col-xl-3">
@@ -98,14 +150,6 @@
         </div>
         <div class="col-sm-6 col-xl-3">
             <x-ui.stat-widget 
-                title="{{ __('visitor.today_checked_in') }}" 
-                value="{{ $stats['today_checked_in'] ?? 0 }}" 
-                icon="feather-log-in" 
-                color="info" 
-                variant="compact" />
-        </div>
-        <div class="col-sm-6 col-xl-3">
-            <x-ui.stat-widget 
                 title="{{ __('visitor.fee_charge') }}" 
                 value="{{ format_currency($stats['today_fees'] ?? 0) }}" 
                 icon="feather-credit-card" 
@@ -114,7 +158,7 @@
         </div>
     </div>
 
-    <!-- 2. Main Panel: Table, Search & Common Filter Toolbar -->
+    <!-- 2. Main Panel: Table, Search & Filter Toolbar -->
     <div class="erp-single-panel">
         
         {{-- Header: Title & Actions --}}
@@ -122,7 +166,7 @@
             <h5 class="fw-bold text-dark mb-0">{{ __('visitor.visitor_passes') }}</h5>
             
             <div class="d-flex align-items-center flex-wrap gap-2">
-                <!-- Outside Search Box (CRM/HRMS Common Style) -->
+                <!-- Outside Search Box -->
                 <form method="GET" action="{{ route('visitor.index') }}" class="d-flex align-items-center bg-light border rounded px-2.5 py-0.5 me-1" style="height: 34px; min-width: 250px;">
                     @foreach(request()->except(['search', 'page']) as $k => $v)
                         @if(is_scalar($v) && $v !== '')
@@ -138,7 +182,7 @@
                     @endif
                 </form>
 
-                <!-- Common Filter Component (Lead Module Style) -->
+                <!-- Filter Component -->
                 <form method="GET" action="{{ route('visitor.index') }}" class="d-inline">
                     @if(request('search'))
                         <input type="hidden" name="search" value="{{ request('search') }}">
@@ -151,11 +195,25 @@
                             <x-ui.odoo-form-ui type="select" name="status">
                                 <option value="">— All Statuses —</option>
                                 <option value="Checked-In" {{ request('status') === 'Checked-In' ? 'selected' : '' }}>{{ __('visitor.statuses.Checked-In') }}</option>
-                                <option value="Expected" {{ request('status') === 'Expected' ? 'selected' : '' }}>{{ __('visitor.statuses.Expected') }}</option>
-                                <option value="Checked-Out" {{ request('status') === 'Checked-Out' ? 'selected' : '' }}>{{ __('visitor.statuses.Checked-Out') }}</option>
+                                <option value="Overstayed" {{ request('status') === 'Overstayed' ? 'selected' : '' }}>{{ __('visitor.statuses.Overstayed') }}</option>
                                 <option value="Waiting Approval" {{ request('status') === 'Waiting Approval' ? 'selected' : '' }}>{{ __('visitor.statuses.Waiting Approval') }}</option>
-                                <option value="Approved" {{ request('status') === 'Approved' ? 'selected' : '' }}>{{ __('visitor.statuses.Approved') }}</option>
-                                <option value="Rejected" {{ request('status') === 'Rejected' ? 'selected' : '' }}>{{ __('visitor.statuses.Rejected') }}</option>
+                                <option value="Arrived" {{ request('status') === 'Arrived' ? 'selected' : '' }}>{{ __('visitor.statuses.Arrived') }}</option>
+                                <option value="Expected" {{ request('status') === 'Expected' ? 'selected' : '' }}>{{ __('visitor.statuses.Expected') }}</option>
+                                <option value="Meeting in Progress" {{ request('status') === 'Meeting in Progress' ? 'selected' : '' }}>{{ __('visitor.statuses.Meeting in Progress') }}</option>
+                                <option value="Checked-Out" {{ request('status') === 'Checked-Out' ? 'selected' : '' }}>{{ __('visitor.statuses.Checked-Out') }}</option>
+                                <option value="Denied" {{ request('status') === 'Denied' ? 'selected' : '' }}>{{ __('visitor.statuses.Denied') }} / {{ __('visitor.statuses.Rejected') }}</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('visitor.visitor_type') }}</label>
+                            <x-ui.odoo-form-ui type="select" name="visitor_type">
+                                <option value="">— All Visitor Types —</option>
+                                <option value="Client" {{ request('visitor_type') === 'Client' ? 'selected' : '' }}>{{ __('visitor.visitor_types.Client') }}</option>
+                                <option value="Vendor" {{ request('visitor_type') === 'Vendor' ? 'selected' : '' }}>{{ __('visitor.visitor_types.Vendor') }}</option>
+                                <option value="Candidate" {{ request('visitor_type') === 'Candidate' ? 'selected' : '' }}>{{ __('visitor.visitor_types.Candidate') }}</option>
+                                <option value="Service" {{ request('visitor_type') === 'Service' ? 'selected' : '' }}>{{ __('visitor.visitor_types.Service') }}</option>
+                                <option value="Guest" {{ request('visitor_type') === 'Guest' ? 'selected' : '' }}>{{ __('visitor.visitor_types.Guest') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
@@ -202,79 +260,97 @@
             </div>
         </div>
 
-        {{-- 2. Status Tabs (Using Common Horizontal Tabs Component) --}}
+        {{-- 2. Status Tabs --}}
         @php
             $activeStatus = request('status');
             $visitorTabs = [
                 [
                     'id' => 'tab-all-passes',
-                    'label' => 'All Passes (' . ($stats['total_passes'] ?? 0) . ')',
+                    'label' => __('visitor.all_passes') . ' (' . ($stats['total_passes'] ?? 0) . ')',
                     'url' => request()->fullUrlWithQuery(['status' => null, 'page' => null]),
                     'active' => empty($activeStatus),
                 ],
                 [
                     'id' => 'tab-checked-in',
-                    'label' => 'Inside Premises (' . ($stats['active_inside'] ?? 0) . ')',
+                    'label' => __('visitor.inside_premises') . ' (' . ($stats['active_inside'] ?? 0) . ')',
                     'url' => request()->fullUrlWithQuery(['status' => 'Checked-In', 'page' => null]),
                     'active' => $activeStatus === 'Checked-In',
                 ],
                 [
+                    'id' => 'tab-overstayed',
+                    'label' => __('visitor.overstayed') . ' (' . ($stats['overstayed_count'] ?? 0) . ')',
+                    'url' => request()->fullUrlWithQuery(['status' => 'Overstayed', 'page' => null]),
+                    'active' => $activeStatus === 'Overstayed',
+                ],
+                [
                     'id' => 'tab-waiting-approval',
-                    'label' => 'Waiting Approval (' . ($stats['waiting_approval'] ?? 0) . ')',
+                    'label' => __('visitor.waiting_approval') . ' (' . ($stats['waiting_approval'] ?? 0) . ')',
                     'url' => request()->fullUrlWithQuery(['status' => 'Waiting Approval', 'page' => null]),
                     'active' => $activeStatus === 'Waiting Approval',
                 ],
                 [
                     'id' => 'tab-expected',
-                    'label' => 'Expected (' . ($stats['today_expected'] ?? 0) . ')',
+                    'label' => __('visitor.expected') . ' (' . ($stats['today_expected'] ?? 0) . ')',
                     'url' => request()->fullUrlWithQuery(['status' => 'Expected', 'page' => null]),
                     'active' => $activeStatus === 'Expected',
                 ],
                 [
                     'id' => 'tab-checked-out',
-                    'label' => 'Checked-Out (' . ($stats['total_checked_out'] ?? 0) . ')',
+                    'label' => __('visitor.checked_out') . ' (' . ($stats['total_checked_out'] ?? 0) . ')',
                     'url' => request()->fullUrlWithQuery(['status' => 'Checked-Out', 'page' => null]),
                     'active' => $activeStatus === 'Checked-Out',
+                ],
+                [
+                    'id' => 'tab-denied',
+                    'label' => __('visitor.denied') . ' (' . ($stats['denied_count'] ?? 0) . ')',
+                    'url' => request()->fullUrlWithQuery(['status' => 'Denied', 'page' => null]),
+                    'active' => $activeStatus === 'Denied',
                 ],
             ];
         @endphp
         <x-ui.horizontal-tabs id="visitorStatusTabs" class="mb-3" :tabs="$visitorTabs" />
 
-        <!-- 3. Visitor Passes Table (Using Common x-ui.odoo-form-ui table) -->
+        <!-- 3. Visitor Passes Table -->
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="visitorPassesTable" class="mb-0">
                 <thead>
                     <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
+                        <th style="width: 30px; background-color: #e8ecf1 !important;" class="text-center">
                             <input type="checkbox" class="form-check-input">
                         </th>
                         <th style="width: 14%; background-color: #e8ecf1 !important;">{{ __('visitor.pass_number') }}</th>
-                        <th style="width: 20%; background-color: #e8ecf1 !important;">{{ __('visitor.visitor_name') }}</th>
-                        <th style="width: 15%; background-color: #e8ecf1 !important;">{{ __('visitor.company') }}</th>
-                        <th style="width: 15%; background-color: #e8ecf1 !important;">{{ __('visitor.select_host') }}</th>
-                        <th style="width: 12%; background-color: #e8ecf1 !important;">{{ __('visitor.purpose_of_visit') }}</th>
-                        <th style="width: 12%; background-color: #e8ecf1 !important;">{{ __('visitor.check_in_time') }}</th>
-                        <th style="width: 10%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('visitor.fee_charge') }}</th>
-                        <th style="width: 10%; background-color: #e8ecf1 !important;">{{ __('visitor.status') }}</th>
+                        <th style="width: 18%; background-color: #e8ecf1 !important;">{{ __('visitor.visitor_name') }}</th>
+                        <th style="width: 14%; background-color: #e8ecf1 !important;">{{ __('visitor.company') }}</th>
+                        <th style="width: 12%; background-color: #e8ecf1 !important;">{{ __('visitor.vehicle_details') }}</th>
+                        <th style="width: 14%; background-color: #e8ecf1 !important;">{{ __('visitor.select_host') }}</th>
+                        <th style="width: 10%; background-color: #e8ecf1 !important;">{{ __('visitor.purpose_of_visit') }}</th>
+                        <th style="width: 10%; background-color: #e8ecf1 !important;">{{ __('visitor.check_in_time') }}</th>
+                        <th style="width: 8%; background-color: #e8ecf1 !important;">{{ __('visitor.status') }}</th>
                         <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('visitor.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($passes as $pass)
-                        <tr>
+                        @php
+                            $isOverstay = $pass->isOverstayed();
+                        @endphp
+                        <tr class="{{ $isOverstay ? 'table-warning' : '' }}">
                             <td class="text-center">
                                 <input type="checkbox" class="form-check-input">
                             </td>
 
-                            <!-- Pass Number & Entry details -->
+                            <!-- Pass Number & Type -->
                             <td>
                                 <a href="{{ route('visitor.passes.show', $pass->id) }}" class="fw-bold text-dark font-monospace text-decoration-none">
                                     {{ $pass->pass_number }}
                                 </a>
-                                <div class="fs-11 text-muted">{{ $pass->gate_number ?? 'Gate 1' }} • {{ $pass->entry_type }}</div>
+                                <div class="d-flex align-items-center gap-1 mt-0.5">
+                                    <span class="badge bg-light text-muted border fs-10 px-1.5 py-0.5">{{ $pass->visitor_type ?? 'Client' }}</span>
+                                    <span class="fs-11 text-muted">{{ $pass->gate_number ?? 'Gate 1' }}</span>
+                                </div>
                             </td>
 
-                            <!-- Visitor Info & Avatar -->
+                            <!-- Visitor Info -->
                             <td>
                                 <div class="d-flex align-items-center gap-2">
                                     @if(!empty($pass->visitor?->photo_url))
@@ -285,7 +361,15 @@
                                         </div>
                                     @endif
                                     <div>
-                                        <div class="fw-bold text-dark fs-13">{{ $pass->visitor?->full_name ?? 'N/A' }}</div>
+                                        <div class="d-flex align-items-center flex-wrap gap-1.5">
+                                            <span class="fw-bold text-dark fs-13">{{ $pass->visitor?->full_name ?? 'N/A' }}</span>
+                                            @if($pass->visitor?->is_blacklisted)
+                                                <x-ui.status-badge status="blocked" :label="__('visitor.blacklisted')" :dot="true" size="sm" title="{{ $pass->visitor?->blacklist_reason }}" />
+                                            @endif
+                                            @if($pass->id_verification_status === 'Verified')
+                                                <i class="feather-check-circle text-success fs-12" title="ID Verified"></i>
+                                            @endif
+                                        </div>
                                         <div class="fs-11 text-muted">
                                             <i class="feather-phone me-1 text-muted"></i>{{ $pass->visitor?->phone ?? '—' }}
                                         </div>
@@ -293,7 +377,7 @@
                                 </div>
                             </td>
 
-                            <!-- Company / Organization -->
+                            <!-- Company -->
                             <td>
                                 <div class="fw-medium text-dark">{{ $pass->visitor?->company_name ?: '—' }}</div>
                                 @if(!empty($pass->visitor?->designation))
@@ -301,7 +385,26 @@
                                 @endif
                             </td>
 
-                            <!-- Host (Employee) -->
+                            <!-- Vehicle & Accompanying -->
+                            <td>
+                                @if(!empty($pass->vehicle_number))
+                                    <div class="fw-semibold font-monospace fs-11 text-dark">
+                                        <i class="feather-truck me-1 text-muted"></i>{{ $pass->vehicle_number }}
+                                    </div>
+                                    @if(!empty($pass->parking_slot))
+                                        <div class="fs-10 text-muted">Slot: {{ $pass->parking_slot }}</div>
+                                    @endif
+                                @else
+                                    <span class="text-muted fs-11">Pedestrian</span>
+                                @endif
+                                @if($pass->accompanying_count > 0)
+                                    <span class="badge bg-soft-secondary text-dark fs-10 mt-0.5" title="{{ $pass->accompanying_names }}">
+                                        +{{ $pass->accompanying_count }} Guests
+                                    </span>
+                                @endif
+                            </td>
+
+                            <!-- Host -->
                             <td>
                                 <div class="fw-semibold text-primary">
                                     <i class="feather-user me-1 text-muted"></i>{{ $pass->host?->name ?: 'Direct Reception' }}
@@ -315,7 +418,7 @@
                                     {{ __('visitor.purposes.' . $pass->purpose, [], null) ?? $pass->purpose }}
                                 </span>
                                 @if($pass->belongings && $pass->belongings->count() > 0)
-                                    <span class="badge bg-soft-info text-info ms-1" title="Belongings Recorded">
+                                    <span class="badge bg-soft-info text-info ms-1" title="Assets Logged">
                                         <i class="feather-briefcase me-1"></i>{{ $pass->belongings->count() }}
                                     </span>
                                 @endif
@@ -331,6 +434,10 @@
                                         <div class="text-danger fw-semibold fs-11 mt-0.5">
                                             <i class="feather-log-out me-1"></i>{{ \Carbon\Carbon::parse($pass->check_out_at)->format('h:i A') }}
                                         </div>
+                                    @elseif($isOverstay)
+                                        <span class="badge bg-danger text-white fs-10 px-1 py-0.5 mt-0.5">
+                                            <i class="feather-clock me-1"></i>Overdue
+                                        </span>
                                     @endif
                                 @else
                                     <span class="text-muted fs-12">
@@ -339,31 +446,28 @@
                                 @endif
                             </td>
 
-                            <!-- Fee (Formatted Currency) -->
-                            <td class="text-end pe-3">
-                                <span class="fw-bold text-dark fs-12">{{ format_currency($pass->fee_amount ?? 0) }}</span>
-                            </td>
-
-                            <!-- Status Badge Component -->
+                            <!-- Status Badge -->
                             <td>
                                 @php
                                     $statusKey = match($pass->status) {
-                                        'Checked-In'       => 'approved',
-                                        'Checked-Out'      => 'completed',
-                                        'Approved'         => 'active',
-                                        'Waiting Approval' => 'pending_approval',
-                                        'Rejected'         => 'rejected',
-                                        default            => 'in_progress',
+                                        'Checked-In'          => 'approved',
+                                        'Meeting in Progress' => 'active',
+                                        'Checked-Out'         => 'completed',
+                                        'Approved'            => 'active',
+                                        'Arrived'             => 'in_progress',
+                                        'Waiting Approval'    => 'pending_approval',
+                                        'Rejected', 'Denied'  => 'rejected',
+                                        default               => 'in_progress',
                                     };
                                 @endphp
                                 <x-ui.status-badge :status="$statusKey" :label="__('visitor.statuses.' . $pass->status, [], null) ?? $pass->status" dot />
                             </td>
 
-                            <!-- Actions (Using Common x-ui.action-dropdown) -->
+                            <!-- Actions Dropdown -->
                             <td class="text-end pe-3">
                                 <x-ui.action-dropdown :viewUrl="route('visitor.passes.show', $pass->id)">
                                     <x-slot:extraActions>
-                                        @if($pass->status === 'Expected' || $pass->status === 'Approved')
+                                        @if($pass->status === 'Expected' || $pass->status === 'Approved' || $pass->status === 'Arrived')
                                             <form method="POST" action="{{ route('visitor.passes.check-in', $pass->id) }}" class="d-inline">
                                                 @csrf
                                                 <button type="submit" class="action-dropdown-btn text-success" title="{{ __('visitor.check_in') }}">
@@ -371,16 +475,16 @@
                                                 </button>
                                             </form>
                                         @elseif($pass->status === 'Waiting Approval')
-                                            <span class="action-dropdown-btn text-warning" title="Waiting Host Approval" style="cursor: not-allowed; opacity: 0.75;">
-                                                <i class="feather-clock"></i>
-                                            </span>
-                                        @elseif($pass->status === 'Checked-In')
-                                            <form method="POST" action="{{ route('visitor.passes.check-out', $pass->id) }}" class="d-inline">
+                                            <form method="POST" action="{{ route('visitor.passes.notify-host', $pass->id) }}" class="d-inline">
                                                 @csrf
-                                                <button type="submit" class="action-dropdown-btn text-danger" title="{{ __('visitor.check_out') }}">
-                                                    <i class="feather-log-out"></i>
+                                                <button type="submit" class="action-dropdown-btn text-primary" title="{{ __('visitor.notify_host') }}">
+                                                    <i class="feather-bell"></i>
                                                 </button>
                                             </form>
+                                        @elseif($pass->status === 'Checked-In' || $pass->status === 'Meeting in Progress')
+                                            <button type="button" class="action-dropdown-btn text-danger" onclick="openCheckoutModal({{ $pass->id }}, '{{ $pass->pass_number }}', '{{ $pass->visitor?->full_name }}')" title="{{ __('visitor.check_out') }}">
+                                                <i class="feather-log-out"></i>
+                                            </button>
                                         @endif
                                     </x-slot:extraActions>
 
@@ -389,22 +493,74 @@
                                             <i class="feather-printer me-2 text-primary fs-12"></i> {{ __('visitor.print_badge') }}
                                         </a>
                                     </li>
-                                    @if($pass->status === 'Expected' || $pass->status === 'Approved')
+
+                                    @if($pass->status === 'Expected')
                                         <li>
-                                            <form method="POST" action="{{ route('visitor.passes.check-in', $pass->id) }}">
+                                            <form method="POST" action="{{ route('visitor.passes.mark-arrived', $pass->id) }}">
                                                 @csrf
-                                                <button type="submit" class="dropdown-item text-success">
-                                                    <i class="feather-log-in me-2 text-success fs-12"></i> {{ __('visitor.check_in') }}
+                                                <button type="submit" class="dropdown-item text-primary">
+                                                    <i class="feather-map-pin me-2 text-primary fs-12"></i> {{ __('visitor.mark_arrived') }}
                                                 </button>
                                             </form>
                                         </li>
                                     @endif
+
                                     @if($pass->status === 'Checked-In')
                                         <li>
-                                            <form method="POST" action="{{ route('visitor.passes.check-out', $pass->id) }}">
+                                            <form method="POST" action="{{ route('visitor.passes.start-meeting', $pass->id) }}">
                                                 @csrf
-                                                <button type="submit" class="dropdown-item text-danger">
-                                                    <i class="feather-log-out me-2 text-danger fs-12"></i> {{ __('visitor.check_out') }}
+                                                <button type="submit" class="dropdown-item text-info">
+                                                    <i class="feather-users me-2 text-info fs-12"></i> {{ __('visitor.start_meeting') }}
+                                                </button>
+                                            </form>
+                                        </li>
+                                    @endif
+
+                                    @if($pass->host_user_id)
+                                        <li>
+                                            <form method="POST" action="{{ route('visitor.passes.notify-host', $pass->id) }}">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item text-secondary">
+                                                    <i class="feather-bell me-2 text-secondary fs-12"></i> {{ __('visitor.notify_host') }}
+                                                </button>
+                                            </form>
+                                        </li>
+                                    @endif
+
+                                    @if($pass->status === 'Checked-In' || $pass->status === 'Meeting in Progress')
+                                        <li>
+                                            <a href="javascript:void(0)" class="dropdown-item text-warning" onclick="openExtendModal({{ $pass->id }}, '{{ $pass->pass_number }}', {{ $pass->expected_duration_minutes ?: 60 }})">
+                                                <i class="feather-clock me-2 text-warning fs-12"></i> {{ __('visitor.extend_visit') }}
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="javascript:void(0)" class="dropdown-item text-danger" onclick="openCheckoutModal({{ $pass->id }}, '{{ $pass->pass_number }}', '{{ $pass->visitor?->full_name }}')">
+                                                <i class="feather-log-out me-2 text-danger fs-12"></i> {{ __('visitor.check_out') }}
+                                            </a>
+                                        </li>
+                                    @endif
+
+                                    @if($pass->status !== 'Denied' && $pass->status !== 'Rejected' && $pass->status !== 'Checked-Out')
+                                        <li>
+                                            <a href="javascript:void(0)" class="dropdown-item text-danger" onclick="openDenyModal({{ $pass->id }}, '{{ $pass->pass_number }}', '{{ $pass->visitor?->full_name }}')">
+                                                <i class="feather-slash me-2 text-danger fs-12"></i> {{ __('visitor.deny_entry') }}
+                                            </a>
+                                        </li>
+                                    @endif
+
+                                    <li>
+                                        <a href="javascript:void(0)" class="dropdown-item text-dark" onclick="openIncidentModal({{ $pass->id }}, '{{ $pass->pass_number }}')">
+                                            <i class="feather-alert-octagon me-2 text-dark fs-12"></i> {{ __('visitor.report_incident') }}
+                                        </a>
+                                    </li>
+
+                                    @if($pass->visitor)
+                                        <li>
+                                            <form method="POST" action="{{ route('visitor.visitors.toggle-blacklist', $pass->visitor_id) }}" onsubmit="return confirm('{{ $pass->visitor->is_blacklisted ? 'Remove this visitor from blacklist?' : 'Are you sure you want to BLACKLIST this visitor? All future pass creations will be blocked.' }}')">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item {{ $pass->visitor->is_blacklisted ? 'text-success' : 'text-danger' }}">
+                                                    <i class="{{ $pass->visitor->is_blacklisted ? 'feather-check-circle text-success' : 'feather-slash text-danger' }} me-2 fs-12"></i>
+                                                    {{ $pass->visitor->is_blacklisted ? __('visitor.unblock_visitor') : __('visitor.blacklist_visitor') }}
                                                 </button>
                                             </form>
                                         </li>
@@ -427,7 +583,7 @@
             </x-ui.odoo-form-ui>
         </div>
 
-        <!-- 4. Pagination (Lead Module Standard Style) -->
+        <!-- 4. Pagination -->
         <div class="pt-3">
             <x-ui.pagination
                 :currentPage="$passes->currentPage()"
@@ -437,23 +593,22 @@
         </div>
     </div>
 
-    <!-- 5. Offcanvas Drawer: Create New Visitor Pass (Using Common x-ui.drawer & x-ui.odoo-form-ui) -->
     <!-- 5. Offcanvas Drawer: Create New Visitor Pass -->
     <x-ui.drawer 
         id="newVisitorDrawer" 
         title="<div class='d-flex align-items-center gap-2'><div class='avatar-sm bg-primary-subtle text-primary rounded-3 d-flex align-items-center justify-content-center' style='width: 34px; height: 34px;'><i class='feather-user-plus fs-16'></i></div><div><div class='fw-bold fs-15 text-dark leading-tight'>{{ __('visitor.new_visitor_pass') }}</div><div class='fs-11 text-muted fw-normal'>Register entry & issue gate pass</div></div></div>" 
         scroll 
-        style="--bs-offcanvas-width: min(780px, 95vw);">
+        style="--bs-offcanvas-width: min(850px, 95vw);">
 
-        <form method="POST" action="{{ route('visitor.store') }}" id="newVisitorDrawerForm" class="p-1">
+        <form method="POST" action="{{ route('visitor.store') }}" id="newVisitorDrawerForm" class="p-2 p-md-3" novalidate>
             @csrf
 
-            <!-- Returning Visitor Live Detection Card -->
-            <div id="returningVisitorAlertDrawer" class="card border border-success-subtle bg-success-subtle rounded-3 shadow-none mb-3 d-none">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
+            <!-- Returning Visitor Live Detection Alert -->
+            <div id="returningVisitorAlertDrawer" class="alert alert-success border border-success-subtle bg-success-subtle rounded-3 shadow-none mb-3 d-none p-3">
+                <div class="d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center gap-2.5">
-                        <div class="avatar-sm bg-success text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px;">
-                            <i class="feather-check-circle fs-18"></i>
+                        <div class="avatar-sm bg-success text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px;">
+                            <i class="feather-check-circle fs-16"></i>
                         </div>
                         <div>
                             <div class="d-flex align-items-center gap-2">
@@ -469,248 +624,196 @@
                 </div>
             </div>
 
-            <!-- Card 1: Visitor Information & Smart Lookup -->
-            <div class="card border border-slate-200 rounded-3 shadow-none mb-3 bg-white">
-                <div class="card-header bg-slate-50 border-bottom py-2.5 px-3 d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="avatar-xs bg-primary-subtle text-primary rounded-2 d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
-                            <i class="feather-user fs-12"></i>
-                        </span>
-                        <h6 class="fw-bold text-dark fs-12 mb-0 text-uppercase tracking-wider">{{ __('visitor.visitor_details') }}</h6>
-                    </div>
-                    <span class="badge bg-light text-muted border fs-10 fw-semibold">Step 1</span>
-                </div>
-                <div class="card-body p-3">
-                    <div class="row g-2">
-                        <!-- Phone Number (with fast auto-lookup) -->
-                        <div class="col-md-6">
-                            <div class="position-relative">
-                                <span id="phoneLookupSpinnerDrawer" class="text-primary fs-11 d-none fw-normal position-absolute end-0 top-0 mt-1 me-1">
-                                    <i class="feather-loader icon-spin me-1"></i> Looking up...
-                                </span>
-                                <x-ui.modal-form-ui 
-                                    type="input" 
-                                    inputType="tel" 
-                                    name="phone" 
-                                    id="drawerVisitorPhone" 
-                                    :label="__('visitor.phone_number')" 
-                                    :required="true" 
-                                    placeholder="e.g. +91 9876543210" 
-                                    oninput="debounceVisitorLookupDrawer(this.value)" 
-                                    helperText="Type phone for instant repeat visitor lookup" />
+            <!-- Blacklisted Visitor Security Alert Banner -->
+            <div id="blacklistedVisitorAlertDrawer" class="alert alert-danger border-2 border-danger bg-danger-subtle rounded-3 shadow-sm mb-3 d-none p-3">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-start gap-2.5">
+                        <div class="avatar-sm bg-danger text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 mt-0.5" style="width: 38px; height: 38px;">
+                            <i class="feather-slash fs-18"></i>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center flex-wrap gap-2">
+                                <strong class="text-danger fs-14 fw-bold">{{ __('visitor.blacklist_warning_title') }}</strong>
+                                <span class="badge bg-danger text-white px-2 py-0.5 fs-10 fw-bold">{{ __('visitor.entry_prohibited') }}</span>
+                            </div>
+                            <div class="fs-12 text-danger-emphasis mt-1">
+                                <strong>{{ __('visitor.blacklist_reason') }}:</strong> <span id="blacklistedReasonTextDrawer" class="fst-italic">—</span>
                             </div>
                         </div>
+                    </div>
+                    <span class="badge bg-danger text-white px-2.5 py-1 fs-11 fw-bold text-uppercase">
+                        <i class="feather-alert-octagon me-1"></i> Blocked
+                    </span>
+                </div>
 
-                        <!-- Visitor Full Name -->
-                        <div class="col-md-6">
-                            <x-ui.modal-form-ui 
-                                type="input" 
-                                name="full_name" 
-                                id="drawerVisitorFullName" 
-                                :label="__('visitor.visitor_name')" 
-                                :required="true" 
-                                placeholder="e.g. Rajesh Sharma" />
-                        </div>
-
-                        <!-- Email Address -->
-                        <div class="col-md-6">
-                            <x-ui.modal-form-ui 
-                                type="input" 
-                                inputType="email" 
-                                name="email" 
-                                id="drawerVisitorEmail" 
-                                :label="__('visitor.email_address')" 
-                                placeholder="e.g. visitor@company.com" />
-                        </div>
-
-                        <!-- Company / Organization -->
-                        <div class="col-md-6">
-                            <x-ui.modal-form-ui 
-                                type="input" 
-                                name="company_name" 
-                                id="drawerVisitorCompany" 
-                                :label="__('visitor.company')" 
-                                placeholder="e.g. Tata Consultancy Services" />
-                        </div>
-
-                        <!-- Designation -->
-                        <div class="col-md-6">
-                            <x-ui.modal-form-ui 
-                                type="input" 
-                                name="designation" 
-                                id="drawerVisitorDesignation" 
-                                :label="__('visitor.designation')" 
-                                placeholder="e.g. Senior Consultant / Vendor Rep" />
-                        </div>
-
-                        <!-- ID Proof Type & Number -->
-                        <div class="col-md-3">
-                            <x-ui.modal-form-ui 
-                                type="select" 
-                                name="id_proof_type" 
-                                id="drawerVisitorIdType" 
-                                :label="__('visitor.id_proof')" 
-                                :searchable="false">
-                                <option value="">— Type —</option>
-                                <option value="National ID">Aadhaar / National ID</option>
-                                <option value="Driving License">Driving License</option>
-                                <option value="Passport">Passport</option>
-                                <option value="Company ID">Company ID Card</option>
-                                <option value="Other">Other</option>
-                            </x-ui.modal-form-ui>
-                        </div>
-                        <div class="col-md-3">
-                            <x-ui.modal-form-ui 
-                                type="input" 
-                                name="id_proof_number" 
-                                id="drawerVisitorIdNumber" 
-                                :label="__('visitor.id_proof_number')" 
-                                placeholder="e.g. DL-987456" />
-                        </div>
+                <!-- Manager Override Authorization -->
+                <div class="border-top border-danger-subtle pt-2 mt-2">
+                    <x-ui.checkbox 
+                        name="allow_blacklisted_override" 
+                        id="drawerBlacklistOverrideCheck" 
+                        value="1" 
+                        :label="__('visitor.blacklist_override')" 
+                        onchange="toggleBlacklistOverride(this.checked)" 
+                    />
+                    <div id="drawerBlacklistOverrideReasonGroup" class="d-none mt-2">
+                        <input type="text" name="blacklist_override_reason" id="drawerBlacklistOverrideReasonInput" class="form-control form-control-sm border-danger-subtle fs-12 bg-white" placeholder="Enter mandatory authorization note / executive approval details...">
                     </div>
                 </div>
             </div>
 
-            <!-- Card 2: Host & Visit Purpose Details -->
-            <div class="card border border-slate-200 rounded-3 shadow-none mb-3 bg-white">
-                <div class="card-header bg-slate-50 border-bottom py-2.5 px-3 d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="avatar-xs bg-info-subtle text-info rounded-2 d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
-                            <i class="feather-compass fs-12"></i>
-                        </span>
-                        <h6 class="fw-bold text-dark fs-12 mb-0 text-uppercase tracking-wider">{{ __('visitor.pass_information') }}</h6>
+            <!-- Main Form Grid -->
+            <div class="row g-3 mb-3">
+                <!-- Visitor Type Dropdown -->
+                <div class="col-md-6">
+                    <div class="odoo-field-group">
+                        <label class="odoo-field-label" for="drawerVisitorTypeSelect">
+                            {{ __('visitor.visitor_type') }} <span class="text-danger">*</span>
+                        </label>
+                        <select name="visitor_type" id="drawerVisitorTypeSelect" class="odoo-field-control" required>
+                            <option value="Client" selected>{{ __('visitor.visitor_types.Client') }}</option>
+                            <option value="Vendor">{{ __('visitor.visitor_types.Vendor') }}</option>
+                            <option value="Candidate">{{ __('visitor.visitor_types.Candidate') }}</option>
+                            <option value="Service">{{ __('visitor.visitor_types.Service') }}</option>
+                            <option value="Guest">{{ __('visitor.visitor_types.Guest') }}</option>
+                        </select>
                     </div>
-                    <span class="badge bg-light text-muted border fs-10 fw-semibold">Step 2</span>
                 </div>
-                <div class="card-body p-3">
-                    <div class="row g-2">
-                        <!-- Host Selection -->
-                        <div class="col-md-6">
-                            <x-ui.modal-form-ui 
-                                type="select" 
-                                name="host_user_id" 
-                                id="drawerHostUserId" 
-                                :label="__('visitor.select_host')" 
-                                :required="true" 
-                                :searchable="false">
-                                <option value="">— {{ __('visitor.select_host') }} —</option>
-                                @foreach($hosts ?? [] as $host)
-                                    <option value="{{ $host->id }}">{{ $host->name }} ({{ $host->email }})</option>
-                                @endforeach
-                            </x-ui.modal-form-ui>
-                        </div>
 
-                        <!-- Purpose of Visit -->
-                        <div class="col-md-6">
-                            <x-ui.modal-form-ui 
-                                type="select" 
-                                name="purpose" 
-                                id="drawerPurpose" 
-                                :label="__('visitor.purpose_of_visit')" 
-                                :required="true" 
-                                :searchable="false">
-                                <option value="Meeting">Meeting / Discussion</option>
-                                <option value="Interview">Job Interview</option>
-                                <option value="Vendor">Vendor / Supplier Visit</option>
-                                <option value="Delivery">Courier / Delivery</option>
-                                <option value="Audit">Audit / Inspection</option>
-                                <option value="Personal">Personal Visit</option>
-                            </x-ui.modal-form-ui>
+                <!-- Phone Number -->
+                <div class="col-md-6">
+                    <div class="odoo-field-group">
+                        <label class="odoo-field-label" for="drawerVisitorPhone">
+                            {{ __('visitor.phone_number') }} <span class="text-danger">*</span>
+                        </label>
+                        <div class="position-relative">
+                            <input type="tel" 
+                                   name="phone" 
+                                   id="drawerVisitorPhone" 
+                                   class="odoo-field-control" 
+                                   required 
+                                   placeholder="e.g. +91 9876543210" 
+                                   oninput="debounceVisitorLookupDrawer(this.value, 'phone')">
+                            <span id="phoneLookupSpinnerDrawer" class="text-primary fs-11 d-none fw-normal position-absolute end-0 top-50 translate-middle-y me-1">
+                                <i class="feather-loader icon-spin me-1"></i> Looking up...
+                            </span>
                         </div>
+                    </div>
+                </div>
 
-                        <!-- Gate Number -->
-                        <div class="col-md-4">
-                            <x-ui.modal-form-ui 
-                                type="input" 
-                                name="gate_number" 
-                                id="drawerGateNumber" 
-                                :label="__('visitor.gate_number')" 
-                                value="Main Gate 1" />
-                        </div>
+                <!-- Visitor Full Name -->
+                <div class="col-md-6">
+                    <div class="odoo-field-group">
+                        <label class="odoo-field-label" for="drawerVisitorFullName">
+                            {{ __('visitor.visitor_name') }} <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" 
+                               name="full_name" 
+                               id="drawerVisitorFullName" 
+                               class="odoo-field-control" 
+                               required 
+                               placeholder="e.g. Rajesh Sharma">
+                    </div>
+                </div>
 
-                        <!-- Pass Fee / Charge -->
-                        <div class="col-md-4">
-                            <x-ui.modal-form-ui 
-                                type="input" 
-                                inputType="number" 
-                                name="fee_amount" 
-                                id="drawerFeeAmount" 
-                                :label="__('visitor.fee_charge') . ' (' . active_currency_symbol() . ')'" 
-                                value="0.00" 
-                                step="0.01" />
-                        </div>
+                <!-- Email Address -->
+                <div class="col-md-6">
+                    <div class="odoo-field-group">
+                        <label class="odoo-field-label" for="drawerVisitorEmail">
+                            {{ __('visitor.email_address') }}
+                        </label>
+                        <input type="email" 
+                               name="email" 
+                               id="drawerVisitorEmail" 
+                               class="odoo-field-control" 
+                               placeholder="e.g. visitor@company.com"
+                               oninput="debounceVisitorLookupDrawer(this.value, 'email')">
+                    </div>
+                </div>
 
-                        <!-- Expected Arrival Time -->
-                        <div class="col-md-4">
-                            <x-ui.modal-form-ui 
-                                type="input" 
-                                inputType="datetime-local" 
-                                name="expected_arrival_at" 
-                                id="drawerExpectedArrival" 
-                                :label="__('visitor.expected_time')" 
-                                value="{{ now()->format('Y-m-d\TH:i') }}" />
-                        </div>
+                <!-- Company -->
+                <div class="col-md-6">
+                    <div class="odoo-field-group">
+                        <label class="odoo-field-label" for="drawerVisitorCompany">
+                            {{ __('visitor.company') }}
+                        </label>
+                        <input type="text" 
+                               name="company_name" 
+                               id="drawerVisitorCompany" 
+                               class="odoo-field-control" 
+                               placeholder="e.g. Acme Industries Ltd"
+                               oninput="debounceVisitorLookupDrawer(this.value, 'company')">
+                    </div>
+                </div>
+
+                <!-- Host User -->
+                <div class="col-md-6">
+                    <div class="odoo-field-group">
+                        <label class="odoo-field-label" for="drawerHostUserId">
+                            {{ __('visitor.select_host') }} <span class="text-danger">*</span>
+                        </label>
+                        <select name="host_user_id" id="drawerHostUserId" class="odoo-field-control" required>
+                            <option value="">— {{ __('visitor.select_host') }} —</option>
+                            @foreach($hosts ?? [] as $host)
+                                <option value="{{ $host->id }}">{{ $host->name }} ({{ $host->email }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Purpose of Visit -->
+                <div class="col-md-6">
+                    <div class="odoo-field-group">
+                        <label class="odoo-field-label" for="drawerPurpose">
+                            {{ __('visitor.purpose_of_visit') }} <span class="text-danger">*</span>
+                        </label>
+                        <select name="purpose" id="drawerPurpose" class="odoo-field-control" required>
+                            <option value="Meeting">Meeting / Discussion</option>
+                            <option value="Interview">Job Interview</option>
+                            <option value="Vendor">Vendor / Supplier Visit</option>
+                            <option value="Delivery">Courier / Delivery</option>
+                            <option value="Audit">Audit / Inspection</option>
+                            <option value="Personal">Personal Visit</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Expected Arrival & Duration -->
+                <div class="col-md-6">
+                    <div class="odoo-field-group">
+                        <label class="odoo-field-label" for="drawerExpectedArrival">{{ __('visitor.expected_time') }}</label>
+                        <input type="datetime-local" name="expected_arrival_at" id="drawerExpectedArrival" class="odoo-field-control" value="{{ now()->format('Y-m-d\TH:i') }}">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="odoo-field-group">
+                        <label class="odoo-field-label" for="drawerDuration">{{ __('visitor.expected_duration') }}</label>
+                        <input type="number" name="expected_duration_minutes" id="drawerDuration" class="odoo-field-control" value="60" min="15" max="720">
                     </div>
                 </div>
             </div>
 
-            <!-- Card 3: Belongings & Equipment -->
-            <div class="card border border-slate-200 rounded-3 shadow-none mb-3 bg-white">
-                <div class="card-header bg-slate-50 border-bottom py-2.5 px-3 d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="avatar-xs bg-warning-subtle text-warning rounded-2 d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
-                            <i class="feather-package fs-12"></i>
-                        </span>
-                        <h6 class="fw-bold text-dark fs-12 mb-0 text-uppercase tracking-wider">{{ __('visitor.belongings') }}</h6>
-                    </div>
-                    <span class="badge bg-light text-muted border fs-10 fw-normal">Optional</span>
+            <!-- Live Photo & Badge Capture -->
+            <div class="mb-3 pb-3 border-bottom">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <label class="odoo-field-label mb-0">
+                        <i class="feather-camera text-primary me-1"></i> {{ __('visitor.live_camera_capture') }}
+                    </label>
+                    <span class="badge bg-light text-muted border fs-10">Optional Badge Photo</span>
                 </div>
-                <div class="card-body p-3">
-                    <div class="row g-2">
-                        <div class="col-md-6">
-                            <x-ui.modal-form-ui 
-                                type="input" 
-                                name="item_type" 
-                                id="drawerItemType" 
-                                :label="__('visitor.item_type')" 
-                                placeholder="e.g. Dell Latitude 7420 Laptop" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.modal-form-ui 
-                                type="input" 
-                                name="serial_number" 
-                                id="drawerSerialNumber" 
-                                :label="__('visitor.serial_number')" 
-                                placeholder="e.g. CN-0G541298" />
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Card 4: Live Photo Studio -->
-            <div class="card border border-slate-200 rounded-3 shadow-none mb-3 bg-white">
-                <div class="card-header bg-slate-50 border-bottom py-2.5 px-3 d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="avatar-xs bg-success-subtle text-success rounded-2 d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
-                            <i class="feather-camera fs-12"></i>
-                        </span>
-                        <h6 class="fw-bold text-dark fs-12 mb-0 text-uppercase tracking-wider">{{ __('visitor.live_camera_capture') }}</h6>
-                    </div>
-                    <span class="badge bg-light text-muted border fs-10 fw-normal">Badge Photo</span>
-                </div>
-                <div class="card-body p-3 text-center">
-                    <input type="hidden" name="photo_url" id="drawerVisitorPhotoData">
-                    
-                    <div id="drawerWebcamContainer" class="d-none mb-2.5">
-                        <video id="drawerWebcamVideo" width="220" height="165" autoplay playsinline class="rounded-3 border border-2 border-primary shadow-sm"></video>
-                        <canvas id="drawerWebcamCanvas" width="220" height="165" class="d-none"></canvas>
+                <input type="hidden" name="photo_url" id="drawerVisitorPhotoData">
+                
+                <div class="d-flex align-items-center flex-wrap gap-3 mt-2">
+                    <div id="drawerPhotoPreviewContainer" class="d-none">
+                        <img id="drawerPhotoPreview" src="" alt="Captured Photo" width="54" height="54" class="rounded-circle border border-2 border-success object-fit-cover shadow-sm">
                     </div>
 
-                    <div id="drawerPhotoPreviewContainer" class="d-none mb-2.5">
-                        <img id="drawerPhotoPreview" src="" alt="Captured Photo" width="100" height="100" class="rounded-circle border border-3 border-success object-fit-cover shadow-sm">
+                    <div id="drawerWebcamContainer" class="d-none">
+                        <video id="drawerWebcamVideo" width="180" height="135" autoplay playsinline class="rounded-3 border border-2 border-primary shadow-sm"></video>
+                        <canvas id="drawerWebcamCanvas" width="180" height="135" class="d-none"></canvas>
                     </div>
 
-                    <div class="d-flex justify-content-center gap-2">
+                    <div class="d-flex gap-2">
                         <button type="button" class="btn btn-sm btn-outline-primary fw-semibold px-3" id="btnStartCameraDrawer" onclick="startWebcamDrawer()">
                             <i class="feather-camera me-1"></i> Open Webcam
                         </button>
@@ -718,98 +821,350 @@
                             <i class="feather-check me-1"></i> {{ __('visitor.capture_photo') }}
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-danger d-none fw-semibold px-3" id="btnRetakePhotoDrawer" onclick="retakeWebcamPhotoDrawer()">
-                            <i class="feather-refresh-cw me-1"></i> {{ __('visitor.retake_photo') }}
+                            <i class="feather-refresh-cw me-1"></i> Retake
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Card 5: Entry Workflow & Pass Type (Interactive Cards) -->
-            <div class="card border border-slate-200 rounded-3 shadow-none mb-3 bg-white">
-                <div class="card-header bg-slate-50 border-bottom py-2.5 px-3 d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="avatar-xs bg-primary-subtle text-primary rounded-2 d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
-                            <i class="feather-shield fs-12"></i>
-                        </span>
-                        <h6 class="fw-bold text-dark fs-12 mb-0 text-uppercase tracking-wider">Entry Workflow & Pass Type</h6>
-                    </div>
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 fw-bold">Select Action</span>
+            <!-- Entry Workflow & Pass Type -->
+            <div class="mb-3 pb-3 border-bottom">
+                <label class="odoo-field-label mb-2">Entry Workflow</label>
+                <div class="d-flex flex-wrap gap-4 align-items-center">
+                    <x-ui.radio 
+                        name="drawer_action_type" 
+                        id="drawerActionCheckIn" 
+                        value="checkin" 
+                        label="Instant Check-in" 
+                        :checked="true" 
+                        onchange="toggleDrawerActionType(this.value)" 
+                    />
+                    <x-ui.radio 
+                        name="drawer_action_type" 
+                        id="drawerActionApproval" 
+                        value="approval" 
+                        label="Host Approval" 
+                        onchange="toggleDrawerActionType(this.value)" 
+                    />
+                    <x-ui.radio 
+                        name="drawer_action_type" 
+                        id="drawerActionExpected" 
+                        value="expected" 
+                        label="Pre-Register" 
+                        onchange="toggleDrawerActionType(this.value)" 
+                    />
                 </div>
-                <div class="card-body p-3">
-                    <div class="row g-2">
-                        <div class="col-md-4">
-                            <label class="workflow-radio-card d-block p-2.5 border rounded-3 cursor-pointer h-100 position-relative transition-all" for="drawerActionCheckIn" style="border: 1.5px solid #cbd5e1; background: #f8fafc;">
-                                <div class="form-check mb-0">
-                                    <input class="form-check-input" type="radio" name="drawer_action_type" id="drawerActionCheckIn" value="checkin" checked onchange="toggleDrawerActionType(this.value)">
-                                    <label class="form-check-label fw-bold fs-12 text-dark d-block cursor-pointer" for="drawerActionCheckIn">
-                                        <i class="feather-check-circle text-success me-1"></i> Instant Check-in
-                                    </label>
-                                </div>
-                                <div class="fs-11 text-muted mt-1 ps-4">Visitor enters immediately; pass status: <strong>Checked-In</strong>.</div>
-                            </label>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="workflow-radio-card d-block p-2.5 border rounded-3 cursor-pointer h-100 position-relative transition-all" for="drawerActionApproval" style="border: 1.5px solid #cbd5e1; background: #f8fafc;">
-                                <div class="form-check mb-0">
-                                    <input class="form-check-input" type="radio" name="drawer_action_type" id="drawerActionApproval" value="approval" onchange="toggleDrawerActionType(this.value)">
-                                    <label class="form-check-label fw-bold fs-12 text-dark d-block cursor-pointer" for="drawerActionApproval">
-                                        <i class="feather-clock text-warning me-1"></i> Host Approval
-                                    </label>
-                                </div>
-                                <div class="fs-11 text-muted mt-1 ps-4">Requires host employee consent before gate entry.</div>
-                            </label>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="workflow-radio-card d-block p-2.5 border rounded-3 cursor-pointer h-100 position-relative transition-all" for="drawerActionExpected" style="border: 1.5px solid #cbd5e1; background: #f8fafc;">
-                                <div class="form-check mb-0">
-                                    <input class="form-check-input" type="radio" name="drawer_action_type" id="drawerActionExpected" value="expected" onchange="toggleDrawerActionType(this.value)">
-                                    <label class="form-check-label fw-bold fs-12 text-dark d-block cursor-pointer" for="drawerActionExpected">
-                                        <i class="feather-calendar text-primary me-1"></i> Pre-Register
-                                    </label>
-                                </div>
-                                <div class="fs-11 text-muted mt-1 ps-4">Pre-schedule guest for future arrival date/time.</div>
-                            </label>
-                        </div>
-                    </div>
-                    <input type="hidden" name="check_in_now" id="drawerCheckInNowHidden" value="1">
-                    <input type="hidden" name="status" id="drawerStatusHidden" value="Checked-In">
-                </div>
+                <input type="hidden" name="check_in_now" id="drawerCheckInNowHidden" value="1">
+                <input type="hidden" name="status" id="drawerStatusHidden" value="Checked-In">
             </div>
 
-            <!-- Card 6: Notes & Remarks -->
-            <div class="card border border-slate-200 rounded-3 shadow-none mb-3 bg-white">
-                <div class="card-body p-3">
-                    <x-ui.modal-form-ui 
-                        type="textarea" 
-                        name="notes" 
-                        id="drawerNotes" 
-                        label="Security Notes / Remarks" 
-                        :rows="2" 
-                        placeholder="Any vehicle number, parking bay, or luggage details..." />
+            <!-- Collapsible Extra Details -->
+            <div class="my-2">
+                <button type="button" 
+                        class="btn btn-outline-primary btn-sm px-3 py-1.5 rounded-2 d-inline-flex align-items-center gap-1.5 fw-semibold shadow-none" 
+                        id="toggleAdditionalVisitorFieldsBtn" 
+                        onclick="toggleAdditionalVisitorFields()">
+                    <i class="feather-plus-circle fs-13" id="toggleAdditionalFieldsIcon"></i>
+                    <span id="toggleAdditionalFieldsText">+ Additional Details (Vehicle, ID Proof, Assets & Safety)</span>
+                </button>
+            </div>
+
+            <!-- Collapsible Secondary Fields Container -->
+            <div id="additionalVisitorFieldsContainer" class="d-none pt-3">
+                <div class="row g-3">
+                    <!-- Designation -->
+                    <div class="col-md-6">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label" for="drawerVisitorDesignation">{{ __('visitor.designation') }}</label>
+                            <input type="text" name="designation" id="drawerVisitorDesignation" class="odoo-field-control" placeholder="e.g. Senior Consultant / Delivery Rep">
+                        </div>
+                    </div>
+
+                    <!-- Gate Number -->
+                    <div class="col-md-6">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label" for="drawerGateNumber">{{ __('visitor.gate_number') }}</label>
+                            <input type="text" name="gate_number" id="drawerGateNumber" class="odoo-field-control" value="Main Gate 1">
+                        </div>
+                    </div>
+
+                    <!-- Vehicle Type & Number -->
+                    <div class="col-md-4">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">{{ __('visitor.vehicle_type') }}</label>
+                            <select name="vehicle_type" class="odoo-field-control">
+                                <option value="none">{{ __('visitor.vehicle_types.none') }}</option>
+                                <option value="2_wheeler">{{ __('visitor.vehicle_types.2_wheeler') }}</option>
+                                <option value="4_wheeler">{{ __('visitor.vehicle_types.4_wheeler') }}</option>
+                                <option value="truck">{{ __('visitor.vehicle_types.truck') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">{{ __('visitor.vehicle_number') }}</label>
+                            <input type="text" name="vehicle_number" class="odoo-field-control" placeholder="e.g. MH-12-AB-1234">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">{{ __('visitor.parking_slot') }}</label>
+                            <input type="text" name="parking_slot" class="odoo-field-control" placeholder="e.g. Bay P-04">
+                        </div>
+                    </div>
+
+                    <!-- Accompanying Persons -->
+                    <div class="col-md-4">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">{{ __('visitor.accompanying_count') }}</label>
+                            <input type="number" name="accompanying_count" class="odoo-field-control" value="0" min="0" max="50">
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">{{ __('visitor.accompanying_names') }}</label>
+                            <input type="text" name="accompanying_names" class="odoo-field-control" placeholder="Comma separated guest names...">
+                        </div>
+                    </div>
+
+                    <!-- ID Proof & Verification -->
+                    <div class="col-md-4">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">{{ __('visitor.id_proof') }}</label>
+                            <select name="id_proof_type" id="drawerVisitorIdType" class="odoo-field-control">
+                                <option value="">— Select ID Proof —</option>
+                                <option value="National ID">Aadhaar / National ID</option>
+                                <option value="Driving License">Driving License</option>
+                                <option value="Passport">Passport</option>
+                                <option value="Company ID">Company ID Card</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">{{ __('visitor.id_proof_number') }}</label>
+                            <input type="text" name="id_proof_number" id="drawerVisitorIdNumber" class="odoo-field-control" placeholder="e.g. DL-987456">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">{{ __('visitor.badge_number') }}</label>
+                            <input type="text" name="badge_number" class="odoo-field-control" placeholder="e.g. RFID-084">
+                        </div>
+                    </div>
+
+                    <!-- Belongings / Equipment -->
+                    <div class="col-md-4">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">{{ __('visitor.item_type') }}</label>
+                            <input type="text" name="item_type" class="odoo-field-control" placeholder="e.g. Dell Latitude Laptop">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">{{ __('visitor.serial_number') }}</label>
+                            <input type="text" name="serial_number" class="odoo-field-control" placeholder="e.g. CN-0G541298">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">{{ __('visitor.gate_pass_number') }}</label>
+                            <input type="text" name="belonging_gate_pass" class="odoo-field-control" placeholder="e.g. GP-9941">
+                        </div>
+                    </div>
+
+                    <!-- Compliance Checkboxes -->
+                    <div class="col-md-12">
+                        <div class="d-flex flex-wrap gap-4 py-2 border-top border-bottom">
+                            <x-ui.checkbox 
+                                name="nda_safety_acknowledged" 
+                                id="drawerNdaCheck" 
+                                value="1" 
+                                :checked="true" 
+                                :label="__('visitor.nda_safety_acknowledged')" 
+                            />
+                            <x-ui.checkbox 
+                                name="restricted_area_access" 
+                                id="drawerRestrictedCheck" 
+                                value="1" 
+                                :label="__('visitor.restricted_area_access')" 
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="col-md-12">
+                        <div class="odoo-field-group">
+                            <label class="odoo-field-label">Security Notes / Remarks</label>
+                            <textarea name="notes" rows="2" class="form-control fs-13" placeholder="Any vehicle parking bay, cargo details or security remarks..."></textarea>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Drawer Bottom Sticky Action Bar -->
-            <div class="d-flex align-items-center justify-content-between gap-2 pt-3 border-top mt-3 bg-white sticky-bottom pb-2">
+            <div class="d-flex align-items-center justify-content-between gap-2 pt-3 border-top mt-4 bg-white sticky-bottom pb-2">
                 <button type="button" class="btn btn-light border px-3 fw-semibold" data-bs-dismiss="offcanvas">
                     <i class="feather-x me-1"></i> Cancel
                 </button>
                 <div class="d-flex align-items-center gap-2">
-                    <x-ui.button type="submit" variant="primary" icon="feather-check" class="px-4 fw-bold">
-                        {{ __('visitor.new_visitor_pass') }}
-                    </x-ui.button>
+                    <button type="submit" id="drawerSubmitBtn" class="btn btn-primary px-4 fw-bold">
+                        <i class="feather-check me-1"></i> {{ __('visitor.new_visitor_pass') }}
+                    </button>
                 </div>
             </div>
         </form>
     </x-ui.drawer>
 
-    <!-- Smart Visual Import Modal (3-Step Column Mapping & Dry Run Importer) -->
+    <!-- Modal 1: Check Out Modal (With Badge Return & Material Exit Verification) -->
+    <x-ui.modal 
+        id="visitorCheckoutModal" 
+        title="<i class='feather-log-out text-danger me-2'></i> {{ __('visitor.check_out') }} - <span id='checkoutPassNumber'></span>" 
+        centered 
+        :showFooter="false">
+        <form id="visitorCheckoutForm" method="POST" action="">
+            @csrf
+            <p class="fs-13 text-dark mb-3">Checking out visitor: <strong id="checkoutVisitorName"></strong></p>
+            
+            <x-ui.checkbox 
+                name="badge_returned" 
+                id="modalBadgeReturnedCheck" 
+                value="1" 
+                :checked="true" 
+                :label="__('visitor.badge_returned_notice')" 
+                class="mb-3"
+            />
+
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.material_gate_pass') }}</label>
+                <input type="text" name="gate_pass_reference" class="form-control fs-13" placeholder="e.g. Exit Gate Pass # or DC Reference">
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
+                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-danger px-3 fw-semibold">
+                    <i class="feather-log-out me-1"></i> Confirm Check-Out
+                </button>
+            </div>
+        </form>
+    </x-ui.modal>
+
+    <!-- Modal 2: Extend Visit Modal -->
+    <x-ui.modal 
+        id="extendVisitModal" 
+        title="<i class='feather-clock text-warning me-2'></i> {{ __('visitor.extend_visit') }} - <span id='extendPassNumber'></span>" 
+        centered 
+        :showFooter="false">
+        <form id="extendVisitForm" method="POST" action="">
+            @csrf
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.extend_minutes') }} <span class="text-danger">*</span></label>
+                <select name="extend_minutes" class="form-select fs-13" required>
+                    <option value="30">+30 Minutes</option>
+                    <option value="60" selected>+60 Minutes (1 Hour)</option>
+                    <option value="120">+120 Minutes (2 Hours)</option>
+                    <option value="240">+240 Minutes (4 Hours)</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">Reason / Remarks</label>
+                <textarea name="extend_notes" class="form-control fs-13" rows="2" placeholder="Meeting prolonged, additional discussion..."></textarea>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
+                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-warning px-3 fw-semibold">
+                    <i class="feather-clock me-1"></i> Extend Stay
+                </button>
+            </div>
+        </form>
+    </x-ui.modal>
+
+    <!-- Modal 3: Deny Entry Modal -->
+    <x-ui.modal 
+        id="denyEntryModal" 
+        title="<i class='feather-slash text-danger me-2'></i> {{ __('visitor.deny_entry') }} - <span id='denyPassNumber'></span>" 
+        centered 
+        :showFooter="false">
+        <form id="denyEntryForm" method="POST" action="">
+            @csrf
+            <p class="fs-13 text-dark mb-2">Denying entry for: <strong id="denyVisitorName"></strong></p>
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.rejection_reason') }} <span class="text-danger">*</span></label>
+                <textarea name="denied_reason" class="form-control fs-13" rows="3" required placeholder="Security concern, invalid authorization, restricted area..."></textarea>
+            </div>
+            <x-ui.checkbox 
+                name="blacklist_visitor" 
+                id="modalBlacklistCheck" 
+                value="1" 
+                :label="__('visitor.blacklist_visitor')" 
+            />
+
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
+                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-danger px-3 fw-semibold">
+                    <i class="feather-slash me-1"></i> Confirm Denial
+                </button>
+            </div>
+        </form>
+    </x-ui.modal>
+
+    <!-- Modal 4: Report Incident Modal -->
+    <x-ui.modal 
+        id="reportIncidentModal" 
+        title="<i class='feather-alert-octagon text-danger me-2'></i> {{ __('visitor.report_incident') }} - <span id='incidentPassNumber'></span>" 
+        centered 
+        :showFooter="false">
+        <form id="reportIncidentForm" method="POST" action="">
+            @csrf
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.incident_details') }} <span class="text-danger">*</span></label>
+                <textarea name="incident_details" class="form-control fs-13" rows="4" required placeholder="Detailed notes about unauthorized access, misconduct, damage, or security alert..."></textarea>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
+                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-dark px-3 fw-semibold">
+                    <i class="feather-alert-circle me-1"></i> Submit Incident
+                </button>
+            </div>
+        </form>
+    </x-ui.modal>
+
+    <!-- Smart Visual Import Modal -->
     @include('modules.visitor.partials.smart-import-modal')
 
 @endsection
 
 @push('scripts')
 <script>
+    function setVisitorType(type, el) {
+        document.querySelectorAll('.visitor-type-card').forEach(c => c.classList.remove('active'));
+        if (el) el.classList.add('active');
+        const input = document.getElementById('drawerVisitorTypeInput');
+        if (input) input.value = type;
+    }
+
+    function toggleAdditionalVisitorFields() {
+        const container = document.getElementById('additionalVisitorFieldsContainer');
+        const textSpan = document.getElementById('toggleAdditionalFieldsText');
+        const icon = document.getElementById('toggleAdditionalFieldsIcon');
+        const btn = document.getElementById('toggleAdditionalVisitorFieldsBtn');
+        
+        if (!container) return;
+
+        if (container.classList.contains('d-none')) {
+            container.classList.remove('d-none');
+            if (textSpan) textSpan.textContent = '- Hide Additional Details';
+            if (icon) icon.className = 'feather-minus-circle fs-13';
+        } else {
+            container.classList.add('d-none');
+            if (textSpan) textSpan.textContent = '+ Additional Details (Vehicle, ID Proof, Assets & Safety)';
+            if (icon) icon.className = 'feather-plus-circle fs-13';
+        }
+    }
+
     let drawerVideoStream = null;
 
     function startWebcamDrawer() {
@@ -833,8 +1188,6 @@
                 .catch(function(err) {
                     alert('Camera access error: ' + err.message);
                 });
-        } else {
-            alert('Camera not supported in this browser.');
         }
     }
 
@@ -888,140 +1241,262 @@
         }
     }
 
-    let drawerLookupTimer = null;
-    let isVisitorAutoFilled = false;
+    function toggleBlacklistOverride(isAllowed) {
+        const submitBtn = document.getElementById('drawerSubmitBtn');
+        const reasonGroup = document.getElementById('drawerBlacklistOverrideReasonGroup');
+        const reasonInput = document.getElementById('drawerBlacklistOverrideReasonInput');
+        const blacklistAlert = document.getElementById('blacklistedVisitorAlertDrawer');
 
-    function clearAutoFilledVisitorFields() {
-        if (!isVisitorAutoFilled) return;
+        if (!blacklistAlert || blacklistAlert.classList.contains('d-none')) {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.className = 'btn btn-primary px-4 fw-bold';
+                submitBtn.innerHTML = '<i class="feather-check me-1"></i> {{ __("visitor.new_visitor_pass") }}';
+            }
+            return;
+        }
 
-        const fullName = document.getElementById('drawerVisitorFullName');
-        if (fullName) fullName.value = '';
-
-        const email = document.getElementById('drawerVisitorEmail');
-        if (email) email.value = '';
-
-        const company = document.getElementById('drawerVisitorCompany');
-        if (company) company.value = '';
-
-        const designation = document.getElementById('drawerVisitorDesignation');
-        if (designation) designation.value = '';
-
-        const idType = document.getElementById('drawerVisitorIdType');
-        if (idType) idType.value = '';
-
-        const idNum = document.getElementById('drawerVisitorIdNumber');
-        if (idNum) idNum.value = '';
-
-        const photoData = document.getElementById('drawerVisitorPhotoData');
-        if (photoData) photoData.value = '';
-
-        const photoPreview = document.getElementById('drawerPhotoPreview');
-        if (photoPreview) photoPreview.src = '';
-
-        const photoPreviewContainer = document.getElementById('drawerPhotoPreviewContainer');
-        if (photoPreviewContainer) photoPreviewContainer.classList.add('d-none');
-
-        const btnStartCamera = document.getElementById('btnStartCameraDrawer');
-        if (btnStartCamera) btnStartCamera.classList.remove('d-none');
-
-        const btnRetake = document.getElementById('btnRetakePhotoDrawer');
-        if (btnRetake) btnRetake.classList.add('d-none');
-
-        const alertBox = document.getElementById('returningVisitorAlertDrawer');
-        if (alertBox) alertBox.classList.add('d-none');
-
-        isVisitorAutoFilled = false;
+        if (isAllowed) {
+            if (reasonGroup) reasonGroup.classList.remove('d-none');
+            if (reasonInput) reasonInput.required = true;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.className = 'btn btn-warning text-dark px-4 fw-bold';
+                submitBtn.innerHTML = '<i class="feather-shield text-dark me-1"></i> Issue Pass (Override Authorized)';
+            }
+        } else {
+            if (reasonGroup) reasonGroup.classList.add('d-none');
+            if (reasonInput) {
+                reasonInput.required = false;
+                reasonInput.value = '';
+            }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.className = 'btn btn-danger px-4 fw-bold disabled';
+                submitBtn.innerHTML = '<i class="feather-slash me-1"></i> {{ __("visitor.entry_prohibited") }}';
+            }
+        }
     }
 
-    function debounceVisitorLookupDrawer(phone) {
+    let drawerLookupTimer = null;
+
+    function debounceVisitorLookupDrawer(val, fieldType) {
         clearTimeout(drawerLookupTimer);
         const spinner = document.getElementById('phoneLookupSpinnerDrawer');
         const alertBox = document.getElementById('returningVisitorAlertDrawer');
+        const blacklistAlert = document.getElementById('blacklistedVisitorAlertDrawer');
 
-        const trimmed = (phone || '').trim();
-
-        if (trimmed.length < 5) {
+        if (!val || val.length < 4) {
             if (alertBox) alertBox.classList.add('d-none');
-            if (spinner) spinner.classList.add('d-none');
-            clearAutoFilledVisitorFields();
+            if (blacklistAlert) blacklistAlert.classList.add('d-none');
+            toggleBlacklistOverride(true);
             return;
         }
 
         if (spinner) spinner.classList.remove('d-none');
 
-        drawerLookupTimer = setTimeout(() => {
-            fetch(`/visitor/lookup?phone=${encodeURIComponent(trimmed)}`)
-                .then(res => res.json())
-                .then(data => {
+        drawerLookupTimer = setTimeout(function() {
+            let queryParams = {};
+            queryParams[fieldType] = val;
+            const url = '{{ route("visitor.lookup") }}?' + new URLSearchParams(queryParams).toString();
+
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(r => r.json())
+                .then(res => {
                     if (spinner) spinner.classList.add('d-none');
-                    if (data.found && data.visitor) {
-                        const v = data.visitor;
-                        isVisitorAutoFilled = true;
-
-                        if (alertBox) {
-                            const visitsText = document.getElementById('returningVisitorVisitsTextDrawer');
-                            if (visitsText) visitsText.textContent = `(Visits: ${v.total_visits || 1})`;
-                            alertBox.classList.remove('d-none');
+                    if (res.found && res.visitor) {
+                        const v = res.visitor;
+                        if (document.getElementById('drawerVisitorFullName') && !document.getElementById('drawerVisitorFullName').value) {
+                            document.getElementById('drawerVisitorFullName').value = v.full_name || '';
                         }
-
-                        // Auto-fill form fields
-                        const fullName = document.getElementById('drawerVisitorFullName');
-                        if (fullName) fullName.value = v.full_name || '';
-
-                        const email = document.getElementById('drawerVisitorEmail');
-                        if (email) email.value = v.email || '';
-
-                        const company = document.getElementById('drawerVisitorCompany');
-                        if (company) company.value = v.company_name || '';
-
-                        const designation = document.getElementById('drawerVisitorDesignation');
-                        if (designation) designation.value = v.designation || '';
-
-                        const idType = document.getElementById('drawerVisitorIdType');
-                        if (idType) idType.value = v.id_proof_type || '';
-
-                        const idNum = document.getElementById('drawerVisitorIdNumber');
-                        if (idNum) idNum.value = v.id_proof_number || '';
-
+                        if (document.getElementById('drawerVisitorEmail') && !document.getElementById('drawerVisitorEmail').value) {
+                            document.getElementById('drawerVisitorEmail').value = v.email || '';
+                        }
+                        if (document.getElementById('drawerVisitorCompany') && !document.getElementById('drawerVisitorCompany').value) {
+                            document.getElementById('drawerVisitorCompany').value = v.company_name || '';
+                        }
+                        if (document.getElementById('drawerVisitorDesignation') && !document.getElementById('drawerVisitorDesignation').value) {
+                            document.getElementById('drawerVisitorDesignation').value = v.designation || '';
+                        }
+                        if (document.getElementById('drawerVisitorTypeSelect') && v.visitor_type) {
+                            document.getElementById('drawerVisitorTypeSelect').value = v.visitor_type;
+                        }
                         if (v.photo_url) {
                             const photoData = document.getElementById('drawerVisitorPhotoData');
-                            if (photoData) photoData.value = v.photo_url;
-
                             const photoPreview = document.getElementById('drawerPhotoPreview');
-                            if (photoPreview) photoPreview.src = v.photo_url;
-
                             const photoPreviewContainer = document.getElementById('drawerPhotoPreviewContainer');
+                            if (photoData) photoData.value = v.photo_url;
+                            if (photoPreview) photoPreview.src = v.photo_url;
                             if (photoPreviewContainer) photoPreviewContainer.classList.remove('d-none');
+                        }
 
-                            const webcamContainer = document.getElementById('drawerWebcamContainer');
-                            if (webcamContainer) webcamContainer.classList.add('d-none');
-
-                            const btnRetake = document.getElementById('btnRetakePhotoDrawer');
-                            if (btnRetake) btnRetake.classList.remove('d-none');
-
-                            const btnStartCamera = document.getElementById('btnStartCameraDrawer');
-                            if (btnStartCamera) btnStartCamera.classList.add('d-none');
+                        if (v.is_blacklisted) {
+                            if (alertBox) alertBox.classList.add('d-none');
+                            if (blacklistAlert) {
+                                blacklistAlert.classList.remove('d-none');
+                                const reasonTxt = document.getElementById('blacklistedReasonTextDrawer');
+                                if (reasonTxt) reasonTxt.textContent = v.blacklist_reason || 'Security Restriction';
+                            }
+                            const overrideCheck = document.getElementById('drawerBlacklistOverrideCheck');
+                            if (overrideCheck) overrideCheck.checked = false;
+                            toggleBlacklistOverride(false);
+                        } else {
+                            if (blacklistAlert) blacklistAlert.classList.add('d-none');
+                            if (alertBox) {
+                                alertBox.classList.remove('d-none');
+                                const txt = document.getElementById('returningVisitorVisitsTextDrawer');
+                                if (txt) txt.textContent = (v.total_visits || 1) + ' Visits';
+                            }
+                            toggleBlacklistOverride(true);
                         }
                     } else {
-                        // Phone changed and no matching visitor found -> clear auto-filled info
-                        clearAutoFilledVisitorFields();
+                        if (blacklistAlert) blacklistAlert.classList.add('d-none');
+                        if (alertBox) alertBox.classList.add('d-none');
+                        toggleBlacklistOverride(true);
                     }
                 })
                 .catch(() => {
                     if (spinner) spinner.classList.add('d-none');
                 });
-        }, 300);
+        }, 350);
     }
 
-    const drawerEl = document.getElementById('newVisitorDrawer');
-    if (drawerEl) {
-        drawerEl.addEventListener('hide.bs.offcanvas', function () {
-            if (drawerVideoStream) {
-                drawerVideoStream.getTracks().forEach(track => track.stop());
-                drawerVideoStream = null;
+    // Modal Helpers
+    function openCheckoutModal(id, passNo, name) {
+        document.getElementById('visitorCheckoutForm').action = '/visitor/passes/' + id + '/check-out';
+        document.getElementById('checkoutPassNumber').textContent = passNo;
+        document.getElementById('checkoutVisitorName').textContent = name;
+        new bootstrap.Modal(document.getElementById('visitorCheckoutModal')).show();
+    }
+
+    function openExtendModal(id, passNo, currentDuration) {
+        document.getElementById('extendVisitForm').action = '/visitor/passes/' + id + '/extend';
+        document.getElementById('extendPassNumber').textContent = passNo;
+        new bootstrap.Modal(document.getElementById('extendVisitModal')).show();
+    }
+
+    function openDenyModal(id, passNo, name) {
+        document.getElementById('denyEntryForm').action = '/visitor/passes/' + id + '/deny-entry';
+        document.getElementById('denyPassNumber').textContent = passNo;
+        document.getElementById('denyVisitorName').textContent = name;
+        new bootstrap.Modal(document.getElementById('denyEntryModal')).show();
+    }
+
+    function openIncidentModal(id, passNo) {
+        document.getElementById('reportIncidentForm').action = '/visitor/passes/' + id + '/report-incident';
+        document.getElementById('incidentPassNumber').textContent = passNo;
+        new bootstrap.Modal(document.getElementById('reportIncidentModal')).show();
+    }
+
+    // Common Component Client-Side Validation Error Handlers
+    function showFieldError(field, message) {
+        if (!field) return;
+        field.classList.add('is-invalid');
+        const group = field.closest('.odoo-field-group') || field.parentElement;
+        let errEl = group.querySelector('.invalid-feedback.dynamic-error-feedback');
+        if (!errEl) {
+            errEl = document.createElement('div');
+            errEl.className = 'invalid-feedback dynamic-error-feedback d-block fs-11 mt-1 text-danger';
+            group.appendChild(errEl);
+        }
+        errEl.innerHTML = '<i class="feather-alert-circle me-1"></i> ' + message;
+    }
+
+    function clearFieldError(field) {
+        if (!field) return;
+        field.classList.remove('is-invalid');
+        const group = field.closest('.odoo-field-group') || field.parentElement;
+        const errEl = group.querySelector('.invalid-feedback.dynamic-error-feedback');
+        if (errEl) {
+            errEl.remove();
+        }
+    }
+
+    $(document).ready(function() {
+        // Real-time error clearance on typing / selecting
+        $(document).on('input change', '#newVisitorDrawerForm input, #newVisitorDrawerForm select, #newVisitorDrawerForm textarea', function() {
+            if (this.value && this.value.trim() !== '') {
+                clearFieldError(this);
             }
         });
-    }
+
+        // Intercept form submit and validate with common theme error component
+        const drawerForm = document.getElementById('newVisitorDrawerForm');
+        if (drawerForm) {
+            drawerForm.addEventListener('submit', function(e) {
+                let hasErrors = false;
+                let firstErrField = null;
+
+                // Remove existing dynamic feedback
+                drawerForm.querySelectorAll('.invalid-feedback.dynamic-error-feedback').forEach(el => el.remove());
+                drawerForm.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+                // Validate Phone Number
+                const phoneInput = document.getElementById('drawerVisitorPhone');
+                if (phoneInput && !phoneInput.value.trim()) {
+                    hasErrors = true;
+                    showFieldError(phoneInput, '{{ __("visitor.phone_number") }} is required.');
+                    if (!firstErrField) firstErrField = phoneInput;
+                }
+
+                // Validate Visitor Name
+                const nameInput = document.getElementById('drawerVisitorFullName');
+                if (nameInput && !nameInput.value.trim()) {
+                    hasErrors = true;
+                    showFieldError(nameInput, '{{ __("visitor.visitor_name") }} is required.');
+                    if (!firstErrField) firstErrField = nameInput;
+                }
+
+                // Validate Visitor Type
+                const typeSelect = document.getElementById('drawerVisitorTypeSelect');
+                if (typeSelect && !typeSelect.value.trim()) {
+                    hasErrors = true;
+                    showFieldError(typeSelect, '{{ __("visitor.visitor_type") }} is required.');
+                    if (!firstErrField) firstErrField = typeSelect;
+                }
+
+                // Validate Host
+                const hostSelect = document.getElementById('drawerHostUserId');
+                if (hostSelect && !hostSelect.value.trim()) {
+                    hasErrors = true;
+                    showFieldError(hostSelect, '{{ __("visitor.select_host") }} is required.');
+                    if (!firstErrField) firstErrField = hostSelect;
+                }
+
+                // Validate Purpose
+                const purposeSelect = document.getElementById('drawerPurpose');
+                if (purposeSelect && !purposeSelect.value.trim()) {
+                    hasErrors = true;
+                    showFieldError(purposeSelect, '{{ __("visitor.purpose_of_visit") }} is required.');
+                    if (!firstErrField) firstErrField = purposeSelect;
+                }
+
+                // Validate Blacklist Override Reason if blacklist banner is active
+                const blacklistAlert = document.getElementById('blacklistedVisitorAlertDrawer');
+                const overrideCheck = document.getElementById('drawerBlacklistOverrideCheck');
+                const overrideReason = document.getElementById('drawerBlacklistOverrideReasonInput');
+                if (blacklistAlert && !blacklistAlert.classList.contains('d-none')) {
+                    if (!overrideCheck || !overrideCheck.checked) {
+                        hasErrors = true;
+                        if (!firstErrField) firstErrField = overrideCheck;
+                    } else if (overrideReason && !overrideReason.value.trim()) {
+                        hasErrors = true;
+                        showFieldError(overrideReason, 'Authorization override reason is required.');
+                        if (!firstErrField) firstErrField = overrideReason;
+                    }
+                }
+
+                if (hasErrors) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (firstErrField) {
+                        firstErrField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        firstErrField.focus();
+                    }
+                    return false;
+                }
+            });
+        }
+    });
 </script>
 @endpush
-

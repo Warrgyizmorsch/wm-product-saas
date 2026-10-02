@@ -168,25 +168,25 @@
             $visitorPassesTabs = [
                 [
                     'id' => 'tab-all-passes',
-                    'label' => 'All Passes (' . ($counts['all'] ?? $passes->total()) . ')',
+                    'label' => __('visitor.all_passes') . ' (' . ($counts['all'] ?? $passes->total()) . ')',
                     'url' => route('visitor.passes.index', array_merge(request()->except('status', 'page'), [])),
                     'active' => empty($status),
                 ],
                 [
                     'id' => 'tab-checked-in',
-                    'label' => 'Inside Premises (' . ($counts['checked_in'] ?? 0) . ')',
+                    'label' => __('visitor.inside_premises') . ' (' . ($counts['checked_in'] ?? 0) . ')',
                     'url' => route('visitor.passes.index', array_merge(request()->except('status', 'page'), ['status' => 'Checked-In'])),
                     'active' => $status === 'Checked-In',
                 ],
                 [
                     'id' => 'tab-expected',
-                    'label' => 'Expected (' . ($counts['expected'] ?? 0) . ')',
+                    'label' => __('visitor.expected') . ' (' . ($counts['expected'] ?? 0) . ')',
                     'url' => route('visitor.passes.index', array_merge(request()->except('status', 'page'), ['status' => 'Expected'])),
                     'active' => $status === 'Expected',
                 ],
                 [
                     'id' => 'tab-checked-out',
-                    'label' => 'Checked-Out (' . ($counts['checked_out'] ?? 0) . ')',
+                    'label' => __('visitor.checked_out') . ' (' . ($counts['checked_out'] ?? 0) . ')',
                     'url' => route('visitor.passes.index', array_merge(request()->except('status', 'page'), ['status' => 'Checked-Out'])),
                     'active' => $status === 'Checked-Out',
                 ],

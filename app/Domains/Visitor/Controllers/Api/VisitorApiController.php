@@ -96,6 +96,8 @@ class VisitorApiController extends Controller
             'check_in_at' => now(),
         ]);
 
+        $this->visitorService->notifyHost($pass, 'checked_in');
+
         return response()->json([
             'success' => true,
             'message' => 'Visitor checked in successfully.',
@@ -115,6 +117,8 @@ class VisitorApiController extends Controller
             'status'       => 'Checked-Out',
             'check_out_at' => now(),
         ]);
+
+        $this->visitorService->notifyHost($pass, 'checked_out');
 
         return response()->json([
             'success' => true,

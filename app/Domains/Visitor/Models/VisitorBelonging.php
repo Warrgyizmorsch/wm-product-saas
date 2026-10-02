@@ -20,7 +20,11 @@ class VisitorBelonging extends Model
         'brand_model',
         'serial_number',
         'quantity',
+        'is_returnable',
+        'gate_pass_number',
         'is_verified_on_exit',
+        'exit_verified_by',
+        'exit_verified_at',
         'remarks',
     ];
 
@@ -28,7 +32,9 @@ class VisitorBelonging extends Model
     {
         return [
             'quantity'            => 'integer',
+            'is_returnable'       => 'boolean',
             'is_verified_on_exit' => 'boolean',
+            'exit_verified_at'    => 'datetime',
         ];
     }
 
