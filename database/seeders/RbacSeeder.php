@@ -755,6 +755,8 @@ class RbacSeeder extends Seeder
             ['name' => 'projects.changerequests.approve', 'module' => 'projects', 'entity' => 'changerequests', 'action' => 'approve'],
             ['name' => 'projects.billing.view', 'module' => 'projects', 'entity' => 'billing', 'action' => 'view'],
             ['name' => 'projects.billing.generate_invoice', 'module' => 'projects', 'entity' => 'billing', 'action' => 'generate_invoice'],
+            ['name' => 'projects.dashboard.view', 'module' => 'projects', 'entity' => 'dashboard', 'action' => 'view'],
+            ['name' => 'projects.reports.view', 'module' => 'projects', 'entity' => 'reports', 'action' => 'view'],
             ['name' => 'accounting.chart_of_accounts.view', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'view'],
 
             ['name' => 'accounting.chart_of_accounts.create', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'create'],

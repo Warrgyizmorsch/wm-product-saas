@@ -293,14 +293,14 @@
                 </div>
                 <div class="row erp-form-row mb-2">
                     <div class="col-md-4"><span
-                            class="fw-semibold text-muted fs-13">{{ __('projects.budget_amount') }}:</span></div>
+                            class="fw-semibold text-muted fs-13">{{ __('projects.budget_amount') }} ({{ active_currency_symbol() }}):</span></div>
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
                                 <x-ui.inline-edit field="budget_amount" :value="$project->budget_amount"
-                                    :url="route('projects.field', $project)" type="number" :label="__('projects.budget_amount')" />
+                                    :url="route('projects.field', $project)" type="number" :label="__('projects.budget_amount') . ' (' . active_currency_symbol() . ')'" />
                             @else
-                                {{ $project->budget_amount !== null ? number_format((float) $project->budget_amount, 2) : '—' }}
+                                {{ $project->budget_amount !== null ? format_currency($project->budget_amount) : '—' }}
                             @endif
                         </span>
                     </div>

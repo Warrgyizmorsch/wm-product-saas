@@ -127,10 +127,10 @@ flowchart TD
 ### Stage 8: Timeline, Scheduling & Gantt Planning
 - **Action:** View project schedule on an interactive Gantt chart.
 - **Capabilities:**
-  - Milestone timeline planning.
-  - Critical Path Method (CPM) calculation identifying non-slack tasks.
-  - Resource workload heatmaps.
-- **Status:** **TARGET REQUIRED (CURRENTLY MISSING).**
+  - Interactive Gantt timeline visualization with milestone and task rows.
+  - Critical Path Method (CPM) calculation calculating early start/finish, late start/finish, total float, and free float.
+  - Isolated and Ripple drag-and-drop rescheduling with dependency boundary protection.
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 6).**
 
 ### Stage 9: Task Execution & Status Transitions
 - **Workflow Transitions:**
@@ -146,39 +146,42 @@ flowchart TD
 - **Action:** Team members log daily work hours against tasks.
 - **Fields:** User, Project, Task, Date, Hours, Start/End Time, Billable (Yes/No), Description.
 - **Automations:** Logged hours accumulate in `Task.actual_hours` upon approval.
-- **Status:** **TARGET REQUIRED (CURRENTLY MISSING).**
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 3).**
 
 ### Stage 11: Defect & Issue Management
 - **Action:** QA/Reviewers log bugs found during development or review.
 - **Lifecycle:** `Open` -> `Assigned` -> `In Progress` -> `Resolved` -> Retest.
   - **Retest Fails:** Transitions back to `In Progress`.
   - **Retest Passes:** Transitions to `Closed`.
-- **Status:** **TARGET REQUIRED (CURRENTLY MISSING).**
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 4).**
 
 ### Stage 12: Timesheet Review & Approval
 - **Action:** Project Manager reviews submitted timesheets in an approval queue.
 - **Outcomes:**
   - **Approve:** Locks the timesheet row, updates task actuals, and marks hours eligible for billing.
   - **Reject:** Returns timesheet to resource with feedback remarks for correction.
-- **Status:** **TARGET REQUIRED (CURRENTLY MISSING).**
+- **Approval UX:** Rendered with standard Production-consistent approval notice banners and role-based action buttons.
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 3).**
 
 ### Stage 13: Client Review / UAT (User Acceptance Testing)
 - **Gatekeeper:** Can only be initiated once **100% of project milestones are Completed** (at least 1 milestone required). Enforces at most 1 active `Pending` review.
 - **Action:** Formal review record created with Client Reviewer and Target Sign-off Date. Always initializes in `Pending` status.
+- **Approval UX:** Rendered with standard Production-consistent pending approval banner.
 - **Outcomes:**
   - **Approved:** Unlocks billing and project closure. Review becomes immutable.
   - **Rework Required:** Mandatory linkage: Change Requests created to resolve rework must reference this review (`project_review_id`).
 - **Evidence:** Formal client acceptance documents attached via polymorphic `ProjectDocument`.
-- **Status:** **CURRENTLY IMPLEMENTED (PHASE 5 COMPLETED & VERIFIED).**
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 5).**
 
 ### Stage 14: Change Request (CR) Governance
 - **Trigger:** Initiated when client requests scope additions (standalone CR) or UAT indicates rework (`Rework Required` review linked).
 - **Action:** Log CR with Impact Analysis (Budget Delta, Hours Delta, Schedule Impact). Sequential format: `PRJ-XXXX-CR-001`.
+- **Approval UX:** Rendered with standard Production-consistent pending approval banner.
 - **Outcomes:**
   - **Approved:** Automatically updates Project Budget (`budget_amount`, `budget_hours`) transactionally with pre/post activity logging. Enforces separation of duties (requester cannot approve own CR unless PM/Owner).
   - **Rejected:** Scope is rejected with mandatory rejection remarks.
   - **Implemented:** Explicit operational action by authorized PM/Owner once approved scope is verified.
-- **Status:** **CURRENTLY IMPLEMENTED (PHASE 5 COMPLETED & VERIFIED).**
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 5).**
 
 ### Stage 15: Project Billing & Invoicing
 - **Action:** Generate commercial customer invoices based on agreed billing model:
@@ -187,7 +190,8 @@ flowchart TD
   - **Task Based:** Invoices triggered upon task sign-off.
   - **User / Time Based (T&M):** Aggregates approved billable timesheets within date range.
 - **Integration:** Directly creates standard Sales Invoices (`App\Domains\Sales\Models\Invoice`), which automatically trigger accounting General Ledger journal entries.
-- **Status:** **TARGET REQUIRED (CURRENTLY MISSING IN PROJECTS; INVOICE INFRASTRUCTURE EXISTS IN SALES).**
+- **Dynamic Tenant Currency:** Invoices and billing modals format amounts dynamically via `format_currency()` and `active_currency_symbol()`.
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 7).**
 
 ### Stage 16: Controlled Project Closure
 - **Prerequisite Validation Gates:**
@@ -197,9 +201,9 @@ flowchart TD
   4. Client UAT Review must be `Approved`.
   5. All approved billable time logs must be marked invoiced.
 - **Action:** Project Manager triggers "Close Project".
-- **Fields Recorded:** `closure_date`, `client_approval_ref`, `final_remarks`, `status = Closed`.
+- **Fields Recorded:** `closure_date`, `closure_status`, `client_approval_ref`, `final_remarks`, `status = Closed`.
 - **Result:** Project is marked read-only. No further tasks, timesheets, or expenses can be logged.
-- **Status:** **TARGET REQUIRED (CURRENTLY MISSING GATES & CLOSURE METADATA).**
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 8).**
 
 ---
 
@@ -209,17 +213,17 @@ flowchart TD
 |---|---|---|---|
 | **1. Fast Creation** | Implemented (Modal -> Detail) | Implemented (Modal -> Detail) | None (Preserve intentional UX) |
 | **2. Metadata Setup** | Implemented (Inline Edits) | Implemented (Inline Edits) | None |
-| **3. Team Staffing** | Implemented (ProjectMember) | Implemented + Capacity tracking | Add capacity / allocation % |
-| **4. Milestones** | Implemented (Manual %) | Implemented + Task rollup % | Auto-calculate milestone % from tasks |
+| **3. Team Staffing** | Implemented (ProjectMember) | Implemented + Rate tracking | None |
+| **4. Milestones** | Implemented (Dynamic %) | Implemented + Task rollup % | None |
 | **5. Task Lists** | Implemented (Reorderable) | Implemented | None |
-| **6. Tasks & Subtasks** | Implemented (Subtasks boolean) | Full Subtask attributes | Add subtask dates, hours, and status |
-| **7. Dependencies** | Cycle Detection Implemented | FS/SS/FF Types + Transition Blocking | Enforce blocker in `updateStatus()` |
-| **8. Scheduling / Gantt** | Missing | Interactive Gantt + Critical Path | Build Gantt view and CPM engine |
+| **6. Tasks & Subtasks** | Implemented (Subtasks full) | Full Subtask attributes | None |
+| **7. Dependencies** | Implemented (Types + FSM) | FS/SS/FF/SF Types + Gating | None |
+| **8. Scheduling / Gantt** | Implemented (Gantt + CPM) | Interactive Gantt + Critical Path | None (Completed in Phase 6) |
 | **9. Execution & Status** | Implemented (FSM transitions) | Implemented | None |
-| **10. Time Tracking** | Implemented (Phase 3) | Daily time entry against tasks | None (Completed & Verified) |
-| **11. Issue Management** | Implemented (Phase 4) | Defect tracking with retest loop | None (Completed & Verified) |
-| **12. Timesheet Approval** | Implemented (Phase 3) | PM approval queue | None (Completed & Verified) |
-| **13. Client UAT** | Implemented (Phase 5) | Milestone gate + Sign-off | None (Completed & Verified) |
-| **14. Change Requests** | Implemented (Phase 5) | Impact analysis + Budget adjust | None (Completed & Verified) |
-| **15. Billing Integration** | Missing in PM | Sales Invoice generation | Bridge approved timesheets -> Sales Invoices |
-| **16. Project Closure** | Unvalidated Status Move | 5 Strict Validation Gates | Add closure fields & validation rules |
+| **10. Time Tracking** | Implemented (TimeLog model) | Daily time entry against tasks | None (Completed in Phase 3) |
+| **11. Issue Management** | Implemented (Retest lifecycle) | Defect tracking with retest loop | None (Completed in Phase 4) |
+| **12. Timesheet Approval** | Implemented (Queue + UX) | PM approval queue + Banner | None (Completed in Phase 3) |
+| **13. Client UAT** | Implemented (Gate + Evidence) | Milestone gate + Sign-off + Banner | None (Completed in Phase 5) |
+| **14. Change Requests** | Implemented (Impact + Budget) | Impact analysis + Budget adjust | None (Completed in Phase 5) |
+| **15. Billing Integration** | Implemented (Sales Invoices) | Sales Invoice generation + Currency | None (Completed in Phase 7) |
+| **16. Project Closure** | Implemented (5 Strict Gates) | 5 Strict Validation Gates | None (Completed in Phase 8) |

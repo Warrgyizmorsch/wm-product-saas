@@ -9,7 +9,7 @@
                     </div>
                     <div>
                         <span class="text-muted fs-12 fw-medium text-uppercase d-block">{{ __('projects.total_invoiced') }}</span>
-                        <h4 class="fw-bold text-dark mb-0 mt-1">₹{{ number_format($billingSummary['total_invoiced'] ?? 0, 2) }}</h4>
+                        <h4 class="fw-bold text-dark mb-0 mt-1">{{ format_currency($billingSummary['total_invoiced'] ?? 0) }}</h4>
                     </div>
                 </div>
             </div>
@@ -23,7 +23,7 @@
                     </div>
                     <div>
                         <span class="text-muted fs-12 fw-medium text-uppercase d-block">{{ __('projects.total_paid') }}</span>
-                        <h4 class="fw-bold text-success mb-0 mt-1">₹{{ number_format($billingSummary['total_paid'] ?? 0, 2) }}</h4>
+                        <h4 class="fw-bold text-success mb-0 mt-1">{{ format_currency($billingSummary['total_paid'] ?? 0) }}</h4>
                     </div>
                 </div>
             </div>
@@ -37,7 +37,7 @@
                     </div>
                     <div>
                         <span class="text-muted fs-12 fw-medium text-uppercase d-block">{{ __('projects.balance_due') }}</span>
-                        <h4 class="fw-bold text-danger mb-0 mt-1">₹{{ number_format($billingSummary['balance_due'] ?? 0, 2) }}</h4>
+                        <h4 class="fw-bold text-danger mb-0 mt-1">{{ format_currency($billingSummary['balance_due'] ?? 0) }}</h4>
                     </div>
                 </div>
             </div>
@@ -51,7 +51,7 @@
                     </div>
                     <div>
                         <span class="text-muted fs-12 fw-medium text-uppercase d-block">{{ __('projects.unbilled_work') }}</span>
-                        <h4 class="fw-bold text-info mb-0 mt-1">₹{{ number_format($billingSummary['unbilled_total'] ?? 0, 2) }}</h4>
+                        <h4 class="fw-bold text-info mb-0 mt-1">{{ format_currency($billingSummary['unbilled_total'] ?? 0) }}</h4>
                     </div>
                 </div>
             </div>
@@ -143,10 +143,10 @@
                                         {{ $invoice->status }}
                                     </x-ui.badge>
                                 </td>
-                                <td class="text-end fw-semibold">₹{{ number_format((float)$invoice->total_amount, 2) }}</td>
-                                <td class="text-end text-success">₹{{ number_format((float)$invoice->amount_paid, 2) }}</td>
+                                <td class="text-end fw-semibold">{{ format_currency($invoice->total_amount) }}</td>
+                                <td class="text-end text-success">{{ format_currency($invoice->amount_paid) }}</td>
                                 <td class="text-end fw-bold {{ $invoice->balance_due > 0 ? 'text-danger' : 'text-muted' }}">
-                                    ₹{{ number_format((float)$invoice->balance_due, 2) }}
+                                    {{ format_currency($invoice->balance_due) }}
                                 </td>
                                 <td class="text-end pe-3">
                                     <x-ui.action-dropdown id="invoiceActions-{{ $invoice->id }}">

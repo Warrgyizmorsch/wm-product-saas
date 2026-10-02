@@ -169,19 +169,19 @@
                                 @click="openRescheduleModal(task)"
                                 @mouseenter="hoveredTaskId = task.id"
                                 @mouseleave="hoveredTaskId = null"
-                                :title="'{{ __('projects.reschedule_task') }}: ' + task.task_code + ' - ' + task.title">
-                                <div style="width: 85px;" class="font-monospace text-primary fw-semibold text-truncate" :title="task.task_code" x-text="task.task_code"></div>
-                                <div class="flex-grow-1 text-truncate fw-medium text-dark pe-2" :title="task.title" x-text="task.title"></div>
+                                x-bind:title="'{{ __('projects.reschedule_task') }}: ' + task.task_code + ' - ' + task.title">
+                                <div style="width: 85px;" class="font-monospace text-primary fw-semibold text-truncate" x-bind:title="task.task_code" x-text="task.task_code"></div>
+                                <div class="flex-grow-1 text-truncate fw-medium text-dark pe-2" x-bind:title="task.title" x-text="task.title"></div>
                                 <div style="width: 60px;" class="text-center text-muted" x-text="task.duration + 'd'"></div>
                                 <div style="width: 65px;" class="text-center">
                                     <template x-if="task.is_completed || task.status === 'Completed'">
                                         <span class="badge bg-success text-white py-1 px-1 fs-10">{{ __('projects.statuses.Completed') }}</span>
                                     </template>
                                     <template x-if="!(task.is_completed || task.status === 'Completed') && task.is_critical">
-                                        <span class="badge bg-danger text-white py-1 px-1 fs-10" :title="'ES: ' + task.early_start + ', LS: ' + task.late_start">0d Crit</span>
+                                        <span class="badge bg-danger text-white py-1 px-1 fs-10" x-bind:title="'ES: ' + task.early_start + ', LS: ' + task.late_start">0d Crit</span>
                                     </template>
                                     <template x-if="!(task.is_completed || task.status === 'Completed') && !task.is_critical">
-                                        <span class="badge bg-soft-secondary text-secondary py-1 px-1 fs-10" :title="'ES: ' + task.early_start + ', LS: ' + task.late_start" x-text="'+' + task.total_float + 'd'"></span>
+                                        <span class="badge bg-soft-secondary text-secondary py-1 px-1 fs-10" x-bind:title="'ES: ' + task.early_start + ', LS: ' + task.late_start" x-text="'+' + task.total_float + 'd'"></span>
                                     </template>
                                 </div>
                             </div>
@@ -253,7 +253,7 @@
                                         @dragend="onDragEnd($event)"
                                         @mouseenter="hoveredTaskId = task.id"
                                         @mouseleave="hoveredTaskId = null"
-                                        :title="getTaskTooltip(task)">
+                                        x-bind:title="getTaskTooltip(task)">
 
                                         {{-- Task Code / Title Inside Bar --}}
                                         <div class="d-flex align-items-center gap-1 text-truncate pe-1">

@@ -334,7 +334,7 @@ The application has an extensive library of 44 pre-built `<x-ui.*>` Blade compon
 23. `projects.documents.download` (Phase 4)
 24. `projects.documents.delete` (Phase 4)
 
-### 13.2 Future Permissions Required (By Phase)
+### 13.2 Additional Implemented & Seeded Permissions (Phases 5–10)
 - **Phase 5 (UAT & Change Requests):**
   - `projects.reviews.view`
   - `projects.reviews.manage`
@@ -346,7 +346,8 @@ The application has an extensive library of 44 pre-built `<x-ui.*>` Blade compon
   - `projects.billing.generate`
 - **Phase 8 (Project Closure):**
   - `projects.projects.close`
-- **Phase 10 (Reports):**
+- **Phase 10 (Dashboard & Reports):**
+  - `projects.dashboard.view`
   - `projects.reports.view`
 
 ---
@@ -368,11 +369,11 @@ The application has an extensive library of 44 pre-built `<x-ui.*>` Blade compon
 | **Projects** | `TaskList`, `Task`, `SubTask` | Project Management | WBS task hierarchy & execution |
 | **Projects** | `TaskDependency` | Project Management | Graph relationships & gating logic |
 | **Projects** | `ActivityLog` | Project Management | Audit trail entries |
-| **Projects (Future)** | `TimeLog` | Project Management | Time tracking & billable hours |
-| **Projects (Future)** | `Issue` | Project Management | Defect tracking & resolution |
-| **Projects (Future)** | `ProjectDocument` | Project Management | Document metadata & version registry |
-| **Projects (Future)** | `Review` (UAT) | Project Management | Client sign-off cycles |
-| **Projects (Future)** | `ChangeRequest` | Project Management | Scope/budget variance approval |
+| **Projects** | `TimeLog` | Project Management | Time tracking & billable hours |
+| **Projects** | `Issue` | Project Management | Defect tracking & resolution |
+| **Projects** | `ProjectDocument` | Project Management | Document metadata & version registry |
+| **Projects** | `Review` (UAT) | Project Management | Client sign-off cycles |
+| **Projects** | `ChangeRequest` | Project Management | Scope/budget variance approval |
 
 ---
 
@@ -390,6 +391,8 @@ The application has an extensive library of 44 pre-built `<x-ui.*>` Blade compon
 | `Barryvdh\DomPDF\Facade\Pdf` | PDF Generation | **REUSE** | Standardized ERP PDF generation engine. |
 | Native Production Timeline (`dispatch-board.blade.php`) | Gantt & Timeline | **REUSE / EXTEND** | Existing HTML5 Drag & Drop swimlane board eliminates external 3rd-party dependencies. |
 | `Illuminate\Support\Facades\Storage` | Document Files | **REUSE** | Standard Laravel private storage on `local` disk. |
+| `format_currency()`, `active_currency_symbol()`, `window.AppCurrency` | Dynamic Currency | **REUSE** | Exact same currency resolution used across Production (BOM, Routing). |
+| Standard Alert Banners (`bg-soft-warning`, `bg-soft-info`) | Approval UX | **REUSE** | Consistent approval banner and sign-off CTA pattern matching Production BOM/Routing. |
 | `App\Domains\HRMS\Models\Employee` | Direct FKs | **EXCLUDE** | Lacks tenant scopes; high data-leakage risk. Use `User->employee` instead. |
 | `project_invoices` (Proposed) | Duplicate Billing | **EXCLUDE** | Redundant parallel system; violates single source of truth. |
 

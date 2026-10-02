@@ -138,8 +138,8 @@
                                 </td>
                                 <td>
                                     @if ($log->is_billable && $log->hourly_rate)
-                                        <div class="fw-semibold text-dark">{{ number_format((float) $log->hourly_rate, 2) }}/hr</div>
-                                        <div class="fs-11 text-success fw-bold">{{ number_format($log->billable_amount, 2) }}</div>
+                                        <div class="fw-semibold text-dark">{{ format_currency($log->hourly_rate) }}/hr</div>
+                                        <div class="fs-11 text-success fw-bold">{{ format_currency($log->billable_amount) }}</div>
                                     @else
                                         <span class="text-muted">—</span>
                                     @endif
