@@ -73,13 +73,15 @@ class VisitorController extends Controller
             });
         }
 
-        $passes = $passesQuery->with(['visitor', 'host', 'belongings'])->latest()->paginate(15)->withQueryString();
+        $passes = $passesQuery->with(['visitor', 'host', 'belongings', 'linkedLead'])->latest()->paginate(15)->withQueryString();
         $hosts = \App\Models\User::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'email']);
+        $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->with(['primaryImage', 'images'])->orderBy('name')->get();
 
         return view('modules.visitor.index', compact(
             'stats',
             'passes',
             'hosts',
+            'products',
             'search',
             'status',
             'visitorType',
@@ -133,6 +135,13 @@ class VisitorController extends Controller
             'expected_arrival_at'       => 'nullable|date',
             'check_in_now'              => 'nullable|boolean',
             'status'                    => 'nullable|string|in:Expected,Arrived,Waiting Approval,Approved,Checked-In',
+            'product_ids'               => 'nullable|array',
+            'product_ids.*'             => 'integer',
+            'product_items'             => 'nullable|array',
+            'product_items.*.product_id' => 'nullable|integer',
+            'product_items.*.quantity'  => 'nullable|numeric|min:0.01',
+            'inquiry_notes'             => 'nullable|string|max:1000',
+            'create_crm_lead'           => 'nullable|boolean',
             'notes'                     => 'nullable|string|max:1000',
         ]);
 

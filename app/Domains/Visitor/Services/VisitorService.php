@@ -218,7 +218,89 @@ class VisitorService
             }
         }
 
-        return $pass->load(['visitor', 'host', 'belongings']);
+        // Check if auto-create CRM Lead requested
+        if (!empty($data['create_crm_lead']) || !empty($data['auto_create_lead'])) {
+            $this->convertToLead($pass, $data);
+        }
+
+        return $pass->load(['visitor', 'host', 'belongings', 'linkedLead']);
+    }
+
+    /**
+     * Convert Visitor Pass / Walk-in into CRM Lead
+     */
+    public function convertToLead(VisitorPass $pass, array $customData = []): \App\Domains\CRM\Models\Lead
+    {
+        $pass->loadMissing(['visitor', 'host']);
+        $visitor = $pass->visitor;
+        $tenantId = $pass->tenant_id;
+        $companyId = $pass->company_id;
+        $branchId = $pass->branch_id;
+
+        $rawItems = $customData['product_items'] ?? $customData['items'] ?? [];
+        $cleanItems = [];
+        $productIds = [];
+
+        if (is_array($rawItems)) {
+            foreach ($rawItems as $item) {
+                $pId = !empty($item['product_id']) ? (int)$item['product_id'] : null;
+                $qty = !empty($item['quantity']) ? (float)$item['quantity'] : 1.0;
+                if ($pId) {
+                    $cleanItems[] = [
+                        'product_id' => $pId,
+                        'quantity'   => $qty > 0 ? $qty : 1.0,
+                    ];
+                    if (!in_array($pId, $productIds)) {
+                        $productIds[] = $pId;
+                    }
+                }
+            }
+        }
+
+        if (empty($cleanItems) && !empty($customData['product_ids'])) {
+            foreach ((array)$customData['product_ids'] as $pId) {
+                $intId = (int)$pId;
+                if ($intId) {
+                    $cleanItems[] = ['product_id' => $intId, 'quantity' => 1.0];
+                    $productIds[] = $intId;
+                }
+            }
+        }
+        
+        $requirement = !empty($customData['requirement'])
+            ? trim($customData['requirement'])
+            : (!empty($customData['inquiry_notes']) 
+                ? trim($customData['inquiry_notes']) 
+                : ($pass->notes ?: "Walk-in inquiry at Front Desk (Pass #{$pass->pass_number})"));
+
+        $lead = \App\Domains\CRM\Models\Lead::create([
+            'tenant_id'          => $tenantId,
+            'company_id'         => $companyId,
+            'branch_id'          => $branchId,
+            'contact_person'     => $visitor?->full_name ?? 'Walk-in Visitor',
+            'company_name'       => $visitor?->company_name ?? ($visitor?->full_name ? $visitor->full_name . ' (Individual)' : 'Walk-in Visitor'),
+            'designation'        => $visitor?->designation,
+            'phone'              => $visitor?->phone,
+            'email'              => $visitor?->email,
+            'lead_owner_id'      => !empty($customData['lead_owner_id']) ? (int)$customData['lead_owner_id'] : ($pass->host_user_id ?: (auth()->id() ?: 1)),
+            'source'             => 'Walk-in (Front Desk)',
+            'lead_type'          => $customData['lead_type'] ?? 'warm',
+            'priority'           => $customData['priority'] ?? 'Medium',
+            'status'             => 'New',
+            'product_ids'        => !empty($productIds) ? $productIds : null,
+            'product_items'      => !empty($cleanItems) ? $cleanItems : null,
+            'requirement'        => $requirement,
+            'call_date'          => now(),
+            'next_followup_date' => !empty($customData['next_followup_date']) ? Carbon::parse($customData['next_followup_date']) : now()->addDays(2),
+        ]);
+
+        $pass->update([
+            'source_module'       => 'crm',
+            'source_reference_id' => $lead->id,
+            'source_reference_no' => $lead->lead_number,
+        ]);
+
+        return $lead;
     }
 
     /**

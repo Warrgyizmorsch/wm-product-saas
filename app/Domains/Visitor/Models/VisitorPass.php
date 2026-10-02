@@ -100,6 +100,11 @@ class VisitorPass extends Model
         return $this->hasMany(VisitorBelonging::class, 'visitor_pass_id');
     }
 
+    public function linkedLead(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\CRM\Models\Lead::class, 'source_reference_id');
+    }
+
     public function isOverstayed(): bool
     {
         if ($this->status === 'Checked-Out' || !$this->check_in_at) {
