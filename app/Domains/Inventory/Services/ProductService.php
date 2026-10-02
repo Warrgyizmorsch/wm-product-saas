@@ -160,11 +160,13 @@ class ProductService
             }
 
             // Save parent product Main Image & Detail Images
-            if (!empty($requestInput['main_image']) && $requestInput['main_image'] instanceof \Illuminate\Http\UploadedFile) {
-                $this->imageService->saveMainImage($parentProduct, $requestInput['main_image'], $tenantId);
+            $mainImage = $requestInput['main_image'] ?? $validated['main_image'] ?? null;
+            if ($mainImage instanceof \Illuminate\Http\UploadedFile && $mainImage->isValid()) {
+                $this->imageService->saveMainImage($parentProduct, $mainImage, $tenantId);
             }
-            if (!empty($requestInput['detail_images']) && is_array($requestInput['detail_images'])) {
-                $this->imageService->saveDetailImages($parentProduct, $requestInput['detail_images'], $tenantId);
+            $detailImages = $requestInput['detail_images'] ?? $validated['detail_images'] ?? [];
+            if (!empty($detailImages) && is_array($detailImages)) {
+                $this->imageService->saveDetailImages($parentProduct, $detailImages, $tenantId);
             }
 
             return $parentProduct;
@@ -453,12 +455,14 @@ class ProductService
                 $this->imageService->setPrimary((int)$requestInput['primary_image_id'], $product);
             }
 
-            if (!empty($requestInput['main_image']) && $requestInput['main_image'] instanceof \Illuminate\Http\UploadedFile) {
-                $this->imageService->saveMainImage($product, $requestInput['main_image'], $tenantId);
+            $mainImage = $requestInput['main_image'] ?? $validated['main_image'] ?? null;
+            if ($mainImage instanceof \Illuminate\Http\UploadedFile && $mainImage->isValid()) {
+                $this->imageService->saveMainImage($product, $mainImage, $tenantId);
             }
 
-            if (!empty($requestInput['detail_images']) && is_array($requestInput['detail_images'])) {
-                $this->imageService->saveDetailImages($product, $requestInput['detail_images'], $tenantId);
+            $detailImages = $requestInput['detail_images'] ?? $validated['detail_images'] ?? [];
+            if (!empty($detailImages) && is_array($detailImages)) {
+                $this->imageService->saveDetailImages($product, $detailImages, $tenantId);
             }
 
             return true;

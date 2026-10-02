@@ -683,7 +683,7 @@
                                     <div class="main-img-preview-box">
                                         <img id="mainImagePreview" src="{{ $product->main_image_url ?: asset('assets/images/icons/default-product.svg') }}" alt="{{ __('inventory.main_image') }}" class="{{ $product->main_image_url ? '' : 'd-none' }}">
                                         
-                                        <div id="mainImagePlaceholder" class="text-center p-3 {{ $product->main_image_url ? 'd-none' : '' }}">
+                                        <div id="mainImagePlaceholder" class="text-center p-3 {{ $product->main_image_url ? 'd-none' : '' }}" onclick="document.getElementById('mainImageInput').click()" style="cursor: pointer;">
                                             <div class="avatar avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center">
                                                 <i class="feather-camera fs-18"></i>
                                             </div>
@@ -692,21 +692,22 @@
                                         </div>
 
                                         <div id="mainImageHoverActions" class="main-img-hover-actions" style="{{ $product->main_image_url ? 'display: flex;' : '' }}">
-                                            <label class="btn btn-xs btn-light shadow-sm cursor-pointer mb-0" title="{{ __('inventory.change_image') }}">
+                                            <button type="button" class="btn btn-xs btn-light shadow-sm cursor-pointer mb-0" onclick="document.getElementById('mainImageInput').click()" title="{{ __('inventory.change_image') }}">
                                                 <i class="feather-edit-2 me-1"></i>{{ __('inventory.change_image') }}
-                                                <input type="file" name="main_image" id="mainImageInput" accept="image/jpeg,image/png,image/webp" class="d-none" onchange="previewMainImage(this)">
-                                            </label>
+                                            </button>
                                             <button type="button" class="btn btn-xs btn-danger shadow-sm" onclick="clearMainImage()" title="{{ __('inventory.remove_image') }}">
                                                 <i class="feather-trash-2"></i>
                                             </button>
                                         </div>
                                     </div>
 
-                                    <div id="mainImageDefaultActions" class="{{ $product->main_image_url ? 'd-none' : '' }}">
-                                        <label class="btn btn-sm btn-outline-primary cursor-pointer mb-0">
+                                    <!-- Single clean file input for main image -->
+                                    <input type="file" name="main_image" id="mainImageInput" accept="image/jpeg,image/png,image/webp" class="d-none" onchange="previewMainImage(this)">
+
+                                    <div id="mainImageDefaultActions" class="{{ $product->main_image_url ? 'd-none' : '' }} mt-2">
+                                        <button type="button" class="btn btn-sm btn-outline-primary cursor-pointer mb-0" onclick="document.getElementById('mainImageInput').click()">
                                             <i class="feather-upload me-1"></i>{{ __('inventory.browse_image') }}
-                                            <input type="file" name="main_image" id="mainImageTriggerInput" accept="image/jpeg,image/png,image/webp" class="d-none" onchange="syncMainImageInput(this)">
-                                        </label>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -1732,8 +1733,13 @@
                 $(`#v_row_count_${index}`).text(count);
             }
 
-            // Sync all variant files and deletions before form submit
+            // Sync all parent detail images & variant files and deletions before form submit
             $('#productForm').on('submit', function() {
+                const mainDetailInput = document.getElementById('detailImagesInput');
+                if (mainDetailInput && window.detailFilesDT && window.detailFilesDT.files.length > 0) {
+                    mainDetailInput.files = window.detailFilesDT.files;
+                }
+
                 if (window.variantMediaStore) {
                     Object.keys(window.variantMediaStore).forEach(idx => {
                         const store = window.variantMediaStore[idx];
