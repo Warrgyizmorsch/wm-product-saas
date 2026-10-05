@@ -112,6 +112,73 @@
     .bg-purple { background-color: #7c3aed !important; }
     .bg-pink   { background-color: #db2777 !important; }
     .bg-amber  { background-color: #d97706 !important; }
+
+    /* ==========================================
+       Dark Mode Support (html.app-skin-dark)
+       ========================================== */
+    html.app-skin-dark .erp-single-panel {
+        background-color: transparent !important;
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .erp-single-panel.bg-white {
+        background-color: #0b1329 !important;
+    }
+    html.app-skin-dark .calendar-container {
+        border-color: #1e293b !important;
+        background-color: #0f172a !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    }
+    html.app-skin-dark .calendar-grid {
+        background-color: #1e293b !important;
+    }
+    html.app-skin-dark .calendar-day-header {
+        background-color: #162038 !important;
+        color: #94a3b8 !important;
+        border-bottom-color: #1e293b !important;
+    }
+    html.app-skin-dark .calendar-day-cell {
+        background-color: #0f172a !important;
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .calendar-day-cell:hover {
+        background-color: #162038 !important;
+    }
+    html.app-skin-dark .calendar-day-cell.other-month {
+        background-color: #090e1a !important;
+        opacity: 0.45;
+    }
+    html.app-skin-dark .calendar-day-cell.is-today {
+        background-color: rgba(59, 130, 246, 0.15) !important;
+        box-shadow: inset 0 0 0 2px #3b82f6 !important;
+    }
+    html.app-skin-dark .day-number-badge {
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .is-today .day-number-badge {
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
+    }
+    html.app-skin-dark .btn-soft-primary {
+        background-color: rgba(59, 130, 246, 0.2) !important;
+        color: #60a5fa !important;
+    }
+    html.app-skin-dark .card.bg-light {
+        background-color: #162038 !important;
+        border: 1px solid #1e293b !important;
+    }
+    html.app-skin-dark .card.bg-light .text-dark {
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .card.bg-light .text-secondary {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .border-bottom,
+    html.app-skin-dark .border-top {
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .text-dark {
+        color: #f8fafc !important;
+    }
 </style>
 @endpush
 
@@ -483,17 +550,19 @@
             <div class="col-12">
                 <div class="p-3 bg-light rounded-3 border mb-2">
                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="syncGoogleSwitch" checked>
-                            <label class="form-check-label fw-bold fs-12 text-dark" for="syncGoogleSwitch">
-                                <i class="feather-calendar text-danger me-1"></i> Sync to Google Calendar
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="fw-bold fs-12 text-dark mb-0 d-flex align-items-center gap-1 c-pointer" for="syncGoogleSwitch">
+                                <i class="feather-calendar text-danger"></i> Sync to Google Calendar
                             </label>
+                            <input type="hidden" name="sync_google_calendar" value="0">
+                            <x-ui.checkbox name="sync_google_calendar" id="syncGoogleSwitch" value="1" :checked="true" />
                         </div>
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="createMeetSwitchUnified">
-                            <label class="form-check-label fw-bold fs-12 text-dark" for="createMeetSwitchUnified">
-                                <i class="feather-video text-primary me-1"></i> Generate Google Meet Video Room Link
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="fw-bold fs-12 text-dark mb-0 d-flex align-items-center gap-1 c-pointer" for="createMeetSwitchUnified">
+                                <i class="feather-video text-primary"></i> Generate Google Meet Video Room Link
                             </label>
+                            <input type="hidden" name="create_meet_link" value="0">
+                            <x-ui.checkbox name="create_meet_link" id="createMeetSwitchUnified" value="1" />
                         </div>
                     </div>
                     <small class="text-muted fs-11 d-block mt-2">

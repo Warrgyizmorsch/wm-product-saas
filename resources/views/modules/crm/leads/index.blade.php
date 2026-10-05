@@ -59,105 +59,122 @@
                     </form>
 
                     <x-ui.view-switcher />
-                    <x-ui.sort-dropdown :label="__('crm.sort')">
-                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'call_date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'call_date' && $sortOrder === 'desc' ? 'active' : '' }}">
-                            <span>{{ __('crm.sort_call_date_latest') }}</span>
-                        </a>
-                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'call_date', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'call_date' && $sortOrder === 'asc' ? 'active' : '' }}">
-                            <span>{{ __('crm.sort_call_date_oldest') }}</span>
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'company_name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'company_name' && $sortOrder === 'asc' ? 'active' : '' }}">
-                            <span>{{ __('crm.sort_company_name_az') }}</span>
-                        </a>
-                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'company_name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'company_name' && $sortOrder === 'desc' ? 'active' : '' }}">
-                            <span>{{ __('crm.sort_company_name_za') }}</span>
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'duplicates', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'duplicates' ? 'active' : '' }}">
-                            <span class="text-danger fw-semibold"><i class="feather-copy me-1"></i>{{ __('crm.group_duplicates') }}</span>
-                        </a>
-                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'expected_amount', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'expected_amount' && $sortOrder === 'desc' ? 'active' : '' }}">
-                            <span>{{ __('crm.sort_expected_amount_desc') }}</span>
-                        </a>
-                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'expected_amount', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'expected_amount' && $sortOrder === 'asc' ? 'active' : '' }}">
-                            <span>{{ __('crm.sort_expected_amount_asc') }}</span>
-                        </a>
-                    </x-ui.sort-dropdown>
 
-                    <form method="GET" action="{{ route('crm.leads.index') }}" class="d-inline">
-                        <x-ui.filter :label="__('crm.filter')" offset="0, 5">
-                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
-                                <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_placeholder_leads')" value="{{ request('search') }}" />
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.priority') }}</label>
-                                <x-ui.odoo-form-ui type="select" name="priority">
-                                    <option value="">{{ __('crm.all_priorities') }}</option>
-                                    <option value="Low" {{ request('priority') === 'Low' ? 'selected' : '' }}>{{ __('crm.priorities.Low') }}</option>
-                                    <option value="Medium" {{ request('priority') === 'Medium' ? 'selected' : '' }}>{{ __('crm.priorities.Medium') }}</option>
-                                    <option value="High" {{ request('priority') === 'High' ? 'selected' : '' }}>{{ __('crm.priorities.High') }}</option>
-                                    <option value="Urgent" {{ request('priority') === 'Urgent' ? 'selected' : '' }}>{{ __('crm.priorities.Urgent') }}</option>
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.segment') }}</label>
-                                <x-ui.odoo-form-ui type="select" name="segment">
-                                    <option value="">{{ __('crm.all_segments') }}</option>
-                                    <option value="SME" {{ request('segment') === 'SME' ? 'selected' : '' }}>{{ __('crm.segments.SME') }}</option>
-                                    <option value="Mid-Market" {{ request('segment') === 'Mid-Market' ? 'selected' : '' }}>{{ __('crm.segments.Mid-Market') }}</option>
-                                    <option value="Enterprise" {{ request('segment') === 'Enterprise' ? 'selected' : '' }}>{{ __('crm.segments.Enterprise') }}</option>
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.status') }}</label>
-                                <x-ui.odoo-form-ui type="select" name="status">
-                                    <option value="">{{ __('crm.all_statuses') }}</option>
-                                    @foreach($leadStatuses as $ls)
-                                        @php
-                                            $lsDisplayName = \Illuminate\Support\Facades\Lang::has('crm.statuses.' . $ls->name) ? __('crm.statuses.' . $ls->name) : $ls->name;
-                                        @endphp
-                                        <option value="{{ $ls->name }}" {{ request('status') === $ls->name ? 'selected' : '' }}>
-                                            {{ $lsDisplayName }}
-                                        </option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.lead_owner') }}</label>
-                                <x-ui.odoo-form-ui type="select" name="lead_owner_id">
-                                    <option value="">{{ __('crm.all_lead_owners') }}</option>
-                                    @foreach($users as $u)
-                                        <option value="{{ $u->id }}" {{ (string)request('lead_owner_id') === (string)$u->id ? 'selected' : '' }}>{{ $u->name }} ({{ $u->email }})</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.quotation_status') }}</label>
-                                <x-ui.odoo-form-ui type="select" name="quotation_status">
-                                    <option value="">{{ __('crm.all_leads') }}</option>
-                                    <option value="with_quotation" {{ request('quotation_status') === 'with_quotation' ? 'selected' : '' }}>{{ __('crm.with_quotation') }}</option>
-                                    <option value="without_quotation" {{ request('quotation_status') === 'without_quotation' ? 'selected' : '' }}>{{ __('crm.without_quotation') }}</option>
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="row g-2 mb-3">
-                                <div class="col-6">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_from') }}</label>
-                                    <x-ui.odoo-form-ui type="input" inputType="date" name="date_from" value="{{ request('date_from') ?? request('start_date') }}" />
+                    <!-- Normal Toolbar (Sort, Filter) -->
+                    <div id="normal-toolbar" class="d-flex gap-2 align-items-center">
+                        <x-ui.sort-dropdown :label="__('crm.sort')">
+                            <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'call_date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'call_date' && $sortOrder === 'desc' ? 'active' : '' }}">
+                                <span>{{ __('crm.sort_call_date_latest') }}</span>
+                            </a>
+                            <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'call_date', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'call_date' && $sortOrder === 'asc' ? 'active' : '' }}">
+                                <span>{{ __('crm.sort_call_date_oldest') }}</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'company_name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'company_name' && $sortOrder === 'asc' ? 'active' : '' }}">
+                                <span>{{ __('crm.sort_company_name_az') }}</span>
+                            </a>
+                            <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'company_name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'company_name' && $sortOrder === 'desc' ? 'active' : '' }}">
+                                <span>{{ __('crm.sort_company_name_za') }}</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'duplicates', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'duplicates' ? 'active' : '' }}">
+                                <span class="text-danger fw-semibold"><i class="feather-copy me-1"></i>{{ __('crm.group_duplicates') }}</span>
+                            </a>
+                            <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'expected_amount', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'expected_amount' && $sortOrder === 'desc' ? 'active' : '' }}">
+                                <span>{{ __('crm.sort_expected_amount_desc') }}</span>
+                            </a>
+                            <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'expected_amount', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'expected_amount' && $sortOrder === 'asc' ? 'active' : '' }}">
+                                <span>{{ __('crm.sort_expected_amount_asc') }}</span>
+                            </a>
+                        </x-ui.sort-dropdown>
+
+                        <form method="GET" action="{{ route('crm.leads.index') }}" class="d-inline">
+                            <x-ui.filter :label="__('crm.filter')" offset="0, 5">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
+                                    <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_placeholder_leads')" value="{{ request('search') }}" />
                                 </div>
-                                <div class="col-6">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_to') }}</label>
-                                    <x-ui.odoo-form-ui type="input" inputType="date" name="date_to" value="{{ request('date_to') ?? request('end_date') }}" />
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.priority') }}</label>
+                                    <x-ui.odoo-form-ui type="select" name="priority">
+                                        <option value="">{{ __('crm.all_priorities') }}</option>
+                                        <option value="Low" {{ request('priority') === 'Low' ? 'selected' : '' }}>{{ __('crm.priorities.Low') }}</option>
+                                        <option value="Medium" {{ request('priority') === 'Medium' ? 'selected' : '' }}>{{ __('crm.priorities.Medium') }}</option>
+                                        <option value="High" {{ request('priority') === 'High' ? 'selected' : '' }}>{{ __('crm.priorities.High') }}</option>
+                                        <option value="Urgent" {{ request('priority') === 'Urgent' ? 'selected' : '' }}>{{ __('crm.priorities.Urgent') }}</option>
+                                    </x-ui.odoo-form-ui>
                                 </div>
-                            </div>
-                            <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('crm.leads.index') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
-                                <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
-                            </div>
-                        </x-ui.filter>
-                    </form>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.segment') }}</label>
+                                    <x-ui.odoo-form-ui type="select" name="segment">
+                                        <option value="">{{ __('crm.all_segments') }}</option>
+                                        <option value="SME" {{ request('segment') === 'SME' ? 'selected' : '' }}>{{ __('crm.segments.SME') }}</option>
+                                        <option value="Mid-Market" {{ request('segment') === 'Mid-Market' ? 'selected' : '' }}>{{ __('crm.segments.Mid-Market') }}</option>
+                                        <option value="Enterprise" {{ request('segment') === 'Enterprise' ? 'selected' : '' }}>{{ __('crm.segments.Enterprise') }}</option>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.status') }}</label>
+                                    <x-ui.odoo-form-ui type="select" name="status">
+                                        <option value="">{{ __('crm.all_statuses') }}</option>
+                                        @foreach($leadStatuses as $ls)
+                                            @php
+                                                $lsDisplayName = \Illuminate\Support\Facades\Lang::has('crm.statuses.' . $ls->name) ? __('crm.statuses.' . $ls->name) : $ls->name;
+                                            @endphp
+                                            <option value="{{ $ls->name }}" {{ request('status') === $ls->name ? 'selected' : '' }}>
+                                                {{ $lsDisplayName }}
+                                            </option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.lead_owner') }}</label>
+                                    <x-ui.odoo-form-ui type="select" name="lead_owner_id">
+                                        <option value="">{{ __('crm.all_lead_owners') }}</option>
+                                        @foreach($users as $u)
+                                            <option value="{{ $u->id }}" {{ (string)request('lead_owner_id') === (string)$u->id ? 'selected' : '' }}>{{ $u->name }} ({{ $u->email }})</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.quotation_status') }}</label>
+                                    <x-ui.odoo-form-ui type="select" name="quotation_status">
+                                        <option value="">{{ __('crm.all_leads') }}</option>
+                                        <option value="with_quotation" {{ request('quotation_status') === 'with_quotation' ? 'selected' : '' }}>{{ __('crm.with_quotation') }}</option>
+                                        <option value="without_quotation" {{ request('quotation_status') === 'without_quotation' ? 'selected' : '' }}>{{ __('crm.without_quotation') }}</option>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_from') }}</label>
+                                        <x-ui.odoo-form-ui type="input" inputType="date" name="date_from" value="{{ request('date_from') ?? request('start_date') }}" />
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_to') }}</label>
+                                        <x-ui.odoo-form-ui type="input" inputType="date" name="date_to" value="{{ request('date_to') ?? request('end_date') }}" />
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 justify-content-end mt-4">
+                                    <a href="{{ route('crm.leads.index') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
+                                    <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
+                                </div>
+                            </x-ui.filter>
+                        </form>
+                    </div>
+
+                    <!-- Bulk Actions Toolbar (initially hidden, shows when checkboxes are selected) -->
+                    <div id="bulk-actions-toolbar" class="d-flex gap-2 d-none">
+                        <x-ui.bulk-actions :label="__('crm.selected_actions') . ' (0)'" id="bulk-actions-dropdown">
+                            <button type="button" class="dropdown-item text-primary" onclick="openBulkAssignDrawer()">
+                                <i class="feather-user-check me-2 text-primary"></i> {{ __('crm.assign_to_sales_rep') }}
+                            </button>
+                            <div class="dropdown-divider"></div>
+                            <button type="button" class="dropdown-item text-secondary" onclick="clearLeadSelections()">
+                                <i class="feather-x me-2 text-secondary"></i> {{ __('crm.deselect') }}
+                            </button>
+                        </x-ui.bulk-actions>
+                    </div>
                 </div>
             </div>
 
@@ -198,25 +215,28 @@
         <div class="table-responsive">
                 <x-ui.odoo-form-ui type="table" id="leadsTable" class="mb-0">
                     <thead>
-                        <tr style="background-color: #e8ecf1 !important;">
-                            <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
-                                <input type="checkbox" class="form-check-input">
+                        <tr>
+                            <th style="width: 35px;" class="text-center">
+                                <input type="checkbox" class="form-check-input" id="selectAllLeadsCheckbox" title="Select All Leads">
                             </th>
-                            <th style="width: 11%; background-color: #e8ecf1 !important;">{{ __('crm.call_date_time') }}</th>
-                            <th style="width: 19%; background-color: #e8ecf1 !important;">{{ __('crm.lead_company') }}</th>
-                            <th style="width: 14%; background-color: #e8ecf1 !important;">{{ __('crm.lead_owner') }}</th>
-                            <th style="width: 17%; background-color: #e8ecf1 !important;">{{ __('crm.phone_email') }}</th>
-                            <th style="width: 12%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.value_est_sale') }}</th>
-                            <th style="width: 18%; background-color: #e8ecf1 !important;">{{ __('crm.details') }}</th>
-                            <th style="width: 9%; background-color: #e8ecf1 !important;">{{ __('crm.status') }}</th>
-                            <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
+                            <th style="width: 11%;">{{ __('crm.call_date_time') }}</th>
+                            <th style="width: 19%;">{{ __('crm.lead_company') }}</th>
+                            <th style="width: 14%;">{{ __('crm.lead_owner') }}</th>
+                            <th style="width: 17%;">{{ __('crm.phone_email') }}</th>
+                            <th style="width: 12%;" class="text-end pe-3">{{ __('crm.value_est_sale') }}</th>
+                            <th style="width: 18%;">{{ __('crm.details') }}</th>
+                            <th style="width: 9%;">{{ __('crm.status') }}</th>
+                            <th style="width: 5%;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($leads as $lead)
-                            <tr>
+                            <tr id="leadRow_{{ $lead->id }}">
                                 <td class="text-center">
-                                    <input type="checkbox" class="form-check-input">
+                                    <input type="checkbox" class="form-check-input lead-select-checkbox" 
+                                           value="{{ $lead->id }}" 
+                                           data-lead-name="{{ e($lead->company_name ?: $lead->contact_person ?: ('Lead #'.$lead->id)) }}"
+                                           data-is-converted="{{ $lead->crm_deal_id || in_array(strtolower($lead->status ?? ''), ['won']) ? '1' : '0' }}">
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center">
@@ -270,16 +290,25 @@
                                     </div>
                                     <span class="text-muted fs-11"><i class="feather-user me-1 fs-10 text-primary"></i>{{ $lead->contact_person ?: 'N/A' }}</span>
                                 </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="rounded-circle me-2 d-flex align-items-center justify-content-center text-white fw-bold shadow-xs" 
-                                             style="width: 28px; height: 28px; background-color: #1e40af; font-size: 11px; flex-shrink: 0;"
-                                             title="{{ $lead->owner?->name ?: 'Unassigned' }}">
+                                <td id="leadOwnerCell_{{ $lead->id }}">
+                                    <div class="d-flex align-items-center cursor-pointer p-1 rounded" 
+                                         onclick="openSingleAssignDrawer({{ $lead->id }}, '{{ e($lead->company_name ?: $lead->contact_person ?: ('Lead #'.$lead->id)) }}', '{{ $lead->lead_owner_id }}', '{{ e($lead->owner?->name ?: __('crm.unassigned')) }}')"
+                                         title="{{ $lead->owner ? __('crm.change_owner') : __('crm.assign_owner') }}"
+                                         style="transition: background-color 0.15s ease;">
+                                        <div class="rounded-circle me-2 d-flex align-items-center justify-content-center text-white fw-bold shadow-xs owner-avatar-circle" 
+                                             style="width: 28px; height: 28px; background-color: {{ $lead->owner ? '#1e40af' : '#64748b' }}; font-size: 11px; flex-shrink: 0;"
+                                             title="{{ $lead->owner?->name ?: __('crm.unassigned') }}">
                                             {{ strtoupper(substr($lead->owner?->name ?: 'U', 0, 1)) }}
                                         </div>
                                         <div>
-                                            <span class="d-block fw-semibold text-dark fs-12" style="line-height: 1.2;">{{ $lead->owner?->name ?: 'Unassigned' }}</span>
-                                            <span class="text-muted fs-10 d-block">{{ $lead->owner?->email ?: '—' }}</span>
+                                            @if($lead->owner)
+                                                <span class="d-block fw-semibold text-dark fs-12 owner-name-text" style="line-height: 1.2;">{{ $lead->owner->name }}</span>
+                                                <span class="text-muted fs-10 d-block owner-email-text">{{ $lead->owner->email ?: '—' }}</span>
+                                            @else
+                                                <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 fw-semibold d-inline-flex align-items-center gap-1 py-0.5 px-2">
+                                                    <i class="feather-user-plus fs-9"></i> {{ __('crm.unassigned') }}
+                                                </span>
+                                            @endif
                                         </div>
                                     </div>
                                 </td>
@@ -415,6 +444,13 @@
                                             </button>
                                         </x-slot:extraActions>
 
+                                        {{-- Assign / Change Owner --}}
+                                        <li>
+                                            <a href="javascript:void(0)" class="dropdown-item" onclick="openSingleAssignDrawer({{ $lead->id }}, '{{ e($lead->company_name ?: $lead->contact_person ?: ('Lead #'.$lead->id)) }}', '{{ $lead->lead_owner_id }}', '{{ e($lead->owner?->name ?: __('crm.unassigned')) }}')">
+                                                <i class="feather-user-check me-2 text-primary fs-12"></i>{{ $lead->lead_owner_id ? __('crm.change_owner') : __('crm.assign_owner') }}
+                                            </a>
+                                        </li>
+
                                         {{-- Edit --}}
                                         @if (!in_array(strtolower($lead->status ?? ''), ['dealing', 'won']))
                                             <li>
@@ -518,9 +554,10 @@
 @endsection
 
 @push('styles')
-    <!-- Select2 Theme Styles -->
+    <!-- Select2 & SweetAlert2 Theme Styles -->
     <link class="select2-css" rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link class="select2-css" rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/sweetalert2.min.css') }}">
     <style>
         /* Status Tabs */
         .crm-status-tab {
@@ -646,13 +683,23 @@
             transition: background-color 0.15s ease;
         }
         #leadsTable tbody tr:hover {
-            background-color: #f8fafc !important;
+            background-color: #f8fafc;
+        }
+        #leadsTable tbody tr.lead-row-selected {
+            background-color: #f0f7ff !important;
+        }
+        html.app-skin-dark #leadsTable tbody tr:hover {
+            background-color: #162038 !important;
+        }
+        html.app-skin-dark #leadsTable tbody tr.lead-row-selected {
+            background-color: #1e293b !important;
         }
     </style>
 @endpush
 
 @push('scripts')
-    <!-- Select2 Scripts -->
+    <!-- Select2 & SweetAlert2 Scripts -->
+    <script src="{{ asset('assets/vendors/js/sweetalert2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script>
@@ -816,47 +863,344 @@
             };
 
             $(document).on('click', '#btnToggleNextSchedule', function() {
-                toggleNextScheduleFields();
+                window.toggleNextScheduleFields();
             });
 
-            // Open and populate Offcanvas drawer for Lead Followup / Schedule Activity
+            // Open and populate Offcanvas drawer for Lead Followup / Schedule Activity from Index listing
             $(document).on('click', '.btn-open-followup-offcanvas', function() {
                 var leadId = $(this).attr('data-lead-id');
-                var leadName = $(this).attr('data-lead-name');
-                var leadStatus = $(this).attr('data-lead-status');
-                var leadPriority = $(this).attr('data-lead-priority');
-                var nextFollowup = $(this).attr('data-next-followup');
+                var leadName = $(this).attr('data-lead-name') || ('Lead #' + leadId);
+                var leadStatus = $(this).attr('data-lead-status') || 'New';
+                var leadPriority = $(this).attr('data-lead-priority') || 'Medium';
+                var nextFollowup = $(this).attr('data-next-followup') || '';
 
-                $('#leadFollowupOffcanvasTitle').text('{{ __('crm.edit_followup_for', ['company' => '']) }}' + leadName);
-                $('#leadFollowupForm').attr('action', '/crm/leads/' + leadId + '/followups');
-                $('#offcanvasLeadStatus').val(leadStatus || 'New');
-                $('#offcanvasLeadPriority').val(leadPriority || 'Medium');
-                $('#offcanvasFollowupDate').val(nextFollowup || '');
+                $('#leadFollowupForm').attr('action', '{{ url("crm/leads") }}/' + leadId + '/followups');
+                $('#leadFollowupOffcanvasTitle').text('Edit Followup for ' + leadName);
+
+                $('#offcanvasLeadStatus').val(leadStatus);
+                $('#offcanvasLeadPriority').val(leadPriority);
+                $('#offcanvasFollowupDate').val(nextFollowup);
                 $('#offcanvasNotes, #offcanvasScheduleNotes').val('');
-                $('#offcanvasRecording').val('');
 
-                if (nextFollowup && nextFollowup.trim() !== '') {
-                    $('#offcanvasNextFollowupDate').val(nextFollowup);
-                    toggleNextScheduleFields(true);
-                } else {
-                    toggleNextScheduleFields(false);
-                }
+                // Reset direct schedule inputs
+                $('#offcanvasEventTitle').val('CRM Followup Call');
+                $('#offcanvasScheduleType').val('Call');
+
+                // Next schedule section reset
+                $('#offcanvasNextFollowupDate').val('');
+                window.toggleNextScheduleFields(false);
 
                 if ($('#offcanvasTagUser').length && $.fn.select2) {
                     if ($('#offcanvasTagUser').hasClass('select2-hidden-accessible')) {
                         $('#offcanvasTagUser').select2('destroy');
                     }
                     $('#offcanvasTagUser').select2({
-                        theme: 'bootstrap-5',
-                        placeholder: '{{ __('crm.select_persons_to_tag') }}',
-                        allowClear: true,
+                        theme: "bootstrap-5",
+                        width: "100%",
                         dropdownParent: $('#leadFollowupOffcanvas'),
-                        width: '100%'
+                        placeholder: "{{ __('crm.select_persons_to_tag') }}"
                     });
                     $('#offcanvasTagUser').val(null).trigger('change');
                 }
 
-                switchOffcanvasMode('log_note');
+                switchOffcanvasMode('schedule');
+            });
+
+            // ==========================================
+            // Lead Quick Assignment & Bulk Assign Logic
+            // ==========================================
+            var assignOffcanvasEl = document.getElementById('assignLeadOffcanvas');
+            var assignBsOffcanvas = assignOffcanvasEl ? new bootstrap.Offcanvas(assignOffcanvasEl) : null;
+            var transAssignLeadOwner = @json(__('crm.assign_lead_owner'));
+            var transBulkAssignLeads = @json(__('crm.bulk_assign_leads'));
+            var transSelectSalesRep = @json(__('crm.select_sales_rep'));
+            var transLeadsSelected = @json(__('crm.leads_selected'));
+            var transLeadSelected = @json(__('crm.lead_selected'));
+            var transUnassigned = @json(__('crm.unassigned'));
+            var transChangeOwner = @json(__('crm.change_owner'));
+            var transAssignOwner = @json(__('crm.assign_owner'));
+
+            var transSelectedActions = @json(__('crm.selected_actions'));
+
+            window.openSingleAssignDrawer = function(leadId, leadName, currentOwnerId, currentOwnerName) {
+                $('#assignModeInput').val('single');
+                $('#assignSingleLeadId').val(leadId);
+                $('#assignBulkLeadIdsContainer').empty();
+                
+                $('#assignLeadOffcanvasTitle').text(transAssignLeadOwner);
+                $('#assignLeadOffcanvasSubtitle').text(transSelectSalesRep);
+                $('#assignTargetTypeLabel').text(@json(__('crm.lead_company')));
+                $('#assignTargetNameDisplay').text(leadName || ('Lead #' + leadId));
+                $('#assignBulkCountHint').hide();
+
+                if (currentOwnerName && currentOwnerName !== 'Unassigned' && currentOwnerName !== transUnassigned && currentOwnerName.trim() !== '') {
+                    $('#assignCurrentOwnerBadge').text(currentOwnerName).removeClass('bg-soft-secondary text-secondary').addClass('bg-soft-info text-info');
+                } else {
+                    $('#assignCurrentOwnerBadge').text(transUnassigned).removeClass('bg-soft-info text-info').addClass('bg-soft-secondary text-secondary');
+                }
+
+                $('#assignLeadOwnerSelect').val(currentOwnerId || '');
+                $('#assignNoteInput').val('');
+
+                if (assignBsOffcanvas) {
+                    assignBsOffcanvas.show();
+                }
+            };
+
+            window.openBulkAssignDrawer = function() {
+                var selectedCheckboxes = $('.lead-select-checkbox:checked');
+                var count = selectedCheckboxes.length;
+                if (count === 0) {
+                    alert('Please select at least one lead from the table checkbox.');
+                    return;
+                }
+
+                $('#assignModeInput').val('bulk');
+                $('#assignSingleLeadId').val('');
+                var container = $('#assignBulkLeadIdsContainer').empty();
+
+                var leadNames = [];
+                selectedCheckboxes.each(function() {
+                    var lid = $(this).val();
+                    var lname = $(this).attr('data-lead-name');
+                    container.append('<input type="hidden" name="lead_ids[]" value="' + lid + '">');
+                    if (leadNames.length < 3 && lname) {
+                        leadNames.push(lname);
+                    }
+                });
+
+                $('#assignLeadOffcanvasTitle').text(transBulkAssignLeads);
+                $('#assignLeadOffcanvasSubtitle').text(transSelectSalesRep);
+                $('#assignTargetTypeLabel').text(count + ' ' + (count === 1 ? transLeadSelected : transLeadsSelected));
+                $('#assignTargetNameDisplay').text(leadNames.join(', ') + (count > 3 ? ' and ' + (count - 3) + ' more...' : ''));
+                $('#assignCurrentOwnerBadge').text(count + ' ' + (count === 1 ? transLeadSelected : transLeadsSelected)).removeClass('bg-soft-info text-info').addClass('bg-soft-primary text-primary');
+                $('#assignBulkCountHint').hide();
+
+                $('#assignLeadOwnerSelect').val('');
+                $('#assignNoteInput').val('');
+
+                if (assignBsOffcanvas) {
+                    assignBsOffcanvas.show();
+                }
+            };
+
+            window.clearLeadSelections = function() {
+                $('.lead-select-checkbox').prop('checked', false);
+                $('#selectAllLeadsCheckbox').prop('checked', false);
+                $('#leadsTable tbody tr').removeClass('lead-row-selected');
+                updateToolbarVisibility();
+            };
+
+            function updateToolbarVisibility() {
+                var selectedCheckboxes = $('.lead-select-checkbox:checked');
+                var count = selectedCheckboxes.length;
+                var normalToolbar = document.getElementById('normal-toolbar');
+                var bulkActionsToolbar = document.getElementById('bulk-actions-toolbar');
+                var bulkActionsLabel = document.querySelector('#bulk-actions-toolbar .bulk-actions-label');
+
+                if (count > 0) {
+                    if (normalToolbar) normalToolbar.classList.add('d-none');
+                    if (bulkActionsToolbar) bulkActionsToolbar.classList.remove('d-none');
+                    if (bulkActionsLabel) {
+                        bulkActionsLabel.textContent = transSelectedActions + ' (' + count + ')';
+                    }
+                } else {
+                    if (normalToolbar) normalToolbar.classList.remove('d-none');
+                    if (bulkActionsToolbar) bulkActionsToolbar.classList.add('d-none');
+                    if (bulkActionsLabel) {
+                        bulkActionsLabel.textContent = transSelectedActions + ' (0)';
+                    }
+                }
+            }
+
+            // Checkbox events
+            $('#selectAllLeadsCheckbox').on('change', function() {
+                var isChecked = $(this).is(':checked');
+                $('.lead-select-checkbox').prop('checked', isChecked);
+                if (isChecked) {
+                    $('#leadsTable tbody tr').addClass('lead-row-selected');
+                } else {
+                    $('#leadsTable tbody tr').removeClass('lead-row-selected');
+                }
+                updateToolbarVisibility();
+            });
+
+            $(document).on('change', '.lead-select-checkbox', function() {
+                var tr = $(this).closest('tr');
+                if ($(this).is(':checked')) {
+                    tr.addClass('lead-row-selected');
+                } else {
+                    tr.removeClass('lead-row-selected');
+                }
+                
+                var totalBoxes = $('.lead-select-checkbox').length;
+                var checkedBoxes = $('.lead-select-checkbox:checked').length;
+                $('#selectAllLeadsCheckbox').prop('checked', totalBoxes > 0 && totalBoxes === checkedBoxes);
+
+                updateToolbarVisibility();
+            });
+
+            // Form Submit AJAX Handler
+            $('#assignLeadForm').on('submit', function(e) {
+                e.preventDefault();
+                var form = $(this);
+                var mode = $('#assignModeInput').val();
+                var submitBtn = $('#btnSubmitLeadAssign');
+                var origBtnHtml = submitBtn.html();
+
+                var ownerId = $('#assignLeadOwnerSelect').val();
+                var note = $('#assignNoteInput').val();
+                var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+                var postUrl = "{{ route('crm.leads.bulkAssign') }}";
+                var payload = {
+                    lead_owner_id: ownerId || null,
+                    note: note
+                };
+
+                var targetLeadIds = [];
+                if (mode === 'single') {
+                    var singleId = parseInt($('#assignSingleLeadId').val());
+                    targetLeadIds.push(singleId);
+                    payload.lead_ids = [singleId];
+                } else {
+                    $('input[name="lead_ids[]"]').each(function() {
+                        targetLeadIds.push(parseInt($(this).val()));
+                    });
+                    payload.lead_ids = targetLeadIds;
+                }
+
+                submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving...');
+
+                fetch(postUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(function(r) {
+                    return r.json().then(function(data) {
+                        return { ok: r.ok, status: r.status, data: data };
+                    }).catch(function() {
+                        return { ok: r.ok, status: r.status, data: { message: r.statusText } };
+                    });
+                })
+                .then(function(resObj) {
+                    submitBtn.prop('disabled', false).html(origBtnHtml);
+                    var res = resObj.data || {};
+                    if (resObj.ok && res.success) {
+                        var ownerName = res.owner_name || transUnassigned;
+                        var ownerEmail = res.owner_email || '—';
+                        var ownerInitial = res.owner_initial || 'U';
+                        var isAssigned = !!res.owner_id;
+
+                        // Update DOM for each target lead
+                        targetLeadIds.forEach(function(leadId) {
+                            var cell = $('#leadOwnerCell_' + leadId);
+                            if (cell.length) {
+                                var row = $('#leadRow_' + leadId);
+                                var leadName = row.find('.lead-select-checkbox').attr('data-lead-name') || ('Lead #' + leadId);
+                                
+                                var newHtml = '';
+                                if (isAssigned) {
+                                    newHtml = '<div class="d-flex align-items-center cursor-pointer p-1 rounded" ' +
+                                        'onclick="openSingleAssignDrawer(' + leadId + ', \'' + (leadName.replace(/'/g, "\\'")) + '\', \'' + res.owner_id + '\', \'' + (ownerName.replace(/'/g, "\\'")) + '\')" ' +
+                                        'title="' + transChangeOwner + '" style="transition: background-color 0.15s ease;">' +
+                                        '<div class="rounded-circle me-2 d-flex align-items-center justify-content-center text-white fw-bold shadow-xs owner-avatar-circle" ' +
+                                        'style="width: 28px; height: 28px; background-color: #1e40af; font-size: 11px; flex-shrink: 0;" title="' + ownerName + '">' +
+                                        ownerInitial +
+                                        '</div>' +
+                                        '<div>' +
+                                        '<span class="d-block fw-semibold text-dark fs-12 owner-name-text" style="line-height: 1.2;">' + ownerName + '</span>' +
+                                        '<span class="text-muted fs-10 d-block owner-email-text">' + ownerEmail + '</span>' +
+                                        '</div>' +
+                                        '</div>';
+                                } else {
+                                    newHtml = '<div class="d-flex align-items-center cursor-pointer p-1 rounded" ' +
+                                        'onclick="openSingleAssignDrawer(' + leadId + ', \'' + (leadName.replace(/'/g, "\\'")) + '\', \'\', \'' + transUnassigned + '\')" ' +
+                                        'title="' + transAssignOwner + '" style="transition: background-color 0.15s ease;">' +
+                                        '<div class="rounded-circle me-2 d-flex align-items-center justify-content-center text-white fw-bold shadow-xs owner-avatar-circle" ' +
+                                        'style="width: 28px; height: 28px; background-color: #64748b; font-size: 11px; flex-shrink: 0;" title="' + transUnassigned + '">' +
+                                        'U' +
+                                        '</div>' +
+                                        '<div>' +
+                                        '<span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 fw-semibold d-inline-flex align-items-center gap-1 py-0.5 px-2">' +
+                                        '<i class="feather-user-plus fs-9"></i> ' + transUnassigned +
+                                        '</span>' +
+                                        '</div>' +
+                                        '</div>';
+                                }
+                                cell.html(newHtml);
+                            }
+                        });
+
+                        if (assignBsOffcanvas) {
+                            assignBsOffcanvas.hide();
+                        }
+
+                        clearLeadSelections();
+
+                        // Standard Duralux Toast Notification
+                        if (typeof Swal !== 'undefined') {
+                            Swal.mixin({
+                                toast: true,
+                                position: 'top-end',
+                                showConfirmButton: false,
+                                timer: 3500,
+                                timerProgressBar: true,
+                                didOpen: function (toast) {
+                                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                                    toast.addEventListener('mouseleave', Swal.resumeTimer);
+                                }
+                            }).fire({
+                                icon: 'success',
+                                title: res.message || 'Lead assigned successfully!'
+                            });
+                        } else if (typeof toastr !== 'undefined') {
+                            toastr.success(res.message || 'Lead assigned successfully!');
+                        }
+                    } else {
+                        var errMsg = res.message;
+                        if (res.errors) {
+                            errMsg = Object.values(res.errors).flat().join("\n");
+                        }
+                        if (typeof Swal !== 'undefined') {
+                            Swal.mixin({
+                                toast: true,
+                                position: 'top-end',
+                                showConfirmButton: false,
+                                timer: 4000,
+                                timerProgressBar: true
+                            }).fire({
+                                icon: 'error',
+                                title: errMsg || 'Error updating lead owner.'
+                            });
+                        } else {
+                            alert(errMsg || 'Error updating lead owner.');
+                        }
+                    }
+                })
+                .catch(function(err) {
+                    submitBtn.prop('disabled', false).html(origBtnHtml);
+                    console.error('Assign failed:', err);
+                    if (typeof Swal !== 'undefined') {
+                        Swal.mixin({
+                            toast: true,
+                            position: 'top-end',
+                            showConfirmButton: false,
+                            timer: 4000,
+                            timerProgressBar: true
+                        }).fire({
+                            icon: 'error',
+                            title: 'An error occurred while assigning leads.'
+                        });
+                    } else {
+                        alert('An error occurred while assigning leads.');
+                    }
+                });
             });
         });
     </script>
@@ -990,21 +1334,21 @@
                             <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                                 <div class="row g-2">
                                     <div class="col-6">
-                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextSyncGoogle" style="cursor: pointer;">
-                                                <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
+                                        <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasNextSyncGoogle">
+                                                <i class="feather-calendar text-danger"></i> {{ __('crm.google_calendar') }}
                                             </label>
                                             <input type="hidden" name="next_sync_google_calendar" value="0">
-                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_sync_google_calendar" value="1" id="offcanvasNextSyncGoogle" style="cursor: pointer;">
+                                            <x-ui.checkbox name="next_sync_google_calendar" id="offcanvasNextSyncGoogle" value="1" />
                                         </div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextCreateMeet" style="cursor: pointer;">
-                                                <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
+                                        <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasNextCreateMeet">
+                                                <i class="feather-video text-primary"></i> {{ __('crm.google_meet_video') }}
                                             </label>
                                             <input type="hidden" name="next_create_meet_link" value="0">
-                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_create_meet_link" value="1" id="offcanvasNextCreateMeet" style="cursor: pointer;">
+                                            <x-ui.checkbox name="next_create_meet_link" id="offcanvasNextCreateMeet" value="1" />
                                         </div>
                                     </div>
                                 </div>
@@ -1091,21 +1435,21 @@
                     <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                         <div class="row g-2">
                             <div class="col-6">
-                                <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                    <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasSyncGoogle" style="cursor: pointer;">
-                                        <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
+                                <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasSyncGoogle">
+                                        <i class="feather-calendar text-danger"></i> {{ __('crm.google_calendar') }}
                                     </label>
                                     <input type="hidden" name="sync_google_calendar" value="0">
-                                    <input class="form-check-input ms-0 mt-0" type="checkbox" name="sync_google_calendar" value="1" id="offcanvasSyncGoogle" style="cursor: pointer;">
+                                    <x-ui.checkbox name="sync_google_calendar" id="offcanvasSyncGoogle" value="1" />
                                 </div>
                             </div>
                             <div class="col-6">
-                                <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                    <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasCreateMeet" style="cursor: pointer;">
-                                        <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
+                                <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasCreateMeet">
+                                        <i class="feather-video text-primary"></i> {{ __('crm.google_meet_video') }}
                                     </label>
                                     <input type="hidden" name="create_meet_link" value="0">
-                                    <input class="form-check-input ms-0 mt-0" type="checkbox" name="create_meet_link" value="1" id="offcanvasCreateMeet" style="cursor: pointer;">
+                                    <x-ui.checkbox name="create_meet_link" id="offcanvasCreateMeet" value="1" />
                                 </div>
                             </div>
                         </div>
@@ -1133,6 +1477,71 @@
                 <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
                     <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">{{ __('crm.close') }}</button>
                     <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">{{ __('crm.save') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Offcanvas Drawer: Quick Single & Bulk Lead Assignment -->
+    <div class="offcanvas offcanvas-end border-0 shadow-lg" tabindex="-1" id="assignLeadOffcanvas" aria-labelledby="assignLeadOffcanvasLabel" style="width: 460px; max-width: 92vw;">
+        <div class="offcanvas-header bg-light border-bottom py-3 px-4">
+            <div class="d-flex align-items-center gap-2">
+                <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle">
+                    <i class="feather-user-check"></i>
+                </div>
+                <div>
+                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="assignLeadOffcanvasTitle">{{ __('crm.assign_lead_owner') }}</h5>
+                    <span class="text-muted fs-11" id="assignLeadOffcanvasSubtitle">{{ __('crm.select_sales_rep') }}</span>
+                </div>
+            </div>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        
+        <div class="offcanvas-body p-4 bg-white">
+            <form id="assignLeadForm">
+                @csrf
+                <input type="hidden" name="assign_mode" id="assignModeInput" value="single">
+                <input type="hidden" name="single_lead_id" id="assignSingleLeadId" value="">
+                <div id="assignBulkLeadIdsContainer"></div>
+
+                <!-- Lead Info / Target Preview Card -->
+                <div class="p-3 mb-3 bg-light rounded-3 border" id="assignTargetSummaryCard">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="text-muted fs-11 fw-bold text-uppercase" id="assignTargetTypeLabel">{{ __('crm.lead_company') }}</span>
+                        <span class="badge bg-soft-info text-info border border-info-subtle fs-10" id="assignCurrentOwnerBadge">{{ __('crm.unassigned') }}</span>
+                    </div>
+                    <div class="fw-bold text-dark fs-13" id="assignTargetNameDisplay">Lead Name</div>
+                    <div class="text-muted fs-11 mt-1" id="assignBulkCountHint" style="display: none;"></div>
+                </div>
+
+                <!-- Assignee Selector -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold fs-12 text-dark mb-1">
+                        {{ __('crm.select_sales_rep') }} <span class="text-danger">*</span>
+                    </label>
+                    <select name="lead_owner_id" id="assignLeadOwnerSelect" class="form-select form-select-sm fs-12 py-2" required>
+                        <option value="">{{ __('crm.choose_sales_rep_placeholder') }}</option>
+                        @foreach($users as $u)
+                            <option value="{{ $u->id }}" data-email="{{ $u->email }}">{{ $u->name }} ({{ $u->email }})</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Optional Assignment Note -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold fs-12 text-dark mb-1">
+                        {{ __('crm.assignment_note_reason') }} <span class="text-muted fw-normal fs-11">({{ __('crm.optional') ?? 'Optional' }})</span>
+                    </label>
+                    <textarea name="note" id="assignNoteInput" class="form-control fs-12" rows="3" placeholder="e.g. Assigned from Meta ad inquiry, ceramic project..."></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
+                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">{{ __('crm.close') }}</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm d-flex align-items-center gap-1.5" id="btnSubmitLeadAssign">
+                        <i class="feather-check"></i>
+                        <span>{{ __('crm.confirm_assignment') }}</span>
+                    </button>
                 </div>
             </form>
         </div>

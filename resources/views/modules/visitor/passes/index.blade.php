@@ -198,19 +198,19 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="passesTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
+                    <tr>
+                        <th style="width: 35px;" class="text-center">
                             <input type="checkbox" class="form-check-input">
                         </th>
-                        <th style="width: 14%; background-color: #e8ecf1 !important;">{{ __('visitor.pass_number') }}</th>
-                        <th style="width: 20%; background-color: #e8ecf1 !important;">{{ __('visitor.visitor_name') }}</th>
-                        <th style="width: 15%; background-color: #e8ecf1 !important;">{{ __('visitor.company') }}</th>
-                        <th style="width: 15%; background-color: #e8ecf1 !important;">{{ __('visitor.select_host') }}</th>
-                        <th style="width: 12%; background-color: #e8ecf1 !important;">{{ __('visitor.purpose_of_visit') }}</th>
-                        <th style="width: 12%; background-color: #e8ecf1 !important;">{{ __('visitor.check_in_time') }}</th>
-                        <th style="width: 10%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('visitor.fee_charge') }}</th>
-                        <th style="width: 10%; background-color: #e8ecf1 !important;">{{ __('visitor.status') }}</th>
-                        <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('visitor.actions') }}</th>
+                        <th style="width: 14%;">{{ __('visitor.pass_number') }}</th>
+                        <th style="width: 20%;">{{ __('visitor.visitor_name') }}</th>
+                        <th style="width: 15%;">{{ __('visitor.company') }}</th>
+                        <th style="width: 15%;">{{ __('visitor.select_host') }}</th>
+                        <th style="width: 12%;">{{ __('visitor.purpose_of_visit') }}</th>
+                        <th style="width: 12%;">{{ __('visitor.check_in_time') }}</th>
+                        <th style="width: 10%;" class="text-end pe-3">{{ __('visitor.fee_charge') }}</th>
+                        <th style="width: 10%;">{{ __('visitor.status') }}</th>
+                        <th style="width: 5%;" class="text-end pe-3">{{ __('visitor.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -482,6 +482,10 @@
                 border-bottom: 1px solid #1b2436 !important;
                 color: #cbd5e1 !important;
             }
+            html.app-skin-dark .odoo-table tbody tr:hover,
+            html.app-skin-dark .odoo-table-hover tbody tr:hover {
+                background-color: #162038 !important;
+            }
             html.app-skin-dark .odoo-table-input,
             html.app-skin-dark .odoo-table-select {
                 border-bottom: 1px solid #283c50 !important;
@@ -514,6 +518,34 @@
                 background-color: rgba(52, 84, 209, 0.2) !important;
                 border-color: rgba(52, 84, 209, 0.4) !important;
                 color: #93c5fd !important;
+            }
+            html.app-skin-dark .qty-row-input {
+                background-color: #121a2d !important;
+                border-color: #283c50 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark #productItemsTable,
+            html.app-skin-dark #editProductItemsTable {
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark #productItemsTable thead tr,
+            html.app-skin-dark #editProductItemsTable thead tr {
+                background-color: #162038 !important;
+                color: #94a3b8 !important;
+            }
+            html.app-skin-dark #productItemsTable .select2-container--bootstrap-5 .select2-selection--single,
+            html.app-skin-dark #editProductItemsTable .select2-container--bootstrap-5 .select2-selection--single {
+                background-color: #121a2d !important;
+                border-color: #283c50 !important;
+            }
+            html.app-skin-dark #productItemsTable .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered,
+            html.app-skin-dark #editProductItemsTable .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+                color: #ffffff !important;
+            }
+            html.app-skin-dark #productItemsContainer .bg-white,
+            html.app-skin-dark #editProductItemsContainer .bg-white {
+                background-color: #0f172a !important;
+                border-color: #1b2436 !important;
             }
         </style>
     @endpush

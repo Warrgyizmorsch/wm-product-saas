@@ -237,14 +237,14 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="approvalTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 14%; background-color: #e8ecf1 !important;">{{ __('visitor.pass_number') }}</th>
-                        <th style="width: 18%; background-color: #e8ecf1 !important;">{{ __('visitor.visitor_name') }}</th>
-                        <th style="width: 13%; background-color: #e8ecf1 !important;">{{ __('visitor.company') }}</th>
-                        <th style="width: 13%; background-color: #e8ecf1 !important;">{{ __('visitor.purpose_of_visit') }}</th>
-                        <th style="width: 12%; background-color: #e8ecf1 !important;">{{ __('visitor.expected_time') }}</th>
-                        <th style="width: 9%; background-color: #e8ecf1 !important;">{{ __('visitor.status') }}</th>
-                        <th style="width: 21%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('visitor.actions') }}</th>
+                    <tr>
+                        <th style="width: 14%;">{{ __('visitor.pass_number') }}</th>
+                        <th style="width: 18%;">{{ __('visitor.visitor_name') }}</th>
+                        <th style="width: 13%;">{{ __('visitor.company') }}</th>
+                        <th style="width: 13%;">{{ __('visitor.purpose_of_visit') }}</th>
+                        <th style="width: 12%;">{{ __('visitor.expected_time') }}</th>
+                        <th style="width: 9%;">{{ __('visitor.status') }}</th>
+                        <th style="width: 21%;" class="text-end pe-3">{{ __('visitor.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

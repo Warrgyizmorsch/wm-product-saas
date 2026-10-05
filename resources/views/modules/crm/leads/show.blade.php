@@ -40,6 +40,191 @@
             border-color: var(--bs-primary) !important;
             background-color: #eff6ff !important;
         }
+        .quotation-rev-chip {
+            min-width: 170px;
+            transition: all 0.2s ease;
+            position: relative;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+        }
+        .quotation-rev-chip:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .quotation-rev-chip.active {
+            border-color: var(--bs-primary) !important;
+            background-color: #f0f9ff;
+            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+        }
+
+        /* ==========================================================================
+           DARK MODE SUPPORT (html.app-skin-dark)
+           ========================================================================== */
+        html.app-skin-dark .quotation-rev-chip {
+            background-color: #162038 !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .quotation-rev-chip:hover {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+        html.app-skin-dark .quotation-rev-chip.active {
+            background-color: #1e293b !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4) !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container,
+        html.app-skin-dark .zoho-main-col,
+        html.app-skin-dark #zohoMainScrollable,
+        html.app-skin-dark .tab-content,
+        html.app-skin-dark .tab-pane {
+            background-color: #0b1329 !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+        html.app-skin-dark .zoho-sidebar-col {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .sticky-top,
+        html.app-skin-dark div[style*="background-color: #f8fafc"],
+        html.app-skin-dark div[style*="background-color:#f8fafc"] {
+            background-color: #0b1329 !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-header-banner {
+            background-color: #111827 !important;
+            border-bottom-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-sidebar-nav {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-sidebar-nav .nav-link {
+            color: #94a3b8 !important;
+        }
+        html.app-skin-dark .zoho-sidebar-nav .nav-link:hover {
+            background-color: #1e293b !important;
+            color: #60a5fa !important;
+        }
+        html.app-skin-dark .zoho-sidebar-nav .nav-link.active {
+            background-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+        }
+        html.app-skin-dark .zoho-nav-tabs .nav-link {
+            border-color: #334155 !important;
+            background-color: #162038 !important;
+            color: #94a3b8 !important;
+        }
+        html.app-skin-dark .zoho-nav-tabs .nav-link:hover {
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
+            border-color: #475569 !important;
+        }
+        html.app-skin-dark .zoho-nav-tabs .nav-link.active {
+            background-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+            border-color: var(--bs-primary) !important;
+        }
+        html.app-skin-dark .zoho-field-row {
+            border-bottom-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-field-label {
+            color: #94a3b8 !important;
+        }
+        html.app-skin-dark .zoho-field-value {
+            color: #f8fafc !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container .card,
+        html.app-skin-dark div[style*="background-color: #ffffff"],
+        html.app-skin-dark div[style*="background-color:#ffffff"],
+        html.app-skin-dark .zoho-lead-card-container .bg-white,
+        html.app-skin-dark .bg-white {
+            background-color: #111827 !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container .bg-light,
+        html.app-skin-dark .bg-light {
+            background-color: #162038 !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container .border,
+        html.app-skin-dark .zoho-lead-card-container .border-bottom,
+        html.app-skin-dark .zoho-lead-card-container .border-top,
+        html.app-skin-dark .zoho-lead-card-container .border-end,
+        html.app-skin-dark .zoho-lead-card-container .border-start,
+        html.app-skin-dark .border {
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container .text-dark,
+        html.app-skin-dark .text-dark {
+            color: #f8fafc !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container .text-muted,
+        html.app-skin-dark .text-muted {
+            color: #94a3b8 !important;
+        }
+        html.app-skin-dark .requirement-clickable-box {
+            background: linear-gradient(135deg, #162038 0%, #1e293b 100%) !important;
+        }
+        html.app-skin-dark .requirement-clickable-box:hover {
+            background: #1e293b !important;
+        }
+        html.app-skin-dark .requirement-empty-box {
+            background-color: #162038 !important;
+            border-color: #334155 !important;
+        }
+        html.app-skin-dark .table-responsive table,
+        html.app-skin-dark .table {
+            color: #f1f5f9 !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .table th,
+        html.app-skin-dark .table.odoo-table th {
+            background-color: #162038 !important;
+            color: #94a3b8 !important;
+            border-color: #1e293b !important;
+            border-bottom-color: #1e293b !important;
+        }
+        html.app-skin-dark .table td,
+        html.app-skin-dark .table.odoo-table td {
+            border-color: #1e293b !important;
+            border-bottom-color: #1e293b !important;
+            color: #f1f5f9 !important;
+        }
+        html.app-skin-dark input,
+        html.app-skin-dark select,
+        html.app-skin-dark textarea,
+        html.app-skin-dark .form-control,
+        html.app-skin-dark .form-select {
+            background-color: #162038 !important;
+            border-color: #334155 !important;
+            color: #f8fafc !important;
+        }
+        html.app-skin-dark .zoho-header-banner .btn-outline-secondary,
+        html.app-skin-dark .btn-outline-secondary {
+            background-color: #162038 !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+        html.app-skin-dark .modal-content,
+        html.app-skin-dark .offcanvas {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .dropdown-menu {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .dropdown-item {
+            color: #cbd5e1 !important;
+        }
+        html.app-skin-dark .dropdown-item:hover {
+            background-color: #1e293b !important;
+            color: #60a5fa !important;
+        }
     </style>
 
     <!-- Hidden form for stage status updates via clickable/action triggers -->
@@ -456,9 +641,13 @@
                                                         height: 32px !important;
                                                         font-size: 13px !important;
                                                         font-weight: 600 !important;
-                                                        border-color: #dee2e6 !important;
-                                                        background-color: #ffffff !important;
+                                                        border-color: #dee2e6;
                                                         padding: 2px 4px !important;
+                                                    }
+                                                    html.app-skin-dark #editProductItemsTable .qty-row-input {
+                                                        background-color: #121a2d !important;
+                                                        border-color: #283c50 !important;
+                                                        color: #ffffff !important;
                                                     }
                                                 </style>
 
@@ -2029,7 +2218,7 @@
                                                 </h6>
                                                 <div class="d-flex flex-wrap gap-2 align-items-center">
                                                     @foreach($revisions as $rev)
-                                                        <div class="d-flex align-items-center gap-2 p-2 border rounded bg-white" style="min-width: 170px; border-color: {{ $rev->id === $activeQuotation->id ? '#3b82f6 !important' : '#e2e8f0' }} !important; transition: all 0.2s; position: relative; {{ $rev->id === $activeQuotation->id ? 'box-shadow: 0 0 0 1px rgba(59,130,246,0.1); background-color: #f0f9ff !important;' : '' }}">
+                                                        <div class="quotation-rev-chip d-flex align-items-center gap-2 p-2 rounded {{ $rev->id === $activeQuotation->id ? 'active' : '' }}">
                                                             @if($rev->id === $activeQuotation->id)
                                                                 <span class="position-absolute top-0 end-0 translate-middle-y badge rounded-pill bg-primary fs-8 text-uppercase px-1" style="font-size: 8px !important; margin-right: 10px;">{{ __('crm.viewing') }}</span>
                                                             @endif
@@ -3569,21 +3758,21 @@
                             <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                                 <div class="row g-2">
                                     <div class="col-6">
-                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextSyncGoogle" style="cursor: pointer;">
-                                                <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
+                                        <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasNextSyncGoogle">
+                                                <i class="feather-calendar text-danger"></i> {{ __('crm.google_calendar') }}
                                             </label>
                                             <input type="hidden" name="next_sync_google_calendar" value="0">
-                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_sync_google_calendar" value="1" id="offcanvasNextSyncGoogle" style="cursor: pointer;">
+                                            <x-ui.checkbox name="next_sync_google_calendar" id="offcanvasNextSyncGoogle" value="1" />
                                         </div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextCreateMeet" style="cursor: pointer;">
-                                                <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
+                                        <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasNextCreateMeet">
+                                                <i class="feather-video text-primary"></i> {{ __('crm.google_meet_video') }}
                                             </label>
                                             <input type="hidden" name="next_create_meet_link" value="0">
-                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_create_meet_link" value="1" id="offcanvasNextCreateMeet" style="cursor: pointer;">
+                                            <x-ui.checkbox name="next_create_meet_link" id="offcanvasNextCreateMeet" value="1" />
                                         </div>
                                     </div>
                                 </div>
@@ -3631,21 +3820,21 @@
                     <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                         <div class="row g-2">
                             <div class="col-6">
-                                <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                    <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasSyncGoogle" style="cursor: pointer;">
-                                        <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
+                                <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasSyncGoogle">
+                                        <i class="feather-calendar text-danger"></i> {{ __('crm.google_calendar') }}
                                     </label>
                                     <input type="hidden" name="sync_google_calendar" value="0">
-                                    <input class="form-check-input ms-0 mt-0" type="checkbox" name="sync_google_calendar" value="1" id="offcanvasSyncGoogle" style="cursor: pointer;">
+                                    <x-ui.checkbox name="sync_google_calendar" id="offcanvasSyncGoogle" value="1" />
                                 </div>
                             </div>
                             <div class="col-6">
-                                <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                    <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasCreateMeet" style="cursor: pointer;">
-                                        <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
+                                <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasCreateMeet">
+                                        <i class="feather-video text-primary"></i> {{ __('crm.google_meet_video') }}
                                     </label>
                                     <input type="hidden" name="create_meet_link" value="0">
-                                    <input class="form-check-input ms-0 mt-0" type="checkbox" name="create_meet_link" value="1" id="offcanvasCreateMeet" style="cursor: pointer;">
+                                    <x-ui.checkbox name="create_meet_link" id="offcanvasCreateMeet" value="1" />
                                 </div>
                             </div>
                         </div>

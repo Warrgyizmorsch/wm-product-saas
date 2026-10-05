@@ -1138,6 +1138,10 @@ class LeadApiController extends Controller
         $lead->lead_owner_id = $request->input('lead_owner_id');
         $lead->save();
 
+        if ($lead->crm_deal_id) {
+            \App\Domains\CRM\Models\CrmDeal::where('id', $lead->crm_deal_id)->update(['owner_id' => $lead->lead_owner_id]);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Lead owner reassigned successfully.',

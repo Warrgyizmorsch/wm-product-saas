@@ -84,6 +84,67 @@
         fill: #f59e0b !important;
         transform: scale(1.25);
     }
+
+    /* ==========================================
+       Dark Mode Support (html.app-skin-dark)
+       ========================================== */
+    html.app-skin-dark .erp-single-panel {
+        background-color: transparent !important;
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .kanban-column {
+        background-color: #111827 !important;
+        border-color: #1f2937 !important;
+    }
+    html.app-skin-dark .kanban-column-header {
+        background-color: #162038 !important;
+        border-bottom-color: #1f2937 !important;
+    }
+    html.app-skin-dark .kanban-column-header .text-dark {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .kanban-column-header .text-muted {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .col-total {
+        color: #38bdf8 !important;
+    }
+    html.app-skin-dark .kanban-card {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3) !important;
+    }
+    html.app-skin-dark .kanban-card:hover {
+        border-color: #475569 !important;
+        background-color: #243248 !important;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45) !important;
+    }
+    html.app-skin-dark .kanban-card .text-dark {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .kanban-card .text-muted,
+    html.app-skin-dark .kanban-card .text-secondary {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .kanban-card a.text-dark:hover {
+        color: #60a5fa !important;
+    }
+    html.app-skin-dark .kanban-card a.text-muted:hover {
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .kanban-card .border-top {
+        border-top-color: #334155 !important;
+    }
+    html.app-skin-dark .drag-over {
+        background-color: #1e293b !important;
+        border-color: #3b82f6 !important;
+    }
+    html.app-skin-dark .empty-col-msg {
+        color: #64748b !important;
+    }
+    html.app-skin-dark .star-rating-widget .star-icon.inactive-star {
+        color: #475569;
+    }
 </style>
 @endpush
 

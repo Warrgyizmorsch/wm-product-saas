@@ -125,13 +125,13 @@
     <div class="table-responsive">
         <x-ui.odoo-form-ui type="table" id="dealStatusMasterTable" class="mb-0">
             <thead>
-                <tr style="background-color: #e8ecf1 !important;">
-                    <th style="width: 50px; background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.drag') }}</th>
-                    <th style="width: 70px; background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.order') }}</th>
-                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.stage_name') }}</th>
-                    <th style="width: 140px; background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.win_prob_percent') }}</th>
-                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.type_protection') }}</th>
-                    <th style="width: 100px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
+                <tr>
+                    <th style="width: 50px;" class="text-center">{{ __('crm.drag') }}</th>
+                    <th style="width: 70px;" class="text-center">{{ __('crm.order') }}</th>
+                    <th>{{ __('crm.stage_name') }}</th>
+                    <th style="width: 140px;" class="text-center">{{ __('crm.win_prob_percent') }}</th>
+                    <th>{{ __('crm.type_protection') }}</th>
+                    <th style="width: 100px;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                 </tr>
             </thead>
             <tbody id="sortableStatusesBody" class="fs-13 text-dark">

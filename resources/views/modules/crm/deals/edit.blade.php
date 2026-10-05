@@ -143,9 +143,13 @@
                             height: 32px !important;
                             font-size: 13px !important;
                             font-weight: 600 !important;
-                            border-color: #dee2e6 !important;
-                            background-color: #ffffff !important;
+                            border-color: #dee2e6;
                             width: 100% !important;
+                        }
+                        html.app-skin-dark #productItemsTable .qty-row-input {
+                            background-color: #121a2d !important;
+                            border-color: #283c50 !important;
+                            color: #ffffff !important;
                         }
                         .remove-product-row-btn {
                             transition: transform 0.15s ease-in-out, opacity 0.15s ease-in-out;

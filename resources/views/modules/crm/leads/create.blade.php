@@ -219,8 +219,12 @@
                                     height: 32px !important;
                                     font-size: 13px !important;
                                     font-weight: 600 !important;
-                                    border-color: #dee2e6 !important;
-                                    background-color: #ffffff !important;
+                                    border-color: #dee2e6;
+                                }
+                                html.app-skin-dark #productItemsTable .qty-row-input {
+                                    background-color: #121a2d !important;
+                                    border-color: #283c50 !important;
+                                    color: #ffffff !important;
                                 }
                                 .remove-product-row-btn {
                                     transition: transform 0.15s ease-in-out, opacity 0.15s ease-in-out;
@@ -820,7 +824,6 @@
                         if (isB2B) {
                             inputEl.setAttribute('required', 'required');
                             if (labelEl) {
-                                labelEl.style.setProperty('color', '#dc3545', 'important');
                                 if (!labelEl.querySelector('.text-danger')) {
                                     labelEl.innerHTML = labelEl.innerHTML.trim() + ' <span class="text-danger">*</span>';
                                 }
@@ -828,7 +831,6 @@
                         } else {
                             inputEl.removeAttribute('required');
                             if (labelEl) {
-                                labelEl.style.removeProperty('color');
                                 var star = labelEl.querySelector('.text-danger');
                                 if (star) star.remove();
                             }
@@ -844,7 +846,6 @@
                         if (!isB2B) {
                             inputEl.setAttribute('required', 'required');
                             if (labelEl) {
-                                labelEl.style.setProperty('color', '#dc3545', 'important');
                                 if (!labelEl.querySelector('.text-danger')) {
                                     labelEl.innerHTML = labelEl.innerHTML.trim() + ' <span class="text-danger">*</span>';
                                 }
@@ -852,7 +853,6 @@
                         } else {
                             inputEl.removeAttribute('required');
                             if (labelEl) {
-                                labelEl.style.removeProperty('color');
                                 var star = labelEl.querySelector('.text-danger');
                                 if (star) star.remove();
                             }

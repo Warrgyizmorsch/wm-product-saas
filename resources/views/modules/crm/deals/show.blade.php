@@ -317,6 +317,343 @@
     .table.odoo-table input[type="number"] {
         -moz-appearance: textfield !important;
     }
+
+    /* Requirement Box Styles */
+    .requirement-clickable-box {
+        cursor: pointer;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border-left: 4px solid var(--bs-primary) !important;
+        border: 1px solid #cbd5e1;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .requirement-clickable-box:hover {
+        border-color: var(--bs-primary) !important;
+        border-left: 4px solid var(--bs-primary) !important;
+        background: #ffffff !important;
+        box-shadow: 0 6px 20px rgba(30, 64, 175, 0.1) !important;
+        transform: translateY(-1px);
+    }
+    .requirement-clickable-box:hover .edit-hint-badge {
+        background-color: var(--bs-primary) !important;
+        color: #ffffff !important;
+        border-color: var(--bs-primary) !important;
+    }
+    .requirement-clickable-box:hover .edit-hint-badge i {
+        color: #ffffff !important;
+    }
+    .requirement-empty-box {
+        border: 2px dashed #cbd5e1 !important;
+        background-color: #f8fafc;
+        transition: all 0.25s ease;
+    }
+    .requirement-empty-box:hover {
+        border-color: var(--bs-primary) !important;
+        background-color: #eff6ff !important;
+    }
+    .deal-doc-box {
+        background-color: #f8fafc;
+        border-color: #e2e8f0 !important;
+    }
+    .quotation-rev-chip {
+        min-width: 170px;
+        transition: all 0.2s ease;
+        position: relative;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+    }
+    .quotation-rev-chip:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    .quotation-rev-chip.active {
+        border-color: var(--bs-primary) !important;
+        background-color: #f0f9ff;
+        box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+    }
+
+    /* ==========================================================================
+       DARK MODE SUPPORT (html.app-skin-dark)
+       ========================================================================== */
+    html.app-skin-dark .quotation-rev-chip {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .quotation-rev-chip:hover {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+    }
+    html.app-skin-dark .quotation-rev-chip.active {
+        background-color: #1e293b !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4) !important;
+    }
+    html.app-skin-dark .zoho-lead-card-container,
+    html.app-skin-dark .zoho-main-col,
+    html.app-skin-dark #zohoMainScrollable,
+    html.app-skin-dark #zohoDealTabsContent,
+    html.app-skin-dark .tab-content,
+    html.app-skin-dark .tab-pane {
+        background-color: #0b1329 !important;
+        border-color: #1e293b !important;
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .zoho-sidebar-col {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .sticky-top {
+        background-color: #0b1329 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark div[style*="background: #f8fafc"],
+    html.app-skin-dark div[style*="background:#f8fafc"],
+    html.app-skin-dark div[style*="background-color: #f8fafc"],
+    html.app-skin-dark div[style*="background-color:#f8fafc"],
+    html.app-skin-dark div[style*="background: #f1f5f9"],
+    html.app-skin-dark div[style*="background:#f1f5f9"],
+    html.app-skin-dark div[style*="background-color: #f1f5f9"],
+    html.app-skin-dark div[style*="background-color:#f1f5f9"] {
+        background-color: #162038 !important;
+        background: #162038 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .requirement-clickable-box {
+        background: linear-gradient(135deg, #162038 0%, #1e293b 100%) !important;
+        border-color: #334155 !important;
+        border-left: 4px solid var(--bs-primary) !important;
+    }
+    html.app-skin-dark .requirement-clickable-box:hover {
+        background: #1e293b !important;
+        background-color: #1e293b !important;
+    }
+    html.app-skin-dark .requirement-empty-box {
+        background: #162038 !important;
+        background-color: #162038 !important;
+        border-color: #334155 !important;
+    }
+    html.app-skin-dark .requirement-empty-box:hover {
+        background-color: #1e293b !important;
+        border-color: #60a5fa !important;
+    }
+    html.app-skin-dark .edit-hint-badge {
+        background-color: #1e293b !important;
+        color: #60a5fa !important;
+        border-color: #334155 !important;
+    }
+    html.app-skin-dark .bg-light-subtle,
+    html.app-skin-dark .deal-doc-box {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .zoho-header-banner {
+        background-color: #111827 !important;
+        border-bottom-color: #1e293b !important;
+    }
+    html.app-skin-dark .zoho-deal-pipeline-strip {
+        background-color: #0f172a !important;
+        border-bottom-color: #1e293b !important;
+    }
+    html.app-skin-dark .zoho-pipeline-step {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .zoho-pipeline-step:hover {
+        background-color: #243248 !important;
+        border-color: #60a5fa !important;
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .zoho-pipeline-step.passed {
+        background-color: #162038 !important;
+        color: #60a5fa !important;
+        border-color: #2563eb !important;
+    }
+    html.app-skin-dark .card,
+    html.app-skin-dark div[style*="background-color: #ffffff"],
+    html.app-skin-dark div[style*="background-color:#ffffff"],
+    html.app-skin-dark div[style*="background: linear-gradient"],
+    html.app-skin-dark div[style*="background:linear-gradient"],
+    html.app-skin-dark .bg-white {
+        background: #111827 !important;
+        background-color: #111827 !important;
+        border-color: #1e293b !important;
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .bg-light,
+    html.app-skin-dark .p-2.5.rounded.border.bg-white,
+    html.app-skin-dark .p-3.rounded.border {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .deal-metric-card {
+        background-color: #111827 !important;
+        border-color: #1e293b !important;
+        color: #f8fafc !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25) !important;
+    }
+    html.app-skin-dark .deal-metric-card:hover {
+        background-color: #162038 !important;
+        border-color: #334155 !important;
+    }
+    html.app-skin-dark .deal-metric-card .text-dark,
+    html.app-skin-dark .zoho-section-title,
+    html.app-skin-dark .text-dark {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .deal-metric-card .text-muted,
+    html.app-skin-dark .text-muted {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .border,
+    html.app-skin-dark .border-bottom,
+    html.app-skin-dark .border-top,
+    html.app-skin-dark .border-end,
+    html.app-skin-dark .border-start {
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .zoho-sidebar-nav {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .zoho-sidebar-nav .nav-link {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .zoho-sidebar-nav .nav-link:hover {
+        background-color: #1e293b !important;
+        color: #60a5fa !important;
+    }
+    html.app-skin-dark .zoho-sidebar-nav .nav-link.active {
+        background-color: var(--bs-primary) !important;
+        color: #ffffff !important;
+    }
+    html.app-skin-dark .zoho-nav-tabs .nav-link {
+        border-color: #334155 !important;
+        background-color: #162038 !important;
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .zoho-nav-tabs .nav-link:hover {
+        background-color: #1e293b !important;
+        color: #f8fafc !important;
+        border-color: #475569 !important;
+    }
+    html.app-skin-dark .zoho-nav-tabs .nav-link.active {
+        background-color: var(--bs-primary) !important;
+        color: #ffffff !important;
+        border-color: var(--bs-primary) !important;
+    }
+    html.app-skin-dark .zoho-timeline-subtabs .nav-link {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .zoho-timeline-subtabs .nav-link.active {
+        color: #60a5fa !important;
+        border-bottom-color: #60a5fa !important;
+    }
+    html.app-skin-dark .zoho-field-row {
+        border-bottom-color: #1e293b !important;
+    }
+    html.app-skin-dark .zoho-field-label {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .zoho-field-value {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .zoho-timeline-date-header {
+        background-color: #162038 !important;
+        color: #94a3b8 !important;
+        border-color: #334155 !important;
+    }
+    html.app-skin-dark .zoho-timeline-icon {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .zoho-timeline-line {
+        background-color: #1e293b !important;
+    }
+    html.app-skin-dark .zoho-header-banner .btn-outline-secondary,
+    html.app-skin-dark .btn-outline-secondary {
+        background-color: #162038 !important;
+        color: #f8fafc !important;
+        border-color: #334155 !important;
+    }
+    html.app-skin-dark .table-responsive table,
+    html.app-skin-dark .table {
+        color: #f1f5f9 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .table th,
+    html.app-skin-dark .table.odoo-table th {
+        background-color: #162038 !important;
+        color: #94a3b8 !important;
+        border-color: #1e293b !important;
+        border-bottom-color: #1e293b !important;
+    }
+    html.app-skin-dark .table td,
+    html.app-skin-dark .table.odoo-table td {
+        border-color: #1e293b !important;
+        border-bottom-color: #1e293b !important;
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .table-bordered {
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark input,
+    html.app-skin-dark select,
+    html.app-skin-dark textarea,
+    html.app-skin-dark .form-control,
+    html.app-skin-dark .form-select {
+        background-color: #162038 !important;
+        border-color: #334155 !important;
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .form-control:focus,
+    html.app-skin-dark .form-select:focus {
+        background-color: #1c2a4a !important;
+        border-color: #60a5fa !important;
+        color: #ffffff !important;
+    }
+    html.app-skin-dark .input-group-text {
+        background-color: #162038 !important;
+        border-color: #334155 !important;
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .modal-content,
+    html.app-skin-dark .offcanvas {
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .modal-header,
+    html.app-skin-dark .modal-footer,
+    html.app-skin-dark .offcanvas-header {
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .dropdown-menu {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .dropdown-item {
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .dropdown-item:hover {
+        background-color: #1e293b !important;
+        color: #60a5fa !important;
+    }
+    html.app-skin-dark .dropdown-divider {
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .alert-light {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .table.odoo-table .odoo-table-input {
+        color: #f8fafc !important;
+        border-bottom-color: #334155 !important;
+    }
+    html.app-skin-dark .table.odoo-table .select2-container--bootstrap-5 .select2-selection__rendered {
+        color: #f8fafc !important;
+    }
 </style>
 @endpush
 
@@ -892,7 +1229,22 @@
 
                                         <div class="zoho-field-row">
                                             <div class="zoho-field-label">{{ __('crm.lead_owner') }}</div>
-                                            <div class="zoho-field-value text-primary fw-bold">{{ $deal->account?->owner?->name ?: __('crm.unassigned') }}</div>
+                                            <div class="zoho-field-value text-primary fw-bold">
+                                                @php
+                                                    $leadOwner = $linkedLead?->owner ?: ($deal->lead?->owner ?: ($deal->account?->owner ?: null));
+                                                    $leadOwnerName = $leadOwner?->name;
+                                                @endphp
+                                                @if($leadOwnerName)
+                                                    <span class="d-inline-flex align-items-center gap-1.5">
+                                                       
+                                                        <span class="text-dark fw-bold">{{ $leadOwnerName }}</span>
+                                                    </span>
+                                                @else
+                                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-11 fw-semibold">
+                                                        <i class="feather-user-plus me-1 fs-10"></i>{{ __('crm.unassigned') }}
+                                                    </span>
+                                                @endif
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1040,16 +1392,16 @@
                                 <!-- View Mode (Clickable to Edit) -->
                                 <div id="viewDealRequirementBlock">
                                     @if (!empty($currentReq))
-                                        <div class="position-relative requirement-clickable-box p-3 rounded shadow-2xs" onclick="enableDealRequirementEdit()" title="Click anywhere to edit requirement" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1; transition: all 0.2s ease;">
+                                        <div class="position-relative requirement-clickable-box p-3 rounded shadow-2xs" onclick="enableDealRequirementEdit()" title="Click anywhere to edit requirement" style="cursor: pointer;">
                                             <div class="d-flex align-items-start justify-content-between gap-3">
                                                 <div class="text-dark fs-13 flex-grow-1" style="white-space: pre-wrap; line-height: 1.6; font-family: 'Inter', sans-serif;" id="viewDealRequirementText">{{ $currentReq }}</div>
-                                                <span class="badge bg-white text-primary border shadow-2xs px-2.5 py-1.5 fs-11 flex-shrink-0 edit-hint-badge" style="border-color: #cbd5e1 !important; transition: all 0.2s ease;">
+                                                <span class="badge bg-white text-primary border shadow-2xs px-2.5 py-1.5 fs-11 flex-shrink-0 edit-hint-badge">
                                                     <i class="feather-edit-2 me-1"></i>Click to Edit
                                                 </span>
                                             </div>
                                         </div>
                                     @else
-                                        <div class="position-relative requirement-empty-box p-4 rounded text-center cursor-pointer" onclick="enableDealRequirementEdit()" title="{{ __('crm.click_to_add_requirements') }}" style="cursor: pointer; background: #f8fafc; border: 1px dashed #cbd5e1; transition: all 0.2s ease;">
+                                        <div class="position-relative requirement-empty-box p-4 rounded text-center cursor-pointer" onclick="enableDealRequirementEdit()" title="{{ __('crm.click_to_add_requirements') }}" style="cursor: pointer;">
                                             <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2">
                                                 <i class="feather-edit-3 fs-5"></i>
                                             </div>
@@ -1122,7 +1474,7 @@
                                                 }
                                             @endphp
                                             <div class="col-md-6">
-                                                <div class="p-3 border rounded-3 d-flex align-items-center justify-content-between h-100 shadow-2xs" style="background-color: #f8fafc; border-color: #e2e8f0 !important;">
+                                                <div class="p-3 border rounded-3 d-flex align-items-center justify-content-between h-100 shadow-2xs deal-doc-box">
                                                     <div class="d-flex align-items-center overflow-hidden me-2" style="gap: 12px;">
                                                         <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px;">
                                                             @if($fileTypeCategory === 'excel')
@@ -1206,33 +1558,31 @@
                                             <a href="{{ route('crm.deals.show', $deal->id) }}" class="btn btn-sm btn-light border">{{ __('crm.cancel') }}</a>
                                         </div>
 
-                                        <div class="row g-4 mb-4 fs-13 text-dark">
-                                            <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.customer_account')" name="_customer_display"
+                                        <div class="row g-3 mb-4 fs-13 text-dark">
+                                            <div class="col-md-6 d-flex flex-column gap-3">
+                                                <x-ui.input :label="__('crm.customer_account')" name="_customer_display"
                                                     :value="$deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A'))"
-                                                    readonly="true"
-                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
+                                                    readonly="true" />
 
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" :value="old('email', $deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : ''))" :errorText="$errors->first('email')" />
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : ''))" :errorText="$errors->first('phone')" />
+                                                <x-ui.input type="email" :label="__('crm.contact_email')" name="email" :value="old('email', $deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : ''))" :helperText="$errors->first('email')" />
+                                                <x-ui.input type="text" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : ''))" :helperText="$errors->first('phone')" />
                                             </div>
-                                            <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.quotation_number')" name="quotation_number"
+                                            <div class="col-md-6 d-flex flex-column gap-3">
+                                                <x-ui.input :label="__('crm.quotation_number')" name="quotation_number"
                                                     :value="old('quotation_number', $nextQuotationNumber)" readonly="true"
-                                                    style="font-weight: bold; color: #495057;"
-                                                    :errorText="$errors->first('quotation_number')" />
+                                                    :helperText="$errors->first('quotation_number')" />
 
-                                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.quotation_date')" name="quotation_date"
-                                                    :value="old('quotation_date', date('Y-m-d'))" :errorText="$errors->first('quotation_date')" />
+                                                <x-ui.input type="date" :label="__('crm.quotation_date')" name="quotation_date"
+                                                    :value="old('quotation_date', date('Y-m-d'))" :helperText="$errors->first('quotation_date')" />
 
-                                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.expiration_date')" name="expiry_date"
-                                                    :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" :errorText="$errors->first('expiry_date')" />
+                                                <x-ui.input type="date" :label="__('crm.expiration_date')" name="expiry_date"
+                                                    :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" :helperText="$errors->first('expiry_date')" />
 
                                                 @if(!$isQuotationAutoApprove)
-                                                    <x-ui.odoo-form-ui type="select" :label="__('crm.initial_status')" name="status" :required="true" :errorText="$errors->first('status')">
+                                                    <x-ui.select :label="__('crm.initial_status')" name="status" :required="true" :helperText="$errors->first('status')">
                                                          <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.draft') }}</option>
                                                          <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>{{ __('crm.sent_for_approval') }}</option>
-                                                     </x-ui.odoo-form-ui>
+                                                    </x-ui.select>
                                                 @endif
                                             </div>
                                         </div>
@@ -1315,33 +1665,31 @@
                                             <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-light border">{{ __('crm.cancel') }}</a>
                                         </div>
 
-                                        <div class="row g-4 mb-4 fs-13 text-dark">
-                                            <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.customer_account')" name="_customer_display"
+                                        <div class="row g-3 mb-4 fs-13 text-dark">
+                                            <div class="col-md-6 d-flex flex-column gap-3">
+                                                <x-ui.input :label="__('crm.customer_account')" name="_customer_display"
                                                     :value="$deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A'))"
-                                                    readonly="true"
-                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
+                                                    readonly="true" />
 
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" :value="old('email', $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '')))" :errorText="$errors->first('email')" />
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '')))" :errorText="$errors->first('phone')" />
+                                                <x-ui.input type="email" :label="__('crm.contact_email')" name="email" :value="old('email', $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '')))" :helperText="$errors->first('email')" />
+                                                <x-ui.input type="text" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '')))" :helperText="$errors->first('phone')" />
                                             </div>
-                                            <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.quotation_number')" name="quotation_number"
+                                            <div class="col-md-6 d-flex flex-column gap-3">
+                                                <x-ui.input :label="__('crm.quotation_number')" name="quotation_number"
                                                     :value="$activeQuotation->quotation_number" readonly="true"
-                                                    style="font-weight: bold; color: #495057;"
-                                                    :errorText="$errors->first('quotation_number')" />
+                                                    :helperText="$errors->first('quotation_number')" />
 
-                                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.quotation_date')" name="quotation_date"
-                                                    :value="old('quotation_date', $activeQuotation->quotation_date ? \Illuminate\Support\Carbon::parse($activeQuotation->quotation_date)->format('Y-m-d') : date('Y-m-d'))" :errorText="$errors->first('quotation_date')" />
+                                                <x-ui.input type="date" :label="__('crm.quotation_date')" name="quotation_date"
+                                                    :value="old('quotation_date', $activeQuotation->quotation_date ? \Illuminate\Support\Carbon::parse($activeQuotation->quotation_date)->format('Y-m-d') : date('Y-m-d'))" :helperText="$errors->first('quotation_date')" />
 
-                                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.expiration_date')" name="expiry_date"
-                                                    :value="old('expiry_date', $activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('Y-m-d') : '')" :errorText="$errors->first('expiry_date')" />
+                                                <x-ui.input type="date" :label="__('crm.expiration_date')" name="expiry_date"
+                                                    :value="old('expiry_date', $activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('Y-m-d') : '')" :helperText="$errors->first('expiry_date')" />
 
                                                 @if(!$isQuotationAutoApprove)
-                                                    <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" :required="true" :errorText="$errors->first('status')">
+                                                    <x-ui.select :label="__('crm.status')" name="status" :required="true" :helperText="$errors->first('status')">
                                                          <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>{{ __('crm.draft') }}</option>
                                                          <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>{{ __('crm.sent_for_approval') }}</option>
-                                                     </x-ui.odoo-form-ui>
+                                                    </x-ui.select>
                                                 @endif
                                             </div>
                                         </div>
@@ -1705,7 +2053,7 @@
                                     @if($revisions->count() > 0)
                                         <div class="d-flex flex-wrap gap-2 align-items-center">
                                             @foreach($revisions as $rev)
-                                                <div class="d-flex align-items-center gap-2 p-2 border rounded bg-white" style="min-width: 170px; border-color: {{ $activeQuotation && $rev->id === $activeQuotation->id ? '#3b82f6 !important' : '#e2e8f0' }} !important; transition: all 0.2s; position: relative; {{ $activeQuotation && $rev->id === $activeQuotation->id ? 'box-shadow: 0 0 0 1px rgba(59,130,246,0.1); background-color: #f0f9ff !important;' : '' }}">
+                                                <div class="quotation-rev-chip d-flex align-items-center gap-2 p-2 rounded {{ $activeQuotation && $rev->id === $activeQuotation->id ? 'active' : '' }}">
                                                     @if($activeQuotation && $rev->id === $activeQuotation->id)
                                                         <span class="position-absolute top-0 end-0 translate-middle-y badge rounded-pill bg-primary fs-8 text-uppercase px-1" style="font-size: 8px !important; margin-right: 10px;">{{ __('crm.viewing') }}</span>
                                                     @endif
@@ -2288,21 +2636,21 @@
                             <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                                 <div class="row g-2">
                                     <div class="col-6">
-                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="dealOffcanvasNextSyncGoogle" style="cursor: pointer;">
-                                                <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
+                                        <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="dealOffcanvasNextSyncGoogle">
+                                                <i class="feather-calendar text-danger"></i> {{ __('crm.google_calendar') }}
                                             </label>
                                             <input type="hidden" name="next_sync_google_calendar" value="0">
-                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_sync_google_calendar" value="1" id="dealOffcanvasNextSyncGoogle" style="cursor: pointer;">
+                                            <x-ui.checkbox name="next_sync_google_calendar" id="dealOffcanvasNextSyncGoogle" value="1" />
                                         </div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="dealOffcanvasNextCreateMeet" style="cursor: pointer;">
-                                                <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
+                                        <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="dealOffcanvasNextCreateMeet">
+                                                <i class="feather-video text-primary"></i> {{ __('crm.google_meet_video') }}
                                             </label>
                                             <input type="hidden" name="next_create_meet_link" value="0">
-                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_create_meet_link" value="1" id="dealOffcanvasNextCreateMeet" style="cursor: pointer;">
+                                            <x-ui.checkbox name="next_create_meet_link" id="dealOffcanvasNextCreateMeet" value="1" />
                                         </div>
                                     </div>
                                 </div>
@@ -2358,19 +2706,25 @@
                         </div>
                     </div>
 
-                    <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="dealOffcanvasSyncGoogle" checked>
-                                <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasSyncGoogle">
-                                    <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
-                                </label>
+                    <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="dealOffcanvasSyncGoogle">
+                                        <i class="feather-calendar text-danger"></i> {{ __('crm.google_calendar') }}
+                                    </label>
+                                    <input type="hidden" name="sync_google_calendar" value="0">
+                                    <x-ui.checkbox name="sync_google_calendar" id="dealOffcanvasSyncGoogle" value="1" :checked="true" />
+                                </div>
                             </div>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="dealOffcanvasCreateMeet">
-                                <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasCreateMeet">
-                                    <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
-                                </label>
+                            <div class="col-6">
+                                <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="dealOffcanvasCreateMeet">
+                                        <i class="feather-video text-primary"></i> {{ __('crm.google_meet_video') }}
+                                    </label>
+                                    <input type="hidden" name="create_meet_link" value="0">
+                                    <x-ui.checkbox name="create_meet_link" id="dealOffcanvasCreateMeet" value="1" />
+                                </div>
                             </div>
                         </div>
                     </div>

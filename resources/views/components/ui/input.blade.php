@@ -5,6 +5,7 @@
     'value' => null,
     'placeholder' => null,
     'disabled' => false,
+    'readonly' => false,
     'required' => false,
     'helperText' => null,
     'stacked' => false,   // Label above the field instead of the label column
@@ -27,6 +28,7 @@
                value="{{ $value }}"
                placeholder="{{ $placeholder }}"
                {{ $disabled ? 'disabled' : '' }}
+               {{ $readonly ? 'readonly' : '' }}
                {{ $required ? 'required' : '' }}
                {{ $attributes->class(['form-control erp-premium-input']) }}>
         @if($helperText)
