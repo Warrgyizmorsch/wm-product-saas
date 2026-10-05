@@ -55,6 +55,8 @@ Route::prefix('crm')
         Route::post('accounts/{account}/contacts', [CrmAccountController::class, 'storeContact'])->name('accounts.contacts.store');
         Route::get('accounts/{account}/contacts-list', [CrmAccountController::class, 'getContactsList'])->name('accounts.contactsList');
         Route::post('contacts/quick-create', [CrmAccountController::class, 'quickStoreContact'])->name('contacts.quick-create');
+        Route::post('accounts/bulk-assign', [CrmAccountController::class, 'bulkAssign'])->name('accounts.bulkAssign');
+        Route::patch('accounts/{account}/owner', [CrmAccountController::class, 'updateOwner'])->name('accounts.updateOwner');
         Route::delete('accounts/{account}', [CrmAccountController::class, 'destroy'])->name('accounts.destroy');
 
         // CRM Deals Routes
@@ -76,6 +78,8 @@ Route::prefix('crm')
         Route::delete('deals/{deal}', [CrmDealController::class, 'destroy'])->name('deals.destroy');
         Route::post('deals/{deal}/documents', [CrmDealController::class, 'uploadDocuments'])->name('deals.documents.upload');
         Route::post('deals/{deal}/followups', [LeadFollowupController::class, 'storeDealFollowup'])->name('deals.followups.store');
+        Route::post('deals/bulk-assign', [CrmDealController::class, 'bulkAssign'])->name('deals.bulkAssign');
+        Route::patch('deals/{deal}/owner', [CrmDealController::class, 'updateOwner'])->name('deals.updateOwner');
         Route::post('deals/{deal}/sync-health', [CrmDealController::class, 'syncHealth'])->name('deals.syncHealth');
         Route::post('deals/{deal}/save-health-evaluation', [CrmDealController::class, 'saveHealthEvaluation'])->name('deals.saveHealthEvaluation');
         Route::post('deals/{deal}/generate-draft-reply', [CrmDealController::class, 'generateDraftReply'])->name('deals.generateDraftReply');
@@ -109,6 +113,8 @@ Route::prefix('crm')
             ->name('leads.export');
         Route::post('leads/check-duplicate', [LeadController::class, 'checkDuplicate'])
             ->name('leads.checkDuplicate');
+        Route::post('leads/bulk-assign', [LeadController::class, 'bulkAssign'])
+            ->name('leads.bulkAssign');
         Route::get('leads/{lead}/convert', [LeadController::class, 'showConvertForm'])
             ->name('leads.showConvertForm');
         Route::post('leads/{lead}/convert', [LeadController::class, 'processConvert'])

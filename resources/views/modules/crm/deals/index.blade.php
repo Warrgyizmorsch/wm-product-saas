@@ -18,6 +18,7 @@
 @endsection
 
 @push('styles')
+<link rel="stylesheet" href="{{ asset('assets/vendors/css/sweetalert2.min.css') }}">
 <style>
     /* Zoho/Odoo CRM Status Filter Tabs */
     .crm-status-tabs-wrapper {
@@ -70,7 +71,16 @@
     }
 
     .table-deal-row:hover {
-        background-color: #f8fafc !important;
+        background-color: #f8fafc;
+    }
+    html.app-skin-dark .table-deal-row:hover {
+        background-color: #162038 !important;
+    }
+    .deal-row-selected {
+        background-color: rgba(30, 64, 175, 0.05) !important;
+    }
+    .cursor-pointer {
+        cursor: pointer;
     }
 
     /* Hide scrollbars on responsive table container */
@@ -119,70 +129,87 @@
         {{-- 1. Header: Title & Actions --}}
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
             <h5 class="fw-bold text-dark mb-0">{{ __('crm.deals_listing') }}</h5>
+            
             <div class="d-flex align-items-center flex-wrap gap-2">
-                <!-- Outside Search Box (HRMS Style) -->
-                <form method="GET" action="{{ route('crm.deals.index') }}" class="d-flex align-items-center bg-light border rounded px-2.5 py-0.5 me-1" style="height: 34px; min-width: 240px;">
-                    @foreach(request()->except(['search', 'page']) as $k => $v)
-                        @if(is_scalar($v) && $v !== '')
-                            <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                <!-- Normal Toolbar (Search, View Switcher, Sort, Filter) -->
+                <div id="normal-toolbar" class="d-flex align-items-center flex-wrap gap-2">
+                    <!-- Outside Search Box (HRMS Style) -->
+                    <form method="GET" action="{{ route('crm.deals.index') }}" class="d-flex align-items-center bg-light border rounded px-2.5 py-0.5 me-1" style="height: 34px; min-width: 240px;">
+                        @foreach(request()->except(['search', 'page']) as $k => $v)
+                            @if(is_scalar($v) && $v !== '')
+                                <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                            @endif
+                        @endforeach
+                        <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
+                        <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('crm.search_placeholder_deals') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                        @if(request('search'))
+                            <a href="{{ route('crm.deals.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search">
+                                <i class="feather-x fs-12"></i>
+                            </a>
                         @endif
-                    @endforeach
-                    <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
-                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('crm.search_placeholder_deals') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
-                    @if(request('search'))
-                        <a href="{{ route('crm.deals.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search">
-                            <i class="feather-x fs-12"></i>
+                    </form>
+
+                    <x-ui.view-switcher />
+
+                    <x-ui.sort-dropdown :label="__('crm.sort')">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'desc' ? 'active' : '' }}">
+                            <span>{{ __('crm.sort_latest_deals') }}</span>
                         </a>
-                    @endif
-                </form>
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'title', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'title' && $sortOrder === 'asc' ? 'active' : '' }}">
+                            <span>{{ __('crm.sort_title_az') }}</span>
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'estimated_value', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'estimated_value' && $sortOrder === 'desc' ? 'active' : '' }}">
+                            <span>{{ __('crm.sort_highest_deal_value') }}</span>
+                        </a>
+                    </x-ui.sort-dropdown>
 
-                <x-ui.view-switcher />
-
-                <x-ui.sort-dropdown :label="__('crm.sort')">
-                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>{{ __('crm.sort_latest_deals') }}</span>
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'title', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'title' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>{{ __('crm.sort_title_az') }}</span>
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'estimated_value', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'estimated_value' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>{{ __('crm.sort_highest_deal_value') }}</span>
-                    </a>
-                </x-ui.sort-dropdown>
-
-                <form method="GET" action="{{ route('crm.deals.index') }}" class="d-inline">
-                    <x-ui.filter :label="__('crm.filter')" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
-                            <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_placeholder_deals')" value="{{ request('search') }}" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.pipeline_stage') }}</label>
-                            <x-ui.odoo-form-ui type="select" name="stage">
-                                <option value="">{{ __('crm.all_stages') }}</option>
-                                @foreach($dealStatuses as $st)
-                                    <option value="{{ $st->name }}" {{ request('stage') === $st->name ? 'selected' : '' }}>{{ $st->name }}</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                        </div>
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_from') }}</label>
-                                <x-ui.odoo-form-ui type="input" inputType="date" name="date_from" value="{{ request('date_from') }}" />
+                    <form method="GET" action="{{ route('crm.deals.index') }}" class="d-inline">
+                        <x-ui.filter :label="__('crm.filter')" offset="0, 5">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
+                                <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_placeholder_deals')" value="{{ request('search') }}" />
                             </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_to') }}</label>
-                                <x-ui.odoo-form-ui type="input" inputType="date" name="date_to" value="{{ request('date_to') }}" />
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.pipeline_stage') }}</label>
+                                <x-ui.odoo-form-ui type="select" name="stage">
+                                    <option value="">{{ __('crm.all_stages') }}</option>
+                                    @foreach($dealStatuses as $st)
+                                        <option value="{{ $st->name }}" {{ request('stage') === $st->name ? 'selected' : '' }}>{{ $st->name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
                             </div>
-                        </div>
-                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                            <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-light border">{{ __('crm.reset') }}</a>
-                            <button type="submit" class="btn btn-xs btn-primary">{{ __('crm.apply_filters') }}</button>
-                        </div>
-                    </x-ui.filter>
-                </form>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_from') }}</label>
+                                    <x-ui.odoo-form-ui type="input" inputType="date" name="date_from" value="{{ request('date_from') }}" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_to') }}</label>
+                                    <x-ui.odoo-form-ui type="input" inputType="date" name="date_to" value="{{ request('date_to') }}" />
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                                <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-light border">{{ __('crm.reset') }}</a>
+                                <button type="submit" class="btn btn-xs btn-primary">{{ __('crm.apply_filters') }}</button>
+                            </div>
+                        </x-ui.filter>
+                    </form>
+                </div>
+
+                <!-- Bulk Actions Toolbar (initially hidden, shows when checkboxes are selected) -->
+                <div id="bulk-actions-toolbar" class="d-flex gap-2 d-none">
+                    <x-ui.bulk-actions :label="__('crm.selected_actions') . ' (0)'" id="bulk-actions-dropdown">
+                        <button type="button" class="dropdown-item text-primary" onclick="openBulkAssignDrawer()">
+                            <i class="feather-user-check me-2 text-primary"></i> {{ __('crm.assign_to_sales_rep') }}
+                        </button>
+                        <div class="dropdown-divider"></div>
+                        <button type="button" class="dropdown-item text-secondary" onclick="clearDealSelections()">
+                            <i class="feather-x me-2 text-secondary"></i> {{ __('crm.deselect') }}
+                        </button>
+                    </x-ui.bulk-actions>
+                </div>
             </div>
         </div>
 
@@ -215,19 +242,20 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="dealsTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
-                            <input type="checkbox" class="form-check-input">
+                    <tr>
+                        <th style="width: 35px;" class="text-center">
+                            <input type="checkbox" class="form-check-input" id="selectAllDealsCheckbox" title="Select All Deals">
                         </th>
-                        <th style="width: 12%; background-color: #e8ecf1 !important;">{{ __('crm.deal_no') }}</th>
-                        <th style="width: 20%; background-color: #e8ecf1 !important;">{{ __('crm.project_deal_title') }}</th>
-                        <th style="width: 18%; background-color: #e8ecf1 !important;">{{ __('crm.account_client') }}</th>
-                        <th style="width: 15%; background-color: #e8ecf1 !important;">{{ __('crm.phone_email') }}</th>
-                        <th style="width: 12%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.est_value') }} ({{ active_currency_symbol() }})</th>
-                        <th style="width: 13%; background-color: #e8ecf1 !important;">{{ __('crm.closing_date_status') }}</th>
-                        <th style="width: 12%; background-color: #e8ecf1 !important;">{{ __('crm.stage') }}</th>
-                        <th style="width: 10%; background-color: #e8ecf1 !important;">{{ __('crm.health_percent') }}</th>
-                        <th style="width: 4%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
+                        <th style="width: 10%;">{{ __('crm.deal_no') }}</th>
+                        <th style="width: 16%;">{{ __('crm.project_deal_title') }}</th>
+                        <th style="width: 14%;">{{ __('crm.account_client') }}</th>
+                        <th style="width: 13%;">{{ __('crm.deal_owner') }}</th>
+                        <th style="width: 13%;">{{ __('crm.phone_email') }}</th>
+                        <th style="width: 10%;" class="text-end pe-3">{{ __('crm.est_value') }} ({{ active_currency_symbol() }})</th>
+                        <th style="width: 10%;">{{ __('crm.closing_date_status') }}</th>
+                        <th style="width: 8%;">{{ __('crm.stage') }}</th>
+                        <th style="width: 6%;">{{ __('crm.health_percent') }}</th>
+                        <th style="width: 4%;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -268,9 +296,11 @@
                             $phone = $deal->contact?->phone ?: ($deal->account?->phone ?: ($dLead?->company_phone ?: $dLead?->phone));
                             $email = $deal->contact?->email ?: ($deal->account?->email ?: ($dLead?->company_email ?: $dLead?->email));
                         @endphp
-                        <tr class="table-deal-row">
+                        <tr class="table-deal-row" id="dealRow_{{ $deal->id }}">
                             <td class="text-center">
-                                <input type="checkbox" class="form-check-input">
+                                <input type="checkbox" class="form-check-input deal-select-checkbox" 
+                                       value="{{ $deal->id }}" 
+                                       data-deal-name="{{ e($deal->title) }}">
                             </td>
                             <td class="font-monospace fw-bold">
                                 <a href="{{ route('crm.deals.show', $deal) }}" class="text-primary text-decoration-none hover-underline fs-13">
@@ -308,6 +338,28 @@
                                 @if($contactName && $contactName !== $companyName)
                                     <span class="text-muted fs-11 d-block"><i class="feather-user me-1 text-muted"></i>{{ $contactName }}</span>
                                 @endif
+                            </td>
+                            <td id="dealOwnerCell_{{ $deal->id }}">
+                                <div class="d-flex align-items-center cursor-pointer p-1 rounded" 
+                                     onclick="openSingleAssignDrawer({{ $deal->id }}, '{{ e($deal->title) }}', '{{ $deal->owner_id }}', '{{ e($deal->owner?->name ?: __('crm.unassigned')) }}')"
+                                     title="{{ $deal->owner ? __('crm.change_owner') : __('crm.assign_deal_owner') }}"
+                                     style="transition: background-color 0.15s ease;">
+                                    <div class="rounded-circle me-2 d-flex align-items-center justify-content-center text-white fw-bold shadow-xs owner-avatar-circle" 
+                                         style="width: 28px; height: 28px; background-color: {{ $deal->owner ? '#1e40af' : '#64748b' }}; font-size: 11px; flex-shrink: 0;"
+                                         title="{{ $deal->owner?->name ?: __('crm.unassigned') }}">
+                                        {{ strtoupper(substr($deal->owner?->name ?: 'U', 0, 1)) }}
+                                    </div>
+                                    <div>
+                                        @if($deal->owner)
+                                            <span class="d-block fw-semibold text-dark fs-12 owner-name-text" style="line-height: 1.2;">{{ $deal->owner->name }}</span>
+                                            <span class="text-muted fs-10 d-block owner-email-text">{{ $deal->owner->email }}</span>
+                                        @else
+                                            <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 fw-semibold d-inline-flex align-items-center gap-1 py-0.5 px-2">
+                                                <i class="feather-user-plus fs-9"></i> {{ __('crm.unassigned') }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
                             </td>
                             <td>
                                 @if ($phone)
@@ -453,6 +505,13 @@
                                         </button>
                                     </x-slot:extraActions>
 
+                                    {{-- Assign / Change Deal Owner --}}
+                                    <li>
+                                        <a href="javascript:void(0)" class="dropdown-item" onclick="openSingleAssignDrawer({{ $deal->id }}, '{{ e($deal->title) }}', '{{ $deal->owner_id }}', '{{ e($deal->owner?->name ?: __('crm.unassigned')) }}')">
+                                            <i class="feather-user-check me-2 text-primary fs-12"></i>{{ $deal->owner_id ? __('crm.change_owner') : __('crm.assign_deal_owner') }}
+                                        </a>
+                                    </li>
+
                                     <li>
                                         <a href="javascript:void(0)" class="dropdown-item btn-open-deal-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-deal-id="{{ $deal->id }}" data-deal-title="{{ addslashes($deal->title) }}" data-deal-stage="{{ $deal->stage }}">
                                             <i class="feather-calendar me-2 text-primary fs-12"></i>{{ __('crm.log_schedule_followup') }}
@@ -542,7 +601,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center py-5 text-muted">
+                            <td colspan="11" class="text-center py-5 text-muted">
                                 <i class="feather-folder fs-1 text-muted d-block mb-2"></i>
                                 {{ __('crm.no_deals_found') }}
                             </td>
@@ -550,6 +609,70 @@
                     @endforelse
                 </tbody>
             </x-ui.odoo-form-ui>
+        </div>
+    </div>
+
+    <!-- Offcanvas Drawer: Quick Single & Bulk Deal Assignment -->
+    <div class="offcanvas offcanvas-end border-0 shadow-lg" tabindex="-1" id="assignDealOffcanvas" aria-labelledby="assignDealOffcanvasLabel" style="width: 460px; max-width: 92vw;">
+        <div class="offcanvas-header bg-light border-bottom py-3 px-4">
+            <div class="d-flex align-items-center gap-2">
+                <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle">
+                    <i class="feather-user-check"></i>
+                </div>
+                <div>
+                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="assignDealOffcanvasTitle">{{ __('crm.assign_deal_owner') }}</h5>
+                    <span class="text-muted fs-11" id="assignDealOffcanvasSubtitle">{{ __('crm.select_sales_rep') }}</span>
+                </div>
+            </div>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        
+        <div class="offcanvas-body p-4 bg-white">
+            <form id="assignDealForm">
+                @csrf
+                <input type="hidden" name="assign_mode" id="assignModeInput" value="single">
+                <input type="hidden" name="single_deal_id" id="assignSingleDealId" value="">
+                <div id="assignBulkDealIdsContainer"></div>
+
+                <!-- Deal Info / Target Preview Card -->
+                <div class="p-3 mb-3 bg-light rounded-3 border" id="assignTargetSummaryCard">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="text-muted fs-11 fw-bold text-uppercase" id="assignTargetTypeLabel">{{ __('crm.project_deal_title') }}</span>
+                        <span class="badge bg-soft-info text-info border border-info-subtle fs-10" id="assignCurrentOwnerBadge">{{ __('crm.unassigned') }}</span>
+                    </div>
+                    <div class="fw-bold text-dark fs-13" id="assignTargetNameDisplay">Deal Title</div>
+                </div>
+
+                <!-- Assignee Selector -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold fs-12 text-dark mb-1">
+                        {{ __('crm.select_sales_rep') }} <span class="text-danger">*</span>
+                    </label>
+                    <select name="deal_owner_id" id="assignDealOwnerSelect" class="form-select form-select-sm fs-12 py-2" required>
+                        <option value="">{{ __('crm.choose_sales_rep_placeholder') }}</option>
+                        @foreach($users as $u)
+                            <option value="{{ $u->id }}" data-email="{{ $u->email }}">{{ $u->name }} ({{ $u->email }})</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Optional Assignment Note -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold fs-12 text-dark mb-1">
+                        {{ __('crm.assignment_note_reason') }} <span class="text-muted fw-normal fs-11">({{ __('crm.optional') ?? 'Optional' }})</span>
+                    </label>
+                    <textarea name="note" id="assignNoteInput" class="form-control fs-12" rows="3" placeholder="e.g. Assigned to senior sales consultant..."></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
+                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">{{ __('crm.close') }}</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm d-flex align-items-center gap-1.5" id="btnSubmitDealAssign">
+                        <i class="feather-check"></i>
+                        <span>{{ __('crm.confirm_assignment') }}</span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -636,21 +759,21 @@
                             <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                                 <div class="row g-2">
                                     <div class="col-6">
-                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="dealOffcanvasNextSyncGoogleIndex" style="cursor: pointer;">
-                                                <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
+                                        <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="dealOffcanvasNextSyncGoogleIndex">
+                                                <i class="feather-calendar text-danger"></i> {{ __('crm.google_calendar') }}
                                             </label>
                                             <input type="hidden" name="next_sync_google_calendar" value="0">
-                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_sync_google_calendar" value="1" id="dealOffcanvasNextSyncGoogleIndex" style="cursor: pointer;">
+                                            <x-ui.checkbox name="next_sync_google_calendar" id="dealOffcanvasNextSyncGoogleIndex" value="1" />
                                         </div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="dealOffcanvasNextCreateMeetIndex" style="cursor: pointer;">
-                                                <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
+                                        <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="dealOffcanvasNextCreateMeetIndex">
+                                                <i class="feather-video text-primary"></i> {{ __('crm.google_meet_video') }}
                                             </label>
                                             <input type="hidden" name="next_create_meet_link" value="0">
-                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_create_meet_link" value="1" id="dealOffcanvasNextCreateMeetIndex" style="cursor: pointer;">
+                                            <x-ui.checkbox name="next_create_meet_link" id="dealOffcanvasNextCreateMeetIndex" value="1" />
                                         </div>
                                     </div>
                                 </div>
@@ -661,7 +784,7 @@
                             <div class="mt-3">
                                 <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.tag_assign_persons') }}</label>
                                 <select name="tagged_user_ids[]" id="dealOffcanvasTagUser" class="form-select form-select-sm shadow-2xs" multiple data-placeholder="{{ __('crm.select_persons_to_tag') }}">
-                                    @foreach((\App\Models\User::orderBy('name')->get()) as $u)
+                                    @foreach($users as $u)
                                         <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
                                     @endforeach
                                 </select>
@@ -693,19 +816,25 @@
                         </div>
                     </div>
 
-                    <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="dealOffcanvasSyncGoogle" checked>
-                                <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasSyncGoogle">
-                                    <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
-                                </label>
+                    <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="dealOffcanvasSyncGoogle">
+                                        <i class="feather-calendar text-danger"></i> {{ __('crm.google_calendar') }}
+                                    </label>
+                                    <input type="hidden" name="sync_google_calendar" value="0">
+                                    <x-ui.checkbox name="sync_google_calendar" id="dealOffcanvasSyncGoogle" value="1" :checked="true" />
+                                </div>
                             </div>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="dealOffcanvasCreateMeet">
-                                <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasCreateMeet">
-                                    <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
-                                </label>
+                            <div class="col-6">
+                                <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="dealOffcanvasCreateMeet">
+                                        <i class="feather-video text-primary"></i> {{ __('crm.google_meet_video') }}
+                                    </label>
+                                    <input type="hidden" name="create_meet_link" value="0">
+                                    <x-ui.checkbox name="create_meet_link" id="dealOffcanvasCreateMeet" value="1" />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -731,6 +860,7 @@
 @endsection
 
 @push('scripts')
+<script src="{{ asset('assets/vendors/js/sweetalert2.all.min.js') }}"></script>
 <script>
     $(function () {
         $(document).on('change change.select2', '.status-select, .stage-select', function() {
@@ -814,6 +944,298 @@
             }
 
             switchDealOffcanvasMode('log_note');
+        });
+
+        // ==========================================
+        // Deal Quick Assignment & Bulk Assign Logic
+        // ==========================================
+        var assignOffcanvasEl = document.getElementById('assignDealOffcanvas');
+        var assignBsOffcanvas = assignOffcanvasEl ? new bootstrap.Offcanvas(assignOffcanvasEl) : null;
+        var transAssignDealOwner = @json(__('crm.assign_deal_owner'));
+        var transBulkAssignDeals = @json(__('crm.bulk_assign_deals'));
+        var transSelectSalesRep = @json(__('crm.select_sales_rep'));
+        var transDealsSelected = @json(__('crm.deals_selected'));
+        var transDealSelected = @json(__('crm.deal_selected'));
+        var transUnassigned = @json(__('crm.unassigned'));
+        var transChangeOwner = @json(__('crm.change_owner'));
+        var transSelectedActions = @json(__('crm.selected_actions'));
+
+        window.openSingleAssignDrawer = function(dealId, dealTitle, currentOwnerId, currentOwnerName) {
+            $('#assignModeInput').val('single');
+            $('#assignSingleDealId').val(dealId);
+            $('#assignBulkDealIdsContainer').empty();
+            
+            $('#assignDealOffcanvasTitle').text(transAssignDealOwner);
+            $('#assignDealOffcanvasSubtitle').text(transSelectSalesRep);
+            $('#assignTargetTypeLabel').text(@json(__('crm.project_deal_title')));
+            $('#assignTargetNameDisplay').text(dealTitle || ('Deal #' + dealId));
+
+            if (currentOwnerName && currentOwnerName !== 'Unassigned' && currentOwnerName !== transUnassigned && currentOwnerName.trim() !== '') {
+                $('#assignCurrentOwnerBadge').text(currentOwnerName).removeClass('bg-soft-secondary text-secondary').addClass('bg-soft-info text-info');
+            } else {
+                $('#assignCurrentOwnerBadge').text(transUnassigned).removeClass('bg-soft-info text-info').addClass('bg-soft-secondary text-secondary');
+            }
+
+            $('#assignDealOwnerSelect').val(currentOwnerId || '');
+            $('#assignNoteInput').val('');
+
+            if (assignBsOffcanvas) {
+                assignBsOffcanvas.show();
+            }
+        };
+
+        window.openBulkAssignDrawer = function() {
+            var selectedCheckboxes = $('.deal-select-checkbox:checked');
+            var count = selectedCheckboxes.length;
+            if (count === 0) {
+                alert('Please select at least one deal from the table checkbox.');
+                return;
+            }
+
+            $('#assignModeInput').val('bulk');
+            $('#assignSingleDealId').val('');
+            var container = $('#assignBulkDealIdsContainer').empty();
+
+            var dealNames = [];
+            selectedCheckboxes.each(function() {
+                var did = $(this).val();
+                var dname = $(this).attr('data-deal-name');
+                container.append('<input type="hidden" name="deal_ids[]" value="' + did + '">');
+                if (dealNames.length < 3 && dname) {
+                    dealNames.push(dname);
+                }
+            });
+
+            $('#assignDealOffcanvasTitle').text(transBulkAssignDeals);
+            $('#assignDealOffcanvasSubtitle').text(transSelectSalesRep);
+            $('#assignTargetTypeLabel').text(count + ' ' + (count === 1 ? transDealSelected : transDealsSelected));
+            $('#assignTargetNameDisplay').text(dealNames.join(', ') + (count > 3 ? ' and ' + (count - 3) + ' more...' : ''));
+            $('#assignCurrentOwnerBadge').text(count + ' ' + (count === 1 ? transDealSelected : transDealsSelected)).removeClass('bg-soft-info text-info').addClass('bg-soft-primary text-primary');
+
+            $('#assignDealOwnerSelect').val('');
+            $('#assignNoteInput').val('');
+
+            if (assignBsOffcanvas) {
+                assignBsOffcanvas.show();
+            }
+        };
+
+        window.clearDealSelections = function() {
+            $('.deal-select-checkbox').prop('checked', false);
+            $('#selectAllDealsCheckbox').prop('checked', false);
+            $('#dealsTable tbody tr').removeClass('deal-row-selected');
+            updateToolbarVisibility();
+        };
+
+        function updateToolbarVisibility() {
+            var selectedCheckboxes = $('.deal-select-checkbox:checked');
+            var count = selectedCheckboxes.length;
+            var normalToolbar = document.getElementById('normal-toolbar');
+            var bulkActionsToolbar = document.getElementById('bulk-actions-toolbar');
+            var bulkActionsLabel = document.querySelector('#bulk-actions-toolbar .bulk-actions-label');
+
+            if (count > 0) {
+                if (normalToolbar) normalToolbar.classList.add('d-none');
+                if (bulkActionsToolbar) bulkActionsToolbar.classList.remove('d-none');
+                if (bulkActionsLabel) {
+                    bulkActionsLabel.textContent = transSelectedActions + ' (' + count + ')';
+                }
+            } else {
+                if (normalToolbar) normalToolbar.classList.remove('d-none');
+                if (bulkActionsToolbar) bulkActionsToolbar.classList.add('d-none');
+                if (bulkActionsLabel) {
+                    bulkActionsLabel.textContent = transSelectedActions + ' (0)';
+                }
+            }
+        }
+
+        // Checkbox events
+        $('#selectAllDealsCheckbox').on('change', function() {
+            var isChecked = $(this).is(':checked');
+            $('.deal-select-checkbox').prop('checked', isChecked);
+            if (isChecked) {
+                $('#dealsTable tbody tr').addClass('deal-row-selected');
+            } else {
+                $('#dealsTable tbody tr').removeClass('deal-row-selected');
+            }
+            updateToolbarVisibility();
+        });
+
+        $(document).on('change', '.deal-select-checkbox', function() {
+            var tr = $(this).closest('tr');
+            if ($(this).is(':checked')) {
+                tr.addClass('deal-row-selected');
+            } else {
+                tr.removeClass('deal-row-selected');
+            }
+            
+            var totalBoxes = $('.deal-select-checkbox').length;
+            var checkedBoxes = $('.deal-select-checkbox:checked').length;
+            $('#selectAllDealsCheckbox').prop('checked', totalBoxes > 0 && totalBoxes === checkedBoxes);
+
+            updateToolbarVisibility();
+        });
+
+        // Form Submit AJAX Handler
+        $('#assignDealForm').on('submit', function(e) {
+            e.preventDefault();
+            var mode = $('#assignModeInput').val();
+            var submitBtn = $('#btnSubmitDealAssign');
+            var origBtnHtml = submitBtn.html();
+
+            var ownerId = $('#assignDealOwnerSelect').val();
+            var note = $('#assignNoteInput').val();
+            var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+            var postUrl = "{{ route('crm.deals.bulkAssign') }}";
+            var payload = {
+                deal_owner_id: ownerId || null,
+                note: note
+            };
+
+            var targetDealIds = [];
+            if (mode === 'single') {
+                var singleId = parseInt($('#assignSingleDealId').val());
+                targetDealIds.push(singleId);
+                payload.deal_ids = [singleId];
+            } else {
+                $('input[name="deal_ids[]"]').each(function() {
+                    targetDealIds.push(parseInt($(this).val()));
+                });
+                payload.deal_ids = targetDealIds;
+            }
+
+            submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving...');
+
+            fetch(postUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(function(r) {
+                return r.json().then(function(data) {
+                    return { ok: r.ok, status: r.status, data: data };
+                }).catch(function() {
+                    return { ok: r.ok, status: r.status, data: { message: r.statusText } };
+                });
+            })
+            .then(function(resObj) {
+                submitBtn.prop('disabled', false).html(origBtnHtml);
+                var res = resObj.data || {};
+                if (resObj.ok && res.success) {
+                    var ownerName = res.owner_name || transUnassigned;
+                    var ownerEmail = res.owner_email || '—';
+                    var ownerInitial = res.owner_initial || 'U';
+                    var isAssigned = !!res.owner_id;
+
+                    // Update DOM for each target deal
+                    targetDealIds.forEach(function(dealId) {
+                        var cell = $('#dealOwnerCell_' + dealId);
+                        if (cell.length) {
+                            var row = $('#dealRow_' + dealId);
+                            var dealName = row.find('.deal-select-checkbox').attr('data-deal-name') || ('Deal #' + dealId);
+                            
+                            var newHtml = '';
+                            if (isAssigned) {
+                                newHtml = '<div class="d-flex align-items-center cursor-pointer p-1 rounded" ' +
+                                    'onclick="openSingleAssignDrawer(' + dealId + ', \'' + (dealName.replace(/'/g, "\\'")) + '\', \'' + res.owner_id + '\', \'' + (ownerName.replace(/'/g, "\\'")) + '\')" ' +
+                                    'title="' + transChangeOwner + '" style="transition: background-color 0.15s ease;">' +
+                                    '<div class="rounded-circle me-2 d-flex align-items-center justify-content-center text-white fw-bold shadow-xs owner-avatar-circle" ' +
+                                    'style="width: 28px; height: 28px; background-color: #1e40af; font-size: 11px; flex-shrink: 0;" title="' + ownerName + '">' +
+                                    ownerInitial +
+                                    '</div>' +
+                                    '<div>' +
+                                    '<span class="d-block fw-semibold text-dark fs-12 owner-name-text" style="line-height: 1.2;">' + ownerName + '</span>' +
+                                    '<span class="text-muted fs-10 d-block owner-email-text">' + ownerEmail + '</span>' +
+                                    '</div>' +
+                                    '</div>';
+                            } else {
+                                newHtml = '<div class="d-flex align-items-center cursor-pointer p-1 rounded" ' +
+                                    'onclick="openSingleAssignDrawer(' + dealId + ', \'' + (dealName.replace(/'/g, "\\'")) + '\', \'\', \'' + transUnassigned + '\')" ' +
+                                    'title="' + transAssignDealOwner + '" style="transition: background-color 0.15s ease;">' +
+                                    '<div class="rounded-circle me-2 d-flex align-items-center justify-content-center text-white fw-bold shadow-xs owner-avatar-circle" ' +
+                                    'style="width: 28px; height: 28px; background-color: #64748b; font-size: 11px; flex-shrink: 0;" title="' + transUnassigned + '">' +
+                                    'U' +
+                                    '</div>' +
+                                    '<div>' +
+                                    '<span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 fw-semibold d-inline-flex align-items-center gap-1 py-0.5 px-2">' +
+                                    '<i class="feather-user-plus fs-9"></i> ' + transUnassigned +
+                                    '</span>' +
+                                    '</div>' +
+                                    '</div>';
+                            }
+                            cell.html(newHtml);
+                        }
+                    });
+
+                    if (assignBsOffcanvas) {
+                        assignBsOffcanvas.hide();
+                    }
+
+                    clearDealSelections();
+
+                    // Standard Duralux Toast Notification
+                    if (typeof Swal !== 'undefined') {
+                        Swal.mixin({
+                            toast: true,
+                            position: 'top-end',
+                            showConfirmButton: false,
+                            timer: 3500,
+                            timerProgressBar: true,
+                            didOpen: function (toast) {
+                                toast.addEventListener('mouseenter', Swal.stopTimer);
+                                toast.addEventListener('mouseleave', Swal.resumeTimer);
+                            }
+                        }).fire({
+                            icon: 'success',
+                            title: res.message || 'Deal assigned successfully!'
+                        });
+                    } else if (typeof toastr !== 'undefined') {
+                        toastr.success(res.message || 'Deal assigned successfully!');
+                    }
+                } else {
+                    var errMsg = res.message;
+                    if (res.errors) {
+                        errMsg = Object.values(res.errors).flat().join("\n");
+                    }
+                    if (typeof Swal !== 'undefined') {
+                        Swal.mixin({
+                            toast: true,
+                            position: 'top-end',
+                            showConfirmButton: false,
+                            timer: 4000,
+                            timerProgressBar: true
+                        }).fire({
+                            icon: 'error',
+                            title: errMsg || 'Error updating deal owner.'
+                        });
+                    } else {
+                        alert(errMsg || 'Error updating deal owner.');
+                    }
+                }
+            })
+            .catch(function(err) {
+                submitBtn.prop('disabled', false).html(origBtnHtml);
+                console.error('Assign failed:', err);
+                if (typeof Swal !== 'undefined') {
+                    Swal.mixin({
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 4000,
+                        timerProgressBar: true
+                    }).fire({
+                        icon: 'error',
+                        title: 'An error occurred while assigning deals.'
+                    });
+                } else {
+                    alert('An error occurred while assigning deals.');
+                }
+            });
         });
     });
 </script>

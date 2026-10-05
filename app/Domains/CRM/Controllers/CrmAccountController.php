@@ -25,7 +25,7 @@ class CrmAccountController extends Controller
         $tenantId = tenant_id() ?? 1;
         $search = $request->input('search');
 
-        $query = CrmAccount::with(['contacts', 'deals', 'customer'])
+        $query = CrmAccount::with(['contacts', 'deals', 'customer', 'owner'])
             ->where('tenant_id', $tenantId);
 
         if ($search) {
@@ -39,8 +39,9 @@ class CrmAccountController extends Controller
         }
 
         $accounts = $query->orderBy('id', 'desc')->paginate(10)->withQueryString();
+        $users = \App\Models\User::orderBy('name')->get();
 
-        return view('modules.crm.accounts.index', compact('accounts', 'search'));
+        return view('modules.crm.accounts.index', compact('accounts', 'search', 'users'));
     }
 
     public function create(): View
@@ -444,5 +445,85 @@ class CrmAccountController extends Controller
             new AccountExport($tenantId, $request->all()),
             'accounts_export_' . date('Y-m-d_His') . '.xlsx'
         );
+    }
+
+    /**
+     * Update the assigned Account Manager / Owner for an Account.
+     */
+    public function updateOwner(Request $request, CrmAccount $account)
+    {
+        $this->authorize('update', $account);
+
+        $validated = $request->validate([
+            'account_owner_id' => 'nullable|exists:users,id',
+            'note'             => 'nullable|string|max:500',
+        ]);
+
+        $ownerId = $validated['account_owner_id'] ?? null;
+        $account->update(['owner_id' => $ownerId]);
+
+        $targetUser = $ownerId ? \App\Models\User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+        $message = "Account manager successfully updated to {$ownerName}!";
+
+        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success'       => true,
+                'message'       => $message,
+                'account_id'    => $account->id,
+                'owner_id'      => $ownerId,
+                'owner_name'    => $ownerName,
+                'owner_email'   => $targetUser?->email ?? '',
+                'owner_initial' => strtoupper(substr($ownerName, 0, 1)),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    /**
+     * Bulk assign accounts to an Account Manager / Sales Rep.
+     */
+    public function bulkAssign(Request $request)
+    {
+        $this->authorize('viewAny', CrmAccount::class);
+
+        $validated = $request->validate([
+            'account_ids'      => 'required|array|min:1',
+            'account_ids.*'    => 'required|integer|exists:crm_accounts,id',
+            'account_owner_id' => 'nullable|exists:users,id',
+            'note'             => 'nullable|string|max:500',
+        ]);
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+        $ownerId = $validated['account_owner_id'] ?? null;
+        $targetUser = $ownerId ? \App\Models\User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+
+        $accounts = CrmAccount::where('tenant_id', $tenantId)
+            ->whereIn('id', $validated['account_ids'])
+            ->get();
+
+        $updatedCount = 0;
+        foreach ($accounts as $account) {
+            $account->update(['owner_id' => $ownerId]);
+            $updatedCount++;
+        }
+
+        $message = "Successfully assigned {$updatedCount} account(s) to {$ownerName}!";
+
+        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success'       => true,
+                'message'       => $message,
+                'updated_count' => $updatedCount,
+                'owner_id'      => $ownerId,
+                'owner_name'    => $ownerName,
+                'owner_email'   => $targetUser?->email ?? '',
+                'owner_initial' => strtoupper(substr($ownerName, 0, 1)),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
     }
 }

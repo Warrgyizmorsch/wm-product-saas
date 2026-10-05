@@ -102,12 +102,12 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="customersTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="background-color: #e8ecf1 !important;" class="ps-3">{{ __('crm.customer_name') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.email_address') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.phone_email') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.status') }}</th>
-                        <th style="width: 1%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
+                    <tr>
+                        <th class="ps-3">{{ __('crm.customer_name') }}</th>
+                        <th>{{ __('crm.email_address') }}</th>
+                        <th>{{ __('crm.phone_email') }}</th>
+                        <th>{{ __('crm.status') }}</th>
+                        <th style="width: 1%;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -87,6 +87,12 @@
         font-weight: 700;
         color: var(--bs-primary);
     }
+    #productImageZoomModal {
+        z-index: 100050 !important;
+    }
+    .modal-backdrop.zoom-backdrop-high {
+        z-index: 100040 !important;
+    }
 </style>
 @endpush
 
@@ -315,19 +321,19 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="visitorPassesTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 30px; background-color: #e8ecf1 !important;" class="text-center">
+                    <tr>
+                        <th style="width: 35px;" class="text-center">
                             <input type="checkbox" class="form-check-input">
                         </th>
-                        <th style="width: 14%; background-color: #e8ecf1 !important;">{{ __('visitor.pass_number') }}</th>
-                        <th style="width: 18%; background-color: #e8ecf1 !important;">{{ __('visitor.visitor_name') }}</th>
-                        <th style="width: 14%; background-color: #e8ecf1 !important;">{{ __('visitor.company') }}</th>
-                        <th style="width: 12%; background-color: #e8ecf1 !important;">{{ __('visitor.vehicle_details') }}</th>
-                        <th style="width: 14%; background-color: #e8ecf1 !important;">{{ __('visitor.select_host') }}</th>
-                        <th style="width: 10%; background-color: #e8ecf1 !important;">{{ __('visitor.purpose_of_visit') }}</th>
-                        <th style="width: 10%; background-color: #e8ecf1 !important;">{{ __('visitor.check_in_time') }}</th>
-                        <th style="width: 8%; background-color: #e8ecf1 !important;">{{ __('visitor.status') }}</th>
-                        <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('visitor.actions') }}</th>
+                        <th style="width: 14%;">{{ __('visitor.pass_number') }}</th>
+                        <th style="width: 18%;">{{ __('visitor.visitor_name') }}</th>
+                        <th style="width: 14%;">{{ __('visitor.company') }}</th>
+                        <th style="width: 12%;">{{ __('visitor.vehicle_details') }}</th>
+                        <th style="width: 14%;">{{ __('visitor.select_host') }}</th>
+                        <th style="width: 10%;">{{ __('visitor.purpose_of_visit') }}</th>
+                        <th style="width: 10%;">{{ __('visitor.check_in_time') }}</th>
+                        <th style="width: 8%;">{{ __('visitor.status') }}</th>
+                        <th style="width: 5%;" class="text-end pe-3">{{ __('visitor.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -685,131 +691,131 @@
             <div class="row g-3 mb-3">
                 <!-- Visitor Type Dropdown -->
                 <div class="col-md-6">
-                    <div class="odoo-field-group">
-                        <label class="odoo-field-label" for="drawerVisitorTypeSelect">
-                            {{ __('visitor.visitor_type') }} <span class="text-danger">*</span>
-                        </label>
-                        <select name="visitor_type" id="drawerVisitorTypeSelect" class="odoo-field-control" required>
-                            <option value="Client" selected>{{ __('visitor.visitor_types.Client') }}</option>
-                            <option value="Vendor">{{ __('visitor.visitor_types.Vendor') }}</option>
-                            <option value="Candidate">{{ __('visitor.visitor_types.Candidate') }}</option>
-                            <option value="Service">{{ __('visitor.visitor_types.Service') }}</option>
-                            <option value="Guest">{{ __('visitor.visitor_types.Guest') }}</option>
-                        </select>
-                    </div>
+                    <x-ui.odoo-form-ui 
+                        type="select" 
+                        :label="__('visitor.visitor_type')" 
+                        name="visitor_type" 
+                        id="drawerVisitorTypeSelect" 
+                        :required="true"
+                        :searchable="false">
+                        <option value="Client" selected>{{ __('visitor.visitor_types.Client') }}</option>
+                        <option value="Vendor">{{ __('visitor.visitor_types.Vendor') }}</option>
+                        <option value="Candidate">{{ __('visitor.visitor_types.Candidate') }}</option>
+                        <option value="Service">{{ __('visitor.visitor_types.Service') }}</option>
+                        <option value="Guest">{{ __('visitor.visitor_types.Guest') }}</option>
+                    </x-ui.odoo-form-ui>
                 </div>
 
                 <!-- Phone Number -->
                 <div class="col-md-6">
-                    <div class="odoo-field-group">
-                        <label class="odoo-field-label" for="drawerVisitorPhone">
-                            {{ __('visitor.phone_number') }} <span class="text-danger">*</span>
-                        </label>
-                        <div class="position-relative">
-                            <input type="tel" 
-                                   name="phone" 
-                                   id="drawerVisitorPhone" 
-                                   class="odoo-field-control" 
-                                   required 
-                                   placeholder="e.g. +91 9876543210" 
-                                   oninput="debounceVisitorLookupDrawer(this.value, 'phone')">
-                            <span id="phoneLookupSpinnerDrawer" class="text-primary fs-11 d-none fw-normal position-absolute end-0 top-50 translate-middle-y me-1">
-                                <i class="feather-loader icon-spin me-1"></i> Looking up...
-                            </span>
-                        </div>
+                    <div class="position-relative">
+                        <x-ui.odoo-form-ui 
+                            type="tel" 
+                            :label="__('visitor.phone_number')" 
+                            name="phone" 
+                            id="drawerVisitorPhone" 
+                            placeholder="e.g. +91 9876543210" 
+                            :required="true" 
+                            oninput="debounceVisitorLookupDrawer(this.value, 'phone')" 
+                        />
+                        <span id="phoneLookupSpinnerDrawer" class="text-primary fs-11 d-none fw-normal position-absolute end-0 top-50 translate-middle-y me-1" style="z-index: 5;">
+                            <i class="feather-loader icon-spin me-1"></i> Looking up...
+                        </span>
                     </div>
                 </div>
 
                 <!-- Visitor Full Name -->
                 <div class="col-md-6">
-                    <div class="odoo-field-group">
-                        <label class="odoo-field-label" for="drawerVisitorFullName">
-                            {{ __('visitor.visitor_name') }} <span class="text-danger">*</span>
-                        </label>
-                        <input type="text" 
-                               name="full_name" 
-                               id="drawerVisitorFullName" 
-                               class="odoo-field-control" 
-                               required 
-                               placeholder="e.g. Rajesh Sharma">
-                    </div>
+                    <x-ui.odoo-form-ui 
+                        type="input" 
+                        :label="__('visitor.visitor_name')" 
+                        name="full_name" 
+                        id="drawerVisitorFullName" 
+                        placeholder="e.g. Rajesh Sharma" 
+                        :required="true" 
+                    />
                 </div>
 
                 <!-- Email Address -->
                 <div class="col-md-6">
-                    <div class="odoo-field-group">
-                        <label class="odoo-field-label" for="drawerVisitorEmail">
-                            {{ __('visitor.email_address') }}
-                        </label>
-                        <input type="email" 
-                               name="email" 
-                               id="drawerVisitorEmail" 
-                               class="odoo-field-control" 
-                               placeholder="e.g. visitor@company.com"
-                               oninput="debounceVisitorLookupDrawer(this.value, 'email')">
-                    </div>
+                    <x-ui.odoo-form-ui 
+                        type="email" 
+                        :label="__('visitor.email_address')" 
+                        name="email" 
+                        id="drawerVisitorEmail" 
+                        placeholder="e.g. visitor@company.com" 
+                        oninput="debounceVisitorLookupDrawer(this.value, 'email')" 
+                    />
                 </div>
 
                 <!-- Company -->
                 <div class="col-md-6">
-                    <div class="odoo-field-group">
-                        <label class="odoo-field-label" for="drawerVisitorCompany">
-                            {{ __('visitor.company') }}
-                        </label>
-                        <input type="text" 
-                               name="company_name" 
-                               id="drawerVisitorCompany" 
-                               class="odoo-field-control" 
-                               placeholder="e.g. Acme Industries Ltd"
-                               oninput="debounceVisitorLookupDrawer(this.value, 'company')">
-                    </div>
+                    <x-ui.odoo-form-ui 
+                        type="input" 
+                        :label="__('visitor.company')" 
+                        name="company_name" 
+                        id="drawerVisitorCompany" 
+                        placeholder="e.g. Acme Industries Ltd" 
+                        oninput="debounceVisitorLookupDrawer(this.value, 'company')" 
+                    />
                 </div>
 
                 <!-- Host User -->
                 <div class="col-md-6">
-                    <div class="odoo-field-group">
-                        <label class="odoo-field-label" for="drawerHostUserId">
-                            {{ __('visitor.select_host') }} <span class="text-danger">*</span>
-                        </label>
-                        <select name="host_user_id" id="drawerHostUserId" class="odoo-field-control" required>
-                            <option value="">— {{ __('visitor.select_host') }} —</option>
-                            @foreach($hosts ?? [] as $host)
-                                <option value="{{ $host->id }}">{{ $host->name }} ({{ $host->email }})</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    <x-ui.odoo-form-ui 
+                        type="select" 
+                        :label="__('visitor.select_host')" 
+                        name="host_user_id" 
+                        id="drawerHostUserId" 
+                        :required="true"
+                        :searchable="false">
+                        <option value="">— {{ __('visitor.select_host') }} —</option>
+                        @foreach($hosts ?? [] as $host)
+                            <option value="{{ $host->id }}">{{ $host->name }} ({{ $host->email }})</option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
                 </div>
 
                 <!-- Purpose of Visit -->
                 <div class="col-md-6">
-                    <div class="odoo-field-group">
-                        <label class="odoo-field-label" for="drawerPurpose">
-                            {{ __('visitor.purpose_of_visit') }} <span class="text-danger">*</span>
-                        </label>
-                        <select name="purpose" id="drawerPurpose" class="odoo-field-control" required onchange="handleDrawerPurposeChange(this.value)">
-                            <option value="Meeting">Meeting / Discussion</option>
-                            <option value="Product Inquiry">{{ __('visitor.purposes.Product Inquiry') }}</option>
-                            <option value="Interview">Job Interview</option>
-                            <option value="Vendor">Vendor / Supplier Visit</option>
-                            <option value="Delivery">Courier / Delivery</option>
-                            <option value="Audit">Audit / Inspection</option>
-                            <option value="Personal">Personal Visit</option>
-                        </select>
-                    </div>
+                    <x-ui.odoo-form-ui 
+                        type="select" 
+                        :label="__('visitor.purpose_of_visit')" 
+                        name="purpose" 
+                        id="drawerPurpose" 
+                        :required="true"
+                        :searchable="false"
+                        onchange="handleDrawerPurposeChange(this.value)">
+                        <option value="Meeting">Meeting / Discussion</option>
+                        <option value="Product Inquiry">{{ __('visitor.purposes.Product Inquiry') }}</option>
+                        <option value="Interview">Job Interview</option>
+                        <option value="Vendor">Vendor / Supplier Visit</option>
+                        <option value="Delivery">Courier / Delivery</option>
+                        <option value="Audit">Audit / Inspection</option>
+                        <option value="Personal">Personal Visit</option>
+                    </x-ui.odoo-form-ui>
                 </div>
 
                 <!-- Expected Arrival & Duration -->
                 <div class="col-md-6">
-                    <div class="odoo-field-group">
-                        <label class="odoo-field-label" for="drawerExpectedArrival">{{ __('visitor.expected_time') }}</label>
-                        <input type="datetime-local" name="expected_arrival_at" id="drawerExpectedArrival" class="odoo-field-control" value="{{ now()->format('Y-m-d\TH:i') }}">
-                    </div>
+                    <x-ui.odoo-form-ui 
+                        type="datetime-local" 
+                        :label="__('visitor.expected_time')" 
+                        name="expected_arrival_at" 
+                        id="drawerExpectedArrival" 
+                        :value="now()->format('Y-m-d\TH:i')" 
+                    />
                 </div>
                 <div class="col-md-6">
-                    <div class="odoo-field-group">
-                        <label class="odoo-field-label" for="drawerDuration">{{ __('visitor.expected_duration') }}</label>
-                        <input type="number" name="expected_duration_minutes" id="drawerDuration" class="odoo-field-control" value="60" min="15" max="720">
-                    </div>
+                    <x-ui.odoo-form-ui 
+                        type="number" 
+                        :label="__('visitor.expected_duration')" 
+                        name="expected_duration_minutes" 
+                        id="drawerDuration" 
+                        value="60" 
+                        min="15" 
+                        max="720" 
+                    />
                 </div>
             </div>
 
@@ -1002,104 +1008,143 @@
                 <div class="row g-3">
                     <!-- Designation -->
                     <div class="col-md-6">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label" for="drawerVisitorDesignation">{{ __('visitor.designation') }}</label>
-                            <input type="text" name="designation" id="drawerVisitorDesignation" class="odoo-field-control" placeholder="e.g. Senior Consultant / Delivery Rep">
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="input" 
+                            :label="__('visitor.designation')" 
+                            name="designation" 
+                            id="drawerVisitorDesignation" 
+                            placeholder="e.g. Senior Consultant / Delivery Rep" 
+                        />
                     </div>
 
                     <!-- Gate Number -->
                     <div class="col-md-6">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label" for="drawerGateNumber">{{ __('visitor.gate_number') }}</label>
-                            <input type="text" name="gate_number" id="drawerGateNumber" class="odoo-field-control" value="Main Gate 1">
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="input" 
+                            :label="__('visitor.gate_number')" 
+                            name="gate_number" 
+                            id="drawerGateNumber" 
+                            value="Main Gate 1" 
+                        />
                     </div>
 
                     <!-- Vehicle Type & Number -->
                     <div class="col-md-4">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">{{ __('visitor.vehicle_type') }}</label>
-                            <select name="vehicle_type" class="odoo-field-control">
-                                <option value="none">{{ __('visitor.vehicle_types.none') }}</option>
-                                <option value="2_wheeler">{{ __('visitor.vehicle_types.2_wheeler') }}</option>
-                                <option value="4_wheeler">{{ __('visitor.vehicle_types.4_wheeler') }}</option>
-                                <option value="truck">{{ __('visitor.vehicle_types.truck') }}</option>
-                            </select>
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="select" 
+                            :label="__('visitor.vehicle_type')" 
+                            name="vehicle_type" 
+                            id="drawerVisitorVehicleType" 
+                            :searchable="false">
+                            <option value="none">{{ __('visitor.vehicle_types.none') }}</option>
+                            <option value="2_wheeler">{{ __('visitor.vehicle_types.2_wheeler') }}</option>
+                            <option value="4_wheeler">{{ __('visitor.vehicle_types.4_wheeler') }}</option>
+                            <option value="truck">{{ __('visitor.vehicle_types.truck') }}</option>
+                        </x-ui.odoo-form-ui>
                     </div>
                     <div class="col-md-4">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">{{ __('visitor.vehicle_number') }}</label>
-                            <input type="text" name="vehicle_number" class="odoo-field-control" placeholder="e.g. MH-12-AB-1234">
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="input" 
+                            :label="__('visitor.vehicle_number')" 
+                            name="vehicle_number" 
+                            id="drawerVisitorVehicleNumber" 
+                            placeholder="e.g. MH-12-AB-1234" 
+                        />
                     </div>
                     <div class="col-md-4">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">{{ __('visitor.parking_slot') }}</label>
-                            <input type="text" name="parking_slot" class="odoo-field-control" placeholder="e.g. Bay P-04">
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="input" 
+                            :label="__('visitor.parking_slot')" 
+                            name="parking_slot" 
+                            id="drawerVisitorParkingSlot" 
+                            placeholder="e.g. Bay P-04" 
+                        />
                     </div>
 
                     <!-- Accompanying Persons -->
                     <div class="col-md-4">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">{{ __('visitor.accompanying_count') }}</label>
-                            <input type="number" name="accompanying_count" class="odoo-field-control" value="0" min="0" max="50">
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="number" 
+                            :label="__('visitor.accompanying_count')" 
+                            name="accompanying_count" 
+                            id="drawerAccompanyingCount" 
+                            value="0" 
+                            min="0" 
+                            max="50" 
+                        />
                     </div>
                     <div class="col-md-8">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">{{ __('visitor.accompanying_names') }}</label>
-                            <input type="text" name="accompanying_names" class="odoo-field-control" placeholder="Comma separated guest names...">
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="input" 
+                            :label="__('visitor.accompanying_names')" 
+                            name="accompanying_names" 
+                            id="drawerAccompanyingNames" 
+                            placeholder="Comma separated guest names..." 
+                        />
                     </div>
 
                     <!-- ID Proof & Verification -->
                     <div class="col-md-4">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">{{ __('visitor.id_proof') }}</label>
-                            <select name="id_proof_type" id="drawerVisitorIdType" class="odoo-field-control">
-                                <option value="">— Select ID Proof —</option>
-                                <option value="National ID">Aadhaar / National ID</option>
-                                <option value="Driving License">Driving License</option>
-                                <option value="Passport">Passport</option>
-                                <option value="Company ID">Company ID Card</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="select" 
+                            :label="__('visitor.id_proof')" 
+                            name="id_proof_type" 
+                            id="drawerVisitorIdType" 
+                            :searchable="false">
+                            <option value="">— Select ID Proof —</option>
+                            <option value="National ID">Aadhaar / National ID</option>
+                            <option value="Driving License">Driving License</option>
+                            <option value="Passport">Passport</option>
+                            <option value="Company ID">Company ID Card</option>
+                            <option value="Other">Other</option>
+                        </x-ui.odoo-form-ui>
                     </div>
                     <div class="col-md-4">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">{{ __('visitor.id_proof_number') }}</label>
-                            <input type="text" name="id_proof_number" id="drawerVisitorIdNumber" class="odoo-field-control" placeholder="e.g. DL-987456">
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="input" 
+                            :label="__('visitor.id_proof_number')" 
+                            name="id_proof_number" 
+                            id="drawerVisitorIdNumber" 
+                            placeholder="e.g. DL-987456" 
+                        />
                     </div>
                     <div class="col-md-4">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">{{ __('visitor.badge_number') }}</label>
-                            <input type="text" name="badge_number" class="odoo-field-control" placeholder="e.g. RFID-084">
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="input" 
+                            :label="__('visitor.badge_number')" 
+                            name="badge_number" 
+                            id="drawerVisitorBadgeNumber" 
+                            placeholder="e.g. RFID-084" 
+                        />
                     </div>
 
                     <!-- Belongings / Equipment -->
                     <div class="col-md-4">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">{{ __('visitor.item_type') }}</label>
-                            <input type="text" name="item_type" class="odoo-field-control" placeholder="e.g. Dell Latitude Laptop">
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="input" 
+                            :label="__('visitor.item_type')" 
+                            name="item_type" 
+                            id="drawerVisitorItemType" 
+                            placeholder="e.g. Dell Latitude Laptop" 
+                        />
                     </div>
                     <div class="col-md-4">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">{{ __('visitor.serial_number') }}</label>
-                            <input type="text" name="serial_number" class="odoo-field-control" placeholder="e.g. CN-0G541298">
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="input" 
+                            :label="__('visitor.serial_number')" 
+                            name="serial_number" 
+                            id="drawerVisitorSerialNumber" 
+                            placeholder="e.g. CN-0G541298" 
+                        />
                     </div>
                     <div class="col-md-4">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">{{ __('visitor.gate_pass_number') }}</label>
-                            <input type="text" name="belonging_gate_pass" class="odoo-field-control" placeholder="e.g. GP-9941">
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="input" 
+                            :label="__('visitor.gate_pass_number')" 
+                            name="belonging_gate_pass" 
+                            id="drawerBelongingGatePass" 
+                            placeholder="e.g. GP-9941" 
+                        />
                     </div>
 
                     <!-- Compliance Checkboxes -->
@@ -1123,10 +1168,14 @@
 
                     <!-- Notes -->
                     <div class="col-md-12">
-                        <div class="odoo-field-group">
-                            <label class="odoo-field-label">Security Notes / Remarks</label>
-                            <textarea name="notes" rows="2" class="form-control fs-13" placeholder="Any vehicle parking bay, cargo details or security remarks..."></textarea>
-                        </div>
+                        <x-ui.odoo-form-ui 
+                            type="textarea" 
+                            label="Security Notes / Remarks" 
+                            name="notes" 
+                            id="drawerSecurityNotes" 
+                            placeholder="Any vehicle parking bay, cargo details or security remarks..." 
+                            rows="2" 
+                        />
                     </div>
                 </div>
             </div>
@@ -1394,12 +1443,12 @@
     </x-ui.modal>
 
     <!-- Product Image Zoom / Lightbox Modal -->
-    <div class="modal fade" id="productImageZoomModal" tabindex="-1" aria-hidden="true" style="z-index: 1080;">
+    <div class="modal fade" id="productImageZoomModal" tabindex="-1" aria-labelledby="zoomModalProductName" aria-hidden="true" style="z-index: 100050;">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0 shadow-lg overflow-hidden rounded-4">
-                <div class="modal-header border-bottom py-2.5 px-3 bg-light">
+                <div class="modal-header border-bottom py-2.5 px-3 bg-light d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center gap-2">
-                        <div class="avatar-xs bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width:28px; height:28px;">
+                        <div class="avatar-xs bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-xs" style="width:28px; height:28px;">
                             <i class="feather-image fs-13"></i>
                         </div>
                         <div>
@@ -1407,14 +1456,18 @@
                             <small class="text-muted fs-11 font-monospace" id="zoomModalProductSku"></small>
                         </div>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn btn-sm btn-light border rounded-circle d-flex align-items-center justify-content-center p-0 shadow-xs" data-bs-dismiss="modal" aria-label="Close" style="width: 32px; height: 32px;" title="Close Preview">
+                        <i class="feather-x fs-16 text-dark"></i>
+                    </button>
                 </div>
-                <div class="modal-body p-3 text-center bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="min-height: 380px; max-height: 75vh;">
+                <div class="modal-body p-3 text-center bg-dark bg-opacity-10 d-flex align-items-center justify-content-center position-relative" style="min-height: 380px; max-height: 75vh;">
                     <img id="zoomModalImage" src="" alt="Product Large Preview" class="img-fluid rounded-3 shadow-sm object-fit-contain" style="max-height: 70vh; max-width: 100%; transition: transform 0.2s ease;">
                 </div>
                 <div class="modal-footer py-2 px-3 bg-light border-top d-flex justify-content-between align-items-center">
                     <span class="fs-11 text-muted"><i class="feather-info me-1"></i> High-resolution product catalog asset</span>
-                    <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">
+                        <i class="feather-x me-1"></i> Close
+                    </button>
                 </div>
             </div>
         </div>
@@ -1765,11 +1818,19 @@
         const name = wrapperEl.getAttribute('data-product-name') || 'Product Image Preview';
         const sku = wrapperEl.getAttribute('data-product-sku') || '';
         
+        const modalEl = document.getElementById('productImageZoomModal');
+        if (!modalEl) return;
+
+        // Ensure modal is directly attached to body to stay above offcanvas drawer and stacking contexts
+        if (modalEl.parentElement !== document.body) {
+            document.body.appendChild(modalEl);
+        }
+        
         document.getElementById('zoomModalProductName').textContent = name;
         document.getElementById('zoomModalProductSku').textContent = sku ? 'SKU: ' + sku : '';
         document.getElementById('zoomModalImage').src = fullImage;
         
-        const zoomModal = new bootstrap.Modal(document.getElementById('productImageZoomModal'));
+        const zoomModal = bootstrap.Modal.getOrCreateInstance(modalEl);
         zoomModal.show();
     }
 
@@ -1849,6 +1910,30 @@
     }
 
     $(document).ready(function() {
+        const zoomModalEl = document.getElementById('productImageZoomModal');
+        if (zoomModalEl) {
+            zoomModalEl.addEventListener('show.bs.modal', function() {
+                if (zoomModalEl.parentElement !== document.body) {
+                    document.body.appendChild(zoomModalEl);
+                }
+                setTimeout(function() {
+                    const backdrops = document.querySelectorAll('.modal-backdrop');
+                    if (backdrops.length > 0) {
+                        const lastBackdrop = backdrops[backdrops.length - 1];
+                        lastBackdrop.classList.add('zoom-backdrop-high');
+                    }
+                }, 10);
+            });
+
+            zoomModalEl.addEventListener('hidden.bs.modal', function() {
+                const openDrawer = document.querySelector('.offcanvas.show');
+                if (openDrawer) {
+                    document.body.classList.add('modal-open');
+                    document.body.style.overflow = 'hidden';
+                }
+            });
+        }
+
         // Real-time error clearance on typing / selecting
         $(document).on('input change', '#newVisitorDrawerForm input, #newVisitorDrawerForm select, #newVisitorDrawerForm textarea', function() {
             if (this.value && this.value.trim() !== '') {

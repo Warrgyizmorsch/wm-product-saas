@@ -75,6 +75,21 @@
         align-items: center;
         justify-content: center;
     }
+
+    /* Dark mode support */
+    html.app-skin-dark .kanban-card {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3) !important;
+    }
+    html.app-skin-dark .kanban-card:hover {
+        background-color: #243248 !important;
+        border-color: #475569 !important;
+    }
+    html.app-skin-dark .candidate-avatar {
+        background-color: #1e3a8a !important;
+        color: #93c5fd !important;
+    }
 </style>
 @endpush
 

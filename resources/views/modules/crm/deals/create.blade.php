@@ -47,8 +47,8 @@
                         @endforeach
                     </x-ui.odoo-form-ui>
 
-                    <x-ui.odoo-form-ui type="select" :label="__('crm.lead_owner')" name="owner_id">
-                        <option value="">{{ __('crm.select_owner_unassigned') }}</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.deal_owner')" name="owner_id">
+                        <option value="">{{ __('crm.select_deal_owner') }}...</option>
                         @foreach($users as $user)
                             <option value="{{ $user->id }}" @selected(old('owner_id', auth()->id()) == $user->id)>
                                 {{ $user->name }}
@@ -81,7 +81,7 @@
 
                 <!-- Right Column: Classification, Notes & Products -->
                 <div class="col-lg-6">
-                    <h6 class="fw-bold text-primary mb-3"><i class="feather-grid me-2"></i>{{ __('crm.lead_classification') }}</h6>
+                    <h6 class="fw-bold text-primary mb-3"><i class="feather-grid me-2"></i>{{ __('crm.deal_classification') }}</h6>
 
                     <x-ui.odoo-form-ui type="select" :label="__('crm.pipeline_stage')" name="stage" required="true">
                         @foreach($dealStatuses as $st)
@@ -141,9 +141,13 @@
                             height: 32px !important;
                             font-size: 13px !important;
                             font-weight: 600 !important;
-                            border-color: #dee2e6 !important;
-                            background-color: #ffffff !important;
+                            border-color: #dee2e6;
                             width: 100% !important;
+                        }
+                        html.app-skin-dark #productItemsTable .qty-row-input {
+                            background-color: #121a2d !important;
+                            border-color: #283c50 !important;
+                            color: #ffffff !important;
                         }
                         .remove-product-row-btn {
                             transition: transform 0.15s ease-in-out, opacity 0.15s ease-in-out;
