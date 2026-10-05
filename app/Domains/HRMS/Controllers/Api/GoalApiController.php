@@ -87,7 +87,7 @@ class GoalApiController extends Controller
                     'on_track_count'     => $data['onTrackCount'] ?? 0,
                     'behind_count'       => $data['behindCount'] ?? 0,
                 ],
-                'active_cycle' => $data['activeCycle'] ? [
+                'active_cycle' => !empty($data['activeCycle']) ? [
                     'id'         => $data['activeCycle']->id,
                     'name'       => $data['activeCycle']->name,
                     'code'       => $data['activeCycle']->code,
@@ -214,7 +214,7 @@ class GoalApiController extends Controller
             $perPage = min((int) ($request->get('per_page', 15)), 100);
             $paginated = $query->paginate($perPage);
 
-            $items = $paginated->getCollection()->map(function ($g) {
+            $items = $paginated->getCollection()->map(function ($g) use ($isHrAdmin, $currentEmployee) {
                 $assignedEmps = $g->employees->isNotEmpty() ? $g->employees : ($g->employee ? collect([$g->employee]) : collect());
 
                 return [
@@ -277,7 +277,7 @@ class GoalApiController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        [$tenantId, $user] = $this->resolveContext();
+        [$tenantId, $user, $currentEmployee, $isHrAdmin] = $this->resolveContext();
 
         try {
             $data = $this->goalRepository->getShowData($id, $user, $tenantId);

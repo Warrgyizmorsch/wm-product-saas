@@ -674,6 +674,17 @@ class PipApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required.', 403);
         }
 
+        // Support either 'name' or 'title' seamlessly
+        if (!$request->has('name') && $request->has('title')) {
+            $request->merge(['name' => $request->input('title')]);
+        }
+        if (!$request->has('duration_days') && $request->has('default_duration_days')) {
+            $request->merge(['duration_days' => $request->input('default_duration_days')]);
+        }
+        if (!$request->has('checkin_frequency') && $request->has('default_checkin_frequency')) {
+            $request->merge(['checkin_frequency' => $request->input('default_checkin_frequency')]);
+        }
+
         $validated = $request->validate([
             'name'              => 'required|string|max:255',
             'duration_days'     => 'required|integer|min:7|max:180',

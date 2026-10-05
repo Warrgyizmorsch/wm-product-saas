@@ -91,20 +91,62 @@ class ProbationApiController extends Controller
                   ->where('probation_end_date', '<', $today->format('Y-m-d'));
         }
 
-        $employees = $query->paginate($request->integer('per_page', 15));
+        $summary = [
+            'total_in_probation' => Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Probation')->count(),
+            'due_soon'           => Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Probation')->whereBetween('probation_end_date', [$today->toDateString(), $in15Days->toDateString()])->count(),
+            'overdue'            => Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Probation')->where('probation_end_date', '<', $today->toDateString())->count(),
+        ];
 
-        $employees->getCollection()->transform(function ($emp) use ($isHrAdmin) {
-            $emp->capabilities = [
-                'can_view'          => true,
-                'can_evaluate'      => $isHrAdmin,
-                'can_quick_confirm' => $isHrAdmin,
-                'can_extend'        => $isHrAdmin,
-                'can_terminate'     => $isHrAdmin,
+        $paginated = $query->paginate($request->integer('per_page', 15));
+
+        $items = collect($paginated->items())->map(function ($emp) use ($today, $isHrAdmin) {
+            $probEndDate = $emp->probation_end_date ? Carbon::parse($emp->probation_end_date) : null;
+            $daysRemaining = $probEndDate ? (int)$today->diffInDays($probEndDate, false) : null;
+            $latestEval = $emp->probationEvaluations->sortByDesc('id')->first();
+
+            return [
+                'id'                 => (int)$emp->id,
+                'employee_code'      => $emp->employee_id ?? '',
+                'full_name'          => trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? '')) ?: ($emp->full_name ?? 'Employee'),
+                'email'              => $emp->office_email ?? $emp->personal_email ?? null,
+                'department'         => $emp->department?->name ?? null,
+                'designation'        => $emp->designation?->name ?? null,
+                'joining_date'       => $emp->joining_date ? Carbon::parse($emp->joining_date)->format('Y-m-d') : null,
+                'probation_end_date' => $probEndDate ? $probEndDate->format('Y-m-d') : null,
+                'days_remaining'     => $daysRemaining,
+                'status'             => $probEndDate && $probEndDate->isPast() ? 'overdue' : ($daysRemaining !== null && $daysRemaining <= 15 ? 'due_soon' : 'in_probation'),
+                'employee_stage'     => $emp->employee_stage ?? 'Probation',
+                'latest_evaluation'  => $latestEval ? [
+                    'id'                 => (int)$latestEval->id,
+                    'evaluation_date'    => $latestEval->evaluation_date ? Carbon::parse($latestEval->evaluation_date)->format('Y-m-d') : null,
+                    'recommendation'     => $latestEval->recommendation,
+                    'performance_rating' => (int)$latestEval->performance_rating,
+                    'attendance_rating'  => (int)$latestEval->attendance_rating,
+                    'culture_rating'     => (int)$latestEval->culture_rating,
+                    'remarks'            => $latestEval->remarks,
+                ] : null,
+                'capabilities'       => [
+                    'can_view'          => true,
+                    'can_evaluate'      => $isHrAdmin,
+                    'can_quick_confirm' => $isHrAdmin,
+                    'can_extend'        => $isHrAdmin,
+                    'can_terminate'     => $isHrAdmin,
+                ],
             ];
-            return $emp;
-        });
+        })->values();
 
-        return $this->sendSuccess($employees, 'Probation list retrieved successfully.');
+        $response = [
+            'summary'    => $summary,
+            'items'      => $items,
+            'pagination' => [
+                'current_page' => $paginated->currentPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+                'total_pages'  => $paginated->lastPage(),
+            ],
+        ];
+
+        return $this->sendSuccess($response, 'Probation list retrieved successfully.');
     }
 
     public function evaluate(Request $request, mixed $employee): JsonResponse
@@ -221,6 +263,21 @@ class ProbationApiController extends Controller
             $empModel->update(['employee_stage' => 'Notice Period']);
         }
 
-        return $this->sendSuccess($eval, 'Probation evaluation recorded successfully.');
+        $response = [
+            'id'                     => (int)$eval->id,
+            'employee_id'            => (int)$empModel->id,
+            'employee_code'          => $empModel->employee_id ?? '',
+            'employee_name'          => trim(($empModel->first_name ?? '') . ' ' . ($empModel->last_name ?? '')) ?: ($empModel->full_name ?? 'Employee'),
+            'evaluation_date'        => $eval->evaluation_date ? Carbon::parse($eval->evaluation_date)->format('Y-m-d') : Carbon::today()->format('Y-m-d'),
+            'recommendation'         => $eval->recommendation,
+            'performance_rating'     => (int)$eval->performance_rating,
+            'attendance_rating'      => (int)$eval->attendance_rating,
+            'culture_rating'         => (int)$eval->culture_rating,
+            'new_probation_end_date' => $newProbationEnd ? $newProbationEnd->format('Y-m-d') : null,
+            'new_stage'              => $empModel->fresh()->employee_stage,
+            'remarks'                => $eval->remarks,
+        ];
+
+        return $this->sendSuccess($response, 'Probation evaluation recorded successfully.');
     }
 }

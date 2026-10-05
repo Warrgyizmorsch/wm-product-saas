@@ -160,6 +160,7 @@ class GoalRepository implements GoalRepositoryInterface
             'onTrackCount',
             'behindCount',
             'cycles',
+            'activeCycle',
             'selectedCycleId',
             'categories',
             'departments',

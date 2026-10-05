@@ -712,21 +712,26 @@
             }, 450);
         });
 
+        function calculateEndDate(startDateStr, durationDays) {
+            if (!startDateStr) return '';
+            const parts = startDateStr.split('-');
+            if (parts.length !== 3) return '';
+            const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            d.setDate(d.getDate() + parseInt(durationDays || 30));
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
         // Policy Template auto-fill: when template selected, update End Date & Check-in Frequency
         $(document).on('change', '#pipPolicyTemplate', function() {
             const selected = $(this).find('option:selected');
-            const duration = selected.data('duration');
+            const duration = selected.data('duration') || 30;
             const frequency = selected.data('frequency');
 
-            if (duration) {
-                // Compute end date from today + duration_days
-                const startInput = $('input[name="start_date"]');
-                const startVal = startInput.val() || '{{ date("Y-m-d") }}';
-                const startDate = new Date(startVal);
-                startDate.setDate(startDate.getDate() + parseInt(duration));
-                const endDateStr = startDate.toISOString().split('T')[0];
-                $('input[name="end_date"]').val(endDateStr);
-            }
+            const startVal = $('input[name="start_date"]').val() || '{{ date("Y-m-d") }}';
+            $('input[name="end_date"]').val(calculateEndDate(startVal, duration));
 
             if (frequency) {
                 const freq = $('#pipCheckinFreq');
@@ -735,14 +740,15 @@
             }
         });
 
-        // When start_date changes and a template is selected, recalculate end date
+        // When start_date changes, ensure end_date is updated if template is selected or if end_date <= start_date
         $(document).on('change', 'input[name="start_date"]', function() {
+            const startVal = $(this).val();
             const selected = $('#pipPolicyTemplate').find('option:selected');
-            const duration = selected.data('duration');
-            if (duration) {
-                const startDate = new Date($(this).val());
-                startDate.setDate(startDate.getDate() + parseInt(duration));
-                $('input[name="end_date"]').val(startDate.toISOString().split('T')[0]);
+            const duration = selected.data('duration') || 30;
+            const currentEndVal = $('input[name="end_date"]').val();
+
+            if (selected.val() || !currentEndVal || currentEndVal <= startVal) {
+                $('input[name="end_date"]').val(calculateEndDate(startVal, duration));
             }
         });
     });

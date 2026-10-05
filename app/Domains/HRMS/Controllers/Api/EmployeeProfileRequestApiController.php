@@ -158,9 +158,33 @@ class EmployeeProfileRequestApiController extends Controller
         };
 
         $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
-        $requests = $query->paginate($perPage);
+        $paginated = $query->paginate($perPage);
 
-        return $this->sendSuccess($requests, 'Profile update requests retrieved.');
+        $items = collect($paginated->items())->map(function ($req) {
+            return [
+                'id'                      => $req->id,
+                'employee_id'             => $req->employee_id,
+                'employee_code'           => $req->employee?->employee_id ?? null,
+                'employee_name'           => $req->employee?->full_name ?? null,
+                'department'              => $req->employee?->department?->name ?? null,
+                'designation'             => $req->employee?->designation?->name ?? null,
+                'status'                  => $req->status,
+                'requested_changes_count' => is_array($req->changes) ? count($req->changes) : 0,
+                'requested_changes'       => $req->changes,
+                'rejection_reason'        => $req->rejection_reason,
+                'reviewer_name'           => $req->reviewer?->name ?? null,
+                'reviewed_at'             => $req->reviewed_at?->toIso8601String(),
+                'created_at'              => $req->created_at?->toIso8601String(),
+            ];
+        });
+
+        return $this->sendSuccess([
+            'items'        => $items,
+            'current_page' => $paginated->currentPage(),
+            'per_page'     => $paginated->perPage(),
+            'total'        => $paginated->total(),
+            'last_page'    => $paginated->lastPage(),
+        ], 'Profile update requests retrieved.');
     }
 
     // =========================================================================
@@ -181,13 +205,32 @@ class EmployeeProfileRequestApiController extends Controller
 
         $perPage = min(max((int) $request->input('per_page', 15), 1), 50);
 
-        $requests = EmployeeProfileUpdateRequest::with(['reviewer:id,name,email'])
+        $paginated = EmployeeProfileUpdateRequest::with(['reviewer:id,name,email'])
             ->where('tenant_id', $tenantId)
             ->where('employee_id', $currentEmployee->id)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
 
-        return $this->sendSuccess($requests, 'My profile update requests retrieved.');
+        $items = collect($paginated->items())->map(function ($req) {
+            return [
+                'id'                      => $req->id,
+                'status'                  => $req->status,
+                'requested_changes_count' => is_array($req->changes) ? count($req->changes) : 0,
+                'requested_changes'       => $req->changes,
+                'rejection_reason'        => $req->rejection_reason,
+                'reviewer_name'           => $req->reviewer?->name ?? null,
+                'reviewed_at'             => $req->reviewed_at?->toIso8601String(),
+                'created_at'              => $req->created_at?->toIso8601String(),
+            ];
+        });
+
+        return $this->sendSuccess([
+            'items'        => $items,
+            'current_page' => $paginated->currentPage(),
+            'per_page'     => $paginated->perPage(),
+            'total'        => $paginated->total(),
+            'last_page'    => $paginated->lastPage(),
+        ], 'My profile update requests retrieved.');
     }
 
     // =========================================================================
@@ -303,7 +346,14 @@ class EmployeeProfileRequestApiController extends Controller
                 'status'      => 'pending',
             ]);
 
-            return $this->sendSuccess($profileRequest, 'Profile edit request submitted successfully and queued for HR review.', 201);
+            return $this->sendSuccess([
+                'id'                      => $profileRequest->id,
+                'employee_id'             => $profileRequest->employee_id,
+                'status'                  => $profileRequest->status,
+                'requested_changes_count' => count($changes),
+                'requested_changes'       => $changes,
+                'created_at'              => $profileRequest->created_at?->toIso8601String(),
+            ], 'Profile edit request submitted successfully and queued for HR review.', 201);
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), 400);
         }
@@ -339,7 +389,26 @@ class EmployeeProfileRequestApiController extends Controller
             return $this->sendError('Unauthorized access to this profile request.', 403);
         }
 
-        return $this->sendSuccess($profileRequest, 'Profile update request details retrieved.');
+        return $this->sendSuccess([
+            'id'                => $profileRequest->id,
+            'employee'          => [
+                'id'            => $profileRequest->employee?->id,
+                'employee_code' => $profileRequest->employee?->employee_id,
+                'name'          => $profileRequest->employee?->full_name,
+                'department'    => $profileRequest->employee?->department?->name,
+                'designation'   => $profileRequest->employee?->designation?->name,
+                'photo'         => $profileRequest->employee?->photo,
+            ],
+            'status'            => $profileRequest->status,
+            'requested_changes' => $profileRequest->changes,
+            'rejection_reason'  => $profileRequest->rejection_reason,
+            'reviewer'          => $profileRequest->reviewer ? [
+                'id'   => $profileRequest->reviewer->id,
+                'name' => $profileRequest->reviewer->name,
+            ] : null,
+            'reviewed_at'       => $profileRequest->reviewed_at?->toIso8601String(),
+            'created_at'        => $profileRequest->created_at?->toIso8601String(),
+        ], 'Profile update request details retrieved.');
     }
 
     // =========================================================================

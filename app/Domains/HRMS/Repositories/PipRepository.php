@@ -118,7 +118,8 @@ class PipRepository implements PipRepositoryInterface
         $categories = PipCategory::where('tenant_id', $tenantId)->get();
         $employees = Employee::where('tenant_id', $tenantId)->orderBy('full_name')->get();
 
-        return compact('plan', 'categories', 'employees');
+        $pip = $plan;
+        return compact('plan', 'pip', 'categories', 'employees');
     }
 
     public function storePlan(array $validated, int $tenantId): PerformanceImprovementPlan
@@ -170,17 +171,49 @@ class PipRepository implements PipRepositoryInterface
     {
         $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($pipId);
 
-        $validated['tenant_id'] = $tenantId;
-        $validated['pip_id'] = $plan->id;
-        $validated['conducted_by_id'] = $loggedById;
+        $data = [
+            'tenant_id'         => $tenantId,
+            'pip_id'            => $plan->id,
+            'review_date'       => $validated['checkin_date'] ?? $validated['review_date'] ?? $validated['meeting_date'] ?? Carbon::today()->toDateString(),
+            'reviewer_id'       => $loggedById,
+            'rating_status'     => $validated['rating_status'] ?? 'on_track',
+            'manager_comments'  => $validated['manager_comments'] ?? $validated['progress_summary'] ?? null,
+            'employee_comments' => $validated['employee_comments'] ?? null,
+            'action_items'      => $validated['action_items'] ?? $validated['support_action_items'] ?? null,
+        ];
 
-        $checkin = PipCheckin::create($validated);
+        return $this->pipService->createCheckin($plan, $data);
+    }
 
-        if (!empty($validated['next_checkin_date'])) {
-            $plan->update(['next_checkin_date' => $validated['next_checkin_date']]);
+    public function updateCheckin(int $checkinId, array $validated, int $tenantId): PipCheckin
+    {
+        $checkin = PipCheckin::where('tenant_id', $tenantId)->findOrFail($checkinId);
+
+        $data = [];
+        if (isset($validated['checkin_date']) || isset($validated['review_date'])) {
+            $data['review_date'] = $validated['checkin_date'] ?? $validated['review_date'];
+        }
+        if (isset($validated['rating_status'])) {
+            $data['rating_status'] = $validated['rating_status'];
+        }
+        if (isset($validated['manager_comments']) || isset($validated['progress_summary'])) {
+            $data['manager_comments'] = $validated['manager_comments'] ?? $validated['progress_summary'];
+        }
+        if (isset($validated['employee_comments'])) {
+            $data['employee_comments'] = $validated['employee_comments'];
+        }
+        if (isset($validated['action_items'])) {
+            $data['action_items'] = $validated['action_items'];
         }
 
+        $checkin->update($data);
         return $checkin;
+    }
+
+    public function deleteCheckin(int $checkinId, int $tenantId): bool
+    {
+        $checkin = PipCheckin::where('tenant_id', $tenantId)->findOrFail($checkinId);
+        return (bool) $checkin->delete();
     }
 
     public function acknowledge(int $id, string $signatureData, int $tenantId): PerformanceImprovementPlan

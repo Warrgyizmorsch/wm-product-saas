@@ -897,27 +897,27 @@ Route::prefix('api/hrms/goals')
         // Summary & Metrics
         Route::get('/summary', [GoalApiController::class, 'summary'])->name('summary');
 
-        // Goals CRUD & Tree
-        Route::get('/', [GoalApiController::class, 'index'])->name('index');
-        Route::post('/', [GoalApiController::class, 'store'])->name('store');
-        Route::get('/alignment-tree', [GoalApiController::class, 'alignmentTree'])->name('alignment-tree');
-        Route::get('/my-goals', [GoalApiController::class, 'myGoals'])->name('my-goals');
-        Route::get('/{id}', [GoalApiController::class, 'show'])->name('show');
-        Route::put('/{id}', [GoalApiController::class, 'update'])->name('update');
-        Route::delete('/{id}', [GoalApiController::class, 'destroy'])->name('destroy');
-
-        // Check-ins
-        Route::post('/{id}/check-in', [GoalApiController::class, 'checkIn'])->name('check-in');
-
-        // Goal Cycles Master
+        // Goal Cycles Master (must be before /{id} wildcard)
         Route::get('/cycles', [GoalApiController::class, 'indexCycles'])->name('cycles.index');
         Route::post('/cycles', [GoalApiController::class, 'storeCycle'])->name('cycles.store');
-        Route::delete('/cycles/{id}', [GoalApiController::class, 'destroyCycle'])->name('cycles.destroy');
+        Route::delete('/cycles/{id}', [GoalApiController::class, 'destroyCycle'])->name('cycles.destroy')->whereNumber('id');
 
-        // Goal Strategic Categories / Pillars Master
+        // Goal Strategic Categories / Pillars Master (must be before /{id} wildcard)
         Route::get('/categories', [GoalApiController::class, 'indexCategories'])->name('categories.index');
         Route::post('/categories', [GoalApiController::class, 'storeCategory'])->name('categories.store');
-        Route::delete('/categories/{id}', [GoalApiController::class, 'destroyCategory'])->name('categories.destroy');
+        Route::delete('/categories/{id}', [GoalApiController::class, 'destroyCategory'])->name('categories.destroy')->whereNumber('id');
+
+        // Alignment Tree & My Goals
+        Route::get('/alignment-tree', [GoalApiController::class, 'alignmentTree'])->name('alignment-tree');
+        Route::get('/my-goals', [GoalApiController::class, 'myGoals'])->name('my-goals');
+
+        // Goals CRUD
+        Route::get('/', [GoalApiController::class, 'index'])->name('index');
+        Route::post('/', [GoalApiController::class, 'store'])->name('store');
+        Route::post('/{id}/check-in', [GoalApiController::class, 'checkIn'])->name('check-in')->whereNumber('id');
+        Route::get('/{id}', [GoalApiController::class, 'show'])->name('show')->whereNumber('id');
+        Route::put('/{id}', [GoalApiController::class, 'update'])->name('update')->whereNumber('id');
+        Route::delete('/{id}', [GoalApiController::class, 'destroy'])->name('destroy')->whereNumber('id');
     });
 
 // ==========================================
@@ -930,31 +930,31 @@ Route::prefix('api/hrms/feedback-360')
         // 1. Hub Summary & Cycles Listing
         Route::get('/', [Feedback360ApiController::class, 'index'])->name('index');
         Route::post('/cycles', [Feedback360ApiController::class, 'store'])->name('cycles.store');
-        Route::get('/cycles/{id}', [Feedback360ApiController::class, 'show'])->name('cycles.show');
-        Route::put('/cycles/{id}', [Feedback360ApiController::class, 'update'])->name('cycles.update');
-        Route::delete('/cycles/{id}', [Feedback360ApiController::class, 'destroy'])->name('cycles.destroy');
-        Route::post('/cycles/{id}/launch', [Feedback360ApiController::class, 'launch'])->name('cycles.launch');
-        Route::post('/cycles/{id}/participants', [Feedback360ApiController::class, 'addParticipants'])->name('cycles.participants');
-        Route::post('/cycles/{id}/bulk-remind', [Feedback360ApiController::class, 'bulkRemind'])->name('cycles.bulk-remind');
+        Route::get('/cycles/{id}', [Feedback360ApiController::class, 'show'])->name('cycles.show')->whereNumber('id');
+        Route::put('/cycles/{id}', [Feedback360ApiController::class, 'update'])->name('cycles.update')->whereNumber('id');
+        Route::delete('/cycles/{id}', [Feedback360ApiController::class, 'destroy'])->name('cycles.destroy')->whereNumber('id');
+        Route::post('/cycles/{id}/launch', [Feedback360ApiController::class, 'launch'])->name('cycles.launch')->whereNumber('id');
+        Route::post('/cycles/{id}/participants', [Feedback360ApiController::class, 'addParticipants'])->name('cycles.participants')->whereNumber('id');
+        Route::post('/cycles/{id}/bulk-remind', [Feedback360ApiController::class, 'bulkRemind'])->name('cycles.bulk-remind')->whereNumber('id');
 
         // 2. Peer Nominations & Approvals
-        Route::post('/participants/{participantId}/nominate-peers', [Feedback360ApiController::class, 'nominatePeers'])->name('participants.nominate-peers');
-        Route::post('/nominations/{nominationId}/approve', [Feedback360ApiController::class, 'approveNomination'])->name('nominations.approve');
+        Route::post('/participants/{participantId}/nominate-peers', [Feedback360ApiController::class, 'nominatePeers'])->name('participants.nominate-peers')->whereNumber('participantId');
+        Route::post('/nominations/{nominationId}/approve', [Feedback360ApiController::class, 'approveNomination'])->name('nominations.approve')->whereNumber('nominationId');
         Route::post('/nominations/batch-approve', [Feedback360ApiController::class, 'batchApproveNominations'])->name('nominations.batch-approve');
 
         // 3. Review Workspace & Evaluation Submission
-        Route::get('/review/{nominationId}', [Feedback360ApiController::class, 'reviewWorkspace'])->name('review.workspace');
-        Route::post('/review/{nominationId}', [Feedback360ApiController::class, 'submitReview'])->name('review.submit');
+        Route::get('/review/{nominationId}', [Feedback360ApiController::class, 'reviewWorkspace'])->name('review.workspace')->whereNumber('nominationId');
+        Route::post('/review/{nominationId}', [Feedback360ApiController::class, 'submitReview'])->name('review.submit')->whereNumber('nominationId');
 
         // 4. 360 Assessment Report & Calibration
-        Route::get('/report/{participantId}', [Feedback360ApiController::class, 'report'])->name('report');
-        Route::post('/report/{participantId}/publish', [Feedback360ApiController::class, 'publishReport'])->name('report.publish');
+        Route::get('/report/{participantId}', [Feedback360ApiController::class, 'report'])->name('report')->whereNumber('participantId');
+        Route::post('/report/{participantId}/publish', [Feedback360ApiController::class, 'publishReport'])->name('report.publish')->whereNumber('participantId');
 
         // 5. Competencies & Question Bank Masters
         Route::post('/competencies', [Feedback360ApiController::class, 'storeCompetency'])->name('competencies.store');
-        Route::delete('/competencies/{id}', [Feedback360ApiController::class, 'destroyCompetency'])->name('competencies.destroy');
+        Route::delete('/competencies/{id}', [Feedback360ApiController::class, 'destroyCompetency'])->name('competencies.destroy')->whereNumber('id');
         Route::post('/questions', [Feedback360ApiController::class, 'storeQuestion'])->name('questions.store');
-        Route::delete('/questions/{id}', [Feedback360ApiController::class, 'destroyQuestion'])->name('questions.destroy');
+        Route::delete('/questions/{id}', [Feedback360ApiController::class, 'destroyQuestion'])->name('questions.destroy')->whereNumber('id');
     });
 
 // ==========================================
@@ -968,9 +968,9 @@ Route::prefix('api/hrms/biometric-devices')
         Route::get('/', [BiometricDeviceApiController::class, 'index'])->name('index');
         Route::post('/', [BiometricDeviceApiController::class, 'store'])->name('store');
         Route::post('/simulate-punch', [BiometricDeviceApiController::class, 'simulatePunch'])->name('simulate-punch');
-        Route::get('/{id}', [BiometricDeviceApiController::class, 'show'])->name('show');
-        Route::put('/{id}', [BiometricDeviceApiController::class, 'update'])->name('update');
-        Route::delete('/{id}', [BiometricDeviceApiController::class, 'destroy'])->name('destroy');
+        Route::get('/{id}', [BiometricDeviceApiController::class, 'show'])->name('show')->whereNumber('id');
+        Route::put('/{id}', [BiometricDeviceApiController::class, 'update'])->name('update')->whereNumber('id');
+        Route::delete('/{id}', [BiometricDeviceApiController::class, 'destroy'])->name('destroy')->whereNumber('id');
     });
 
 // ==========================================
@@ -986,20 +986,20 @@ Route::prefix('api/hrms/expense-policies')
         // Approval Workflows CRUD
         Route::get('/workflows', [ExpensePolicyApiController::class, 'listWorkflows'])->name('workflows.index');
         Route::post('/workflows', [ExpensePolicyApiController::class, 'storeWorkflow'])->name('workflows.store');
-        Route::put('/workflows/{id}', [ExpensePolicyApiController::class, 'updateWorkflow'])->name('workflows.update');
-        Route::delete('/workflows/{id}', [ExpensePolicyApiController::class, 'destroyWorkflow'])->name('workflows.destroy');
+        Route::put('/workflows/{id}', [ExpensePolicyApiController::class, 'updateWorkflow'])->name('workflows.update')->whereNumber('id');
+        Route::delete('/workflows/{id}', [ExpensePolicyApiController::class, 'destroyWorkflow'])->name('workflows.destroy')->whereNumber('id');
 
         // Category Policy Rules
-        Route::get('/{policyId}/rules', [ExpensePolicyApiController::class, 'listRules'])->name('rules.index');
-        Route::post('/{policyId}/rules', [ExpensePolicyApiController::class, 'storeRule'])->name('rules.store');
-        Route::delete('/{policyId}/rules/{ruleId}', [ExpensePolicyApiController::class, 'destroyRule'])->name('rules.destroy');
+        Route::get('/{policyId}/rules', [ExpensePolicyApiController::class, 'listRules'])->name('rules.index')->whereNumber('policyId');
+        Route::post('/{policyId}/rules', [ExpensePolicyApiController::class, 'storeRule'])->name('rules.store')->whereNumber('policyId');
+        Route::delete('/{policyId}/rules/{ruleId}', [ExpensePolicyApiController::class, 'destroyRule'])->name('rules.destroy')->whereNumber('policyId')->whereNumber('ruleId');
 
         // Policies Header CRUD
         Route::get('/', [ExpensePolicyApiController::class, 'index'])->name('index');
         Route::post('/', [ExpensePolicyApiController::class, 'store'])->name('store');
-        Route::get('/{id}', [ExpensePolicyApiController::class, 'show'])->name('show');
-        Route::put('/{id}', [ExpensePolicyApiController::class, 'update'])->name('update');
-        Route::delete('/{id}', [ExpensePolicyApiController::class, 'destroy'])->name('destroy');
+        Route::get('/{id}', [ExpensePolicyApiController::class, 'show'])->name('show')->whereNumber('id');
+        Route::put('/{id}', [ExpensePolicyApiController::class, 'update'])->name('update')->whereNumber('id');
+        Route::delete('/{id}', [ExpensePolicyApiController::class, 'destroy'])->name('destroy')->whereNumber('id');
     });
 
 
