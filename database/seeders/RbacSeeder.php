@@ -327,6 +327,21 @@ class RbacSeeder extends Seeder
             'hrms.wfh_requests.create' => $permissions['hrms.wfh_requests.create'],
             'hrms.wfh_requests.approve' => $permissions['hrms.wfh_requests.approve'],
             'hrms.wfh_requests.manage' => $permissions['hrms.wfh_requests.manage'],
+            'hrms.sop.view' => $permissions['hrms.sop.view'],
+            'hrms.sop.create' => $permissions['hrms.sop.create'],
+            'hrms.sop.update' => $permissions['hrms.sop.update'],
+            'hrms.sop.delete' => $permissions['hrms.sop.delete'],
+            'hrms.sop.manage' => $permissions['hrms.sop.manage'],
+            'hrms.goals.view' => $permissions['hrms.goals.view'],
+            'hrms.goals.create' => $permissions['hrms.goals.create'],
+            'hrms.goals.update' => $permissions['hrms.goals.update'],
+            'hrms.goals.delete' => $permissions['hrms.goals.delete'],
+            'hrms.goals.manage' => $permissions['hrms.goals.manage'],
+            'hrms.feedback_360.view' => $permissions['hrms.feedback_360.view'],
+            'hrms.feedback_360.create' => $permissions['hrms.feedback_360.create'],
+            'hrms.feedback_360.update' => $permissions['hrms.feedback_360.update'],
+            'hrms.feedback_360.delete' => $permissions['hrms.feedback_360.delete'],
+            'hrms.feedback_360.manage' => $permissions['hrms.feedback_360.manage'],
         ], RolePermission::SCOPE_TENANT);
 
         // Employee Self-Service (own Leave/WFH/Attendance/Travel-Expense/Payslip/
@@ -377,6 +392,9 @@ class RbacSeeder extends Seeder
             'accounting.ledger_groups.update' => $permissions['accounting.ledger_groups.update'],
             'accounting.bank_reconciliation.view' => $permissions['accounting.bank_reconciliation.view'],
             'accounting.bank_reconciliation.create' => $permissions['accounting.bank_reconciliation.create'],
+            // Filing GSTR-1 is the accountant's job.
+            'accounting.gst_returns.view' => $permissions['accounting.gst_returns.view'],
+            'accounting.gst_returns.file' => $permissions['accounting.gst_returns.file'],
             'accounting.budgets.view' => $permissions['accounting.budgets.view'],
             'accounting.budgets.create' => $permissions['accounting.budgets.create'],
             'accounting.budgets.update' => $permissions['accounting.budgets.update'],
@@ -385,7 +403,7 @@ class RbacSeeder extends Seeder
             'accounting.exchange_rates.view' => $permissions['accounting.exchange_rates.view'],
             'accounting.exchange_rates.create' => $permissions['accounting.exchange_rates.create'],
             'accounting.exchange_rates.update' => $permissions['accounting.exchange_rates.update'],
-            'accounting.exchange_rates.sync' => $permissions['accounting.exchange_rates.sync'],
+            // 'accounting.exchange_rates.sync' => $permissions['accounting.exchange_rates.sync'],
             'fixed_assets.categories.view' => $permissions['fixed_assets.categories.view'],
             'fixed_assets.categories.create' => $permissions['fixed_assets.categories.create'],
             'fixed_assets.categories.edit' => $permissions['fixed_assets.categories.edit'],
@@ -422,6 +440,7 @@ class RbacSeeder extends Seeder
             'accounting.vouchers.sales.view' => $permissions['accounting.vouchers.sales.view'],
             'accounting.ledger_groups.view' => $permissions['accounting.ledger_groups.view'],
             'accounting.bank_reconciliation.view' => $permissions['accounting.bank_reconciliation.view'],
+            'accounting.gst_returns.view' => $permissions['accounting.gst_returns.view'],
             'accounting.budgets.view' => $permissions['accounting.budgets.view'],
             'accounting.exchange_rates.view' => $permissions['accounting.exchange_rates.view'],
             'fixed_assets.categories.view' => $permissions['fixed_assets.categories.view'],
@@ -430,6 +449,31 @@ class RbacSeeder extends Seeder
             'fixed_assets.disposal.view' => $permissions['fixed_assets.disposal.view'],
             'audit.logs.view' => $permissions['audit.logs.view'],
         ], RolePermission::SCOPE_TENANT);
+
+        // Security Guard & Receptionist have full operational access to visitor management
+        foreach (['security', 'receptionist'] as $secRole) {
+            $this->grant($roles[$secRole], [
+                'visitor.visitors.view' => $permissions['visitor.visitors.view'],
+                'visitor.visitors.create' => $permissions['visitor.visitors.create'],
+                'visitor.visitors.update' => $permissions['visitor.visitors.update'],
+                'visitor.passes.view' => $permissions['visitor.passes.view'],
+                'visitor.passes.create' => $permissions['visitor.passes.create'],
+                'visitor.passes.update' => $permissions['visitor.passes.update'],
+                'visitor.passes.checkin' => $permissions['visitor.passes.checkin'],
+                'visitor.passes.checkout' => $permissions['visitor.passes.checkout'],
+                'visitor.passes.approve' => $permissions['visitor.passes.approve'],
+                'visitor.passes.reject' => $permissions['visitor.passes.reject'],
+            ], RolePermission::SCOPE_TENANT);
+        }
+
+        // All departmental managers can view and approve visitor requests
+        foreach (['hr_manager', 'sales_manager', 'production_manager', 'inventory_manager', 'purchase_manager', 'accountant'] as $mgrRole) {
+            $this->grant($roles[$mgrRole], [
+                'visitor.passes.view' => $permissions['visitor.passes.view'],
+                'visitor.passes.approve' => $permissions['visitor.passes.approve'],
+                'visitor.passes.reject' => $permissions['visitor.passes.reject'],
+            ], RolePermission::SCOPE_TENANT);
+        }
 
         $this->assignDemoAdmin($roles['tenant_owner']);
     }
@@ -646,6 +690,10 @@ class RbacSeeder extends Seeder
             ['name' => 'purchase.bills.view', 'module' => 'purchase', 'entity' => 'bills', 'action' => 'view'],
             ['name' => 'purchase.bills.create', 'module' => 'purchase', 'entity' => 'bills', 'action' => 'create'],
             ['name' => 'purchase.bills.edit', 'module' => 'purchase', 'entity' => 'bills', 'action' => 'edit'],
+            // 3-way match: release a bill held for PO/GRN mismatch, and set the
+            // matching mode/tolerances. Owner/admin only via the all-permissions grant.
+            ['name' => 'purchase.bills.release_hold', 'module' => 'purchase', 'entity' => 'bills', 'action' => 'release_hold'],
+            ['name' => 'purchase.bills.match_configure', 'module' => 'purchase', 'entity' => 'bills', 'action' => 'match_configure'],
             ['name' => 'purchase.approvals.manage', 'module' => 'purchase', 'entity' => 'approvals', 'action' => 'manage'],
             ['name' => 'purchase.vendors.view', 'module' => 'purchase', 'entity' => 'vendors', 'action' => 'view'],
             ['name' => 'purchase.vendors.create', 'module' => 'purchase', 'entity' => 'vendors', 'action' => 'create'],
@@ -693,6 +741,7 @@ class RbacSeeder extends Seeder
             ['name' => 'projects.projects.create', 'module' => 'projects', 'entity' => 'projects', 'action' => 'create'],
             ['name' => 'projects.projects.update', 'module' => 'projects', 'entity' => 'projects', 'action' => 'update'],
             ['name' => 'projects.projects.delete', 'module' => 'projects', 'entity' => 'projects', 'action' => 'delete'],
+            ['name' => 'projects.projects.close', 'module' => 'projects', 'entity' => 'projects', 'action' => 'close'],
             ['name' => 'projects.members.manage', 'module' => 'projects', 'entity' => 'members', 'action' => 'manage'],
             ['name' => 'projects.milestones.manage', 'module' => 'projects', 'entity' => 'milestones', 'action' => 'manage'],
             ['name' => 'projects.tasklists.manage', 'module' => 'projects', 'entity' => 'tasklists', 'action' => 'manage'],
@@ -713,6 +762,16 @@ class RbacSeeder extends Seeder
             ['name' => 'projects.documents.view', 'module' => 'projects', 'entity' => 'documents', 'action' => 'view'],
             ['name' => 'projects.documents.upload', 'module' => 'projects', 'entity' => 'documents', 'action' => 'upload'],
             ['name' => 'projects.documents.delete', 'module' => 'projects', 'entity' => 'documents', 'action' => 'delete'],
+            ['name' => 'projects.reviews.view', 'module' => 'projects', 'entity' => 'reviews', 'action' => 'view'],
+            ['name' => 'projects.reviews.create', 'module' => 'projects', 'entity' => 'reviews', 'action' => 'create'],
+            ['name' => 'projects.reviews.signoff', 'module' => 'projects', 'entity' => 'reviews', 'action' => 'signoff'],
+            ['name' => 'projects.changerequests.view', 'module' => 'projects', 'entity' => 'changerequests', 'action' => 'view'],
+            ['name' => 'projects.changerequests.create', 'module' => 'projects', 'entity' => 'changerequests', 'action' => 'create'],
+            ['name' => 'projects.changerequests.approve', 'module' => 'projects', 'entity' => 'changerequests', 'action' => 'approve'],
+            ['name' => 'projects.billing.view', 'module' => 'projects', 'entity' => 'billing', 'action' => 'view'],
+            ['name' => 'projects.billing.generate_invoice', 'module' => 'projects', 'entity' => 'billing', 'action' => 'generate_invoice'],
+            ['name' => 'projects.dashboard.view', 'module' => 'projects', 'entity' => 'dashboard', 'action' => 'view'],
+            ['name' => 'projects.reports.view', 'module' => 'projects', 'entity' => 'reports', 'action' => 'view'],
             ['name' => 'accounting.chart_of_accounts.view', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'view'],
 
             ['name' => 'accounting.chart_of_accounts.create', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'create'],
@@ -730,6 +789,11 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.journals.view', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'view'],
             ['name' => 'accounting.journals.post', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'post'],
             ['name' => 'accounting.journals.reverse', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'reverse'],
+            // Maker-checker: approving someone else's manual journal/voucher, and
+            // switching approvals on/off. Owner/admin only (via the all-permissions
+            // grant) — deliberately not given to 'accountant', the usual maker.
+            ['name' => 'accounting.journals.approve', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'approve'],
+            ['name' => 'accounting.approvals.configure', 'module' => 'accounting', 'entity' => 'approvals', 'action' => 'configure'],
             ['name' => 'accounting.tax_rates.view', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'view'],
             ['name' => 'accounting.tax_rates.create', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'create'],
             ['name' => 'accounting.tax_rates.update', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'update'],
@@ -763,6 +827,8 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.bank_reconciliation.view', 'module' => 'accounting', 'entity' => 'bank_reconciliation', 'action' => 'view'],
             ['name' => 'accounting.bank_reconciliation.create', 'module' => 'accounting', 'entity' => 'bank_reconciliation', 'action' => 'create'],
             ['name' => 'accounting.bank_reconciliation.complete', 'module' => 'accounting', 'entity' => 'bank_reconciliation', 'action' => 'complete'],
+            ['name' => 'accounting.gst_returns.view', 'module' => 'accounting', 'entity' => 'gst_returns', 'action' => 'view'],
+            ['name' => 'accounting.gst_returns.file', 'module' => 'accounting', 'entity' => 'gst_returns', 'action' => 'file'],
             ['name' => 'accounting.budgets.view', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'view'],
             ['name' => 'accounting.budgets.create', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'create'],
             ['name' => 'accounting.budgets.update', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'update'],
@@ -772,11 +838,38 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.exchange_rates.create', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'create'],
             ['name' => 'accounting.exchange_rates.update', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'update'],
             ['name' => 'accounting.exchange_rates.delete', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'delete'],
-            ['name' => 'accounting.exchange_rates.sync', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'sync'],
             ['name' => 'hrms.recruitment.view', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'view'],
             ['name' => 'hrms.recruitment.create', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'create'],
             ['name' => 'hrms.recruitment.update', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'update'],
             ['name' => 'hrms.recruitment.manage', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'manage'],
+            ['name' => 'hrms.sop.view', 'module' => 'hrms', 'entity' => 'sop', 'action' => 'view'],
+            ['name' => 'hrms.sop.create', 'module' => 'hrms', 'entity' => 'sop', 'action' => 'create'],
+            ['name' => 'hrms.sop.update', 'module' => 'hrms', 'entity' => 'sop', 'action' => 'update'],
+            ['name' => 'hrms.sop.delete', 'module' => 'hrms', 'entity' => 'sop', 'action' => 'delete'],
+            ['name' => 'hrms.sop.manage', 'module' => 'hrms', 'entity' => 'sop', 'action' => 'manage'],
+            ['name' => 'hrms.goals.view', 'module' => 'hrms', 'entity' => 'goals', 'action' => 'view'],
+            ['name' => 'hrms.goals.create', 'module' => 'hrms', 'entity' => 'goals', 'action' => 'create'],
+            ['name' => 'hrms.goals.update', 'module' => 'hrms', 'entity' => 'goals', 'action' => 'update'],
+            ['name' => 'hrms.goals.delete', 'module' => 'hrms', 'entity' => 'goals', 'action' => 'delete'],
+            ['name' => 'hrms.goals.manage', 'module' => 'hrms', 'entity' => 'goals', 'action' => 'manage'],
+            ['name' => 'hrms.feedback_360.view', 'module' => 'hrms', 'entity' => 'feedback_360', 'action' => 'view'],
+            ['name' => 'hrms.feedback_360.create', 'module' => 'hrms', 'entity' => 'feedback_360', 'action' => 'create'],
+            ['name' => 'hrms.feedback_360.update', 'module' => 'hrms', 'entity' => 'feedback_360', 'action' => 'update'],
+            ['name' => 'hrms.feedback_360.delete', 'module' => 'hrms', 'entity' => 'feedback_360', 'action' => 'delete'],
+            ['name' => 'hrms.feedback_360.manage', 'module' => 'hrms', 'entity' => 'feedback_360', 'action' => 'manage'],
+            ['name' => 'visitor.visitors.view', 'module' => 'visitor', 'entity' => 'visitors', 'action' => 'view'],
+            ['name' => 'visitor.visitors.create', 'module' => 'visitor', 'entity' => 'visitors', 'action' => 'create'],
+            ['name' => 'visitor.visitors.update', 'module' => 'visitor', 'entity' => 'visitors', 'action' => 'update'],
+            ['name' => 'visitor.visitors.delete', 'module' => 'visitor', 'entity' => 'visitors', 'action' => 'delete'],
+            ['name' => 'visitor.passes.view', 'module' => 'visitor', 'entity' => 'passes', 'action' => 'view'],
+            ['name' => 'visitor.passes.create', 'module' => 'visitor', 'entity' => 'passes', 'action' => 'create'],
+            ['name' => 'visitor.passes.update', 'module' => 'visitor', 'entity' => 'passes', 'action' => 'update'],
+            ['name' => 'visitor.passes.delete', 'module' => 'visitor', 'entity' => 'passes', 'action' => 'delete'],
+            ['name' => 'visitor.passes.checkin', 'module' => 'visitor', 'entity' => 'passes', 'action' => 'checkin'],
+            ['name' => 'visitor.passes.checkout', 'module' => 'visitor', 'entity' => 'passes', 'action' => 'checkout'],
+            ['name' => 'visitor.passes.approve', 'module' => 'visitor', 'entity' => 'passes', 'action' => 'approve'],
+            ['name' => 'visitor.passes.reject', 'module' => 'visitor', 'entity' => 'passes', 'action' => 'reject'],
+            ['name' => 'visitor.settings.manage', 'module' => 'visitor', 'entity' => 'settings', 'action' => 'manage'],
         ];
 
         $permissions = [];
@@ -809,6 +902,8 @@ class RbacSeeder extends Seeder
             ['slug' => 'hr_manager', 'name' => 'HR Manager', 'tenant_id' => null, 'level' => 40],
             ['slug' => 'accountant', 'name' => 'Accountant', 'tenant_id' => null, 'level' => 40],
             ['slug' => 'auditor', 'name' => 'Auditor', 'tenant_id' => null, 'level' => 80],
+            ['slug' => 'security', 'name' => 'Security Guard', 'tenant_id' => null, 'level' => 60],
+            ['slug' => 'receptionist', 'name' => 'Receptionist', 'tenant_id' => null, 'level' => 60],
             ['slug' => 'read_only', 'name' => 'Read Only User', 'tenant_id' => null, 'level' => 90],
         ];
 

@@ -26,6 +26,7 @@ class VendorPayment extends BaseModel
         'purchase_order_id',
         'payment_type', // Advance, Bill Payment
         'payment_method',
+        'bank_account_id',
         'payment_date',
         'amount',
         'reference_number',

@@ -21,6 +21,12 @@
                 align-items: center;
                 padding: 0 20px !important;
             }
+
+            /* x-ui.input / x-ui.select wrap themselves in .mb-3 — inside the toolbar that
+               margin lifts them above plain selects and the buttons. */
+            .ui-filter-toolbar .mb-3 {
+                margin-bottom: 0 !important;
+            }
         </style>
     @endpush
 @endonce

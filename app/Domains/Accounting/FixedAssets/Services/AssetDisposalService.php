@@ -7,7 +7,8 @@ use App\Domains\Accounting\FixedAssets\Models\AssetDisposal;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
-use App\Domains\Accounting\Support\AccountCode;
+use App\Domains\Accounting\Services\SystemAccountService;
+use App\Domains\Accounting\Support\SystemAccount;
 use App\Domains\HRMS\Models\Asset;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -20,8 +21,8 @@ use InvalidArgumentException;
  */
 class AssetDisposalService
 {
-    private const FALLBACK_BANK_CODE = '1020';
-    private const FALLBACK_OUTPUT_TAX_CODE = '2100';
+    private const FALLBACK_BANK_KEY = SystemAccount::BANK;
+    private const FALLBACK_OUTPUT_TAX_KEY = SystemAccount::OUTPUT_TAX;
 
     private const TERMINAL_STATUSES = [
         Asset::STATUS_DISPOSED,
@@ -34,6 +35,7 @@ class AssetDisposalService
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly SystemAccountService $systemAccounts,
     ) {
     }
 
@@ -129,7 +131,7 @@ class AssetDisposalService
             $tenantId = $asset->tenant_id;
 
             $fixedAssetAccount = $category?->chartOfAccount
-                ?? $this->accounts->findByCode(AccountCode::FIXED_ASSETS, $tenantId);
+                ?? $this->systemAccounts->get(SystemAccount::FIXED_ASSETS, $tenantId);
 
             if ($fixedAssetAccount === null) {
                 throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: no fixed asset account configured.");
@@ -138,9 +140,9 @@ class AssetDisposalService
             $lines = [];
 
             if ($disposal->sale_proceeds > 0) {
-                $bankAccount = $this->accounts->findByCode(self::FALLBACK_BANK_CODE, $tenantId);
+                $bankAccount = $this->systemAccounts->get(self::FALLBACK_BANK_KEY, $tenantId);
                 if ($bankAccount === null) {
-                    throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: bank account (code " . self::FALLBACK_BANK_CODE . ') not found.');
+                    throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: bank account (code " . SystemAccount::templateCode(self::FALLBACK_BANK_KEY) . ') not found.');
                 }
                 $lines[] = [
                     'chart_of_account_id' => $bankAccount->id,
@@ -151,7 +153,7 @@ class AssetDisposalService
 
             if ((float) $disposal->accumulated_depreciation_at_disposal > 0) {
                 $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount
-                    ?? $this->accounts->findByCode(AccountCode::ACCUMULATED_DEPRECIATION, $tenantId);
+                    ?? $this->systemAccounts->get(SystemAccount::ACCUMULATED_DEPRECIATION, $tenantId);
                 if ($accumulatedDepreciationAccount === null) {
                     throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: accumulated depreciation account not found.");
                 }
@@ -166,8 +168,8 @@ class AssetDisposalService
 
             if ($gainLoss < 0) {
                 $lossAccount = $category?->lossOnDisposalAccount
-                    ?? $this->accounts->findByCode(AccountCode::LOSS_ON_ASSET_DISPOSAL, $tenantId)
-                    ?? $this->accounts->findByCode('5900', $tenantId);
+                    ?? $this->systemAccounts->get(SystemAccount::LOSS_ON_ASSET_DISPOSAL, $tenantId)
+                    ?? $this->systemAccounts->get(SystemAccount::OTHER_EXPENSE, $tenantId);
                 if ($lossAccount === null) {
                     throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: loss-on-disposal account not found.");
                 }
@@ -187,8 +189,8 @@ class AssetDisposalService
             if ($gainLoss > 0) {
                 // Miscellaneous Income (4900) only for charts that predate 4940.
                 $gainAccount = $category?->gainOnDisposalAccount
-                    ?? $this->accounts->findByCode(AccountCode::GAIN_ON_ASSET_DISPOSAL, $tenantId)
-                    ?? $this->accounts->findByCode('4900', $tenantId);
+                    ?? $this->systemAccounts->get(SystemAccount::GAIN_ON_ASSET_DISPOSAL, $tenantId)
+                    ?? $this->systemAccounts->get(SystemAccount::MISC_INCOME, $tenantId);
                 if ($gainAccount === null) {
                     throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: gain-on-disposal account not found.");
                 }
@@ -200,9 +202,9 @@ class AssetDisposalService
             }
 
             if ((float) $disposal->tax_amount > 0) {
-                $outputTaxAccount = $this->accounts->findByCode(self::FALLBACK_OUTPUT_TAX_CODE, $tenantId);
+                $outputTaxAccount = $this->systemAccounts->get(self::FALLBACK_OUTPUT_TAX_KEY, $tenantId);
                 if ($outputTaxAccount === null) {
-                    throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: output tax account (code " . self::FALLBACK_OUTPUT_TAX_CODE . ') not found.');
+                    throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: output tax account (code " . SystemAccount::templateCode(self::FALLBACK_OUTPUT_TAX_KEY) . ') not found.');
                 }
                 $lines[] = [
                     'chart_of_account_id' => $outputTaxAccount->id,

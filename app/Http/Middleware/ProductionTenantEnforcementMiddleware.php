@@ -79,6 +79,14 @@ class ProductionTenantEnforcementMiddleware
             ], Response::HTTP_FORBIDDEN);
         }
 
+        // Subscription lapsed (see EnsureBillingActive).
+        if ($activeTenant->isBillingLocked()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your subscription has lapsed — renew it to use the workspace again.',
+            ], Response::HTTP_PAYMENT_REQUIRED);
+        }
+
         return $next($request);
     }
 }

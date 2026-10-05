@@ -302,6 +302,20 @@ class SopService
                     'due_date' => $dueDate,
                 ]);
                 $assignedCount++;
+
+                try {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employee: $emp,
+                        title: 'New SOP Assigned for Sign-Off',
+                        message: "You have been assigned Standard Operating Procedure: {$sop->title} ({$sop->code}).",
+                        actionUrl: route('hrms.sop.show', $sop->id),
+                        module: 'hrms',
+                        type: 'sop_assigned',
+                        iconClass: 'feather-book'
+                    );
+                } catch (\Throwable $e) {
+                    // Suppress notification errors
+                }
             }
         }
 
@@ -346,6 +360,20 @@ class SopService
                         'due_date' => now()->addDays($sop->acknowledgment_days_limit ?? 7)->toDateString(),
                     ]
                 );
+
+                try {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employee: $employee,
+                        title: 'New SOP Assigned for Sign-Off',
+                        message: "You have been assigned Standard Operating Procedure: {$sop->title} ({$sop->code}).",
+                        actionUrl: route('hrms.sop.show', $sop->id),
+                        module: 'hrms',
+                        type: 'sop_assigned',
+                        iconClass: 'feather-book'
+                    );
+                } catch (\Throwable $e) {
+                    // Suppress notification errors
+                }
             }
         }
     }
@@ -363,6 +391,21 @@ class SopService
             'signature_data' => $data['signature_data'] ?? null,
             'checklist_responses' => $data['checklist_responses'] ?? null,
         ]);
+
+        try {
+            $assignment->loadMissing('employee', 'document');
+            $emp = $assignment->employee;
+            $doc = $assignment->document;
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                'SOP Acknowledged',
+                "{$emp?->full_name} has acknowledged Standard Operating Procedure: {$doc?->title} ({$doc?->code}).",
+                route('hrms.sop.show', $doc?->id ?? 1),
+                'sop_acknowledged_hr',
+                'feather-check-circle'
+            );
+        } catch (\Throwable $e) {
+            // Suppress notification errors
+        }
 
         return $assignment;
     }

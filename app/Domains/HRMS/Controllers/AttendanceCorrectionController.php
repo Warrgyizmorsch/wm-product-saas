@@ -33,6 +33,53 @@ class AttendanceCorrectionController extends Controller
     }
 
     /**
+     * GET /api/hrms/attendance-corrections/{id}
+     * Get details of a single attendance correction request.
+     */
+    public function show(Request $request, int|string $id): JsonResponse
+    {
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        $correction = AttendanceCorrection::where('tenant_id', $tenantId)
+            ->with([
+                'employee:id,employee_id,full_name,photo',
+                'attendance:id,check_in,check_out,status,total_work_hours',
+            ])
+            ->find($id);
+
+        if (!$correction) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Attendance correction request not found.',
+            ], 404);
+        }
+
+        $user = auth()->user();
+        $isHrAdmin = $user && (
+            $user->is_admin
+            || in_array(strtolower($user->role ?? ''), ['admin', 'super_admin', 'super admin', 'hr_manager', 'tenant_owner'])
+        );
+        $isOwner = $user && $correction->employee && ($correction->employee->user_id === $user->id || $correction->employee->office_email === $user->email);
+        $isManager = false;
+        if ($user && $correction->employee) {
+            $currentEmp = \App\Domains\HRMS\Models\Employee::resolveForUser($user);
+            $isManager = $currentEmp && $correction->employee->reporting_manager_id === $currentEmp->id;
+        }
+
+        $data = $this->attendanceCorrectionRepository->getSingleCorrection($correction);
+        $data['can_view'] = true;
+        $data['can_approve'] = ($isHrAdmin || $isManager) && $correction->status === 'pending';
+        $data['can_reject'] = ($isHrAdmin || $isManager) && $correction->status === 'pending';
+        $data['can_withdraw'] = ($isOwner || $isHrAdmin) && $correction->status === 'pending';
+        $data['can_request_cancellation'] = ($isOwner || $isHrAdmin) && $correction->status === 'approved';
+
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
+    }
+
+    /**
      * POST /api/hrms/attendance-corrections
      * Submit a new attendance correction request.
      */
@@ -56,6 +103,13 @@ class AttendanceCorrectionController extends Controller
         }
 
         $res = $this->attendanceCorrectionRepository->storeCorrection($validated, auth()->user(), $tenantId);
+
+        if (!$request->expectsJson() && !$request->ajax()) {
+            if (!$res['success']) {
+                return redirect()->back()->with('error', $res['message'])->withInput();
+            }
+            return redirect()->back()->with('success', $res['message']);
+        }
 
         return response()->json([
             'success' => $res['success'],

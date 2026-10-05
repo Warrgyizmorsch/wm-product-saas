@@ -7,6 +7,8 @@ use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Models\JournalEntry;
 use App\Domains\Accounting\Repositories\JournalRepositoryInterface;
+use App\Models\User;
+use App\Services\Access\AccessService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +20,160 @@ class JournalService
         private readonly JournalRepositoryInterface $journals,
         private readonly FiscalPeriodService $periods,
         private readonly AccountingAuditLogService $auditLog,
+        private readonly JournalApprovalSettings $approvalSettings,
+        private readonly AccessService $access,
     ) {
+    }
+
+    /**
+     * Entry point for journals and vouchers a person keys in on the Journal or
+     * Voucher screens. Posts straight away unless the tenant's maker-checker
+     * settings say this one needs a second person, in which case it is saved
+     * as pending_approval and stays out of the ledger until approve().
+     *
+     * Automatic postings (sales, purchase, payments, assets, bank
+     * reconciliation) keep calling post() directly — they are not manual
+     * entries and must not stall waiting for a human.
+     *
+     * @param array<int, array<string, mixed>> $lines
+     * @param array<string, mixed> $meta  same keys as post()
+     */
+    public function submit(array $lines, array $meta = []): Journal
+    {
+        if (!$this->requiresApproval($lines, $meta)) {
+            return $this->post($lines, $meta);
+        }
+
+        return DB::transaction(function () use ($lines, $meta) {
+            $journal = $this->createJournal($lines, $meta, Journal::STATUS_PENDING_APPROVAL);
+
+            $this->auditLog->record(
+                $journal,
+                'journal.submitted',
+                "Journal {$journal->journal_number} submitted for approval",
+                ['total_debit' => $journal->total_debit, 'voucher_type' => $journal->voucher_type]
+            );
+
+            return $journal;
+        });
+    }
+
+    /**
+     * Would submit() hold these lines for approval? Exposed so screens can
+     * tell the maker before they save.
+     */
+    public function requiresApproval(array $lines, array $meta = []): bool
+    {
+        $tenantId = $meta['tenant_id'] ?? tenant_id();
+        $settings = $this->approvalSettings->for($tenantId);
+
+        if (!$settings['enabled']) {
+            return false;
+        }
+
+        $total = round(array_sum(array_map(fn ($line) => (float) ($line['debit'] ?? 0), $lines)), 2);
+        if ($total < $settings['threshold']) {
+            return false;
+        }
+
+        if ($settings['approvers_post_directly'] && !empty($meta['posted_by'])) {
+            $maker = User::query()->withoutGlobalScope('tenant')->find($meta['posted_by']);
+            if ($maker !== null && $this->access->allows($maker, 'accounting.journals.approve', ['tenant_id' => $tenantId])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Checker approves a pending journal: it is posted into the period open
+     * for its date *now* (the period may have closed while it waited).
+     * The maker can never approve their own entry.
+     */
+    public function approve(int $journalId, int $approverId): Journal
+    {
+        return DB::transaction(function () use ($journalId, $approverId) {
+            $journal = $this->lockPending($journalId);
+
+            if ((int) $journal->posted_by === $approverId) {
+                throw new InvalidArgumentException('You entered this journal, so someone else has to approve it.');
+            }
+
+            $period = $this->periods->assertOpenPeriodForDate($journal->journal_date);
+
+            $journal->update([
+                'status' => Journal::STATUS_POSTED,
+                'accounting_period_id' => $period->id,
+                'approved_by' => $approverId,
+                'approved_at' => now(),
+                'posted_at' => now(),
+            ]);
+
+            $this->auditLog->record(
+                $journal,
+                'journal.approved',
+                "Journal {$journal->journal_number} approved and posted",
+                ['total_debit' => $journal->total_debit, 'maker_id' => $journal->posted_by, 'approver_id' => $approverId]
+            );
+
+            return $journal->fresh(['entries']);
+        });
+    }
+
+    /** Checker sends a pending journal back; it never posts. A reason is required. */
+    public function reject(int $journalId, int $userId, string $reason): Journal
+    {
+        $reason = trim($reason);
+        if ($reason === '') {
+            throw new InvalidArgumentException('Give a reason for rejecting this journal.');
+        }
+
+        return DB::transaction(function () use ($journalId, $userId, $reason) {
+            $journal = $this->lockPending($journalId);
+
+            $journal->update([
+                'status' => Journal::STATUS_REJECTED,
+                'rejected_by' => $userId,
+                'rejected_at' => now(),
+                'rejection_reason' => mb_substr($reason, 0, 500),
+            ]);
+
+            $this->auditLog->record(
+                $journal,
+                'journal.rejected',
+                "Journal {$journal->journal_number} rejected",
+                ['reason' => $reason, 'maker_id' => $journal->posted_by, 'rejected_by' => $userId]
+            );
+
+            return $journal->fresh();
+        });
+    }
+
+    /** @return \Illuminate\Contracts\Pagination\LengthAwarePaginator */
+    public function pendingApproval(int $perPage = 20)
+    {
+        return Journal::query()
+            ->pendingApproval()
+            ->with(['entries.account', 'postedBy', 'voucherDetail'])
+            ->orderBy('journal_date')
+            ->orderBy('id')
+            ->paginate($perPage);
+    }
+
+    private function lockPending(int $journalId): Journal
+    {
+        $journal = Journal::query()->whereKey($journalId)->lockForUpdate()->first();
+
+        if ($journal === null) {
+            throw new InvalidArgumentException('Journal not found.');
+        }
+
+        if (!$journal->isPendingApproval()) {
+            throw new InvalidArgumentException("Journal {$journal->journal_number} is {$journal->status}, not waiting for approval.");
+        }
+
+        return $journal;
     }
 
     /**
@@ -41,6 +196,32 @@ class JournalService
      */
     public function post(array $lines, array $meta = []): Journal
     {
+        return DB::transaction(function () use ($lines, $meta) {
+            $journal = $this->createJournal($lines, $meta, Journal::STATUS_POSTED);
+
+            $this->auditLog->record(
+                $journal,
+                'journal.posted',
+                "Journal {$journal->journal_number} posted",
+                [
+                    'total_debit' => $journal->total_debit,
+                    'total_credit' => $journal->total_credit,
+                    'source' => $journal->source,
+                    'voucher_type' => $journal->voucher_type,
+                ]
+            );
+
+            return $journal;
+        });
+    }
+
+    /**
+     * Validate and save a journal with its lines in the given status. Balance
+     * and open-period checks run for pending journals too, so a maker learns
+     * about a closed period immediately rather than at approval time.
+     */
+    private function createJournal(array $lines, array $meta, string $status): Journal
+    {
         $tenantId = $meta['tenant_id'] ?? tenant_id();
         $companyId = $meta['company_id'] ?? company_id();
         $branchId = $meta['branch_id'] ?? branch_id();
@@ -48,7 +229,7 @@ class JournalService
 
         $this->assertLinesAreBalanced($lines);
 
-        return DB::transaction(function () use ($lines, $meta, $tenantId, $companyId, $branchId, $journalDate) {
+        return DB::transaction(function () use ($lines, $meta, $tenantId, $companyId, $branchId, $journalDate, $status) {
             $period = $this->periods->assertOpenPeriodForDate($journalDate);
 
             $totalDebit = array_sum(array_column($lines, 'debit'));
@@ -68,24 +249,12 @@ class JournalService
                 'reference_type' => $meta['reference_type'] ?? null,
                 'reference_id' => $meta['reference_id'] ?? null,
                 'memo' => $meta['memo'] ?? null,
-                'status' => Journal::STATUS_POSTED,
+                'status' => $status,
                 'total_debit' => round($totalDebit, 2),
                 'total_credit' => round($totalCredit, 2),
                 'posted_by' => $meta['posted_by'] ?? null,
-                'posted_at' => now(),
+                'posted_at' => $status === Journal::STATUS_POSTED ? now() : null,
             ], $lines);
-
-            $this->auditLog->record(
-                $journal,
-                'journal.posted',
-                "Journal {$journal->journal_number} posted",
-                [
-                    'total_debit' => $journal->total_debit,
-                    'total_credit' => $journal->total_credit,
-                    'source' => $journal->source,
-                    'voucher_type' => $journal->voucher_type,
-                ]
-            );
 
             return $journal;
         });
@@ -106,6 +275,16 @@ class JournalService
 
             if ($original->status !== Journal::STATUS_POSTED) {
                 throw new InvalidArgumentException("Only posted journals can be reversed; journal is {$original->status}.");
+            }
+
+            // A journal the bank has already cleared is part of a bank
+            // reconciliation; reversing it would silently break that
+            // reconciliation's statement. Unmatch it there first.
+            $reconciled = $original->entries->first(fn ($entry) => $entry->is_reconciled);
+            if ($reconciled !== null) {
+                throw new InvalidArgumentException(
+                    "Journal {$original->journal_number} is matched in bank reconciliation #{$reconciled->bank_reconciliation_id}. Unmatch it there before reversing."
+                );
             }
 
             $reversalLines = $original->entries->map(fn ($entry) => [

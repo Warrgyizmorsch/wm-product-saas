@@ -4,22 +4,36 @@
 @section('page-title', 'Accounting Dashboard')
 @section('breadcrumb', 'Accounting / Dashboard')
 
+@if ($booksClosedThrough)
+    @section('page-badge')
+        <span class="ax-ref ax-tone-positive" title="Periods up to here are closed — nothing more can post into them">Books Closed: {{ $booksClosedThrough->format('M Y') }}</span>
+    @endsection
+@endif
+
+@if ($canPostJournals)
+    @section('header-cta')
+        <a href="{{ route('accounting.journals.create') }}" class="btn btn-primary ax-create-btn"><i class="feather-plus"></i><span class="d-none d-sm-inline">New Journal</span></a>
+    @endsection
+@endif
+
 @section('page-actions')
     <div class="d-flex gap-2 flex-wrap align-items-center">
+        {{-- Figures come from a cached summary; say how fresh they are and let people refresh. --}}
+        <span class="ax-sync-pill d-none d-xl-inline-flex">
+            <span class="ax-dot is-live"></span>
+            Last sync <strong class="ax-mono">{{ ($generatedAt ?? now())->format('h:i A') }}</strong>
+            <a href="{{ route('accounting.dashboard', $query + ['refresh' => 1]) }}" class="ax-sync-refresh" title="Refresh now"><i class="feather-refresh-cw"></i></a>
+        </span>
         <div class="dropdown">
-            <button class="btn btn-light-brand dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="feather-download me-2"></i>Export
+            <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="feather-download"></i>Export<i class="feather-chevron-down"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
                 <li><a class="dropdown-item" href="{{ route('accounting.dashboard.export', ['format' => 'pdf'] + $query) }}"><i class="feather-file-text me-2"></i>PDF</a></li>
                 <li><a class="dropdown-item" href="{{ route('accounting.dashboard.export', ['format' => 'xlsx'] + $query) }}"><i class="feather-grid me-2"></i>Excel</a></li>
             </ul>
         </div>
-        @if ($canPostJournals)
-            <a href="{{ route('accounting.journals.create') }}" class="btn btn-primary">
-                <i class="feather-plus me-2"></i>New Journal
-            </a>
-        @endif
+        <button type="button" class="btn btn-light btn-icon" onclick="window.print()" title="Print"><i class="feather-printer"></i></button>
         @include('partials.dashboard.actions')
     </div>
 @endsection
@@ -29,50 +43,77 @@
         // Ledger amounts carry no symbol, like every Accounting screen — the layout
         // shows "Amounts in <company currency>" once per page.
         $mixedCurrencies = $currencyNote && str_starts_with($currencyNote, 'Warning');
+        // Quick period switch (ui-reference segmented control), keeping the other filters.
+        $quickPresets = ['this_month' => 'MTD', 'last_month' => 'Last Month', 'this_quarter' => 'QTD', 'fiscal_year' => 'YTD'];
+        $presetUrl = fn (string $preset) => route('accounting.dashboard', array_diff_key($query, array_flip(['preset', 'from', 'to'])) + ['preset' => $preset]);
     @endphp
 
     {{-- Filters: they apply to every block on the page. --}}
-    <x-ui.card class="mb-3">
-        <x-ui.filter-toolbar formId="dashboard-period-form" :resetUrl="route('accounting.dashboard')">
-            <input type="hidden" name="view" value="{{ $activeView }}">
-            <x-ui.filter-field label="Period" col="col-md-2">
-                <select name="preset" id="preset" class="form-select form-select-sm">
+    <x-ui.filter-panel formId="dashboard-period-form" :resetUrl="route('accounting.dashboard')" submitLabel="Filter Ledger">
+        <input type="hidden" name="view" value="{{ $activeView }}">
+        <div class="col-sm-6 col-lg-auto">
+            <label class="form-label" for="preset">Accounting Period</label>
+            <div class="ax-select-chip">
+                <i class="feather-calendar"></i>
+                <select name="preset" id="preset" class="form-select">
                     @foreach ($presets as $value => $label)
-                        <option value="{{ $value }}" @selected($period->preset === $value)>{{ $label }}</option>
+                        <option value="{{ $value }}" @selected($period->preset === $value)>{{ $label }}{{ $period->preset === $value && $value !== 'custom' ? ' ('.$period->label().')' : '' }}</option>
                     @endforeach
                 </select>
-            </x-ui.filter-field>
-            <x-ui.filter-field label="From" col="col-md-2" class="custom-range {{ $period->preset === 'custom' ? '' : 'd-none' }}">
-                <input type="date" name="from" id="from" class="form-control form-control-sm" value="{{ $period->from->toDateString() }}">
-            </x-ui.filter-field>
-            <x-ui.filter-field label="To" col="col-md-2" class="custom-range {{ $period->preset === 'custom' ? '' : 'd-none' }}">
-                <input type="date" name="to" id="to" class="form-control form-control-sm" value="{{ $period->to->toDateString() }}">
-            </x-ui.filter-field>
-            @if ($companyCount > 1)
-                <x-ui.filter-field label="Companies" col="col-md-2">
-                    <select name="company_scope" id="company_scope" class="form-select form-select-sm">
+            </div>
+        </div>
+        <div class="col-sm-3 col-lg-auto custom-range {{ $period->preset === 'custom' ? '' : 'd-none' }}">
+            <label class="form-label" for="from">From</label>
+            <input type="date" name="from" id="from" class="form-control" value="{{ $period->from->toDateString() }}">
+        </div>
+        <div class="col-sm-3 col-lg-auto custom-range {{ $period->preset === 'custom' ? '' : 'd-none' }}">
+            <label class="form-label" for="to">To</label>
+            <input type="date" name="to" id="to" class="form-control" value="{{ $period->to->toDateString() }}">
+        </div>
+        @if ($companyCount > 1)
+            <div class="col-sm-6 col-lg-auto">
+                <label class="form-label" for="company_scope">Companies</label>
+                <div class="ax-select-chip">
+                    <i class="feather-briefcase"></i>
+                    <select name="company_scope" id="company_scope" class="form-select">
                         <option value="current" @selected(! $filters['consolidated'])>{{ company()?->company_name ?? 'Selected company' }}</option>
                         <option value="all" @selected($filters['consolidated'])>All companies (consolidated)</option>
                     </select>
-                </x-ui.filter-field>
-            @endif
-            @if ($costCenters->isNotEmpty())
-                <x-ui.filter-field label="Cost center" col="col-md-2">
-                    <select name="cost_center_id" id="cost_center_id" class="form-select form-select-sm">
-                        <option value="">All cost centers</option>
+                </div>
+            </div>
+        @endif
+        @if ($costCenters->isNotEmpty())
+            <div class="col-sm-6 col-lg-auto">
+                <label class="form-label" for="cost_center_id">Cost Center</label>
+                <div class="ax-select-chip">
+                    <i class="feather-layers"></i>
+                    <select name="cost_center_id" id="cost_center_id" class="form-select">
+                        <option value="">All Cost Centers (Consolidated)</option>
                         @foreach ($costCenters as $costCenter)
                             <option value="{{ $costCenter->id }}" @selected($filters['cost_center']?->id === $costCenter->id)>{{ $costCenter->code }} — {{ $costCenter->name }}</option>
                         @endforeach
                     </select>
-                </x-ui.filter-field>
-            @endif
-        </x-ui.filter-toolbar>
-        <div class="text-end fs-12 text-muted mt-2 pt-2 border-top">
-            <strong class="text-dark">{{ $period->label() }}</strong> ({{ $period->days() }} days) · vs {{ $period->previousLabel() }}
-            · Figures as of {{ ($generatedAt ?? now())->format('H:i') }}
-            · <a href="{{ route('accounting.dashboard', $query + ['refresh' => 1]) }}"><i class="feather-refresh-cw" style="vertical-align: middle;"></i> Refresh</a>
+                </div>
+            </div>
+        @endif
+        <div class="col-auto">
+            <x-ui.segmented :options="$quickPresets" :active="$period->preset" :href="$presetUrl" />
         </div>
-    </x-ui.card>
+
+        <x-slot:meta>
+            <span class="d-inline-flex flex-wrap align-items-center gap-2">
+                <span class="ax-ref ax-tone-brand">{{ $period->preset === 'custom' ? 'CUSTOM' : 'LIVE' }}</span>
+                <span class="text-subtle">·</span>
+                <span>Current snapshot: <strong class="text-dark fw-medium">{{ $period->label() }} ({{ $period->days() }} {{ \Illuminate\Support\Str::plural('day', $period->days()) }})</strong></span>
+                <span class="ax-footer-sep">|</span>
+                <span>Comparative: <span class="fw-medium">{{ $period->previousLabel() }}</span></span>
+            </span>
+            <span class="d-inline-flex align-items-center gap-2">
+                <span class="ax-overline" style="font-size: 11px;">Ledger:</span>
+                <span class="ax-ref">{{ $filters['consolidated'] ? 'ALL COMPANIES' : (company()?->company_name ?? '—') }}{{ $filters['cost_center'] ? ' · '.$filters['cost_center']->code : '' }}</span>
+            </span>
+        </x-slot:meta>
+    </x-ui.filter-panel>
 
     @if ($mixedCurrencies)
         <x-ui.alert variant="warning" icon="feather-alert-triangle" class="mb-3">{{ $currencyNote }}</x-ui.alert>

@@ -11,6 +11,7 @@ use App\Domains\Accounting\Controllers\BankBookController;
 use App\Domains\Accounting\Controllers\CashBookController;
 use App\Domains\Accounting\Controllers\LedgerGroupController;
 use App\Domains\Accounting\Controllers\BankReconciliationController;
+use App\Domains\Accounting\Controllers\BankReconciliationRuleController;
 use App\Domains\Accounting\Controllers\BudgetController;
 use App\Domains\Accounting\Controllers\BudgetVsActualController;
 use App\Domains\Accounting\Controllers\CashFlowController;
@@ -26,10 +27,13 @@ use App\Domains\Accounting\Controllers\FixedAssets\AssetWriteOffController;
 use App\Domains\Accounting\Controllers\DayBookController;
 use App\Domains\Accounting\Controllers\FiscalYearController;
 use App\Domains\Accounting\Controllers\GeneralLedgerController;
+use App\Domains\Accounting\Controllers\GstReturnController;
+use App\Domains\Accounting\Controllers\Gstr2bReconciliationController;
 use App\Domains\Accounting\Controllers\GstSummaryController;
 use App\Domains\Accounting\Controllers\Gstr1Controller;
 use App\Domains\Accounting\Controllers\Gstr3bController;
 use App\Domains\Accounting\Controllers\JournalController;
+use App\Domains\Accounting\Controllers\JournalApprovalController;
 use App\Domains\Accounting\Controllers\PartyLedgerController;
 use App\Domains\Accounting\Controllers\ProfitLossController;
 use App\Domains\Accounting\Controllers\ReportExportController;
@@ -85,6 +89,12 @@ Route::prefix('accounting')
         Route::put('exchange-rates/{exchangeRate}', [ExchangeRateController::class, 'update'])->name('exchange-rates.update');
         Route::delete('exchange-rates/{exchangeRate}', [ExchangeRateController::class, 'destroy'])->name('exchange-rates.destroy');
 
+        // Declared before bank-reconciliation/{reconciliation} so "rules" is never read as an id.
+        Route::get('bank-reconciliation/rules', [BankReconciliationRuleController::class, 'index'])->name('bank-rules.index');
+        Route::post('bank-reconciliation/rules', [BankReconciliationRuleController::class, 'store'])->name('bank-rules.store');
+        Route::put('bank-reconciliation/rules/{rule}', [BankReconciliationRuleController::class, 'update'])->name('bank-rules.update');
+        Route::post('bank-reconciliation/rules/{rule}/toggle', [BankReconciliationRuleController::class, 'toggle'])->name('bank-rules.toggle');
+        Route::delete('bank-reconciliation/rules/{rule}', [BankReconciliationRuleController::class, 'destroy'])->name('bank-rules.destroy');
         Route::get('bank-reconciliation', [BankReconciliationController::class, 'index'])->name('bank-reconciliation.index');
         Route::get('bank-reconciliation/create', [BankReconciliationController::class, 'create'])->name('bank-reconciliation.create');
         Route::post('bank-reconciliation', [BankReconciliationController::class, 'store'])->name('bank-reconciliation.store');
@@ -95,6 +105,17 @@ Route::prefix('accounting')
         Route::post('bank-reconciliation/{reconciliation}/match', [BankReconciliationController::class, 'match'])->name('bank-reconciliation.match');
         Route::post('bank-reconciliation/{reconciliation}/create-and-match', [BankReconciliationController::class, 'createAndMatch'])->name('bank-reconciliation.create-and-match');
         Route::post('bank-reconciliation/{reconciliation}/complete', [BankReconciliationController::class, 'complete'])->name('bank-reconciliation.complete');
+        Route::post('bank-reconciliation/{reconciliation}/reopen', [BankReconciliationController::class, 'reopen'])->name('bank-reconciliation.reopen');
+        Route::put('bank-reconciliation/{reconciliation}/details', [BankReconciliationController::class, 'updateDetails'])->name('bank-reconciliation.update-details');
+        Route::post('bank-reconciliation/{reconciliation}/lines/{line}/unmatch', [BankReconciliationController::class, 'unmatch'])->whereNumber('line')->name('bank-reconciliation.unmatch');
+        Route::get('bank-reconciliation/{reconciliation}/party-documents', [BankReconciliationController::class, 'partyDocuments'])->name('bank-reconciliation.party-documents');
+        Route::post('bank-reconciliation/{reconciliation}/settle', [BankReconciliationController::class, 'settle'])->name('bank-reconciliation.settle');
+        Route::post('bank-reconciliation/{reconciliation}/lines/post', [BankReconciliationController::class, 'bulkPost'])->name('bank-reconciliation.bulk-post');
+        Route::post('bank-reconciliation/{reconciliation}/lines/delete', [BankReconciliationController::class, 'deleteLines'])->name('bank-reconciliation.delete-lines');
+        Route::get('bank-reconciliation/{reconciliation}/uploads/{upload}/mapping', [BankReconciliationController::class, 'mapping'])->whereNumber('upload')->name('bank-reconciliation.mapping');
+        Route::post('bank-reconciliation/{reconciliation}/uploads/{upload}/mapping', [BankReconciliationController::class, 'applyMapping'])->whereNumber('upload')->name('bank-reconciliation.apply-mapping');
+        Route::delete('bank-reconciliation/{reconciliation}/uploads/{upload}', [BankReconciliationController::class, 'deleteUpload'])->whereNumber('upload')->name('bank-reconciliation.delete-upload');
+        Route::get('bank-reconciliation/{reconciliation}/statement/{format}', [BankReconciliationController::class, 'exportStatement'])->whereIn('format', ['pdf', 'xlsx'])->name('bank-reconciliation.export');
 
         Route::get('budgets', [BudgetController::class, 'index'])->name('budgets.index');
         Route::get('budgets/create', [BudgetController::class, 'create'])->name('budgets.create');
@@ -109,6 +130,12 @@ Route::prefix('accounting')
         Route::post('journals', [JournalController::class, 'store'])->name('journals.store');
         Route::get('journals/{journal}', [JournalController::class, 'show'])->name('journals.show');
         Route::post('journals/{journal}/reverse', [JournalController::class, 'reverse'])->name('journals.reverse');
+
+        // Maker-checker queue for manual journals and vouchers.
+        Route::get('approvals', [JournalApprovalController::class, 'index'])->name('approvals.index');
+        Route::post('approvals/{journal}/approve', [JournalApprovalController::class, 'approve'])->name('approvals.approve');
+        Route::post('approvals/{journal}/reject', [JournalApprovalController::class, 'reject'])->name('approvals.reject');
+        Route::put('approvals/settings', [JournalApprovalController::class, 'updateSettings'])->name('approvals.settings');
 
         Route::get('reports/day-book', [DayBookController::class, 'index'])->name('reports.day-book');
         Route::get('reports/cash-book', [CashBookController::class, 'index'])->name('reports.cash-book');
@@ -129,6 +156,15 @@ Route::prefix('accounting')
         Route::get('reports/gst-summary', [GstSummaryController::class, 'index'])->name('reports.gst-summary');
         Route::get('reports/gstr1', [Gstr1Controller::class, 'index'])->name('reports.gstr1');
         Route::get('reports/gstr3b', [Gstr3bController::class, 'index'])->name('reports.gstr3b');
+        Route::get('gst-returns/gstr1', [GstReturnController::class, 'gstr1'])->name('gst-returns.gstr1');
+        Route::post('gst-returns/gstr1/export', [GstReturnController::class, 'export'])->name('gst-returns.gstr1.export');
+        Route::post('gst-returns/gstr1/status', [GstReturnController::class, 'updateStatus'])->name('gst-returns.gstr1.status');
+        Route::get('gst-returns/filings/{filing}/download', [GstReturnController::class, 'downloadFiling'])->name('gst-returns.filings.download');
+        Route::get('gst-returns/gstr2b', [Gstr2bReconciliationController::class, 'index'])->name('gst-returns.gstr2b.index');
+        Route::post('gst-returns/gstr2b', [Gstr2bReconciliationController::class, 'store'])->name('gst-returns.gstr2b.store');
+        Route::get('gst-returns/gstr2b/{import}', [Gstr2bReconciliationController::class, 'show'])->whereNumber('import')->name('gst-returns.gstr2b.show');
+        Route::post('gst-returns/gstr2b/{import}/rematch', [Gstr2bReconciliationController::class, 'rematch'])->whereNumber('import')->name('gst-returns.gstr2b.rematch');
+        Route::delete('gst-returns/gstr2b/{import}', [Gstr2bReconciliationController::class, 'destroy'])->whereNumber('import')->name('gst-returns.gstr2b.destroy');
         Route::get('reports/audit-trail', [AccountingAuditLogController::class, 'index'])->name('reports.audit-trail');
         Route::get('reports/budget-vs-actual', [BudgetVsActualController::class, 'index'])->name('reports.budget-vs-actual');
 

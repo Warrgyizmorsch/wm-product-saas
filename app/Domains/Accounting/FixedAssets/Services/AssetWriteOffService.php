@@ -7,7 +7,8 @@ use App\Domains\Accounting\FixedAssets\Models\AssetWriteOff;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
-use App\Domains\Accounting\Support\AccountCode;
+use App\Domains\Accounting\Services\SystemAccountService;
+use App\Domains\Accounting\Support\SystemAccount;
 use App\Domains\HRMS\Models\Asset;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -29,6 +30,7 @@ class AssetWriteOffService
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly SystemAccountService $systemAccounts,
     ) {
     }
 
@@ -105,11 +107,11 @@ class AssetWriteOffService
             $category = $asset->category;
             $tenantId = $asset->tenant_id;
 
-            $fixedAssetAccount = $category?->chartOfAccount ?? $this->accounts->findByCode(AccountCode::FIXED_ASSETS, $tenantId);
-            $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount ?? $this->accounts->findByCode(AccountCode::ACCUMULATED_DEPRECIATION, $tenantId);
+            $fixedAssetAccount = $category?->chartOfAccount ?? $this->systemAccounts->get(SystemAccount::FIXED_ASSETS, $tenantId);
+            $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount ?? $this->systemAccounts->get(SystemAccount::ACCUMULATED_DEPRECIATION, $tenantId);
             $lossAccount = $category?->lossOnDisposalAccount
-                ?? $this->accounts->findByCode(AccountCode::LOSS_ON_ASSET_DISPOSAL, $tenantId)
-                ?? $this->accounts->findByCode('5900', $tenantId);
+                ?? $this->systemAccounts->get(SystemAccount::LOSS_ON_ASSET_DISPOSAL, $tenantId)
+                ?? $this->systemAccounts->get(SystemAccount::OTHER_EXPENSE, $tenantId);
 
             if ($fixedAssetAccount === null || $accumulatedDepreciationAccount === null || $lossAccount === null) {
                 throw new InvalidArgumentException("Cannot post write-off for asset #{$asset->id}: required accounts are not configured.");

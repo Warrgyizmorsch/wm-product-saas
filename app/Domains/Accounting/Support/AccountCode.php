@@ -17,6 +17,10 @@ namespace App\Domains\Accounting\Support;
  *
  * Resolve a code to an account through ChartOfAccountRepository::findByCode(),
  * which scopes by tenant. Never assume an id.
+ *
+ * @deprecated Use SystemAccount keys with SystemAccountService::get() — those
+ *             survive a tenant renumbering the account. Kept only because older
+ *             backfill migrations reference these codes.
  */
 final class AccountCode
 {

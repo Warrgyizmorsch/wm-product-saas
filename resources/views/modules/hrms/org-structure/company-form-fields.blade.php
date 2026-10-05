@@ -37,7 +37,7 @@
             </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.currency') }}" name="currency" id="{{ $prefix }}_currency" select2-selector="default" :required="true" :errorText="$errors->first('currency')">
-                    <option value="">Select Currency</option>
+                    <option value="">{{ __('hrms.org.select_currency') }}</option>
                     @foreach($currencies ?? [] as $currencyOption)
                         {{-- Edit mode is filled in by the edit-modal script, so only preselect on Add. --}}
                         <option value="{{ $currencyOption->code }}" @selected(! $isEdit && old('currency', 'INR') === $currencyOption->code)>{{ $currencyOption->code }} — {{ $currencyOption->name }} ({{ $currencyOption->symbol }})</option>

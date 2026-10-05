@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Domains\Accounting\FixedAssets\Services\AssetDepreciationService;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Services\SystemAccountService;
 use App\Domains\HRMS\Models\Asset;
 use PHPUnit\Framework\TestCase;
 
@@ -24,6 +25,7 @@ class AssetDepreciationCalculationTest extends TestCase
         $this->service = new AssetDepreciationService(
             $this->createStub(JournalService::class),
             $this->createStub(ChartOfAccountRepositoryInterface::class),
+            $this->createStub(SystemAccountService::class),
         );
     }
 

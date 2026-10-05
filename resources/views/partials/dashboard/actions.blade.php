@@ -1,6 +1,6 @@
 {{-- Header buttons for a customizable dashboard: Customize, then the edit-mode toolbar. Pairs with partials.dashboard.grid. --}}
 <div id="dash-view-actions">
-    <button type="button" class="btn btn-primary" id="dash-customize"><i class="feather-sliders me-2"></i>Customize</button>
+    <button type="button" class="btn btn-outline-primary" id="dash-customize"><i class="feather-sliders me-2"></i>Customize</button>
 </div>
 <div id="dash-edit-actions" class="d-none align-items-center gap-2 flex-wrap">
     <button type="button" class="btn btn-light-brand" id="dash-add"><i class="feather-plus me-2"></i>Add widget</button>

@@ -40,6 +40,7 @@ class TaskListController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'id'   => $taskList->id,
+                'name' => $taskList->name,
                 'html' => $this->renderCardHtml($project, $taskList),
             ]);
         }

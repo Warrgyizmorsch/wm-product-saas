@@ -5,13 +5,18 @@ namespace App\Exports;
 use App\Domains\Accounting\Support\ReportTables;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
 use Maatwebsite\Excel\Concerns\WithTitle;
 
 /**
  * One accounting report as a single sheet: title, filter lines, then each
  * table with its heading, rows and totals. See ReportTables::build().
  */
-class AccountingReportExport implements FromArray, ShouldAutoSize, WithTitle
+/**
+ * WithStrictNullComparison: without it Laravel Excel treats 0 as empty, so
+ * zero balances, totals and differences came out as blank cells.
+ */
+class AccountingReportExport implements FromArray, ShouldAutoSize, WithStrictNullComparison, WithTitle
 {
     public function __construct(
         private readonly array $report,

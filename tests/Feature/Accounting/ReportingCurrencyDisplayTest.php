@@ -30,8 +30,8 @@ class ReportingCurrencyDisplayTest extends TestCase
         $this->seed(RbacSeeder::class);
 
         app(TenantContext::class)->set($tenant);
-        // First by id is resolved as the current company. A second company makes the
-        // header render its company switcher chip, which also carries the currency.
+        // First by id is resolved as the current company; its currency also shows in the
+        // header's currency pill. The second company makes the sidebar offer a company switch.
         Company::create(['company_name' => 'UK Ltd', 'currency' => 'GBP']);
         Company::create(['company_name' => 'India Pvt Ltd', 'currency' => 'INR']);
 
@@ -48,7 +48,7 @@ class ReportingCurrencyDisplayTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Amounts in GBP (£)');
-        $response->assertSee('GBP · ', false);
+        $response->assertSee('Amounts are in GBP');   // the header's currency pill
         $response->assertDontSee('Amounts in INR');
     }
 

@@ -50,12 +50,18 @@ class Milestone extends BaseModel
         'due_date',
         'status',
         'completion_percentage',
+        'billing_amount',
+        'is_invoiced',
+        'invoice_id',
     ];
 
     protected $casts = [
         'start_date'             => 'date',
         'due_date'                => 'date',
         'completion_percentage'  => 'integer',
+        'billing_amount'         => 'decimal:2',
+        'is_invoiced'            => 'boolean',
+        'invoice_id'             => 'integer',
     ];
 
     public function getProgressAttribute(): int
@@ -91,5 +97,10 @@ class Milestone extends BaseModel
     public function documents(): MorphMany
     {
         return $this->morphMany(ProjectDocument::class, 'attachable');
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Sales\Models\Invoice::class, 'invoice_id');
     }
 }

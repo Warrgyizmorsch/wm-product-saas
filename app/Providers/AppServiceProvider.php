@@ -265,6 +265,16 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(
+            \App\Domains\HRMS\Repositories\GoalRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\GoalRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\Feedback360RepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\Feedback360Repository::class
+        );
+
+        $this->app->bind(
             \App\Domains\HRMS\Repositories\DocumentRepositoryInterface::class,
             \App\Domains\HRMS\Repositories\DocumentRepository::class
         );
@@ -368,6 +378,18 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Domains\Projects\Repositories\ProjectDocumentRepositoryInterface::class,
             \App\Domains\Projects\Repositories\ProjectDocumentRepository::class
+        );
+
+        // ── Projects: Review / UAT ────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\ProjectReviewRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\ProjectReviewRepository::class
+        );
+
+        // ── Projects: Change Request ──────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\ChangeRequestRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\ChangeRequestRepository::class
         );
 
 
@@ -549,6 +571,28 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Purchase\Events\GrnAssetLineReceived::class,
             \App\Domains\HRMS\Listeners\CreateAssetFromGrnLine::class
         );
+
+        // ── Project Management Event Notifications ───────────────────────────
+        foreach ([
+            \App\Domains\Projects\Events\TaskAssigned::class,
+            \App\Domains\Projects\Events\TaskCompleted::class,
+            \App\Domains\Projects\Events\IssueLogged::class,
+            \App\Domains\Projects\Events\IssueResolved::class,
+            \App\Domains\Projects\Events\IssueRetested::class,
+            \App\Domains\Projects\Events\TimesheetSubmitted::class,
+            \App\Domains\Projects\Events\TimesheetApproved::class,
+            \App\Domains\Projects\Events\TimesheetRejected::class,
+            \App\Domains\Projects\Events\ProjectReviewRequested::class,
+            \App\Domains\Projects\Events\ProjectReviewSignedOff::class,
+            \App\Domains\Projects\Events\ChangeRequestCreated::class,
+            \App\Domains\Projects\Events\ProjectClosed::class,
+        ] as $projectEventClass) {
+            \Illuminate\Support\Facades\Event::listen(
+                $projectEventClass,
+                \App\Domains\Projects\Listeners\ProjectNotificationListener::class
+            );
+        }
+
 
         // ── Accounting dashboard cache: any journal change can move a figure ──
         $flushAccountingDashboard = function ($model): void {
@@ -860,6 +904,16 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Policies\ProjectDocumentPolicy::class
         );
 
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\ProjectReview::class,
+            \App\Domains\Projects\Policies\ProjectReviewPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\ChangeRequest::class,
+            \App\Domains\Projects\Policies\ChangeRequestPolicy::class
+        );
+
 
         // ── Accounting Policies ────────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
@@ -996,6 +1050,21 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\Broadcast::class,
             \App\Domains\HRMS\Policies\BroadcastPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\SopDocument::class,
+            \App\Domains\HRMS\Policies\SopPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Goal::class,
+            \App\Domains\HRMS\Policies\GoalPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Feedback360Cycle::class,
+            \App\Domains\HRMS\Policies\Feedback360Policy::class
         );
 
         // ── Fixed Asset Policies ────────────────────────────────────────────

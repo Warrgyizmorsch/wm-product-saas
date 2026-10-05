@@ -241,18 +241,22 @@ All project actors map to the ERP's global `App\Models\User` filtered through `p
   - `Completed` -> terminal
   - `Cancelled` -> terminal
 
-### 8.4 Issue Statuses (Target)
+### 8.4 Issue Statuses (Implemented & Verified)
 - **Canonical Values:** `Open`, `Assigned`, `In Progress`, `Resolved`, `Closed`.
 - **Retest Loop:** Moving from `Resolved` -> Retest fails -> `In Progress`; Retest passes -> `Closed`.
 
-### 8.5 Timesheet Approval Statuses (Target)
+### 8.5 Timesheet Approval Statuses (Implemented & Verified)
 - **Canonical Values:** `Pending`, `Approved`, `Rejected`.
 
-### 8.6 Review / UAT Statuses (Target)
+### 8.6 Review / UAT Statuses (Implemented & Verified)
 - **Canonical Values:** `Pending`, `Approved`, `Rework Required`.
 
-### 8.7 Change Request Statuses (Target)
+### 8.7 Change Request Statuses (Implemented & Verified)
 - **Canonical Values:** `Pending`, `Approved`, `Rejected`, `Implemented`.
+
+### 8.8 Dynamic Tenant Currency & Approval UX Standards (Implemented & Verified)
+- **Dynamic Tenant Currency:** Every monetary amount across the PM module (budgets, member rates, actual cost, time log billables, change requests, invoices, dashboard KPIs, and tabular reports/exports) resolves through the ERP's shared `format_currency($amount)` and `active_currency_symbol()`. Hardcoded symbols (`$`, `₹`, `USD`) are strictly prohibited.
+- **Production-Consistent Approval UX:** When an entity enters a pending approval state (UAT Review sign-off, Change Request review, Timesheet approval), prominent localized notice banners (`alert alert-warning border-warning bg-soft-warning` / `alert alert-info border-info bg-soft-info`) are rendered with clear role-gated sign-off action buttons matching Production BOM/Routing conventions.
 
 ---
 

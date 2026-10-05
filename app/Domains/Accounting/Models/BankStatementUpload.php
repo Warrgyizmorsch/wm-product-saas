@@ -17,6 +17,8 @@ class BankStatementUpload extends BaseModel
     public const STATUS_PENDING = 'pending';
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_FAILED = 'failed';
+    /** Stored, waiting for the user to map the header row and columns. */
+    public const STATUS_NEEDS_MAPPING = 'needs_mapping';
 
     protected $table = 'bank_statement_uploads';
 

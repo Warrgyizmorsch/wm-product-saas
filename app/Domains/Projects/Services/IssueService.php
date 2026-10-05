@@ -2,6 +2,9 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Projects\Events\IssueLogged;
+use App\Domains\Projects\Events\IssueResolved;
+use App\Domains\Projects\Events\IssueRetested;
 use App\Domains\Projects\Models\Issue;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\ProjectMember;
@@ -63,6 +66,8 @@ class IssueService
                 ]
             );
 
+            event(new IssueLogged($issue, $reporter));
+
             return $issue;
         });
     }
@@ -105,6 +110,8 @@ class IssueService
                         $updated,
                         ['resolution_notes' => $updated->resolution_notes]
                     );
+
+                    event(new IssueResolved($updated, $actor));
                 } else {
                     $this->activityLogs->record(
                         $project,
@@ -159,6 +166,8 @@ class IssueService
                 $updated,
                 ['resolution_notes' => $notes]
             );
+
+            event(new IssueResolved($updated, $actor));
 
             return $updated;
         });
@@ -228,6 +237,8 @@ class IssueService
                     ['retest_notes' => $notes, 'result' => 'failed', 'status' => Issue::STATUS_IN_PROGRESS]
                 );
             }
+
+            event(new IssueRetested($updated, $tester, $passed));
 
             return $updated;
         });

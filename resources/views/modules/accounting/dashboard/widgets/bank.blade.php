@@ -1,7 +1,7 @@
-<x-ui.card title="Bank Reconciliation" bodyClass="p-0" class="accounting-dense mb-3" stretch>
-    <x-slot:headerAction>
+<x-ui.section title="Bank Reconciliation" class="accounting-dense mb-3 h-100" flush>
+    <x-slot:actions>
         <a href="{{ route('accounting.bank-reconciliation.index') }}" class="fs-12">Reconcile <i class="feather-arrow-right"></i></a>
-    </x-slot:headerAction>
+    </x-slot:actions>
     <x-ui.table hoverable>
         <tbody class="fs-13 text-dark">
             @forelse ($bankAccounts as $bank)
@@ -25,4 +25,4 @@
             @endforelse
         </tbody>
     </x-ui.table>
-</x-ui.card>
+</x-ui.section>

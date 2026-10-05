@@ -32,6 +32,7 @@ class JournalEntry extends BaseModel
         'foreign_credit',
         'description',
         'is_reconciled',
+        'bank_date',
         'reconciled_at',
         'bank_reconciliation_id',
     ];
@@ -42,6 +43,7 @@ class JournalEntry extends BaseModel
         'foreign_debit' => 'float',
         'foreign_credit' => 'float',
         'is_reconciled' => 'boolean',
+        'bank_date' => 'date',
         'reconciled_at' => 'datetime',
     ];
 
@@ -63,6 +65,14 @@ class JournalEntry extends BaseModel
     public function bankReconciliation(): BelongsTo
     {
         return $this->belongsTo(BankReconciliation::class, 'bank_reconciliation_id');
+    }
+
+    /**
+     * The bank statement line that cleared this entry, if it has been reconciled.
+     */
+    public function statementMatch(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(BankStatementMatch::class, 'journal_entry_id');
     }
 
     /**

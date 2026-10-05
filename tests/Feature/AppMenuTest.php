@@ -186,17 +186,17 @@ class AppMenuTest extends TestCase
 
     public function test_the_sidebar_and_launcher_render_for_both_modes(): void
     {
-        // The sidebar's app-context button opens its own flat app-switcher list
-        // (id="app-switcher-list"), separate from the header's own "Modules"
-        // dropdown (id="mega-menu-dropdown") — kept apart so the two never
-        // collide as duplicate ids on the same page.
+        // Inside an app the sidebar expands that app under its group caption and
+        // lists every other app under "Enterprise Modules" (ui-reference/code.html).
+        $apps = $this->nav($this->owner, 'crm.dashboard')['apps'];
         $crm = $this->actingAs($this->owner)->get(route('crm.dashboard'))->assertOk();
         $crm->assertSee('data-nav-app="crm"', false);
-        $crm->assertSee('app-switcher-toggle', false);
-        $crm->assertSee('app-switcher-list', false);
+        $crm->assertSee('Revenue Cycle');
+        $crm->assertSee('Enterprise Modules');
+        $crm->assertSee('data-app="sales"', false);
+        $crm->assertSee($apps['sales']['url'], false);
+        $crm->assertDontSee('data-app="crm"', false);
 
-        // Not assertDontSee('app-switcher-list', ...): the id also appears inside the
-        // page's own <script> (a getElementById call), which renders unconditionally.
         $home = $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
         $home->assertDontSee('data-nav-app=', false);
         $home->assertSee(route('apps'), false);

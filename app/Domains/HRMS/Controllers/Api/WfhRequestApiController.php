@@ -147,6 +147,18 @@ class WfhRequestApiController extends Controller
 
         $requests = $query->orderBy('created_at', 'desc')->paginate($request->integer('per_page', 10));
 
+        $requests->getCollection()->transform(function ($req) use ($employee, $isHrAdmin) {
+            $isOwner = $employee && (int)$req->employee_id === (int)$employee->id;
+            $isPending = $req->status === 'pending';
+            $req->capabilities = [
+                'can_view'    => true,
+                'can_approve' => $isHrAdmin && $isPending,
+                'can_reject'  => $isHrAdmin && $isPending,
+                'can_cancel'  => ($isOwner || $isHrAdmin) && $isPending,
+            ];
+            return $req;
+        });
+
         return $this->sendSuccess($requests, 'WFH requests retrieved successfully');
     }
 
@@ -169,6 +181,15 @@ class WfhRequestApiController extends Controller
                 return $this->sendError('Unauthorized action. You can only view your own WFH requests.', 403);
             }
         }
+
+        $isOwner = $employee && (int)$wfhRequest->employee_id === (int)$employee->id;
+        $isPending = $wfhRequest->status === 'pending';
+        $wfhRequest->capabilities = [
+            'can_view'    => true,
+            'can_approve' => $isHrAdmin && $isPending,
+            'can_reject'  => $isHrAdmin && $isPending,
+            'can_cancel'  => ($isOwner || $isHrAdmin) && $isPending,
+        ];
 
         return $this->sendSuccess($wfhRequest, 'WFH request details loaded');
     }

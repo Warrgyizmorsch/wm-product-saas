@@ -188,6 +188,19 @@ class DocumentApiController extends Controller
 
         $documents = $query->paginate($request->integer('per_page', 10));
 
+        $documents->getCollection()->transform(function ($doc) use ($employee, $isHrAdmin) {
+            $isOwner = $employee && (int)$doc->documentable_id === (int)$employee->id;
+            $doc->capabilities = [
+                'can_view'     => true,
+                'can_download' => true,
+                'can_verify'   => $isHrAdmin && $doc->status === 'pending',
+                'can_reject'   => $isHrAdmin && $doc->status === 'pending',
+                'can_sign'     => ($isOwner || $isHrAdmin) && ($doc->signature_status === 'pending_signature' || $doc->requires_signature),
+                'can_delete'   => $isHrAdmin || ($isOwner && $doc->status === 'pending'),
+            ];
+            return $doc;
+        });
+
         return $this->sendSuccess($documents, 'Documents retrieved successfully');
     }
 

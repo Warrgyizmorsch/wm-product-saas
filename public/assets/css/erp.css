@@ -1,5 +1,7 @@
 :root {
     --bs-primary: #6337fa;
+    /* Keep in step with --bs-primary (the layout's erpApplyPrimaryColor() updates both). */
+    --bs-primary-rgb: 99, 55, 250;
     /* Shared radius & shadow scale (consumed by x-ui.* components) */
     --erp-radius-sm: 6px;
     --erp-radius: 8px;
@@ -130,23 +132,53 @@ body.app-skin-dark .badge.erp-badge .rounded-circle.bg-secondary,
 
 /* Tenant-uploaded branding logos can be any resolution/aspect ratio —
    constrain them so the sidebar brand slot never overflows/crops. */
+.nxl-navigation .m-header {
+    padding: 10px 20px;
+}
+
+html.minimenu .nxl-navigation .m-header {
+    padding: 10px 18px;
+    justify-content: center;
+}
+
 .erp-tenant-brand {
     display: flex;
     align-items: center;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
 }
 
+/* Fill the 80px brand slot: up to 60px tall and the full sidebar width. */
 .erp-brand-logo-full {
-    height: 32px;
+    height: 100%;
+    max-height: 60px;
     width: auto;
-    max-width: 160px;
+    max-width: 100%;
     object-fit: contain;
+    object-position: left center;
 }
 
 .erp-brand-logo-abbr {
-    height: 32px;
-    width: 32px;
+    height: 56px;
+    width: 56px;
+    max-width: 100%;
     object-fit: contain;
+}
+
+/* Text fallbacks when the tenant hasn't uploaded a logo. */
+.erp-brand-wordmark {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-brand-mark {
+    font-size: 26px;
+    font-weight: 700;
 }
 
 .loader-bg {
@@ -246,7 +278,7 @@ body.app-skin-dark .badge.erp-badge .rounded-circle.bg-secondary,
 }
 
 .erp-module-link:hover {
-    border-color: #3454d1;
+    border-color: var(--bs-primary);
     background-color: #f8faff;
 }
 
@@ -382,8 +414,8 @@ body.app-skin-dark .badge.erp-badge .rounded-circle.bg-secondary,
 }
 
 .erp-domain-tile:hover {
-    border-color: #3454d1;
-    color: #3454d1;
+    border-color: var(--bs-primary);
+    color: var(--bs-primary);
 }
 
 @media (max-width: 1199.98px) {
@@ -604,7 +636,7 @@ body.app-skin-dark .badge.erp-badge .rounded-circle.bg-secondary,
     height: 32px;
     background-color: #f0f2f5;
     border-radius: 6px;
-    color: #3454d1;
+    color: var(--bs-primary);
 }
 
 .table-date-content {
@@ -1926,8 +1958,8 @@ html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--multiple 
 }
 
 html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
-    background-color: rgba(52, 84, 209, 0.2) !important;
-    border-color: rgba(52, 84, 209, 0.4) !important;
+    background-color: rgba(var(--bs-primary-rgb), 0.2) !important;
+    border-color: rgba(var(--bs-primary-rgb), 0.4) !important;
     color: #93c5fd !important;
 }
 
@@ -2253,3 +2285,236 @@ html.app-skin-dark .header-color-preview-circle {
 .btn-group > .btn:not(:first-child) {
     margin-left: 5px;
 }
+
+/* Sticky footer: on short pages the content area grows to fill the screen
+   so the footer always sits at the bottom; on long pages it follows the content. */
+.nxl-container {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 80px);
+}
+
+.nxl-container > .nxl-content {
+    flex: 1 0 auto;
+}
+
+.nxl-container > .footer {
+    flex-shrink: 0;
+    margin-top: auto;
+}
+
+/* ==========================================
+   PRIMARY COLOUR SYNC
+   The header colour picker sets --bs-primary; the Duralux theme and Bootstrap
+   hard-code their blue (#3454d1) in these utilities, so they ignored it.
+   Point them at --bs-primary so every primary control matches the header.
+   ========================================== */
+.text-primary {
+    color: var(--bs-primary) !important;
+}
+
+.bg-primary {
+    background-color: var(--bs-primary) !important;
+}
+
+.avatar-text.bg-primary {
+    box-shadow: 0 10px 10px -1px color-mix(in srgb, var(--bs-primary) 30%, transparent) !important;
+}
+
+.bg-soft-primary {
+    background-color: color-mix(in srgb, var(--bs-primary) 9%, transparent) !important;
+}
+
+.border-primary {
+    border-color: var(--bs-primary) !important;
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--bs-primary);
+    --bs-btn-border-color: var(--bs-primary);
+    --bs-btn-hover-bg: var(--bs-primary);
+    --bs-btn-hover-border-color: var(--bs-primary);
+    --bs-btn-active-bg: var(--bs-primary);
+    --bs-btn-active-border-color: var(--bs-primary);
+    --bs-btn-disabled-color: var(--bs-primary);
+}
+
+.alert-primary {
+    --bs-alert-color: color-mix(in srgb, var(--bs-primary) 75%, #000);
+    --bs-alert-bg: color-mix(in srgb, var(--bs-primary) 10%, #fff);
+    --bs-alert-border-color: color-mix(in srgb, var(--bs-primary) 22%, #fff);
+}
+
+/* Every checkbox/radio and input focus ring, not only the x-ui ones. */
+.form-check-input:checked {
+    background-color: var(--bs-primary) !important;
+    border-color: var(--bs-primary) !important;
+}
+
+.form-check-input:focus,
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--bs-primary) 15%, transparent);
+}
+
+/* ==========================================
+   SEARCHABLE SELECTS (assets/js/erp-searchable-select.js)
+   Every data-driven dropdown becomes a Select2 with a search box.
+   ========================================== */
+.select2-container--bootstrap-5 .select2-selection.erp-s2-sm {
+    min-height: 31px !important;
+    padding: 3px 10px !important;
+    font-size: 12px !important;
+}
+.select2-container--bootstrap-5 .select2-selection--single.erp-s2-sm .select2-selection__rendered {
+    line-height: 23px !important;
+}
+.select2-container--bootstrap-5 .select2-dropdown .select2-search--dropdown .select2-search__field {
+    border: 1px solid #dcdce0 !important;
+    border-radius: 6px !important;
+    font-size: 12px !important;
+    padding: 6px 10px !important;
+}
+.select2-container--bootstrap-5 .select2-dropdown .select2-search--dropdown .select2-search__field:focus {
+    border-color: var(--bs-primary) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--bs-primary) 15%, transparent) !important;
+    outline: 0 !important;
+}
+.select2-container--bootstrap-5 .select2-results > .select2-results__options {
+    max-height: 280px;
+}
+.select2-container--bootstrap-5 .select2-results__group {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #64748b !important;
+    padding: 8px 12px 4px !important;
+}
+/* Inside modals the dropdown must sit above the dialog. */
+.modal .select2-container--open .select2-dropdown { z-index: 1061; }
+/* A select2 inside a flex filter bar should not collapse to nothing. */
+.d-flex > .select2-container { min-width: 160px; }
+
+/* ==========================================
+   SELECT2 CLEAR (CROSS) & REMOVE BUTTON POLISH
+   ========================================== */
+.select2-container .select2-selection--single .select2-selection__clear,
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear,
+.select2-container--default .select2-selection--single .select2-selection__clear,
+.select2-container--classic .select2-selection--single .select2-selection__clear {
+    position: absolute !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    right: 28px !important;
+    width: 18px !important;
+    height: 18px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    font-family: inherit !important;
+    line-height: 1 !important;
+    color: #64748b !important;
+    background-color: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 4 !important;
+    transition: all 0.15s ease-in-out !important;
+    text-indent: 0 !important;
+    overflow: visible !important;
+    float: none !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.select2-container .select2-selection--single .select2-selection__clear:hover,
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear:hover,
+.select2-container--default .select2-selection--single .select2-selection__clear:hover,
+.select2-container--classic .select2-selection--single .select2-selection__clear:hover {
+    color: #ef4444 !important;
+    background-color: #fee2e2 !important;
+    border-color: #fca5a5 !important;
+    transform: translateY(-50%) scale(1.1) !important;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.15) !important;
+}
+
+.select2-container .select2-selection--single .select2-selection__clear > span,
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear > span {
+    display: inline-block !important;
+    line-height: 1 !important;
+    margin-top: -1px !important;
+}
+
+/* Ensure single select rendered text never overlaps clear cross button or dropdown arrow */
+.select2-container .select2-selection--single .select2-selection__rendered,
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered,
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    padding-right: 52px !important;
+}
+
+/* Small / Compact Select2 (e.g. erp-s2-sm, tables, form-select-sm) */
+.select2-container .select2-selection.erp-s2-sm .select2-selection__clear,
+.form-select-sm ~ .select2-container .select2-selection__clear,
+.form-control-sm ~ .select2-container .select2-selection__clear,
+.table .select2-container .select2-selection__clear {
+    right: 24px !important;
+    width: 16px !important;
+    height: 16px !important;
+    font-size: 12px !important;
+}
+
+.select2-container .select2-selection.erp-s2-sm .select2-selection__rendered,
+.form-select-sm ~ .select2-container .select2-selection__rendered,
+.table .select2-container .select2-selection__rendered {
+    padding-right: 44px !important;
+}
+
+/* Multi-select choice clear cross badge */
+.select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove,
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 15px !important;
+    height: 15px !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+    color: #64748b !important;
+    background-color: #f1f5f9 !important;
+    border-radius: 50% !important;
+    margin-right: 5px !important;
+    transition: all 0.15s ease !important;
+    cursor: pointer !important;
+    border: none !important;
+    text-indent: 0 !important;
+    padding: 0 !important;
+}
+
+.select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove:hover,
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+    color: #ef4444 !important;
+    background-color: #fee2e2 !important;
+}
+
+/* Dark mode adjustments */
+html.app-skin-dark .select2-container .select2-selection--single .select2-selection__clear,
+body.app-skin-dark .select2-container .select2-selection--single .select2-selection__clear,
+[data-bs-theme="dark"] .select2-container .select2-selection--single .select2-selection__clear {
+    color: #94a3b8 !important;
+    background-color: #334155 !important;
+    border-color: #475569 !important;
+}
+
+html.app-skin-dark .select2-container .select2-selection--single .select2-selection__clear:hover,
+body.app-skin-dark .select2-container .select2-selection--single .select2-selection__clear:hover,
+[data-bs-theme="dark"] .select2-container .select2-selection--single .select2-selection__clear:hover {
+    color: #f87171 !important;
+    background-color: rgba(239, 68, 68, 0.25) !important;
+    border-color: #ef4444 !important;
+}
+

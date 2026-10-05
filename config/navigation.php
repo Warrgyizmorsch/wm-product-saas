@@ -83,20 +83,22 @@ return [
     | home page, where every section is listed. Each app also carries a
     | `color` (hex) for its icon tile — like Odoo's app grid, every app gets
     | its own distinct color rather than one uniform brand blue, so the
-    | launcher and switcher stay scannable at a glance.
+    | launcher and switcher stay scannable at a glance. group is the sidebar
+    | caption the app sits under while you are inside it (e.g. Core Financials).
     |
     */
 
     'apps' => [
-        'crm' => ['label' => 'CRM', 'icon' => 'feather-users', 'description' => 'Leads, deals, customers, activities', 'color' => '#7C3AED'],
-        'sales' => ['label' => 'Sales', 'icon' => 'feather-shopping-cart', 'description' => 'Quotations, orders, invoices, receipts', 'color' => '#2563EB'],
-        'inventory' => ['label' => 'Inventory', 'icon' => 'feather-box', 'description' => 'Products, stock, warehouses, store', 'color' => '#EA580C'],
-        'purchase' => ['label' => 'Purchase', 'icon' => 'feather-truck', 'description' => 'Suppliers, POs, bills, goods receipts', 'color' => '#0D9488'],
-        'production' => ['label' => 'Production', 'icon' => 'feather-cpu', 'description' => 'BOM, orders, shop floor, quality', 'color' => '#DB2777'],
-        'hrms' => ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'description' => 'Employees, attendance, leave, payroll', 'color' => '#16A34A'],
-        'accounting' => ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'description' => 'Ledgers, journals, tax, reports', 'color' => '#CA8A04'],
-        'projects' => ['label' => 'Projects', 'icon' => 'feather-briefcase', 'description' => 'Projects, milestones, tasks', 'color' => '#4F46E5'],
-        'admin' => ['label' => 'Administration', 'icon' => 'feather-shield', 'description' => 'Tenants, plans, users, roles, audit', 'color' => '#475569'],
+        'crm' => ['label' => 'CRM', 'icon' => 'feather-users', 'description' => 'Leads, deals, customers, activities', 'color' => '#7C3AED', 'group' => 'Revenue Cycle'],
+        'sales' => ['label' => 'Sales', 'icon' => 'feather-shopping-cart', 'description' => 'Quotations, orders, invoices, receipts', 'color' => '#2563EB', 'group' => 'Revenue Cycle'],
+        'inventory' => ['label' => 'Inventory', 'icon' => 'feather-box', 'description' => 'Products, stock, warehouses, store', 'color' => '#EA580C', 'group' => 'Supply Chain'],
+        'purchase' => ['label' => 'Purchase', 'icon' => 'feather-truck', 'description' => 'Suppliers, POs, bills, goods receipts', 'color' => '#0D9488', 'group' => 'Supply Chain'],
+        'production' => ['label' => 'Production', 'icon' => 'feather-cpu', 'description' => 'BOM, orders, shop floor, quality', 'color' => '#DB2777', 'group' => 'Manufacturing'],
+        'hrms' => ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'description' => 'Employees, attendance, leave, payroll', 'color' => '#16A34A', 'group' => 'People'],
+        'accounting' => ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'description' => 'Ledgers, journals, tax, reports', 'color' => '#CA8A04', 'group' => 'Core Financials'],
+        'projects' => ['label' => 'Projects', 'icon' => 'feather-briefcase', 'description' => 'Projects, milestones, tasks', 'color' => '#4F46E5', 'group' => 'Revenue Cycle'],
+        'visitor' => ['label' => 'Visitor Management', 'icon' => 'feather-user-check', 'description' => 'Visitor passes, check-in, live headcount', 'color' => '#059669', 'group' => 'Workspace'],
+        'admin' => ['label' => 'Administration', 'icon' => 'feather-shield', 'description' => 'Tenants, plans, users, roles, audit', 'color' => '#475569', 'group' => 'Administration'],
     ],
 
     /*
@@ -120,6 +122,7 @@ return [
         'hrms' => 'hrms',
         'accounting' => 'accounting',
         'projects' => 'projects',
+        'visitor' => 'visitor',
         'platform' => 'admin',
         'access' => 'admin',
     ],

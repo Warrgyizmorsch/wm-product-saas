@@ -40,7 +40,7 @@
                         <select class="form-select form-select-sm odoo-table-select milestone-create-owner" data-select2-selector="user">
                             <option value="">{{ __('projects.select_user') }}</option>
                             @foreach ($activeMemberOptions as $memberOption)
-                                <option value="{{ $memberOption->id }}">{{ $memberOption->name }}</option>
+                                <option value="{{ $memberOption->id }}" data-avatar="{{ $memberOption->avatar_url }}">{{ $memberOption->name }}</option>
                             @endforeach
                         </select>
                         <div class="invalid-feedback d-block fs-11 milestone-create-error" data-field="owner_id"></div>

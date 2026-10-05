@@ -44,7 +44,8 @@ class ProbationApiController extends Controller
 
         return $user->hasHrPermission('hr.settings.manage')
             || $user->hasHrPermission('hr.employees.manage')
-            || $user->hasHrPermission('hrms.employees.manage');
+            || $user->hasHrPermission('hrms.employees.manage')
+            || $user->hasHrPermission('hrms.probation.manage');
     }
 
     private function getAuthenticatedEmployee(): ?Employee
@@ -91,6 +92,17 @@ class ProbationApiController extends Controller
         }
 
         $employees = $query->paginate($request->integer('per_page', 15));
+
+        $employees->getCollection()->transform(function ($emp) use ($isHrAdmin) {
+            $emp->capabilities = [
+                'can_view'          => true,
+                'can_evaluate'      => $isHrAdmin,
+                'can_quick_confirm' => $isHrAdmin,
+                'can_extend'        => $isHrAdmin,
+                'can_terminate'     => $isHrAdmin,
+            ];
+            return $emp;
+        });
 
         return $this->sendSuccess($employees, 'Probation list retrieved successfully.');
     }

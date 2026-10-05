@@ -11,7 +11,7 @@
         ['Cash runway', $burn['runway_months'] === null ? 'Not burning cash' : number_format($burn['runway_months'], 1) . ' months', 'Cash ÷ average net burn'],
     ];
 @endphp
-<x-ui.card title="Financial Health" bodyClass="p-0" class="accounting-dense mb-3" stretch>
+<x-ui.section title="Financial Health" class="accounting-dense mb-3 h-100" flush>
     <x-ui.table>
         <tbody class="fs-13 text-dark">
             @foreach ($ratioRows as [$label, $value, $hint])
@@ -25,4 +25,4 @@
             @endforeach
         </tbody>
     </x-ui.table>
-</x-ui.card>
+</x-ui.section>

@@ -31,7 +31,13 @@ class VoucherService
      *     payment_method?: string,
      *     reference_no?: string,
      *     posted_by?: int,
+     *     through_approval?: bool,
      * } $meta
+     *
+     * through_approval: true for vouchers a person keys in on the voucher
+     * screens — they go through JournalService::submit() and may wait for
+     * maker-checker approval. Vouchers posted by other flows (e.g. bank
+     * reconciliation) leave it false and post immediately.
      */
     public function post(string $voucherType, array $lines, array $meta = []): Journal
     {
@@ -39,14 +45,26 @@ class VoucherService
             throw new InvalidArgumentException("Unknown voucher type: {$voucherType}");
         }
 
-        $journal = $this->journals->post($lines, [
+        // tenant/company/branch and reference_* are optional: a voucher posted
+        // from another screen (e.g. bank reconciliation) passes them so the
+        // voucher lands in the right entity and links back to its source.
+        $journalMeta = array_filter([
+            'tenant_id' => $meta['tenant_id'] ?? null,
+            'company_id' => $meta['company_id'] ?? null,
+            'branch_id' => $meta['branch_id'] ?? null,
             'journal_date' => $meta['journal_date'] ?? now(),
             'source' => Journal::SOURCE_MANUAL,
             'voucher_type' => $voucherType,
             'journal_number_prefix' => VoucherType::prefix($voucherType),
+            'reference_type' => $meta['reference_type'] ?? null,
+            'reference_id' => $meta['reference_id'] ?? null,
             'memo' => $meta['memo'] ?? null,
             'posted_by' => $meta['posted_by'] ?? null,
-        ]);
+        ], fn ($value) => $value !== null);
+
+        $journal = ($meta['through_approval'] ?? false)
+            ? $this->journals->submit($lines, $journalMeta)
+            : $this->journals->post($lines, $journalMeta);
 
         $this->voucherDetails->create([
             'tenant_id' => $journal->tenant_id,

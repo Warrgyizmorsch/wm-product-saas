@@ -524,6 +524,7 @@ class SalesOrderApiController extends Controller
 
         $invoiceNumber = 'INV-' . strtoupper(bin2hex(random_bytes(4)));
 
+        $invoice = DB::transaction(function () use ($order, $invoiceNumber, $tenantId, $companyId, $branchId, $request) {
             $gstType = $order->gst_type ?? 'cgst_sgst';
             $orderTax = (float)($order->tax ?? 0);
             $cgstAmt = 0.0;

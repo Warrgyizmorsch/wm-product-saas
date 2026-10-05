@@ -175,6 +175,14 @@ class PipApiController extends Controller
                 ] : null,
                 'objectives_count'      => $pip->objectives_count ?? 0,
                 'checkins_count'        => $pip->checkins_count ?? 0,
+                'capabilities'          => [
+                    'can_view'        => true,
+                    'can_edit'        => $isHrAdmin,
+                    'can_delete'      => $isHrAdmin,
+                    'can_checkin'     => $isHrAdmin || ($employee && $employee->id === $pip->manager_id),
+                    'can_conclude'    => $isHrAdmin,
+                    'can_acknowledge' => ($employee && $employee->id === $pip->employee_id && empty($pip->employee_acknowledged_at)),
+                ],
                 'created_at'            => $pip->created_at ? (is_string($pip->created_at) ? $pip->created_at : $pip->created_at->toIso8601String()) : null,
             ];
         });
@@ -278,6 +286,14 @@ class PipApiController extends Controller
                     'reviewer_name'     => $chk->reviewer ? $chk->reviewer->name : null,
                 ];
             }),
+            'capabilities'          => [
+                'can_view'        => true,
+                'can_edit'        => $this->isHrAdmin(),
+                'can_delete'      => $this->isHrAdmin(),
+                'can_checkin'     => $this->isHrAdmin() || ($this->getAuthenticatedEmployee() && $this->getAuthenticatedEmployee()->id === $pip->manager_id),
+                'can_conclude'    => $this->isHrAdmin(),
+                'can_acknowledge' => ($this->getAuthenticatedEmployee() && $this->getAuthenticatedEmployee()->id === $pip->employee_id && empty($pip->employee_acknowledged_at)),
+            ],
             'created_at'            => $pip->created_at ? (is_string($pip->created_at) ? $pip->created_at : $pip->created_at->toIso8601String()) : null,
         ];
     }

@@ -11,7 +11,7 @@
     @if($title || isset($headerAction))
         <div class="card-header">
             @if($title)
-                <h5 class="card-title">{{ $title }}</h5>
+                <h5 class="card-title">{!! $title !!}</h5>
             @endif
             @if(isset($headerAction))
                 <div class="card-header-action">

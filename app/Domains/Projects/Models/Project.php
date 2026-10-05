@@ -23,6 +23,20 @@ class Project extends BaseModel
         return 'project_code';
     }
 
+    public function resolveRouteBinding($value, $field = null)
+    {
+        $field = $field ?? $this->getRouteKeyName();
+
+        if ($field === 'project_code' && is_numeric($value)) {
+            $match = $this->where('id', (int) $value)->first();
+            if ($match) {
+                return $match;
+            }
+        }
+
+        return parent::resolveRouteBinding($value, $field);
+    }
+
     public const STATUS_DRAFT = 'Draft';
     public const STATUS_ACTIVE = 'Active';
     public const STATUS_ON_HOLD = 'On Hold';
@@ -61,6 +75,16 @@ class Project extends BaseModel
 
     public const BILLING_METHODS = ['Project Based', 'Milestone Based', 'Task Based', 'User Based'];
 
+    public const CLOSURE_STATUS_COMPLETED   = 'Completed';
+    public const CLOSURE_STATUS_TERMINATED  = 'Terminated';
+    public const CLOSURE_STATUS_HANDED_OVER = 'Handed Over';
+
+    public const CLOSURE_STATUSES = [
+        self::CLOSURE_STATUS_COMPLETED,
+        self::CLOSURE_STATUS_TERMINATED,
+        self::CLOSURE_STATUS_HANDED_OVER,
+    ];
+
     protected $fillable = [
         'tenant_id',
         'company_id',
@@ -78,15 +102,31 @@ class Project extends BaseModel
         'billing_method',
         'priority',
         'status',
+        'closure_date',
+        'closure_status',
+        'client_approval_ref',
+        'final_remarks',
+        'closed_by',
         'description',
     ];
 
     protected $casts = [
         'start_date'    => 'date',
         'end_date'      => 'date',
+        'closure_date'  => 'date',
         'budget_amount' => 'decimal:2',
         'budget_hours'  => 'decimal:2',
     ];
+
+    public function isClosed(): bool
+    {
+        return $this->status === self::STATUS_CLOSED;
+    }
+
+    public function closedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closed_by');
+    }
 
     /**
      * Human-readable status label, the single source of truth for how a
@@ -161,6 +201,21 @@ class Project extends BaseModel
     public function documents(): HasMany
     {
         return $this->hasMany(ProjectDocument::class, 'project_id');
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(ProjectReview::class, 'project_id');
+    }
+
+    public function changeRequests(): HasMany
+    {
+        return $this->hasMany(ChangeRequest::class, 'project_id');
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Sales\Models\Invoice::class, 'project_id');
     }
 }
 

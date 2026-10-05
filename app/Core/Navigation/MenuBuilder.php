@@ -98,6 +98,8 @@ class MenuBuilder
 
         $item = [
             'label' => $this->label($entry),
+            'default_label' => $entry['default'] ?? null,
+            'raw_label' => $entry['label'] ?? null,
             'icon' => $entry['icon'] ?? 'feather-circle',
             'route' => null,
             'url' => '#',
@@ -273,23 +275,43 @@ class MenuBuilder
             'sections' => $sections,
             'apps' => $apps,
             'app' => $current,
-            'items' => $current === null ? [] : $this->withoutAppNameGroup($itemsByApp[$current], $apps[$current]['label']),
+            'items' => $current === null ? [] : $this->withoutAppNameGroup($itemsByApp[$current], $current, $apps[$current]),
         ];
     }
 
     /**
-     * Inside the Purchase app a group also called "Purchase" is noise — like Odoo, list its
+     * Inside the Purchase/Visitor app a group also called "Purchase"/"Visitor Management" is noise — like Odoo, list its
      * screens directly instead of repeating the app's name as a menu.
      *
      * @param list<array> $items
      * @return list<array>
      */
-    private function withoutAppNameGroup(array $items, string $appLabel): array
+    private function withoutAppNameGroup(array $items, string $appKey, array $app): array
     {
         $flat = [];
+        $appLabel = mb_strtolower(trim($app['label'] ?? ''));
 
         foreach ($items as $item) {
-            if ($item['children'] !== [] && mb_strtolower(trim($item['label'])) === mb_strtolower(trim($appLabel))) {
+            $itemLabel = mb_strtolower(trim($item['label'] ?? ''));
+            $itemDefault = mb_strtolower(trim($item['default_label'] ?? ''));
+            $itemRaw = mb_strtolower(trim($item['raw_label'] ?? ''));
+
+            $isMatch = ($item['children'] !== []) && (
+                $itemLabel === $appLabel
+                || ($itemDefault !== '' && $itemDefault === $appLabel)
+                || ($itemRaw !== '' && (
+                    Str::endsWith($itemRaw, '.'.$appKey) 
+                    || Str::endsWith($itemRaw, '_'.$appKey) 
+                    || $itemRaw === $appKey 
+                    || $itemRaw === 'ui.'.$appKey 
+                    || $itemRaw === $appKey.'.'.$appKey 
+                    || $itemRaw === $appKey.'.'.$appKey.'_management'
+                    || $itemRaw === 'visitor.visitor_management'
+                ))
+                || ($item['app'] === $appKey && count($items) === 1)
+            );
+
+            if ($isMatch) {
                 array_push($flat, ...$item['children']);
             } else {
                 $flat[] = $item;

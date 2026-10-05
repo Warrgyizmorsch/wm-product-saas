@@ -106,6 +106,7 @@
                                 <option value="Posted" @selected(request('status') === 'Posted')>{{ __('purchase.status_posted') }}</option>
                                 <option value="Paid" @selected(request('status') === 'Paid')>{{ __('purchase.status_paid') }}</option>
                                 <option value="Partially Paid" @selected(request('status') === 'Partially Paid')>{{ __('purchase.status_partially_paid') }}</option>
+                                <option value="On Hold" @selected(request('status') === 'On Hold')>On Hold</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
@@ -165,6 +166,7 @@
                                 'Unpaid' => 'Unpaid',
                                 'Posted' => 'Posted',
                                 'Cancelled' => 'Cancelled',
+                                'On Hold' => 'On Hold',
                                 default => $bill->status,
                             };
                             $badgeClass = match($bill->status) {
@@ -172,6 +174,7 @@
                                 'Partially Paid' => 'info',
                                 'Unpaid' => 'danger',
                                 'Posted', 'Draft' => 'warning',
+                                'On Hold' => 'primary',
                                 'Cancelled' => 'secondary',
                                 default => 'secondary',
                             };

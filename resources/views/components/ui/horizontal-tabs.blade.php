@@ -1,6 +1,8 @@
 @props([
     'id',
-    'tabs' => [] // array of ['id' => '', 'label' => '', 'active' => true/false, 'icon' => '']
+    'tabs' => [], // array of ['id' => '', 'label' => '', 'active' => true/false, 'icon' => '']
+    'syncUrl' => false,
+    'syncParam' => 'tab'
 ])
 
 @once
@@ -117,12 +119,28 @@
     @endpush
 @endonce
 
-<ul class="nav nav-tabs erp-horizontal-tabs" id="{{ $id }}" role="tablist" {{ $attributes }}>
+<ul class="nav nav-tabs erp-horizontal-tabs" id="{{ $id }}" role="tablist" 
+    @if($syncUrl) data-sync-url="true" data-sync-param="{{ $syncParam }}" @endif 
+    {{ $attributes }}>
     @foreach($tabs as $tab)
         @if(!empty($tab['is_header']) || !empty($tab['header']))
             <li class="nav-item d-flex align-items-center px-2 py-1 text-uppercase fw-extrabold me-1 ms-1 erp-tab-header-badge">
                 <i class="feather-grid me-1 text-primary" style="font-size: 9px;"></i>
                 {{ $tab['header'] ?? $tab['label'] }}
+            </li>
+        @elseif(!empty($tab['url']) || !empty($tab['href']))
+            <li class="nav-item" role="presentation">
+                <a class="nav-link btn-badge-container {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
+                   id="{{ ($tab['id'] ?? 'tab-'.\Illuminate\Support\Str::slug($tab['label'] ?? 'item')) }}-tab"
+                   href="{{ $tab['url'] ?? $tab['href'] }}">
+                    @if(!empty($tab['icon']))
+                        <i class="{{ $tab['icon'] }} me-2"></i>
+                    @endif
+                    {{ $tab['label'] }}
+                    @if(isset($tab['badge']) && (int)$tab['badge'] > 0)
+                        <span class="btn-badge-count {{ $tab['badgeClass'] ?? '' }}">{{ $tab['badge'] }}</span>
+                    @endif
+                </a>
             </li>
         @else
             <li class="nav-item" role="presentation">
@@ -146,3 +164,65 @@
         @endif
     @endforeach
 </ul>
+
+@once
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                // Synchronize tab clicks with URL query param if data-sync-url="true"
+                document.addEventListener('shown.bs.tab', function (event) {
+                    var tabButton = event.target;
+                    var container = tabButton.closest('.erp-horizontal-tabs[data-sync-url="true"]');
+                    if (!container) return;
+
+                    var target = tabButton.getAttribute('data-bs-target') || '';
+                    var paramName = container.getAttribute('data-sync-param') || 'tab';
+                    var tabKey = target.replace('#tab-', '').replace('#', '');
+
+                    if (tabKey) {
+                        var url = new URL(window.location.href);
+                        if (url.searchParams.get(paramName) !== tabKey) {
+                            url.searchParams.set(paramName, tabKey);
+                            window.history.replaceState({ path: url.toString() }, '', url.toString());
+                        }
+                    }
+                });
+
+                // Handle browser back/forward buttons (popstate)
+                window.addEventListener('popstate', function () {
+                    document.querySelectorAll('.erp-horizontal-tabs[data-sync-url="true"]').forEach(function (container) {
+                        var paramName = container.getAttribute('data-sync-param') || 'tab';
+                        var url = new URL(window.location.href);
+                        var tabKey = url.searchParams.get(paramName);
+                        if (tabKey && window.bootstrap) {
+                            var tabBtn = container.querySelector('button[data-bs-target="#tab-' + tabKey + '"], button[data-bs-target="#' + tabKey + '"]');
+                            if (tabBtn && !tabBtn.classList.contains('active')) {
+                                var tab = bootstrap.Tab.getOrCreateInstance(tabBtn);
+                                tab.show();
+                            }
+                        }
+                    });
+                });
+
+                // Activate tab matching URL query or hash on initial load if not already active
+                document.querySelectorAll('.erp-horizontal-tabs[data-sync-url="true"]').forEach(function (container) {
+                    var paramName = container.getAttribute('data-sync-param') || 'tab';
+                    var url = new URL(window.location.href);
+                    var tabKey = url.searchParams.get(paramName);
+
+                    if (!tabKey && window.location.hash) {
+                        tabKey = window.location.hash.replace('#tab-', '').replace('#', '');
+                    }
+
+                    if (tabKey && window.bootstrap) {
+                        var tabBtn = container.querySelector('button[data-bs-target="#tab-' + tabKey + '"], button[data-bs-target="#' + tabKey + '"]');
+                        if (tabBtn && !tabBtn.classList.contains('active')) {
+                            var tab = bootstrap.Tab.getOrCreateInstance(tabBtn);
+                            tab.show();
+                        }
+                    }
+                });
+            });
+        </script>
+    @endpush
+@endonce

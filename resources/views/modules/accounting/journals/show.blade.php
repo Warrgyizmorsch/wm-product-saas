@@ -12,6 +12,36 @@
 
 @section('content')
 
+    @if ($journal->status === 'pending_approval')
+        <x-ui.alert variant="primary" icon="feather-clock" class="fs-13 mb-4">
+            <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                <span>Awaiting approval — not in the ledger yet. Entered by {{ $journal->postedBy?->name ?? 'unknown' }}.</span>
+                @if ($canApprove ?? false)
+                    <span class="d-flex align-items-center gap-2">
+                        <form method="POST" action="{{ route('accounting.approvals.approve', $journal) }}" class="m-0">
+                            @csrf
+                            <x-ui.button type="submit" variant="primary" size="sm" icon="feather-check">Approve &amp; post</x-ui.button>
+                        </form>
+                        <x-ui.button type="button" variant="light-brand" size="sm" icon="feather-x"
+                            data-bs-toggle="modal" data-bs-target="#rejectJournalModal"
+                            data-reject-url="{{ route('accounting.approvals.reject', $journal) }}"
+                            data-journal-number="{{ $journal->journal_number }}">Reject</x-ui.button>
+                    </span>
+                @endif
+            </div>
+        </x-ui.alert>
+        @if ($canApprove ?? false)
+            @include('modules.accounting.approvals._reject-modal')
+        @endif
+    @elseif ($journal->status === 'rejected')
+        <x-ui.alert variant="danger" icon="feather-x-circle" class="fs-13 mb-4">
+            Rejected by {{ $journal->rejectedBy?->name ?? 'unknown' }} on {{ $journal->rejected_at?->format('d M Y H:i') }} — it did not post.
+            <span class="d-block mt-1"><strong>Reason:</strong> {{ $journal->rejection_reason }}</span>
+        </x-ui.alert>
+    @elseif ($journal->approved_by)
+        <div class="fs-12 text-muted mb-3"><i class="feather-check-circle text-success me-1"></i>Approved by {{ $journal->approvedBy?->name ?? 'unknown' }} on {{ $journal->approved_at?->format('d M Y H:i') }}</div>
+    @endif
+
     <x-ui.card class="mb-4">
         <div class="row g-4 fs-13">
             <div class="col-md-3">
@@ -32,15 +62,9 @@
             </div>
             <div class="col-md-3">
                 <span class="text-muted fs-11 text-uppercase d-block mb-1">Status</span>
-                @if ($journal->status === 'posted')
-                    <x-ui.badge variant="success" soft>Posted</x-ui.badge>
-                @elseif ($journal->status === 'reversed')
-                    <x-ui.badge variant="secondary" soft>Reversed</x-ui.badge>
-                    @if ($journal->reversedJournal)
-                        <a href="{{ route('accounting.journals.show', $journal->reversedJournal) }}" class="fs-11 ms-2">View reversal &rarr;</a>
-                    @endif
-                @else
-                    <x-ui.badge variant="warning" soft>Draft</x-ui.badge>
+                @include('modules.accounting.journals._status-badge', ['status' => $journal->status])
+                @if ($journal->status === 'reversed' && $journal->reversedJournal)
+                    <a href="{{ route('accounting.journals.show', $journal->reversedJournal) }}" class="fs-11 ms-2">View reversal &rarr;</a>
                 @endif
             </div>
         </div>

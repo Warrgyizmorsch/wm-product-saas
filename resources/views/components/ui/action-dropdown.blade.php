@@ -37,11 +37,15 @@
             .action-dropdown-wrapper {
                 position: relative !important;
             }
+            .action-dropdown-wrapper.show {
+                z-index: 1055 !important;
+            }
             .action-dropdown-wrapper .dropdown-menu {
                 right: 0 !important;
                 left: auto !important;
                 transform: none !important;
                 margin-top: 4px !important;
+                z-index: 1055 !important;
             }
 
             /* Dark Mode Support */

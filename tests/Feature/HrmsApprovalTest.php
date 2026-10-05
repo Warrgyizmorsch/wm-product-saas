@@ -212,5 +212,62 @@ class HrmsApprovalTest extends TestCase
         $this->assertEquals('approved', $leaveRequest->status);
         $this->assertEquals('approved', (string)$leaveRequest->current_level);
     }
+
+    /** @test */
+    public function hr_admin_can_see_extended_hrms_approvals_in_global_approvals(): void
+    {
+        $employee = Employee::create([
+            'tenant_id' => $this->tenant->id,
+            'first_name' => 'Sara',
+            'last_name' => 'Connor',
+            'office_email' => 'sara@acme.test',
+            'employee_code' => 'EMP-301',
+            'status' => true,
+        ]);
+
+        $leaveType = LeaveType::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Casual Leave',
+            'code' => 'CL',
+        ]);
+
+        // 1. Leave Encashment
+        \App\Domains\HRMS\Models\LeaveEncashment::create([
+            'tenant_id' => $this->tenant->id,
+            'employee_id' => $employee->id,
+            'leave_type_id' => $leaveType->id,
+            'requested_days' => 5,
+            'status' => 'pending',
+            'reason' => 'Annual encashment',
+        ]);
+
+        // 2. Profile Update Request
+        \App\Domains\HRMS\Models\EmployeeProfileUpdateRequest::create([
+            'tenant_id' => $this->tenant->id,
+            'employee_id' => $employee->id,
+            'user_id' => $this->adminUser->id,
+            'changes' => ['phone' => ['old' => '111', 'new' => '222']],
+            'status' => 'pending',
+        ]);
+
+        // 3. Job Requisition
+        \App\Domains\HRMS\Models\JobRequisition::create([
+            'tenant_id' => $this->tenant->id,
+            'job_title' => 'Senior Backend Engineer',
+            'vacancies' => 2,
+            'status' => 'pending_approval',
+        ]);
+
+        $this->actingAs($this->adminUser);
+
+        $response = $this->getJson('/global-approvals');
+        $response->assertOk()
+            ->assertJsonPath('count', 3);
+
+        $types = array_column($response->json('items'), 'type');
+        $this->assertContains('Leave Encashment', $types);
+        $this->assertContains('Profile Change', $types);
+        $this->assertContains('Job Requisition', $types);
+    }
 }
 

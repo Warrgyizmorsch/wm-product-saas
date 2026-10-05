@@ -12,14 +12,12 @@
 
 @push('styles')
 @once
-<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 @endonce
 <style>
     #detail-drawer-map {
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
-    }
-    .pac-container {
-        z-index: 9999 !important;
     }
 </style>
 @endpush
@@ -441,7 +439,11 @@
     let detailDrawerOverlays = [];
 
     function clearDetailDrawerOverlays() {
-        detailDrawerOverlays.forEach(overlay => overlay.setMap(null));
+        detailDrawerOverlays.forEach(overlay => {
+            if (overlay && typeof overlay.remove === 'function') {
+                overlay.remove();
+            }
+        });
         detailDrawerOverlays = [];
     }
 
@@ -592,25 +594,27 @@
                 };
 
                 const renderResults = (results) => {
-                    currentResults = results;
+                    currentResults = Array.isArray(results) ? results : [];
                     dropdown.innerHTML = '';
                     selectedIndex = -1;
                     updateDropdownPosition();
 
-                    if (!results || results.length === 0) {
+                    if (!currentResults || currentResults.length === 0) {
                         dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">No locations found</div>';
                         dropdown.style.display = 'block';
                         return;
                     }
 
-                    results.forEach((item, index) => {
+                    currentResults.forEach((item, index) => {
+                        const name = item.display_name || item.description || '';
+                        const mainName = name.split(',')[0] || name;
                         const div = document.createElement('div');
                         div.className = 'p-2 border-bottom cursor-pointer nominatim-item text-truncate d-flex align-items-center gap-2';
                         div.style.cssText = 'cursor: pointer; transition: background 0.15s ease; border-color: #f1f5f9 !important; background: #ffffff; text-align: left;';
                         div.innerHTML = `<i class="feather-map-pin text-primary flex-shrink-0" style="font-size: 12px;"></i>
                                          <div class="text-truncate">
-                                             <div class="fw-semibold text-dark text-truncate" style="font-size: 11px;">${escapeHtml(item.display_name.split(',')[0])}</div>
-                                             <div class="text-muted fs-10 text-truncate">${escapeHtml(item.display_name)}</div>
+                                             <div class="fw-semibold text-dark text-truncate" style="font-size: 11px;">${escapeHtml(mainName)}</div>
+                                             <div class="text-muted fs-10 text-truncate">${escapeHtml(name)}</div>
                                          </div>`;
 
                         div.addEventListener('mouseenter', () => { highlightItem(index); });
@@ -635,13 +639,14 @@
                 const selectItem = (index) => {
                     if (index >= 0 && index < currentResults.length) {
                         const item = currentResults[index];
-                        inputEl.value = item.display_name;
+                        const displayName = item.display_name || item.description || '';
+                        inputEl.value = displayName;
                         closeDropdown();
                         if (typeof onSelectCallback === 'function') {
                             onSelectCallback({
                                 lat: parseFloat(item.lat),
-                                lng: parseFloat(item.lon),
-                                formatted_address: item.display_name
+                                lng: parseFloat(item.lon || item.lng),
+                                formatted_address: displayName
                             });
                         }
                     }
@@ -656,12 +661,23 @@
                     }
 
                     debounceTimer = setTimeout(() => {
-                        fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                        fetch('/api/maps/autocomplete?query=' + encodeURIComponent(query))
                             .then(res => res.json())
-                            .then(data => renderResults(data))
-                            .catch(err => {
-                                console.error('Nominatim search error:', err);
-                                closeDropdown();
+                            .then(data => {
+                                if (data && data.success && Array.isArray(data.predictions) && data.predictions.length > 0) {
+                                    renderResults(data.predictions);
+                                } else {
+                                    fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                                        .then(res => res.json())
+                                        .then(osmData => renderResults(osmData))
+                                        .catch(() => closeDropdown());
+                                }
+                            })
+                            .catch(() => {
+                                fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                                    .then(res => res.json())
+                                    .then(osmData => renderResults(osmData))
+                                    .catch(() => closeDropdown());
                             });
                     }, 300);
                 });
@@ -692,38 +708,45 @@
             };
         }
 
-        // Render Google map
+        // Render Leaflet map
         setTimeout(() => {
             if (hasCheckinCoords || hasCheckoutCoords || hasLocationLogs || hasGeofenceCoords) {
-                if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+                if (typeof L === 'undefined') {
                     return;
                 }
 
-                // Initialize map if not yet initialized
-                if (!detailDrawerMapObj) {
-                    @if($officeLat && $officeLng)
-                    const initCenter = { lat: {{ (float)$officeLat }}, lng: {{ (float)$officeLng }} };
-                    @elseif($wfhLat && $wfhLng)
-                    const initCenter = { lat: {{ (float)$wfhLat }}, lng: {{ (float)$wfhLng }} };
-                    @else
-                    const initCenter = { lat: 20.5937, lng: 78.9629 };
-                    @endif
+                @if($officeLat && $officeLng)
+                const initCenter = [{{ (float)$officeLat }}, {{ (float)$officeLng }}];
+                @elseif($wfhLat && $wfhLng)
+                const initCenter = [{{ (float)$wfhLat }}, {{ (float)$wfhLng }}];
+                @else
+                const initCenter = [20.5937, 78.9629];
+                @endif
 
-                    detailDrawerMapObj = new google.maps.Map(document.getElementById('detail-drawer-map'), {
-                        center: initCenter,
-                        zoom: 13,
-                        mapTypeControl: false,
-                        fullscreenControl: false,
-                        streetViewControl: false
-                    });
+                const mapEl = document.getElementById('detail-drawer-map');
+                if (!mapEl) return;
+
+                // Initialize map if not yet initialized
+                if (!detailDrawerMapObj || !mapEl._leaflet_id) {
+                    if (detailDrawerMapObj) {
+                        detailDrawerMapObj.remove();
+                        detailDrawerMapObj = null;
+                    }
+                    mapEl.innerHTML = '';
+
+                    detailDrawerMapObj = L.map('detail-drawer-map').setView(initCenter, 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '&copy; OpenStreetMap contributors'
+                    }).addTo(detailDrawerMapObj);
 
                     // Nominatim Autocomplete search logic for details drawer map (Hybrid OpenStreetMap Search)
                     const searchInput = document.getElementById('detail_drawer_map_search');
                     if (searchInput && window.initNominatimAutocomplete) {
                         window.initNominatimAutocomplete(searchInput, function(place) {
-                            const pos = { lat: place.lat, lng: place.lng };
-                            detailDrawerMapObj.setCenter(pos);
-                            detailDrawerMapObj.setZoom(15);
+                            const lat = parseFloat(place.lat);
+                            const lng = parseFloat(place.lng);
+                            detailDrawerMapObj.setView([lat, lng], 15);
                         });
 
                         searchInput.addEventListener('keypress', function(e) {
@@ -737,28 +760,38 @@
                 }
 
                 const pathLatLngs = [];
-                const bounds = new google.maps.LatLngBounds();
+                const allPoints = [];
+
+                const greenIcon = L.divIcon({
+                    className: 'custom-attendance-pin',
+                    html: `<div style="background-color: #10b981; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"><i class="feather-log-in" style="font-size: 12px;"></i></div>`,
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 13],
+                    popupAnchor: [0, -13]
+                });
+
+                const redIcon = L.divIcon({
+                    className: 'custom-attendance-pin',
+                    html: `<div style="background-color: #ef4444; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"><i class="feather-log-out" style="font-size: 12px;"></i></div>`,
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 13],
+                    popupAnchor: [0, -13]
+                });
 
                 // Add Check-In Marker
                 if (hasCheckinCoords) {
                     const checkinLatVal = parseFloat(checkinLat);
                     const checkinLngVal = parseFloat(checkinLng);
-                    const checkinLatLng = { lat: checkinLatVal, lng: checkinLngVal };
+                    const checkinLatLng = [checkinLatVal, checkinLngVal];
                     pathLatLngs.push(checkinLatLng);
-                    bounds.extend(checkinLatLng);
+                    allPoints.push(checkinLatLng);
                     
-                    const marker = new google.maps.Marker({
-                        position: checkinLatLng,
-                        map: detailDrawerMapObj,
-                        title: 'Check In Point',
-                        icon: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'
-                    });
+                    const marker = L.marker(checkinLatLng, {
+                        icon: greenIcon,
+                        title: 'Check In Point'
+                    }).addTo(detailDrawerMapObj).bindPopup(`<b>Check In Point</b><br>Time: ${checkinTime}<br>Lat: ${checkinLatVal.toFixed(6)}<br>Lng: ${checkinLngVal.toFixed(6)}`);
+                    
                     detailDrawerOverlays.push(marker);
-
-                    const infowindow = new google.maps.InfoWindow({
-                        content: `<b>Check In Point</b><br>Time: ${checkinTime}<br>Lat: ${checkinLatVal.toFixed(6)}<br>Lng: ${checkinLngVal.toFixed(6)}`
-                    });
-                    marker.addListener('click', () => infowindow.open(detailDrawerMapObj, marker));
                 }
 
                 // Add Location tracking Logs
@@ -767,31 +800,19 @@
                         if (log.lat && log.lng) {
                             const latVal = parseFloat(log.lat);
                             const lngVal = parseFloat(log.lng);
-                            const logLatLng = { lat: latVal, lng: lngVal };
+                            const logLatLng = [latVal, lngVal];
                             pathLatLngs.push(logLatLng);
-                            bounds.extend(logLatLng);
+                            allPoints.push(logLatLng);
 
-                            const circleMarker = new google.maps.Marker({
-                                position: logLatLng,
-                                map: detailDrawerMapObj,
-                                icon: {
-                                    path: google.maps.SymbolPath.CIRCLE,
-                                    fillColor: '#3b82f6',
-                                    fillOpacity: 0.8,
-                                    strokeColor: '#FFFFFF',
-                                    strokeWeight: 2,
-                                    scale: 6 // 6-pixel radius dot
-                                }
-                            });
+                            const circleMarker = L.circleMarker(logLatLng, {
+                                radius: 5,
+                                fillColor: '#3b82f6',
+                                color: '#ffffff',
+                                weight: 1.5,
+                                fillOpacity: 0.85
+                            }).addTo(detailDrawerMapObj).bindPopup(`<b>Location Log (Tracking)</b><br>Time: ${log.time || ''}<br>Lat: ${latVal.toFixed(6)}<br>Lng: ${lngVal.toFixed(6)}`);
+                            
                             detailDrawerOverlays.push(circleMarker);
-
-                            const infowindow = new google.maps.InfoWindow({
-                                content: `<b>Location Log (Tracking)</b><br>Time: ${log.time}<br>Lat: ${latVal.toFixed(6)}<br>Lng: ${lngVal.toFixed(6)}`
-                            });
-                            circleMarker.addListener('click', () => {
-                                infowindow.setPosition(logLatLng);
-                                infowindow.open(detailDrawerMapObj);
-                            });
                         }
                     });
                 }
@@ -800,97 +821,78 @@
                 if (hasCheckoutCoords) {
                     const checkoutLatVal = parseFloat(checkoutLat);
                     const checkoutLngVal = parseFloat(checkoutLng);
-                    const checkoutLatLng = { lat: checkoutLatVal, lng: checkoutLngVal };
+                    const checkoutLatLng = [checkoutLatVal, checkoutLngVal];
                     pathLatLngs.push(checkoutLatLng);
-                    bounds.extend(checkoutLatLng);
+                    allPoints.push(checkoutLatLng);
 
-                    const marker = new google.maps.Marker({
-                        position: checkoutLatLng,
-                        map: detailDrawerMapObj,
-                        title: 'Check Out Point',
-                        icon: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
-                    });
+                    const marker = L.marker(checkoutLatLng, {
+                        icon: redIcon,
+                        title: 'Check Out Point'
+                    }).addTo(detailDrawerMapObj).bindPopup(`<b>Check Out Point</b><br>Time: ${checkoutTime}<br>Lat: ${checkoutLatVal.toFixed(6)}<br>Lng: ${checkoutLngVal.toFixed(6)}`);
+                    
                     detailDrawerOverlays.push(marker);
-
-                    const infowindow = new google.maps.InfoWindow({
-                        content: `<b>Check Out Point</b><br>Time: ${checkoutTime}<br>Lat: ${checkoutLatVal.toFixed(6)}<br>Lng: ${checkoutLngVal.toFixed(6)}`
-                    });
-                    marker.addListener('click', () => infowindow.open(detailDrawerMapObj, marker));
                 }
 
                 // Add Polyline connecting all tracking path points
                 if (pathLatLngs.length >= 2) {
-                    const polyline = new google.maps.Polyline({
-                        path: pathLatLngs,
-                        geodesic: true,
-                        strokeColor: '#4f46e5',
-                        strokeOpacity: 0.8,
-                        strokeWeight: 4
-                    });
-                    polyline.setMap(detailDrawerMapObj);
+                    const polyline = L.polyline(pathLatLngs, {
+                        color: '#4f46e5',
+                        weight: 4,
+                        opacity: 0.85,
+                        dashArray: '4, 6'
+                    }).addTo(detailDrawerMapObj);
                     detailDrawerOverlays.push(polyline);
                 }
 
                 // Draw geofence threshold radius circles
                 @if($officeLat && $officeLng)
-                const officeGeofenceLat = {{ (float)$officeLat }};
-                const officeGeofenceLng = {{ (float)$officeLng }};
-                const officeGeofenceRadius = {{ $officeRad }};
-                const officePos = { lat: officeGeofenceLat, lng: officeGeofenceLng };
-                bounds.extend(officePos);
+                const officePos = [{{ (float)$officeLat }}, {{ (float)$officeLng }}];
+                allPoints.push(officePos);
 
-                const officeCircle = new google.maps.Circle({
-                    strokeColor: '#4f46e5',
-                    strokeOpacity: 0.8,
-                    strokeWeight: 2,
+                const officeCircle = L.circle(officePos, {
+                    color: '#4f46e5',
+                    weight: 2,
                     fillColor: '#4f46e5',
                     fillOpacity: 0.08,
-                    map: detailDrawerMapObj,
-                    center: officePos,
-                    radius: officeGeofenceRadius
-                });
+                    radius: {{ $officeRad }}
+                }).addTo(detailDrawerMapObj);
                 detailDrawerOverlays.push(officeCircle);
                 @endif
 
                 @if($wfhLat && $wfhLng)
-                const wfhGeofenceLat = {{ (float)$wfhLat }};
-                const wfhGeofenceLng = {{ (float)$wfhLng }};
-                const wfhGeofenceRadius = {{ $wfhRad }};
-                const wfhPos = { lat: wfhGeofenceLat, lng: wfhGeofenceLng };
-                bounds.extend(wfhPos);
+                const wfhPos = [{{ (float)$wfhLat }}, {{ (float)$wfhLng }}];
+                allPoints.push(wfhPos);
 
-                const wfhCircle = new google.maps.Circle({
-                    strokeColor: '#10b981',
-                    strokeOpacity: 0.8,
-                    strokeWeight: 2,
+                const wfhCircle = L.circle(wfhPos, {
+                    color: '#10b981',
+                    weight: 2,
                     fillColor: '#10b981',
                     fillOpacity: 0.08,
-                    map: detailDrawerMapObj,
-                    center: wfhPos,
-                    radius: wfhGeofenceRadius
-                });
+                    radius: {{ $wfhRad }}
+                }).addTo(detailDrawerMapObj);
                 detailDrawerOverlays.push(wfhCircle);
                 @endif
 
                 // Set View/Bounds
-                if (pathLatLngs.length > 0) {
-                    detailDrawerMapObj.fitBounds(bounds);
-                    if (pathLatLngs.length === 1) {
-                        detailDrawerMapObj.setZoom(15);
-                    }
+                detailDrawerMapObj.invalidateSize();
+                if (allPoints.length > 0) {
+                    const bounds = L.latLngBounds(allPoints);
+                    detailDrawerMapObj.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
                 } else {
-                    @if($officeLat && $officeLng)
-                    detailDrawerMapObj.setCenter({ lat: {{ (float)$officeLat }}, lng: {{ (float)$officeLng }} });
-                    detailDrawerMapObj.setZoom(15);
-                    @elseif($wfhLat && $wfhLng)
-                    detailDrawerMapObj.setCenter({ lat: {{ (float)$wfhLat }}, lng: {{ (float)$wfhLng }} });
-                    detailDrawerMapObj.setZoom(15);
-                    @endif
+                    detailDrawerMapObj.setView(initCenter, 13);
                 }
-
-                google.maps.event.trigger(detailDrawerMapObj, 'resize');
             }
         }, 300);
+    }
+
+    // Invalidate Leaflet size automatically once offcanvas finish slide animation
+    const detailDrawerEl = document.getElementById('attendanceRecordDetailDrawer');
+    if (detailDrawerEl) {
+        detailDrawerEl.addEventListener('shown.bs.offcanvas', function() {
+            if (detailDrawerMapObj) {
+                detailDrawerMapObj.invalidateSize();
+            }
+        });
     }
 
     // Attach invalidation listener on drawer open & handle live AJAX filters/search

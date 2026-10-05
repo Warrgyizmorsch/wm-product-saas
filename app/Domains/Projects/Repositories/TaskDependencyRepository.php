@@ -38,7 +38,7 @@ class TaskDependencyRepository implements TaskDependencyRepositoryInterface
     {
         return TaskDependency::query()
             ->where('project_id', $projectId)
-            ->get(['task_id', 'depends_on_task_id']);
+            ->get(['id', 'task_id', 'depends_on_task_id', 'dependency_type', 'lag_days']);
     }
 
     public function hasOpenDependenciesForMilestone(int $milestoneId): bool

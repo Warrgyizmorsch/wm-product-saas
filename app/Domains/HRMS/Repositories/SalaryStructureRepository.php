@@ -163,12 +163,28 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
         $salaryStructures = $salaryStructuresQuery->paginate(10, ['*'], 'struct_page')->withQueryString();
         $chartOfAccounts = \App\Domains\Accounting\Models\ChartOfAccount::orderBy('code', 'asc')->get();
 
+        $allStructuresForSimulatorQuery = SalaryStructure::with(['company', 'items.component'])
+            ->where('status', true);
+        if ($selectedPayGroup) {
+            $allStructuresForSimulatorQuery->where(function ($q) use ($selectedPayGroup) {
+                $q->where('pay_group_id', $selectedPayGroup->id)
+                  ->orWhereNull('pay_group_id');
+            });
+        }
+        $allStructuresForSimulator = $allStructuresForSimulatorQuery->get();
+        if ($allStructuresForSimulator->isEmpty()) {
+            $allStructuresForSimulator = SalaryStructure::with(['company', 'items.component'])
+                ->where('status', true)
+                ->get();
+        }
+
         return compact(
             'companies',
             'payGroups',
             'selectedPayGroup',
             'salaryComponents',
             'salaryStructures',
+            'allStructuresForSimulator',
             'recurringComponents',
             'adhocComponents',
             'chartOfAccounts'
@@ -190,12 +206,15 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
             if (isset($validated['components']) && is_array($validated['components'])) {
                 foreach ($validated['components'] as $componentId => $itemData) {
                     if (isset($itemData['calculation_type']) && $itemData['calculation_type'] !== 'not_included') {
-                        SalaryStructureItem::create([
-                            'salary_structure_id' => $salaryStructure->id,
-                            'salary_component_id' => $componentId,
-                            'calculation_type' => $itemData['calculation_type'],
-                            'value' => $itemData['value'] ?? 0,
-                        ]);
+                        $realComponentId = $this->resolveComponentId($componentId, $itemData, $salaryStructure->company_id, $salaryStructure->pay_group_id);
+                        if ($realComponentId) {
+                            SalaryStructureItem::create([
+                                'salary_structure_id' => $salaryStructure->id,
+                                'salary_component_id' => $realComponentId,
+                                'calculation_type' => $itemData['calculation_type'],
+                                'value' => ($itemData['calculation_type'] === 'balancing') ? 0 : ($itemData['value'] ?? 0),
+                            ]);
+                        }
                     }
                 }
             }
@@ -221,18 +240,58 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
             if (isset($validated['components']) && is_array($validated['components'])) {
                 foreach ($validated['components'] as $componentId => $itemData) {
                     if (isset($itemData['calculation_type']) && $itemData['calculation_type'] !== 'not_included') {
-                        SalaryStructureItem::create([
-                            'salary_structure_id' => $salaryStructure->id,
-                            'salary_component_id' => $componentId,
-                            'calculation_type' => $itemData['calculation_type'],
-                            'value' => $itemData['value'] ?? 0,
-                        ]);
+                        $realComponentId = $this->resolveComponentId($componentId, $itemData, $salaryStructure->company_id, $salaryStructure->pay_group_id);
+                        if ($realComponentId) {
+                            SalaryStructureItem::create([
+                                'salary_structure_id' => $salaryStructure->id,
+                                'salary_component_id' => $realComponentId,
+                                'calculation_type' => $itemData['calculation_type'],
+                                'value' => ($itemData['calculation_type'] === 'balancing') ? 0 : ($itemData['value'] ?? 0),
+                            ]);
+                        }
                     }
                 }
             }
 
             return true;
         });
+    }
+
+    protected function resolveComponentId(mixed $componentId, array $itemData, ?int $companyId, ?int $payGroupId): ?int
+    {
+        if (is_numeric($componentId) && (int)$componentId > 0) {
+            return (int)$componentId;
+        }
+
+        // Handle inline dynamic components created directly in structure form
+        if (!empty($itemData['name'])) {
+            $code = !empty($itemData['code']) 
+                ? strtoupper(trim($itemData['code'])) 
+                : strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $itemData['name']), 0, 8));
+
+            $existing = SalaryComponent::where('company_id', $companyId)
+                ->where('code', $code)
+                ->first();
+
+            if ($existing) {
+                return $existing->id;
+            }
+
+            $newComponent = SalaryComponent::create([
+                'company_id' => $companyId ?? (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+                'pay_group_id' => $payGroupId,
+                'name' => trim($itemData['name']),
+                'code' => $code,
+                'type' => in_array($itemData['type'] ?? '', ['earning', 'deduction']) ? $itemData['type'] : 'earning',
+                'calculation_type' => in_array($itemData['calculation_type'] ?? '', ['fixed', 'percentage_of_basic', 'percentage_of_ctc', 'balancing']) ? $itemData['calculation_type'] : 'fixed',
+                'is_adhoc' => false,
+                'status' => true,
+            ]);
+
+            return $newComponent->id;
+        }
+
+        return null;
     }
 
     public function destroyStructure(SalaryStructure $salaryStructure): bool

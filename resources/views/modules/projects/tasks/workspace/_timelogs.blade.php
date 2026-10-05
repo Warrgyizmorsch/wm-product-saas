@@ -113,8 +113,15 @@
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" inputType="time" name="end_time" :label="__('projects.end_time', ['default' => 'End Time'])" />
             </div>
-            <div class="col-12">
+            <div class="col-md-6 d-flex align-items-center">
                 <x-ui.odoo-form-ui type="checkbox" name="is_billable" value="1" id="isBillableSwitch" checked :label="__('projects.billable_time', ['default' => 'Billable to Client'])" />
+            </div>
+            <div class="col-md-6" id="hourlyRateGroup">
+                @php
+                    $currentMember = $project->members?->firstWhere('user_id', auth()->id());
+                    $defaultMemberRate = $currentMember?->rate_per_hour;
+                @endphp
+                <x-ui.odoo-form-ui type="input" inputType="number" name="hourly_rate" :label="__('projects.rate_per_hour', ['default' => 'Rate / Hour']) . ' (' . active_currency_symbol() . ')'" step="0.01" min="0" placeholder="e.g. 500.00" :value="$defaultMemberRate" />
             </div>
             <div class="col-12">
                 <x-ui.odoo-form-ui type="textarea" name="description" :label="__('projects.description', ['default' => 'Work Summary / Description'])" :rows="3" placeholder="{{ __('projects.describe_work_done', ['default' => 'Describe work performed...']) }}" />

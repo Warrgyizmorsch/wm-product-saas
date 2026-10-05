@@ -237,6 +237,11 @@ class BankStatementExtractionTest extends TestCase
 
         $response->assertRedirect();
         $this->assertCount(1, $this->reconciliation->refresh()->statementLines);
-        $this->assertSame(0, BankStatementUpload::where('bank_reconciliation_id', $this->reconciliation->id)->count());
+        // CSV imports now keep an upload record (provider file_import) so the
+        // whole import can be removed in one step; it never calls the PDF API.
+        $upload = BankStatementUpload::where('bank_reconciliation_id', $this->reconciliation->id)->sole();
+        $this->assertSame('file_import', $upload->provider);
+        $this->assertSame(BankStatementUpload::STATUS_COMPLETED, $upload->status);
+        $this->assertSame(1, $upload->extracted_count);
     }
 }

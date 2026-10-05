@@ -30,6 +30,31 @@ class OrgController extends Controller
         return view('modules.hrms.org-structure.org', $data);
     }
 
+    public function create()
+    {
+        return redirect()->route('hrms.org.index', ['tab' => 'legal-entities']);
+    }
+
+    public function createBusinessUnit()
+    {
+        return redirect()->route('hrms.org.index', ['tab' => 'business-units']);
+    }
+
+    public function createBranch()
+    {
+        return redirect()->route('hrms.org.index', ['tab' => 'branches']);
+    }
+
+    public function createDepartment()
+    {
+        return redirect()->route('hrms.org.index', ['tab' => 'departments']);
+    }
+
+    public function createDesignation()
+    {
+        return redirect()->route('hrms.org.index', ['tab' => 'designations']);
+    }
+
     public function storeCompany(Request $request)
     {
         $this->authorize('create', Company::class);
@@ -103,6 +128,21 @@ class OrgController extends Controller
         $this->orgRepository->destroyCompany($company);
 
         return redirect()->route('hrms.org.index', ['tab' => 'legal-entities'])->with('success', __('hrms.org.company_deleted'));
+    }
+
+    public function store(Request $request)
+    {
+        return $this->storeCompany($request);
+    }
+
+    public function update(Request $request, Company $company)
+    {
+        return $this->updateCompany($request, $company);
+    }
+
+    public function destroy(Request $request, Company $company)
+    {
+        return $this->destroyCompany($request, $company);
     }
 
     public function storeBusinessUnit(Request $request)
@@ -351,50 +391,7 @@ class OrgController extends Controller
         return redirect()->route('hrms.org.index', ['tab' => 'designations'])->with('success', __('hrms.org.desig_deleted'));
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Route aliases: web.php maps store/update/destroy → storeCompany etc.
-    // ─────────────────────────────────────────────────────────────────────────
-
-    public function create()
-    {
-        return redirect()->route('hrms.org.index');
-    }
-
-    public function store(\Illuminate\Http\Request $request)
-    {
-        return $this->storeCompany($request);
-    }
-
-    public function update(\Illuminate\Http\Request $request, \App\Domains\HRMS\Models\Company $company)
-    {
-        return $this->updateCompany($request, $company);
-    }
-
-    public function destroy(\App\Domains\HRMS\Models\Company $company)
-    {
-        return $this->destroyCompany($company);
-    }
-
-    public function createBusinessUnit()
-    {
-        return redirect()->route('hrms.org.index', ['tab' => 'business-units']);
-    }
-
-    public function createBranch()
-    {
-        return redirect()->route('hrms.org.index', ['tab' => 'branches']);
-    }
-
-    public function createDepartment()
-    {
-        return redirect()->route('hrms.org.index', ['tab' => 'departments']);
-    }
-
-    public function createDesignation()
-    {
-        return redirect()->route('hrms.org.index', ['tab' => 'designations']);
-    }
-
+    
     // ─────────────────────────────────────────────────────────────────────────
     // Salary Component (delegated to SalaryStructureController)
     // ─────────────────────────────────────────────────────────────────────────
@@ -422,7 +419,7 @@ class OrgController extends Controller
 
         \App\Domains\HRMS\Models\SalaryComponent::create($validated);
 
-        return redirect()->route('hrms.org.index')->with('success', 'Salary component created successfully.');
+        return redirect()->route('hrms.org.index')->with('success', __('hrms.salary.component_created_success'));
     }
 
     public function updateSalaryComponent(\Illuminate\Http\Request $request, \App\Domains\HRMS\Models\SalaryComponent $salaryComponent)
@@ -440,7 +437,7 @@ class OrgController extends Controller
 
         $salaryComponent->update($validated);
 
-        return redirect()->route('hrms.org.index')->with('success', 'Salary component updated successfully.');
+        return redirect()->route('hrms.org.index')->with('success', __('hrms.salary.component_updated_success'));
     }
 
     public function destroySalaryComponent(\Illuminate\Http\Request $request, \App\Domains\HRMS\Models\SalaryComponent $salaryComponent)
@@ -449,7 +446,7 @@ class OrgController extends Controller
 
         $salaryComponent->delete();
 
-        return redirect()->route('hrms.org.index')->with('success', 'Salary component deleted successfully.');
+        return redirect()->route('hrms.org.index')->with('success', __('hrms.salary.component_deleted_success'));
     }
 }
 

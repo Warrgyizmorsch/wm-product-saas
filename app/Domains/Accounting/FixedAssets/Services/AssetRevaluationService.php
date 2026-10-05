@@ -8,7 +8,8 @@ use App\Domains\Accounting\FixedAssets\Models\AssetRevaluation;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
-use App\Domains\Accounting\Support\AccountCode;
+use App\Domains\Accounting\Services\SystemAccountService;
+use App\Domains\Accounting\Support\SystemAccount;
 use App\Domains\HRMS\Models\Asset;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -22,12 +23,13 @@ use InvalidArgumentException;
  */
 class AssetRevaluationService
 {
-    private const FALLBACK_REVALUATION_RESERVE_CODE = AccountCode::REVALUATION_RESERVE;
-    private const FALLBACK_IMPAIRMENT_LOSS_CODE = AccountCode::IMPAIRMENT_LOSS;
+    private const FALLBACK_REVALUATION_RESERVE_KEY = SystemAccount::REVALUATION_RESERVE;
+    private const FALLBACK_IMPAIRMENT_LOSS_KEY = SystemAccount::IMPAIRMENT_LOSS;
 
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly SystemAccountService $systemAccounts,
         private readonly AssetDepreciationService $depreciation,
     ) {
     }
@@ -102,7 +104,7 @@ class AssetRevaluationService
             $category = $asset->category;
             $tenantId = $asset->tenant_id;
 
-            $fixedAssetAccount = $category?->chartOfAccount ?? $this->accounts->findByCode(AccountCode::FIXED_ASSETS, $tenantId);
+            $fixedAssetAccount = $category?->chartOfAccount ?? $this->systemAccounts->get(SystemAccount::FIXED_ASSETS, $tenantId);
             if ($fixedAssetAccount === null) {
                 throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: no fixed asset account configured.");
             }
@@ -111,9 +113,9 @@ class AssetRevaluationService
 
             if ($amount > 0) {
                 if ((float) $revaluation->revaluation_surplus_deficit > 0) {
-                    $reserveAccount = $this->accounts->findByCode(self::FALLBACK_REVALUATION_RESERVE_CODE, $tenantId);
+                    $reserveAccount = $this->systemAccounts->get(self::FALLBACK_REVALUATION_RESERVE_KEY, $tenantId);
                     if ($reserveAccount === null) {
-                        throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: revaluation reserve account (code " . self::FALLBACK_REVALUATION_RESERVE_CODE . ') not found.');
+                        throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: revaluation reserve account (code " . SystemAccount::templateCode(self::FALLBACK_REVALUATION_RESERVE_KEY) . ') not found.');
                     }
 
                     $lines = [
@@ -121,8 +123,8 @@ class AssetRevaluationService
                         ['chart_of_account_id' => $reserveAccount->id, 'credit' => $amount, 'description' => "Revaluation surplus - {$asset->asset_code}"],
                     ];
                 } else {
-                    $impairmentAccount = $this->accounts->findByCode(self::FALLBACK_IMPAIRMENT_LOSS_CODE, $tenantId)
-                        ?? $this->accounts->findByCode('5900', $tenantId);
+                    $impairmentAccount = $this->systemAccounts->get(self::FALLBACK_IMPAIRMENT_LOSS_KEY, $tenantId)
+                        ?? $this->systemAccounts->get(SystemAccount::OTHER_EXPENSE, $tenantId);
                     if ($impairmentAccount === null) {
                         throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: impairment loss account not found.");
                     }

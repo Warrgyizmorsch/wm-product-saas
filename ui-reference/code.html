@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-slate-50 antialiased" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ApexERP Enterprise - Accounting &amp; Financial Intelligence Dashboard</title>
+<!-- Tailwind CSS CDN with forms and container queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'monospace']
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              200: '#c7d2fe',
+              500: '#4f46e5',
+              600: '#4338ca',
+              700: '#3730a3',
+              800: '#312e81',
+              900: '#1e1b4b'
+            },
+            accent: {
+              50: '#f0fdf4',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857'
+            }
+          },
+          boxShadow: {
+            'soft-2xs': '0 1px 2px 0 rgba(15, 23, 42, 0.03)',
+            'soft-sm': '0 1px 2px 0 rgba(15, 23, 42, 0.05)',
+            'soft': '0 2px 4px -1px rgba(15, 23, 42, 0.06), 0 4px 6px -1px rgba(15, 23, 42, 0.08)',
+            'card': '0 0 0 1px rgba(226, 232, 240, 0.8), 0 1px 3px 0 rgba(15, 23, 42, 0.05)'
+          }
+        }
+      }
+    }
+  </script>
+<!-- Typography & Visual Refinements -->
+<style data-purpose="typography">
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    
+    .font-tabular {
+      font-feature-settings: 'tnum' on, 'zero' on;
+    }
+  </style>
+<style data-purpose="custom-scrollbars">
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="h-full flex overflow-hidden text-slate-800 bg-slate-50 font-sans selection:bg-brand-500 selection:text-white">
+<!-- BEGIN: LeftSidebar -->
+<aside class="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col justify-between select-none z-30" data-purpose="primary-sidebar">
+<!-- Top Branding & Workspace Selector -->
+<div class="flex flex-col">
+<!-- App Brand Logo -->
+<div class="h-16 flex items-center justify-between px-4 border-b border-slate-800/80 bg-slate-950/40">
+<div class="flex items-center space-x-2.5">
+<div class="h-8 w-8 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-brand-500/20 text-white font-bold text-lg">
+<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<span class="text-sm font-semibold tracking-tight text-white block leading-none">ApexERP Suite</span>
+<span class="text-[11px] font-medium text-slate-400 tracking-wide mt-1 block">Demo Tenant Enterprise</span>
+</div>
+</div>
+<button class="text-slate-400 hover:text-white p-1 rounded-md transition-colors" title="Collapse Sidebar" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</div>
+<!-- Current Fiscal Context Selector -->
+<div class="p-3">
+<div class="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/60 flex items-center justify-between hover:bg-slate-800 transition-colors cursor-pointer group">
+<div class="flex items-center space-x-2 min-w-0">
+<div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></div>
+<div class="truncate">
+<p class="text-xs font-semibold text-slate-200 truncate">HQ - Noida Hub</p>
+<p class="text-[10px] text-slate-400 truncate">FY 2026-2027 · Main Ledger</p>
+</div>
+</div>
+<svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-white flex-shrink-0 ml-1" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+</div>
+<!-- Navigation Hierarchy -->
+<nav class="flex-1 overflow-y-auto px-2 space-y-1 py-1 max-h-[calc(100vh-175px)] text-xs font-medium" data-purpose="module-navigation">
+<div class="px-2 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Core Financials</div>
+<!-- Active Module: Accounting -->
+<div class="space-y-0.5">
+<div class="flex items-center justify-between w-full px-2.5 py-2 text-white bg-slate-800 rounded-lg shadow-sm border border-slate-700/50">
+<div class="flex items-center space-x-2.5">
+<span class="p-1 rounded bg-brand-500/20 text-brand-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</span>
+<span class="font-semibold text-slate-100 text-[13px]">Accounting</span>
+</div>
+<svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<!-- Accounting Sub-items List -->
+<div class="pl-4 pr-1 py-1 space-y-0.5 border-l-2 border-brand-500/30 ml-4 my-1">
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md text-white bg-brand-600/90 font-semibold shadow-xs" href="#">
+<span class="flex items-center">
+<span class="w-1.5 h-1.5 rounded-full bg-white mr-2"></span>
+                Dashboard
+              </span>
+<span class="text-[10px] px-1.5 py-0.2 bg-brand-700 rounded text-brand-100 font-mono">Live</span>
+</a>
+<a class="flex items-center px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors" href="#">
+              Chart of Accounts
+            </a>
+<a class="flex items-center px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors" href="#">
+              Cost Centers
+            </a>
+<a class="flex items-center px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors" href="#">
+              Ledger Groups
+            </a>
+<a class="flex items-center px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors" href="#">
+              Fixed Asset Register
+            </a>
+<a class="flex items-center px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors" href="#">
+              Depreciation &amp; Write-offs
+            </a>
+<a class="flex items-center px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors" href="#">
+              Budgets &amp; Targets
+            </a>
+<a class="flex items-center px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors" href="#">
+              Journals &amp; Entries
+            </a>
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors" href="#">
+<span>Pending Approvals</span>
+<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">3</span>
+</a>
+<a class="flex items-center px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors" href="#">
+              Payment Vouchers
+            </a>
+<a class="flex items-center px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors" href="#">
+              Receipt Vouchers
+            </a>
+</div>
+</div>
+<div class="px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Enterprise Modules</div>
+<!-- Other Inactive Modules -->
+<a class="flex items-center px-2.5 py-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 rounded-lg transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          CRM &amp; Leads
+        </a>
+<a class="flex items-center px-2.5 py-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 rounded-lg transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          Sales &amp; Invoicing
+        </a>
+<a class="flex items-center px-2.5 py-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 rounded-lg transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          Inventory &amp; Stock
+        </a>
+<a class="flex items-center px-2.5 py-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 rounded-lg transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          Procurement &amp; Purchase
+        </a>
+<a class="flex items-center px-2.5 py-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 rounded-lg transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          Manufacturing &amp; Works
+        </a>
+<a class="flex items-center px-2.5 py-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 rounded-lg transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          HR &amp; Global Payroll
+        </a>
+<a class="flex items-center px-2.5 py-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 rounded-lg transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+          System Admin
+        </a>
+</nav>
+</div>
+<!-- Bottom Sidebar Status Widget -->
+<div class="p-3 border-t border-slate-800 bg-slate-950/60" data-purpose="sidebar-status-footer">
+<div class="flex items-center justify-between text-[11px] text-slate-400 mb-2">
+<span class="flex items-center">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
+          Cluster SYNC: OK
+        </span>
+<span class="font-mono text-slate-400">14ms</span>
+</div>
+<div class="w-full bg-slate-800 rounded-full h-1 mb-2">
+<div class="bg-brand-500 h-1 rounded-full" style="width: 82%"></div>
+</div>
+<div class="flex items-center justify-between text-[10px] text-slate-400">
+<span>ERP Cloud v4.8.2</span>
+<a class="hover:text-slate-300 underline" href="#">Docs &amp; API</a>
+</div>
+</div>
+</aside>
+<!-- END: LeftSidebar -->
+<!-- BEGIN: MainContentWrapper -->
+<div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50">
+<!-- BEGIN: TopGlobalHeader -->
+<header class="h-16 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between shadow-soft-sm flex-shrink-0 z-20" data-purpose="top-header">
+<!-- Left: Breadcrumb Navigation & Tenant Badge -->
+<div class="flex items-center space-x-3">
+<nav aria-label="Breadcrumb" class="flex items-center space-x-2 text-xs text-slate-500">
+<span class="hover:text-slate-800 cursor-pointer font-medium">Workspaces</span>
+<svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="hover:text-slate-800 cursor-pointer font-medium">Demo Tenant</span>
+<svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-slate-900 font-semibold bg-slate-100 px-2 py-0.5 rounded text-[11px] border border-slate-200">
+            Corporate HQ - Noida (FY 26-27)
+          </span>
+</nav>
+</div>
+<!-- Right: Global Actions, Quick Search, User Profile -->
+<div class="flex items-center space-x-3">
+<!-- Global Search Bar with Shortcut -->
+<div class="relative w-64">
+<input class="w-full text-xs pl-8 pr-12 py-1.5 bg-slate-100/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-500 focus:bg-white text-slate-700 placeholder-slate-400 transition-all" placeholder="Search ledger, voucher, account..." type="text"/>
+<svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<kbd class="absolute right-2 top-2 px-1.5 py-0.5 text-[9px] font-mono text-slate-400 bg-white border border-slate-200 rounded shadow-2xs">⌘K</kbd>
+</div>
+<!-- Currency Switcher Pill -->
+<div class="flex items-center px-2 py-1 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-md">
+<span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
+          INR (₹)
+        </div>
+<!-- Action: New Journal Entry -->
+<button class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 active:bg-brand-800 rounded-lg shadow-sm transition-all focus:ring-2 focus:ring-brand-500 focus:ring-offset-1" type="button">
+<svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+          New Journal
+        </button>
+<div class="h-4 w-px bg-slate-200 mx-1"></div>
+<!-- Notifications Bell -->
+<button class="relative p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors" title="Notifications" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
+</button>
+<!-- Help & Docs -->
+<button class="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors" title="Documentation" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+<!-- User Profile Avatar with Online Dot -->
+<div class="flex items-center pl-2 border-l border-slate-200">
+<div class="relative cursor-pointer group">
+<div class="w-8 h-8 rounded-full bg-slate-800 text-white text-xs font-semibold flex items-center justify-center ring-2 ring-slate-100 group-hover:ring-brand-400 transition-all">
+<span>VK</span>
+</div>
+<span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+</div>
+</div>
+</div>
+</header>
+<!-- END: TopGlobalHeader -->
+<!-- BEGIN: SecondaryActionBar / Context Bar -->
+<section class="bg-white border-b border-slate-200/80 px-6 py-2.5 flex flex-wrap items-center justify-between gap-4 flex-shrink-0" data-purpose="secondary-toolbar">
+<div class="flex items-center space-x-3">
+<h1 class="text-lg font-bold text-slate-900 tracking-tight">Accounting Dashboard</h1>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-mono">
+          Books Closed: Sep 2026
+        </span>
+</div>
+<!-- Quick Action Utilities -->
+<div class="flex items-center space-x-2">
+<!-- Live Sync Status Indicator -->
+<div class="flex items-center text-xs text-slate-500 mr-2 bg-slate-50 px-2.5 py-1 rounded border border-slate-200">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-2"></span>
+<span>Last sync <strong class="text-slate-700 font-mono font-medium">11:15 AM</strong> · Auto-sync on</span>
+<button class="ml-2 hover:text-brand-600" title="Trigger Instant Refresh">
+<svg class="w-3.5 h-3.5 text-slate-400 hover:text-slate-600" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</div>
+<!-- Export Dropdown -->
+<div class="relative inline-block text-left">
+<button class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors" type="button">
+<svg class="w-3.5 h-3.5 mr-1.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+            Export
+            <svg class="w-3 h-3 ml-1 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+<!-- Print Shortcut -->
+<button class="p-1.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-2xs" title="Print Accounting Overview" type="button">
+<svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+<!-- Customize View Button -->
+<button class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 border border-brand-200 hover:bg-brand-100/70 rounded-lg transition-colors" type="button">
+<svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+          Customize
+        </button>
+</div>
+</section>
+<!-- END: SecondaryActionBar -->
+<!-- BEGIN: MainScrollableCanvas -->
+<main class="flex-1 overflow-y-auto p-6 space-y-6" data-purpose="dashboard-body">
+<!-- BEGIN: FilterBarSection -->
+<section class="bg-white rounded-xl border border-slate-200/90 shadow-sm p-4 ring-1 ring-slate-900/5" data-purpose="audit-filter-controls">
+<div class="flex flex-wrap items-center justify-between gap-4">
+<!-- Filters Group with Pro-level Segmented Selectors -->
+<div class="flex flex-wrap items-center gap-3">
+<!-- Period Selector Chip -->
+<div class="flex flex-col">
+<span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Accounting Period</span>
+<div class="relative inline-flex items-center">
+<button class="inline-flex items-center space-x-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/90 hover:border-slate-300 text-slate-800 text-xs font-semibold px-3 py-1.5 rounded-lg shadow-soft-2xs transition-all focus:outline-none focus:ring-2 focus:ring-brand-500/20" type="button">
+<svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+<span>This Month (01 Oct 2026 – 02 Oct 2026)</span>
+<svg class="w-3 h-3 text-slate-400 ml-1" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</div>
+</div>
+<!-- Cost Center Selector Chip -->
+<div class="flex flex-col">
+<span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Cost Center</span>
+<div class="relative inline-flex items-center">
+<button class="inline-flex items-center space-x-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/90 hover:border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 rounded-lg shadow-soft-2xs transition-all focus:outline-none focus:ring-2 focus:ring-brand-500/20" type="button">
+<svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+<span>All Cost Centers (Consolidated)</span>
+<svg class="w-3 h-3 text-slate-400 ml-1" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</div>
+</div>
+<!-- Voucher Status Filter Chip -->
+<div class="flex flex-col">
+<span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Voucher Status</span>
+<div class="relative inline-flex items-center">
+<button class="inline-flex items-center space-x-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/90 hover:border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 rounded-lg shadow-soft-2xs transition-all focus:outline-none focus:ring-2 focus:ring-brand-500/20" type="button">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+<span>All Statuses (Posted &amp; Drafts)</span>
+<svg class="w-3 h-3 text-slate-400 ml-1" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</div>
+</div>
+<!-- Quick Action Segmented Pill Selector (Stripe/Ramp style) -->
+<div class="flex flex-col self-end">
+<span class="text-[10px] font-bold uppercase tracking-wider text-transparent mb-1 select-none">Timeline</span>
+<div class="inline-flex p-0.5 bg-slate-100 rounded-lg border border-slate-200/90 text-xs">
+<button class="px-2.5 py-1 text-[11px] font-medium rounded-md text-slate-600 hover:text-slate-900 transition-colors" type="button">Today</button>
+<button class="px-3 py-1 text-[11px] font-semibold rounded-md bg-slate-900 text-white shadow-sm transition-all" type="button">MTD</button>
+<button class="px-2.5 py-1 text-[11px] font-medium rounded-md text-slate-600 hover:text-slate-900 transition-colors" type="button">QTD</button>
+<button class="px-2.5 py-1 text-[11px] font-medium rounded-md text-slate-600 hover:text-slate-900 transition-colors" type="button">YTD (26-27)</button>
+</div>
+</div>
+</div>
+<!-- Primary Action & Reset Group -->
+<div class="flex items-center space-x-2 self-end pt-2 sm:pt-0">
+<button class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white rounded-lg text-xs font-medium shadow-sm transition-colors flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-slate-900/20" type="button">
+<svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span>Filter Ledger</span>
+</button>
+<button class="px-3 py-1.5 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-600 hover:text-slate-800 border border-slate-200/90 rounded-lg text-xs font-medium shadow-soft-2xs transition-colors" type="button">
+Reset
+</button>
+</div>
+</div>
+<!-- Comparative Snapshot Metadata Bar -->
+<div class="mt-3.5 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+<div class="flex items-center space-x-2">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-50 text-brand-700 border border-brand-200/60 font-mono">LIVE AUDIT</span>
+<span class="text-slate-400">·</span>
+<span>Current snapshot: <strong class="text-slate-800 font-medium">01 Oct 2026 – 02 Oct 2026 (2 days)</strong></span>
+<span class="text-slate-300">|</span>
+<span class="text-slate-500">Comparative: <span class="text-slate-600 font-medium">29 Sep 2026 – 30 Sep 2026</span></span>
+</div>
+<div class="flex items-center space-x-1.5">
+<span class="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Ledger Ref:</span>
+<span class="font-mono text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">GL-IN-NOI-2026-V1</span>
+</div>
+</div>
+</section>
+<!-- END: FilterBarSection -->
+<!-- BEGIN: KeyMetricsCards (4 Columns) -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5" data-purpose="executive-kpi-grid">
+<!-- Metric 1: Revenue -->
+<div class="bg-white rounded-xl border border-slate-200/90 shadow-sm ring-1 ring-slate-900/5 p-5 relative overflow-hidden flex flex-col justify-between hover:border-slate-300 hover:shadow transition-all group">
+<div>
+<div class="flex items-start justify-between mb-3">
+<span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Operating Revenue</span>
+<div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/80 group-hover:scale-105 transition-transform">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24"><path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+</div>
+<div class="text-3xl font-extrabold text-slate-900 tracking-tight font-tabular">
+              ₹0.00
+            </div>
+</div>
+<div class="mt-4 pt-3.5 border-t border-slate-100/80 flex items-center justify-between text-xs">
+<span class="inline-flex items-center text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+              No prior data vs ₹0.00
+            </span>
+<span class="text-[11px] text-slate-400 font-medium">Cycle: MTD</span>
+</div>
+</div>
+<!-- Metric 2: Operating Expenses -->
+<div class="bg-white rounded-xl border border-slate-200/90 shadow-sm ring-1 ring-slate-900/5 p-5 relative overflow-hidden flex flex-col justify-between hover:border-slate-300 hover:shadow transition-all group">
+<div>
+<div class="flex items-start justify-between mb-3">
+<span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Operating Expenses</span>
+<div class="w-9 h-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100/80 group-hover:scale-105 transition-transform">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24"><path d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+</div>
+<div class="text-3xl font-extrabold text-slate-900 tracking-tight font-tabular flex items-baseline">
+              -₹2,220<span class="text-xl text-slate-400 font-semibold ml-0.5">.00</span>
+</div>
+</div>
+<div class="mt-4 pt-3.5 border-t border-slate-100/80 flex items-center justify-between text-xs">
+<span class="inline-flex items-center space-x-1 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200/70 px-2 py-0.5 rounded-full">
+<span>▼ 175.8%</span>
+<span class="font-normal text-rose-600/80">vs ₹2,929.17</span>
+</span>
+<span class="text-[11px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">Controlled</span>
+</div>
+</div>
+<!-- Metric 3: Net Profit / Margin -->
+<div class="bg-white rounded-xl border border-slate-200/90 shadow-sm ring-1 ring-slate-900/5 p-5 relative overflow-hidden flex flex-col justify-between hover:border-slate-300 hover:shadow transition-all group">
+<div>
+<div class="flex items-start justify-between mb-3">
+<span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Net Accounting Profit</span>
+<div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/80 group-hover:scale-105 transition-transform">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+<div class="text-3xl font-extrabold text-emerald-600 tracking-tight font-tabular flex items-baseline">
+              ₹2,220<span class="text-xl text-emerald-500/80 font-semibold ml-0.5">.00</span>
+</div>
+</div>
+<div class="mt-4 pt-3.5 border-t border-slate-100/80 flex items-center justify-between text-xs">
+<span class="inline-flex items-center space-x-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full">
+<span>▲ 175.8%</span>
+<span class="font-normal text-emerald-600/80">vs -₹2,929.17</span>
+</span>
+<span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/50">Surplus</span>
+</div>
+</div>
+<!-- Metric 4: Cash & Bank Liquidity -->
+<div class="bg-white rounded-xl border border-slate-200/90 shadow-sm ring-1 ring-slate-900/5 p-5 relative overflow-hidden flex flex-col justify-between hover:border-slate-300 hover:shadow transition-all group">
+<div>
+<div class="flex items-start justify-between mb-3">
+<span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Cash &amp; Bank Liquidity</span>
+<div class="w-9 h-9 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center border border-teal-100/80 group-hover:scale-105 transition-transform">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+</div>
+<div class="text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight font-tabular flex items-baseline">
+              ₹1,618,675<span class="text-lg text-slate-400 font-semibold ml-0.5">.46</span>
+</div>
+</div>
+<div class="mt-4 pt-3.5 border-t border-slate-100/80 flex items-center justify-between text-xs">
+<span class="inline-flex items-center text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full">
+              13.9 months runway
+            </span>
+<a class="text-[11px] font-semibold text-brand-600 hover:text-brand-800 flex items-center hover:underline" href="#">
+<span>Reconcile</span>
+<svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</a>
+</div>
+</div>
+</section>
+<!-- END: KeyMetricsCards -->
+<!-- BEGIN: MidSectionChartsAndActions (2/3 + 1/3) -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-6" data-purpose="charts-and-approvals-row">
+<!-- Left: Interactive Financial Trend Visualization (2 Cols) -->
+<div class="lg:col-span-2 bg-white rounded-xl border border-slate-200/90 shadow-sm ring-1 ring-slate-900/5 p-6 flex flex-col justify-between" data-purpose="income-expense-trend">
+<div>
+<!-- Card Header with timeframe pills and link -->
+<div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+<div>
+<div class="flex items-center space-x-2">
+<h2 class="text-sm font-bold text-slate-900">Income vs Expense</h2>
+<span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200/60">6 Months Trend</span>
+</div>
+<p class="text-xs text-slate-500 mt-0.5">Historical comparison of operating burn vs inbound revenue</p>
+</div>
+<div class="flex items-center space-x-4">
+<!-- Legend -->
+<div class="flex items-center space-x-3 text-xs">
+<div class="flex items-center space-x-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-100"></span>
+<span class="text-slate-600 font-medium">Income</span>
+</div>
+<div class="flex items-center space-x-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-100"></span>
+<span class="text-slate-600 font-medium">Expense</span>
+</div>
+</div>
+<div class="h-3.5 w-px bg-slate-200"></div>
+<a class="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center group" href="#">
+<span>P&amp;L Statement</span>
+<svg class="w-3.5 h-3.5 ml-1 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</a>
+</div>
+</div>
+<!-- Financial Summary Quick Stats (Redesigned with hairline dividers & clear hierarchy) -->
+<div class="grid grid-cols-3 divide-x divide-slate-100 bg-slate-50/70 rounded-lg p-3 my-4 border border-slate-200/70 text-xs">
+<div class="px-3 first:pl-2">
+<span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Gross Profit</span>
+<span class="font-extrabold text-slate-800 text-sm font-tabular">₹0.00</span>
+</div>
+<div class="px-3">
+<span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Direct Income</span>
+<span class="font-extrabold text-slate-800 text-sm font-tabular">₹0.00</span>
+</div>
+<div class="px-3 last:pr-2">
+<span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Cost of Sales</span>
+<span class="font-extrabold text-slate-800 text-sm font-tabular">₹0.00</span>
+</div>
+</div>
+<!-- SVG Visual Representation matching image chart dynamics -->
+<div class="relative pt-3 pb-1">
+<div class="h-64 w-full flex flex-col justify-between">
+<!-- Chart grid and bars container -->
+<div class="relative h-56 w-full flex items-end">
+<!-- Grid Lines & Y-Axis Scale -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none text-[10px] font-mono text-slate-400 border-b border-slate-200">
+<div class="w-full flex items-center justify-between border-b border-slate-100 border-dashed pb-0.5">
+<span class="w-12 text-right">360,000</span>
+<div class="w-full h-px border-t border-slate-100 border-dashed ml-3"></div>
+</div>
+<div class="w-full flex items-center justify-between border-b border-slate-100 border-dashed pb-0.5">
+<span class="w-12 text-right">270,000</span>
+<div class="w-full h-px border-t border-slate-100 border-dashed ml-3"></div>
+</div>
+<div class="w-full flex items-center justify-between border-b border-slate-100 border-dashed pb-0.5">
+<span class="w-12 text-right">180,000</span>
+<div class="w-full h-px border-t border-slate-100 border-dashed ml-3"></div>
+</div>
+<div class="w-full flex items-center justify-between border-b border-slate-100 border-dashed pb-0.5">
+<span class="w-12 text-right">90,000</span>
+<div class="w-full h-px border-t border-slate-100 border-dashed ml-3"></div>
+</div>
+<div class="w-full flex items-center justify-between border-b border-slate-300 pb-0.5 font-bold text-slate-600">
+<span class="w-12 text-right">0</span>
+<div class="w-full h-px border-t border-slate-300 ml-3"></div>
+</div>
+<div class="w-full flex items-center justify-between text-rose-400">
+<span class="w-12 text-right">-90,000</span>
+<div class="w-full h-px border-t border-rose-100 border-dashed ml-3"></div>
+</div>
+</div>
+<!-- Bar Columns across 6 Months: May 2026 -> Oct 2026 -->
+<div class="relative w-full h-full flex items-end pl-14 pr-4 justify-between z-10">
+<!-- Month 1: May 2026 -->
+<div class="flex flex-col items-center flex-1 h-full justify-end group cursor-pointer">
+<div class="w-full flex justify-center space-x-1.5 items-end h-full pb-7">
+<div class="w-3.5 bg-emerald-400/80 rounded-t-sm h-[1%] transition-all group-hover:bg-emerald-500"></div>
+<div class="w-3.5 bg-rose-400/80 rounded-t-sm h-[1%] transition-all group-hover:bg-rose-500"></div>
+</div>
+<span class="text-[11px] font-medium text-slate-500 mt-2">May 2026</span>
+</div>
+<!-- Month 2: Jun 2026 -->
+<div class="flex flex-col items-center flex-1 h-full justify-end group cursor-pointer">
+<div class="w-full flex justify-center space-x-1.5 items-end h-full pb-7">
+<div class="w-3.5 bg-emerald-500 rounded-t-sm h-[4%] transition-all group-hover:brightness-110"></div>
+<div class="w-3.5 bg-rose-400/80 rounded-t-sm h-[2%] transition-all group-hover:bg-rose-500"></div>
+</div>
+<span class="text-[11px] font-medium text-slate-500 mt-2">Jun 2026</span>
+</div>
+<!-- Month 3: Jul 2026 -->
+<div class="flex flex-col items-center flex-1 h-full justify-end group cursor-pointer">
+<div class="w-full flex justify-center space-x-1.5 items-end h-full pb-7">
+<div class="w-3.5 bg-emerald-500 rounded-t-sm h-[5%] transition-all group-hover:brightness-110"></div>
+<div class="w-3.5 bg-rose-500 rounded-t-sm h-[12%] transition-all group-hover:brightness-110"></div>
+</div>
+<span class="text-[11px] font-medium text-slate-500 mt-2">Jul 2026</span>
+</div>
+<!-- Month 4: Aug 2026 (Large Expense Spike) -->
+<div class="flex flex-col items-center flex-1 h-full justify-end group relative cursor-pointer">
+<div class="w-full flex justify-center space-x-1.5 items-end h-full pb-7">
+<div class="w-3.5 bg-emerald-500 rounded-t-sm h-[2%] transition-all"></div>
+<div class="w-3.5 bg-rose-500 rounded-t-sm h-[88%] shadow-xs transition-all group-hover:bg-rose-600" title="Aug 2026: ₹315,000 Expense"></div>
+</div>
+<span class="text-[11px] font-semibold text-slate-800 mt-2">Aug 2026</span>
+</div>
+<!-- Month 5: Sep 2026 (Balanced High Operations) -->
+<div class="flex flex-col items-center flex-1 h-full justify-end group cursor-pointer">
+<div class="w-full flex justify-center space-x-1.5 items-end h-full pb-7">
+<div class="w-3.5 bg-emerald-500 rounded-t-sm h-[45%] shadow-xs transition-all group-hover:bg-emerald-600" title="Sep 2026 Income: ₹162,000"></div>
+<div class="w-3.5 bg-rose-500 rounded-t-sm h-[45%] shadow-xs transition-all group-hover:bg-rose-600" title="Sep 2026 Expense: ₹162,000"></div>
+</div>
+<span class="text-[11px] font-semibold text-slate-800 mt-2">Sep 2026</span>
+</div>
+<!-- Month 6: Oct 2026 (Current Month) -->
+<div class="flex flex-col items-center flex-1 h-full justify-end group cursor-pointer">
+<div class="w-full flex justify-center space-x-1.5 items-end h-full pb-7">
+<div class="w-3.5 bg-emerald-500 rounded-t-sm h-[2%] transition-all"></div>
+<div class="w-3.5 bg-rose-500 rounded-t-sm h-[2%] transition-all"></div>
+</div>
+<span class="text-[11px] font-bold text-brand-600 mt-2 flex items-center bg-brand-50 px-2 py-0.5 rounded-full border border-brand-200/60">
+                        Oct 2026
+                        <span class="w-1.5 h-1.5 rounded-full bg-brand-600 ml-1.5 animate-pulse"></span>
+</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+<span class="flex items-center space-x-1.5">
+<svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span>Chart values calibrated in INR (Standard Enterprise Basis)</span>
+</span>
+<span class="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600">Accrual Accounting Method</span>
+</div>
+</div>
+<!-- Right: Actionable Pending Approvals & Bank Accounts (1 Col) -->
+<div class="space-y-6">
+<!-- Pending Approvals Widget -->
+<div class="bg-white rounded-xl border border-slate-200/90 shadow-sm ring-1 ring-slate-900/5 p-5" data-purpose="pending-approvals-card">
+<div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
+<div class="flex items-center space-x-2">
+<span class="flex h-2 w-2 relative">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+</span>
+<h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">Pending Approvals</h3>
+</div>
+<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 font-mono">3 Items</span>
+</div>
+<div class="divide-y divide-slate-100 mt-1">
+<!-- Item 1 -->
+<div class="py-2.5 flex items-center justify-between group hover:bg-slate-50/50 -mx-2 px-2 rounded-lg transition-colors">
+<div>
+<div class="flex items-center space-x-2">
+<span class="text-xs font-bold text-slate-900 font-mono">JV-2026-089</span>
+<span class="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded font-medium">Tax Provision</span>
+</div>
+<p class="text-[11px] text-slate-500 mt-0.5"><strong class="text-slate-800 font-medium">₹45,000.00</strong> · Auth by S. Sharma</p>
+</div>
+<div class="flex items-center space-x-1">
+<button class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center justify-center border border-emerald-200/60 transition-colors shadow-2xs" title="Quick Approve" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</button>
+<button class="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center transition-colors shadow-2xs" title="View details" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</button>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="py-2.5 flex items-center justify-between group hover:bg-slate-50/50 -mx-2 px-2 rounded-lg transition-colors">
+<div>
+<div class="flex items-center space-x-2">
+<span class="text-xs font-bold text-slate-900 font-mono">PV-2026-143</span>
+<span class="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded font-medium">Vendor Payout</span>
+</div>
+<p class="text-[11px] text-slate-500 mt-0.5"><strong class="text-slate-800 font-medium">₹112,400.00</strong> · Noida AWS Inf.</p>
+</div>
+<div class="flex items-center space-x-1">
+<button class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center justify-center border border-emerald-200/60 transition-colors shadow-2xs" title="Quick Approve" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</button>
+<button class="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center transition-colors shadow-2xs" title="View details" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</button>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="py-2.5 flex items-center justify-between group hover:bg-slate-50/50 -mx-2 px-2 rounded-lg transition-colors">
+<div>
+<div class="flex items-center space-x-2">
+<span class="text-xs font-bold text-slate-900 font-mono">AD-2026-004</span>
+<span class="text-[10px] px-1.5 py-0.2 bg-rose-50 text-rose-700 border border-rose-200/50 rounded font-medium">Asset Write-off</span>
+</div>
+<p class="text-[11px] text-slate-500 mt-0.5"><strong class="text-slate-800 font-medium">₹2,220.00</strong> · Hardware Depr.</p>
+</div>
+<div class="flex items-center space-x-1">
+<button class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center justify-center border border-emerald-200/60 transition-colors shadow-2xs" title="Quick Approve" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</button>
+<button class="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center transition-colors shadow-2xs" title="View details" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</button>
+</div>
+</div>
+</div>
+<button class="w-full mt-3 py-2 text-center text-xs font-semibold text-brand-700 hover:text-brand-800 bg-brand-50 hover:bg-brand-100/70 border border-brand-200/60 rounded-lg transition-colors flex items-center justify-center space-x-1" type="button">
+<span>Go to Approval Center (3)</span>
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+<!-- Cash & Bank Accounts Breakdown -->
+<div class="bg-white rounded-xl border border-slate-200/90 shadow-sm ring-1 ring-slate-900/5 p-5" data-purpose="bank-liquidity-summary">
+<div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
+<h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">Primary Bank Accounts</h3>
+<a class="text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline flex items-center" href="#">
+<span>Add Bank</span>
+<svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</a>
+</div>
+<div class="mt-3.5 space-y-4">
+<!-- Bank 1 -->
+<div class="p-2.5 rounded-lg border border-slate-100 bg-slate-50/50">
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center space-x-2">
+<div class="w-6 h-6 rounded bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">H</div>
+<span class="font-semibold text-slate-900">HDFC Corporate Current</span>
+</div>
+<span class="font-mono font-bold text-slate-900 text-sm">₹1,240,675.46</span>
+</div>
+<div class="flex items-center justify-between text-[11px] text-slate-400 mt-2">
+<span class="font-mono">A/C •••• 9920</span>
+<span class="inline-flex items-center text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 font-medium text-[10px]">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1"></span>
+                    Reconciled today
+                  </span>
+</div>
+<div class="w-full bg-slate-200/80 rounded-full h-1.5 mt-2">
+<div class="bg-teal-500 h-1.5 rounded-full" style="width: 76%"></div>
+</div>
+</div>
+<!-- Bank 2 -->
+<div class="p-2.5 rounded-lg border border-slate-100 bg-slate-50/50">
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center space-x-2">
+<div class="w-6 h-6 rounded bg-indigo-700 text-white font-bold text-[10px] flex items-center justify-center">I</div>
+<span class="font-semibold text-slate-900">ICICI Escrow &amp; Tax Reserve</span>
+</div>
+<span class="font-mono font-bold text-slate-900 text-sm">₹378,000.00</span>
+</div>
+<div class="flex items-center justify-between text-[11px] text-slate-400 mt-2">
+<span class="font-mono">A/C •••• 4402</span>
+<span class="text-slate-500 text-[10px]">Reconciled Sep 30</span>
+</div>
+<div class="w-full bg-slate-200/80 rounded-full h-1.5 mt-2">
+<div class="bg-indigo-500 h-1.5 rounded-full" style="width: 24%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- END: MidSectionChartsAndActions -->
+<!-- BEGIN: LedgerDataTableSection -->
+<section class="bg-white rounded-xl border border-slate-200/90 shadow-sm ring-1 ring-slate-900/5 overflow-hidden" data-purpose="ledger-transactions-table">
+<!-- Table Header and Sub-actions -->
+<div class="p-5 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-4">
+<div>
+<h2 class="text-sm font-bold text-slate-900">Recent Ledger Postings &amp; Voucher Activity</h2>
+<p class="text-xs text-slate-500 mt-0.5">Real-time transactional audit trail for FY 2026-2027</p>
+</div>
+<div class="flex items-center space-x-2">
+<!-- Filter Table by Type -->
+<div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+<button class="px-2.5 py-1 bg-white font-semibold text-slate-800 rounded-md shadow-2xs">All (24)</button>
+<button class="px-2.5 py-1 font-medium text-slate-600 hover:text-slate-900">Journals</button>
+<button class="px-2.5 py-1 font-medium text-slate-600 hover:text-slate-900">Payments</button>
+<button class="px-2.5 py-1 font-medium text-slate-600 hover:text-slate-900">Receipts</button>
+</div>
+<!-- Quick Table Search -->
+<input class="text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-500 w-44" placeholder="Search entries..." type="text"/>
+</div>
+</div>
+<!-- Semantic Table Element -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse" id="accounting-journal-table">
+<thead>
+<tr class="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+<th class="py-3 px-4" scope="col">Voucher No</th>
+<th class="py-3 px-4" scope="col">Date</th>
+<th class="py-3 px-4" scope="col">Account / Ledger Head</th>
+<th class="py-3 px-4" scope="col">Cost Center</th>
+<th class="py-3 px-4" scope="col">Type</th>
+<th class="py-3 px-4 text-right" scope="col">Debit (INR)</th>
+<th class="py-3 px-4 text-right" scope="col">Credit (INR)</th>
+<th class="py-3 px-4 text-center" scope="col">Status</th>
+<th class="py-3 px-4 text-right" scope="col">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 text-xs font-normal">
+<!-- Row 1: Direct Expense Row from Current Snapshot -->
+<tr class="hover:bg-slate-50/70 transition-colors">
+<td class="py-3 px-4 font-mono font-semibold text-brand-700">JV-2026-1002</td>
+<td class="py-3 px-4 text-slate-600 font-mono">02 Oct 2026</td>
+<td class="py-3 px-4">
+<div class="font-semibold text-slate-900">Operational Software Subscriptions</div>
+<div class="text-[11px] text-slate-400">Ledger: Operating Overhead #5400</div>
+</td>
+<td class="py-3 px-4 text-slate-600">Noida Corp HQ</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 font-mono">Journal</span>
+</td>
+<td class="py-3 px-4 text-right font-mono font-semibold text-slate-900">2,220.00</td>
+<td class="py-3 px-4 text-right font-mono text-slate-400">—</td>
+<td class="py-3 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
+                    Posted
+                  </span>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-slate-400 hover:text-slate-700 p-1" title="Options" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</td>
+</tr>
+<!-- Row 2: Balancing Cash Bank Entry -->
+<tr class="hover:bg-slate-50/70 transition-colors">
+<td class="py-3 px-4 font-mono font-semibold text-brand-700">PV-2026-0988</td>
+<td class="py-3 px-4 text-slate-600 font-mono">01 Oct 2026</td>
+<td class="py-3 px-4">
+<div class="font-semibold text-slate-900">HDFC Corporate Operating Bank</div>
+<div class="text-[11px] text-slate-400">Contra Transfer #1010</div>
+</td>
+<td class="py-3 px-4 text-slate-600">Central Treasury</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 font-mono">Payment</span>
+</td>
+<td class="py-3 px-4 text-right font-mono text-slate-400">—</td>
+<td class="py-3 px-4 text-right font-mono font-semibold text-slate-900">2,220.00</td>
+<td class="py-3 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
+                    Posted
+                  </span>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-slate-400 hover:text-slate-700 p-1" title="Options" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</td>
+</tr>
+<!-- Row 3: Pending Entry -->
+<tr class="hover:bg-slate-50/70 transition-colors bg-amber-50/20">
+<td class="py-3 px-4 font-mono font-semibold text-amber-700">JV-2026-1003</td>
+<td class="py-3 px-4 text-slate-600 font-mono">02 Oct 2026</td>
+<td class="py-3 px-4">
+<div class="font-semibold text-slate-900">Direct GST Withholding Liability</div>
+<div class="text-[11px] text-slate-400">Statutory Tax Payable #2210</div>
+</td>
+<td class="py-3 px-4 text-slate-600">Noida Corp HQ</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-800 font-mono">Approval Req</span>
+</td>
+<td class="py-3 px-4 text-right font-mono font-semibold text-slate-900">45,000.00</td>
+<td class="py-3 px-4 text-right font-mono font-semibold text-slate-900">45,000.00</td>
+<td class="py-3 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
+                    Pending
+                  </span>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-slate-400 hover:text-slate-700 p-1" title="Options" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</td>
+</tr>
+<!-- Row 4: Historical Month-end Close -->
+<tr class="hover:bg-slate-50/70 transition-colors">
+<td class="py-3 px-4 font-mono font-semibold text-brand-700">RV-2026-0419</td>
+<td class="py-3 px-4 text-slate-600 font-mono">30 Sep 2026</td>
+<td class="py-3 px-4">
+<div class="font-semibold text-slate-900">Enterprise SaaS Retainer - Client Acc.</div>
+<div class="text-[11px] text-slate-400">Trade Receivables #1200</div>
+</td>
+<td class="py-3 px-4 text-slate-600">Enterprise Direct</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-800 font-mono">Receipt</span>
+</td>
+<td class="py-3 px-4 text-right font-mono font-semibold text-slate-900">162,000.00</td>
+<td class="py-3 px-4 text-right font-mono text-slate-400">—</td>
+<td class="py-3 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
+                    Audited
+                  </span>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-slate-400 hover:text-slate-700 p-1" title="Options" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer / Pagination -->
+<div class="px-5 py-3 bg-slate-50/80 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+<div>Showing <strong class="text-slate-700">1 to 4</strong> of <strong class="text-slate-700">24</strong> recorded entries</div>
+<div class="flex items-center space-x-1">
+<button class="px-2.5 py-1 border border-slate-200 rounded bg-white text-slate-400 cursor-not-allowed">Previous</button>
+<button class="px-2.5 py-1 border border-brand-500 rounded bg-brand-50 font-bold text-brand-700">1</button>
+<button class="px-2.5 py-1 border border-slate-200 rounded bg-white text-slate-600 hover:bg-slate-100">2</button>
+<button class="px-2.5 py-1 border border-slate-200 rounded bg-white text-slate-600 hover:bg-slate-100">3</button>
+<button class="px-2.5 py-1 border border-slate-200 rounded bg-white text-slate-600 hover:bg-slate-100">Next</button>
+</div>
+</div>
+</section>
+<!-- END: LedgerDataTableSection -->
+</main>
+<!-- END: MainScrollableCanvas -->
+<!-- BEGIN: SystemGlobalFooter -->
+<footer class="h-10 bg-white border-t border-slate-200 px-6 flex items-center justify-between text-[11px] text-slate-500 flex-shrink-0" data-purpose="enterprise-footer">
+<div class="flex items-center space-x-4">
+<span class="flex items-center">
+<span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
+          System Engine: <strong class="text-slate-700 font-mono ml-1">v4.8.2-enterprise</strong>
+</span>
+<span class="text-slate-300">|</span>
+<span>SOC-2 Type II &amp; IFRS Compliant</span>
+<span class="text-slate-300">|</span>
+<span class="font-mono text-slate-400">Tenant Hash: TN-90214-NOIDA</span>
+</div>
+<div class="flex items-center space-x-4">
+<a class="hover:text-brand-600 transition-colors" href="#">Audit Logs</a>
+<a class="hover:text-brand-600 transition-colors" href="#">Shortcut Keys</a>
+<a class="hover:text-brand-600 transition-colors" href="#">Support Portal</a>
+<span class="text-slate-400 font-mono">11:16 AM UTC+5:30</span>
+</div>
+</footer>
+<!-- END: SystemGlobalFooter -->
+</div>
+<!-- END: MainContentWrapper -->
+<!-- Interactivity Script for Tab Controls / Filters -->
+<script data-purpose="dashboard-interactions">
+    document.addEventListener('DOMContentLoaded', () => {
+      // Handle keyboard shortcut for search bar focus
+      window.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+          e.preventDefault();
+          const searchInput = document.querySelector('input[placeholder*="Search"]');
+          if (searchInput) {
+            searchInput.focus();
+          }
+        }
+      });
+    });
+  </script>
+</body></html>

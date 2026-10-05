@@ -5,6 +5,7 @@ namespace App\Domains\Platform\Services;
 use App\Core\Tenant\TenantProvisioner;
 use App\Domains\Platform\Models\SubscriptionPayment;
 use App\Domains\Platform\Models\TenantModule;
+use App\Domains\Platform\Models\TenantSubscription;
 use App\Http\Middleware\EnsureTenantModuleAccess;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +29,8 @@ class TenantModuleService
     /**
      * Every gated module with its state for this tenant:
      * 'plan' (included in the plan), 'addon' (bought, installed),
-     * 'uninstalled' (bought, reinstall is free) or 'available' (not bought).
+     * 'uninstalled' (bought, reinstall is free) or 'available' (not bought —
+     * including a recurring add-on no longer on the bill, which must be bought again).
      *
      * @return array<string, string>
      */
@@ -36,18 +38,37 @@ class TenantModuleService
     {
         $planFeatures = $tenant->planCatalog?->features;
         $rows = $tenant->addonModules->keyBy('module');
+        $billed = null;
 
         $states = [];
         foreach (EnsureTenantModuleAccess::GATED_MODULES as $module) {
+            $row = $rows->get($module);
+
+            if ($row?->billing === TenantModule::BILLING_RECURRING && ! $row->isActive()) {
+                $billed ??= $this->billedModules($tenant);
+                $row = in_array($module, $billed, true) ? $row : null;
+            }
+
             $states[$module] = match (true) {
                 $planFeatures === null || in_array($module, $planFeatures, true) => 'plan',
-                $rows->get($module)?->isActive() === true => 'addon',
-                $rows->has($module) => 'uninstalled',
+                $row?->isActive() === true => 'addon',
+                $row !== null => 'uninstalled',
                 default => 'available',
             };
         }
 
         return $states;
+    }
+
+    /** @return list<string> add-ons the tenant's live subscription is paying for */
+    private function billedModules(Tenant $tenant): array
+    {
+        return TenantSubscription::query()
+            ->withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenant->id)
+            ->whereIn('status', TenantSubscription::LIVE_STATUSES)
+            ->latest('id')
+            ->first()?->modules ?? [];
     }
 
     /** @return list<string> modules $module cannot work without */

@@ -14,6 +14,7 @@ use App\Domains\Projects\Services\ProjectMemberService;
 use App\Domains\Projects\Services\TaskService;
 use App\Domains\Projects\Support\TaskDrawerPayload;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Support\InlineEdit\HandlesInlineFieldUpdates;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -33,6 +34,50 @@ class TaskController extends Controller
         private readonly ActivityLogService $activity,
         private readonly ProjectMemberService $members,
     ) {
+    }
+
+    public function index(Request $request): View
+    {
+        $this->authorize('viewAny', Project::class);
+
+        $filters = $request->only(['search', 'status', 'priority', 'project_id', 'assignee_id']);
+
+        $query = Task::query()
+            ->with(['project', 'taskList', 'milestone', 'assignee', 'reviewer'])
+            ->where('tenant_id', require_tenant_id());
+
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('task_code', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['priority'])) {
+            $query->where('priority', $filters['priority']);
+        }
+
+        if (!empty($filters['project_id'])) {
+            $query->where('project_id', $filters['project_id']);
+        }
+
+        if (!empty($filters['assignee_id'])) {
+            $query->where('assignee_id', $filters['assignee_id']);
+        }
+
+        $tasks = $query->latest('id')->paginate(15)->withQueryString();
+        $statuses = Task::STATUSES;
+        $priorities = Task::PRIORITIES;
+        $projects = Project::query()->where('tenant_id', require_tenant_id())->orderBy('name')->get();
+        $assignees = User::query()->where('tenant_id', require_tenant_id())->orderBy('name')->get();
+
+        return view('modules.projects.tasks.index', compact('tasks', 'filters', 'statuses', 'priorities', 'projects', 'assignees'));
     }
 
     /**

@@ -48,6 +48,14 @@ class ChartOfAccountRepository implements ChartOfAccountRepositoryInterface
         return $query->first();
     }
 
+    public function findBySystemKey(string $systemKey, int $tenantId): ?ChartOfAccount
+    {
+        return ChartOfAccount::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('system_key', $systemKey)
+            ->first();
+    }
+
     public function create(array $data): ChartOfAccount
     {
         return ChartOfAccount::create($data);

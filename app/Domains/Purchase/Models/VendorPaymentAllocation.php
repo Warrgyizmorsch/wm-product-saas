@@ -27,6 +27,21 @@ class VendorPaymentAllocation extends BaseModel
         'allocated_amount' => 'decimal:2',
     ];
 
+    /**
+     * Backstop for every payment path (web, API, bank reconciliation): money
+     * can't be applied to a bill held by 3-way match.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $allocation): void {
+            $status = VendorBill::query()->withoutGlobalScopes()->whereKey($allocation->vendor_bill_id)->value('status');
+
+            if ($status === VendorBill::STATUS_ON_HOLD) {
+                throw new \InvalidArgumentException('This bill is on hold for a PO/GRN mismatch and cannot be paid until it is released.');
+            }
+        });
+    }
+
     public function payment(): BelongsTo
     {
         return $this->belongsTo(VendorPayment::class, 'vendor_payment_id');

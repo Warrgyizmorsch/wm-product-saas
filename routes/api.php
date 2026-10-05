@@ -20,6 +20,11 @@ Route::prefix('auth')->name('auth.')->group(function () {
         ->middleware('throttle:5,1')
         ->name('login');
 
+    // Authenticated profile & permissions route
+    Route::get('/me', [LoginController::class, 'apiMe'])
+        ->middleware('auth:sanctum')
+        ->name('me');
+
     // Authenticated logout route to revoke token
     Route::post('/logout', [LoginController::class, 'apiLogout'])
         ->middleware('auth:sanctum')

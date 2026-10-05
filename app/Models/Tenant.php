@@ -31,6 +31,8 @@ class Tenant extends Model
     public const SUBSCRIPTION_ACTIVE = 'active';
     public const SUBSCRIPTION_PAST_DUE = 'past_due';
     public const SUBSCRIPTION_CANCELLED = 'cancelled';
+    // Grace ran out or a cancelled period ended: users can still sign in, but only billing works.
+    public const SUBSCRIPTION_SUSPENDED = 'suspended';
 
     protected $fillable = [
         'owner_user_id',
@@ -107,12 +109,19 @@ class Tenant extends Model
             self::SUBSCRIPTION_ACTIVE => 'Active',
             self::SUBSCRIPTION_PAST_DUE => 'Past Due',
             self::SUBSCRIPTION_CANCELLED => 'Cancelled',
+            self::SUBSCRIPTION_SUSPENDED => 'Suspended',
         ];
     }
 
     public function isAccessible(): bool
     {
         return in_array($this->status, self::accessibleStatuses(), true);
+    }
+
+    /** Subscription lapsed: everything but billing is locked until it's renewed (EnsureBillingActive). */
+    public function isBillingLocked(): bool
+    {
+        return $this->subscription_status === self::SUBSCRIPTION_SUSPENDED;
     }
 
     public function owner(): BelongsTo

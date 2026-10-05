@@ -15,6 +15,7 @@ use App\Domains\HRMS\Services\ExitDocumentationService;
 use App\Domains\HRMS\Services\FnFCalculationService;
 use App\Domains\HRMS\Services\HrmsScopeService;
 use App\Models\User;
+use App\Services\Notification\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -173,17 +174,82 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
             $employee->update(['employee_stage' => 'Notice Period']);
         }
 
+        // Dispatch notifications on Exit creation
+        try {
+            if ($validated['initiated_by'] === 'employee') {
+                $employee->loadMissing('reportingManager');
+                if ($employee->reportingManager) {
+                    NotificationService::sendToEmployee(
+                        $employee->reportingManager,
+                        'Resignation Request Submitted',
+                        "{$employee->full_name} has submitted a resignation request with preferred LWD: {$exit->preferred_lwd}.",
+                        route('hrms.exits.index'),
+                        'hrms',
+                        'resignation_submitted',
+                        'feather-user-minus'
+                    );
+                }
+
+                NotificationService::sendToHrAdmins(
+                    'New Resignation Request',
+                    "{$employee->full_name} has submitted a resignation request (Preferred LWD: {$exit->preferred_lwd}).",
+                    route('hrms.exits.index'),
+                    'resignation_hr_alert',
+                    'feather-user-minus'
+                );
+            } else {
+                NotificationService::sendToEmployee(
+                    $employee,
+                    'Offboarding Clearance Initiated',
+                    "Your exit and offboarding clearance workflow has been initiated.",
+                    route('hrms.exits.index'),
+                    'hrms',
+                    'exit_initiated',
+                    'feather-user-x'
+                );
+            }
+        } catch (\Throwable $e) {
+            // Suppress notification errors
+        }
+
         return $exit;
     }
 
     public function approveManager(EmployeeExit $exit, array $validated, ?int $userId): bool
     {
-        return $exit->update([
+        $updated = $exit->update([
             'status' => 'pending_hr',
             'manager_recommended_lwd' => $validated['manager_recommended_lwd'] ?? $exit->preferred_lwd,
             'manager_remarks' => $validated['manager_remarks'] ?? null,
             'approved_by' => $userId,
         ]);
+
+        try {
+            $exit->loadMissing('employee');
+            if ($exit->employee) {
+                NotificationService::sendToEmployee(
+                    $exit->employee,
+                    'Resignation Approved by Manager',
+                    "Your manager has approved your resignation request. It is now awaiting HR approval.",
+                    route('hrms.exits.index'),
+                    'hrms',
+                    'resignation_manager_approved',
+                    'feather-check-circle'
+                );
+            }
+
+            NotificationService::sendToHrAdmins(
+                'Resignation Manager Approved',
+                "Manager approval completed for {$exit->employee?->full_name}'s resignation (Recommended LWD: {$exit->manager_recommended_lwd}).",
+                route('hrms.exits.index'),
+                'resignation_hr_pending',
+                'feather-clock'
+            );
+        } catch (\Throwable $e) {
+            // Suppress notification errors
+        }
+
+        return $updated;
     }
 
     public function approveHr(EmployeeExit $exit, array $validated, ?int $userId, int $tenantId): bool
@@ -209,15 +275,59 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
 
         $exit->employee->update(['employee_stage' => 'Notice Period']);
 
+        try {
+            $exit->loadMissing('employee');
+            if ($exit->employee) {
+                NotificationService::sendToEmployee(
+                    $exit->employee,
+                    'Resignation Approved by HR — Clearance Active',
+                    "Your resignation is officially approved with Approved LWD: {$exit->approved_lwd}. Department clearance items are now active.",
+                    route('hrms.exits.index'),
+                    'hrms',
+                    'resignation_hr_approved',
+                    'feather-check-circle'
+                );
+            }
+
+            NotificationService::sendToHrAdmins(
+                'Exit Clearance In-Progress',
+                "Departmental clearances active for {$exit->employee?->full_name} (Approved LWD: {$exit->approved_lwd}).",
+                route('hrms.exits.index'),
+                'clearance_in_progress',
+                'feather-clipboard'
+            );
+        } catch (\Throwable $e) {
+            // Suppress notification errors
+        }
+
         return true;
     }
 
     public function rejectExit(EmployeeExit $exit, ?string $reason): bool
     {
-        return $exit->update([
+        $rejected = $exit->update([
             'status' => 'rejected',
             'hr_remarks' => $reason,
         ]);
+
+        try {
+            $exit->loadMissing('employee');
+            if ($exit->employee) {
+                NotificationService::sendToEmployee(
+                    $exit->employee,
+                    'Resignation Request Rejected',
+                    "Your resignation request has been rejected. Reason: " . ($reason ?: 'Not specified'),
+                    route('hrms.exits.index'),
+                    'hrms',
+                    'resignation_rejected',
+                    'feather-x-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            // Suppress notification errors
+        }
+
+        return $rejected;
     }
 
     public function clearItem(EmployeeExitClearance $item, array $validated, ?int $userId): bool
@@ -277,6 +387,31 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
             'employee_stage' => 'Relieved',
             'date_of_exit' => $exit->approved_lwd ?? $exit->preferred_lwd ?? now()->format('Y-m-d'),
         ]);
+
+        try {
+            $exit->loadMissing('employee');
+            if ($exit->employee) {
+                NotificationService::sendToEmployee(
+                    $exit->employee,
+                    'Full & Final Settlement Settled',
+                    "Your Full & Final Settlement has been processed and paid via {$validated['payment_mode']}. Exit certificates are now generated.",
+                    route('hrms.exits.index'),
+                    'hrms',
+                    'fnf_settled',
+                    'feather-award'
+                );
+            }
+
+            NotificationService::sendToHrAdmins(
+                'Employee Relieved & FnF Settled',
+                "FnF settlement completed and employee {$exit->employee?->full_name} marked Relieved.",
+                route('hrms.exits.index'),
+                'fnf_completed_hr',
+                'feather-check-circle'
+            );
+        } catch (\Throwable $e) {
+            // Suppress notification errors
+        }
 
         return true;
     }

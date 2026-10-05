@@ -337,4 +337,14 @@ class FakeModuleGateway implements PaymentGateway
     {
         throw new \LogicException('Not used.');
     }
+
+    public function cancelSubscription(TenantSubscription $subscription, bool $atCycleEnd): void
+    {
+        throw new \LogicException('Not used.');
+    }
+
+    public function fetchSubscription(TenantSubscription $subscription): array
+    {
+        throw new \LogicException('Not used.');
+    }
 }

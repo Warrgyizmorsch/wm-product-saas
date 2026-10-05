@@ -38,7 +38,7 @@
                 ['id' => 'tab-activity', 'label' => __('projects.activity'), 'icon' => 'feather-activity', 'active' => $activeTab === 'activity'],
             ];
         @endphp
-        <x-ui.horizontal-tabs id="milestoneWorkspaceTabs" :tabs="$workspaceTabs" />
+        <x-ui.horizontal-tabs id="milestoneWorkspaceTabs" :tabs="$workspaceTabs" :syncUrl="true" />
 
         <div class="tab-content mt-3">
             <div class="tab-pane fade {{ $activeTab === 'overview' ? 'show active' : '' }}" id="tab-overview"
@@ -62,6 +62,7 @@
 
     @if ($canManageMilestones)
         @include('modules.projects.milestones._modal')
+        @include('modules.projects.milestones._delete_modal')
         @include('modules.projects.milestones._drawer')
     @endif
 

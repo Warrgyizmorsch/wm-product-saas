@@ -9,6 +9,8 @@ use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\ProjectDocument;
 use App\Domains\Projects\Models\ProjectMember;
+use App\Domains\Projects\Models\ProjectReview;
+use App\Domains\Projects\Models\ChangeRequest;
 use App\Domains\Projects\Models\Task;
 use App\Domains\Projects\Models\TaskList;
 use App\Domains\Projects\Requests\StoreProjectRequest;
@@ -164,6 +166,12 @@ class ProjectController extends Controller
         $canCreateIssues = auth()->user()->can('create', [Issue::class, $project]);
         $canViewDocuments = auth()->user()->can('viewAny', [ProjectDocument::class, $project]);
         $canUploadDocuments = auth()->user()->can('create', [ProjectDocument::class, $project]);
+        $canViewReviews = auth()->user()->can('viewAny', [ProjectReview::class, $project]);
+        $canCreateReviews = auth()->user()->can('create', [ProjectReview::class, $project]);
+        $canViewCRs = auth()->user()->can('viewAny', [ChangeRequest::class, $project]);
+        $canCreateCRs = auth()->user()->can('create', [ChangeRequest::class, $project]);
+        $canViewBilling = auth()->user()->can('viewBilling', $project);
+        $canGenerateInvoice = auth()->user()->can('generateInvoice', $project);
 
         $members = $this->members->list($project);
         $activeMembers = ($canManageMembers || $canManageMilestones || $canManageTaskLists || $canCreateTasks || $canUpdateProject || $canCreateIssues)
@@ -188,6 +196,26 @@ class ProjectController extends Controller
             ? $project->documents()->with(['uploader', 'attachable'])->latest()->get()
             : collect();
 
+        $reviews = $canViewReviews
+            ? $project->reviews()->with(['reviewer', 'creator', 'documents'])->latest('review_date')->latest('id')->get()
+            : collect();
+
+        $changeRequests = $canViewCRs
+            ? $project->changeRequests()->with(['requester', 'approver', 'creator', 'review'])->latest('id')->get()
+            : collect();
+
+        $billingService = app(\App\Domains\Projects\Services\ProjectBillingService::class);
+        $billingSummary = $canViewBilling ? $billingService->getBillingSummary($project) : [];
+        $unbilledTimeLogs = ($canViewBilling && $canGenerateInvoice) ? $billingService->getUnbilledTimeLogs($project) : collect();
+        $unbilledMilestones = ($canViewBilling && $canGenerateInvoice) ? $billingService->getUnbilledMilestones($project) : collect();
+        $serviceProducts = ($canViewBilling && $canGenerateInvoice)
+            ? \App\Domains\Inventory\Models\Product::where('tenant_id', $project->tenant_id)
+                ->where('item_type', 'Service')
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get()
+            : collect();
+
         $taskFilters = array_filter(
             $request->only(['search', 'status', 'priority', 'assignee_id']),
             fn ($value) => trim((string) $value) !== '',
@@ -207,6 +235,17 @@ class ProjectController extends Controller
             'canCreateIssues'     => $canCreateIssues,
             'canViewDocuments'    => $canViewDocuments,
             'canUploadDocuments'  => $canUploadDocuments,
+            'canViewReviews'      => $canViewReviews,
+            'canCreateReviews'    => $canCreateReviews,
+            'canViewCRs'          => $canViewCRs,
+            'canCreateCRs'        => $canCreateCRs,
+            'canViewBilling'      => $canViewBilling,
+            'canGenerateInvoice'  => $canGenerateInvoice,
+            'canCloseProject'     => auth()->user()->can('close', $project),
+            'billingSummary'      => $billingSummary,
+            'unbilledTimeLogs'    => $unbilledTimeLogs,
+            'unbilledMilestones'  => $unbilledMilestones,
+            'serviceProducts'     => $serviceProducts,
             'statusTransitions'   => $canUpdateProject ? $this->projects->availableStatusTransitions($project) : [],
             'customers'           => $canUpdateProject ? Customer::query()->orderBy('name')->get() : collect(),
             'activeMemberOptions' => $activeMembers->pluck('user'),
@@ -219,6 +258,8 @@ class ProjectController extends Controller
             'allTasks'            => $allTasks->keyBy('id'),
             'issues'              => $issues,
             'documents'           => $documents,
+            'reviews'             => $reviews,
+            'changeRequests'      => $changeRequests,
             'taskFilters'         => $taskFilters,
             'hasActiveTaskFilters' => $hasActiveTaskFilters,
             'taskStatuses'        => Task::STATUSES,

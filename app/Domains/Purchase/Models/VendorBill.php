@@ -16,6 +16,13 @@ class VendorBill extends BaseModel
 {
     use BelongsToCompany, BelongsToBranch, HasFactory;
 
+    /** Held by 3-way match: not in the ledger and not payable until released. */
+    public const STATUS_ON_HOLD = 'On Hold';
+
+    public const MATCH_MATCHED = 'matched';
+    public const MATCH_EXCEPTION = 'exception';
+    public const MATCH_NOT_APPLICABLE = 'not_applicable';
+
     protected $table = 'vendor_bills';
 
     protected $fillable = [
@@ -43,7 +50,13 @@ class VendorBill extends BaseModel
         'vendor_id',
         'bill_date',
         'due_date',
-        'status', // Draft, Posted, Partially Paid, Paid, Cancelled
+        'status', // Draft, Posted, Partially Paid, Paid, Cancelled, On Hold
+        'match_status',
+        'match_details',
+        'match_checked_at',
+        'hold_released_by',
+        'hold_released_at',
+        'hold_release_reason',
         'subtotal',
         'tax_amount',
         'adjustment',
@@ -56,6 +69,9 @@ class VendorBill extends BaseModel
     ];
 
     protected $casts = [
+        'match_details' => 'array',
+        'match_checked_at' => 'datetime',
+        'hold_released_at' => 'datetime',
         'bill_date' => 'date',
         'due_date' => 'date',
         'freight_amount' => 'decimal:2',
@@ -111,6 +127,16 @@ class VendorBill extends BaseModel
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function holdReleasedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'hold_released_by')->withoutGlobalScope('tenant');
+    }
+
+    public function isOnHold(): bool
+    {
+        return $this->status === self::STATUS_ON_HOLD;
     }
 
     public function getTotalAmountAttribute(): float

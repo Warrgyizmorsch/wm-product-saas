@@ -41,7 +41,9 @@ class GoogleCalendarApiController extends Controller
     public function events(Request $request): JsonResponse
     {
         $limit = min((int)$request->input('limit', 50), 100);
-        $events = $this->calendarService->getUpcomingEvents(auth()->id(), $limit);
+        $userId = $request->input('user_id') ? (int)$request->input('user_id') : auth()->id();
+        $token = $request->input('token') ?: $request->input('access_token');
+        $events = $this->calendarService->getUpcomingEvents($userId, $limit, $token);
 
         return response()->json([
             'success' => true,
@@ -68,6 +70,9 @@ class GoogleCalendarApiController extends Controller
             'deal_id'              => 'nullable|exists:crm_deals,id',
             'attendees'            => 'nullable|array',
             'attendees.*'          => 'nullable|email',
+            'token'                => 'nullable|string',
+            'access_token'         => 'nullable|string',
+            'user_id'              => 'nullable',
         ]);
 
         $tenantId = tenant_id() ?? (auth()->user()?->tenant_id ?? 1);
@@ -108,6 +113,8 @@ class GoogleCalendarApiController extends Controller
             'create_meet_link' => $createMeetLink,
             'lead_id'          => $validated['lead_id'] ?? null,
             'deal_id'          => $validated['deal_id'] ?? null,
+            'token'            => $validated['token'] ?? $validated['access_token'] ?? $request->input('token'),
+            'user_id'          => $validated['user_id'] ?? $request->input('user_id'),
         ]);
 
         $followupType = $createMeetLink ? 'Meeting' : 'Call';

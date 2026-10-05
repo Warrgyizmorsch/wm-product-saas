@@ -22,6 +22,7 @@ class CustomerPayment extends BaseModel
         'payment_date',
         'amount',
         'payment_method',
+        'bank_account_id',
         'reference_no',
         'status',
         'notes'

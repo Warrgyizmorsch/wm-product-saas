@@ -13,6 +13,8 @@ interface ChartOfAccountRepositoryInterface
 
     public function findByCode(string $code, int $tenantId, ?int $ignoreId = null): ?ChartOfAccount;
 
+    public function findBySystemKey(string $systemKey, int $tenantId): ?ChartOfAccount;
+
     public function create(array $data): ChartOfAccount;
 
     public function update(int $id, array $data): ChartOfAccount;

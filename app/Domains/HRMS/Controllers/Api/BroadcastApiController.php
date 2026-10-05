@@ -93,6 +93,19 @@ class BroadcastApiController extends Controller
 
         $broadcasts = $query->latest('published_at')->paginate($request->integer('per_page', 10));
 
+        $isHrAdmin = $this->isHrAdmin();
+        $broadcasts->getCollection()->transform(function ($b) use ($isHrAdmin) {
+            $b->capabilities = [
+                'can_view'        => true,
+                'can_comment'     => (bool) ($b->allow_comments ?? true),
+                'can_react'       => true,
+                'can_acknowledge' => (bool) ($b->is_acknowledgement_required ?? false),
+                'can_edit'        => $isHrAdmin,
+                'can_delete'      => $isHrAdmin,
+            ];
+            return $b;
+        });
+
         $unreadCount = 0;
         if ($employee) {
             $unreadCount = BroadcastReceipt::where('tenant_id', $tenantId)
@@ -123,6 +136,19 @@ class BroadcastApiController extends Controller
             ->with(['creator', 'receipts'])
             ->latest('id')
             ->paginate($request->integer('per_page', 15));
+
+        $isHrAdmin = $this->isHrAdmin();
+        $broadcasts->getCollection()->transform(function ($b) use ($isHrAdmin) {
+            $b->capabilities = [
+                'can_view'        => true,
+                'can_comment'     => (bool) ($b->allow_comments ?? true),
+                'can_react'       => true,
+                'can_acknowledge' => (bool) ($b->is_acknowledgement_required ?? false),
+                'can_edit'        => $isHrAdmin,
+                'can_delete'      => $isHrAdmin,
+            ];
+            return $b;
+        });
 
         return $this->sendSuccess($broadcasts, 'Management broadcasts list retrieved successfully.');
     }
@@ -178,6 +204,16 @@ class BroadcastApiController extends Controller
         if ($employee) {
             $this->broadcastService->markRead($broadcast, $employee->id);
         }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $broadcast->capabilities = [
+            'can_view'        => true,
+            'can_comment'     => (bool) ($broadcast->allow_comments ?? true),
+            'can_react'       => true,
+            'can_acknowledge' => (bool) ($broadcast->is_acknowledgement_required ?? false),
+            'can_edit'        => $isHrAdmin,
+            'can_delete'      => $isHrAdmin,
+        ];
 
         return $this->sendSuccess($broadcast, 'Broadcast details retrieved successfully.');
     }

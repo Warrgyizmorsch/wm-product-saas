@@ -6,42 +6,32 @@
     'placeholder' => null,
     'disabled' => false,
     'required' => false,
-    'helperText' => null
+    'helperText' => null,
+    'stacked' => false,   // Label above the field instead of the label column
 ])
 
-<div class="mb-3">
+{{-- Layout (label column, spacing, 36px control) comes from .ax-form-row in public/assets/css/apex-ui.css. --}}
+@php($fieldId = $attributes->get('id') ?? $name)
+
+<div class="ax-field">
+<div @class(['ax-form-row' => $label, 'ax-form-row-stacked' => $label && $stacked])>
     @if($label)
-        <div class="row align-items-center">
-            <div class="col-md-4">
-                <label for="{{ $attributes->get('id') ?? $name }}" class="form-label fw-semibold fs-12 text-uppercase mb-0 text-dark" style="{{ $required ? 'color: #b91c1c !important;' : '' }}">
-                    {{ $label }} @if($required)<span class="text-danger">*</span>@endif
-                </label>
-            </div>
-            <div class="col-md-8">
-                <input type="{{ $type }}" 
-                       name="{{ $name }}" 
-                       id="{{ $attributes->get('id') ?? $name }}" 
-                       value="{{ $value }}" 
-                       placeholder="{{ $placeholder }}" 
-                       {{ $disabled ? 'disabled' : '' }} 
-                       {{ $required ? 'required' : '' }} 
-                       {{ $attributes->class(['form-control erp-premium-input']) }}>
-                @if($helperText)
-                    <small class="form-text text-muted fs-11 mt-1 d-block">{{ $helperText }}</small>
-                @endif
-            </div>
-        </div>
-    @else
-        <input type="{{ $type }}" 
-               name="{{ $name }}" 
-               id="{{ $attributes->get('id') ?? $name }}" 
-               value="{{ $value }}" 
-               placeholder="{{ $placeholder }}" 
-               {{ $disabled ? 'disabled' : '' }} 
-               {{ $required ? 'required' : '' }} 
+        <label for="{{ $fieldId }}" class="ax-form-label">
+            {{ $label }}@if($required)<span class="ax-required">*</span>@endif
+        </label>
+    @endif
+    <div class="ax-form-control">
+        <input type="{{ $type }}"
+               name="{{ $name }}"
+               id="{{ $fieldId }}"
+               value="{{ $value }}"
+               placeholder="{{ $placeholder }}"
+               {{ $disabled ? 'disabled' : '' }}
+               {{ $required ? 'required' : '' }}
                {{ $attributes->class(['form-control erp-premium-input']) }}>
         @if($helperText)
             <small class="form-text text-muted fs-11 mt-1 d-block">{{ $helperText }}</small>
         @endif
-    @endif
+    </div>
+</div>
 </div>

@@ -20,6 +20,10 @@ class IssuePolicy
 
     public function create(User $user, Project $project): bool
     {
+        if ($project->isClosed()) {
+            return false;
+        }
+
         return $this->authorizeOnProject($user, $project, 'projects.issues.create');
     }
 
@@ -30,22 +34,38 @@ class IssuePolicy
 
     public function update(User $user, Issue $issue): bool
     {
+        if ($issue->project?->isClosed()) {
+            return false;
+        }
+
         return $this->authorizeOnIssue($user, $issue, 'projects.issues.edit')
             || $this->authorizeOnIssue($user, $issue, 'projects.issues.update');
     }
 
     public function resolve(User $user, Issue $issue): bool
     {
+        if ($issue->project?->isClosed()) {
+            return false;
+        }
+
         return $this->authorizeOnIssue($user, $issue, 'projects.issues.resolve');
     }
 
     public function delete(User $user, Issue $issue): bool
     {
+        if ($issue->project?->isClosed()) {
+            return false;
+        }
+
         return $this->authorizeOnIssue($user, $issue, 'projects.issues.delete');
     }
 
     public function retest(User $user, Issue $issue): bool
     {
+        if ($issue->project?->isClosed()) {
+            return false;
+        }
+
         return $this->authorizeOnIssue($user, $issue, 'projects.issues.retest');
     }
 

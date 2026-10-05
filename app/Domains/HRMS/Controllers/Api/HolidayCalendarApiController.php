@@ -51,7 +51,8 @@ class HolidayCalendarApiController extends Controller
         }
 
         return $user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hrms.holidays.manage');
+            || $user->hasHrPermission('hrms.holidays.manage')
+            || $user->hasHrPermission('hrms.holiday_calendar.manage');
     }
 
     /**

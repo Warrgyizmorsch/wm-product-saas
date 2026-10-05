@@ -29,6 +29,9 @@ use App\Domains\HRMS\Controllers\Api\RecruitmentApiController;
 use App\Domains\HRMS\Controllers\Api\EmployeeProfileRequestApiController;
 use App\Domains\HRMS\Controllers\Api\SopApiController;
 use App\Domains\HRMS\Controllers\Api\GoalApiController;
+use App\Domains\HRMS\Controllers\Api\Feedback360ApiController;
+use App\Domains\HRMS\Controllers\Api\BiometricDeviceApiController;
+use App\Domains\HRMS\Controllers\Api\ExpensePolicyApiController;
 use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
 /*
@@ -457,6 +460,7 @@ Route::prefix('api/hrms/attendance')
         Route::post('/manual', [AttendanceApiController::class, 'storeManual'])->name('manual.store');
         Route::delete('/date/{date}', [AttendanceApiController::class, 'destroyDate'])->name('destroy-date');
         Route::post('/track-location', [AttendanceApiController::class, 'trackLocation'])->name('track-location');
+        Route::get('/employee/{employee}', [AttendanceApiController::class, 'getEmployeeLocationLogs'])->name('employee-logs');
     });
 
 // Public Webhook route for ADMS devices
@@ -893,7 +897,7 @@ Route::prefix('api/hrms/goals')
         // Summary & Metrics
         Route::get('/summary', [GoalApiController::class, 'summary'])->name('summary');
 
-        // Goals CRUD & Listings
+        // Goals CRUD & Tree
         Route::get('/', [GoalApiController::class, 'index'])->name('index');
         Route::post('/', [GoalApiController::class, 'store'])->name('store');
         Route::get('/alignment-tree', [GoalApiController::class, 'alignmentTree'])->name('alignment-tree');
@@ -902,13 +906,103 @@ Route::prefix('api/hrms/goals')
         Route::put('/{id}', [GoalApiController::class, 'update'])->name('update');
         Route::delete('/{id}', [GoalApiController::class, 'destroy'])->name('destroy');
 
-        // Check-in
+        // Check-ins
         Route::post('/{id}/check-in', [GoalApiController::class, 'checkIn'])->name('check-in');
 
-        // Cycles & Categories
+        // Goal Cycles Master
         Route::get('/cycles', [GoalApiController::class, 'indexCycles'])->name('cycles.index');
+        Route::post('/cycles', [GoalApiController::class, 'storeCycle'])->name('cycles.store');
+        Route::delete('/cycles/{id}', [GoalApiController::class, 'destroyCycle'])->name('cycles.destroy');
+
+        // Goal Strategic Categories / Pillars Master
         Route::get('/categories', [GoalApiController::class, 'indexCategories'])->name('categories.index');
+        Route::post('/categories', [GoalApiController::class, 'storeCategory'])->name('categories.store');
+        Route::delete('/categories/{id}', [GoalApiController::class, 'destroyCategory'])->name('categories.destroy');
     });
+
+// ==========================================
+// 26. 360-DEGREE FEEDBACK API ROUTES
+// ==========================================
+Route::prefix('api/hrms/feedback-360')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.feedback360.')
+    ->group(function () {
+        // 1. Hub Summary & Cycles Listing
+        Route::get('/', [Feedback360ApiController::class, 'index'])->name('index');
+        Route::post('/cycles', [Feedback360ApiController::class, 'store'])->name('cycles.store');
+        Route::get('/cycles/{id}', [Feedback360ApiController::class, 'show'])->name('cycles.show');
+        Route::put('/cycles/{id}', [Feedback360ApiController::class, 'update'])->name('cycles.update');
+        Route::delete('/cycles/{id}', [Feedback360ApiController::class, 'destroy'])->name('cycles.destroy');
+        Route::post('/cycles/{id}/launch', [Feedback360ApiController::class, 'launch'])->name('cycles.launch');
+        Route::post('/cycles/{id}/participants', [Feedback360ApiController::class, 'addParticipants'])->name('cycles.participants');
+        Route::post('/cycles/{id}/bulk-remind', [Feedback360ApiController::class, 'bulkRemind'])->name('cycles.bulk-remind');
+
+        // 2. Peer Nominations & Approvals
+        Route::post('/participants/{participantId}/nominate-peers', [Feedback360ApiController::class, 'nominatePeers'])->name('participants.nominate-peers');
+        Route::post('/nominations/{nominationId}/approve', [Feedback360ApiController::class, 'approveNomination'])->name('nominations.approve');
+        Route::post('/nominations/batch-approve', [Feedback360ApiController::class, 'batchApproveNominations'])->name('nominations.batch-approve');
+
+        // 3. Review Workspace & Evaluation Submission
+        Route::get('/review/{nominationId}', [Feedback360ApiController::class, 'reviewWorkspace'])->name('review.workspace');
+        Route::post('/review/{nominationId}', [Feedback360ApiController::class, 'submitReview'])->name('review.submit');
+
+        // 4. 360 Assessment Report & Calibration
+        Route::get('/report/{participantId}', [Feedback360ApiController::class, 'report'])->name('report');
+        Route::post('/report/{participantId}/publish', [Feedback360ApiController::class, 'publishReport'])->name('report.publish');
+
+        // 5. Competencies & Question Bank Masters
+        Route::post('/competencies', [Feedback360ApiController::class, 'storeCompetency'])->name('competencies.store');
+        Route::delete('/competencies/{id}', [Feedback360ApiController::class, 'destroyCompetency'])->name('competencies.destroy');
+        Route::post('/questions', [Feedback360ApiController::class, 'storeQuestion'])->name('questions.store');
+        Route::delete('/questions/{id}', [Feedback360ApiController::class, 'destroyQuestion'])->name('questions.destroy');
+    });
+
+// ==========================================
+// 27. BIOMETRIC DEVICE HARDWARE MANAGEMENT API ROUTES
+// ==========================================
+Route::prefix('api/hrms/biometric-devices')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.biometric-devices.')
+    ->group(function () {
+        Route::get('/summary', [BiometricDeviceApiController::class, 'summary'])->name('summary');
+        Route::get('/', [BiometricDeviceApiController::class, 'index'])->name('index');
+        Route::post('/', [BiometricDeviceApiController::class, 'store'])->name('store');
+        Route::post('/simulate-punch', [BiometricDeviceApiController::class, 'simulatePunch'])->name('simulate-punch');
+        Route::get('/{id}', [BiometricDeviceApiController::class, 'show'])->name('show');
+        Route::put('/{id}', [BiometricDeviceApiController::class, 'update'])->name('update');
+        Route::delete('/{id}', [BiometricDeviceApiController::class, 'destroy'])->name('destroy');
+    });
+
+// ==========================================
+// 28. EXPENSE POLICIES & APPROVAL WORKFLOWS MASTER API ROUTES
+// ==========================================
+Route::prefix('api/hrms/expense-policies')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.expense-policies.')
+    ->group(function () {
+        // Summary
+        Route::get('/summary', [ExpensePolicyApiController::class, 'summary'])->name('summary');
+
+        // Approval Workflows CRUD
+        Route::get('/workflows', [ExpensePolicyApiController::class, 'listWorkflows'])->name('workflows.index');
+        Route::post('/workflows', [ExpensePolicyApiController::class, 'storeWorkflow'])->name('workflows.store');
+        Route::put('/workflows/{id}', [ExpensePolicyApiController::class, 'updateWorkflow'])->name('workflows.update');
+        Route::delete('/workflows/{id}', [ExpensePolicyApiController::class, 'destroyWorkflow'])->name('workflows.destroy');
+
+        // Category Policy Rules
+        Route::get('/{policyId}/rules', [ExpensePolicyApiController::class, 'listRules'])->name('rules.index');
+        Route::post('/{policyId}/rules', [ExpensePolicyApiController::class, 'storeRule'])->name('rules.store');
+        Route::delete('/{policyId}/rules/{ruleId}', [ExpensePolicyApiController::class, 'destroyRule'])->name('rules.destroy');
+
+        // Policies Header CRUD
+        Route::get('/', [ExpensePolicyApiController::class, 'index'])->name('index');
+        Route::post('/', [ExpensePolicyApiController::class, 'store'])->name('store');
+        Route::get('/{id}', [ExpensePolicyApiController::class, 'show'])->name('show');
+        Route::put('/{id}', [ExpensePolicyApiController::class, 'update'])->name('update');
+        Route::delete('/{id}', [ExpensePolicyApiController::class, 'destroy'])->name('destroy');
+    });
+
+
 
 
 

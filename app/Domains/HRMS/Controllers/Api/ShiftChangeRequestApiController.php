@@ -127,6 +127,23 @@ class ShiftChangeRequestApiController extends Controller
 
         $data = $this->shiftChangeRepository->getIndexData($request->all());
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
+        if (isset($data['requests']) && method_exists($data['requests'], 'getCollection')) {
+            $data['requests']->getCollection()->transform(function ($req) use ($employee, $isHrAdmin) {
+                $isOwner = $employee && (int)$req->employee_id === (int)$employee->id;
+                $isPending = $req->status === 'pending';
+                $req->capabilities = [
+                    'can_view'    => true,
+                    'can_approve' => $isHrAdmin && $isPending,
+                    'can_reject'  => $isHrAdmin && $isPending,
+                    'can_cancel'  => ($isOwner || $isHrAdmin) && $isPending,
+                ];
+                return $req;
+            });
+        }
+
         return $this->sendSuccess($data['requests'], 'Shift Change requests retrieved successfully');
     }
 
@@ -148,6 +165,15 @@ class ShiftChangeRequestApiController extends Controller
         if (!$isHrAdmin && $shiftChangeRequest->employee_id !== $employee?->id) {
             return $this->sendError('Unauthorized access to shift change request.', 403);
         }
+
+        $isOwner = $employee && (int)$shiftChangeRequest->employee_id === (int)$employee->id;
+        $isPending = $shiftChangeRequest->status === 'pending';
+        $shiftChangeRequest->capabilities = [
+            'can_view'    => true,
+            'can_approve' => $isHrAdmin && $isPending,
+            'can_reject'  => $isHrAdmin && $isPending,
+            'can_cancel'  => ($isOwner || $isHrAdmin) && $isPending,
+        ];
 
         return $this->sendSuccess($shiftChangeRequest, 'Shift Change request details loaded');
     }

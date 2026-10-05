@@ -18,8 +18,11 @@ use RuntimeException;
  * verified, and mirrors the gateway's lifecycle webhooks (renewal charged,
  * payment pending/halted, cancelled). Mid-cycle changes (step 4): an upgrade
  * is charged pro rata now and applies at once, a downgrade applies at renewal;
- * either way renewals bill the new amount. The one place a subscription
- * changes the tenant's plan, user limit and recurring add-ons.
+ * either way renewals bill the new amount. Cancelling stops renewals at period
+ * end; reconcile() catches missed webhooks and, once grace or the last paid
+ * period runs out, locks the tenant to billing until it subscribes again.
+ * The one place a subscription changes the tenant's plan, user limit and
+ * recurring add-ons.
  */
 class TenantSubscriptionService
 {
@@ -124,9 +127,11 @@ class TenantSubscriptionService
             $tenant = Tenant::query()->findOrFail($subscription->tenant_id);
             $this->tenants->switchOwnPlan($tenant, $subscription->plan_id);
 
+            // Also lifts a billing lock left by a lapsed earlier subscription.
             $tenant->refresh()->update([
                 'max_users' => $subscription->seats,
                 'plan_expires_at' => $subscription->current_end,
+                'subscription_status' => Tenant::SUBSCRIPTION_ACTIVE,
             ]);
 
             $this->modules->install($tenant, $subscription->modules ?? [], null, null, TenantModule::BILLING_RECURRING);
@@ -155,6 +160,10 @@ class TenantSubscriptionService
 
         if ($live->status !== TenantSubscription::STATUS_ACTIVE) {
             return ['error' => 'Your last renewal payment failed — settle it before changing your subscription.'] + $preview;
+        }
+
+        if ($live->isCancelling()) {
+            return ['error' => "Your subscription is cancelled and ends on {$preview['renews_on']} — you can subscribe again after that."] + $preview;
         }
 
         if ($quote->cycle !== $live->cycle) {
@@ -313,6 +322,189 @@ class TenantSubscriptionService
         }
     }
 
+    /**
+     * The tenant cancels: renewals stop at the end of the paid period, which
+     * stays usable; then the tenant is locked to billing (reconcile()). A
+     * booked downgrade or an unpaid upgrade is dropped. Can't be undone on the
+     * gateway — the tenant subscribes again once the period has ended.
+     *
+     * @throws RuntimeException when there's nothing to cancel or the gateway refuses
+     */
+    public function cancel(Tenant $tenant): TenantSubscription
+    {
+        $live = $this->live($tenant) ?? throw new RuntimeException('You have no active subscription to cancel.');
+
+        if ($live->isCancelling()) {
+            throw new RuntimeException("Your subscription is already cancelled — it ends on {$live->current_end?->format('d M Y')}.");
+        }
+
+        if ($live->status !== TenantSubscription::STATUS_ACTIVE) {
+            throw new RuntimeException("Your last renewal payment failed — unless it's paid, the subscription ends on its own on {$live->grace_ends_at?->format('d M Y')}.");
+        }
+
+        $gateway = $this->gatewayFor($live);
+
+        try {
+            if ($live->scheduledChange() !== null) {
+                $gateway->cancelScheduledSubscriptionChange($live);
+            }
+            $gateway->cancelSubscription($live, atCycleEnd: true);
+        } catch (\Throwable $e) {
+            report($e);
+
+            throw new RuntimeException("{$gateway->label()} could not cancel the subscription: {$e->getMessage()}", 0, $e);
+        }
+
+        $live->update(['cancel_requested_at' => now(), 'pending_change' => null]);
+
+        return $live;
+    }
+
+    /**
+     * Run hourly (billing:reconcile-subscriptions): catches up on webhooks the
+     * gateway couldn't deliver, then locks tenants whose grace ran out or
+     * whose cancelled period has ended. Data is never touched.
+     *
+     * @return array{synced: int, suspended: int}
+     */
+    public function reconcile(): array
+    {
+        $synced = 0;
+        $suspended = 0;
+
+        $live = TenantSubscription::query()
+            ->withoutGlobalScope('tenant')
+            ->whereIn('status', TenantSubscription::LIVE_STATUSES)
+            ->whereNotNull('gateway_subscription_id')
+            ->get();
+
+        foreach ($live as $subscription) {
+            try {
+                $synced += (int) $this->syncFromGateway($subscription);
+            } catch (\Throwable $e) {
+                report(new RuntimeException("Subscription {$subscription->id} could not be reconciled with its gateway: {$e->getMessage()}", 0, $e));
+            }
+        }
+
+        $overdue = TenantSubscription::query()
+            ->withoutGlobalScope('tenant')
+            ->whereIn('status', [TenantSubscription::STATUS_PENDING, TenantSubscription::STATUS_HALTED])
+            ->where('grace_ends_at', '<=', now())
+            ->get();
+
+        foreach ($overdue as $subscription) {
+            $this->suspendOverdue($subscription);
+            $suspended++;
+        }
+
+        // ended() leaves the tenant `cancelled` while its last paid period runs on.
+        Tenant::query()
+            ->where('subscription_status', Tenant::SUBSCRIPTION_CANCELLED)
+            ->each(function (Tenant $tenant) use (&$suspended): void {
+                $latest = TenantSubscription::query()
+                    ->withoutGlobalScope('tenant')
+                    ->where('tenant_id', $tenant->id)
+                    ->whereNotNull('activated_at')
+                    ->latest('id')
+                    ->first();
+
+                // No recurring subscription: cancelled by a platform admin, not ours to lock.
+                if ($latest === null || $latest->isLive() || $latest->current_end?->isFuture()) {
+                    return;
+                }
+
+                $this->lock($tenant->id);
+                $suspended++;
+            });
+
+        return ['synced' => $synced, 'suspended' => $suspended];
+    }
+
+    /** Applies whatever the gateway knows that we missed. Returns whether anything changed. */
+    private function syncFromGateway(TenantSubscription $subscription): bool
+    {
+        $state = $this->gatewayFor($subscription)->fetchSubscription($subscription);
+
+        switch ($state['status']) {
+            case 'active':
+                $renewed = $state['current_end'] !== null
+                    && $state['current_end'] > ($subscription->current_end?->getTimestamp() ?? 0) + 60;
+
+                if (! $renewed && $subscription->status === TenantSubscription::STATUS_ACTIVE) {
+                    return false;
+                }
+
+                $this->charged($subscription, ['payment_id' => null, 'amount' => null] + $state);
+
+                return true;
+
+            case 'pending':
+            case 'halted':
+                if ($subscription->status === $state['status']) {
+                    return false;
+                }
+
+                $this->paymentFailing($subscription, $state['status']);
+
+                return true;
+
+            case 'cancelled':
+            case 'completed':
+            case 'expired':
+                $this->ended($subscription, $state['status'] === 'completed' ? 'completed' : 'cancelled');
+
+                return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Grace ran out without a payment: stop the gateway retrying (the tenant
+     * re-subscribes to come back) and lock the tenant to billing.
+     */
+    private function suspendOverdue(TenantSubscription $subscription): void
+    {
+        try {
+            $this->gatewayFor($subscription)->cancelSubscription($subscription, atCycleEnd: false);
+        } catch (\Throwable $e) {
+            // Still unpaid either way — lock now, support cancels on the gateway by hand.
+            report(new RuntimeException("Overdue subscription {$subscription->id} could not be cancelled on its gateway: {$e->getMessage()}", 0, $e));
+        }
+
+        $subscription->update([
+            'status' => TenantSubscription::STATUS_CANCELLED,
+            'cancelled_at' => $subscription->cancelled_at ?? now(),
+        ]);
+
+        $this->lock($subscription->tenant_id);
+    }
+
+    /**
+     * Billing-only lockout (EnsureBillingActive). Recurring add-ons are switched
+     * off too, so a new subscription only brings back what it pays for; lifetime
+     * add-ons and all data stay.
+     */
+    private function lock(int $tenantId): void
+    {
+        $tenant = Tenant::query()->findOrFail($tenantId);
+
+        $tenant->update(['subscription_status' => Tenant::SUBSCRIPTION_SUSPENDED]);
+
+        $tenant->addonModules()
+            ->where('billing', TenantModule::BILLING_RECURRING)
+            ->whereNull('uninstalled_at')
+            ->update(['uninstalled_at' => now()]);
+    }
+
+    /** False for an old subscription whose late webhook arrives after the tenant subscribed again. */
+    private function isCurrent(TenantSubscription $subscription): bool
+    {
+        $live = $this->live(Tenant::query()->findOrFail($subscription->tenant_id));
+
+        return $live === null || $live->id === $subscription->id;
+    }
+
     private function sameAs(TenantSubscription $live, SubscriptionQuote $quote): bool
     {
         $current = $live->modules ?? [];
@@ -391,6 +583,10 @@ class TenantSubscriptionService
     /** Renewal charge failed: past due, with a grace period before suspension. */
     private function paymentFailing(TenantSubscription $subscription, string $status): void
     {
+        if (! $subscription->isLive()) {
+            return;
+        }
+
         $subscription->update([
             'status' => $status,
             'grace_ends_at' => $subscription->grace_ends_at ?? now()->addDays((int) config('billing.grace_days')),
@@ -401,17 +597,33 @@ class TenantSubscriptionService
         ]);
     }
 
-    /** Cancelled or ran its course: access continues until current_end. */
+    /**
+     * Cancelled or ran its course: access continues until current_end, then
+     * reconcile() locks the tenant to billing (at once if that's already past).
+     */
     private function ended(TenantSubscription $subscription, string $status): void
     {
+        $wasCurrent = $this->isCurrent($subscription);
+
         $subscription->update([
             'status' => $status,
             'cancelled_at' => $subscription->cancelled_at ?? now(),
         ]);
 
-        Tenant::query()->whereKey($subscription->tenant_id)->update([
-            'subscription_status' => Tenant::SUBSCRIPTION_CANCELLED,
-        ]);
+        $tenant = Tenant::query()->findOrFail($subscription->tenant_id);
+
+        // A checkout that was never paid never gave the tenant anything to take away.
+        if ($subscription->activated_at === null || ! $wasCurrent || $tenant->isBillingLocked()) {
+            return;
+        }
+
+        if ($subscription->current_end === null || ! $subscription->current_end->isFuture()) {
+            $this->lock($tenant->id);
+
+            return;
+        }
+
+        $tenant->update(['subscription_status' => Tenant::SUBSCRIPTION_CANCELLED]);
     }
 
     private function recordPayment(TenantSubscription $subscription, string $gatewayPaymentId, int $amount): void

@@ -251,29 +251,68 @@
 
             // A block that draws its own card grows until its content fits, so it never scrolls.
             // KPI cards in one row then all take the tallest one's height, keeping the row even.
-            function fit(id) {
-                const node = grid.engine.nodes.find(n => n.id === id);
-                if (!node) return;
-                const holder = node.el && node.el.querySelector('.grid-stack-item-content > .dash-bare');
-                if (holder && holder.scrollHeight > holder.clientHeight + 2) {
-                    const unit = 70 + 8;
-                    grid.update(node.el, {h: Math.ceil((holder.scrollHeight + 8) / unit)});
-                }
-                if ((meta.get(id)?.key || '').includes('kpi')) evenKpiRow(node.y);
+            // Cards only ever grow; whatever sits below one in the same columns moves down by
+            // as much, so the arrangement people saved stays in the same order.
+            let refitQueued = false;
+            function fit() {
+                if (refitQueued) return;
+                refitQueued = true;
+                requestAnimationFrame(() => { refitQueued = false; refitAll(); });
             }
 
-            function evenKpiRow(y) {
-                const row = grid.engine.nodes.filter(n => n.y === y && (meta.get(n.id)?.key || '').includes('kpi'));
-                const h = Math.max(...row.map(n => n.h));
-                row.forEach(n => { if (n.h !== h) grid.update(n.el, {h}); });
+            function refitAll() {
+                const nodes = [...grid.engine.nodes].sort((a, b) => a.y - b.y || a.x - b.x);
+                const isKpi = n => (meta.get(n.id)?.key || '').includes('kpi');
+                const height = new Map();
+
+                nodes.forEach(n => {
+                    const holder = n.el && n.el.querySelector('.grid-stack-item-content > .dash-bare');
+                    let h = n.h;
+                    if (holder && holder.scrollHeight > holder.clientHeight + 2) {
+                        // A row is cellHeight (70px) tall and the content sits 8px inside it top and bottom.
+                        h = Math.max(h, Math.ceil((holder.scrollHeight + 16) / 70));
+                    }
+                    height.set(n, h);
+                });
+
+                const kpiRows = new Map();
+                nodes.filter(isKpi).forEach(n => kpiRows.set(n.y, [...(kpiRows.get(n.y) || []), n]));
+                kpiRows.forEach(row => {
+                    const h = Math.max(...row.map(n => height.get(n)));
+                    row.forEach(n => height.set(n, h));
+                });
+
+                // Re-stack in the saved order: each card sits right under the cards above it in its columns.
+                const top = new Map();
+                const placed = [];
+                nodes.forEach(n => {
+                    const y = placed
+                        .filter(p => p.x < n.x + n.w && n.x < p.x + p.w)
+                        .reduce((max, p) => Math.max(max, top.get(p) + height.get(p)), 0);
+                    top.set(n, y);
+                    placed.push(n);
+                });
+
+                const changed = nodes.filter(n => top.get(n) !== n.y || height.get(n) !== n.h);
+                if (changed.length === 0) return;
+
+                // Bottom-up: every card moves into space that is already free, so the grid never
+                // has a collision to resolve (and never swaps cards around).
+                grid.batchUpdate();
+                changed.slice().reverse().forEach(n => grid.update(n.el, {y: top.get(n), h: height.get(n)}));
+                grid.commit();
             }
 
             // Narrower cards wrap their text: fit again once the window settles.
             let refitTimer;
             window.addEventListener('resize', () => {
                 clearTimeout(refitTimer);
-                refitTimer = setTimeout(() => meta.forEach((_, id) => fit(id)), 200);
+                refitTimer = setTimeout(refitAll, 200);
             });
+
+            // Web fonts arrive after the first fit and make text a little taller: fit again then.
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+            window.addEventListener('load', fit);
 
             // ── Editing ──
             function setEditing(on) {
@@ -293,7 +332,7 @@
                 grid.batchUpdate(); layout.forEach(addWidget); grid.commit();
                 refreshEmpty();
                 // Server-rendered blocks are already in place; size them once the grid has laid out.
-                if (usePreloaded) requestAnimationFrame(() => meta.forEach((_, id) => fit(id)));
+                if (usePreloaded) requestAnimationFrame(refitAll);
             }
 
             function current() {

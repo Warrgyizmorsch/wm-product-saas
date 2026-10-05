@@ -508,10 +508,22 @@ class PayrollCalculationService
         // 9.9. Dynamic Statutory Calculations (PF & ESI)
         $enablePf = !isset($rules['enable_pf']) || (bool)$rules['enable_pf'];
         $restrictPfCeiling = !isset($rules['restrict_pf_ceiling']) || (bool)$rules['restrict_pf_ceiling'];
+        $pfCeiling = isset($rules['pf_wage_ceiling']) && is_numeric($rules['pf_wage_ceiling']) && (float)$rules['pf_wage_ceiling'] > 0
+            ? (float)$rules['pf_wage_ceiling']
+            : 15000.00;
+
         $enableEsi = !isset($rules['enable_esi']) || (bool)$rules['enable_esi'];
         $restrictEsiThreshold = !isset($rules['restrict_esi_threshold']) || (bool)$rules['restrict_esi_threshold'];
+        $esiThreshold = isset($rules['esi_gross_threshold']) && is_numeric($rules['esi_gross_threshold']) && (float)$rules['esi_gross_threshold'] > 0
+            ? (float)$rules['esi_gross_threshold']
+            : 21000.00;
 
+        // Resolve rates dynamically from employee's assigned salary structure if configured
+        $pfItem = $baseStructure?->items?->first(fn($i) => $i->component && strtoupper($i->component->code) === 'PF');
+        $pfRate = ($pfItem && (float)$pfItem->value > 0) ? ((float)$pfItem->value / 100) : 0.12;
 
+        $esiItem = $baseStructure?->items?->first(fn($i) => $i->component && strtoupper($i->component->code) === 'ESI');
+        $esiRate = ($esiItem && (float)$esiItem->value > 0) ? ((float)$esiItem->value / 100) : 0.0075;
 
         // 9.9.1. Dynamic PF Calculation
         if (isset($computedSalaryItems['PF'])) {
@@ -536,10 +548,10 @@ class PayrollCalculationService
                         }
                     }
                 }
-                $pfBasis = $restrictPfCeiling ? min($pfEarnedBasic, 15000.00) : $pfEarnedBasic;
-                $pfDeduction = round($pfBasis * 0.12, 2);
+                $pfBasis = $restrictPfCeiling ? min($pfEarnedBasic, $pfCeiling) : $pfEarnedBasic;
+                $pfDeduction = round($pfBasis * $pfRate, 2);
                 $computedSalaryItems['PF']['calculated_value'] = $pfDeduction;
-                $computedSalaryItems['PF']['base_monthly'] = $restrictPfCeiling ? min($pfBaseBasic, 15000.00) * 0.12 : $pfBaseBasic * 0.12;
+                $computedSalaryItems['PF']['base_monthly'] = $restrictPfCeiling ? min($pfBaseBasic, $pfCeiling) * $pfRate : $pfBaseBasic * $pfRate;
             } else {
                 $computedSalaryItems['PF']['calculated_value'] = 0.00;
                 $computedSalaryItems['PF']['base_monthly'] = 0.00;
@@ -561,9 +573,9 @@ class PayrollCalculationService
                 // Once eligible, the ESI contribution is calculated on total gross INCLUDING Overtime.
                 $esiContributionGross = $esiEligibleGross + $totalOtPayout;
 
-                if (!$restrictEsiThreshold || ($esiEligibleGross <= 21000.00 && $esiEligibleGross > 0)) {
+                if (!$restrictEsiThreshold || ($esiEligibleGross <= $esiThreshold && $esiEligibleGross > 0)) {
                     // ESI employee deduction must be rounded up to the next higher rupee (statutory ceil)
-                    $esiDeduction = ceil($esiContributionGross * 0.0075);
+                    $esiDeduction = ceil($esiContributionGross * $esiRate);
                 } else {
                     $esiDeduction = 0.00;
                 }
@@ -575,7 +587,7 @@ class PayrollCalculationService
                         $baseGross += $item['base_monthly'];
                     }
                 }
-                $computedSalaryItems['ESI']['base_monthly'] = (!$restrictEsiThreshold || $baseGross <= 21000.00) ? ceil($baseGross * 0.0075) : 0.00;
+                $computedSalaryItems['ESI']['base_monthly'] = (!$restrictEsiThreshold || $baseGross <= $esiThreshold) ? ceil($baseGross * $esiRate) : 0.00;
             } else {
                 $computedSalaryItems['ESI']['calculated_value'] = 0.00;
                 $computedSalaryItems['ESI']['base_monthly'] = 0.00;

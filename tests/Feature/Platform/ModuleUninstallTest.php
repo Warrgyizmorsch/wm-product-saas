@@ -47,7 +47,8 @@ class ModuleUninstallTest extends TestCase
         $this->withHeader('X-Tenant', 'acme');
 
         $this->modules = app(TenantModuleService::class);
-        $this->modules->install($this->tenant, ['inventory', 'production'], null, $this->owner->id);
+        // Bought with the old one-time fee; recurring add-ons are covered in SubscriptionLifecycleTest.
+        $this->modules->install($this->tenant, ['inventory', 'production'], null, $this->owner->id, TenantModule::BILLING_LIFETIME);
     }
 
     private function makeUser(string $email, ?string $roleSlug): User
@@ -127,7 +128,7 @@ class ModuleUninstallTest extends TestCase
             'gateway' => 'fake', 'gateway_order_id' => 'order_p', 'amount' => 99900,
             'currency' => 'INR', 'status' => SubscriptionPayment::STATUS_PAID,
         ]);
-        $this->modules->install($this->tenant, ['projects'], $payment);
+        $this->modules->install($this->tenant, ['projects'], $payment, null, TenantModule::BILLING_LIFETIME);
 
         $this->uninstall('projects');
         $this->reinstall('projects');

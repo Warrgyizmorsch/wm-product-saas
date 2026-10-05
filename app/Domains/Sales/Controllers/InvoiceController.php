@@ -119,6 +119,7 @@ class InvoiceController extends Controller
         $warehouses = Warehouse::query()->orderBy('name')->get();
 
         $dispatchOrder = null;
+        $salesOrder = null;
         $materialRequirement = null;
 
         if ($requestedMode === 'dispatch' || $requestedMode === 'dispatch_order') {

@@ -8,7 +8,11 @@ use App\Domains\HRMS\Models\AttendanceCorrection;
 use App\Domains\HRMS\Models\CashAdvance;
 use App\Domains\HRMS\Models\Document;
 use App\Domains\HRMS\Models\EmployeeExit;
+use App\Domains\HRMS\Models\EmployeeProfileUpdateRequest;
 use App\Domains\HRMS\Models\ExpenseReport;
+use App\Domains\HRMS\Models\Feedback360Nomination;
+use App\Domains\HRMS\Models\JobRequisition;
+use App\Domains\HRMS\Models\LeaveEncashment;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\OvertimeRequest;
 use App\Domains\HRMS\Models\PerformanceImprovementPlan;
@@ -250,6 +254,9 @@ class ApprovalCenterService
             $canApproveExit = $isHrAdmin || $this->hasPermission($user, 'hrms.exits.approve') || $this->hasPermission($user, 'hrms.employees.update');
             $canApprovePip = $isHrAdmin || $this->hasPermission($user, 'hrms.pip.evaluate') || $this->hasPermission($user, 'hrms.employees.update');
             $canApproveDoc = $isHrAdmin || $this->hasPermission($user, 'hrms.documents.approve') || $this->hasPermission($user, 'hrms.employees.update');
+            $canApproveProfileRequest = $isHrAdmin || $this->hasPermission($user, 'hrms.employees.update');
+            $canApproveRecruitment = $isHrAdmin || $this->hasPermission($user, 'hrms.recruitment.manage') || $this->hasPermission($user, 'hrms.recruitment.approve') || $this->hasPermission($user, 'hrms.employees.update');
+            $canApproveFeedback360 = $isHrAdmin || $this->hasPermission($user, 'hrms.performance.manage') || $this->hasPermission($user, 'hrms.feedback_360.manage') || $this->hasPermission($user, 'hrms.employees.update');
 
             // Leave Requests
             if ($canApproveLeave) {
@@ -560,6 +567,114 @@ class ApprovalCenterService
                             'icon' => 'feather-file-text',
                             'time' => $doc->created_at?->diffForHumans(),
                             'created_at' => $doc->created_at?->toIso8601String(),
+                        ];
+                    }
+                }
+            }
+
+            // Leave Encashments
+            if ($canApproveLeave && class_exists(LeaveEncashment::class)) {
+                $encashQuery = LeaveEncashment::query()->where('status', 'pending');
+                $encashCount = (clone $encashQuery)->count();
+                $totalActionableCount += $encashCount;
+                if ($encashCount > 0) {
+                    $encashments = $encashQuery->with(['employee', 'leaveType'])
+                        ->orderBy('created_at', 'asc')
+                        ->take(self::MAX_HEADER_ITEMS)
+                        ->get();
+                    foreach ($encashments as $encash) {
+                        $empName = $encash->employee?->full_name ?: 'Employee';
+                        $typeName = $encash->leaveType?->name ?: 'Leave';
+                        $days = floatval($encash->requested_days);
+                        $candidateItems[] = [
+                            'module' => 'HRMS',
+                            'type' => 'Leave Encashment',
+                            'title' => "{$empName} - {$typeName} Encashment",
+                            'subtitle' => "{$days} day(s) encashment requested",
+                            'url' => Route::has('hrms.leaves.index') ? route('hrms.leaves.index') : url('/hrms/leaves'),
+                            'icon' => 'feather-dollar-sign',
+                            'time' => $encash->created_at?->diffForHumans(),
+                            'created_at' => $encash->created_at?->toIso8601String(),
+                        ];
+                    }
+                }
+            }
+
+            // Employee Profile Update Requests
+            if ($canApproveProfileRequest && class_exists(EmployeeProfileUpdateRequest::class)) {
+                $profileReqQuery = EmployeeProfileUpdateRequest::query()->where('status', 'pending');
+                $profileReqCount = (clone $profileReqQuery)->count();
+                $totalActionableCount += $profileReqCount;
+                if ($profileReqCount > 0) {
+                    $profileReqs = $profileReqQuery->with(['employee'])
+                        ->orderBy('created_at', 'asc')
+                        ->take(self::MAX_HEADER_ITEMS)
+                        ->get();
+                    foreach ($profileReqs as $pReq) {
+                        $empName = $pReq->employee?->full_name ?: 'Employee';
+                        $candidateItems[] = [
+                            'module' => 'HRMS',
+                            'type' => 'Profile Change',
+                            'title' => "{$empName} - Profile Update",
+                            'subtitle' => 'Profile change approval required',
+                            'url' => Route::has('hrms.employees.profile-requests.index') ? route('hrms.employees.profile-requests.index') : url('/hrms/employees/profile-requests'),
+                            'icon' => 'feather-user-check',
+                            'time' => $pReq->created_at?->diffForHumans(),
+                            'created_at' => $pReq->created_at?->toIso8601String(),
+                        ];
+                    }
+                }
+            }
+
+            // Job Requisitions
+            if ($canApproveRecruitment && class_exists(JobRequisition::class)) {
+                $jobReqQuery = JobRequisition::query()->whereIn('status', ['pending_approval', 'pending']);
+                $jobReqCount = (clone $jobReqQuery)->count();
+                $totalActionableCount += $jobReqCount;
+                if ($jobReqCount > 0) {
+                    $jobReqs = $jobReqQuery->with(['department', 'designation', 'requestedBy'])
+                        ->orderBy('created_at', 'asc')
+                        ->take(self::MAX_HEADER_ITEMS)
+                        ->get();
+                    foreach ($jobReqs as $jReq) {
+                        $deptPart = $jReq->department?->name ? "{$jReq->department->name} • " : '';
+                        $vacancies = (int) ($jReq->vacancies ?? 1);
+                        $candidateItems[] = [
+                            'module' => 'HRMS',
+                            'type' => 'Job Requisition',
+                            'title' => (string) ($jReq->job_title ?: ($jReq->requisition_code ?: "Requisition #{$jReq->id}")),
+                            'subtitle' => "{$deptPart}{$vacancies} vacancy(ies)",
+                            'url' => Route::has('hrms.requisitions.index') ? route('hrms.requisitions.index') : url('/hrms/requisitions'),
+                            'icon' => 'feather-user-plus',
+                            'time' => $jReq->created_at?->diffForHumans(),
+                            'created_at' => $jReq->created_at?->toIso8601String(),
+                        ];
+                    }
+                }
+            }
+
+            // 360 Feedback Nominations
+            if ($canApproveFeedback360 && class_exists(Feedback360Nomination::class)) {
+                $nomQuery = Feedback360Nomination::query()->whereIn('status', ['pending_approval', 'pending']);
+                $nomCount = (clone $nomQuery)->count();
+                $totalActionableCount += $nomCount;
+                if ($nomCount > 0) {
+                    $noms = $nomQuery->with(['employee', 'reviewer', 'cycle'])
+                        ->orderBy('created_at', 'asc')
+                        ->take(self::MAX_HEADER_ITEMS)
+                        ->get();
+                    foreach ($noms as $nom) {
+                        $empName = $nom->employee?->full_name ?: 'Employee';
+                        $reviewerName = $nom->reviewer?->full_name ?: 'Peer';
+                        $candidateItems[] = [
+                            'module' => 'HRMS',
+                            'type' => '360 Nomination',
+                            'title' => "{$empName} - 360 Nomination",
+                            'subtitle' => "Reviewer: {$reviewerName} • Approval required",
+                            'url' => Route::has('hrms.feedback-360.index') ? route('hrms.feedback-360.index') : url('/hrms/feedback-360'),
+                            'icon' => 'feather-users',
+                            'time' => $nom->created_at?->diffForHumans(),
+                            'created_at' => $nom->created_at?->toIso8601String(),
                         ];
                     }
                 }
@@ -968,7 +1083,11 @@ class ApprovalCenterService
             || $this->hasPermission($user, 'hrms.attendance.manage')
             || $this->hasPermission($user, 'hrms.travel_expenses.approve')
             || $this->hasPermission($user, 'hrms.assets.manage')
-            || $this->hasPermission($user, 'hrms.exits.approve');
+            || $this->hasPermission($user, 'hrms.exits.approve')
+            || $this->hasPermission($user, 'hrms.recruitment.manage')
+            || $this->hasPermission($user, 'hrms.recruitment.approve')
+            || $this->hasPermission($user, 'hrms.performance.manage')
+            || $this->hasPermission($user, 'hrms.feedback_360.manage');
     }
 
     /**

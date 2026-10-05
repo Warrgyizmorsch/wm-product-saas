@@ -67,9 +67,10 @@
                     <th class="ps-4">Account</th>
                     <th>
                         <a href="{{ $sortUrl('statement_date') }}" class="text-muted text-decoration-none d-inline-flex align-items-center gap-1">
-                            Statement Date <i class="{{ $sortIcon('statement_date') }} fs-12"></i>
+                            Statement Period <i class="{{ $sortIcon('statement_date') }} fs-12"></i>
                         </a>
                     </th>
+                    <th>Lines Matched</th>
                     <th class="text-end">
                         <a href="{{ $sortUrl('opening_balance') }}" class="text-muted text-decoration-none d-inline-flex align-items-center gap-1">
                             Opening Balance <i class="{{ $sortIcon('opening_balance') }} fs-12"></i>
@@ -92,7 +93,24 @@
                 @forelse ($reconciliations as $reconciliation)
                     <tr>
                         <td class="ps-4 fw-bold">{{ $reconciliation->chartOfAccount->code }} - {{ $reconciliation->chartOfAccount->name }}</td>
-                        <td>{{ $reconciliation->statement_date->format('d M Y') }}</td>
+                        <td>
+                            @if ($reconciliation->statement_from_date)
+                                {{ $reconciliation->statement_from_date->format('d M Y') }} – {{ $reconciliation->statement_date->format('d M Y') }}
+                            @else
+                                Up to {{ $reconciliation->statement_date->format('d M Y') }}
+                            @endif
+                        </td>
+                        <td>
+                            @php $total = $reconciliation->statement_lines_count; $done = $reconciliation->matched_lines_count; @endphp
+                            @if ($total)
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="progress flex-grow-1" style="height: 5px; max-width: 90px;"><div class="progress-bar bg-success" style="width: {{ round($done * 100 / $total) }}%"></div></div>
+                                    <span class="fs-12 text-muted">{{ $done }}/{{ $total }}</span>
+                                </div>
+                            @else
+                                <span class="fs-12 text-muted">No statement</span>
+                            @endif
+                        </td>
                         <td class="text-end">{{ number_format($reconciliation->opening_balance, 2) }}</td>
                         <td class="text-end">{{ number_format($reconciliation->closing_balance, 2) }}</td>
                         <td>
@@ -108,7 +126,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="text-center py-5 text-muted">
+                        <td colspan="7" class="text-center py-5 text-muted">
                             <i class="feather-repeat fs-1 mb-2 d-block"></i>
                             No bank reconciliations yet.
                         </td>

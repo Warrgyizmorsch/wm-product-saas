@@ -288,6 +288,25 @@ class RazorpayGateway implements PaymentGateway
         $this->api()->subscription->fetch($subscription->gateway_subscription_id)->cancelScheduledChanges();
     }
 
+    public function cancelSubscription(TenantSubscription $subscription, bool $atCycleEnd): void
+    {
+        // Razorpay can't undo a cancel, at cycle end or not.
+        $this->api()->subscription->fetch($subscription->gateway_subscription_id)->cancel([
+            'cancel_at_cycle_end' => $atCycleEnd ? 1 : 0,
+        ]);
+    }
+
+    public function fetchSubscription(TenantSubscription $subscription): array
+    {
+        $entity = $this->api()->subscription->fetch($subscription->gateway_subscription_id);
+
+        return [
+            'status' => (string) $entity['status'],
+            'current_start' => isset($entity['current_start']) ? (int) $entity['current_start'] : null,
+            'current_end' => isset($entity['current_end']) ? (int) $entity['current_end'] : null,
+        ];
+    }
+
     /**
      * Razorpay plans are immutable, so one per (period, per-seat amount) is
      * created once and reused from gateway_plans.

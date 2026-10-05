@@ -3,9 +3,16 @@
 use App\Domains\Projects\Controllers\IssueController;
 use App\Domains\Projects\Controllers\MilestoneController;
 use App\Domains\Projects\Controllers\ProjectActivityLogController;
+use App\Domains\Projects\Controllers\ProjectBillingController;
+use App\Domains\Projects\Controllers\ProjectClosureController;
 use App\Domains\Projects\Controllers\ProjectController;
+use App\Domains\Projects\Controllers\ProjectDashboardController;
 use App\Domains\Projects\Controllers\ProjectDocumentController;
 use App\Domains\Projects\Controllers\ProjectMemberController;
+use App\Domains\Projects\Controllers\ProjectReportController;
+use App\Domains\Projects\Controllers\ProjectReviewController;
+use App\Domains\Projects\Controllers\ProjectScheduleController;
+use App\Domains\Projects\Controllers\ChangeRequestController;
 use App\Domains\Projects\Controllers\SubTaskController;
 use App\Domains\Projects\Controllers\TaskController;
 use App\Domains\Projects\Controllers\TaskDependencyController;
@@ -18,6 +25,26 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('projects')
     ->as('projects.')
     ->group(function (): void {
+        Route::get('dashboard', [ProjectDashboardController::class, 'index'])->name('dashboard');
+        Route::get('dashboard/export/{format}', [ProjectDashboardController::class, 'export'])
+            ->name('dashboard.export')
+            ->whereIn('format', ['csv', 'xlsx']);
+
+        Route::prefix('reports')->as('reports.')->group(function (): void {
+            Route::get('/', [ProjectReportController::class, 'index'])->name('index');
+            Route::get('summary', [ProjectReportController::class, 'summary'])->name('summary');
+            Route::get('task-status', [ProjectReportController::class, 'taskStatus'])->name('task-status');
+            Route::get('resource-utilization', [ProjectReportController::class, 'resourceUtilization'])->name('resource-utilization');
+            Route::get('timesheet-billability', [ProjectReportController::class, 'timesheetBillability'])->name('timesheet-billability');
+            Route::get('issue-defect-density', [ProjectReportController::class, 'issueDefectDensity'])->name('issue-defect-density');
+            Route::get('milestone-variance', [ProjectReportController::class, 'milestoneVariance'])->name('milestone-variance');
+            Route::get('budget-cost', [ProjectReportController::class, 'budgetCost'])->name('budget-cost');
+            Route::get('{report}/export/{format}', [ProjectReportController::class, 'export'])
+                ->name('export')
+                ->whereIn('report', ['summary', 'task-status', 'resource-utilization', 'timesheet-billability', 'issue-defect-density', 'milestone-variance', 'budget-cost'])
+                ->whereIn('format', ['xlsx', 'csv']);
+        });
+
         Route::get('/', [ProjectController::class, 'index'])->name('index');
         Route::post('/', [ProjectController::class, 'store'])->name('store');
         Route::post('bulk-action', [ProjectController::class, 'bulkAction'])->name('bulk-action');
@@ -28,6 +55,7 @@ Route::prefix('projects')
         Route::get('lookups/owners', [ProjectController::class, 'searchOwners'])->name('lookups.owners');
 
         Route::get('milestones', [MilestoneController::class, 'index'])->name('milestones.index');
+        Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
         Route::get('timesheets/approval', [TimesheetApprovalController::class, 'index'])->name('timesheets.approval');
         Route::patch('timesheets/{timeLog}/approve', [TimesheetApprovalController::class, 'approve'])->name('timesheets.approve');
         Route::patch('timesheets/{timeLog}/reject', [TimesheetApprovalController::class, 'reject'])->name('timesheets.reject');
@@ -37,6 +65,9 @@ Route::prefix('projects')
         Route::put('{project}', [ProjectController::class, 'update'])->name('update');
         Route::patch('{project}/field', [ProjectController::class, 'updateField'])->name('field');
         Route::delete('{project}', [ProjectController::class, 'destroy'])->name('destroy');
+
+        Route::get('{project}/closure-check', [ProjectClosureController::class, 'checkGates'])->name('closure.check');
+        Route::post('{project}/close', [ProjectClosureController::class, 'close'])->name('close');
 
         Route::get('{project}/activity', [ProjectActivityLogController::class, 'index'])->name('activity');
 
@@ -142,6 +173,51 @@ Route::prefix('projects')
                 Route::get('{document}/preview', [ProjectDocumentController::class, 'preview'])->name('preview');
                 Route::get('{document}/download', [ProjectDocumentController::class, 'download'])->name('download');
                 Route::delete('{document}', [ProjectDocumentController::class, 'destroy'])->name('destroy');
+            });
+
+        Route::prefix('{project}/reviews')
+            ->as('reviews.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::get('/', [ProjectReviewController::class, 'index'])->name('index');
+                Route::post('/', [ProjectReviewController::class, 'store'])->name('store');
+                Route::match(['post', 'patch'], '{review}/signoff', [ProjectReviewController::class, 'signoff'])->name('signoff');
+                Route::get('{review}/signoff', fn ($project) => redirect()->to(route('projects.show', $project) . '?tab=reviews'));
+                Route::delete('{review}', [ProjectReviewController::class, 'destroy'])->name('destroy');
+            });
+
+        Route::prefix('{project}/change-requests')
+            ->as('change-requests.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::get('/', [ChangeRequestController::class, 'index'])->name('index');
+                Route::post('/', [ChangeRequestController::class, 'store'])->name('store');
+                Route::match(['post', 'patch'], '{changeRequest}/approve', [ChangeRequestController::class, 'approve'])->name('approve');
+                Route::get('{changeRequest}/approve', fn ($project) => redirect()->to(route('projects.show', $project) . '?tab=reviews'));
+                Route::match(['post', 'patch'], '{changeRequest}/reject', [ChangeRequestController::class, 'reject'])->name('reject');
+                Route::get('{changeRequest}/reject', fn ($project) => redirect()->to(route('projects.show', $project) . '?tab=reviews'));
+                Route::match(['post', 'patch'], '{changeRequest}/implement', [ChangeRequestController::class, 'markImplemented'])->name('implement');
+                Route::get('{changeRequest}/implement', fn ($project) => redirect()->to(route('projects.show', $project) . '?tab=reviews'));
+                Route::match(['post', 'patch'], '{changeRequest}/mark-implemented', [ChangeRequestController::class, 'markImplemented'])->name('mark-implemented');
+                Route::delete('{changeRequest}', [ChangeRequestController::class, 'destroy'])->name('destroy');
+            });
+
+        Route::prefix('{project}/timeline')
+            ->as('timeline.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::get('/', [ProjectScheduleController::class, 'index'])->name('index');
+                Route::get('data', [ProjectScheduleController::class, 'data'])->name('data');
+                Route::match(['post', 'patch'], 'tasks/{task}/reschedule', [ProjectScheduleController::class, 'reschedule'])->name('reschedule');
+            });
+
+        Route::prefix('{project}/billing')
+            ->as('billing.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::get('/', [ProjectBillingController::class, 'index'])->name('index');
+                Route::post('preview', [ProjectBillingController::class, 'preview'])->name('preview');
+                Route::post('invoices', [ProjectBillingController::class, 'store'])->name('store');
             });
 
     });

@@ -4,7 +4,7 @@ namespace App\Domains\Accounting\Services\Dashboard;
 
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Repositories\JournalRepositoryInterface;
-use App\Domains\Accounting\Support\AccountCode;
+use App\Domains\Accounting\Support\SystemAccount;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -20,9 +20,16 @@ class LedgerMetrics
     private const BURN_MONTHS = 3;
 
     /** 1200 Inventory and 1201–1203 stock accounts in the default chart. */
+    /** User-created stock ledgers are still recognised by the default 120x numbering. */
     private const INVENTORY_CODE_PREFIX = '120';
-    private const TDS_PAYABLE_CODE = '2140';
-    private const SUSPENSE_CODE = '2900';
+
+    private const INVENTORY_KEYS = [
+        SystemAccount::INVENTORY,
+        'stock_in_hand_finished_goods',
+        'stock_in_hand_raw_material',
+        'stock_in_transit',
+        SystemAccount::WORK_IN_PROGRESS,
+    ];
 
     public function __construct(
         private readonly JournalRepositoryInterface $journals,
@@ -101,12 +108,16 @@ class LedgerMetrics
             }
 
             $amount = $account->canonicalMovement((float) $row->debit, (float) $row->credit);
+            // Identify system accounts by key so a renumbered account still lands
+            // in the right bucket; unkeyed rows fall back to their default code.
+            $systemKey = $account->system_key ?? SystemAccount::keyForTemplateCode((string) $account->code);
             $isCurrent = ! in_array($account->subtype, ChartOfAccount::NON_CURRENT_SUBTYPES, true);
 
             if ($account->type === ChartOfAccount::TYPE_ASSET && $isCurrent) {
                 $position['current_assets'] += $amount;
 
-                if (str_starts_with((string) $account->code, self::INVENTORY_CODE_PREFIX)) {
+                if (in_array($systemKey, self::INVENTORY_KEYS, true)
+                    || ($systemKey === null && str_starts_with((string) $account->code, self::INVENTORY_CODE_PREFIX))) {
                     $position['inventory'] += $amount;
                 }
             } elseif ($account->type === ChartOfAccount::TYPE_LIABILITY && $isCurrent) {
@@ -118,11 +129,11 @@ class LedgerMetrics
                 $cashAccounts->push(['account' => $account, 'balance' => round($amount, 2)]);
             }
 
-            match ((string) $account->code) {
-                AccountCode::AR => $position['receivables'] += $amount,
-                AccountCode::AP => $position['payables'] += $amount,
-                self::TDS_PAYABLE_CODE => $position['tds_payable'] += $amount,
-                self::SUSPENSE_CODE => $position['suspense'] += $amount,
+            match ($systemKey) {
+                SystemAccount::AR => $position['receivables'] += $amount,
+                SystemAccount::AP => $position['payables'] += $amount,
+                SystemAccount::TDS_PAYABLE => $position['tds_payable'] += $amount,
+                SystemAccount::SUSPENSE => $position['suspense'] += $amount,
                 default => null,
             };
         }

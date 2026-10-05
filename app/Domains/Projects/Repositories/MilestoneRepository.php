@@ -31,7 +31,8 @@ class MilestoneRepository implements MilestoneRepositoryInterface
     public function paginateAll(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = Milestone::query()
-            ->with(['project', 'owner']);
+            ->with(['project', 'owner'])
+            ->withCount('tasks');
 
         $search = trim((string) ($filters['search'] ?? ''));
 

@@ -44,9 +44,12 @@
     $rowCloneJsData = array_merge($rowJsData, [
         'name' => $milestone->name ? $milestone->name . ' ' . __('projects.clone_suffix') : '',
     ]);
+
+    $isFirst = isset($loop) && $loop->first;
+    $isLast = isset($loop) && $loop->last;
 @endphp
 
-<div class="milestone-row border-bottom py-3 px-2 px-md-3">
+<div class="milestone-row {{ $isLast ? '' : 'border-bottom' }} {{ $isFirst ? 'rounded-top-3' : '' }} {{ $isLast ? 'rounded-bottom-3' : '' }} py-3 px-2 px-md-3">
     {{-- Desktop / tablet dense row --}}
     <div class="d-none d-md-flex align-items-center gap-3">
         <div class="avatar-text avatar-md rounded-circle bg-soft-{{ $rowHealthVariant }} text-{{ $rowHealthVariant }} flex-shrink-0">
@@ -115,7 +118,7 @@
                     </li>
                     <li>
                         <a class="dropdown-item text-danger" href="javascript:void(0);"
-                           onclick="confirmAction(@js(__('projects.confirm_remove_milestone')), function () { document.getElementById('milestoneRowDeleteForm{{ $milestone->id }}').submit(); })">
+                           onclick="openDeleteMilestoneModal('{{ route('projects.milestones.destroy', [$project, $milestone->id]) }}', @js($milestone->name), {{ $rowTasksTotal }})">
                             <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
                         </a>
                     </li>
@@ -163,7 +166,7 @@
                     </li>
                     <li>
                         <a class="dropdown-item text-danger" href="javascript:void(0);"
-                           onclick="confirmAction(@js(__('projects.confirm_remove_milestone')), function () { document.getElementById('milestoneRowDeleteFormMobile{{ $milestone->id }}').submit(); })">
+                           onclick="openDeleteMilestoneModal('{{ route('projects.milestones.destroy', [$project, $milestone->id]) }}', @js($milestone->name), {{ $rowTasksTotal }})">
                             <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
                         </a>
                     </li>

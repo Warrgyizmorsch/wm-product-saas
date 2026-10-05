@@ -41,6 +41,7 @@ class TenantSubscription extends BaseModel
         'current_start',
         'current_end',
         'grace_ends_at',
+        'cancel_requested_at',
         'cancelled_at',
     ];
 
@@ -57,6 +58,7 @@ class TenantSubscription extends BaseModel
             'current_start' => 'datetime',
             'current_end' => 'datetime',
             'grace_ends_at' => 'datetime',
+            'cancel_requested_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];
     }
@@ -64,6 +66,12 @@ class TenantSubscription extends BaseModel
     public function isLive(): bool
     {
         return in_array($this->status, self::LIVE_STATUSES, true);
+    }
+
+    /** Cancelled by the tenant, still usable until current_end. */
+    public function isCancelling(): bool
+    {
+        return $this->cancel_requested_at !== null && $this->isLive();
     }
 
     /** A downgrade booked for the next renewal (not an upgrade still awaiting payment). */

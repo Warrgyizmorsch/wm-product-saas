@@ -10,6 +10,7 @@ use App\Domains\HRMS\Services\ExitClearanceService;
 use App\Domains\HRMS\Services\FnFCalculationService;
 use App\Domains\HRMS\Services\HrmsScopeService;
 use App\Models\User;
+use App\Services\Notification\NotificationService;
 use Carbon\Carbon;
 
 class ProbationRepository implements ProbationRepositoryInterface
@@ -135,11 +136,49 @@ class ProbationRepository implements ProbationRepositoryInterface
                 'employee_stage' => 'Confirmed',
                 'confirmation_date' => Carbon::today()->format('Y-m-d'),
             ]);
+
+            try {
+                NotificationService::sendToEmployee(
+                    $employee,
+                    'Probation Confirmed!',
+                    "Congratulations! Your employment probation period has been successfully completed and confirmed.",
+                    route('hrms.employees.show', $employee->id),
+                    'hrms',
+                    'probation_confirmed',
+                    'feather-award'
+                );
+
+                NotificationService::sendToHrAdmins(
+                    'Employee Probation Confirmed',
+                    "{$employee->full_name} has been formally evaluated and confirmed.",
+                    route('hrms.employees.show', $employee->id),
+                    'probation_confirmed_hr',
+                    'feather-check-circle'
+                );
+            } catch (\Throwable $e) {
+                // Suppress notification errors
+            }
+
             return "Employee {$employee->full_name} has been formally evaluated and confirmed.";
         } elseif ($validated['recommendation'] === 'extend') {
             $employee->update([
                 'probation_end_date' => $newProbationEnd->format('Y-m-d'),
             ]);
+
+            try {
+                NotificationService::sendToEmployee(
+                    $employee,
+                    'Probation Period Extended',
+                    "Your probation period has been extended by {$validated['extension_days']} days (New End Date: " . $newProbationEnd->format('d M, Y') . ").",
+                    route('hrms.employees.show', $employee->id),
+                    'hrms',
+                    'probation_extended',
+                    'feather-clock'
+                );
+            } catch (\Throwable $e) {
+                // Suppress notification errors
+            }
+
             return "Probation period for {$employee->full_name} extended by {$validated['extension_days']} days (New End Date: " . $newProbationEnd->format('d M, Y') . ").";
         } else {
             $mode = $validated['termination_mode'] ?? 'notice';
@@ -177,6 +216,18 @@ class ProbationRepository implements ProbationRepositoryInterface
 
             $employee->update(['employee_stage' => 'Notice Period']);
 
+            try {
+                NotificationService::sendToHrAdmins(
+                    'Probation Separation Initiated',
+                    "Involuntary separation initiated for {$employee->full_name} following probation evaluation.",
+                    route('hrms.exits.index'),
+                    'probation_terminated_hr',
+                    'feather-alert-triangle'
+                );
+            } catch (\Throwable $e) {
+                // Suppress notification errors
+            }
+
             return "Probation review completed. Involuntary separation initiated for {$employee->full_name}. Last Working Day is set to " . $lwd->format('d M, Y') . " (" . ($mode === 'immediate' ? 'Immediate' : "{$noticeDays} Days Notice") . "). Exit case & clearance checklists created in Offboarding Hub.";
         }
     }
@@ -205,6 +256,28 @@ class ProbationRepository implements ProbationRepositoryInterface
             'employee_stage' => 'Confirmed',
             'confirmation_date' => $confDate,
         ]);
+
+        try {
+            NotificationService::sendToEmployee(
+                $employee,
+                'Probation Confirmed!',
+                "Congratulations! Your employment status has been formally transitioned to Confirmed.",
+                route('hrms.employees.show', $employee->id),
+                'hrms',
+                'probation_confirmed',
+                'feather-award'
+            );
+
+            NotificationService::sendToHrAdmins(
+                'Employee Quick Confirmed',
+                "{$employee->full_name} confirmed from probation reviews.",
+                route('hrms.employees.show', $employee->id),
+                'probation_confirmed_hr',
+                'feather-check-circle'
+            );
+        } catch (\Throwable $e) {
+            // Suppress notification errors
+        }
 
         return "Employee {$employee->full_name} confirmed successfully.";
     }

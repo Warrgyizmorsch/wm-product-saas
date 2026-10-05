@@ -17,6 +17,11 @@
     <link rel="stylesheet" href="{{ asset('assets/css/theme.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/erp.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/production.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Mulish:ital,wght@0,200..1000;1,200..1000&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet">
+    {{-- Global design system (ui-reference/DESIGN.md) — keep it after the theme CSS so it wins. --}}
+    <link rel="stylesheet" href="{{ asset('assets/css/apex-ui.css') }}?v={{ @filemtime(public_path('assets/css/apex-ui.css')) }}">
     <script>
         (function () {
             if (window.navigator && navigator.serviceWorker) {
@@ -32,9 +37,20 @@
             if (savedSkin === 'app-skin-dark') {
                 document.documentElement.classList.add('app-skin-dark');
             }
+            // Header colour picker → one source of truth for the primary colour.
+            // Sets --bs-primary and its RGB triplet, because Bootstrap/theme
+            // styles (sidebar highlights, soft backgrounds) use rgba(var(--bs-primary-rgb), a).
+            window.erpApplyPrimaryColor = function (hex) {
+                var root = document.documentElement.style;
+                root.setProperty('--bs-primary', hex);
+                var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+                if (m) {
+                    root.setProperty('--bs-primary-rgb', parseInt(m[1], 16) + ', ' + parseInt(m[2], 16) + ', ' + parseInt(m[3], 16));
+                }
+            };
             var savedColor = localStorage.getItem('erp_primary_color');
             if (savedColor) {
-                document.documentElement.style.setProperty('--bs-primary', savedColor);
+                window.erpApplyPrimaryColor(savedColor);
             }
         })();
         window.AppCurrency = {
@@ -63,10 +79,6 @@
 
 
     <style>
-        .nxl-container .nxl-content .main-content {
-            padding: 10px !important;
-        }
-
         .dark-light-theme .light-button {
             display: none;
         }
@@ -144,6 +156,9 @@
 </head>
 
 <body>
+    {{-- Where you are (tenant, company, branch, FY, apps) — resolved once, shared by the shell partials. --}}
+    @php($shell = app(\App\Support\ShellContext::class)->resolve())
+
     @include('partials.duralux.sidebar')
     @include('partials.duralux.header')
 
@@ -153,30 +168,23 @@
                 @include('partials.duralux.production-workflow-strip')
             @endif
 
-            <div class="page-header">
-                <div class="page-header-left d-flex align-items-center">
+            {{-- Context bar: page title + status chips on the left, page actions on the right (ui-reference "SecondaryActionBar"). --}}
+            <div class="page-header ax-context-bar">
+                <div class="page-header-left d-flex align-items-center gap-2 min-w-0">
                     @hasSection('page-back-button')
-                        <div class="me-2">
+                        <div class="me-1">
                             @yield('page-back-button')
                         </div>
                     @endif
-                    <div class="page-header-title">
-                        <h5 class="m-b-10">
-                            @yield('page-title', __('ui.dashboard'))
-                            {{-- Ledger amounts carry no symbol of their own; say once, per page, what they are in. --}}
-                            @if (request()->routeIs('accounting.*') && !request()->routeIs('accounting.exchange-rates.*') && company())
+                    <div class="page-header-title d-flex flex-wrap align-items-center gap-2 min-w-0">
+                        <h5 class="ax-page-title mb-0">@yield('page-title', __('ui.dashboard'))</h5>
+                        {{-- Ledger amounts carry no symbol of their own; say once, per page, what they are in. --}}
+                        @if (request()->routeIs('accounting.*') && !request()->routeIs('accounting.exchange-rates.*') && company())
                             @php($reportingCurrency = company_currency())
-                            <span class="badge bg-soft-primary text-primary fs-11 fw-semibold ms-2 align-middle"
-                                title="{{ $reportingCurrency['name'] }} — the company's base currency">
-                                Amounts in {{ $reportingCurrency['code'] }} ({{ $reportingCurrency['symbol'] }})
-                            </span>
-                            @endif
-                        </h5>
+                            <span class="ax-ref ax-tone-positive" title="{{ $reportingCurrency['name'] }} — the company's base currency">Amounts in {{ $reportingCurrency['code'] }} ({{ $reportingCurrency['symbol'] }})</span>
+                        @endif
+                        @yield('page-badge')
                     </div>
-                    <ul class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('ui.home') }}</a></li>
-                        <li class="breadcrumb-item">@yield('breadcrumb', __('ui.dashboard'))</li>
-                    </ul>
                 </div>
                 <div class="page-header-right ms-auto">
                     <div class="page-header-right-items">
@@ -199,6 +207,14 @@
             </div>
 
             <div class="main-content">
+                @if (tenant()?->subscription_status === \App\Models\Tenant::SUBSCRIPTION_PAST_DUE && auth()->user()?->tenant_id !== null)
+                    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+                        <span><i class="feather-alert-triangle me-2"></i>Your subscription renewal payment failed. Please renew soon to keep using the workspace — your data is safe.</span>
+                        @can('viewSubscription', tenant())
+                            <a href="{{ route('platform.subscription.index') }}" class="btn btn-sm btn-warning">Go to billing</a>
+                        @endcan
+                    </div>
+                @endif
                 @yield('content')
             </div>
         </div>
@@ -215,7 +231,9 @@
     <script src="{{ asset('assets/vendors/js/daterangepicker.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
-    <script src="{{ asset('assets/vendors/js/nxlNavigation.min.js') }}"></script>
+    <script src="{{ asset('assets/js/erp-searchable-select.js') }}?v={{ @filemtime(public_path('assets/js/erp-searchable-select.js')) }}"></script>
+    {{-- nxlNavigation is already bundled in vendors.min.js; loading it again bound every
+         sidebar/menu handler twice (the mobile menu opened and closed on the same tap). --}}
     <script src="{{ asset('assets/js/common-init.min.js') }}"></script>
     <script>
         $(document).on('click', '.language_select a[data-flag]', function () {
@@ -228,6 +246,29 @@
                 alt: selected.data('language')
             });
         });
+
+        // User format for Select2 with data-avatar support and fallback
+        window.userformat = function (user) {
+            if (!user.id) {
+                return user.text;
+            }
+            var avatar = '/assets/images/avatar/default.png';
+            if (user.element) {
+                var opt = $(user.element);
+                var dataAvatar = opt.data('avatar') || opt.attr('data-avatar');
+                if (dataAvatar) {
+                    avatar = dataAvatar;
+                } else if (opt.data('user')) {
+                    avatar = '/assets/images/avatar/' + opt.data('user') + '.png';
+                }
+            }
+            return $(
+                '<span class="hstack gap-2 align-items-center">' +
+                    '<img src="' + avatar + '" class="avatar-image avatar-sm object-fit-cover rounded-circle flex-shrink-0" style="width: 22px; height: 22px; border-radius: 50%;" onerror="this.onerror=null; this.src=\'/assets/images/avatar/default.png\';" /> ' +
+                    '<span>' + (user.text || '') + '</span>' +
+                '</span>'
+            );
+        };
 
         // Select2 search focus fix inside Bootstrap modals
         $(document).on('show.bs.modal', '.modal', function () {
@@ -289,7 +330,7 @@
         });
         // Initialize and bind primary color picker
         $(document).ready(function () {
-            var savedColor = localStorage.getItem('erp_primary_color') || '#6337fa';
+            var savedColor = localStorage.getItem('erp_primary_color') || '#4f46e5';
             var picker = $('#primaryColorPicker');
             var preview = $('#primaryColorPreview');
             if (picker.length) {
@@ -299,7 +340,7 @@
                 }
                 picker.on('input change', function () {
                     var color = $(this).val();
-                    document.documentElement.style.setProperty('--bs-primary', color);
+                    window.erpApplyPrimaryColor(color);
                     localStorage.setItem('erp_primary_color', color);
                     if (preview.length) {
                         preview.css('background-color', color);
@@ -310,14 +351,10 @@
 
         // Dark / Light Mode Toggle Handler
         $(document).ready(function () {
+            // Light / Dark is a segmented control in the user menu: mark the current one.
             function syncThemeUI(isDark) {
-                if (isDark) {
-                    $('.dark-button').hide().addClass('active');
-                    $('.light-button').show().removeClass('active');
-                } else {
-                    $('.light-button').hide().removeClass('active');
-                    $('.dark-button').show().removeClass('active');
-                }
+                $('.dark-button').toggleClass('active', isDark);
+                $('.light-button').toggleClass('active', !isDark);
             }
 
             var initialDark = $('html').hasClass('app-skin-dark');

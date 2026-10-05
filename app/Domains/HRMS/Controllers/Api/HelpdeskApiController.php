@@ -120,7 +120,15 @@ class HelpdeskApiController extends Controller
         $indexData = $this->ticketRepository->getIndexData($request->all());
         $ticketsPaginator = $indexData['tickets'];
 
-        $formattedTickets = $ticketsPaginator->through(function ($ticket) {
+        $isHrAdmin = $this->isHrAdmin();
+        $currentEmployee = $this->getAuthenticatedEmployee();
+
+        $formattedTickets = $ticketsPaginator->through(function ($ticket) use ($isHrAdmin, $currentEmployee) {
+            $isOwner = $currentEmployee && (int)$ticket->employee_id === (int)$currentEmployee->id;
+            $isAgent = $currentEmployee && (int)$ticket->assigned_to === (int)$currentEmployee->id;
+            $isOpen = in_array($ticket->status, ['open', 'in_progress', 'pending_employee']);
+            $canRate = $isOwner && in_array($ticket->status, ['resolved', 'closed']) && empty($ticket->rating);
+
             return [
                 'id'              => $ticket->id,
                 'ticket_number'   => $ticket->ticket_number,
@@ -151,6 +159,14 @@ class HelpdeskApiController extends Controller
                     'rating'   => $ticket->rating->rating,
                     'feedback' => $ticket->rating->feedback,
                 ] : null,
+                'capabilities'    => [
+                    'can_view'    => true,
+                    'can_reply'   => $isOpen || $isHrAdmin,
+                    'can_assign'  => $isHrAdmin,
+                    'can_resolve' => $isHrAdmin || $isAgent,
+                    'can_close'   => $isHrAdmin || $isOwner,
+                    'can_rate'    => (bool) $canRate,
+                ],
                 'created_at'      => $ticket->created_at?->toIso8601String(),
             ];
         });
@@ -814,6 +830,14 @@ class HelpdeskApiController extends Controller
                     'created_at'       => $rep->created_at?->toIso8601String(),
                 ];
             }) : [],
+            'capabilities'    => [
+                'can_view'    => true,
+                'can_reply'   => in_array($ticket->status, ['open', 'in_progress', 'pending_employee']) || $this->isHrAdmin(),
+                'can_assign'  => $this->isHrAdmin(),
+                'can_resolve' => $this->isHrAdmin() || ($this->getAuthenticatedEmployee() && (int)$ticket->assigned_to === (int)$this->getAuthenticatedEmployee()->id),
+                'can_close'   => $this->isHrAdmin() || ($this->getAuthenticatedEmployee() && (int)$ticket->employee_id === (int)$this->getAuthenticatedEmployee()->id),
+                'can_rate'    => (bool) ($this->getAuthenticatedEmployee() && (int)$ticket->employee_id === (int)$this->getAuthenticatedEmployee()->id && in_array($ticket->status, ['resolved', 'closed']) && empty($ticket->rating)),
+            ],
             'created_at'      => $ticket->created_at?->toIso8601String(),
         ];
     }
