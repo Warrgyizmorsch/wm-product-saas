@@ -54,7 +54,8 @@ class LeaveStructureApiController extends Controller
 
         return $user->hasHrPermission('hr.settings.manage')
             || $user->hasHrPermission('hrms.leave_requests.approve')
-            || $user->hasHrPermission('hrms.leaves.manage');
+            || $user->hasHrPermission('hrms.leaves.manage')
+            || $user->hasHrPermission('hrms.leave_structures.manage');
     }
 
     /**

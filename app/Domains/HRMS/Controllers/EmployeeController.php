@@ -654,6 +654,17 @@ class EmployeeController extends Controller
             'remarks'             => 'nullable|string|max:500',
         ]);
 
+        // Enforce Pay Group Variable / Ad-hoc Inputs Lock Day
+        $employee->loadMissing('payGroup');
+        if ($employee->payGroup && is_array($employee->payGroup->payroll_rules)) {
+            $lockDay = (int) ($employee->payGroup->payroll_rules['variable_lock_day'] ?? 25);
+            $payrollMonth = $validated['payroll_month'];
+            $currentMonth = \Carbon\Carbon::now()->format('Y-m');
+            if ($payrollMonth === $currentMonth && \Carbon\Carbon::now()->day > $lockDay) {
+                return redirect()->back()->with('error', "Ad-hoc / Variable inputs for {$payrollMonth} are locked after day {$lockDay} of the month.");
+            }
+        }
+
         $validated['employee_id'] = $employee->id;
         $validated['status']      = 'pending';
 

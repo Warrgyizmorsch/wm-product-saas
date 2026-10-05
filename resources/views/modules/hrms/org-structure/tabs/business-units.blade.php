@@ -106,7 +106,7 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <form action="{{ route('hrms.business-unit.destroy', $unit->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_bu') }}', { title: 'Delete Business Unit', variant: 'danger', confirmButtonText: 'Delete' });">
+                                <form action="{{ route('hrms.business-unit.destroy', $unit->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_bu') }}', { title: '{{ __('hrms.org.delete_bu') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end align-items-center">
@@ -239,9 +239,9 @@
                     let statusEl = document.getElementById('modal_view_bu_status');
                     if (statusEl) {
                         if (unit.status === true || unit.status === 1 || unit.status === '1') {
-                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success">Active</span>';
+                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success">{{ __('hrms.employees.frm_status_active') }}</span>';
                         } else {
-                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">Inactive</span>';
+                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">{{ __('hrms.employees.frm_status_inactive') }}</span>';
                         }
                     }
                 });
@@ -278,6 +278,7 @@
                     let statusSelect = document.getElementById('edit_bu_status');
                     if (statusSelect) {
                         statusSelect.value = (unit.status === true || unit.status === 1 || unit.status === '1') ? '1' : '0';
+                        $(statusSelect).trigger('change');
                     }
                     
                     let form = document.getElementById('bu_edit_form');

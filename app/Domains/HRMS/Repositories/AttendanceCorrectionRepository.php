@@ -124,6 +124,21 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
             ->whereDate('date', $date)
             ->first();
 
+        // Enforce Pay Group Attendance Lock Day
+        $employee = Employee::with('payGroup')->find($employeeId);
+        if ($employee && $employee->payGroup && is_array($employee->payGroup->payroll_rules)) {
+            $lockDay = (int) ($employee->payGroup->payroll_rules['attendance_lock_day'] ?? 25);
+            $correctionMonth = Carbon::parse($date)->format('Y-m');
+            $currentMonth = Carbon::now()->format('Y-m');
+            if ($correctionMonth === $currentMonth && Carbon::now()->day > $lockDay) {
+                return [
+                    'success' => false,
+                    'status_code' => 422,
+                    'message' => "Attendance corrections for the current cycle are locked after day {$lockDay} of the month.",
+                ];
+            }
+        }
+
         $checkIn  = $validated['requested_check_in']  ? "{$date} {$validated['requested_check_in']}"  : null;
         $checkOut = $validated['requested_check_out'] ? "{$date} {$validated['requested_check_out']}" : null;
 

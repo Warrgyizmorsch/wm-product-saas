@@ -27,11 +27,11 @@
                             @if($filters['ds_sort'] === 'name_desc') <i class="feather-check ms-3"></i> @endif
                         </a>
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['ds_sort'] === 'level_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'designations', 'ds_sort' => 'level_asc']) }}">
-                            <span>{{ __('hrms.employees.lbl_grade') ?? 'Grade' }} (A-Z)</span>
+                            <span>{{ __('hrms.org.sort_grade_asc') }}</span>
                             @if($filters['ds_sort'] === 'level_asc') <i class="feather-check ms-3"></i> @endif
                         </a>
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['ds_sort'] === 'level_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'designations', 'ds_sort' => 'level_desc']) }}">
-                            <span>{{ __('hrms.employees.lbl_grade') ?? 'Grade' }} (Z-A)</span>
+                            <span>{{ __('hrms.org.sort_grade_desc') }}</span>
                             @if($filters['ds_sort'] === 'level_desc') <i class="feather-check ms-3"></i> @endif
                         </a>
                     </x-ui.sort-dropdown>
@@ -102,7 +102,7 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <form action="{{ route('hrms.designation.destroy', $ds->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_desig') }}', { title: 'Delete Designation', variant: 'danger', confirmButtonText: 'Delete' });">
+                                <form action="{{ route('hrms.designation.destroy', $ds->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_desig') }}', { title: '{{ __('hrms.org.delete_desig') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                     @csrf
                                     @method('DELETE')
                                      <div class="hstack gap-2 justify-content-end align-items-center">
@@ -215,7 +215,10 @@
                     if (levelEl) levelEl.value = desig.level || '';
                     
                     let deptEl = document.getElementById('edit_desig_dept_id');
-                    if (deptEl) deptEl.value = desig.department_id || '';
+                    if (deptEl) {
+                        deptEl.value = desig.department_id || '';
+                        $(deptEl).trigger('change');
+                    }
                     
                     let descEl = document.getElementById('edit_desig_description');
                     if (descEl) descEl.value = desig.description || '';
@@ -223,6 +226,7 @@
                     let statusSelect = document.getElementById('edit_desig_status');
                     if (statusSelect) {
                         statusSelect.value = (desig.status === true || desig.status === 1 || desig.status === '1') ? '1' : '0';
+                        $(statusSelect).trigger('change');
                     }
                     
                     let form = document.getElementById('desig_edit_form');

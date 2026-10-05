@@ -91,7 +91,7 @@ return [
         'label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index',
     ],
     ['section' => 'hrms', 'order' => 112, 'label' => 'Goal Management (OKRs)', 'icon' => 'feather-target', 'route' => 'hrms.goals.index', 'permission' => $selfService],
-    ['section' => 'hrms', 'order' => 114, 'label' => '360° Feedback', 'icon' => 'feather-refresh-cw', 'route' => 'hrms.feedback360.index'],
+    ['section' => 'hrms', 'order' => 114, 'label' => '360° Feedback', 'icon' => 'feather-refresh-cw', 'route' => 'hrms.feedback360.index', 'permission' => $selfService],
     ['section' => 'hrms', 'order' => 115, 'label' => 'SOP Management', 'icon' => 'feather-book-open', 'route' => 'hrms.sop.index', 'permission' => $selfService],
     ['section' => 'hrms', 'order' => 120, 'label' => 'Broadcasts', 'icon' => 'feather-radio', 'route' => 'hrms.broadcasts.index', 'permission' => $selfService],
     [

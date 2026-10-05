@@ -42,7 +42,8 @@
 
 @section('content')
 @once
-<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 @endonce
 
 <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
@@ -1041,9 +1042,12 @@
         }
     }
 
-    // Initialize Google Map for a specific details row
+    window.activeRowMaps = window.activeRowMaps || {};
+
+    // Initialize Leaflet Map for a specific details row
     function initializeRowMap(logId, log) {
-        if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+        if (typeof L === 'undefined') {
+            setTimeout(() => initializeRowMap(logId, log), 100);
             return;
         }
 
@@ -1068,113 +1072,94 @@
                 const mapEl = document.getElementById(`map-${logId}`);
                 if (!mapEl) return;
 
-                // Clear previous map content to avoid duplicate initializations
+                // Clean up previous Leaflet map on this container if any
+                if (window.activeRowMaps[logId]) {
+                    window.activeRowMaps[logId].remove();
+                    delete window.activeRowMaps[logId];
+                }
                 mapEl.innerHTML = '';
                 
-                // Base map set to center on check-in or India by default
-                const defaultCenter = hasCheckin ? { lat: checkinLat, lng: checkinLng } : { lat: 20.5937, lng: 78.9629 };
+                // Base center
+                const defaultCenter = hasCheckin ? [checkinLat, checkinLng] : (hasCheckout ? [checkoutLat, checkoutLng] : [20.5937, 78.9629]);
                 
-                const map = new google.maps.Map(mapEl, {
-                    center: defaultCenter,
-                    zoom: 13,
-                    mapTypeControl: false,
-                    fullscreenControl: false,
-                    streetViewControl: false
-                });
+                const map = L.map(mapEl).setView(defaultCenter, 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
                 
                 const pathLatLngs = [];
-                const bounds = new google.maps.LatLngBounds();
                 
+                const greenIcon = L.divIcon({
+                    className: 'custom-attendance-pin',
+                    html: `<div style="background-color: #10b981; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"><i class="feather-log-in" style="font-size: 12px;"></i></div>`,
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 13],
+                    popupAnchor: [0, -13]
+                });
+
+                const redIcon = L.divIcon({
+                    className: 'custom-attendance-pin',
+                    html: `<div style="background-color: #ef4444; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"><i class="feather-log-out" style="font-size: 12px;"></i></div>`,
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 13],
+                    popupAnchor: [0, -13]
+                });
+
                 // 1. Add Check-In Marker (Green)
                 if (hasCheckin) {
-                    const checkinLatLng = { lat: checkinLat, lng: checkinLng };
+                    const checkinLatLng = [checkinLat, checkinLng];
                     pathLatLngs.push(checkinLatLng);
-                    bounds.extend(checkinLatLng);
 
-                    const marker = new google.maps.Marker({
-                        position: checkinLatLng,
-                        map: map,
-                        title: 'Check In Point',
-                        icon: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'
-                    });
-
-                    const infowindow = new google.maps.InfoWindow({
-                        content: `<b>Check In Point</b><br>Lat: ${checkinLat.toFixed(6)}<br>Lng: ${checkinLng.toFixed(6)}`
-                    });
-                    marker.addListener('click', () => infowindow.open(map, marker));
+                    L.marker(checkinLatLng, { icon: greenIcon, title: 'Check In Point' })
+                        .addTo(map)
+                        .bindPopup(`<b>Check In Point</b><br>Lat: ${checkinLat.toFixed(6)}<br>Lng: ${checkinLng.toFixed(6)}`);
                 }
                 
                 // 2. Add intermediate tracking location logs (Blue circles)
                 if (hasLogs) {
                     locationLogs.forEach(locLog => {
                         if (locLog.lat && locLog.lng) {
-                            const logLatLng = { lat: parseFloat(locLog.lat), lng: parseFloat(locLog.lng) };
+                            const logLatLng = [parseFloat(locLog.lat), parseFloat(locLog.lng)];
                             pathLatLngs.push(logLatLng);
-                            bounds.extend(logLatLng);
 
-                            const circleMarker = new google.maps.Marker({
-                                position: logLatLng,
-                                map: map,
-                                icon: {
-                                    path: google.maps.SymbolPath.CIRCLE,
-                                    fillColor: '#3b82f6',
-                                    fillOpacity: 0.8,
-                                    strokeColor: '#FFFFFF',
-                                    strokeWeight: 1.5,
-                                    scale: 6 // 6-pixel radius dot
-                                }
-                            });
-
-                            const infowindow = new google.maps.InfoWindow({
-                                content: `<b>Tracking Log</b><br>Time: ${locLog.time}<br>Lat: ${logLatLng.lat.toFixed(6)}<br>Lng: ${logLatLng.lng.toFixed(6)}`
-                            });
-                            circleMarker.addListener('click', () => {
-                                infowindow.setPosition(logLatLng);
-                                infowindow.open(map);
-                            });
+                            L.circleMarker(logLatLng, {
+                                radius: 5,
+                                fillColor: '#3b82f6',
+                                color: '#ffffff',
+                                weight: 1.5,
+                                fillOpacity: 0.85
+                            }).addTo(map).bindPopup(`<b>Tracking Log</b><br>Time: ${locLog.time || ''}<br>Lat: ${logLatLng[0].toFixed(6)}<br>Lng: ${logLatLng[1].toFixed(6)}`);
                         }
                     });
                 }
                 
                 // 3. Add Check-Out Marker (Red)
                 if (hasCheckout) {
-                    const checkoutLatLng = { lat: checkoutLat, lng: checkoutLng };
+                    const checkoutLatLng = [checkoutLat, checkoutLng];
                     pathLatLngs.push(checkoutLatLng);
-                    bounds.extend(checkoutLatLng);
 
-                    const marker = new google.maps.Marker({
-                        position: checkoutLatLng,
-                        map: map,
-                        title: 'Check Out Point',
-                        icon: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
-                    });
-
-                    const infowindow = new google.maps.InfoWindow({
-                        content: `<b>Check Out Point</b><br>Lat: ${checkoutLat.toFixed(6)}<br>Lng: ${checkoutLng.toFixed(6)}`
-                    });
-                    marker.addListener('click', () => infowindow.open(map, marker));
+                    L.marker(checkoutLatLng, { icon: redIcon, title: 'Check Out Point' })
+                        .addTo(map)
+                        .bindPopup(`<b>Check Out Point</b><br>Lat: ${checkoutLat.toFixed(6)}<br>Lng: ${checkoutLng.toFixed(6)}`);
                 }
                 
                 // 4. Indigo Path Connecting Line
                 if (pathLatLngs.length >= 2) {
-                    const polyline = new google.maps.Polyline({
-                        path: pathLatLngs,
-                        geodesic: true,
-                        strokeColor: '#4f46e5',
-                        strokeOpacity: 0.8,
-                        strokeWeight: 3
-                    });
-                    polyline.setMap(map);
+                    L.polyline(pathLatLngs, {
+                        color: '#4f46e5',
+                        weight: 3,
+                        opacity: 0.85,
+                        dashArray: '4, 6'
+                    }).addTo(map);
                 }
                 
-                window.activeRowMap = map;
+                window.activeRowMaps[logId] = map;
                 
-                google.maps.event.trigger(map, 'resize');
+                map.invalidateSize();
                 if (pathLatLngs.length > 0) {
-                    map.fitBounds(bounds);
-                    if (pathLatLngs.length === 1) {
-                        map.setZoom(14);
-                    }
+                    const bounds = L.latLngBounds(pathLatLngs);
+                    map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
                 }
             }, 150);
         } else {

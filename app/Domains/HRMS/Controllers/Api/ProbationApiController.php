@@ -44,7 +44,8 @@ class ProbationApiController extends Controller
 
         return $user->hasHrPermission('hr.settings.manage')
             || $user->hasHrPermission('hr.employees.manage')
-            || $user->hasHrPermission('hrms.employees.manage');
+            || $user->hasHrPermission('hrms.employees.manage')
+            || $user->hasHrPermission('hrms.probation.manage');
     }
 
     private function getAuthenticatedEmployee(): ?Employee

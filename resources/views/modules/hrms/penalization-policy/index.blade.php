@@ -8,13 +8,9 @@
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     @once
-    <script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     @endonce
-    <style>
-        .pac-container {
-            z-index: 9999 !important;
-        }
-    </style>
 @endpush
 
 @push('scripts')
@@ -1708,25 +1704,27 @@
                 };
 
                 const renderResults = (results) => {
-                    currentResults = results;
+                    currentResults = Array.isArray(results) ? results : [];
                     dropdown.innerHTML = '';
                     selectedIndex = -1;
                     updateDropdownPosition();
 
-                    if (!results || results.length === 0) {
+                    if (!currentResults || currentResults.length === 0) {
                         dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">No locations found</div>';
                         dropdown.style.display = 'block';
                         return;
                     }
 
-                    results.forEach((item, index) => {
+                    currentResults.forEach((item, index) => {
+                        const name = item.display_name || item.description || '';
+                        const mainName = name.split(',')[0] || name;
                         const div = document.createElement('div');
                         div.className = 'p-2 border-bottom cursor-pointer nominatim-item text-truncate d-flex align-items-center gap-2';
                         div.style.cssText = 'cursor: pointer; transition: background 0.15s ease; border-color: #f1f5f9 !important; background: #ffffff; text-align: left;';
                         div.innerHTML = `<i class="feather-map-pin text-primary flex-shrink-0" style="font-size: 12px;"></i>
                                          <div class="text-truncate">
-                                             <div class="fw-semibold text-dark text-truncate" style="font-size: 11px;">${escapeHtml(item.display_name.split(',')[0])}</div>
-                                             <div class="text-muted fs-10 text-truncate">${escapeHtml(item.display_name)}</div>
+                                             <div class="fw-semibold text-dark text-truncate" style="font-size: 11px;">${escapeHtml(mainName)}</div>
+                                             <div class="text-muted fs-10 text-truncate">${escapeHtml(name)}</div>
                                          </div>`;
 
                         div.addEventListener('mouseenter', () => { highlightItem(index); });
@@ -1751,13 +1749,14 @@
                 const selectItem = (index) => {
                     if (index >= 0 && index < currentResults.length) {
                         const item = currentResults[index];
-                        inputEl.value = item.display_name;
+                        const displayName = item.display_name || item.description || '';
+                        inputEl.value = displayName;
                         closeDropdown();
                         if (typeof onSelectCallback === 'function') {
                             onSelectCallback({
                                 lat: parseFloat(item.lat),
-                                lng: parseFloat(item.lon),
-                                formatted_address: item.display_name
+                                lng: parseFloat(item.lon || item.lng),
+                                formatted_address: displayName
                             });
                         }
                     }
@@ -1772,12 +1771,23 @@
                     }
 
                     debounceTimer = setTimeout(() => {
-                        fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                        fetch('/api/maps/autocomplete?query=' + encodeURIComponent(query))
                             .then(res => res.json())
-                            .then(data => renderResults(data))
-                            .catch(err => {
-                                console.error('Nominatim search error:', err);
-                                closeDropdown();
+                            .then(data => {
+                                if (data && data.success && Array.isArray(data.predictions) && data.predictions.length > 0) {
+                                    renderResults(data.predictions);
+                                } else {
+                                    fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                                        .then(res => res.json())
+                                        .then(osmData => renderResults(osmData))
+                                        .catch(() => closeDropdown());
+                                }
+                            })
+                            .catch(() => {
+                                fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&addressdetails=1&limit=8')
+                                    .then(res => res.json())
+                                    .then(osmData => renderResults(osmData))
+                                    .catch(() => closeDropdown());
                             });
                     }, 300);
                 });
@@ -1816,32 +1826,29 @@
             if (!officeMapObj) return;
             const latInput = document.getElementById('office_latitude');
             const lngInput = document.getElementById('office_longitude');
-            const lat = parseFloat(latInput.value);
-            const lng = parseFloat(lngInput.value);
+            const lat = parseFloat(latInput ? latInput.value : '');
+            const lng = parseFloat(lngInput ? lngInput.value : '');
             const radius = parseFloat(document.getElementById('office_radius').value) || 100;
             
             if (isNaN(lat) || isNaN(lng)) return;
-            const center = { lat: lat, lng: lng };
             
             if (officeCircleObj) {
-                officeCircleObj.setCenter(center);
+                officeCircleObj.setLatLng([lat, lng]);
                 officeCircleObj.setRadius(radius);
             } else {
-                officeCircleObj = new google.maps.Circle({
-                    strokeColor: '#10b981',
-                    strokeOpacity: 0.8,
-                    strokeWeight: 2,
+                officeCircleObj = L.circle([lat, lng], {
+                    color: '#10b981',
                     fillColor: '#d1fae5',
                     fillOpacity: 0.35,
-                    map: officeMapObj,
-                    center: center,
+                    weight: 2,
                     radius: radius
-                });
+                }).addTo(officeMapObj);
             }
         };
 
         const initOfficeMapPicker = () => {
-            if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+            if (typeof L === 'undefined') {
+                setTimeout(initOfficeMapPicker, 100);
                 return;
             }
 
@@ -1849,49 +1856,47 @@
             const latInput = document.getElementById('office_latitude');
             const lngInput = document.getElementById('office_longitude');
             
+            if (!document.getElementById(mapContainerId)) return;
+
             let curLat = parseFloat(latInput ? latInput.value : '') || 28.6139;
             let curLng = parseFloat(lngInput ? lngInput.value : '') || 77.2090;
-            const initCenter = { lat: curLat, lng: curLng };
 
             if (officeMapObj) {
-                google.maps.event.trigger(officeMapObj, 'resize');
-                officeMapObj.setCenter(initCenter);
-                officeMarkerObj.setPosition(initCenter);
+                officeMapObj.invalidateSize();
+                officeMapObj.setView([curLat, curLng], officeMapObj.getZoom() || 14);
+                if (officeMarkerObj) {
+                    officeMarkerObj.setLatLng([curLat, curLng]);
+                }
                 updateGeofenceCircle();
                 return;
             }
 
-            officeMapObj = new google.maps.Map(document.getElementById(mapContainerId), {
-                center: initCenter,
-                zoom: 14,
-                mapTypeControl: false,
-                fullscreenControl: false,
-                streetViewControl: false
-            });
+            officeMapObj = L.map(mapContainerId).setView([curLat, curLng], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(officeMapObj);
 
-            officeMarkerObj = new google.maps.Marker({
-                position: initCenter,
-                map: officeMapObj,
+            officeMarkerObj = L.marker([curLat, curLng], {
                 draggable: true,
                 title: 'Drag to adjust office location'
-            });
+            }).addTo(officeMapObj);
 
             updateGeofenceCircle();
 
-            google.maps.event.addListener(officeMapObj, 'click', function(e) {
-                const clickedLat = e.latLng.lat();
-                const clickedLng = e.latLng.lng();
-                officeMarkerObj.setPosition(e.latLng);
+            officeMapObj.on('click', function(e) {
+                const clickedLat = e.latlng.lat;
+                const clickedLng = e.latlng.lng;
+                officeMarkerObj.setLatLng(e.latlng);
                 latInput.value = clickedLat.toFixed(6);
                 lngInput.value = clickedLng.toFixed(6);
                 updateGeofenceCircle();
             });
 
-            google.maps.event.addListener(officeMarkerObj, 'dragend', function(e) {
-                const draggedLat = e.latLng.lat();
-                const draggedLng = e.latLng.lng();
-                latInput.value = draggedLat.toFixed(6);
-                lngInput.value = draggedLng.toFixed(6);
+            officeMarkerObj.on('dragend', function(e) {
+                const pos = e.target.getLatLng();
+                latInput.value = pos.lat.toFixed(6);
+                lngInput.value = pos.lng.toFixed(6);
                 updateGeofenceCircle();
             });
 
@@ -1899,9 +1904,8 @@
                 const newLat = parseFloat(latInput.value);
                 const newLng = parseFloat(lngInput.value);
                 if (!isNaN(newLat) && !isNaN(newLng)) {
-                    const pos = { lat: newLat, lng: newLng };
-                    officeMapObj.setCenter(pos);
-                    officeMarkerObj.setPosition(pos);
+                    officeMapObj.setView([newLat, newLng], officeMapObj.getZoom() || 14);
+                    officeMarkerObj.setLatLng([newLat, newLng]);
                     updateGeofenceCircle();
                 }
             };
@@ -1917,15 +1921,15 @@
 
             // Nominatim Autocomplete search logic (Hybrid OpenStreetMap Search)
             const searchInput = document.getElementById('office_map_search');
-            if (searchInput) {
+            if (searchInput && window.initNominatimAutocomplete) {
                 window.initNominatimAutocomplete(searchInput, function(place) {
-                    const pos = { lat: place.lat, lng: place.lng };
-                    officeMapObj.setCenter(pos);
-                    officeMapObj.setZoom(15);
-                    officeMarkerObj.setPosition(pos);
+                    const lat = parseFloat(place.lat);
+                    const lng = parseFloat(place.lng);
+                    officeMapObj.setView([lat, lng], 15);
+                    officeMarkerObj.setLatLng([lat, lng]);
 
-                    latInput.value = place.lat.toFixed(6);
-                    lngInput.value = place.lng.toFixed(6);
+                    latInput.value = lat.toFixed(6);
+                    lngInput.value = lng.toFixed(6);
                     updateGeofenceCircle();
                 });
 
@@ -1936,7 +1940,7 @@
                 });
             }
             setTimeout(() => {
-                if (officeMapObj) google.maps.event.trigger(officeMapObj, 'resize');
+                if (officeMapObj) officeMapObj.invalidateSize();
             }, 300);
         };
 

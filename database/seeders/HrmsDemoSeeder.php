@@ -143,6 +143,12 @@ class HrmsDemoSeeder extends Seeder
             'feedback_360_questions',
             'feedback_360_competencies',
             'feedback_360_cycles',
+            'goal_check_ins',
+            'goal_key_results',
+            'goal_employees',
+            'goals',
+            'goal_categories',
+            'goal_cycles',
             'sop_version_histories',
             'sop_assignments',
             'sop_sections',
@@ -4063,6 +4069,7 @@ class HrmsDemoSeeder extends Seeder
             'tenant_id'      => $tenant->id,
             'cycle_id'       => $feedbackCycle->id,
             'participant_id' => $participant->id,
+            'employee_id'    => $targetEmployee->id,
             'reviewer_id'    => $targetEmployee->id,
             'reviewer_type'  => 'self',
             'status'         => 'completed',
@@ -4073,13 +4080,14 @@ class HrmsDemoSeeder extends Seeder
         Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech2->id, 'rating_value' => 5.0]);
         Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTeam1->id, 'rating_value' => 4.0]);
         Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOpen1->id, 'text_value' => 'Successfully refactored HRMS repository layer and improved database query execution times by 40%.']);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOpen1->id, 'text_response' => 'Successfully refactored HRMS repository layer and improved database query execution times by 40%.']);
 
         // 2. Manager Review
         $nomManager = Feedback360Nomination::create([
             'tenant_id'      => $tenant->id,
             'cycle_id'       => $feedbackCycle->id,
             'participant_id' => $participant->id,
+            'employee_id'    => $targetEmployee->id,
             'reviewer_id'    => $managerEmployee->id,
             'reviewer_type'  => 'manager',
             'status'         => 'completed',
@@ -4090,14 +4098,15 @@ class HrmsDemoSeeder extends Seeder
         Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech2->id, 'rating_value' => 4.5]);
         Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTeam1->id, 'rating_value' => 4.5]);
         Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen1->id, 'text_value' => 'Rahul exhibits exceptional technical grit, consistently delivering zero-defect pull requests.']);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen2->id, 'text_value' => 'Encouraged to take on lead architecture roles in upcoming cross-module services.']);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen1->id, 'text_response' => 'Rahul exhibits exceptional technical grit, consistently delivering zero-defect pull requests.']);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen2->id, 'text_response' => 'Encouraged to take on lead architecture roles in upcoming cross-module services.']);
 
         // 3. Peer Review 1
         $nomPeer1 = Feedback360Nomination::create([
             'tenant_id'      => $tenant->id,
             'cycle_id'       => $feedbackCycle->id,
             'participant_id' => $participant->id,
+            'employee_id'    => $targetEmployee->id,
             'reviewer_id'    => $peerEmployee1->id,
             'reviewer_type'  => 'peer',
             'status'         => 'completed',
@@ -4108,7 +4117,7 @@ class HrmsDemoSeeder extends Seeder
         Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech2->id, 'rating_value' => 4.0]);
         Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTeam1->id, 'rating_value' => 5.0]);
         Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOpen1->id, 'text_value' => 'Always approachable, provides thorough and respectful code review feedback.']);
+        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOpen1->id, 'text_response' => 'Always approachable, provides thorough and respectful code review feedback.']);
 
         $participant->recalculateScores();
 

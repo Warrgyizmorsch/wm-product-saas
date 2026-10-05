@@ -419,7 +419,7 @@ class OrgController extends Controller
 
         \App\Domains\HRMS\Models\SalaryComponent::create($validated);
 
-        return redirect()->route('hrms.org.index')->with('success', 'Salary component created successfully.');
+        return redirect()->route('hrms.org.index')->with('success', __('hrms.salary.component_created_success'));
     }
 
     public function updateSalaryComponent(\Illuminate\Http\Request $request, \App\Domains\HRMS\Models\SalaryComponent $salaryComponent)
@@ -437,7 +437,7 @@ class OrgController extends Controller
 
         $salaryComponent->update($validated);
 
-        return redirect()->route('hrms.org.index')->with('success', 'Salary component updated successfully.');
+        return redirect()->route('hrms.org.index')->with('success', __('hrms.salary.component_updated_success'));
     }
 
     public function destroySalaryComponent(\Illuminate\Http\Request $request, \App\Domains\HRMS\Models\SalaryComponent $salaryComponent)
@@ -446,7 +446,7 @@ class OrgController extends Controller
 
         $salaryComponent->delete();
 
-        return redirect()->route('hrms.org.index')->with('success', 'Salary component deleted successfully.');
+        return redirect()->route('hrms.org.index')->with('success', __('hrms.salary.component_deleted_success'));
     }
 }
 

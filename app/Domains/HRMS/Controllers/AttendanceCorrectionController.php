@@ -104,6 +104,13 @@ class AttendanceCorrectionController extends Controller
 
         $res = $this->attendanceCorrectionRepository->storeCorrection($validated, auth()->user(), $tenantId);
 
+        if (!$request->expectsJson() && !$request->ajax()) {
+            if (!$res['success']) {
+                return redirect()->back()->with('error', $res['message'])->withInput();
+            }
+            return redirect()->back()->with('success', $res['message']);
+        }
+
         return response()->json([
             'success' => $res['success'],
             'message' => $res['message'],

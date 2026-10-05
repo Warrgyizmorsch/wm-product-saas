@@ -130,7 +130,7 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <form action="{{ route('hrms.department.destroy', $d->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_dept') }}', { title: 'Delete Department', variant: 'danger', confirmButtonText: 'Delete' });">
+                                <form action="{{ route('hrms.department.destroy', $d->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_dept') }}', { title: '{{ __('hrms.org.delete_dept') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                     @csrf
                                     @method('DELETE')
                                       <div class="hstack gap-2 justify-content-end align-items-center">
@@ -246,17 +246,31 @@
                     let codeEl = document.getElementById('edit_dept_code');
                     if (codeEl) codeEl.value = dept.code || '';
                     
-                    let branchEl = document.getElementById('edit_dept_branch_id');
-                    if (branchEl) branchEl.value = dept.branch_id || '';
-                    
                     let companyEl = document.getElementById('edit_dept_company_id');
-                    if (companyEl) companyEl.value = dept.company_id || '';
+                    if (companyEl) {
+                        companyEl.value = dept.company_id || '';
+                        $(companyEl).trigger('change');
+                    }
                     
                     let buEl = document.getElementById('edit_dept_bu_id');
-                    if (buEl) buEl.value = dept.business_unit_id || '';
+                    if (buEl) {
+                        buEl.value = dept.business_unit_id || '';
+                        $(buEl).trigger('change');
+                    }
+
+                    let branchEl = document.getElementById('edit_dept_branch_id');
+                    if (branchEl) {
+                        branchEl.value = dept.branch_id || '';
+                        $(branchEl).trigger('change');
+                    }
                     
                     let headEl = document.getElementById('edit_dept_head_id');
-                    if (headEl) headEl.value = dept.head_employee_id || '';
+                    if (headEl) {
+                        $(headEl).val(dept.head_employee_id || '');
+                        if ($(headEl).hasClass('select2-hidden-accessible')) {
+                            $(headEl).trigger('change.select2');
+                        }
+                    }
                     
                     let descEl = document.getElementById('edit_dept_description');
                     if (descEl) descEl.value = dept.description || '';
@@ -264,6 +278,7 @@
                     let statusSelect = document.getElementById('edit_dept_status');
                     if (statusSelect) {
                         statusSelect.value = (dept.status === true || dept.status === 1 || dept.status === '1') ? '1' : '0';
+                        $(statusSelect).trigger('change');
                     }
                     
                     let form = document.getElementById('dept_edit_form');

@@ -107,7 +107,7 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <form action="{{ route('hrms.company.destroy', $company->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_co') }}', { title: 'Delete Legal Entity', variant: 'danger', confirmButtonText: 'Delete' });">
+                                <form action="{{ route('hrms.company.destroy', $company->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_co') }}', { title: '{{ __('hrms.org.delete_co') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end align-items-center">
@@ -307,19 +307,34 @@
                     if (webEl) webEl.value = company.website || '';
                     
                     let currEl = document.getElementById('edit_currency');
-                    if (currEl) currEl.value = company.currency || '';
+                    if (currEl) {
+                        currEl.value = company.currency || '';
+                        $(currEl).trigger('change');
+                    }
                     
                     let tzEl = document.getElementById('edit_timezone');
-                    if (tzEl) tzEl.value = company.timezone || '';
+                    if (tzEl) {
+                        tzEl.value = company.timezone || '';
+                        $(tzEl).trigger('change');
+                    }
                     
                     let countryEl = document.getElementById('edit_country');
-                    if (countryEl) countryEl.value = company.country || '';
+                    if (countryEl) {
+                        countryEl.value = company.country || '';
+                        $(countryEl).trigger('change');
+                    }
                     
                     let stateEl = document.getElementById('edit_state');
-                    if (stateEl) stateEl.value = company.state || '';
+                    if (stateEl) {
+                        stateEl.value = company.state || '';
+                        $(stateEl).trigger('change');
+                    }
                     
                     let cityEl = document.getElementById('edit_city');
-                    if (cityEl) cityEl.value = company.city || '';
+                    if (cityEl) {
+                        cityEl.value = company.city || '';
+                        $(cityEl).trigger('change');
+                    }
                     
                     let zipEl = document.getElementById('edit_postal_code');
                     if (zipEl) zipEl.value = company.postal_code || '';
@@ -330,6 +345,7 @@
                     let statusSelect = document.getElementById('edit_status');
                     if (statusSelect) {
                         statusSelect.value = (company.status === true || company.status === 1 || company.status === '1') ? '1' : '0';
+                        $(statusSelect).trigger('change');
                     }
                     
                     let previewImg = document.getElementById('edit_logo_preview');
