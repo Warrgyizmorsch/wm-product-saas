@@ -43,6 +43,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'crm/whatsapp/webhook',
             'platform/whatsapp/webhook',
             'webhooks/razorpay',
+            'webhooks/meta-leadgen',
+            'api/webhooks/meta-leadgen',
             'api/*',
         ]);
 

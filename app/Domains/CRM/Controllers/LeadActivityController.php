@@ -4,6 +4,7 @@ namespace App\Domains\CRM\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\LeadFollowup;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -35,8 +36,9 @@ class LeadActivityController extends Controller
 
         $followups = LeadFollowup::query()
             ->where('tenant_id', $tenantId)
+            ->whereNotNull('lead_id')
             ->whereBetween('followup_date', [$monthStart->copy()->subDays(7), $monthEnd->copy()->addDays(7)])
-            ->with(['lead', 'deal'])
+            ->with(['lead.owner'])
             ->orderBy('followup_date', 'asc')
             ->get();
 
