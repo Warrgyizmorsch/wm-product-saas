@@ -142,16 +142,12 @@
                                     alpineError="errors.version" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="select" :label="__('production.routing_reference')"
-                                    name="routing_id" id="routing_id" x-model="selectedRoutingId"
-                                    :error-text="$errors->first('routing_id')" alpineError="errors.routing_id">
-                                    <option value="">{{ __('production.no_routing') }}</option>
-                                    @foreach($routings as $rt)
-                                        <option value="{{ $rt->id }}" data-product-id="{{ $rt->product_id }}">
-                                            {{ $rt->routing_number }} - {{ $rt->name }} (v{{ $rt->version }})
-                                        </option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
+                                <label for="routing_reference_display" class="form-label fs-12 fw-semibold text-dark mb-2">
+                                    {{ __('production.routing_reference') }}
+                                </label>
+                                <input type="text" id="routing_reference_display" class="form-control" readonly
+                                       value="" placeholder="{{ __('production.no_routing') }}">
+                                <input type="hidden" name="routing_id" id="routing_id" value="{{ old('routing_id', $bom->routing_id) }}">
                             </div>
                             <div class="col-md-6">
                                 <x-ui.odoo-form-ui type="input" :label="__('production.start_date') ?? 'Start Date'"
@@ -519,15 +515,50 @@
     </div>
     @php
         $oldItems = old('items', $bom->items->toArray());
+
+        $activeRoutingsJson = $routings
+            ->where('status', 'active')
+            ->map(function ($rt) {
+                return [
+                    'id' => (int) $rt->id,
+                    'text' => trim(($rt->routing_number ?? '') . ' - ' . ($rt->name ?? '') . ' (v' . ($rt->version ?? '0') . ')'),
+                    'productId' => (int) ($rt->product_id ?? 0),
+                    'status' => $rt->status,
+                ];
+            })
+            ->values()
+            ->toArray();
     @endphp
 
     <script>
+        const activeRoutings = @json($activeRoutingsJson);
+
+        const setRoutingUi = (route) => {
+            const $display = $('#routing_reference_display');
+            const $hidden = $('#routing_id');
+
+            if (!route || route.status !== 'active') {
+                $hidden.val('');
+                $display.val('No Routing');
+                return '';
+            }
+
+            $hidden.val(route.id);
+            $display.val(route.text);
+            return String(route.id);
+        };
+
+        const syncRoutingDisplay = (routeId) => {
+            const route = activeRoutings.find(rt => String(rt.id) === String(routeId));
+            return setRoutingUi(route || null);
+        };
+
         document.addEventListener('alpine:init', () => {
             Alpine.data('bomForm', () => ({
                 items: @json($oldItems),
                 errors: @json($errors->toArray()),
                 materials: @json($materials),
-                selectedRoutingId: '{{ old("routing_id", $bom->routing_id) }}',
+                selectedRoutingId: syncRoutingDisplay('{{ old("routing_id", $bom->routing_id) }}'),
                 operations: [],
                 loadingOperations: false,
                 activeTab: 'components',
@@ -617,62 +648,35 @@
                         });
                     });
 
-                    // Store all routing options in memory on init
-                    const allRoutings = [];
-                    $('#routing_id option').each(function () {
-                        const val = $(this).val();
-                        if (val) {
-                            allRoutings.push({
-                                id: val,
-                                text: $(this).text(),
-                                productId: $(this).attr('data-product-id')
-                            });
-                        }
-                    });
-
-                    // Function to filter routing options based on selected product (visible only)
                     const filterRoutings = (productId) => {
-                        const $routingSelect = $('#routing_id');
-                        const currentVal = $routingSelect.val();
+                        const currentVal = $('#routing_id').val();
+                        const validRoutes = activeRoutings.filter(rt => rt.status === 'active' && (!productId || String(rt.productId) === String(productId)));
+                        const selectedRoute = validRoutes.find(rt => String(rt.id) === String(currentVal)) || validRoutes[0] || null;
 
-                        $routingSelect.empty();
-                        $routingSelect.append($('<option value="">No Routing Reference</option>'));
+                        if (!productId || validRoutes.length === 0) {
+                            $('#routing_id').val('');
+                            $('#routing_reference_display').val('No Routing');
+                            this.selectedRoutingId = '';
+                            this.loadOperations();
+                            return;
+                        }
 
-                        let selectedValStillValid = false;
-
-                        allRoutings.forEach(rt => {
-                            if (productId && rt.productId == productId) {
-                                const $opt = $('<option></option>')
-                                    .val(rt.id)
-                                    .text(rt.text)
-                                    .attr('data-product-id', rt.productId);
-                                $routingSelect.append($opt);
-                                if (rt.id == currentVal) {
-                                    selectedValStillValid = true;
-                                }
-                            }
-                        });
-
-                        if (selectedValStillValid && currentVal) {
-                            $routingSelect.val(currentVal);
+                        if (selectedRoute) {
+                            $('#routing_id').val(selectedRoute.id);
+                            $('#routing_reference_display').val(selectedRoute.text);
+                            this.selectedRoutingId = String(selectedRoute.id);
                         } else {
-                            $routingSelect.val('');
+                            $('#routing_id').val('');
+                            $('#routing_reference_display').val('No Routing');
+                            this.selectedRoutingId = '';
                         }
 
-                        if ($routingSelect.data('select2')) {
-                            $routingSelect.trigger('change');
-                        }
+                        this.loadOperations();
                     };
 
                     // Initial filter on load
                     const initialProductId = $('#product_id').val();
                     filterRoutings(initialProductId);
-
-                    // Hook select2 change event for routing reference
-                    $('#routing_id').on('change.select2', (e) => {
-                        this.selectedRoutingId = e.target.value;
-                        this.loadOperations();
-                    });
 
                     // Hook select2 change event for parent product_id to disable it in row selections and filter routings
                     $('#product_id').on('change.select2 change', (e) => {
