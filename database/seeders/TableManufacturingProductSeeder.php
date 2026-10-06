@@ -51,14 +51,15 @@ class TableManufacturingProductSeeder extends Seeder
     {
         Schema::disableForeignKeyConstraints();
 
-        $productIds = Product::where('tenant_id', $tenantId)
+        $productIds = Product::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->pluck('id')
             ->toArray();
 
         if (!empty($productIds)) {
-            StockTransaction::where('tenant_id', $tenantId)->delete();
-            ProductWarehouseStock::where('tenant_id', $tenantId)->delete();
-            Product::where('tenant_id', $tenantId)->forceDelete();
+            StockTransaction::withoutGlobalScopes()->where('tenant_id', $tenantId)->delete();
+            ProductWarehouseStock::withoutGlobalScopes()->where('tenant_id', $tenantId)->delete();
+            Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->forceDelete();
         }
 
         Schema::enableForeignKeyConstraints();
@@ -147,8 +148,6 @@ class TableManufacturingProductSeeder extends Seeder
 
         $company = DB::table('companies')->where('tenant_id', $tenantId)->first();
         $companyId = $company?->id;
-        $branch = DB::table('branches')->where('tenant_id', $tenantId)->first();
-        $branchId = $branch?->id;
 
         $whList = [
             [
@@ -169,11 +168,11 @@ class TableManufacturingProductSeeder extends Seeder
         ];
 
         foreach ($whList as $w) {
-            $wh = Warehouse::firstOrCreate(
+            $wh = Warehouse::updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $w['code']],
                 [
                     'company_id' => $companyId,
-                    'branch_id' => $branchId,
+                    'branch_id' => null,
                     'name' => $w['name'],
                     'type' => $w['type'],
                     'status' => 'active',
@@ -328,8 +327,6 @@ class TableManufacturingProductSeeder extends Seeder
 
         $company = DB::table('companies')->where('tenant_id', $tenantId)->first();
         $companyId = $company?->id;
-        $branch = DB::table('branches')->where('tenant_id', $tenantId)->first();
-        $branchId = $branch?->id;
 
         $createdProducts = [];
 
@@ -338,7 +335,7 @@ class TableManufacturingProductSeeder extends Seeder
                 ['tenant_id' => $tenantId, 'sku' => $item['sku']],
                 [
                     'company_id' => $companyId,
-                    'branch_id' => $branchId,
+                    'branch_id' => null,
                     'name' => $item['name'],
                     'type' => $item['type'],
                     'planning_type' => $item['planning_type'],
@@ -380,8 +377,6 @@ class TableManufacturingProductSeeder extends Seeder
     {
         $company = DB::table('companies')->where('tenant_id', $tenantId)->first();
         $companyId = $company?->id;
-        $branch = DB::table('branches')->where('tenant_id', $tenantId)->first();
-        $branchId = $branch?->id;
 
         foreach ($products as $key => $info) {
             $product = $info['model'];
@@ -402,7 +397,7 @@ class TableManufacturingProductSeeder extends Seeder
                 ],
                 [
                     'company_id' => $companyId,
-                    'branch_id' => $branchId,
+                    'branch_id' => null,
                     'quantity' => $qty,
                     'available_qty' => $qty,
                     'reserved_qty' => 0.00,
@@ -419,7 +414,7 @@ class TableManufacturingProductSeeder extends Seeder
                 ],
                 [
                     'company_id' => $companyId,
-                    'branch_id' => $branchId,
+                    'branch_id' => null,
                     'type' => 'IN',
                     'reference_id' => $product->id,
                     'quantity' => $qty,
