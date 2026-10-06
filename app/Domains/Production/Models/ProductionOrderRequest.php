@@ -5,17 +5,21 @@ namespace App\Domains\Production\Models;
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Sales\Models\MaterialRequirementItem;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProductionOrderRequest extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'production_order_requests';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'material_requirement_item_id',
         'product_id',
         'quantity_requested',

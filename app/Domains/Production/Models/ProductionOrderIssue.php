@@ -6,15 +6,21 @@ use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Batch;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProductionOrderIssue extends BaseModel
 {
+    use BelongsToCompany, BelongsToBranch;
+
     protected $table = 'production_order_issues';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'production_order_id',
         'reservation_id',
         'product_id',

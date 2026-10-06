@@ -3,6 +3,8 @@
 namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\Loggable;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProductionSchedule extends BaseModel
 {
-    use HasFactory, SoftDeletes, Loggable;
+    use HasFactory, SoftDeletes, Loggable, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'production_schedules';
 
@@ -52,6 +54,8 @@ class ProductionSchedule extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'schedule_number',
         'production_order_id',
         'scheduling_type',

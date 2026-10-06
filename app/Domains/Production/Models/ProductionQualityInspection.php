@@ -3,6 +3,8 @@
 namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,12 +13,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProductionQualityInspection extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'production_quality_inspections';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'inspection_number',
         'quality_plan_id',
         'stage',

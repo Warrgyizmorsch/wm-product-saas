@@ -117,10 +117,14 @@ class PmScheduleService
                 }
 
                 // Generate unique WO number
-                $woNumber = $this->codeService->generateWorkOrderNumber($tenantId);
+                $branchId = $schedule->machine?->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+                $companyId = $schedule->machine?->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+                $woNumber = $this->codeService->generateWorkOrderNumber($tenantId, $branchId);
 
                 $workOrder = $this->repository->createWorkOrder([
                     'tenant_id'           => $tenantId,
+                    'company_id'          => $companyId,
+                    'branch_id'           => $branchId,
                     'work_order_number'   => $woNumber,
                     'machine_id'          => $schedule->machine_id,
                     'pm_schedule_id'      => $schedule->id,

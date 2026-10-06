@@ -11,6 +11,8 @@ class ProductWarehouseStock extends BaseModel
 {
     use BelongsToCompany, BelongsToBranch;
 
+    public bool $sharedAcrossCompanies = true;
+
     protected $table = 'product_warehouse_stocks';
 
     protected $fillable = [
