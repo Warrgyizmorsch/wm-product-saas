@@ -1021,4 +1021,55 @@ class PayrollRunApiController extends Controller
             ->whereNotIn('id', $groupAccountIds)
             ->first();
     }
+
+    /**
+     * Export payroll bank transfer batch file (.xlsx).
+     */
+    public function exportBankFile(PayrollRun $run): mixed
+    {
+        $fileName = 'bank_transfer_' . $run->payroll_month . '.xlsx';
+        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\PayrollBankExport($run), $fileName);
+    }
+
+    /**
+     * Download Employee Payslip as PDF.
+     */
+    public function downloadPayslip(PayrollRun $run, Employee $employee): mixed
+    {
+        $user = auth()->user();
+        if ($user && $user->employee && $user->employee->id !== $employee->id && !$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized access to this payslip.', 403);
+        }
+
+        $repo = app(\App\Domains\HRMS\Repositories\PayrollRunRepositoryInterface::class);
+        $data = $repo->getPayslipData($run, $employee);
+        $fileName = 'payslip_' . $employee->employee_id . '_' . $run->payroll_month . '.pdf';
+
+        try {
+            $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+            $template = \App\Domains\HRMS\Models\DocumentTemplate::query()
+                ->where('status', 'active')
+                ->where(function ($q) {
+                    $q->whereIn('code', ['PAYSLIP', 'SALARY_SLIP', 'SALARYSLIP'])
+                      ->orWhereHas('category', function ($cq) {
+                          $cq->where('name', 'like', '%payroll%')
+                             ->orWhere('name', 'like', '%salary%');
+                      });
+                })
+                ->orderBy('is_default', 'desc')
+                ->first();
+
+            if ($template && !empty($template->body_content)) {
+                $renderedHtml = $templateService->renderPayslip($template, $data);
+                $printableHtml = $templateService->toPrintableDocument($renderedHtml, 'Payslip - ' . $employee->full_name);
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($printableHtml);
+                return $pdf->download($fileName);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Dynamic payslip generation failed in API, falling back to default view: ' . $e->getMessage());
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.hrms.payroll.payslip-pdf', $data);
+        return $pdf->download($fileName);
+    }
 }

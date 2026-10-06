@@ -920,4 +920,38 @@ class AttendanceApiController extends Controller
 
         return $this->sendSuccess($data, 'Attendance and location logs retrieved successfully');
     }
+
+    /**
+     * Export attendance logs to CSV.
+     */
+    public function export(Request $request): mixed
+    {
+        return $this->attendanceRepository->export($request->all());
+    }
+
+    /**
+     * Download Attendance Import CSV Template.
+     */
+    public function downloadTemplate(): mixed
+    {
+        return $this->attendanceRepository->downloadTemplate();
+    }
+
+    /**
+     * Bulk Import Attendance & Biometric Punches via API.
+     */
+    public function import(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|max:10240',
+        ]);
+
+        $result = $this->attendanceRepository->import($request->file('file'));
+
+        if (!($result['success'] ?? false)) {
+            return $this->sendError($result['message'] ?? 'Failed to import attendance.', 422);
+        }
+
+        return $this->sendSuccess($result, $result['message'] ?? 'Attendance records processed successfully');
+    }
 }

@@ -1490,4 +1490,78 @@ class AssetApiController extends Controller
             'returned_assets' => $returnedAssetsData,
         ], 'Selected asset(s) returned to inventory successfully');
     }
+
+    /**
+     * Export all assets to Excel (.xlsx).
+     */
+    public function export(): mixed
+    {
+        $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
+        return $repo->export();
+    }
+
+    /**
+     * Import assets from Excel / CSV file.
+     */
+    public function import(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
+        ]);
+
+        $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
+        $result = $repo->import($request->file('file'));
+
+        if (!($result['success'] ?? false)) {
+            return $this->sendError($result['message'] ?? 'Failed to import assets.', 422);
+        }
+
+        return $this->sendSuccess($result, $result['message'] ?? 'Assets imported successfully.');
+    }
+
+    /**
+     * Download Asset Import Excel Template.
+     */
+    public function downloadTemplate(): mixed
+    {
+        $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
+        return $repo->downloadTemplate();
+    }
+
+    /**
+     * Export all asset categories to Excel (.xlsx).
+     */
+    public function exportCategories(): mixed
+    {
+        $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
+        return $repo->exportCategories();
+    }
+
+    /**
+     * Import asset categories from Excel / CSV file.
+     */
+    public function importCategories(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
+        ]);
+
+        $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
+        $result = $repo->importCategories($request->file('file'));
+
+        if (!($result['success'] ?? false)) {
+            return $this->sendError($result['message'] ?? 'Failed to import asset categories.', 422);
+        }
+
+        return $this->sendSuccess($result, $result['message'] ?? 'Asset categories imported successfully.');
+    }
+
+    /**
+     * Download Asset Categories Import Excel Template.
+     */
+    public function downloadCategoriesTemplate(): mixed
+    {
+        $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
+        return $repo->downloadCategoriesTemplate();
+    }
 }

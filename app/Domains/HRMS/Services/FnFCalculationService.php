@@ -42,16 +42,21 @@ class FnFCalculationService
         $workedDaysInExitMonth = max(0, $startOfMonth->diffInDays($lwdCarbon) + 1);
         $unpaidSalaryAmount = round($dailyWage * $workedDaysInExitMonth, 2);
 
-        // 3. Calculate Leave Encashment from unused earned balances
+        // 3. Calculate Leave Encashment from unused earned balances & Negative Leave Balance Recovery
         $leaveBalances = LeaveBalance::where('employee_id', $employee->id)->with('leaveType')->get();
         $totalEncashableDays = 0.0;
+        $totalNegativeDays = 0.0;
+
         foreach ($leaveBalances as $bal) {
             $rem = floatval($bal->allocated) - floatval($bal->used) - floatval($bal->encashed ?? 0);
             if ($rem > 0) {
                 $totalEncashableDays += $rem;
+            } elseif ($rem < 0) {
+                $totalNegativeDays += abs($rem);
             }
         }
         $leaveEncashmentAmount = round($totalEncashableDays * $dailyWage, 2);
+        $negativeLeaveRecovery = round($totalNegativeDays * $dailyWage, 2);
 
         // 4. Calculate Gratuity (Statutory: 15 days of last drawn salary for each completed year if tenure >= 5 years)
         $doj = $employee->date_of_joining ? Carbon::parse($employee->date_of_joining) : null;
@@ -89,13 +94,18 @@ class FnFCalculationService
             ->sum('net_reimbursement');
         $otherEarnings = round(floatval($pendingReimbursements), 2);
 
-        // 9. Totals Calculation
+        // 9. Totals Calculation (including Negative Leave Recovery)
         $bonusAmount = 0.00;
-        $otherDeductions = 0.00;
+        $otherDeductions = round($negativeLeaveRecovery, 2);
 
         $totalEarnings = round($unpaidSalaryAmount + $leaveEncashmentAmount + $gratuityAmount + $bonusAmount + $otherEarnings, 2);
         $totalDeductions = round($noticeShortfallRecovery + $unsettledAdvancesRecovery + $assetDamageRecovery + $otherDeductions, 2);
         $netPayable = round($totalEarnings - $totalDeductions, 2);
+
+        $notes = null;
+        if ($totalNegativeDays > 0) {
+            $notes = "Includes negative leave recovery of {$totalNegativeDays} day(s) (${$negativeLeaveRecovery}).";
+        }
 
         return [
             'employee_id' => $employee->id,
@@ -107,6 +117,8 @@ class FnFCalculationService
             'unpaid_salary_amount' => $unpaidSalaryAmount,
             'leave_encashment_days' => $totalEncashableDays,
             'leave_encashment_amount' => $leaveEncashmentAmount,
+            'negative_leave_days' => $totalNegativeDays,
+            'negative_leave_recovery' => $negativeLeaveRecovery,
             'gratuity_amount' => $gratuityAmount,
             'bonus_amount' => $bonusAmount,
             'other_earnings' => $otherEarnings,
@@ -118,6 +130,7 @@ class FnFCalculationService
             'other_deductions' => $otherDeductions,
             'total_deductions' => $totalDeductions,
             'net_payable_amount' => $netPayable,
+            'notes' => $notes,
             'status' => 'draft',
             'settlement_channel' => 'monthly_payroll',
         ];

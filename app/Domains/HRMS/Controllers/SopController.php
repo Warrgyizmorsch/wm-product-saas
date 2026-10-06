@@ -7,6 +7,7 @@ use App\Domains\HRMS\Models\SopCategory;
 use App\Domains\HRMS\Models\SopDocument;
 use App\Domains\HRMS\Services\HrmsScopeService;
 use App\Domains\HRMS\Services\SopService;
+use App\Domains\HRMS\Repositories\SopRepositoryInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -18,7 +19,8 @@ class SopController extends Controller
 {
     public function __construct(
         private readonly SopService $sopService,
-        private readonly HrmsScopeService $scopeService
+        private readonly HrmsScopeService $scopeService,
+        private readonly SopRepositoryInterface $sopRepository
     ) {}
 
     /**
@@ -312,78 +314,10 @@ class SopController extends Controller
     /**
      * Export compliance audit log as CSV.
      */
-    public function exportAudit(int $id): Response
+    public function exportAudit(int $id): mixed
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $sop = SopDocument::with(['category', 'department', 'creator', 'approver'])
-            ->where('tenant_id', $tenantId)
-            ->findOrFail($id);
-
-        $assignments = SopAssignment::with(['employee.department', 'employee.designation'])
-            ->where('sop_document_id', $sop->id)
-            ->get();
-
-        $totalAssigned = $assignments->count();
-        $acknowledgedCount = $assignments->where('status', 'acknowledged')->count();
-        $complianceRate = $totalAssigned > 0 ? round(($acknowledgedCount / $totalAssigned) * 100, 1) : 0;
-
-        $handle = fopen('php://temp', 'r+');
-
-        // UTF-8 BOM for Microsoft Excel compatibility
-        fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
-
-        // Official Audit Header Block
-        fputcsv($handle, ['STANDARD OPERATING PROCEDURE (SOP) COMPLIANCE AUDIT REPORT']);
-        fputcsv($handle, ['Document Code:', $sop->code, 'Version:', $sop->version, 'Status:', strtoupper($sop->status)]);
-        fputcsv($handle, ['Document Title:', $sop->title]);
-        fputcsv($handle, ['Category:', $sop->category->name ?? 'General', 'Department:', $sop->department->name ?? 'Organization-Wide']);
-        fputcsv($handle, ['Effective Date:', $sop->effective_date ? $sop->effective_date->format('Y-m-d') : 'N/A', 'Review Interval:', $sop->review_interval_months . ' Months']);
-        fputcsv($handle, ['Total Assigned Staff:', $totalAssigned, 'Compliant Staff:', $acknowledgedCount, 'Compliance Rate:', $complianceRate . '%']);
-        fputcsv($handle, ['Report Export Date:', now()->format('Y-m-d H:i:s')]);
-        fputcsv($handle, []); // Blank separator line
-
-        // Compliance Roster Column Headers
-        fputcsv($handle, [
-            'Employee Code',
-            'Employee Full Name',
-            'Work Email',
-            'Department',
-            'Designation',
-            'SOP Version',
-            'Compliance Status',
-            'Assigned Date',
-            'Due Date',
-            'Sign-Off Timestamp',
-            'Sign-Off IP Address',
-        ]);
-
-        foreach ($assignments as $a) {
-            $empName = $a->employee->full_name ?? ($a->employee->first_name ?? 'N/A');
-            fputcsv($handle, [
-                $a->employee->employee_id ?? ('EMP-' . $a->employee->id),
-                $empName,
-                $a->employee->office_email ?? $a->employee->personal_email ?? 'N/A',
-                $a->employee->department->name ?? 'N/A',
-                $a->employee->designation->name ?? 'N/A',
-                $a->version_assigned,
-                strtoupper($a->status),
-                $a->assigned_at ? $a->assigned_at->format('Y-m-d H:i') : '',
-                $a->due_date ? $a->due_date->format('Y-m-d') : '',
-                $a->acknowledged_at ? $a->acknowledged_at->format('Y-m-d H:i:s') : 'Pending Sign-off',
-                $a->ip_address ?? '',
-            ]);
-        }
-
-        rewind($handle);
-        $content = stream_get_contents($handle);
-        fclose($handle);
-
-        $filename = 'SOP_Compliance_Audit_' . preg_replace('/[^A-Za-z0-9_\-]/', '_', $sop->code) . '_' . date('Ymd_His') . '.csv';
-
-        return response($content, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ]);
+        return $this->sopRepository->exportAudit($id, $tenantId);
     }
 
     /**
