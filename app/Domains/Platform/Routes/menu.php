@@ -24,6 +24,7 @@ return [
             ['label' => 'Email & SMTP Setup', 'route' => 'platform.emailSettings.index'],
             ['label' => 'WhatsApp Web Setup', 'route' => 'platform.whatsappSettings.index'],
             ['label' => 'GST & E-Invoice Setup', 'route' => 'platform.gstSettings.index'],
+            ['label' => 'Meta Lead Ads Setup', 'route' => 'platform.metaSettings.index'],
         ],
     ],
     [

@@ -979,7 +979,7 @@
                 <div class="d-flex align-items-center justify-content-between border-bottom px-3 py-2 flex-wrap gap-2 sticky-top" style="z-index: 90; background-color: #f8fafc;">
                     <ul class="nav nav-pills zoho-nav-tabs" id="zohoDealTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ (!$isQuotationTabActive && !$isSalesOrdersTabActive) ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ (!$isQuotationTabActive && !$isSalesOrdersTabActive && request('tab') !== 'interactions' && request('tab') !== 'timeline') ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
                                 <i class="feather-grid me-1"></i>{{ __('crm.overview') }}
                             </button>
                         </li>
@@ -994,7 +994,7 @@
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab">
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ (request('tab') === 'interactions' || request('tab') === 'timeline') ? 'active' : '' }}" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab">
                                 <i class="feather-clock me-1"></i>{{ __('crm.timeline_audit') }}
                             </button>
                         </li>
@@ -1010,7 +1010,7 @@
                 <div class="pt-2 px-3 pb-3 tab-content" id="zohoDealTabsContent">
                     
                     <!-- ==================== TAB 1: OVERVIEW PANE ==================== -->
-                    <div class="tab-pane fade show {{ (!$isQuotationTabActive && !$isSalesOrdersTabActive) ? 'active' : '' }}" id="overview-pane" role="tabpanel">
+                    <div class="tab-pane fade {{ (!$isQuotationTabActive && !$isSalesOrdersTabActive && request('tab') !== 'interactions' && request('tab') !== 'timeline') ? 'show active' : '' }}" id="overview-pane" role="tabpanel">
                         
                         <!-- ZOHO DEAL KPI METRICS CARDS STRIP -->
                         <div class="row g-3 mb-3 align-items-stretch">
@@ -2156,7 +2156,7 @@
                     </div>
 
                     <!-- ==================== TAB 4: TIMELINE & AUDIT LOG PANE ==================== -->
-                    <div class="tab-pane fade" id="timeline-pane" role="tabpanel">
+                    <div class="tab-pane fade {{ (request('tab') === 'interactions' || request('tab') === 'timeline') ? 'show active' : '' }}" id="timeline-pane" role="tabpanel">
                         <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
                             <div class="card-body p-3">
                                 
@@ -2164,12 +2164,12 @@
                                 <div class="border-bottom pb-1 mb-3">
                                     <ul class="nav nav-tabs border-bottom-0 zoho-timeline-subtabs" id="zohoTimelineSubTabs" role="tablist">
                                         <li class="nav-item" role="presentation">
-                                            <button class="nav-link active py-2 px-3 border-0 bg-transparent" id="subtab-history-tab" data-bs-toggle="tab" data-bs-target="#subtab-history" type="button" role="tab">
+                                            <button class="nav-link {{ request('tab') !== 'interactions' ? 'active' : '' }} py-2 px-3 border-0 bg-transparent" id="subtab-history-tab" data-bs-toggle="tab" data-bs-target="#subtab-history" type="button" role="tab">
                                                 {{ __('crm.history_audit_stream') }}
                                             </button>
                                         </li>
                                         <li class="nav-item" role="presentation">
-                                            <button class="nav-link py-2 px-3 border-0 bg-transparent" id="subtab-interactions-tab" data-bs-toggle="tab" data-bs-target="#subtab-interactions" type="button" role="tab">
+                                            <button class="nav-link {{ request('tab') === 'interactions' ? 'active' : '' }} py-2 px-3 border-0 bg-transparent" id="subtab-interactions-tab" data-bs-toggle="tab" data-bs-target="#subtab-interactions" type="button" role="tab">
                                                 {{ __('crm.interactions_scheduled_calls') }}
                                             </button>
                                         </li>
@@ -2180,7 +2180,7 @@
                                 <div class="tab-content" id="zohoTimelineSubTabsContent">
                                     
                                     <!-- SUBTAB 1: HISTORY TIMELINE -->
-                                    <div class="tab-pane fade show active" id="subtab-history" role="tabpanel">
+                                    <div class="tab-pane fade {{ request('tab') !== 'interactions' ? 'show active' : '' }}" id="subtab-history" role="tabpanel">
                                         <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
                                             <div class="d-flex align-items-center gap-2">
                                                 <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.timeline_history_audit_stream') }}</h5>
@@ -2253,7 +2253,7 @@
                                     </div>
 
                                     <!-- SUBTAB 2: INTERACTIONS & ACTIVITIES -->
-                                    <div class="tab-pane fade" id="subtab-interactions" role="tabpanel">
+                                    <div class="tab-pane fade {{ request('tab') === 'interactions' ? 'show active' : '' }}" id="subtab-interactions" role="tabpanel">
                                         <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
                                             <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.interactions_scheduled_activities') }}</h5>
                                         </div>
@@ -3042,20 +3042,23 @@
                 localStorage.setItem(activeTabKey, 'salesorders-tab');
             }
 
-            // Check URL Hash first if present
+            // Check URL Query Param & Hash first
+            var urlParams = new URLSearchParams(window.location.search);
+            var tabParam = urlParams.get('tab');
             var hash = window.location.hash;
-            if (hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
+
+            if (tabParam === 'interactions' || tabParam === 'timeline' || hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
                 localStorage.setItem(activeTabKey, 'timeline-tab');
-                if (hash === '#subtab-interactions') {
+                if (tabParam === 'interactions' || hash === '#subtab-interactions') {
                     localStorage.setItem(activeSubTabKey, 'subtab-interactions-tab');
                 } else if (hash === '#subtab-history') {
                     localStorage.setItem(activeSubTabKey, 'subtab-history-tab');
                 }
-            } else if (hash === '#overview' || hash === '#overview-pane') {
+            } else if (tabParam === 'overview' || hash === '#overview' || hash === '#overview-pane') {
                 localStorage.setItem(activeTabKey, 'overview-tab');
-            } else if (hash === '#quotations' || hash === '#quotations-pane') {
+            } else if (tabParam === 'quotations' || hash === '#quotations' || hash === '#quotations-pane') {
                 localStorage.setItem(activeTabKey, 'quotations-tab');
-            } else if (hash === '#salesorders' || hash === '#salesorders-pane') {
+            } else if (tabParam === 'salesorders' || hash === '#salesorders' || hash === '#salesorders-pane') {
                 localStorage.setItem(activeTabKey, 'salesorders-tab');
             }
 

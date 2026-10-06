@@ -22,6 +22,12 @@ Route::post('/webhooks/razorpay', [RazorpayWebhookController::class, 'handle'])
     ->middleware('throttle:60,1')
     ->name('webhooks.razorpay');
 
+// Public Meta (Facebook & Instagram) Lead Ads Webhook Route (GET for handshake verification, POST for lead ingestion)
+Route::match(['get', 'post'], '/webhooks/meta-leadgen', [\App\Domains\Platform\Controllers\MetaWebhookController::class, 'handle'])
+    ->name('webhooks.meta-leadgen');
+Route::match(['get', 'post'], '/api/webhooks/meta-leadgen', [\App\Domains\Platform\Controllers\MetaWebhookController::class, 'handle'])
+    ->name('api.webhooks.meta-leadgen');
+
 Route::middleware(['tenant'])->group(function (): void {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store'])
