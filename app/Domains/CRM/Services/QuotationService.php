@@ -101,6 +101,7 @@ class QuotationService
 
             $data['subtotal'] = $subtotal;
             $data['tax'] = $tax;
+            $data['discount'] = $discount;
             $data['total_amount'] = $totalAmount;
             $data['is_current'] = true;
             $data['revision_number'] = 0;

@@ -330,12 +330,6 @@
                     <i class="feather-calendar me-1"></i> + {{ __('crm.followup') }}
                 </button>
 
-                <!-- Send Email Button -->
-                @if ($lead->email)
-                    <a href="mailto:{{ $lead->email }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-2 rounded d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-mail me-1"></i> {{ __('crm.email') }}
-                    </a>
-                @endif
 
                 <!-- More Actions 3-Dot Dropdown using common component -->
                 @if (!in_array(strtolower($lead->status ?? ''), ['dealing', 'won']))
