@@ -54,6 +54,7 @@ Route::prefix('api/crm')
                 Route::get('/export', [LeadApiController::class, 'export'])->name('export');
                 Route::get('/kanban', [LeadApiController::class, 'kanban'])->name('kanban');
                 Route::match(['get', 'post'], '/check-duplicate', [LeadApiController::class, 'checkDuplicate'])->name('check-duplicate');
+                Route::post('/bulk-assign', [LeadApiController::class, 'bulkAssign'])->name('bulk-assign');
 
                 Route::get('/', [LeadApiController::class, 'index'])->name('index');
                 Route::post('/', [LeadApiController::class, 'store'])->name('store');
@@ -87,6 +88,7 @@ Route::prefix('api/crm')
                 Route::get('/meta', [CrmDealApiController::class, 'meta'])->name('meta');
                 Route::get('/export', [CrmDealApiController::class, 'export'])->name('export');
                 Route::get('/kanban', [CrmDealApiController::class, 'kanban'])->name('kanban');
+                Route::post('/bulk-assign', [CrmDealApiController::class, 'bulkAssign'])->name('bulk-assign');
 
                 Route::get('/', [CrmDealApiController::class, 'index'])->name('index');
                 Route::post('/', [CrmDealApiController::class, 'store'])->name('store');
@@ -97,6 +99,7 @@ Route::prefix('api/crm')
                 Route::post('/{deal}/restore', [CrmDealApiController::class, 'restore'])->whereNumber('deal')->name('restore');
 
                 // Quick Deal Actions
+                Route::patch('/{deal}/owner', [CrmDealApiController::class, 'updateOwner'])->whereNumber('deal')->name('owner');
                 Route::patch('/{deal}/stage', [CrmDealApiController::class, 'updateStage'])->whereNumber('deal')->name('stage');
                 Route::patch('/{deal}/move-stage', [CrmDealApiController::class, 'updateStage'])->whereNumber('deal')->name('move-stage');
                 Route::patch('/{deal}/requirement', [CrmDealApiController::class, 'updateRequirement'])->whereNumber('deal')->name('requirement');
@@ -132,10 +135,12 @@ Route::prefix('api/crm')
         // ==========================================
         Route::prefix('accounts')->name('accounts.')->group(function () {
             Route::get('/meta', [\App\Domains\CRM\Controllers\Api\CrmAccountApiController::class, 'meta'])->name('meta');
+            Route::post('/bulk-assign', [\App\Domains\CRM\Controllers\Api\CrmAccountApiController::class, 'bulkAssign'])->name('bulk-assign');
             Route::get('/', [\App\Domains\CRM\Controllers\Api\CrmAccountApiController::class, 'index'])->name('index');
             Route::post('/', [\App\Domains\CRM\Controllers\Api\CrmAccountApiController::class, 'store'])->name('store');
             Route::get('/{id}', [\App\Domains\CRM\Controllers\Api\CrmAccountApiController::class, 'show'])->name('show');
             Route::put('/{id}', [\App\Domains\CRM\Controllers\Api\CrmAccountApiController::class, 'update'])->name('update');
+            Route::patch('/{id}/owner', [\App\Domains\CRM\Controllers\Api\CrmAccountApiController::class, 'updateOwner'])->name('owner');
             Route::patch('/{id}', [\App\Domains\CRM\Controllers\Api\CrmAccountApiController::class, 'update'])->name('patch');
             Route::delete('/{id}', [\App\Domains\CRM\Controllers\Api\CrmAccountApiController::class, 'destroy'])->name('destroy');
             Route::post('/{id}/contacts', [\App\Domains\CRM\Controllers\Api\CrmAccountApiController::class, 'storeContact'])->name('contacts.store');

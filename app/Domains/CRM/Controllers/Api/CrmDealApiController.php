@@ -802,6 +802,134 @@ class CrmDealApiController extends Controller
     }
 
     /**
+     * PATCH /api/crm/deals/{deal}/owner
+     */
+    public function updateOwner(Request $request, CrmDeal $deal): JsonResponse
+    {
+        $this->authorize('update', $deal);
+
+        $validator = Validator::make($request->all(), [
+            'deal_owner_id' => 'nullable|integer|exists:users,id',
+            'owner_id'      => 'nullable|integer|exists:users,id',
+            'note'          => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $ownerId = $request->input('deal_owner_id', $request->input('owner_id'));
+        $deal->update(['owner_id' => $ownerId]);
+
+        // Sync linked Lead owner if lead exists
+        $linkedLead = Lead::where('crm_deal_id', $deal->id)
+            ->orWhere(function ($q) use ($deal) {
+                if ($deal->lead_id) {
+                    $q->where('id', $deal->lead_id);
+                }
+            })
+            ->first();
+
+        if ($linkedLead) {
+            $linkedLead->update(['lead_owner_id' => $ownerId]);
+            if ($request->filled('note')) {
+                \App\Domains\CRM\Models\LeadHistory::logEvent(
+                    $linkedLead,
+                    'note',
+                    null,
+                    $request->input('note'),
+                    "Deal Assignment Note: {$request->input('note')}"
+                );
+            }
+        }
+
+        $targetUser = $ownerId ? User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+
+        return response()->json([
+            'success'       => true,
+            'message'       => "Deal owner successfully updated to {$ownerName}.",
+            'deal_id'       => $deal->id,
+            'owner_id'      => $ownerId,
+            'owner_name'    => $ownerName,
+            'data'          => $deal->load('owner'),
+        ]);
+    }
+
+    /**
+     * POST /api/crm/deals/bulk-assign
+     */
+    public function bulkAssign(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', CrmDeal::class);
+        [$tenantId] = $this->resolveTenantContext();
+
+        $validator = Validator::make($request->all(), [
+            'deal_ids'      => 'required|array|min:1',
+            'deal_ids.*'    => 'required|integer|exists:crm_deals,id',
+            'deal_owner_id' => 'nullable|integer|exists:users,id',
+            'owner_id'      => 'nullable|integer|exists:users,id',
+            'note'          => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $ownerId = $request->input('deal_owner_id', $request->input('owner_id'));
+        $targetUser = $ownerId ? User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+        $note = $request->input('note');
+
+        $deals = CrmDeal::where('tenant_id', $tenantId)
+            ->whereIn('id', $request->input('deal_ids'))
+            ->get();
+
+        $updatedCount = 0;
+        foreach ($deals as $deal) {
+            $deal->update(['owner_id' => $ownerId]);
+
+            $linkedLead = Lead::where('crm_deal_id', $deal->id)
+                ->orWhere(function ($q) use ($deal) {
+                    if ($deal->lead_id) {
+                        $q->where('id', $deal->lead_id);
+                    }
+                })
+                ->first();
+
+            if ($linkedLead) {
+                $linkedLead->update(['lead_owner_id' => $ownerId]);
+                if (!empty($note)) {
+                    \App\Domains\CRM\Models\LeadHistory::logEvent(
+                        $linkedLead,
+                        'note',
+                        null,
+                        $note,
+                        "Bulk Deal Assignment Note: {$note}"
+                    );
+                }
+            }
+            $updatedCount++;
+        }
+
+        return response()->json([
+            'success'       => true,
+            'message'       => "Successfully assigned {$updatedCount} deal(s) to {$ownerName}.",
+            'updated_count' => $updatedCount,
+            'owner_id'      => $ownerId,
+            'owner_name'    => $ownerName,
+        ]);
+    }
+
+    /**
      * GET /api/crm/deals/export
      */
     public function export(Request $request)
