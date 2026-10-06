@@ -213,16 +213,11 @@ class SalaryStructureController extends Controller
             'status'      => 'required',
         ]);
 
-        $status = in_array($request->status, ['success', '1', 'active', true], true);
+        $validated['status'] = in_array($request->status, ['success', '1', 'active', true], true);
 
-        PayGroup::create([
-            'company_id'  => $validated['company_id'] ?? null,
-            'name'        => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'status'      => $status,
-        ]);
+        $newPayGroup = $this->salaryStructureRepository->storePayGroup($validated);
 
-        return redirect()->route('hrms.salary-structure.index')->with('success', __('hrms.salary.pay_group_created_success'));
+        return redirect()->route('hrms.salary-structure.index', ['pay_group_id' => $newPayGroup->id])->with('success', __('hrms.salary.pay_group_created_success'));
     }
 
     public function updatePayGroup(Request $request, PayGroup $payGroup)
@@ -236,16 +231,11 @@ class SalaryStructureController extends Controller
             'status'      => 'required',
         ]);
 
-        $status = in_array($request->status, ['success', '1', 'active', true], true);
+        $validated['status'] = in_array($request->status, ['success', '1', 'active', true], true);
 
-        $payGroup->update([
-            'company_id'  => $validated['company_id'] ?? $payGroup->company_id,
-            'name'        => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'status'      => $status,
-        ]);
+        $this->salaryStructureRepository->updatePayGroup($payGroup, $validated);
 
-        return redirect()->route('hrms.salary-structure.index')->with('success', __('hrms.salary.pay_group_updated_success'));
+        return redirect()->route('hrms.salary-structure.index', ['pay_group_id' => $payGroup->id])->with('success', __('hrms.salary.pay_group_updated_success'));
     }
 
     public function updatePayGroupRules(Request $request, PayGroup $payGroup)
@@ -277,9 +267,7 @@ class SalaryStructureController extends Controller
             'esi_gross_threshold'    => 'nullable|numeric|min:0',
         ]);
 
-        $payGroup->update([
-            'payroll_rules' => $validated,
-        ]);
+        $this->salaryStructureRepository->updatePayGroupRules($payGroup, $validated);
 
         return redirect()->route('hrms.salary-structure.index', [
             'pay_group_id' => $payGroup->id,
@@ -291,7 +279,7 @@ class SalaryStructureController extends Controller
     {
         $this->authorize('delete', SalaryStructure::class);
 
-        $payGroup->delete();
+        $this->salaryStructureRepository->destroyPayGroup($payGroup);
 
         return redirect()->route('hrms.salary-structure.index')->with('success', __('hrms.salary.pay_group_deleted_success'));
     }

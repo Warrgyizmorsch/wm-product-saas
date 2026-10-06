@@ -5,9 +5,9 @@
 @section('breadcrumb', 'HRMS / ' . __('hrms.sidebar.leave_structure') . ' / ' . __('hrms.leave.plan_transition'))
 
 @section('page-actions')
-    <a href="{{ route('hrms.leave-structure.index') }}" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1">
-        <i class="feather-arrow-left me-1"></i> {{ __('hrms.leave.back_to_structures') }}
-    </a>
+    <x-ui.button href="{{ route('hrms.leave-structure.index') }}" variant="primary" icon="feather-arrow-left">
+        {{ __('hrms.leave.back_to_structures') }}
+    </x-ui.button>
 @endsection
 
 @push('styles')
@@ -167,8 +167,8 @@
                                         <div class="dropdown-divider my-3"></div>
 
                                         <div class="d-flex gap-2">
-                                            <button type="button" id="btnApplyFilters" class="btn btn-primary btn-sm flex-grow-1">{{ __('hrms.common.apply') }}</button>
-                                            <button type="button" id="btnResetFilters" class="btn btn-light btn-sm border flex-grow-1">{{ __('hrms.common.reset') }}</button>
+                                            <x-ui.button type="button" id="btnApplyFilters" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
+                                            <x-ui.button type="button" id="btnResetFilters" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
                                         </div>
                                     </x-ui.filter>
                                 </div>
@@ -178,7 +178,7 @@
                             <div style="max-height: 450px; overflow-y: auto;" id="employeesListContainer">
                                 @forelse($employees as $emp)
                                     @php
-                                        $planName = $emp->leavePlan ? $emp->leavePlan->name : 'No Leave Plan';
+                                        $planName = $emp->leavePlan ? $emp->leavePlan->name : __('hrms.leave.no_plan_assigned');
                                     @endphp
                                     <div class="employee-row d-flex align-items-center justify-content-between p-3 border-bottom transition-all" 
                                          data-company="{{ $emp->company_id }}" 
@@ -245,7 +245,7 @@
                                 <div class="mb-4">
                                     <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.unused_leaves_action')" name="leave_transition_unused" id="leave_transition_unused">
                                         <option value="carry" selected>{{ __('hrms.leave.transition_carry') }}</option>
-                                        <option value="encash">Encash Unused Leaves (Payout & Reset)</option>
+                                        <option value="encash">{{ __('hrms.leave.transition_encash') }}</option>
                                         <option value="lapse">{{ __('hrms.leave.transition_lapse') }}</option>
                                     </x-ui.odoo-form-ui>
                                     <small class="form-text text-muted fs-11 mt-1 d-block">

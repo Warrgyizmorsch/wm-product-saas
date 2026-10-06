@@ -216,6 +216,14 @@ Route::prefix('api/hrms/assets')
         // Summary Dashboard API
         Route::get('/summary', [AssetApiController::class, 'summary'])->name('summary');
 
+        // Import / Export APIs
+        Route::get('/export', [AssetApiController::class, 'export'])->name('export');
+        Route::post('/import', [AssetApiController::class, 'import'])->name('import');
+        Route::get('/import/template', [AssetApiController::class, 'downloadTemplate'])->name('import.template');
+        Route::get('/categories/export', [AssetApiController::class, 'exportCategories'])->name('categories.export');
+        Route::post('/categories/import', [AssetApiController::class, 'importCategories'])->name('categories.import');
+        Route::get('/categories/import/template', [AssetApiController::class, 'downloadCategoriesTemplate'])->name('categories.import.template');
+
         // Asset Registry APIs
         Route::get('/registry', [AssetApiController::class, 'indexAssets'])->name('registry.index');
         Route::post('/registry', [AssetApiController::class, 'storeAsset'])->name('registry.store');
@@ -324,6 +332,7 @@ Route::prefix('api/hrms/leave-requests')
         Route::get('/summary', [LeaveRequestApiController::class, 'summary'])->name('summary');
         Route::get('/balances', [LeaveRequestApiController::class, 'balances'])->name('balances');
         Route::get('/rules', [LeaveRequestApiController::class, 'getRules'])->name('rules');
+        Route::get('/export', [LeaveRequestApiController::class, 'export'])->name('export');
  
         // Leave Application & Approval Workflows
         Route::get('/', [LeaveRequestApiController::class, 'indexRequests'])->name('index');
@@ -347,6 +356,7 @@ Route::prefix('api/hrms/wfh-requests')
     ->name('api.hrms.wfh-requests.')
     ->group(function () {
         Route::get('/summary', [WfhRequestApiController::class, 'summary'])->name('summary');
+        Route::get('/export', [WfhRequestApiController::class, 'export'])->name('export');
         Route::get('/', [WfhRequestApiController::class, 'indexRequests'])->name('index');
         Route::post('/', [WfhRequestApiController::class, 'storeRequest'])->name('store');
         Route::get('/{wfhRequest}', [WfhRequestApiController::class, 'showRequest'])->name('show');
@@ -360,7 +370,24 @@ Route::prefix('api/hrms/wfh-requests')
     });
 
 // ==========================================
-// 8C. SHIFT CHANGE REQUESTS API ROUTES
+// 8C. LEAVE ENCASHMENTS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/leave-encashments')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.leave-encashments.')
+    ->group(function () {
+        Route::get('/summary', [LeaveEncashmentApiController::class, 'summary'])->name('summary');
+        Route::get('/export', [LeaveEncashmentApiController::class, 'export'])->name('export');
+        Route::get('/', [LeaveEncashmentApiController::class, 'indexEncashments'])->name('index');
+        Route::post('/', [LeaveEncashmentApiController::class, 'storeEncashment'])->name('store');
+        Route::get('/{encashment}', [LeaveEncashmentApiController::class, 'showEncashment'])->name('show');
+        Route::post('/{encashment}/approve', [LeaveEncashmentApiController::class, 'approveEncashment'])->name('approve');
+        Route::post('/{encashment}/reject', [LeaveEncashmentApiController::class, 'rejectEncashment'])->name('reject');
+        Route::delete('/{encashment}', [LeaveEncashmentApiController::class, 'destroyEncashment'])->name('destroy');
+    });
+
+// ==========================================
+// 8D. SHIFT CHANGE REQUESTS API ROUTES
 // ==========================================
 Route::prefix('api/hrms/shift-change-requests')
     ->middleware(['auth:sanctum', 'throttle:60,1'])
@@ -377,7 +404,7 @@ Route::prefix('api/hrms/shift-change-requests')
     });
 
 // ==========================================
-// 8D. OVERTIME REQUESTS API ROUTES
+// 8E. OVERTIME REQUESTS API ROUTES
 // ==========================================
 Route::prefix('api/hrms/overtime-requests')
     ->middleware(['auth:sanctum', 'throttle:60,1'])
@@ -391,27 +418,6 @@ Route::prefix('api/hrms/overtime-requests')
         Route::post('/{overtimeRequest}/reject', [OvertimeRequestApiController::class, 'rejectRequest'])->name('reject');
         Route::put('/{overtimeRequest}/status', [OvertimeRequestApiController::class, 'updateStatus'])->name('status.update');
         Route::delete('/{overtimeRequest}', [OvertimeRequestApiController::class, 'destroy'])->name('destroy');
-    });
-
-
-// ==========================================
-// 9. LEAVE ENCASHMENTS API ROUTES
-// ==========================================
-Route::prefix('api/hrms/leave-encashments')
-    ->middleware(['auth:sanctum', 'throttle:60,1'])
-    ->name('api.hrms.leave-encashments.')
-    ->group(function () {
-
-        // Summary Dashboard API
-        Route::get('/summary', [LeaveEncashmentApiController::class, 'summary'])->name('summary');
-
-        // Leave Encashment Application & Approval Workflows
-        Route::get('/', [LeaveEncashmentApiController::class, 'indexEncashments'])->name('index');
-        Route::post('/', [LeaveEncashmentApiController::class, 'storeEncashment'])->name('store');
-        Route::get('/{leaveEncashment}', [LeaveEncashmentApiController::class, 'showEncashment'])->name('show');
-        Route::post('/{leaveEncashment}/approve', [LeaveEncashmentApiController::class, 'approveEncashment'])->name('approve');
-        Route::post('/{leaveEncashment}/reject', [LeaveEncashmentApiController::class, 'rejectEncashment'])->name('reject');
-        Route::delete('/{leaveEncashment}', [LeaveEncashmentApiController::class, 'destroyEncashment'])->name('destroy');
     });
 
 // ==========================================
@@ -451,6 +457,9 @@ Route::prefix('api/hrms/attendance')
     ->group(function () {
         Route::post('/biometric-sync', [BiometricWebhookController::class, 'syncLogs'])->name('biometric-sync');
         Route::get('/summary', [AttendanceApiController::class, 'summary'])->name('summary');
+        Route::get('/export', [AttendanceApiController::class, 'export'])->name('export');
+        Route::post('/import', [AttendanceApiController::class, 'import'])->name('import');
+        Route::get('/import/template', [AttendanceApiController::class, 'downloadTemplate'])->name('import.template');
         Route::get('/', [AttendanceApiController::class, 'index'])->name('index');
         Route::get('/my-attendance', [AttendanceApiController::class, 'myAttendance'])->name('my-attendance');
         Route::post('/check-in', [AttendanceApiController::class, 'checkIn'])->name('check-in');
@@ -502,6 +511,7 @@ Route::prefix('api/hrms/documents-master')
         Route::put('/documents/{document}', [DocumentMasterApiController::class, 'updateDocument'])->name('documents.update');
         Route::delete('/documents/{document}', [DocumentMasterApiController::class, 'destroyDocument'])->name('documents.destroy');
         Route::patch('/documents/{document}/toggle', [DocumentMasterApiController::class, 'toggleStatus'])->name('documents.toggle');
+        Route::post('/parse-template-file', [DocumentMasterApiController::class, 'parseTemplateFile'])->name('parse-template-file');
     });
 
 // ==========================================
@@ -564,6 +574,8 @@ Route::prefix('api/hrms/payroll')
         Route::post('/hold/toggle', [PayrollRunApiController::class, 'toggleHold'])->name('hold.toggle');
         Route::get('/my-salary', [PayrollRunApiController::class, 'mySalary'])->name('my-salary');
         Route::post('/bulk-adhoc', [PayrollRunApiController::class, 'storeBulkAdhoc'])->name('bulk-adhoc');
+        Route::get('/{run}/export-bank-file', [PayrollRunApiController::class, 'exportBankFile'])->name('export-bank-file');
+        Route::get('/{run}/employees/{employee}/download-payslip', [PayrollRunApiController::class, 'downloadPayslip'])->name('download-payslip');
     });
 
 // ==========================================
@@ -871,6 +883,7 @@ Route::prefix('api/hrms/sop')
         Route::post('/documents/{id}/sync-assignments', [SopApiController::class, 'syncAssignments'])->name('documents.sync-assignments');
         Route::post('/documents/{id}/bulk-remind', [SopApiController::class, 'bulkRemind'])->name('documents.bulk-remind');
         Route::get('/documents/{id}/assignments', [SopApiController::class, 'documentAssignments'])->name('documents.assignments');
+        Route::get('/documents/{id}/export-audit', [SopApiController::class, 'exportAudit'])->name('documents.export-audit');
 
         // Employee Sign-Off & "My SOPs" Workspace
         Route::get('/my-sops', [SopApiController::class, 'mySops'])->name('my-sops');
@@ -1001,11 +1014,4 @@ Route::prefix('api/hrms/expense-policies')
         Route::put('/{id}', [ExpensePolicyApiController::class, 'update'])->name('update')->whereNumber('id');
         Route::delete('/{id}', [ExpensePolicyApiController::class, 'destroy'])->name('destroy')->whereNumber('id');
     });
-
-
-
-
-
-
-
 

@@ -113,6 +113,10 @@
                 $points[] = 'You must attach supporting documents when the leave duration is more than ' . ($application['attachment_days'] ?? 0) . ' day(s).';
             }
 
+            if (!empty($application['sandwich_rule'])) {
+                $points[] = 'Sandwich Rule is active: intervening holidays and weekly offs will be counted as leave days.';
+            }
+
             $sections[] = ['title' => 'Application Rules', 'icon' => 'feather-file-text', 'points' => $points];
         }
 
@@ -153,6 +157,11 @@
 
             if (!empty($accrual['limit_carry'])) {
                 $points[] = 'Maximum accumulated balance is limited to ' . ($accrual['max_accum'] ?? 0) . ' day(s).';
+            }
+
+            if (!empty($accrual['allow_negative'])) {
+                $maxNeg = $formatNumber($accrual['max_negative'] ?? 0);
+                $points[] = 'Negative Leave Balance is allowed up to ' . $maxNeg . ' day(s) without current month salary deduction.';
             }
 
             $sections[] = ['title' => 'Accrual Rules', 'icon' => 'feather-calendar', 'points' => $points];
@@ -830,6 +839,7 @@
                     data: {
                         _token: '{{ csrf_token() }}',
                         employee_id: empId,
+                        leave_type_id: $('#leave_type_select').val(),
                         start_date: startDateStr,
                         end_date: endDateStr,
                         start_date_type: startType,
@@ -843,11 +853,15 @@
                             var estTpl = "{{ __('hrms.leave.app.estimated_duration_simple', ['duration' => '__duration__']) }}";
                             var displayText = estTpl.replace('__duration__', '<strong>' + duration + '</strong>');
 
-                            if (response.holidays && response.holidays.length > 0) {
-                                displayText += ' <span class="badge bg-soft-success text-success ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.holidays.join(', ') + '"><i class="feather-calendar me-1"></i>Excludes ' + response.holidays.length + ' Holiday(s)</span>';
-                            }
-                            if (response.rest_days && response.rest_days.length > 0) {
-                                displayText += ' <span class="badge bg-soft-secondary text-secondary ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.rest_days.join(', ') + '"><i class="feather-coffee me-1"></i>Excludes ' + response.rest_days.length + ' Rest Day(s)</span>';
+                            if (response.sandwich_rule && response.sandwich_days && response.sandwich_days.length > 0) {
+                                displayText += ' <span class="badge bg-soft-warning text-warning ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.sandwich_days.join(', ') + '"><i class="feather-layers me-1"></i>' + '{{ __("hrms.leave.sandwich_rule_applied") }}' + ' (' + response.sandwich_days.length + ' {{ __("hrms.leave.days") }})</span>';
+                            } else {
+                                if (response.holidays && response.holidays.length > 0) {
+                                    displayText += ' <span class="badge bg-soft-success text-success ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.holidays.join(', ') + '"><i class="feather-calendar me-1"></i>Excludes ' + response.holidays.length + ' Holiday(s)</span>';
+                                }
+                                if (response.rest_days && response.rest_days.length > 0) {
+                                    displayText += ' <span class="badge bg-soft-secondary text-secondary ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.rest_days.join(', ') + '"><i class="feather-coffee me-1"></i>Excludes ' + response.rest_days.length + ' Rest Day(s)</span>';
+                                }
                             }
 
                             $('#calculated_duration_display').html(displayText);

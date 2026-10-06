@@ -334,4 +334,22 @@ class DocumentMasterApiController extends Controller
 
         return $this->sendSuccess($document->fresh(), 'Document status toggled successfully.');
     }
+
+    /**
+     * Parse and extract HTML content from uploaded Word/HTML template file (.docx, .html, .txt).
+     */
+    public function parseTemplateFile(Request $request): JsonResponse
+    {
+        $request->validate([
+            'template_file' => 'required|file|mimes:html,htm,txt,docx|max:10240',
+        ]);
+
+        $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+        $extractedContent = $templateService->importTemplateFromFile($request->file('template_file'));
+
+        return $this->sendSuccess([
+            'body_content' => $extractedContent,
+            'file_name'    => $request->file('template_file')->getClientOriginalName(),
+        ], 'Template file parsed successfully');
+    }
 }

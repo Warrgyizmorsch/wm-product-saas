@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Api\MapApiController;
+use App\Http\Controllers\Api\NotificationApiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -40,6 +41,19 @@ Route::prefix('maps')
     ->group(function () {
         Route::get('/geocode', [MapApiController::class, 'geocode'])->name('geocode');
         Route::get('/autocomplete', [MapApiController::class, 'autocomplete'])->name('autocomplete');
+    });
+
+// Notifications API (Mobile & Web App)
+Route::prefix('notifications')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.notifications.')
+    ->group(function () {
+        Route::get('/', [NotificationApiController::class, 'index'])->name('index');
+        Route::post('/mark-all-read', [NotificationApiController::class, 'markAllRead'])->name('mark-all-read');
+        Route::post('/device-token', [NotificationApiController::class, 'updateDeviceToken'])->name('device-token');
+        Route::post('/{id}/read', [NotificationApiController::class, 'markAsRead'])->name('read');
+        Route::post('/{id}/unread', [NotificationApiController::class, 'markAsUnread'])->name('unread');
+        Route::delete('/{id}', [NotificationApiController::class, 'destroy'])->name('destroy');
     });
 
 // Production Module API v1
