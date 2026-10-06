@@ -34,4 +34,9 @@ class PipCheckin extends BaseModel
     {
         return $this->belongsTo(User::class, 'reviewer_id');
     }
+
+    public function conductor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewer_id');
+    }
 }

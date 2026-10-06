@@ -195,7 +195,7 @@ class AssetApiController extends Controller
                 'assigned_employee_id' => $asset->assigned_employee_id,
                 'assigned_employee'   => $asset->assignedEmployee ? [
                     'id'            => $asset->assignedEmployee->id,
-                    'employee_code' => $asset->assignedEmployee->employee_code ?? null,
+                    'employee_code' => $asset->assignedEmployee->employee_id ?? null,
                     'name'          => trim(($asset->assignedEmployee->first_name ?? '') . ' ' . ($asset->assignedEmployee->last_name ?? '')),
                     'email'         => $asset->assignedEmployee->office_email ?? $asset->assignedEmployee->personal_email ?? null,
                 ] : null,

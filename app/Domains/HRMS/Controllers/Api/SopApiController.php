@@ -188,7 +188,7 @@ class SopApiController extends Controller
             $paginated = $query->paginate($perPage);
 
             // Transform items concisely
-            $items = $paginated->getCollection()->map(function ($doc) use ($currentEmployee) {
+            $items = $paginated->getCollection()->map(function ($doc) use ($currentEmployee, $isHrOrAdmin) {
                 $totalAssigned = $doc->assignments()->count();
                 $ackCount = $doc->assignments()->where('status', 'acknowledged')->count();
                 $complianceRate = $totalAssigned > 0 ? round(($ackCount / $totalAssigned) * 100, 1) : 0.0;

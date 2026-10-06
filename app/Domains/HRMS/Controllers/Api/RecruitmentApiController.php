@@ -105,7 +105,7 @@ class RecruitmentApiController extends Controller
 
             $upcomingInterviews = CandidateInterview::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
                 ->where('status', 'scheduled')
-                ->with(['application.candidate', 'application.requisition:id,job_title,requisition_code', 'interviewer:id,full_name,employee_code'])
+                ->with(['application.candidate', 'application.requisition:id,job_title,requisition_code', 'interviewer:id,full_name,employee_id'])
                 ->orderBy('scheduled_at', 'asc')
                 ->take(5)
                 ->get();
@@ -142,7 +142,7 @@ class RecruitmentApiController extends Controller
 
         $tenantId = $this->getTenantId();
 
-        $query = JobRequisition::with(['department:id,name', 'designation:id,name', 'requestedBy:id,full_name,employee_code'])
+        $query = JobRequisition::with(['department:id,name', 'designation:id,name', 'requestedBy:id,full_name,employee_id'])
             ->withCount('applications')
             ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId));
 
@@ -677,7 +677,7 @@ class RecruitmentApiController extends Controller
         $query = CandidateInterview::with([
             'application.candidate',
             'application.requisition:id,job_title,requisition_code',
-            'interviewer:id,full_name,employee_code',
+            'interviewer:id,full_name,employee_id',
             'scorecard',
         ])
             ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId));
@@ -733,7 +733,7 @@ class RecruitmentApiController extends Controller
 
         try {
             $interview = $this->recruitmentRepository->scheduleInterview($application, $validator->validated(), $tenantId);
-            $interview->load(['interviewer:id,full_name,employee_code']);
+            $interview->load(['interviewer:id,full_name,employee_id']);
 
             return $this->sendSuccess($interview, "Interview Round #{$request->round_number} ({$request->round_name}) scheduled successfully.", 201);
         } catch (Exception $e) {
