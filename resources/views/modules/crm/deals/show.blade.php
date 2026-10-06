@@ -2013,6 +2013,12 @@
                                                 <span class="text-muted">{{ __('crm.taxes_label') }}</span>
                                                 <span class="fw-bold">{{ format_currency($activeQuotation->tax ?? $activeQuotation->tax_amount ?? 0) }}</span>
                                             </div>
+                                            @if(($activeQuotation->discount ?? 0) > 0)
+                                                <div class="d-flex justify-content-between py-1 border-bottom text-danger">
+                                                    <span>{{ __('crm.discount') }}</span>
+                                                    <span class="fw-bold">-{{ format_currency($activeQuotation->discount) }}</span>
+                                                </div>
+                                            @endif
                                             <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1">
                                                 <span class="fw-bold text-dark">{{ __('crm.grand_total') }}</span>
                                                 <span class="fw-extrabold text-primary">{{ format_currency($activeQuotation->total_amount) }}</span>
