@@ -115,4 +115,9 @@ class LeaveStructureRepository implements LeaveStructureRepositoryInterface
     {
         return $leaveType->delete();
     }
+
+    public function updateRules(LeaveType $leaveType, array $rules): bool
+    {
+        return $leaveType->update(['rules' => $rules]);
+    }
 }

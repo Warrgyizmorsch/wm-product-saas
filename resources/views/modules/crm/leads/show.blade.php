@@ -40,6 +40,191 @@
             border-color: var(--bs-primary) !important;
             background-color: #eff6ff !important;
         }
+        .quotation-rev-chip {
+            min-width: 170px;
+            transition: all 0.2s ease;
+            position: relative;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+        }
+        .quotation-rev-chip:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .quotation-rev-chip.active {
+            border-color: var(--bs-primary) !important;
+            background-color: #f0f9ff;
+            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+        }
+
+        /* ==========================================================================
+           DARK MODE SUPPORT (html.app-skin-dark)
+           ========================================================================== */
+        html.app-skin-dark .quotation-rev-chip {
+            background-color: #162038 !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .quotation-rev-chip:hover {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+        html.app-skin-dark .quotation-rev-chip.active {
+            background-color: #1e293b !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4) !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container,
+        html.app-skin-dark .zoho-main-col,
+        html.app-skin-dark #zohoMainScrollable,
+        html.app-skin-dark .tab-content,
+        html.app-skin-dark .tab-pane {
+            background-color: #0b1329 !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+        html.app-skin-dark .zoho-sidebar-col {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .sticky-top,
+        html.app-skin-dark div[style*="background-color: #f8fafc"],
+        html.app-skin-dark div[style*="background-color:#f8fafc"] {
+            background-color: #0b1329 !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-header-banner {
+            background-color: #111827 !important;
+            border-bottom-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-sidebar-nav {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-sidebar-nav .nav-link {
+            color: #94a3b8 !important;
+        }
+        html.app-skin-dark .zoho-sidebar-nav .nav-link:hover {
+            background-color: #1e293b !important;
+            color: #60a5fa !important;
+        }
+        html.app-skin-dark .zoho-sidebar-nav .nav-link.active {
+            background-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+        }
+        html.app-skin-dark .zoho-nav-tabs .nav-link {
+            border-color: #334155 !important;
+            background-color: #162038 !important;
+            color: #94a3b8 !important;
+        }
+        html.app-skin-dark .zoho-nav-tabs .nav-link:hover {
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
+            border-color: #475569 !important;
+        }
+        html.app-skin-dark .zoho-nav-tabs .nav-link.active {
+            background-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+            border-color: var(--bs-primary) !important;
+        }
+        html.app-skin-dark .zoho-field-row {
+            border-bottom-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-field-label {
+            color: #94a3b8 !important;
+        }
+        html.app-skin-dark .zoho-field-value {
+            color: #f8fafc !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container .card,
+        html.app-skin-dark div[style*="background-color: #ffffff"],
+        html.app-skin-dark div[style*="background-color:#ffffff"],
+        html.app-skin-dark .zoho-lead-card-container .bg-white,
+        html.app-skin-dark .bg-white {
+            background-color: #111827 !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container .bg-light,
+        html.app-skin-dark .bg-light {
+            background-color: #162038 !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container .border,
+        html.app-skin-dark .zoho-lead-card-container .border-bottom,
+        html.app-skin-dark .zoho-lead-card-container .border-top,
+        html.app-skin-dark .zoho-lead-card-container .border-end,
+        html.app-skin-dark .zoho-lead-card-container .border-start,
+        html.app-skin-dark .border {
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container .text-dark,
+        html.app-skin-dark .text-dark {
+            color: #f8fafc !important;
+        }
+        html.app-skin-dark .zoho-lead-card-container .text-muted,
+        html.app-skin-dark .text-muted {
+            color: #94a3b8 !important;
+        }
+        html.app-skin-dark .requirement-clickable-box {
+            background: linear-gradient(135deg, #162038 0%, #1e293b 100%) !important;
+        }
+        html.app-skin-dark .requirement-clickable-box:hover {
+            background: #1e293b !important;
+        }
+        html.app-skin-dark .requirement-empty-box {
+            background-color: #162038 !important;
+            border-color: #334155 !important;
+        }
+        html.app-skin-dark .table-responsive table,
+        html.app-skin-dark .table {
+            color: #f1f5f9 !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .table th,
+        html.app-skin-dark .table.odoo-table th {
+            background-color: #162038 !important;
+            color: #94a3b8 !important;
+            border-color: #1e293b !important;
+            border-bottom-color: #1e293b !important;
+        }
+        html.app-skin-dark .table td,
+        html.app-skin-dark .table.odoo-table td {
+            border-color: #1e293b !important;
+            border-bottom-color: #1e293b !important;
+            color: #f1f5f9 !important;
+        }
+        html.app-skin-dark input,
+        html.app-skin-dark select,
+        html.app-skin-dark textarea,
+        html.app-skin-dark .form-control,
+        html.app-skin-dark .form-select {
+            background-color: #162038 !important;
+            border-color: #334155 !important;
+            color: #f8fafc !important;
+        }
+        html.app-skin-dark .zoho-header-banner .btn-outline-secondary,
+        html.app-skin-dark .btn-outline-secondary {
+            background-color: #162038 !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+        html.app-skin-dark .modal-content,
+        html.app-skin-dark .offcanvas {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .dropdown-menu {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .dropdown-item {
+            color: #cbd5e1 !important;
+        }
+        html.app-skin-dark .dropdown-item:hover {
+            background-color: #1e293b !important;
+            color: #60a5fa !important;
+        }
     </style>
 
     <!-- Hidden form for stage status updates via clickable/action triggers -->
@@ -145,12 +330,6 @@
                     <i class="feather-calendar me-1"></i> + {{ __('crm.followup') }}
                 </button>
 
-                <!-- Send Email Button -->
-                @if ($lead->email)
-                    <a href="mailto:{{ $lead->email }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-2 rounded d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-mail me-1"></i> {{ __('crm.email') }}
-                    </a>
-                @endif
 
                 <!-- More Actions 3-Dot Dropdown using common component -->
                 @if (!in_array(strtolower($lead->status ?? ''), ['dealing', 'won']))
@@ -236,22 +415,22 @@
                 <div class="d-flex align-items-center justify-content-between border-bottom px-3 py-2 bg-light-50 flex-wrap gap-2 sticky-top" style="z-index: 90; background-color: #f8fafc;">
                     <ul class="nav nav-pills zoho-nav-tabs" id="zohoLeadTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 rounded-pill {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="true">
-                                {{ __('crm.overview') }}
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 rounded-pill" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab" aria-controls="timeline-pane" aria-selected="false">
-                                {{ __('crm.timeline') }}
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') && request('tab') !== 'interactions' && request('tab') !== 'timeline' ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="{{ request('tab') !== 'interactions' && request('tab') !== 'timeline' ? 'true' : 'false' }}">
+                                <i class="feather-grid me-1"></i>{{ __('crm.overview') }}
                             </button>
                         </li>
                         @if ($activeQuotation || request()->has('create_quotation'))
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link px-3 py-1 fw-bold fs-12 rounded-pill {{ request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('view_quotation') ? 'active' : '' }}" id="quotation-tab" data-bs-toggle="tab" data-bs-target="#quotation-pane" type="button" role="tab" aria-controls="quotation-pane" aria-selected="false">
-                                    {{ __('crm.quotation') }}
+                                <button class="nav-link px-3 py-1 fw-bold fs-12 {{ request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('view_quotation') ? 'active' : '' }}" id="quotation-tab" data-bs-toggle="tab" data-bs-target="#quotation-pane" type="button" role="tab" aria-controls="quotation-pane" aria-selected="false">
+                                    <i class="feather-file-text me-1"></i>{{ __('crm.quotation_proposals') }} @if($activeQuotation)({{ $lead->quotations ? $lead->quotations->count() : 1 }})@endif
                                 </button>
                             </li>
                         @endif
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ request('tab') === 'interactions' || request('tab') === 'timeline' ? 'active' : '' }}" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab" aria-controls="timeline-pane" aria-selected="{{ request('tab') === 'interactions' || request('tab') === 'timeline' ? 'true' : 'false' }}">
+                                <i class="feather-clock me-1"></i>{{ __('crm.timeline_audit') }}
+                            </button>
+                        </li>
                     </ul>
 
                     <!-- Clock / Last Update Information -->
@@ -265,7 +444,7 @@
                 <div class="pt-2 px-3 pb-3 tab-content" id="zohoLeadTabsContent">
                     
                     <!-- ==================== TAB 1: OVERVIEW PANE ==================== -->
-                    <div class="tab-pane fade show {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') && old('form_type') !== 'quotation_create' && old('form_type') !== 'quotation_edit' ? 'active' : '' }}" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab">
+                    <div class="tab-pane fade {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') && old('form_type') !== 'quotation_create' && old('form_type') !== 'quotation_edit' && request('tab') !== 'interactions' && request('tab') !== 'timeline' ? 'show active' : '' }}" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab">
                         
                         @if ((request()->has('edit_lead') || old('form_type') === 'lead_edit') && !in_array(strtolower($lead->status ?? ''), ['dealing', 'won']))
                             <!-- ==================== STATE: EDIT LEAD FORM ==================== -->
@@ -456,9 +635,13 @@
                                                         height: 32px !important;
                                                         font-size: 13px !important;
                                                         font-weight: 600 !important;
-                                                        border-color: #dee2e6 !important;
-                                                        background-color: #ffffff !important;
+                                                        border-color: #dee2e6;
                                                         padding: 2px 4px !important;
+                                                    }
+                                                    html.app-skin-dark #editProductItemsTable .qty-row-input {
+                                                        background-color: #121a2d !important;
+                                                        border-color: #283c50 !important;
+                                                        color: #ffffff !important;
                                                     }
                                                 </style>
 
@@ -1167,7 +1350,7 @@
                     </div> <!-- End TAB 1: OVERVIEW PANE -->
 
                     <!-- ==================== TAB 2: TIMELINE PANE (ACTIVITIES & HISTORY) ==================== -->
-                    <div class="tab-pane fade" id="timeline-pane" role="tabpanel" aria-labelledby="timeline-tab">
+                    <div class="tab-pane fade {{ request('tab') === 'interactions' || request('tab') === 'timeline' ? 'show active' : '' }}" id="timeline-pane" role="tabpanel" aria-labelledby="timeline-tab">
                         <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
                             <div class="card-body p-3">
                                 
@@ -1175,12 +1358,12 @@
                                 <div class="border-bottom pb-1 mb-3">
                                     <ul class="nav nav-tabs border-bottom-0 zoho-timeline-subtabs" id="zohoTimelineSubTabs" role="tablist">
                                         <li class="nav-item" role="presentation">
-                                            <button class="nav-link active py-2 px-3 border-0 bg-transparent" id="subtab-history-tab" data-bs-toggle="tab" data-bs-target="#subtab-history" type="button" role="tab" aria-controls="subtab-history" aria-selected="true">
+                                            <button class="nav-link {{ request('tab') !== 'interactions' ? 'active' : '' }} py-2 px-3 border-0 bg-transparent" id="subtab-history-tab" data-bs-toggle="tab" data-bs-target="#subtab-history" type="button" role="tab" aria-controls="subtab-history" aria-selected="{{ request('tab') !== 'interactions' ? 'true' : 'false' }}">
                                                 {{ __('crm.history') }}
                                             </button>
                                         </li>
                                         <li class="nav-item" role="presentation">
-                                            <button class="nav-link py-2 px-3 border-0 bg-transparent" id="subtab-interactions-tab" data-bs-toggle="tab" data-bs-target="#subtab-interactions" type="button" role="tab" aria-controls="subtab-interactions" aria-selected="false">
+                                            <button class="nav-link {{ request('tab') === 'interactions' ? 'active' : '' }} py-2 px-3 border-0 bg-transparent" id="subtab-interactions-tab" data-bs-toggle="tab" data-bs-target="#subtab-interactions" type="button" role="tab" aria-controls="subtab-interactions" aria-selected="{{ request('tab') === 'interactions' ? 'true' : 'false' }}">
                                                 {{ __('crm.interactions') }}
                                             </button>
                                         </li>
@@ -1191,7 +1374,7 @@
                                 <div class="tab-content" id="zohoTimelineSubTabsContent">
                                     
                                     <!-- SUBTAB 1: HISTORY TIMELINE -->
-                                    <div class="tab-pane fade show active" id="subtab-history" role="tabpanel" aria-labelledby="subtab-history-tab">
+                                    <div class="tab-pane fade {{ request('tab') !== 'interactions' ? 'show active' : '' }}" id="subtab-history" role="tabpanel" aria-labelledby="subtab-history-tab">
                                         <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
                                             <div class="d-flex align-items-center gap-2">
                                                 <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.timeline_history') }}</h5>
@@ -1264,7 +1447,7 @@
                                     </div>
 
                                     <!-- SUBTAB 2: INTERACTIONS (ACTIVITIES) TIMELINE -->
-                                    <div class="tab-pane fade" id="subtab-interactions" role="tabpanel" aria-labelledby="subtab-interactions-tab">
+                                    <div class="tab-pane fade {{ request('tab') === 'interactions' ? 'show active' : '' }}" id="subtab-interactions" role="tabpanel" aria-labelledby="subtab-interactions-tab">
                                         <div class="d-flex align-items-center justify-content-between mb-3 mt-1 flex-wrap gap-2">
                                             <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.interactions_scheduled_activities') }}</h5>
                                         </div>
@@ -2029,7 +2212,7 @@
                                                 </h6>
                                                 <div class="d-flex flex-wrap gap-2 align-items-center">
                                                     @foreach($revisions as $rev)
-                                                        <div class="d-flex align-items-center gap-2 p-2 border rounded bg-white" style="min-width: 170px; border-color: {{ $rev->id === $activeQuotation->id ? '#3b82f6 !important' : '#e2e8f0' }} !important; transition: all 0.2s; position: relative; {{ $rev->id === $activeQuotation->id ? 'box-shadow: 0 0 0 1px rgba(59,130,246,0.1); background-color: #f0f9ff !important;' : '' }}">
+                                                        <div class="quotation-rev-chip d-flex align-items-center gap-2 p-2 rounded {{ $rev->id === $activeQuotation->id ? 'active' : '' }}">
                                                             @if($rev->id === $activeQuotation->id)
                                                                 <span class="position-absolute top-0 end-0 translate-middle-y badge rounded-pill bg-primary fs-8 text-uppercase px-1" style="font-size: 8px !important; margin-right: 10px;">{{ __('crm.viewing') }}</span>
                                                             @endif
@@ -2176,20 +2359,24 @@
             border: 1px solid #cbd5e1;
             background-color: #ffffff;
             color: #475569;
-            padding: 6px 16px;
+            padding: 6px 18px;
             font-size: 12px;
+            font-weight: 600;
+            border-radius: 20px !important;
             transition: all 0.2s ease;
         }
 
         .zoho-nav-tabs .nav-link:hover {
             background-color: #f8fafc;
             color: #0f172a;
+            border-color: #94a3b8;
         }
 
         .zoho-nav-tabs .nav-link.active {
-            background-color: #eef2f6 !important;
-            color: #0f172a !important;
-            border-color: #94a3b8 !important;
+            background-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+            border-color: var(--bs-primary) !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
         }
 
         .zoho-quick-info-box {
@@ -2675,18 +2862,21 @@
             var activeTabKey = 'lead_active_tab_' + {{ $lead->id }};
             var activeSubTabKey = 'lead_active_subtab_' + {{ $lead->id }};
             
-            // Check URL Hash first if present and clean it up from address bar
+            // Check URL Query Param & Hash first
+            var urlParams = new URLSearchParams(window.location.search);
+            var tabParam = urlParams.get('tab');
             var hash = window.location.hash;
-            if (hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
+
+            if (tabParam === 'interactions' || tabParam === 'timeline' || hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
                 localStorage.setItem(activeTabKey, 'timeline-tab');
-                if (hash === '#subtab-interactions') {
+                if (tabParam === 'interactions' || hash === '#subtab-interactions') {
                     localStorage.setItem(activeSubTabKey, 'subtab-interactions-tab');
                 } else if (hash === '#subtab-history') {
                     localStorage.setItem(activeSubTabKey, 'subtab-history-tab');
                 }
-            } else if (hash === '#overview' || hash === '#overview-pane') {
+            } else if (tabParam === 'overview' || hash === '#overview' || hash === '#overview-pane') {
                 localStorage.setItem(activeTabKey, 'overview-tab');
-            } else if (hash === '#quotation' || hash === '#quotation-pane') {
+            } else if (tabParam === 'quotation' || hash === '#quotation' || hash === '#quotation-pane') {
                 localStorage.setItem(activeTabKey, 'quotation-tab');
             }
 
@@ -2694,6 +2884,72 @@
             if (window.history && window.history.replaceState) {
                 var cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
                 window.history.replaceState(null, '', cleanUrl);
+            }
+
+            // Scroll Spy for Overview Sections
+            let isManualClick = false;
+            $('#zohoMainScrollable').on('scroll', function() {
+                if (isManualClick) return;
+                const scrollContainer = this;
+                const containerTop = scrollContainer.getBoundingClientRect().top;
+                const stickyHeader = document.querySelector('.sticky-top');
+                const stickyHeaderHeight = stickyHeader ? stickyHeader.offsetHeight : 50;
+
+                const sections = ['#sectionLeadInfo', '#sectionLeadProducts', '#sectionAddressInfo', '#sectionRequirements', '#sectionNotes', '#sectionDocuments'];
+                let currentSection = null;
+
+                sections.forEach(function(secId) {
+                    const el = document.querySelector(secId);
+                    if (el) {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.top - containerTop <= stickyHeaderHeight + 60) {
+                            currentSection = secId;
+                        }
+                    }
+                });
+
+                if (currentSection && $('#overview-pane').hasClass('active')) {
+                    $('#zohoSidebarLinks a').removeClass('active');
+                    $('#zohoSidebarLinks a[href="' + currentSection + '"]').addClass('active');
+                }
+            });
+
+            function syncSidebarWithCurrentTab(targetId) {
+                if (targetId === 'overview-tab' || targetId === '#overview-pane') {
+                    const scrollContainer = document.getElementById('zohoMainScrollable');
+                    if (scrollContainer) {
+                        const containerTop = scrollContainer.getBoundingClientRect().top;
+                        const stickyHeader = document.querySelector('.sticky-top');
+                        const stickyHeaderHeight = stickyHeader ? stickyHeader.offsetHeight : 50;
+                        const sections = ['#sectionLeadInfo', '#sectionLeadProducts', '#sectionAddressInfo', '#sectionRequirements', '#sectionNotes', '#sectionDocuments'];
+                        let currentSection = '#sectionLeadInfo';
+                        sections.forEach(function(secId) {
+                            const el = document.querySelector(secId);
+                            if (el) {
+                                const rect = el.getBoundingClientRect();
+                                if (rect.top - containerTop <= stickyHeaderHeight + 60) {
+                                    currentSection = secId;
+                                }
+                            }
+                        });
+                        $('#zohoSidebarLinks a').removeClass('active');
+                        $('#zohoSidebarLinks a[href="' + currentSection + '"]').addClass('active');
+                    }
+                } else if (targetId === 'quotation-tab' || targetId === '#quotation-pane') {
+                    $('#zohoSidebarLinks a').removeClass('active');
+                    $('#zohoSidebarLinks a[href="#sectionQuotationHistory"]').addClass('active');
+                } else if (targetId === 'timeline-tab' || targetId === '#timeline-pane') {
+                    const isInteractionsActive = $('#subtab-interactions-tab').hasClass('active') || $('#subtab-interactions').hasClass('active') || localStorage.getItem(activeSubTabKey) === 'subtab-interactions-tab';
+                    const activeSubtabHref = isInteractionsActive ? '#subtab-interactions' : '#subtab-history';
+                    $('#zohoSidebarLinks a').removeClass('active');
+                    $('#zohoSidebarLinks a[href="' + activeSubtabHref + '"]').addClass('active');
+                } else if (targetId === 'subtab-interactions-tab' || targetId === '#subtab-interactions') {
+                    $('#zohoSidebarLinks a').removeClass('active');
+                    $('#zohoSidebarLinks a[href="#subtab-interactions"]').addClass('active');
+                } else if (targetId === 'subtab-history-tab' || targetId === '#subtab-history') {
+                    $('#zohoSidebarLinks a').removeClass('active');
+                    $('#zohoSidebarLinks a[href="#subtab-history"]').addClass('active');
+                }
             }
 
             // Restore tab from localStorage
@@ -2713,7 +2969,12 @@
                             bootstrap.Tab.getOrCreateInstance(subTabEl).show();
                         }
                     }
-                }, 50);
+                    syncSidebarWithCurrentTab(savedTabId);
+                }, 60);
+            } else {
+                if ($('#timeline-tab').hasClass('active')) {
+                    syncSidebarWithCurrentTab('timeline-tab');
+                }
             }
 
             var scrollTargetOnTabShown = null;
@@ -2738,6 +2999,7 @@
                 // Remove active class from all sidebar links and add to clicked one
                 $('#zohoSidebarLinks a').removeClass('active');
                 $(this).addClass('active');
+                isManualClick = true;
 
                 // Ensure URL hash is removed from browser bar
                 if (window.history && window.history.replaceState) {
@@ -2773,6 +3035,7 @@
                     if (targetEl.length) {
                         scrollToElement(targetEl);
                     }
+                    setTimeout(function() { isManualClick = false; }, 500);
                 } else if (mainTabEl) {
                     if (targetEl.length) {
                         scrollTargetOnTabShown = targetEl;
@@ -2790,11 +3053,15 @@
                         localStorage.setItem(activeSubTabKey, e.target.id);
                         localStorage.setItem(activeTabKey, 'timeline-tab');
                     }
+                    if (!scrollTargetOnTabShown) {
+                        syncSidebarWithCurrentTab(e.target.id);
+                    }
                 }
 
                 if (scrollTargetOnTabShown) {
                     scrollToElement(scrollTargetOnTabShown);
                     scrollTargetOnTabShown = null;
+                    setTimeout(function() { isManualClick = false; }, 500);
                 }
             });
 
@@ -3569,21 +3836,21 @@
                             <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                                 <div class="row g-2">
                                     <div class="col-6">
-                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextSyncGoogle" style="cursor: pointer;">
-                                                <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
+                                        <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasNextSyncGoogle">
+                                                <i class="feather-calendar text-danger"></i> {{ __('crm.google_calendar') }}
                                             </label>
                                             <input type="hidden" name="next_sync_google_calendar" value="0">
-                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_sync_google_calendar" value="1" id="offcanvasNextSyncGoogle" style="cursor: pointer;">
+                                            <x-ui.checkbox name="next_sync_google_calendar" id="offcanvasNextSyncGoogle" value="1" />
                                         </div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextCreateMeet" style="cursor: pointer;">
-                                                <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
+                                        <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasNextCreateMeet">
+                                                <i class="feather-video text-primary"></i> {{ __('crm.google_meet_video') }}
                                             </label>
                                             <input type="hidden" name="next_create_meet_link" value="0">
-                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_create_meet_link" value="1" id="offcanvasNextCreateMeet" style="cursor: pointer;">
+                                            <x-ui.checkbox name="next_create_meet_link" id="offcanvasNextCreateMeet" value="1" />
                                         </div>
                                     </div>
                                 </div>
@@ -3631,21 +3898,21 @@
                     <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                         <div class="row g-2">
                             <div class="col-6">
-                                <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                    <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasSyncGoogle" style="cursor: pointer;">
-                                        <i class="feather-calendar text-danger me-1"></i> {{ __('crm.google_calendar') }}
+                                <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasSyncGoogle">
+                                        <i class="feather-calendar text-danger"></i> {{ __('crm.google_calendar') }}
                                     </label>
                                     <input type="hidden" name="sync_google_calendar" value="0">
-                                    <input class="form-check-input ms-0 mt-0" type="checkbox" name="sync_google_calendar" value="1" id="offcanvasSyncGoogle" style="cursor: pointer;">
+                                    <x-ui.checkbox name="sync_google_calendar" id="offcanvasSyncGoogle" value="1" />
                                 </div>
                             </div>
                             <div class="col-6">
-                                <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
-                                    <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasCreateMeet" style="cursor: pointer;">
-                                        <i class="feather-video text-primary me-1"></i> {{ __('crm.google_meet_video') }}
+                                <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="fw-bold fs-11 text-dark mb-0 pe-1 d-flex align-items-center gap-1 c-pointer" for="offcanvasCreateMeet">
+                                        <i class="feather-video text-primary"></i> {{ __('crm.google_meet_video') }}
                                     </label>
                                     <input type="hidden" name="create_meet_link" value="0">
-                                    <input class="form-check-input ms-0 mt-0" type="checkbox" name="create_meet_link" value="1" id="offcanvasCreateMeet" style="cursor: pointer;">
+                                    <x-ui.checkbox name="create_meet_link" id="offcanvasCreateMeet" value="1" />
                                 </div>
                             </div>
                         </div>

@@ -596,7 +596,7 @@ class KraKpiApiController extends Controller
             $search = '%' . trim($request->search) . '%';
             $query->whereHas('employee', function ($q) use ($search) {
                 $q->where('full_name', 'like', $search)
-                  ->orWhere('employee_code', 'like', $search);
+                  ->orWhere('employee_id', 'like', $search);
             });
         }
 

@@ -107,8 +107,9 @@ class CrmDealController extends Controller
         }
 
         $deals = $query->orderBy('id', 'desc')->paginate(100);
+        $users = \App\Models\User::orderBy('name')->get();
 
-        return view('modules.crm.deals.index', compact('deals', 'search', 'stage', 'stageCounts', 'dateFrom', 'dateTo', 'dealStatuses'));
+        return view('modules.crm.deals.index', compact('deals', 'users', 'search', 'stage', 'stageCounts', 'dateFrom', 'dateTo', 'dealStatuses'));
     }
 
     public function kanban(Request $request): View
@@ -303,7 +304,7 @@ class CrmDealController extends Controller
         // Fetch linked lead for complete activity roll-up & document history
         $linkedLead = null;
         if (!empty($deal->lead_id)) {
-            $linkedLead = \App\Domains\CRM\Models\Lead::with(['histories.user', 'leadDocuments'])->find($deal->lead_id);
+            $linkedLead = \App\Domains\CRM\Models\Lead::with(['histories.user', 'leadDocuments', 'owner'])->find($deal->lead_id);
         }
         if (!$linkedLead) {
             $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)
@@ -312,7 +313,7 @@ class CrmDealController extends Controller
                         $q->where('crm_account_id', $deal->crm_account_id);
                     }
                 })
-                ->with(['histories.user', 'leadDocuments'])
+                ->with(['histories.user', 'leadDocuments', 'owner'])
                 ->first();
         }
 
@@ -1046,16 +1047,125 @@ class CrmDealController extends Controller
 
 
     /**
-     * Export Deals to Excel with customizable columns and applied filters
+     * Update deal owner and sync linked lead owner.
      */
-    public function export(Request $request)
+    public function updateOwner(Request $request, CrmDeal $deal)
+    {
+        $this->authorize('update', $deal);
+
+        $validated = $request->validate([
+            'deal_owner_id' => 'nullable|exists:users,id',
+            'note' => 'nullable|string|max:500',
+        ]);
+
+        $ownerId = $validated['deal_owner_id'] ?? null;
+        $deal->update(['owner_id' => $ownerId]);
+
+        // Also sync linked Lead owner if lead exists
+        $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)
+            ->orWhere(function($q) use ($deal) {
+                if ($deal->lead_id) {
+                    $q->where('id', $deal->lead_id);
+                }
+            })
+            ->first();
+
+        if ($linkedLead) {
+            $linkedLead->update(['lead_owner_id' => $ownerId]);
+            if (!empty($validated['note'])) {
+                \App\Domains\CRM\Models\LeadHistory::logEvent(
+                    $linkedLead,
+                    'note',
+                    null,
+                    $validated['note'],
+                    "Deal Assignment Note: {$validated['note']}"
+                );
+            }
+        }
+
+        $targetUser = $ownerId ? \App\Models\User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+        $message = "Deal owner successfully updated to {$ownerName}!";
+
+        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'deal_id' => $deal->id,
+                'owner_id' => $ownerId,
+                'owner_name' => $ownerName,
+                'owner_email' => $targetUser?->email ?? '',
+                'owner_initial' => strtoupper(substr($ownerName, 0, 1)),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    /**
+     * Bulk assign deals to a sales representative.
+     */
+    public function bulkAssign(Request $request)
     {
         $this->authorize('viewAny', CrmDeal::class);
-        $tenantId = tenant_id() ?? auth()->user()->tenant_id ?? 1;
+        $validated = $request->validate([
+            'deal_ids' => 'required|array|min:1',
+            'deal_ids.*' => 'required|integer|exists:crm_deals,id',
+            'deal_owner_id' => 'nullable|exists:users,id',
+            'note' => 'nullable|string|max:500',
+        ]);
 
-        return Excel::download(
-            new DealExport($tenantId, $request->all()),
-            'deals_export_' . date('Y-m-d_His') . '.xlsx'
-        );
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+        $ownerId = $validated['deal_owner_id'] ?? null;
+        $targetUser = $ownerId ? \App\Models\User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+
+        $deals = CrmDeal::where('tenant_id', $tenantId)
+            ->whereIn('id', $validated['deal_ids'])
+            ->get();
+
+        $updatedCount = 0;
+        foreach ($deals as $deal) {
+            $deal->update(['owner_id' => $ownerId]);
+
+            // Sync linked lead
+            $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)
+                ->orWhere(function($q) use ($deal) {
+                    if ($deal->lead_id) {
+                        $q->where('id', $deal->lead_id);
+                    }
+                })
+                ->first();
+
+            if ($linkedLead) {
+                $linkedLead->update(['lead_owner_id' => $ownerId]);
+                if (!empty($validated['note'])) {
+                    \App\Domains\CRM\Models\LeadHistory::logEvent(
+                        $linkedLead,
+                        'note',
+                        null,
+                        $validated['note'],
+                        "Bulk Deal Assignment Note: {$validated['note']}"
+                    );
+                }
+            }
+            $updatedCount++;
+        }
+
+        $message = "Successfully assigned {$updatedCount} deal(s) to {$ownerName}!";
+
+        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'updated_count' => $updatedCount,
+                'owner_id' => $ownerId,
+                'owner_name' => $ownerName,
+                'owner_email' => $targetUser?->email ?? '',
+                'owner_initial' => strtoupper(substr($ownerName, 0, 1)),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
     }
 }

@@ -69,4 +69,9 @@ interface SopRepositoryInterface
      * Generate compliance matrix audit CSV.
      */
     public function generateAuditCsv(int $tenantId): string;
+
+    /**
+     * Export SOP audit report for a specific SOP.
+     */
+    public function exportAudit(int $id, int $tenantId): mixed;
 }

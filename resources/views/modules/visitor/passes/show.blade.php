@@ -264,6 +264,12 @@
             display: none !important;
         }
     }
+    #productImageZoomModal {
+        z-index: 100050 !important;
+    }
+    .modal-backdrop.zoom-backdrop-high {
+        z-index: 100040 !important;
+    }
 </style>
 @endpush
 
@@ -1045,12 +1051,12 @@
 </x-ui.modal>
 
 <!-- Product Image Zoom / Lightbox Modal -->
-<div class="modal fade" id="productImageZoomModal" tabindex="-1" aria-hidden="true" style="z-index: 1080;">
+<div class="modal fade" id="productImageZoomModal" tabindex="-1" aria-labelledby="zoomModalProductName" aria-hidden="true" style="z-index: 100050;">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg overflow-hidden rounded-4">
-            <div class="modal-header border-bottom py-2.5 px-3 bg-light">
+            <div class="modal-header border-bottom py-2.5 px-3 bg-light d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center gap-2">
-                    <div class="avatar-xs bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width:28px; height:28px;">
+                    <div class="avatar-xs bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-xs" style="width:28px; height:28px;">
                         <i class="feather-image fs-13"></i>
                     </div>
                     <div>
@@ -1058,14 +1064,18 @@
                         <small class="text-muted fs-11 font-monospace" id="zoomModalProductSku"></small>
                     </div>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn btn-sm btn-light border rounded-circle d-flex align-items-center justify-content-center p-0 shadow-xs" data-bs-dismiss="modal" aria-label="Close" style="width: 32px; height: 32px;" title="Close Preview">
+                    <i class="feather-x fs-16 text-dark"></i>
+                </button>
             </div>
-            <div class="modal-body p-3 text-center bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="min-height: 380px; max-height: 75vh;">
+            <div class="modal-body p-3 text-center bg-dark bg-opacity-10 d-flex align-items-center justify-content-center position-relative" style="min-height: 380px; max-height: 75vh;">
                 <img id="zoomModalImage" src="" alt="Product Large Preview" class="img-fluid rounded-3 shadow-sm object-fit-contain" style="max-height: 70vh; max-width: 100%; transition: transform 0.2s ease;">
             </div>
             <div class="modal-footer py-2 px-3 bg-light border-top d-flex justify-content-between align-items-center">
                 <span class="fs-11 text-muted"><i class="feather-info me-1"></i> High-resolution product catalog asset</span>
-                <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">
+                    <i class="feather-x me-1"></i> Close
+                </button>
             </div>
         </div>
     </div>
@@ -1227,13 +1237,47 @@
         const name = wrapperEl.getAttribute('data-product-name') || 'Product Image Preview';
         const sku = wrapperEl.getAttribute('data-product-sku') || '';
         
+        const modalEl = document.getElementById('productImageZoomModal');
+        if (!modalEl) return;
+
+        // Ensure modal is directly attached to body to stay above drawers and backdrop stacking contexts
+        if (modalEl.parentElement !== document.body) {
+            document.body.appendChild(modalEl);
+        }
+        
         document.getElementById('zoomModalProductName').textContent = name;
         document.getElementById('zoomModalProductSku').textContent = sku ? 'SKU: ' + sku : '';
         document.getElementById('zoomModalImage').src = fullImage;
         
-        const zoomModal = new bootstrap.Modal(document.getElementById('productImageZoomModal'));
+        const zoomModal = bootstrap.Modal.getOrCreateInstance(modalEl);
         zoomModal.show();
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const zoomModalEl = document.getElementById('productImageZoomModal');
+        if (zoomModalEl) {
+            zoomModalEl.addEventListener('show.bs.modal', function() {
+                if (zoomModalEl.parentElement !== document.body) {
+                    document.body.appendChild(zoomModalEl);
+                }
+                setTimeout(function() {
+                    const backdrops = document.querySelectorAll('.modal-backdrop');
+                    if (backdrops.length > 0) {
+                        const lastBackdrop = backdrops[backdrops.length - 1];
+                        lastBackdrop.classList.add('zoom-backdrop-high');
+                    }
+                }, 10);
+            });
+
+            zoomModalEl.addEventListener('hidden.bs.modal', function() {
+                const openDrawer = document.querySelector('.offcanvas.show');
+                if (openDrawer) {
+                    document.body.classList.add('modal-open');
+                    document.body.style.overflow = 'hidden';
+                }
+            });
+        }
+    });
 
     function removeProductItemRow(btn) {
         const row = btn.closest('tr');

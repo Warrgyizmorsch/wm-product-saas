@@ -893,12 +893,51 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"lead_owner_id\": 1\n}"
+                                    "raw": "{\n    \"lead_owner_id\": 1,\n    \"note\": \"Transferred lead ownership for technical follow-up.\"\n}"
                                 }
                             }
                         },
                         {
-                            "name": "11. Quick Requirement Update",
+                            "name": "11. Bulk Reassign Leads Owner",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/leads/bulk-assign",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "leads",
+                                        "bulk-assign"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"lead_ids\": [1, 2, 3],\n    \"lead_owner_id\": 1,\n    \"note\": \"Reassigned Q4 target leads to account executive.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "12. Quick Requirement Update",
                             "request": {
                                 "method": "PATCH",
                                 "header": [
@@ -1466,7 +1505,86 @@
                             }
                         },
                         {
-                            "name": "8. Update Deal Requirement",
+                            "name": "8. Deal Owner Update",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/deals/1/owner",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "deals",
+                                        "1",
+                                        "owner"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"deal_owner_id\": 1,\n    \"note\": \"Transferred deal ownership for negotiation phase.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "9. Bulk Reassign Deals Owner",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/deals/bulk-assign",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "deals",
+                                        "bulk-assign"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"deal_ids\": [1, 2],\n    \"deal_owner_id\": 1,\n    \"note\": \"Bulk assigned pipeline deals to sales manager.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "10. Update Deal Requirement",
                             "request": {
                                 "method": "PATCH",
                                 "header": [
@@ -2031,7 +2149,86 @@
                             }
                         },
                         {
-                            "name": "6. Add Contact Person to Account",
+                            "name": "6. Account Owner Update",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/accounts/1/owner",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "accounts",
+                                        "1",
+                                        "owner"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"account_owner_id\": 1,\n    \"note\": \"Assigned dedicated Account Manager.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "7. Bulk Reassign Accounts Owner",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/accounts/bulk-assign",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "accounts",
+                                        "bulk-assign"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"account_ids\": [1, 2],\n    \"account_owner_id\": 1,\n    \"note\": \"Bulk assigned corporate accounts to Key Accounts Team.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "8. Add Contact Person to Account",
                             "request": {
                                 "method": "POST",
                                 "header": [

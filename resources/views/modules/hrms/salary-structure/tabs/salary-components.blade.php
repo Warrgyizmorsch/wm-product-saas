@@ -629,6 +629,10 @@
             if (form) {
                 form.action = form.dataset.updateRoute.replace('__ID__', component.id);
             }
+            let editScIdInput = document.getElementById('edit_sc_id');
+            if (editScIdInput) {
+                editScIdInput.value = component.id;
+            }
         });
     });
 </script>
@@ -673,8 +677,8 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_component') }}</button>
+                    <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">{{ __('hrms.org.save_component') }}</x-ui.button>
                 </div>
             </form>
         </div>
@@ -689,8 +693,9 @@
                 <h5 class="modal-title fw-bold" id="editSalaryComponentModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.org.edit_salary_component') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="salary_component_edit_form" method="POST" data-update-route="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.update', ['salaryComponent' => '__ID__']) : route('hrms.salary-component.update', ['salaryComponent' => '__ID__']) }}">
+            <form id="salary_component_edit_form" method="POST" action="{{ old('edit_sc_id') ? (request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.update', ['salaryComponent' => old('edit_sc_id')]) : route('hrms.salary-component.update', ['salaryComponent' => old('edit_sc_id')])) : '' }}" data-update-route="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.update', ['salaryComponent' => '__ID__']) : route('hrms.salary-component.update', ['salaryComponent' => '__ID__']) }}">
                 @csrf
+                <input type="hidden" name="edit_sc_id" id="edit_sc_id" value="{{ old('edit_sc_id') }}">
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
@@ -721,8 +726,8 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_component') }}</button>
+                    <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">{{ __('hrms.org.update_component') }}</x-ui.button>
                 </div>
             </form>
         </div>

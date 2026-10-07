@@ -170,4 +170,57 @@ class WfhRequestRepository implements WfhRequestRepositoryInterface
             'current_level' => 'cancelled',
         ]);
     }
+
+    /**
+     * Export WFH requests to Excel (.xlsx).
+     */
+    public function export(array $filters = []): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $user = auth()->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $employee = \App\Domains\HRMS\Models\Employee::resolveForUser($user);
+
+        $query = WfhRequest::with(['employee.department'])->orderBy('created_at', 'desc');
+
+        if (!$isHrAdmin) {
+            $query->where('employee_id', $employee ? $employee->id : 0);
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+        if (!empty($filters['employee_id']) && $isHrAdmin) {
+            $query->where('employee_id', $filters['employee_id']);
+        }
+
+        $rows = $query->get();
+
+        $headers = [
+            'Employee Name',
+            'Employee ID',
+            'Start Date',
+            'End Date',
+            'Duration (Days)',
+            'Status',
+            'Applied On',
+            'Reason',
+        ];
+
+        $data = $rows->map(function ($req) {
+            return [
+                $req->employee->full_name ?? '—',
+                $req->employee->employee_id ?? '—',
+                $req->start_date ? $req->start_date->format('d M Y') : '—',
+                $req->end_date   ? $req->end_date->format('d M Y')   : '—',
+                floatval($req->duration),
+                ucfirst($req->status ?? 'pending'),
+                $req->created_at ? $req->created_at->format('d M Y H:i') : '—',
+                $req->reason ?? '',
+            ];
+        })->toArray();
+
+        $filename = 'wfh_requests_' . now()->format('Y-m-d') . '.xlsx';
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $data, $filename);
+    }
 }

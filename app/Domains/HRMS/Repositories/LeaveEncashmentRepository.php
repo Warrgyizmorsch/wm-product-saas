@@ -111,7 +111,6 @@ class LeaveEncashmentRepository implements LeaveEncashmentRepositoryInterface
             $days = floatval($leaveEncashment->requested_days);
 
             $balance->encashed = floatval($balance->encashed ?? 0) + $days;
-            $balance->remaining = max(0, floatval($balance->remaining) - $days);
             $balance->save();
 
             $leaveEncashment->status = 'approved';
@@ -144,7 +143,6 @@ class LeaveEncashmentRepository implements LeaveEncashmentRepositoryInterface
             if ($balance) {
                 $days = floatval($leaveEncashment->requested_days);
                 $balance->encashed = max(0, floatval($balance->encashed ?? 0) - $days);
-                $balance->remaining = floatval($balance->remaining) + $days;
                 $balance->save();
             }
         }
@@ -260,5 +258,43 @@ class LeaveEncashmentRepository implements LeaveEncashmentRepositoryInterface
             ->whereIn('status', ['pending', 'approved'])
             ->whereBetween('created_at', [$start, $end])
             ->exists();
+    }
+
+    public function export(array $filters = []): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $tenantId = auth()->user()->tenant_id ?? 1;
+        $user = auth()->user();
+        $encashments = $this->getExportData($filters, $user, $tenantId);
+
+        $headers = [
+            'ID',
+            'Employee Code',
+            'Employee Name',
+            'Department',
+            'Leave Type',
+            'Requested Days',
+            'Status',
+            'Reason',
+            'Rejection Reason',
+            'Applied Date',
+        ];
+
+        $rows = [];
+        foreach ($encashments as $encash) {
+            $rows[] = [
+                $encash->id,
+                $encash->employee->employee_id ?? 'N/A',
+                $encash->employee->full_name ?? 'N/A',
+                $encash->employee->department->name ?? 'N/A',
+                $encash->leaveType->name ?? 'N/A',
+                $encash->requested_days,
+                ucfirst($encash->status),
+                $encash->reason ?? '',
+                $encash->rejection_reason ?? '',
+                $encash->created_at ? $encash->created_at->format('Y-m-d H:i') : '',
+            ];
+        }
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $rows, 'leave_encashments_' . date('Ymd_His') . '.xlsx');
     }
 }

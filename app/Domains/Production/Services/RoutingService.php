@@ -4,6 +4,7 @@ namespace App\Domains\Production\Services;
 
 use App\Domains\Production\DTO\RoutingDTO;
 use App\Domains\Production\Models\Machine;
+use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
 use App\Domains\Production\Models\RoutingOperation;
@@ -134,6 +135,22 @@ class RoutingService
     }
 
     /**
+     * Update all draft BOMs for the product to use the newly approved routing.
+     *
+     * If no draft BOMs exist, nothing is changed.
+     */
+    private function updateDraftBomsForApprovedRouting(Routing $routing): void
+    {
+        ProductionBom::query()
+            ->where('tenant_id', $routing->tenant_id)
+            ->where('product_id', $routing->product_id)
+            ->draft()
+            ->update([
+                'routing_id' => $routing->id,
+            ]);
+    }
+
+    /**
      * Approve a pending routing. Makes it active and archives old active version.
      */
     public function approve(int $id, int $approverUserId): Routing
@@ -171,6 +188,9 @@ class RoutingService
                 'action'     => RoutingApproval::ACTION_APPROVED,
                 'comments'   => 'Routing approved and set as active manufacturing process.',
             ]);
+
+            // Update all draft BOMs for this product to use the newly approved routing
+            $this->updateDraftBomsForApprovedRouting($routing);
 
             event(new \App\Domains\Production\Events\RoutingApproved($routing->fresh()));
 

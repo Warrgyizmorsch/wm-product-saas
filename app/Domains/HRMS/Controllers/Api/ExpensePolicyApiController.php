@@ -201,7 +201,7 @@ class ExpensePolicyApiController extends Controller
             'company:id,company_name',
             'branch:id,name',
             'rules:id,expense_policy_id,expense_category_id,max_limit_per_claim,max_daily_limit,max_monthly_limit,receipt_required,receipt_required_threshold,notes',
-            'rules.category:id,name,code,icon',
+            'rules.category:id,name,code',
         ])
             ->where('tenant_id', $tenantId)
             ->find($id);
@@ -300,7 +300,7 @@ class ExpensePolicyApiController extends Controller
             return $this->sendError("Expense policy with ID '{$policyId}' not found.", 404);
         }
 
-        $rules = ExpensePolicyRule::with('category:id,name,code,icon')
+        $rules = ExpensePolicyRule::with('category:id,name,code')
             ->where('expense_policy_id', $policy->id)
             ->get();
 

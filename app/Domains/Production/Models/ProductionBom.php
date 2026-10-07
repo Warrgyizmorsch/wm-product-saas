@@ -91,6 +91,11 @@ class ProductionBom extends BaseModel
         return $this->status === 'draft';
     }
 
+    public function scopeDraft(Builder $query): Builder
+    {
+        return $query->where('status', 'draft');
+    }
+
     public function isPendingApproval(): bool
     {
         return $this->status === 'pending_approval';
@@ -124,7 +129,7 @@ class ProductionBom extends BaseModel
             ->where('effective_date', '<=', $today)
             ->where(function (Builder $q) use ($today): void {
                 $q->whereNull('expiry_date')
-                  ->orWhere('expiry_date', '>=', $today);
+                    ->orWhere('expiry_date', '>=', $today);
             });
     }
 }

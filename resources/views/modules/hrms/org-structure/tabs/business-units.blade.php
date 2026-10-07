@@ -66,8 +66,8 @@
                             </div>
                             
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('hrms.org.index', ['tab' => 'business-units']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">{{ __('hrms.common.reset') }}</a>
-                                <button type="submit" class="btn btn-sm btn-primary text-uppercase fw-bold py-2 px-3 text-white" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em;">{{ __('hrms.common.apply') }}</button>
+                                <x-ui.button href="{{ route('hrms.org.index', ['tab' => 'business-units']) }}" variant="light" size="sm" class="text-uppercase fw-bold py-2 px-3">{{ __('hrms.common.reset') }}</x-ui.button>
+                                <x-ui.button type="submit" variant="primary" size="sm" class="text-uppercase fw-bold py-2 px-3">{{ __('hrms.common.apply') }}</x-ui.button>
                             </div>
                         </form>
                     </x-ui.filter>
@@ -110,7 +110,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end align-items-center">
-                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-bu" data-bs-toggle="modal" data-bs-target="#viewBuModal" data-bu="{{ base64_encode($unit->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;">
+                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-bu" data-bs-toggle="modal" data-bs-target="#viewBuModal" data-bu="{{ base64_encode($unit->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
                                             <i class="feather feather-eye"></i>
                                         </a>
                                         <x-ui.action-dropdown>
@@ -163,137 +163,130 @@
 
 <script>
     (function() {
-        function init() {
-            // Bind company change listener for edit business unit modal once
+        // Bind company change listener for edit business unit modal
+        $(document).on('change', '#edit_bu_company_id', function () {
             const editCompanySelect = $('#edit_bu_company_id');
             const editHeadSelect = $('#edit_bu_head_employee_id');
-            if (editCompanySelect.length && editHeadSelect.length) {
-                editCompanySelect.on('change', function () {
-                    const compId = editCompanySelect.val();
-                    let originalOptions = editHeadSelect.data('original-options');
-                    if (!originalOptions) {
-                        originalOptions = editHeadSelect.find('option').clone();
-                        editHeadSelect.data('original-options', originalOptions);
-                    }
+            if (!editHeadSelect.length) return;
 
-                    const currentSelected = editHeadSelect.val();
-                    editHeadSelect.empty();
-
-                    originalOptions.each(function () {
-                        const opt = $(this);
-                        const optVal = opt.val();
-                        const optionCompId = opt.attr('data-company-id');
-
-                        if (!optVal || !compId || String(optionCompId) === String(compId)) {
-                            editHeadSelect.append(opt.clone());
-                        }
-                    });
-
-                    if (editHeadSelect.find(`option[value="${currentSelected}"]`).length) {
-                        editHeadSelect.val(currentSelected);
-                    } else {
-                        editHeadSelect.val('');
-                    }
-
-                    if (editHeadSelect.hasClass('select2-hidden-accessible')) {
-                        editHeadSelect.trigger('change.select2');
-                    }
-                });
+            const compId = editCompanySelect.val();
+            let originalOptions = editHeadSelect.data('original-options');
+            if (!originalOptions) {
+                originalOptions = editHeadSelect.find('option').clone();
+                editHeadSelect.data('original-options', originalOptions);
             }
 
-            function getInitials(name, fallback) {
-                const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
+            const currentSelected = editHeadSelect.val();
+            editHeadSelect.empty();
 
-                if (words.length >= 2) {
-                    return (words[0][0] + words[1][0]).toUpperCase();
+            originalOptions.each(function () {
+                const opt = $(this);
+                const optVal = opt.val();
+                const optionCompId = opt.attr('data-company-id');
+
+                if (!optVal || !compId || String(optionCompId) === String(compId)) {
+                    editHeadSelect.append(opt.clone());
                 }
+            });
 
-                return (words[0] || fallback || '').substring(0, 2).toUpperCase();
+            if (editHeadSelect.find(`option[value="${currentSelected}"]`).length) {
+                editHeadSelect.val(currentSelected);
+            } else {
+                editHeadSelect.val('');
             }
 
-            // View Action Trigger
-            document.querySelectorAll('.btn-view-bu').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    let unit = JSON.parse(atob(this.dataset.bu));
-                    
-                    let nameEl = document.getElementById('modal_view_bu_name');
-                    if (nameEl) nameEl.innerText = unit.name;
-                    
-                    let compEl = document.getElementById('modal_view_bu_company');
-                    if (compEl) compEl.innerText = (unit.company && unit.company.company_name) ? unit.company.company_name : 'N/A';
-                    
-                    let codeEl = document.getElementById('modal_view_bu_code');
-                    if (codeEl) codeEl.innerText = unit.code;
-                    
-                    let headEl = document.getElementById('modal_view_bu_head');
-                    if (headEl) headEl.innerText = (unit.head) ? (unit.head.first_name + ' ' + unit.head.last_name) : 'N/A';
-                    
-                    let descEl = document.getElementById('modal_view_bu_desc');
-                    if (descEl) descEl.innerText = unit.description || 'No description provided.';
-                    
-                    let avatarEl = document.getElementById('modal_view_bu_avatar');
-                    if (avatarEl) {
-                        avatarEl.innerText = getInitials(unit.name, 'BU');
-                    }
-                    
-                    let statusEl = document.getElementById('modal_view_bu_status');
-                    if (statusEl) {
-                        if (unit.status === true || unit.status === 1 || unit.status === '1') {
-                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success">{{ __('hrms.employees.frm_status_active') }}</span>';
-                        } else {
-                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">{{ __('hrms.employees.frm_status_inactive') }}</span>';
-                        }
-                    }
-                });
-            });
+            if (editHeadSelect.hasClass('select2-hidden-accessible')) {
+                editHeadSelect.trigger('change.select2');
+            }
+        });
 
-            // Edit Action Trigger
-            document.querySelectorAll('.btn-edit-bu').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    let unit = JSON.parse(atob(this.dataset.bu));
-                    
-                    let nameEl = document.getElementById('edit_bu_name');
-                    if (nameEl) nameEl.value = unit.name || '';
-                    
-                    let codeEl = document.getElementById('edit_bu_code');
-                    if (codeEl) codeEl.value = unit.code || '';
-                    
-                    let companyEl = document.getElementById('edit_bu_company_id');
-                    if (companyEl) {
-                        companyEl.value = unit.company_id || '';
-                        $(companyEl).trigger('change');
-                    }
-                    
-                    let headEl = document.getElementById('edit_bu_head_employee_id');
-                    if (headEl) {
-                        $(headEl).val(unit.head_employee_id || '');
-                        if ($(headEl).hasClass('select2-hidden-accessible')) {
-                            $(headEl).trigger('change.select2');
-                        }
-                    }
-                    
-                    let descEl = document.getElementById('edit_bu_description');
-                    if (descEl) descEl.value = unit.description || '';
-                    
-                    let statusSelect = document.getElementById('edit_bu_status');
-                    if (statusSelect) {
-                        statusSelect.value = (unit.status === true || unit.status === 1 || unit.status === '1') ? '1' : '0';
-                        $(statusSelect).trigger('change');
-                    }
-                    
-                    let form = document.getElementById('bu_edit_form');
-                    if (form) {
-                        form.action = '/hrms/org/business-unit/update/' + unit.id;
-                    }
-                });
-            });
+        function getInitials(name, fallback) {
+            const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
+
+            if (words.length >= 2) {
+                return (words[0][0] + words[1][0]).toUpperCase();
+            }
+
+            return (words[0] || fallback || '').substring(0, 2).toUpperCase();
         }
 
-        if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", init);
-        } else {
-            init();
-        }
+        // Delegated View Action Trigger
+        $(document).on('click', '.btn-view-bu', function() {
+            let unit = JSON.parse(atob(this.dataset.bu));
+            
+            let nameEl = document.getElementById('modal_view_bu_name');
+            if (nameEl) nameEl.innerText = unit.name;
+            
+            let compEl = document.getElementById('modal_view_bu_company');
+            if (compEl) compEl.innerText = (unit.company && unit.company.company_name) ? unit.company.company_name : 'N/A';
+            
+            let codeEl = document.getElementById('modal_view_bu_code');
+            if (codeEl) codeEl.innerText = unit.code;
+            
+            let headEl = document.getElementById('modal_view_bu_head');
+            if (headEl) headEl.innerText = (unit.head) ? (unit.head.first_name + ' ' + unit.head.last_name) : 'N/A';
+            
+            let descEl = document.getElementById('modal_view_bu_desc');
+            if (descEl) descEl.innerText = unit.description || '{{ __("hrms.employees.lbl_no_description") }}';
+            
+            let avatarEl = document.getElementById('modal_view_bu_avatar');
+            if (avatarEl) {
+                avatarEl.innerText = getInitials(unit.name, 'BU');
+            }
+            
+            let statusEl = document.getElementById('modal_view_bu_status');
+            if (statusEl) {
+                if (unit.status === true || unit.status === 1 || unit.status === '1') {
+                    statusEl.innerHTML = '<span class="badge bg-soft-success text-success">{{ __("hrms.employees.frm_status_active") }}</span>';
+                } else {
+                    statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">{{ __("hrms.employees.frm_status_inactive") }}</span>';
+                }
+            }
+        });
+
+        // Delegated Edit Action Trigger
+        $(document).on('click', '.btn-edit-bu', function() {
+            let unit = JSON.parse(atob(this.dataset.bu));
+            
+            let nameEl = document.getElementById('edit_bu_name');
+            if (nameEl) nameEl.value = unit.name || '';
+            
+            let codeEl = document.getElementById('edit_bu_code');
+            if (codeEl) codeEl.value = unit.code || '';
+            
+            let companyEl = document.getElementById('edit_bu_company_id');
+            if (companyEl) {
+                companyEl.value = unit.company_id || '';
+                $(companyEl).trigger('change');
+            }
+            
+            let headEl = document.getElementById('edit_bu_head_employee_id');
+            if (headEl) {
+                $(headEl).val(unit.head_employee_id || '');
+                if ($(headEl).hasClass('select2-hidden-accessible')) {
+                    $(headEl).trigger('change.select2');
+                }
+            }
+            
+            let descEl = document.getElementById('edit_bu_description');
+            if (descEl) descEl.value = unit.description || '';
+            
+            let statusSelect = document.getElementById('edit_bu_status');
+            if (statusSelect) {
+                statusSelect.value = (unit.status === true || unit.status === 1 || unit.status === '1') ? '1' : '0';
+                $(statusSelect).trigger('change');
+            }
+            
+            let form = document.getElementById('bu_edit_form');
+            if (form) {
+                form.action = '/hrms/org/business-unit/update/' + unit.id;
+            }
+
+            let buIdInput = document.getElementById('edit_bu_id');
+            if (buIdInput) {
+                buIdInput.value = unit.id || '';
+            }
+        });
     })();
 </script>
 
@@ -336,7 +329,7 @@
                 </div>
             </div>
             <div class="modal-footer bg-light py-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                <x-ui.button variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
             </div>
         </div>
     </div>
@@ -352,12 +345,13 @@
             </div>
             <form action="{{ route('hrms.business-unit.store') }}" method="POST">
                 @csrf
+                <input type="hidden" name="form_mode" value="add_bu">
                 <div class="modal-body p-4">
                     @include('modules.hrms.org-structure.business-unit-form-fields', ['mode' => 'add'])
                 </div>
                 <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_business_unit') }}</button>
+                    <x-ui.button variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">{{ __('hrms.org.save_business_unit') }}</x-ui.button>
                 </div>
             </form>
         </div>
@@ -372,14 +366,16 @@
                 <h5 class="modal-title fw-bold" id="editBuModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.common.edit') }} {{ __('hrms.org.business_units') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="bu_edit_form" method="POST">
+            <form id="bu_edit_form" method="POST" action="{{ old('form_mode') === 'edit_bu' && old('edit_bu_id') ? route('hrms.business-unit.update', ['businessUnit' => old('edit_bu_id')]) : '' }}">
                 @csrf
+                <input type="hidden" name="form_mode" value="edit_bu">
+                <input type="hidden" name="edit_bu_id" id="edit_bu_id" value="{{ old('edit_bu_id') }}">
                 <div class="modal-body p-4">
                     @include('modules.hrms.org-structure.business-unit-form-fields', ['mode' => 'edit'])
                 </div>
                 <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_business_unit') }}</button>
+                    <x-ui.button variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">{{ __('hrms.org.update_business_unit') }}</x-ui.button>
                 </div>
             </form>
         </div>

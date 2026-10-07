@@ -595,10 +595,103 @@ class LeadController extends Controller
     public function updateOwner(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
-        $validated = $request->validate(['lead_owner_id' => 'nullable|exists:users,id']);
-        $this->leadRepo->updateOwner($lead, $validated['lead_owner_id'] ?? null);
 
-        return redirect()->back()->with('success', 'Lead owner successfully updated!');
+        $validated = $request->validate([
+            'lead_owner_id' => 'nullable|exists:users,id',
+            'note' => 'nullable|string|max:500',
+        ]);
+
+        $ownerId = $validated['lead_owner_id'] ?? null;
+        $this->leadRepo->updateOwner($lead, $ownerId);
+
+        // Also sync owner on linked Deal if converted
+        if ($lead->crm_deal_id) {
+            \App\Domains\CRM\Models\CrmDeal::where('id', $lead->crm_deal_id)->update(['owner_id' => $ownerId]);
+        }
+
+        if (!empty($validated['note'])) {
+            \App\Domains\CRM\Models\LeadHistory::logEvent(
+                $lead,
+                'note',
+                null,
+                $validated['note'],
+                "Assignment Note: {$validated['note']}"
+            );
+        }
+
+        $targetUser = $ownerId ? \App\Models\User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+        $message = "Lead owner successfully updated to {$ownerName}!";
+
+        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'lead_id' => $lead->id,
+                'owner_id' => $ownerId,
+                'owner_name' => $ownerName,
+                'owner_email' => $targetUser?->email ?? '',
+                'owner_initial' => strtoupper(substr($ownerName, 0, 1)),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    public function bulkAssign(Request $request)
+    {
+        $this->authorize('viewAny', Lead::class);
+        $validated = $request->validate([
+            'lead_ids' => 'required|array|min:1',
+            'lead_ids.*' => 'required|integer|exists:leads,id',
+            'lead_owner_id' => 'nullable|exists:users,id',
+            'note' => 'nullable|string|max:500',
+        ]);
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+        $ownerId = $validated['lead_owner_id'] ?? null;
+        $targetUser = $ownerId ? \App\Models\User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+
+        $leads = Lead::where('tenant_id', $tenantId)
+            ->whereIn('id', $validated['lead_ids'])
+            ->get();
+
+        $updatedCount = 0;
+        foreach ($leads as $lead) {
+            $this->leadRepo->updateOwner($lead, $ownerId);
+
+            if ($lead->crm_deal_id) {
+                \App\Domains\CRM\Models\CrmDeal::where('id', $lead->crm_deal_id)->update(['owner_id' => $ownerId]);
+            }
+
+            if (!empty($validated['note'])) {
+                \App\Domains\CRM\Models\LeadHistory::logEvent(
+                    $lead,
+                    'note',
+                    null,
+                    $validated['note'],
+                    "Assignment Note: {$validated['note']}"
+                );
+            }
+            $updatedCount++;
+        }
+
+        $message = "Successfully assigned {$updatedCount} lead(s) to {$ownerName}!";
+
+        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'updated_count' => $updatedCount,
+                'owner_id' => $ownerId,
+                'owner_name' => $ownerName,
+                'owner_email' => $targetUser?->email ?? '',
+                'owner_initial' => strtoupper(substr($ownerName, 0, 1)),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
     }
 
     public function updateRequirement(Request $request, Lead $lead)

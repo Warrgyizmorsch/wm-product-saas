@@ -30,6 +30,10 @@ interface PipRepositoryInterface
 
     public function storeCheckin(int $pipId, array $validated, ?int $loggedById, int $tenantId): PipCheckin;
 
+    public function updateCheckin(int $checkinId, array $validated, int $tenantId): PipCheckin;
+
+    public function deleteCheckin(int $checkinId, int $tenantId): bool;
+
     public function acknowledge(int $id, string $signatureData, int $tenantId): PerformanceImprovementPlan;
 
     public function conclude(int $id, array $validated, int $tenantId): PerformanceImprovementPlan;

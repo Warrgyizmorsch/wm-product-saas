@@ -266,6 +266,94 @@ class CrmAccountApiController extends Controller
     }
 
     /**
+     * PATCH /api/crm/accounts/{id}/owner
+     */
+    public function updateOwner(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $account = CrmAccount::where('tenant_id', $tenantId)->find($id);
+
+        if (!$account) {
+            return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'account_owner_id' => 'nullable|integer|exists:users,id',
+            'owner_id'         => 'nullable|integer|exists:users,id',
+            'note'             => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $ownerId = $request->input('account_owner_id', $request->input('owner_id'));
+        $account->update(['owner_id' => $ownerId]);
+
+        $targetUser = $ownerId ? User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+
+        return response()->json([
+            'success'       => true,
+            'message'       => "Account owner successfully updated to {$ownerName}.",
+            'account_id'    => $account->id,
+            'owner_id'      => $ownerId,
+            'owner_name'    => $ownerName,
+            'data'          => $account->fresh(['contacts', 'deals']),
+        ]);
+    }
+
+    /**
+     * POST /api/crm/accounts/bulk-assign
+     */
+    public function bulkAssign(Request $request): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $validator = Validator::make($request->all(), [
+            'account_ids'      => 'required|array|min:1',
+            'account_ids.*'    => 'required|integer|exists:crm_accounts,id',
+            'account_owner_id' => 'nullable|integer|exists:users,id',
+            'owner_id'         => 'nullable|integer|exists:users,id',
+            'note'             => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $ownerId = $request->input('account_owner_id', $request->input('owner_id'));
+        $targetUser = $ownerId ? User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+
+        $accounts = CrmAccount::where('tenant_id', $tenantId)
+            ->whereIn('id', $request->input('account_ids'))
+            ->get();
+
+        $updatedCount = 0;
+        foreach ($accounts as $account) {
+            $account->update(['owner_id' => $ownerId]);
+            $updatedCount++;
+        }
+
+        return response()->json([
+            'success'       => true,
+            'message'       => "Successfully assigned {$updatedCount} account(s) to {$ownerName}.",
+            'updated_count' => $updatedCount,
+            'owner_id'      => $ownerId,
+            'owner_name'    => $ownerName,
+        ]);
+    }
+
+    /**
      * DELETE /api/crm/accounts/{id}
      */
     public function destroy(int $id): JsonResponse

@@ -76,6 +76,40 @@
                 box-shadow: 0 0 0 3px color-mix(in srgb, var(--bs-primary) 12%, transparent) !important;
             }
 
+            /* Password reveal toggle button styling */
+            input[type="password"]::-ms-reveal,
+            input[type="password"]::-ms-clear {
+                display: none !important;
+            }
+            .odoo-password-toggle-btn {
+                position: absolute;
+                right: 2px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 28px;
+                height: 28px;
+                padding: 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                background: transparent;
+                border: none;
+                color: #475569;
+                cursor: pointer;
+                text-decoration: none;
+                z-index: 5;
+                transition: all 0.2s ease-in-out;
+            }
+            .odoo-password-toggle-btn:hover {
+                color: var(--bs-primary) !important;
+                transform: translateY(-50%) scale(1.12);
+            }
+            .odoo-password-toggle-btn i {
+                font-size: 16px !important;
+                line-height: 1;
+                font-weight: 600;
+            }
+
             /* Custom Styled Checkboxes & Radios Globally */
             .form-check-input {
                 width: 18px !important;
@@ -482,6 +516,10 @@
                 border-bottom: 1px solid #1b2436 !important;
                 color: #cbd5e1 !important;
             }
+            html.app-skin-dark .odoo-table tbody tr:hover,
+            html.app-skin-dark .odoo-table-hover tbody tr:hover {
+                background-color: #162038 !important;
+            }
             html.app-skin-dark .odoo-table-input,
             html.app-skin-dark .odoo-table-select {
                 border-bottom: 1px solid #283c50 !important;
@@ -514,6 +552,34 @@
                 background-color: rgba(52, 84, 209, 0.2) !important;
                 border-color: rgba(52, 84, 209, 0.4) !important;
                 color: #93c5fd !important;
+            }
+            html.app-skin-dark .qty-row-input {
+                background-color: #121a2d !important;
+                border-color: #283c50 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark #productItemsTable,
+            html.app-skin-dark #editProductItemsTable {
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark #productItemsTable thead tr,
+            html.app-skin-dark #editProductItemsTable thead tr {
+                background-color: #162038 !important;
+                color: #94a3b8 !important;
+            }
+            html.app-skin-dark #productItemsTable .select2-container--bootstrap-5 .select2-selection--single,
+            html.app-skin-dark #editProductItemsTable .select2-container--bootstrap-5 .select2-selection--single {
+                background-color: #121a2d !important;
+                border-color: #283c50 !important;
+            }
+            html.app-skin-dark #productItemsTable .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered,
+            html.app-skin-dark #editProductItemsTable .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+                color: #ffffff !important;
+            }
+            html.app-skin-dark #productItemsContainer .bg-white,
+            html.app-skin-dark #editProductItemsContainer .bg-white {
+                background-color: #0f172a !important;
+                border-color: #1b2436 !important;
             }
         </style>
     @endpush
@@ -870,19 +936,46 @@
             </label>
             <div class="flex-grow-1">
     @endif
-                <input type="{{ $actualInputType }}" 
-                       name="{{ $name }}" 
-                       id="{{ $fieldId }}"
-                       value="{{ $value }}" 
-                       placeholder="{{ $placeholder }}" 
-                       {{ $required ? 'required' : '' }} 
-                       {{ $readonly ? 'readonly' : '' }}
-                       {{ $disabled ? 'disabled' : '' }}
-                       {{ $attributes->class([
-                           $label ? 'odoo-form-control' : 'odoo-table-input',
-                           $errorText ? 'is-invalid' : ''
-                       ]) }}
-                       @if($alpineError) :class="{{ $alpineError }} ? 'is-invalid' : ''" @endif>
+                @if($actualInputType === 'password')
+                    <div class="position-relative d-flex align-items-center w-100">
+                        <input type="password" 
+                               name="{{ $name }}" 
+                               id="{{ $fieldId }}"
+                               value="{{ $value }}" 
+                               placeholder="{{ $placeholder }}" 
+                               {{ $required ? 'required' : '' }} 
+                               {{ $readonly ? 'readonly' : '' }}
+                               {{ $disabled ? 'disabled' : '' }}
+                               {{ $attributes->class([
+                                   $label ? 'odoo-form-control' : 'odoo-table-input',
+                                   $errorText ? 'is-invalid' : ''
+                               ]) }}
+                               style="padding-right: 32px !important;"
+                               @if($alpineError) :class="{{ $alpineError }} ? 'is-invalid' : ''" @endif>
+                        <button type="button" 
+                                class="odoo-password-toggle-btn" 
+                                onclick="const inp = document.getElementById('{{ $fieldId }}'); const icon = this.querySelector('i'); if (inp.type === 'password') { inp.type = 'text'; icon.classList.remove('feather-eye'); icon.classList.add('feather-eye-off'); } else { inp.type = 'password'; icon.classList.remove('feather-eye-off'); icon.classList.add('feather-eye'); }"
+                                tabindex="-1"
+                                title="Toggle visibility"
+                                aria-label="Toggle password visibility">
+                            <i class="feather-eye fs-16"></i>
+                        </button>
+                    </div>
+                @else
+                    <input type="{{ $actualInputType }}" 
+                           name="{{ $name }}" 
+                           id="{{ $fieldId }}"
+                           value="{{ $value }}" 
+                           placeholder="{{ $placeholder }}" 
+                           {{ $required ? 'required' : '' }} 
+                           {{ $readonly ? 'readonly' : '' }}
+                           {{ $disabled ? 'disabled' : '' }}
+                           {{ $attributes->class([
+                               $label ? 'odoo-form-control' : 'odoo-table-input',
+                               $errorText ? 'is-invalid' : ''
+                           ]) }}
+                           @if($alpineError) :class="{{ $alpineError }} ? 'is-invalid' : ''" @endif>
+                @endif
                 @if($alpineError)
                     <template x-if="{{ $alpineError }}">
                         <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray({{ $alpineError }}) ? {{ $alpineError }}[0] : {{ $alpineError }}"></div>

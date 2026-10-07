@@ -22,6 +22,7 @@ class PerformanceImprovementPlan extends BaseModel
         'manager_id',
         'hr_representative_id',
         'pip_category_id',
+        'pip_policy_template_id',
         'reason_category',
         'reason_details',
         'start_date',
@@ -70,6 +71,11 @@ class PerformanceImprovementPlan extends BaseModel
     public function category(): BelongsTo
     {
         return $this->belongsTo(PipCategory::class, 'pip_category_id');
+    }
+
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(PipPolicyTemplate::class, 'pip_policy_template_id');
     }
 
     public function objectives(): HasMany

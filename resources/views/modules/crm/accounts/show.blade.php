@@ -24,6 +24,77 @@
         border-radius: 8px;
         padding: 14px 18px;
     }
+
+    /* Dark Mode Support */
+    html.app-skin-dark .erp-single-panel,
+    html.app-skin-dark .erp-single-panel.bg-white {
+        background-color: #0b1329 !important;
+        border-color: #1e293b !important;
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .account-info-box {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .zoho-field-label {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .zoho-field-value {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .text-dark {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .text-muted {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .border-bottom,
+    html.app-skin-dark .border-top,
+    html.app-skin-dark .border-end,
+    html.app-skin-dark .border-start,
+    html.app-skin-dark .border {
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .card,
+    html.app-skin-dark .bg-white {
+        background-color: #111827 !important;
+        border-color: #1e293b !important;
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .card.bg-light,
+    html.app-skin-dark .bg-light {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .table-responsive table,
+    html.app-skin-dark .table {
+        color: #f1f5f9 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .table th {
+        background-color: #162038 !important;
+        color: #94a3b8 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .table td {
+        border-color: #1e293b !important;
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark input,
+    html.app-skin-dark select,
+    html.app-skin-dark textarea,
+    html.app-skin-dark .form-control,
+    html.app-skin-dark .form-select {
+        background-color: #162038 !important;
+        border-color: #334155 !important;
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .btn-light,
+    html.app-skin-dark .btn-outline-secondary {
+        background-color: #162038 !important;
+        color: #f8fafc !important;
+        border-color: #334155 !important;
+    }
 </style>
 @endpush
 
@@ -313,13 +384,13 @@
                         <div class="table-responsive">
                             <x-ui.odoo-form-ui type="table" id="contactsTable" class="mb-0">
                                 <thead>
-                                    <tr style="background-color: #e8ecf1 !important;">
-                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.contact_name') }}</th>
-                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.designation') ?? 'Designation' }}</th>
-                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.buying_center_role') }}</th>
-                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.email') }}</th>
-                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.mobile') ?? 'Mobile' }}</th>
-                                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.status') ?? 'Status' }}</th>
+                                    <tr>
+                                        <th>{{ __('crm.contact_name') }}</th>
+                                        <th>{{ __('crm.designation') ?? 'Designation' }}</th>
+                                        <th>{{ __('crm.buying_center_role') }}</th>
+                                        <th>{{ __('crm.email') }}</th>
+                                        <th>{{ __('crm.mobile') ?? 'Mobile' }}</th>
+                                        <th>{{ __('crm.status') ?? 'Status' }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -373,16 +444,16 @@
                     <div class="table-responsive">
                         <x-ui.odoo-form-ui type="table" id="invoicesTable" class="mb-0">
                             <thead>
-                                <tr style="background-color: #e8ecf1 !important;">
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.invoice_no') ?? 'Invoice #' }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.linked_so_deal') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.invoice_date') ?? 'Invoice Date' }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.due_date') ?? 'Due Date' }}</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.total_amount') }} ({{ active_currency_symbol() }})</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.amount_paid') }} ({{ active_currency_symbol() }})</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.balance_due') }} ({{ active_currency_symbol() }})</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.status') ?? 'Status' }}</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') ?? 'Action' }}</th>
+                                <tr>
+                                    <th>{{ __('crm.invoice_no') ?? 'Invoice #' }}</th>
+                                    <th>{{ __('crm.linked_so_deal') }}</th>
+                                    <th>{{ __('crm.invoice_date') ?? 'Invoice Date' }}</th>
+                                    <th>{{ __('crm.due_date') ?? 'Due Date' }}</th>
+                                    <th class="text-end">{{ __('crm.total_amount') }} ({{ active_currency_symbol() }})</th>
+                                    <th class="text-end">{{ __('crm.amount_paid') }} ({{ active_currency_symbol() }})</th>
+                                    <th class="text-end">{{ __('crm.balance_due') }} ({{ active_currency_symbol() }})</th>
+                                    <th class="text-center">{{ __('crm.status') ?? 'Status' }}</th>
+                                    <th class="text-end pe-3">{{ __('crm.actions') ?? 'Action' }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -481,13 +552,13 @@
                     <div class="table-responsive">
                         <x-ui.odoo-form-ui type="table" id="paymentsTable" class="mb-0">
                             <thead>
-                                <tr style="background-color: #e8ecf1 !important;">
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.receipt_no') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.date') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.linked_invoice_deal') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.payment_mode_ref') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.amount_received') }} ({{ active_currency_symbol() }})</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.status') ?? 'Status' }}</th>
+                                <tr>
+                                    <th>{{ __('crm.receipt_no') }}</th>
+                                    <th>{{ __('crm.date') }}</th>
+                                    <th>{{ __('crm.linked_invoice_deal') }}</th>
+                                    <th>{{ __('crm.payment_mode_ref') }}</th>
+                                    <th class="text-end">{{ __('crm.amount_received') }} ({{ active_currency_symbol() }})</th>
+                                    <th class="text-center">{{ __('crm.status') ?? 'Status' }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -576,14 +647,14 @@
                     <div class="table-responsive">
                         <x-ui.odoo-form-ui type="table" id="ordersTable" class="mb-0">
                             <thead>
-                                <tr style="background-color: #e8ecf1 !important;">
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.order_no') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.linked_opportunity_deal') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.order_date') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.items') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.total_amount') }} ({{ active_currency_symbol() }})</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.status') ?? 'Status' }}</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') ?? 'Action' }}</th>
+                                <tr>
+                                    <th>{{ __('crm.order_no') }}</th>
+                                    <th>{{ __('crm.linked_opportunity_deal') }}</th>
+                                    <th>{{ __('crm.order_date') }}</th>
+                                    <th>{{ __('crm.items') }}</th>
+                                    <th class="text-end">{{ __('crm.total_amount') }} ({{ active_currency_symbol() }})</th>
+                                    <th class="text-center">{{ __('crm.status') ?? 'Status' }}</th>
+                                    <th class="text-end pe-3">{{ __('crm.actions') ?? 'Action' }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -745,15 +816,15 @@
                     <div class="table-responsive">
                         <x-ui.odoo-form-ui type="table" id="ledgerTable" class="mb-0">
                             <thead>
-                                <tr style="background-color: #e8ecf1 !important;">
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.date') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.type') ?? 'Type' }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.reference_no') ?? 'Reference #' }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.particulars_description') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.linked_deal_so') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-end text-danger">{{ __('crm.debit_billed') }} ({{ active_currency_symbol() }})</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-end text-success">{{ __('crm.credit_paid') }} ({{ active_currency_symbol() }})</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-end text-primary">{{ __('crm.running_balance') }} ({{ active_currency_symbol() }})</th>
+                                <tr>
+                                    <th>{{ __('crm.date') }}</th>
+                                    <th>{{ __('crm.type') ?? 'Type' }}</th>
+                                    <th>{{ __('crm.reference_no') ?? 'Reference #' }}</th>
+                                    <th>{{ __('crm.particulars_description') }}</th>
+                                    <th>{{ __('crm.linked_deal_so') }}</th>
+                                    <th class="text-end text-danger">{{ __('crm.debit_billed') }} ({{ active_currency_symbol() }})</th>
+                                    <th class="text-end text-success">{{ __('crm.credit_paid') }} ({{ active_currency_symbol() }})</th>
+                                    <th class="text-end text-primary">{{ __('crm.running_balance') }} ({{ active_currency_symbol() }})</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -829,13 +900,13 @@
                     <div class="table-responsive">
                         <x-ui.odoo-form-ui type="table" id="dealsTable" class="mb-0">
                             <thead>
-                                <tr style="background-color: #e8ecf1 !important;">
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.deal_no') ?? 'Deal #' }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.project_title') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.stage') ?? 'Stage' }}</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-end">{{ __('crm.total_value') }} ({{ active_currency_symbol() }})</th>
-                                    <th style="background-color: #e8ecf1 !important;">{{ __('crm.closing_date') }}</th>
-                                    <th style="background-color: #e8ecf1 !important;" class="text-center">{{ __('crm.actions') ?? 'Action' }}</th>
+                                <tr>
+                                    <th>{{ __('crm.deal_no') ?? 'Deal #' }}</th>
+                                    <th>{{ __('crm.project_title') }}</th>
+                                    <th>{{ __('crm.stage') ?? 'Stage' }}</th>
+                                    <th class="text-end">{{ __('crm.total_value') }} ({{ active_currency_symbol() }})</th>
+                                    <th>{{ __('crm.closing_date') }}</th>
+                                    <th class="text-center">{{ __('crm.actions') ?? 'Action' }}</th>
                                 </tr>
                             </thead>
                             <tbody>

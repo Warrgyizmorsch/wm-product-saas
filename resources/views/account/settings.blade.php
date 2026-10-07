@@ -239,6 +239,28 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded h-100 bg-light-soft d-flex flex-column">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="fw-bold text-dark mb-0">
+                                                <i class="feather-globe text-primary me-1"></i>{{ __('Meta (FB & Insta) Leads Setup') }}
+                                            </h6>
+                                            <span class="badge bg-soft-primary text-primary">Marketing & Ads</span>
+                                        </div>
+                                        <p class="text-muted fs-13 mb-3">
+                                            {{ __('Configure Meta App ID, Ad Account, Page Access Tokens, and learn the complete Campaign & Lead Form structure.') }}
+                                        </p>
+                                        <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                                            <span class="fs-12 text-muted">{{ __('Campaigns & Instant Forms') }}</span>
+                                            @if ($canManagePlatformSettings && Route::has('platform.metaSettings.index'))
+                                                <x-ui.button href="{{ route('platform.metaSettings.index') }}" variant="secondary" size="sm" icon="feather-external-link">
+                                                    {{ __('Manage Meta Setup') }}
+                                                </x-ui.button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             @if (Route::has('platform.notification-rules.index') && $canManagePlatformSettings)

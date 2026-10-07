@@ -111,10 +111,10 @@ class EmployeeExitApiController extends Controller
             $stats = [
                 'total_exits'          => (clone $baseQuery)->count(),
                 'in_clearance_count'   => (clone $baseQuery)->where('status', 'in_clearance')->count(),
-                'notice_period_count'  => (clone $baseQuery)->where('status', 'pending_approval')->count(),
-                'settled_count'        => (clone $baseQuery)->where('status', 'completed')->count(),
-                'pending_hr_count'     => (clone $baseQuery)->where('status', 'pending_approval')->whereNull('approved_at')->count(),
-                'pending_manager_count'=> (clone $baseQuery)->where('status', 'pending_approval')->whereNull('manager_recommended_lwd')->count(),
+                'notice_period_count'  => (clone $baseQuery)->whereIn('status', ['pending_approval', 'pending_manager', 'pending_hr'])->count(),
+                'settled_count'        => (clone $baseQuery)->whereIn('status', ['completed', 'settled'])->count(),
+                'pending_hr_count'     => (clone $baseQuery)->whereIn('status', ['pending_hr', 'pending_approval'])->whereNull('approved_at')->count(),
+                'pending_manager_count'=> (clone $baseQuery)->where('status', 'pending_manager')->count(),
             ];
 
             return $this->sendSuccess($stats, 'Exit summary retrieved successfully.');
@@ -140,7 +140,7 @@ class EmployeeExitApiController extends Controller
             'employee.department:id,name',
             'employee.designation:id,name',
             'employee.company:id,company_name',
-            'fnfSettlement:id,employee_exit_id,net_payable,status,is_settled',
+            'fnfSettlement:id,employee_exit_id,net_payable_amount,status,paid_at',
         ])
             ->withCount('clearances')
             ->where('tenant_id', $tenantId);
@@ -256,7 +256,23 @@ class EmployeeExitApiController extends Controller
             $computedFnF = $this->fnfService->calculateFnF($exit);
             $this->fnfService->saveSettlement($exit, $computedFnF);
 
-            return $this->sendSuccess($exit->load('clearances', 'fnfSettlement'), 'Exit initiated successfully.', 201);
+            $response = [
+                'id'                    => (int) $exit->id,
+                'employee_id'           => (int) $employee->id,
+                'employee_code'         => $employee->employee_id ?? '',
+                'employee_name'         => trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')) ?: ($employee->full_name ?? 'Employee'),
+                'separation_type'       => $exit->separation_type,
+                'resignation_date'      => $exit->resignation_date ? Carbon::parse($exit->resignation_date)->format('Y-m-d') : null,
+                'preferred_lwd'         => $exit->preferred_lwd ? Carbon::parse($exit->preferred_lwd)->format('Y-m-d') : null,
+                'approved_lwd'          => $exit->approved_lwd ? Carbon::parse($exit->approved_lwd)->format('Y-m-d') : null,
+                'notice_period_days'    => (int) $exit->notice_period_days,
+                'reason_category'       => $exit->reason_category,
+                'status'                => $exit->status,
+                'clearances_count'      => $exit->clearances()->count(),
+                'estimated_net_payable' => $exit->fnfSettlement ? (float) $exit->fnfSettlement->net_payable_amount : null,
+            ];
+
+            return $this->sendSuccess($response, 'Exit initiated successfully.', 201);
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), 400);
         }

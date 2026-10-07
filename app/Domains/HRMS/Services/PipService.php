@@ -50,7 +50,12 @@ class PipService
             // Calculate duration in days
             $start = Carbon::parse($data['start_date']);
             $end = Carbon::parse($data['end_date'] ?? $start->copy()->addDays((int)($data['duration_days'] ?? 30)));
-            $data['duration_days'] = $start->diffInDays($end);
+            if ($end->lessThan($start)) {
+                $end = $start->copy()->addDays(max(7, (int)($data['duration_days'] ?? 30)));
+            }
+            $data['duration_days'] = max(1, (int)$start->diffInDays($end));
+            $data['start_date'] = $start->toDateString();
+            $data['end_date'] = $end->toDateString();
 
             $pip = PerformanceImprovementPlan::create($data);
 

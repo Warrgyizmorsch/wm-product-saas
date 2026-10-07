@@ -109,6 +109,40 @@
                 </select>
             </div>
 
+            <div class="col-xl-2 col-md-3 col-sm-6">
+                <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="campaign"><i class="feather-target me-1"></i>{{ __('crm.dashboard.campaign_name') }}</label>
+                <select name="campaign" id="campaign" class="form-select form-select-sm border-gray-300" data-select2-selector="default">
+                    <option value="">{{ __('crm.dashboard.all_campaigns') }}</option>
+                    @foreach ($availableCampaigns as $camp)
+                        <option value="{{ $camp }}" @selected((string)$campaign === (string)$camp)>{{ $camp }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            @if(count($availableAdsets) > 0)
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="adset"><i class="feather-layers me-1"></i>{{ __('crm.dashboard.adset_label') }}</label>
+                    <select name="adset" id="adset" class="form-select form-select-sm border-gray-300" data-select2-selector="default">
+                        <option value="">{{ __('crm.dashboard.all_adsets') }}</option>
+                        @foreach ($availableAdsets as $aset)
+                            <option value="{{ $aset }}" @selected((string)$adset === (string)$aset)>{{ $aset }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+
+            @if(count($availableAds) > 0)
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="ad_name"><i class="feather-image me-1"></i>{{ __('crm.dashboard.ad_creative_label') }}</label>
+                    <select name="ad_name" id="ad_name" class="form-select form-select-sm border-gray-300" data-select2-selector="default">
+                        <option value="">{{ __('crm.dashboard.all_ads') }}</option>
+                        @foreach ($availableAds as $ad)
+                            <option value="{{ $ad }}" @selected((string)$adName === (string)$ad)>{{ $ad }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+
             @if ($preset === 'custom')
                 <div class="col-xl-2 col-md-3">
                     <label class="form-label fs-11 text-uppercase fw-bold text-muted mb-1" for="from">{{ __('crm.dashboard.from_date') }}</label>
@@ -135,22 +169,14 @@
 {{-- Navigation View Tabs (Executive Overview vs Sales Velocity & Reps) --}}
 <div class="d-flex align-items-center justify-content-between mb-4 border-bottom pb-2">
     <div class="d-flex align-items-center gap-2" id="crmDashboardTabs">
-        <x-ui.button 
-            href="{{ route('crm.dashboard', array_merge($query, ['view' => 'overview'])) }}" 
-            variant="{{ $activeView === 'overview' ? 'primary' : 'light-brand' }}"
-            icon="feather-pie-chart"
-            class="fw-bold"
-        >
-            {{ __('crm.dashboard.executive_overview') }}
-        </x-ui.button>
-        <x-ui.button 
-            href="{{ route('crm.dashboard', array_merge($query, ['view' => 'operations'])) }}" 
-            variant="{{ $activeView === 'operations' ? 'primary' : 'light-brand' }}"
-            icon="feather-activity"
-            class="fw-bold"
-        >
-            {{ __('crm.dashboard.sales_velocity_reps') }}
-        </x-ui.button>
+        <a href="{!! route('crm.dashboard', array_merge($query, ['view' => 'overview'])) !!}" 
+           class="btn {{ $activeView === 'overview' ? 'btn-primary text-white shadow-sm' : 'btn-light-brand text-muted' }} fw-bold d-inline-flex align-items-center">
+            <i class="feather-pie-chart me-2"></i>{{ __('crm.dashboard.executive_overview') }}
+        </a>
+        <a href="{!! route('crm.dashboard', array_merge($query, ['view' => 'operations'])) !!}" 
+           class="btn {{ $activeView === 'operations' ? 'btn-primary text-white shadow-sm' : 'btn-light-brand text-muted' }} fw-bold d-inline-flex align-items-center">
+            <i class="feather-activity me-2"></i>{{ __('crm.dashboard.sales_velocity_reps') }}
+        </a>
     </div>
     <span class="fs-11 text-muted"><i class="feather-info me-1"></i>{{ __('crm.dashboard.realtime_metrics_synced') }}</span>
 </div>
@@ -159,7 +185,7 @@
     {{-- Executive KPI Metrics Row --}}
     <div class="row g-3 mb-4">
         {{-- Total Leads --}}
-        <div class="col-xxl col-xl-4 col-md-6">
+        <div class="col-xxl-2 col-xl-4 col-md-6">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -178,7 +204,7 @@
         </div>
 
         {{-- Active Pipeline Value --}}
-        <div class="col-xxl col-xl-4 col-md-6">
+        <div class="col-xxl-2 col-xl-4 col-md-6">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -197,7 +223,7 @@
         </div>
 
         {{-- Won Deals Revenue --}}
-        <div class="col-xxl col-xl-4 col-md-6">
+        <div class="col-xxl-2 col-xl-4 col-md-6">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -208,7 +234,7 @@
                     </div>
                     <h3 class="fw-bolder mb-1 text-dark">{{ $formatCurrency($wonRevenue) }}</h3>
                     <div class="d-flex align-items-center justify-content-between mt-2">
-                        <span class="badge bg-soft-success text-success fs-11 fw-semibold"><i class="feather-award me-1"></i>{{ __('crm.dashboard.win_rate') }} {{ $winRate }}%</span>
+                        <span class="badge bg-soft-success text-success fs-11 fw-semibold"><i class="feather-award me-1"></i>{{ $winRate }}%</span>
                         <span class="fs-11 text-muted">{{ $wonCount }} {{ __('crm.dashboard.deals_won') }}</span>
                     </div>
                 </div>
@@ -216,7 +242,7 @@
         </div>
 
         {{-- Quotations Value --}}
-        <div class="col-xxl col-xl-6 col-md-6">
+        <div class="col-xxl-2 col-xl-6 col-md-6">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -234,8 +260,27 @@
             </div>
         </div>
 
+        {{-- Meta Ads Leads Card --}}
+        <div class="col-xxl-2 col-xl-6 col-md-6">
+            <div class="card stretch stretch-full border-0 shadow-sm h-100 bg-soft-primary">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="fs-11 fw-bold text-uppercase text-primary">{{ __('crm.dashboard.meta_leads_title') }}</span>
+                        <div class="avatar-text avatar-md bg-primary text-white rounded-3">
+                            <i class="feather-globe fs-16"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bolder mb-1 text-primary">{{ number_format($metaLeadsCount) }} <span class="fs-12 fw-normal">{{ __('crm.dashboard.leads_label') }}</span></h3>
+                    <div class="d-flex align-items-center justify-content-between mt-2">
+                        <span class="badge bg-primary text-white fs-11 fw-semibold"><i class="feather-award me-1"></i>{{ $metaWinRate }}% {{ __('crm.dashboard.win_label') }}</span>
+                        <span class="fs-11 text-primary fw-bold">{{ $formatCurrency($metaWonRevenue) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {{-- WhatsApp Bot Integration --}}
-        <div class="col-xxl col-xl-6 col-md-12">
+        <div class="col-xxl-2 col-xl-6 col-md-6">
             <div class="card stretch stretch-full border-0 shadow-sm h-100 bg-soft-success">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -244,9 +289,9 @@
                             <i class="feather-message-square fs-16"></i>
                         </div>
                     </div>
-                    <h3 class="fw-bolder mb-1 text-success">{{ number_format($whatsappLeadsCount) }} <span class="fs-13 fw-normal">{{ __('crm.dashboard.bot_leads') }}</span></h3>
+                    <h3 class="fw-bolder mb-1 text-success">{{ number_format($whatsappLeadsCount) }} <span class="fs-12 fw-normal">{{ __('crm.dashboard.bot_leads') }}</span></h3>
                     <div class="d-flex align-items-center justify-content-between mt-2">
-                        <span class="badge bg-success text-white fs-11 fw-semibold"><i class="feather-check-circle me-1"></i>{{ $whatsappQualificationRate }}% {{ __('crm.dashboard.auto_qualified') }}</span>
+                        <span class="badge bg-success text-white fs-11 fw-semibold"><i class="feather-check-circle me-1"></i>{{ $whatsappQualificationRate }}%</span>
                         <span class="fs-11 text-success font-bold">{{ __('crm.dashboard.ai_engine_active') }}</span>
                     </div>
                 </div>
@@ -254,54 +299,92 @@
         </div>
     </div>
 
-    {{-- Analytics Charts & Funnel Section --}}
+    {{-- Enterprise Multi-Stage Visual Sales Funnel & Monthly Trend --}}
     <div class="row g-4 mb-4">
-        {{-- Sales Funnel & Lead Status Breakdown --}}
-        <div class="col-xxl-4 col-xl-5">
+        {{-- Enterprise Connected Multi-Stage Sales Funnel --}}
+        <div class="col-xxl-5 col-xl-5">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
-                <div class="card-header border-bottom-0 pb-0">
-                    <h5 class="card-title text-dark font-bold"><i class="feather-filter text-primary me-2"></i>{{ __('crm.dashboard.sales_funnel_stage_health') }}</h5>
-                    <div class="card-header-action">
-                        <span class="badge bg-soft-primary text-primary">{{ __('crm.dashboard.live_conversion') }}</span>
+                <div class="card-header border-bottom-0 pb-1 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h5 class="card-title text-dark font-bold mb-0">
+                            <i class="feather-filter text-primary me-2"></i>{{ __('crm.dashboard.enterprise_funnel_title') }}
+                        </h5>
+                        <span class="fs-11 text-muted">{{ __('crm.dashboard.enterprise_funnel_sub') }}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <ul class="nav nav-pills nav-pills-sm bg-light p-0.5 rounded-2" id="funnelTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active py-1 px-2 fs-11 fw-semibold" id="funnel-flow-tab" data-bs-toggle="pill" data-bs-target="#funnel-flow-pane" type="button" role="tab">
+                                    <i class="feather-git-commit me-1"></i>{{ __('crm.dashboard.funnel_tab_flow') }}
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link py-1 px-2 fs-11 fw-semibold" id="funnel-chart-tab" data-bs-toggle="pill" data-bs-target="#funnel-chart-pane" type="button" role="tab">
+                                    <i class="feather-bar-chart-2 me-1"></i>{{ __('crm.dashboard.funnel_tab_chart') }}
+                                </button>
+                            </li>
+                        </ul>
+                        <span class="badge bg-soft-success text-success fw-bold px-2 py-1 fs-11 border border-success border-opacity-25">
+                            <i class="feather-award me-1"></i>{{ __('crm.dashboard.win_rate') }}: {{ $funnelDetailed['overall_conversion'] }}%
+                        </span>
                     </div>
                 </div>
-                <div class="card-body pt-3">
-                    @php
-                        $maxFunnel = max(array_values($funnelStages)) ?: 1;
-                        $stageColors = [
-                            'New'           => 'primary',
-                            'Contacted'     => 'info',
-                            'Qualified'     => 'warning',
-                            'Quotation'     => 'purple',
-                            'Converted/Won' => 'success',
-                        ];
-                    @endphp
-                    @foreach ($funnelStages as $stageName => $count)
-                        @php
-                            $pct = round(($count / $maxFunnel) * 100);
-                            $color = $stageColors[$stageName] ?? 'primary';
-                        @endphp
-                        <div class="mb-3">
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <span class="fs-12 fw-semibold text-dark">{{ $stageName }}</span>
-                                <span class="fs-12 fw-bold text-dark">{{ number_format($count) }} <span class="text-muted fs-11">({{ $pct }}%)</span></span>
-                            </div>
-                            <div class="progress ht-8 rounded-pill bg-light">
-                                <div class="progress-bar bg-{{ $color }} rounded-pill" role="progressbar" style="width: {{ max($pct, 4) }}%" aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                <div class="card-body pt-2 pb-3">
+                    <div class="tab-content" id="funnelTabContent">
+                        {{-- Tab 1: Visual Funnel Pipeline Flow --}}
+                        <div class="tab-pane fade show active" id="funnel-flow-pane" role="tabpanel">
+                            <div class="funnel-pipeline-wrapper">
+                                @foreach ($funnelDetailed['stages'] as $index => $stg)
+                                    @if ($index > 0)
+                                        <div class="d-flex align-items-center justify-content-center my-1.5 position-relative">
+                                            <div class="border-top border-2 border-dashed w-100 position-absolute" style="z-index: 1;"></div>
+                                            <span class="badge bg-white text-muted border shadow-xs px-2 py-0.5 fs-10 position-relative" style="z-index: 2;">
+                                                <i class="feather-arrow-down me-1 text-primary"></i>
+                                                <strong class="text-dark">{{ $stg['conversion_from_prev'] }}%</strong> {{ __('crm.dashboard.step_conversion') }}
+                                                @php $dropOff = round(100 - $stg['conversion_from_prev'], 1); @endphp
+                                                @if ($dropOff > 0)
+                                                    <span class="text-danger ms-1">({{ $dropOff }}% {{ __('crm.dashboard.drop_off') }})</span>
+                                                @endif
+                                            </span>
+                                        </div>
+                                    @endif
+
+                                    <div class="funnel-stage-item p-2.5 rounded-3 border bg-white shadow-xs position-relative" style="border-left: 4px solid var(--bs-{{ $stg['color'] }}) !important;">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="avatar-text avatar-sm bg-soft-{{ $stg['color'] }} text-{{ $stg['color'] }} rounded-circle flex-shrink-0">
+                                                    <i class="{{ $stg['icon'] }} fs-13"></i>
+                                                </div>
+                                                <div>
+                                                    <span class="fs-12 fw-bold text-dark d-block lh-sm">{{ $stg['name'] }}</span>
+                                                    <span class="fs-10 text-muted">{{ $stg['sub'] }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="text-end">
+                                                <div class="fs-13 fw-bolder text-dark">
+                                                    {{ number_format($stg['count']) }}
+                                                    @if(isset($stg['value']) && $stg['value'] > 0)
+                                                        <span class="fs-11 text-success font-monospace ms-1">({{ $formatCurrency($stg['value']) }})</span>
+                                                    @endif
+                                                </div>
+                                                <div class="fs-10 text-muted">
+                                                    <span class="badge bg-soft-{{ $stg['color'] }} text-{{ $stg['color'] }} py-0.5 px-1.5 fs-10 fw-semibold">{{ $stg['pct_of_total'] }}% {{ __('crm.dashboard.of_top_funnel') }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="progress ht-6 rounded-pill bg-light border mt-2">
+                                            <div class="progress-bar bg-{{ $stg['color'] }} rounded-pill" role="progressbar" style="width: {{ max($stg['pct_of_total'], 5) }}%" aria-valuenow="{{ $stg['pct_of_total'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                        </div>
+                                    </div>
+                                @endforeach
                             </div>
                         </div>
-                    @endforeach
 
-                    <hr class="my-3 text-gray-300">
-
-                    <div class="d-flex align-items-center justify-content-between pt-1">
-                        <div>
-                            <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('crm.dashboard.period_customers') }}</span>
-                            <h5 class="fw-bolder mb-0 text-dark">{{ number_format($totalCustomers) }}</h5>
-                        </div>
-                        <div>
-                            <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('crm.dashboard.period_accounts') }}</span>
-                            <h5 class="fw-bolder mb-0 text-dark">{{ number_format($totalAccounts) }}</h5>
+                        {{-- Tab 2: Interactive Funnel Chart --}}
+                        <div class="tab-pane fade" id="funnel-chart-pane" role="tabpanel">
+                            <div style="position: relative; height: 320px; max-height: 320px; width: 100%;">
+                                <canvas id="crmFunnelChart"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -309,7 +392,7 @@
         </div>
 
         {{-- Monthly Acquisition & Revenue Trend Chart --}}
-        <div class="col-xxl-8 col-xl-7">
+        <div class="col-xxl-7 col-xl-7">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-header border-bottom-0 pb-0">
                     <div class="d-flex align-items-center justify-content-between w-100">
@@ -323,8 +406,218 @@
                     </div>
                 </div>
                 <div class="card-body pt-2 pb-3">
-                    <div style="position: relative; height: 230px; max-height: 230px; width: 100%;">
+                    <div style="position: relative; height: 320px; max-height: 320px; width: 100%;">
                         <canvas id="crmTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Marketing Campaigns ROI & Performance Section --}}
+    <div class="row g-4 mb-4">
+        {{-- Campaign Performance Comparison Chart --}}
+        <div class="col-xxl-6 col-xl-6">
+            <div class="card stretch stretch-full border-0 shadow-sm h-100">
+                <div class="card-header border-bottom-0 pb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h5 class="card-title text-dark font-bold mb-0"><i class="feather-target text-primary me-2"></i>{{ __('crm.dashboard.top_campaigns_chart_title') }}</h5>
+                        <p class="fs-11 text-muted mb-0">{{ __('crm.dashboard.top_campaigns_chart_sub') }}</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <div class="btn-group btn-group-sm p-0.5 bg-light rounded-2" role="group">
+                            <a href="{{ route('crm.dashboard', array_merge($query, ['campaign_dimension' => 'campaign'])) }}" 
+                               class="btn btn-xs {{ $campaignDimension === 'campaign' ? 'btn-primary text-white' : 'btn-light text-muted' }} py-1 px-2 fs-10 fw-bold rounded-1">
+                               {{ __('crm.dashboard.by_campaign') }}
+                            </a>
+                            <a href="{{ route('crm.dashboard', array_merge($query, ['campaign_dimension' => 'adset'])) }}" 
+                               class="btn btn-xs {{ $campaignDimension === 'adset' ? 'btn-primary text-white' : 'btn-light text-muted' }} py-1 px-2 fs-10 fw-bold rounded-1">
+                               {{ __('crm.dashboard.by_adset') }}
+                            </a>
+                            <a href="{{ route('crm.dashboard', array_merge($query, ['campaign_dimension' => 'ad_name'])) }}" 
+                               class="btn btn-xs {{ $campaignDimension === 'ad_name' ? 'btn-primary text-white' : 'btn-light text-muted' }} py-1 px-2 fs-10 fw-bold rounded-1">
+                               {{ __('crm.dashboard.by_ad') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body pt-3 pb-3">
+                    @if($campaignPerformance->isNotEmpty())
+                    <div class="row g-3 align-items-center h-100">
+                        {{-- Left Column: Data Type / Campaign Select Filter --}}
+                        <div class="col-md-4 col-sm-12">
+                            <div class="pe-md-1">
+                                <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1.5 d-flex align-items-center gap-1">
+                                    <i class="feather-filter text-primary"></i> {{ __('crm.dashboard.select_data_type') }}
+                                </label>
+                                <select class="form-select form-select-sm fs-12 fw-semibold border-secondary border-opacity-25 rounded-2 shadow-none py-1.5" id="campaignFunnelSelect" onchange="updateCampaignFunnel(this.value)">
+                                    <option value="all">
+                                        {{ $campaignDimension === 'adset' ? __('crm.dashboard.all_adsets') : ($campaignDimension === 'ad_name' ? __('crm.dashboard.all_ads') : __('crm.dashboard.all_campaigns')) }}
+                                    </option>
+                                    @foreach($campaignPerformance as $idx => $camp)
+                                        <option value="{{ $idx }}">{{ Str::limit($camp->campaign_name, 22) }}</option>
+                                    @endforeach
+                                </select>
+                                
+                                <div class="mt-3 p-2.5 rounded-3 bg-light border border-light-subtle">
+                                    <span class="fs-10 text-uppercase fw-bold text-muted d-block">{{ __('crm.dashboard.overall_conversion') }}</span>
+                                    <div class="d-flex align-items-baseline gap-1 mt-0.5">
+                                        <h4 class="fs-16 fw-bolder text-success mb-0" id="funnelOverallConv">{{ $campaignFunnel['overall_conv_rate'] ?? 0 }}%</h4>
+                                        <span class="fs-10 text-muted">{{ __('crm.dashboard.leads_label') }} ➔ {{ __('crm.dashboard.win_label') }}</span>
+                                    </div>
+                                    <div class="fs-10 text-muted mt-1" id="funnelRevenueNote">
+                                        {{ __('crm.dashboard.won_revenue') }}: <b class="text-dark">{{ $formatCurrency($campaignFunnel['revenue'] ?? 0) }}</b>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Center Column: Clean Linear Inverted Triangular Funnel SVG --}}
+                        <div class="col-md-5 col-sm-6 text-center">
+                            <div class="funnel-chart-wrapper mx-auto" style="max-width: 250px;">
+                                <svg viewBox="0 0 320 230" width="100%" height="220" class="funnel-svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));">
+                                    <!-- Slice 0: Total Leads -->
+                                    <polygon id="funnelPoly0" points="20,6 300,6 277,41 43,41" fill="#DE6C37" class="funnel-slice" style="cursor: pointer; transition: all 0.25s ease;" />
+                                    <text id="funnelTxt0" x="160" y="24" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF" font-weight="700" font-size="13" font-family="'Inter', sans-serif">{{ $campaignFunnel['total_leads'] }}</text>
+
+                                    <!-- Slice 1: Contacted / Followup -->
+                                    <polygon id="funnelPoly1" points="43,43 277,43 254,78 66,78" fill="#DEB841" class="funnel-slice" style="cursor: pointer; transition: all 0.25s ease;" />
+                                    <text id="funnelTxt1" x="160" y="61" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF" font-weight="700" font-size="13" font-family="'Inter', sans-serif">{{ $campaignFunnel['contacted'] }}</text>
+
+                                    <!-- Slice 2: Qualified Leads -->
+                                    <polygon id="funnelPoly2" points="66,80 254,80 231,115 89,115" fill="#6CAE9B" class="funnel-slice" style="cursor: pointer; transition: all 0.25s ease;" />
+                                    <text id="funnelTxt2" x="160" y="98" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF" font-weight="700" font-size="13" font-family="'Inter', sans-serif">{{ $campaignFunnel['qualified'] }}</text>
+
+                                    <!-- Slice 3: Opportunities / Deals -->
+                                    <polygon id="funnelPoly3" points="89,117 231,117 208,152 112,152" fill="#2D6CB4" class="funnel-slice" style="cursor: pointer; transition: all 0.25s ease;" />
+                                    <text id="funnelTxt3" x="160" y="135" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF" font-weight="700" font-size="13" font-family="'Inter', sans-serif">{{ $campaignFunnel['deals'] }}</text>
+
+                                    <!-- Slice 4: Proposals / Quotations -->
+                                    <polygon id="funnelPoly4" points="112,154 208,154 185,189 135,189" fill="#8A89E6" class="funnel-slice" style="cursor: pointer; transition: all 0.25s ease;" />
+                                    <text id="funnelTxt4" x="160" y="172" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF" font-weight="700" font-size="12" font-family="'Inter', sans-serif">{{ $campaignFunnel['proposals'] }}</text>
+
+                                    <!-- Slice 5: Closed & Won -->
+                                    <polygon id="funnelPoly5" points="135,191 185,191 170,224 150,224" fill="#E668B8" class="funnel-slice" style="cursor: pointer; transition: all 0.25s ease;" />
+                                    <text id="funnelTxt5" x="160" y="207" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF" font-weight="700" font-size="12" font-family="'Inter', sans-serif">{{ $campaignFunnel['won'] }}</text>
+                                </svg>
+                            </div>
+                        </div>
+
+                        {{-- Right Column: Stage Legend List --}}
+                        <div class="col-md-3 col-sm-6">
+                            <div class="d-flex flex-column gap-2 ps-md-1">
+                                <div class="d-flex align-items-center justify-content-between p-1 rounded-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span style="width: 13px; height: 13px; background-color: #DE6C37; border-radius: 2px;" class="d-inline-block flex-shrink-0"></span>
+                                        <span class="fs-11 text-muted fw-semibold text-truncate">{{ __('crm.dashboard.leads_label') }}</span>
+                                    </div>
+                                    <b class="fs-12 text-dark font-monospace" id="legendCnt0">{{ number_format($campaignFunnel['total_leads']) }}</b>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-between p-1 rounded-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span style="width: 13px; height: 13px; background-color: #DEB841; border-radius: 2px;" class="d-inline-block flex-shrink-0"></span>
+                                        <span class="fs-11 text-muted fw-semibold text-truncate">{{ __('crm.dashboard.funnel_contacted') }}</span>
+                                    </div>
+                                    <b class="fs-12 text-dark font-monospace" id="legendCnt1">{{ number_format($campaignFunnel['contacted']) }}</b>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-between p-1 rounded-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span style="width: 13px; height: 13px; background-color: #6CAE9B; border-radius: 2px;" class="d-inline-block flex-shrink-0"></span>
+                                        <span class="fs-11 text-muted fw-semibold text-truncate">{{ __('crm.dashboard.funnel_qualified') }}</span>
+                                    </div>
+                                    <b class="fs-12 text-dark font-monospace" id="legendCnt2">{{ number_format($campaignFunnel['qualified']) }}</b>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-between p-1 rounded-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span style="width: 13px; height: 13px; background-color: #2D6CB4; border-radius: 2px;" class="d-inline-block flex-shrink-0"></span>
+                                        <span class="fs-11 text-muted fw-semibold text-truncate">{{ __('crm.dashboard.funnel_deals') }}</span>
+                                    </div>
+                                    <b class="fs-12 text-dark font-monospace" id="legendCnt3">{{ number_format($campaignFunnel['deals']) }}</b>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-between p-1 rounded-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span style="width: 13px; height: 13px; background-color: #8A89E6; border-radius: 2px;" class="d-inline-block flex-shrink-0"></span>
+                                        <span class="fs-11 text-muted fw-semibold text-truncate">{{ __('crm.dashboard.funnel_quotations') }}</span>
+                                    </div>
+                                    <b class="fs-12 text-dark font-monospace" id="legendCnt4">{{ number_format($campaignFunnel['proposals']) }}</b>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-between p-1 rounded-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span style="width: 13px; height: 13px; background-color: #E668B8; border-radius: 2px;" class="d-inline-block flex-shrink-0"></span>
+                                        <span class="fs-11 text-muted fw-semibold text-truncate">{{ __('crm.dashboard.funnel_won') }}</span>
+                                    </div>
+                                    <b class="fs-12 text-dark font-monospace" id="legendCnt5">{{ number_format($campaignFunnel['won']) }}</b>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @else
+                    <div class="text-center py-5">
+                        <div class="avatar-text avatar-lg bg-soft-primary text-primary mx-auto mb-3 rounded-circle">
+                            <i class="feather-filter fs-20"></i>
+                        </div>
+                        <h6 class="fs-13 fw-bold text-dark mb-1">{{ __('crm.dashboard.no_campaign_data') }}</h6>
+                        <p class="fs-11 text-muted mb-0">{{ __('crm.dashboard.meta_utm_populate_notice') }}</p>
+                    </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        {{-- Campaign Performance & Revenue Matrix Table --}}
+        <div class="col-xxl-6 col-xl-6">
+            <div class="card stretch stretch-full border-0 shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0"><i class="feather-grid text-success me-2"></i>{{ __('crm.dashboard.campaign_matrix_title') }}</h5>
+                        <span class="fs-11 text-muted">{{ __('crm.dashboard.campaign_matrix_sub') }}</span>
+                    </div>
+                    <span class="badge bg-soft-primary text-primary fs-11 fw-bold">{{ $dimensionLabel }}</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="fs-11 text-uppercase text-muted ps-3">{{ $dimensionLabel }}</th>
+                                    <th class="fs-11 text-uppercase text-muted text-center">{{ __('crm.dashboard.leads_label') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted text-center">{{ __('crm.dashboard.won_deals') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted">{{ __('crm.dashboard.won_revenue') }}</th>
+                                    <th class="fs-11 text-uppercase text-muted text-end pe-3">{{ __('crm.dashboard.conv_rate') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($campaignPerformance as $camp)
+                                    <tr>
+                                        <td class="ps-3">
+                                            <strong class="text-dark d-block fs-12">{{ $camp->campaign_name }}</strong>
+                                            <span class="badge bg-light text-secondary border fs-10">{{ $camp->channel }}</span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-soft-primary text-primary fs-11 fw-bold">{{ number_format($camp->total_leads) }}</span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-soft-success text-success fs-11 fw-bold">{{ number_format($camp->won_deals) }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="fw-bold text-dark fs-12">{{ $formatCurrency($camp->won_revenue) }}</span>
+                                        </td>
+                                        <td class="text-end pe-3">
+                                            <span class="badge bg-soft-{{ $camp->conversion_rate > 20 ? 'success' : ($camp->conversion_rate > 10 ? 'warning' : 'secondary') }} text-{{ $camp->conversion_rate > 20 ? 'success' : ($camp->conversion_rate > 10 ? 'warning' : 'secondary') }} fs-11 fw-bold">
+                                                {{ $camp->conversion_rate }}%
+                                            </span>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted fs-12">
+                                            <i class="feather-target fs-24 mb-1 d-block opacity-50"></i>
+                                            {{ __('crm.dashboard.no_campaign_data') }}
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -334,14 +627,14 @@
     {{-- Deal Pipeline Stage Cards & Lead Sources --}}
     <div class="row g-4 mb-4">
         {{-- Deal Pipeline Stage Distribution --}}
-        <div class="col-xxl-8 col-xl-7">
-            <div class="card stretch stretch-full border-0 shadow-sm">
-                <div class="card-header">
-                    <h5 class="card-title"><i class="feather-layers text-warning me-2"></i>{{ __('crm.dashboard.deal_pipeline_stage_distribution') }}</h5>
+        <div class="col-xxl-7 col-xl-7">
+            <div class="card stretch stretch-full border-0 shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0"><i class="feather-layers text-warning me-2"></i>{{ __('crm.dashboard.deal_pipeline_stage_distribution') }}</h5>
                     <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-light-brand">{{ __('crm.dashboard.view_all_deals') }}</a>
                 </div>
                 <div class="card-body">
-                    <div class="row g-3">
+                    <div class="row g-3 mb-3">
                         @php
                             $standardStages = [
                                 'qualification' => ['name' => __('crm.statuses.Qualified'), 'color' => 'info', 'icon' => 'feather-check-square'],
@@ -356,7 +649,7 @@
                                 $cnt = $stageData?->count ?? 0;
                                 $val = $stageData?->total_value ?? 0;
                             @endphp
-                            <div class="col">
+                            <div class="col-sm-6 col-md-3">
                                 <div class="p-3 rounded-3 bg-soft-{{ $meta['color'] }} border border-{{ $meta['color'] }} border-opacity-10 text-center h-100">
                                     <i class="{{ $meta['icon'] }} fs-20 text-{{ $meta['color'] }} mb-2"></i>
                                     <h6 class="fs-12 fw-bold text-dark mb-1">{{ $meta['name'] }}</h6>
@@ -370,41 +663,51 @@
             </div>
         </div>
 
-        {{-- Lead Sources Breakdown --}}
-        <div class="col-xxl-4 col-xl-5">
+        {{-- Lead Acquisition Channels Breakdown & Doughnut Chart --}}
+        <div class="col-xxl-5 col-xl-5">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
-                <div class="card-header">
-                    <h5 class="card-title"><i class="feather-pie-chart text-info me-2"></i>{{ __('crm.dashboard.lead_acquisition_channels') }}</h5>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0"><i class="feather-pie-chart text-info me-2"></i>{{ __('crm.dashboard.lead_acquisition_channels') }}</h5>
+                    <span class="badge bg-soft-info text-info">{{ array_sum($sourceBreakdown) }} {{ __('crm.dashboard.leads_label') }}</span>
                 </div>
-                <div class="card-body">
+                <div class="card-body pt-2">
                     @if (empty($sourceBreakdown))
                         <div class="text-center py-4 text-muted">
                             <i class="feather-inbox fs-30 mb-2"></i>
                             <p class="fs-12 mb-0">{{ __('crm.dashboard.no_lead_source_data') }}</p>
                         </div>
                     @else
-                        @php
-                            $totalSourceCount = array_sum($sourceBreakdown) ?: 1;
-                            $sourceColors = ['WhatsApp Bot' => 'success', 'Web Form' => 'primary', 'Direct' => 'info', 'Referral' => 'warning', 'Cold Call' => 'secondary'];
-                        @endphp
-                        @foreach ($sourceBreakdown as $sourceName => $count)
-                            @php
-                                $sourcePct = round(($count / $totalSourceCount) * 100);
-                                $clr = $sourceColors[$sourceName] ?? 'primary';
-                            @endphp
-                            <div class="d-flex align-items-center justify-content-between mb-3">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="avatar-text avatar-xs bg-soft-{{ $clr }} text-{{ $clr }} rounded-circle">
-                                        <i class="feather-hash"></i>
-                                    </span>
-                                    <span class="fs-12 fw-semibold text-dark">{{ ($sourceName && \Illuminate\Support\Facades\Lang::has('crm.sources.' . $sourceName)) ? __('crm.sources.' . $sourceName) : ($sourceName ?: __('crm.sources.Direct Inquiry')) }}</span>
-                                </div>
-                                <div class="text-end">
-                                    <span class="fs-12 fw-bold text-dark me-2">{{ number_format($count) }}</span>
-                                    <span class="badge bg-soft-{{ $clr }} text-{{ $clr }} fs-11">{{ $sourcePct }}%</span>
+                        <div class="row align-items-center">
+                            <div class="col-sm-5 text-center mb-3 mb-sm-0">
+                                <div style="position: relative; height: 160px; max-height: 160px; width: 100%;">
+                                    <canvas id="crmSourceChart"></canvas>
                                 </div>
                             </div>
-                        @endforeach
+                            <div class="col-sm-7">
+                                @php
+                                    $totalSourceCount = array_sum($sourceBreakdown) ?: 1;
+                                    $sourceColors = ['WhatsApp Bot' => 'success', 'Web Form' => 'primary', 'Direct' => 'info', 'Referral' => 'warning', 'Cold Call' => 'secondary', 'Meta Ads' => 'primary'];
+                                @endphp
+                                @foreach ($sourceBreakdown as $sourceName => $count)
+                                    @php
+                                        $sourcePct = round(($count / $totalSourceCount) * 100);
+                                        $clr = $sourceColors[$sourceName] ?? 'primary';
+                                    @endphp
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="avatar-text avatar-xs bg-soft-{{ $clr }} text-{{ $clr }} rounded-circle">
+                                                <i class="feather-hash"></i>
+                                            </span>
+                                            <span class="fs-12 fw-semibold text-dark">{{ ($sourceName && \Illuminate\Support\Facades\Lang::has('crm.sources.' . $sourceName)) ? __('crm.sources.' . $sourceName) : ($sourceName ?: __('crm.sources.Direct Inquiry')) }}</span>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="fs-12 fw-bold text-dark me-2">{{ number_format($count) }}</span>
+                                            <span class="badge bg-soft-{{ $clr }} text-{{ $clr }} fs-10">{{ $sourcePct }}%</span>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
                     @endif
                 </div>
             </div>
@@ -708,79 +1011,262 @@
 <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
 <script>
     $(document).ready(function() {
-        $('#preset, #company_scope, #owner_id, #lead_type').on('change', function() {
+        $('#preset, #company_scope, #owner_id, #lead_type, #campaign, #adset, #ad_name').on('change', function() {
             $('#crm-filter-form').submit();
         });
     });
 </script>
-@if ($activeView === 'overview')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+@if ($activeView === 'overview')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const trendData = @json($monthlyTrend);
+        const currencySymbol = window.AppCurrency?.symbol || @json(active_currency_symbol());
 
-        const ctx = document.getElementById('crmTrendChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: trendData.labels,
-                datasets: [
-                    {
-                        label: 'Leads Created',
-                        data: trendData.leads,
-                        borderColor: '#3B82F6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2,
-                        tension: 0.3,
-                        fill: true,
-                        yAxisID: 'yLeads'
-                    },
-                    {
-                        label: 'Revenue Won (' + (window.AppCurrency?.symbol || @json(active_currency_symbol())) + ')',
-                        data: trendData.revenue,
-                        borderColor: '#10B981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        borderWidth: 2,
-                        tension: 0.3,
-                        fill: true,
-                        yAxisID: 'yRevenue'
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: { font: { family: 'Inter', size: 12 } }
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false
-                    }
+        // 1. Revenue & Lead Acquisition Trend Chart
+        const trendData = @json($monthlyTrend);
+        const trendEl = document.getElementById('crmTrendChart');
+        if (trendEl) {
+            new Chart(trendEl.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: trendData.labels,
+                    datasets: [
+                        {
+                            label: '{{ __("crm.dashboard.leads_label") }}',
+                            data: trendData.leads,
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                            borderWidth: 2.5,
+                            tension: 0.35,
+                            fill: true,
+                            pointBackgroundColor: '#3B82F6',
+                            pointRadius: 4,
+                            yAxisID: 'yLeads'
+                        },
+                        {
+                            label: '{{ __("crm.dashboard.won_revenue") }} (' + currencySymbol + ')',
+                            data: trendData.revenue,
+                            borderColor: '#10B981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                            borderWidth: 2.5,
+                            tension: 0.35,
+                            fill: true,
+                            pointBackgroundColor: '#10B981',
+                            pointRadius: 4,
+                            yAxisID: 'yRevenue'
+                        }
+                    ]
                 },
-                scales: {
-                    x: {
-                        grid: { display: false }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { font: { family: 'Inter', size: 12, weight: '500' }, usePointStyle: true, boxWidth: 8 }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            padding: 10,
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleFont: { family: 'Inter', size: 12, weight: 'bold' },
+                            bodyFont: { family: 'Inter', size: 12 }
+                        }
                     },
-                    yLeads: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        title: { display: true, text: 'Leads Count' },
-                        grid: { borderDash: [2, 4] }
-                    },
-                    yRevenue: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: { display: true, text: 'Won Revenue' },
-                        grid: { drawOnChartArea: false }
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { family: 'Inter', size: 11 } }
+                        },
+                        yLeads: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: '{{ __("crm.dashboard.leads_label") }}', font: { family: 'Inter', size: 11, weight: '600' } },
+                            grid: { borderDash: [2, 4], color: 'rgba(0,0,0,0.06)' }
+                        },
+                        yRevenue: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: '{{ __("crm.dashboard.won_revenue") }}', font: { family: 'Inter', size: 11, weight: '600' } },
+                            grid: { drawOnChartArea: false }
+                        }
                     }
                 }
+            });
+        }
+
+        // 2. Enterprise Interactive Funnel Horizontal Bar Chart
+        const funnelData = @json($funnelDetailed['stages']);
+        const funnelEl = document.getElementById('crmFunnelChart');
+        if (funnelEl) {
+            const funnelLabels = funnelData.map(s => s.name);
+            const funnelCounts = funnelData.map(s => s.count);
+            const funnelColors = ['#3B82F6', '#06B6D4', '#F59E0B', '#8B5CF6', '#10B981'];
+
+            new Chart(funnelEl.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: funnelLabels,
+                    datasets: [{
+                        label: '{{ __("crm.dashboard.leads_label") }} / {{ __("crm.dashboard.active_opps") }}',
+                        data: funnelCounts,
+                        backgroundColor: funnelColors,
+                        borderRadius: 6,
+                        barThickness: 24
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const stg = funnelData[context.dataIndex];
+                                    let str = ' ' + context.parsed.x + ' (' + stg.pct_of_total + '% {{ __("crm.dashboard.of_top_funnel") }})';
+                                    if (stg.value > 0) {
+                                        str += ' | ' + currencySymbol + ' ' + Number(stg.value).toLocaleString();
+                                    }
+                                    return str;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: { borderDash: [2, 4], color: 'rgba(0,0,0,0.06)' },
+                            ticks: { font: { family: 'Inter', size: 11 } }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { font: { family: 'Inter', size: 11, weight: '500' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 3. Interactive Campaign Funnel Data Handler
+        const campaignFunnelData = {
+            all: @json($campaignFunnel),
+            items: @json($campaignPerformance)
+        };
+        const currencySym = window.AppCurrency?.symbol || @json(active_currency_symbol());
+
+        window.updateCampaignFunnel = function(val) {
+            let data = {};
+            if (val === 'all') {
+                data = campaignFunnelData.all;
+            } else {
+                const item = campaignFunnelData.items[val];
+                if (!item) return;
+                const leads = Number(item.total_leads) || 0;
+                const qual = Number(item.qualified_leads) || 0;
+                const contacted = qual > 0 ? qual : (leads > 0 ? 1 : 0);
+                const deals = Number(item.converted_deals) || 0;
+                const won = Number(item.won_deals) || 0;
+                const conv = Number(item.conversion_rate) || 0;
+                const rev = Number(item.won_revenue) || 0;
+
+                data = {
+                    total_leads: leads,
+                    contacted: contacted,
+                    qualified: qual,
+                    deals: deals,
+                    proposals: deals,
+                    won: won,
+                    overall_conv_rate: conv,
+                    revenue: rev
+                };
             }
-        });
+
+            // Update SVG numbers
+            const txt0 = document.getElementById('funnelTxt0');
+            const txt1 = document.getElementById('funnelTxt1');
+            const txt2 = document.getElementById('funnelTxt2');
+            const txt3 = document.getElementById('funnelTxt3');
+            const txt4 = document.getElementById('funnelTxt4');
+            const txt5 = document.getElementById('funnelTxt5');
+
+            if (txt0) txt0.textContent = data.total_leads;
+            if (txt1) txt1.textContent = data.contacted;
+            if (txt2) txt2.textContent = data.qualified;
+            if (txt3) txt3.textContent = data.deals;
+            if (txt4) txt4.textContent = data.proposals;
+            if (txt5) txt5.textContent = data.won;
+
+            // Update legend numbers
+            const l0 = document.getElementById('legendCnt0');
+            const l1 = document.getElementById('legendCnt1');
+            const l2 = document.getElementById('legendCnt2');
+            const l3 = document.getElementById('legendCnt3');
+            const l4 = document.getElementById('legendCnt4');
+            const l5 = document.getElementById('legendCnt5');
+
+            if (l0) l0.textContent = Number(data.total_leads).toLocaleString();
+            if (l1) l1.textContent = Number(data.contacted).toLocaleString();
+            if (l2) l2.textContent = Number(data.qualified).toLocaleString();
+            if (l3) l3.textContent = Number(data.deals).toLocaleString();
+            if (l4) l4.textContent = Number(data.proposals).toLocaleString();
+            if (l5) l5.textContent = Number(data.won).toLocaleString();
+
+            // Update stats
+            const overallEl = document.getElementById('funnelOverallConv');
+            if (overallEl) overallEl.textContent = data.overall_conv_rate + '%';
+
+            const revEl = document.getElementById('funnelRevenueNote');
+            if (revEl) {
+                const revFormatted = Number(data.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                revEl.innerHTML = '{{ __("crm.dashboard.won_revenue") }}: <b class="text-dark">' + currencySym + ' ' + revFormatted + '</b>';
+            }
+        };
+
+        // 4. Lead Acquisition Channels Doughnut Chart
+        const sourceData = @json($sourceBreakdown);
+        const sourceEl = document.getElementById('crmSourceChart');
+        if (sourceEl && Object.keys(sourceData).length > 0) {
+            const srcLabels = Object.keys(sourceData);
+            const srcValues = Object.values(sourceData);
+            const srcColors = ['#10B981', '#3B82F6', '#06B6D4', '#F59E0B', '#64748B', '#8B5CF6'];
+
+            new Chart(sourceEl.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: srcLabels,
+                    datasets: [{
+                        data: srcValues,
+                        backgroundColor: srcColors,
+                        borderWidth: 2,
+                        borderColor: '#FFFFFF',
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = srcValues.reduce((a, b) => a + b, 0) || 1;
+                                    const val = context.parsed;
+                                    const pct = Math.round((val / total) * 100);
+                                    return ' ' + context.label + ': ' + val + ' (' + pct + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
     });
 </script>
 @endif

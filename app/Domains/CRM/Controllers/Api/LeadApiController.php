@@ -1124,7 +1124,9 @@ class LeadApiController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'lead_owner_id' => 'required|integer|exists:users,id',
+            'lead_owner_id' => 'nullable|integer|exists:users,id',
+            'owner_id'      => 'nullable|integer|exists:users,id',
+            'note'          => 'nullable|string|max:500',
         ]);
 
         if ($validator->fails()) {
@@ -1135,13 +1137,96 @@ class LeadApiController extends Controller
             ], 422);
         }
 
-        $lead->lead_owner_id = $request->input('lead_owner_id');
+        $ownerId = $request->input('lead_owner_id', $request->input('owner_id'));
+        $lead->lead_owner_id = $ownerId;
         $lead->save();
 
+        if ($lead->crm_deal_id) {
+            \App\Domains\CRM\Models\CrmDeal::where('id', $lead->crm_deal_id)->update(['owner_id' => $lead->lead_owner_id]);
+        }
+
+        if ($request->filled('note')) {
+            \App\Domains\CRM\Models\LeadHistory::logEvent(
+                $lead,
+                'note',
+                null,
+                $request->input('note'),
+                "Assignment Note: {$request->input('note')}"
+            );
+        }
+
+        $targetUser = $ownerId ? User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+
         return response()->json([
-            'success' => true,
-            'message' => 'Lead owner reassigned successfully.',
-            'data'    => $lead->load('owner'),
+            'success'       => true,
+            'message'       => "Lead owner reassigned successfully to {$ownerName}.",
+            'lead_id'       => $lead->id,
+            'owner_id'      => $ownerId,
+            'owner_name'    => $ownerName,
+            'data'          => $lead->load('owner'),
+        ]);
+    }
+
+    /**
+     * POST /api/crm/leads/bulk-assign
+     */
+    public function bulkAssign(Request $request): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $validator = Validator::make($request->all(), [
+            'lead_ids'      => 'required|array|min:1',
+            'lead_ids.*'    => 'required|integer|exists:leads,id',
+            'lead_owner_id' => 'nullable|integer|exists:users,id',
+            'owner_id'      => 'nullable|integer|exists:users,id',
+            'note'          => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $ownerId = $request->input('lead_owner_id', $request->input('owner_id'));
+        $targetUser = $ownerId ? User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+        $note = $request->input('note');
+
+        $leads = Lead::where('tenant_id', $tenantId)
+            ->whereIn('id', $request->input('lead_ids'))
+            ->get();
+
+        $updatedCount = 0;
+        foreach ($leads as $lead) {
+            $lead->lead_owner_id = $ownerId;
+            $lead->save();
+
+            if ($lead->crm_deal_id) {
+                \App\Domains\CRM\Models\CrmDeal::where('id', $lead->crm_deal_id)->update(['owner_id' => $ownerId]);
+            }
+
+            if (!empty($note)) {
+                \App\Domains\CRM\Models\LeadHistory::logEvent(
+                    $lead,
+                    'note',
+                    null,
+                    $note,
+                    "Bulk Assignment Note: {$note}"
+                );
+            }
+            $updatedCount++;
+        }
+
+        return response()->json([
+            'success'       => true,
+            'message'       => "Successfully assigned {$updatedCount} lead(s) to {$ownerName}.",
+            'updated_count' => $updatedCount,
+            'owner_id'      => $ownerId,
+            'owner_name'    => $ownerName,
         ]);
     }
 

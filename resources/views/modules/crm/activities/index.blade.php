@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Activity Calendar & Scheduler | CRM | SaaS ERP')
-@section('page-title', 'Activity Calendar & Scheduler')
-@section('breadcrumb', 'CRM > Activity Calendar')
+@section('title', __('crm.lead_activity_scheduler') . ' | CRM | SaaS ERP')
+@section('page-title', __('crm.lead_activity_scheduler'))
+@section('breadcrumb', 'CRM > ' . __('crm.lead_activity_calendar'))
 
 @push('styles')
 <style>
@@ -39,7 +39,7 @@
     }
     .calendar-day-cell {
         background-color: #ffffff;
-        min-height: 125px;
+        min-height: 145px;
         padding: 0.6rem;
         display: flex;
         flex-direction: column;
@@ -79,27 +79,35 @@
     .activities-list {
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
+        gap: 0.45rem;
         margin-top: 0.35rem;
         overflow-y: auto;
-        max-height: 110px;
+        max-height: 180px;
+        padding-right: 2px;
     }
-    .activity-pill {
-        font-size: 0.72rem;
-        padding: 0.3rem 0.5rem;
+    .activity-card-rich {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
         border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        padding: 0.45rem 0.55rem;
         text-decoration: none !important;
-        font-weight: 600;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        display: block;
+        cursor: pointer;
     }
-    .activity-pill:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 3px 6px rgba(0,0,0,0.1);
-        opacity: 0.95;
+    .activity-card-rich:hover {
+        transform: translateY(-1.5px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        background-color: #fafbfc;
+    }
+    .fs-8 { font-size: 8px !important; }
+    .fs-9 { font-size: 9px !important; }
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        display: inline-block;
     }
     .legend-indicator {
         width: 12px;
@@ -112,6 +120,73 @@
     .bg-purple { background-color: #7c3aed !important; }
     .bg-pink   { background-color: #db2777 !important; }
     .bg-amber  { background-color: #d97706 !important; }
+
+    /* ==========================================
+       Dark Mode Support (html.app-skin-dark)
+       ========================================== */
+    html.app-skin-dark .erp-single-panel {
+        background-color: transparent !important;
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .erp-single-panel.bg-white {
+        background-color: #0b1329 !important;
+    }
+    html.app-skin-dark .calendar-container {
+        border-color: #1e293b !important;
+        background-color: #0f172a !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    }
+    html.app-skin-dark .calendar-grid {
+        background-color: #1e293b !important;
+    }
+    html.app-skin-dark .calendar-day-header {
+        background-color: #162038 !important;
+        color: #94a3b8 !important;
+        border-bottom-color: #1e293b !important;
+    }
+    html.app-skin-dark .calendar-day-cell {
+        background-color: #0f172a !important;
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .calendar-day-cell:hover {
+        background-color: #162038 !important;
+    }
+    html.app-skin-dark .calendar-day-cell.other-month {
+        background-color: #090e1a !important;
+        opacity: 0.45;
+    }
+    html.app-skin-dark .calendar-day-cell.is-today {
+        background-color: rgba(59, 130, 246, 0.15) !important;
+        box-shadow: inset 0 0 0 2px #3b82f6 !important;
+    }
+    html.app-skin-dark .day-number-badge {
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .is-today .day-number-badge {
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
+    }
+    html.app-skin-dark .btn-soft-primary {
+        background-color: rgba(59, 130, 246, 0.2) !important;
+        color: #60a5fa !important;
+    }
+    html.app-skin-dark .card.bg-light {
+        background-color: #162038 !important;
+        border: 1px solid #1e293b !important;
+    }
+    html.app-skin-dark .card.bg-light .text-dark {
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .card.bg-light .text-secondary {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .border-bottom,
+    html.app-skin-dark .border-top {
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .text-dark {
+        color: #f8fafc !important;
+    }
 </style>
 @endpush
 
@@ -131,7 +206,7 @@
         </a>
     @endif
     <button type="button" class="btn btn-primary btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#scheduleActivityModal">
-        <i class="feather-plus me-1"></i>Log Activity / Follow-up
+        <i class="feather-plus me-1"></i>{{ __('crm.log_lead_activity') }}
     </button>
 @endsection
 
@@ -155,7 +230,7 @@
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-3 border-bottom">
         <!-- Left Section: Title & Date Navigation Controls -->
         <div class="d-flex align-items-center flex-wrap gap-2">
-            <h5 class="fw-bold text-dark mb-0 me-2">Activity Calendar</h5>
+            <h5 class="fw-bold text-dark mb-0 me-2">{{ __('crm.lead_activity_calendar') }}</h5>
 
             <!-- Date Prev / Next / Today Controls -->
             <div class="d-flex align-items-center gap-1 me-2">
@@ -329,38 +404,102 @@
                                 };
 
                                 if ($f->status === 'Completed') {
-                                    $badgeClass = 'bg-success text-white';
-                                    $iconClass  = 'feather-check-circle';
+                                    $cardBgClass = 'bg-success text-white';
+                                    $statusText = 'Completed';
+                                    $badgeBgClass = 'bg-white bg-opacity-25 text-white';
                                 } elseif ($f->status === 'Not Connected') {
-                                    $badgeClass = 'bg-warning text-white';
-                                    $iconClass  = 'feather-phone-off';
+                                    $cardBgClass = 'bg-warning text-dark';
+                                    $statusText = 'Not Connected';
+                                    $badgeBgClass = 'bg-black bg-opacity-10 text-dark';
                                 } elseif ($f->status === 'Cancelled') {
-                                    $badgeClass = 'bg-danger text-white';
-                                    $iconClass  = 'feather-x-circle';
+                                    $cardBgClass = 'bg-danger text-white';
+                                    $statusText = 'Cancelled';
+                                    $badgeBgClass = 'bg-white bg-opacity-25 text-white';
                                 } elseif ($f->status === 'Rescheduled') {
-                                    $badgeClass = 'bg-purple text-white';
-                                    $iconClass  = 'feather-refresh-cw';
+                                    $cardBgClass = 'bg-purple text-white';
+                                    $statusText = 'Rescheduled';
+                                    $badgeBgClass = 'bg-white bg-opacity-25 text-white';
                                 } elseif ($isOverdue) {
-                                    $badgeClass = 'bg-danger text-white';
-                                    $iconClass  = 'feather-alert-triangle';
+                                    $cardBgClass = 'bg-danger text-white';
+                                    $statusText = 'Overdue';
+                                    $badgeBgClass = 'bg-white bg-opacity-25 text-white';
                                 } else {
-                                    $badgeClass = match($f->type) {
+                                    $cardBgClass = match($f->type) {
                                         'Meeting' => 'bg-indigo text-white',
                                         'Call'    => 'bg-primary text-white',
                                         'Email'   => 'bg-amber text-white',
                                         'Demo'    => 'bg-pink text-white',
-                                        default   => 'bg-secondary text-white',
+                                        default   => 'bg-indigo text-white',
                                     };
+                                    $statusText = 'Scheduled';
+                                    $badgeBgClass = 'bg-white bg-opacity-25 text-white';
                                 }
-                                $activityUrl = $f->lead_id ? route('crm.leads.show', $f->lead_id) : ($f->crm_deal_id ? route('crm.deals.show', $f->crm_deal_id) : '#');
-                                $activityLabel = $f->lead?->company_name ?: ($f->deal?->title ?: ($f->lead_id ? 'Lead #'.$f->lead_id : ($f->crm_deal_id ? 'Deal #'.$f->crm_deal_id : 'Activity')));
+
+                                $activityUrl = $f->lead_id 
+                                    ? route('crm.leads.show', ['lead' => $f->lead_id, 'tab' => 'interactions']) . '#subtab-interactions' 
+                                    : ($f->crm_deal_id ? route('crm.deals.show', ['deal' => $f->crm_deal_id, 'tab' => 'interactions']) . '#subtab-interactions' : '#');
+
+                                $entityName = '';
+                                $entityTypeLabel = '';
+                                $entityNumber = '';
+                                if ($f->lead_id && $f->lead) {
+                                    $entityName = $f->lead->company_name ?: $f->lead->contact_person;
+                                    $entityTypeLabel = 'Lead';
+                                    $entityNumber = $f->lead->lead_number ?: '#' . $f->lead->id;
+                                } elseif ($f->crm_deal_id && $f->deal) {
+                                    $entityName = $f->deal->title ?: ($f->deal->account?->name ?: 'Deal');
+                                    $entityTypeLabel = 'Deal';
+                                    $entityNumber = $f->deal->deal_number ?: '#' . $f->deal->id;
+                                } else {
+                                    $entityName = $f->title ?: 'CRM Activity';
+                                }
+
+                                $assigneeName = $f->tagged_users->pluck('name')->first() ?: ($f->lead?->owner?->name ?: ($f->deal?->owner?->name ?: null));
+                                $pillStyle = ($f->status === 'Not Connected') 
+                                    ? 'background-color: rgba(0,0,0,0.15); color: #1e293b !important;' 
+                                    : 'background-color: rgba(255,255,255,0.22); color: #ffffff !important;';
                             @endphp
-                            <a href="{{ $activityUrl }}" class="activity-pill {{ $badgeClass }}" title="{{ $f->type }}: {{ $activityLabel }} — {{ $f->notes ?: 'Scheduled Follow-up' }} [Status: {{ $f->status ?: 'Pending' }}]" onclick="event.stopPropagation();">
-                                <span class="d-flex align-items-center text-truncate">
-                                    <i class="{{ $iconClass }} me-1 opacity-85"></i>
-                                    <span class="text-truncate">{{ $activityLabel }}</span>
-                                </span>
-                                <span class="font-monospace fs-10 opacity-90 ms-1">{{ $f->followup_date->format('h:i A') }}</span>
+                            <a href="{{ $activityUrl }}" 
+                               class="activity-card-rich {{ $cardBgClass }} p-2 rounded-2 border-0 d-block text-decoration-none shadow-xs position-relative" 
+                               title="{{ $f->title ?: ($f->notes ?: $f->type) }} [Status: {{ $statusText }}]" 
+                               onclick="event.stopPropagation(); if (window.localStorage && '{{ $f->lead_id }}') { localStorage.setItem('lead_active_tab_{{ $f->lead_id }}', 'timeline-tab'); localStorage.setItem('lead_active_subtab_{{ $f->lead_id }}', 'subtab-interactions-tab'); }">
+                                
+                                <!-- Top Row: Time + Type & Meet Indicator -->
+                                <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
+                                    <span class="fs-11 fw-bolder text-white d-inline-flex align-items-center gap-1">
+                                        <i class="{{ $iconClass }} fs-11 opacity-90"></i>
+                                        <span>{{ $f->followup_date->format('h:i A') }}</span>
+                                        <span style="{{ $pillStyle }} padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; display: inline-block;">
+                                            {{ $f->type ?: 'Meeting' }}
+                                        </span>
+                                    </span>
+                                    @if(!empty($f->google_meet_link) || $f->is_google_meet)
+                                        <span style="background-color: #ffffff; color: #dc2626 !important; padding: 1px 6px; border-radius: 12px; font-size: 9px; font-weight: 800; display: inline-flex; align-items: center; gap: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);" title="Google Meet Video Link Active">
+                                            <i class="feather-video fs-8"></i> Meet
+                                        </span>
+                                    @endif
+                                </div>
+
+                                <!-- Middle Row: Target (with Company / Contact / Deal) -->
+                                <div class="fs-11 text-white fw-bold text-truncate lh-sm mb-1">
+                                    <span class="opacity-80 fw-normal fs-10">with</span> 
+                                    <span class="text-white">{{ $entityName }}</span>
+                                    @if($entityTypeLabel)
+                                        <span class="opacity-80 fw-normal fs-9">({{ $entityTypeLabel }} {{ $entityNumber }})</span>
+                                    @endif
+                                </div>
+
+                                <!-- Bottom Row: Status & Assignee -->
+                                <div class="d-flex align-items-center justify-content-between gap-1 fs-10 text-white opacity-90 border-top border-white border-opacity-25 pt-1 mt-1">
+                                    <span style="{{ $pillStyle }} padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: 600; display: inline-block;">
+                                        {{ $statusText }}
+                                    </span>
+                                    @if($assigneeName)
+                                        <span class="text-truncate text-white fw-medium" title="Assigned To: {{ $assigneeName }}">
+                                            <i class="feather-user fs-9 me-0.5 opacity-80"></i>{{ Str::limit($assigneeName, 13) }}
+                                        </span>
+                                    @endif
+                                </div>
                             </a>
                         @endforeach
                     </div>
@@ -370,10 +509,8 @@
             @endwhile
         </div>
     </div>
-</div>
-
-<!-- Schedule Activity Modal (Matching Image 2 UI Aesthetic & Unified Fields) -->
-<x-ui.modal id="scheduleActivityModal" title="Schedule Google Calendar Event / Meeting" size="lg" :showFooter="false">
+</div><!-- Schedule Activity Modal -->
+<x-ui.modal id="scheduleActivityModal" :title="__('crm.log_lead_activity')" size="lg" :showFooter="false">
     <form action="" method="POST" id="quickScheduleForm">
         @csrf
         <input type="hidden" name="action_mode" value="schedule">
@@ -405,7 +542,8 @@
         @endif
 
         <div class="row g-2">
-            <div class="col-md-6">
+            <!-- Lead Select Container -->
+            <div class="col-md-6" id="leadSelectWrapper">
                 <x-ui.modal-form-ui 
                     type="select" 
                     label="Select CRM Lead" 
@@ -428,7 +566,7 @@
                     label="Event / Meeting Title" 
                     name="title" 
                     id="modal_event_title"
-                    :required="true"
+                    :required="true" 
                     placeholder="e.g. CRM Followup Call / Client Demo" 
                     value="CRM Followup Call" 
                 />
@@ -483,17 +621,19 @@
             <div class="col-12">
                 <div class="p-3 bg-light rounded-3 border mb-2">
                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="syncGoogleSwitch" checked>
-                            <label class="form-check-label fw-bold fs-12 text-dark" for="syncGoogleSwitch">
-                                <i class="feather-calendar text-danger me-1"></i> Sync to Google Calendar
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="fw-bold fs-12 text-dark mb-0 d-flex align-items-center gap-1 c-pointer" for="syncGoogleSwitch">
+                                <i class="feather-calendar text-danger"></i> Sync to Google Calendar
                             </label>
+                            <input type="hidden" name="sync_google_calendar" value="0">
+                            <x-ui.checkbox name="sync_google_calendar" id="syncGoogleSwitch" value="1" :checked="true" />
                         </div>
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="createMeetSwitchUnified">
-                            <label class="form-check-label fw-bold fs-12 text-dark" for="createMeetSwitchUnified">
-                                <i class="feather-video text-primary me-1"></i> Generate Google Meet Video Room Link
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="fw-bold fs-12 text-dark mb-0 d-flex align-items-center gap-1 c-pointer" for="createMeetSwitchUnified">
+                                <i class="feather-video text-primary"></i> Generate Google Meet Video Room Link
                             </label>
+                            <input type="hidden" name="create_meet_link" value="0">
+                            <x-ui.checkbox name="create_meet_link" id="createMeetSwitchUnified" value="1" />
                         </div>
                     </div>
                     <small class="text-muted fs-11 d-block mt-2">
@@ -611,8 +751,8 @@
 
         if (!leadId) {
             e.preventDefault();
-            leadSelect.classList.add('is-invalid');
-            leadSelect.focus();
+            leadSelect?.classList.add('is-invalid');
+            leadSelect?.focus();
             return false;
         }
 

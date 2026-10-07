@@ -48,7 +48,10 @@ class ProductionPlanService
             );
         }
 
-        $planNumber = $dto->plan_number ?: $this->numberService->generateNextNumber($tenantId);
+        $branchId = property_exists($dto, 'branch_id') && $dto->branch_id ? $dto->branch_id : (branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id());
+        $companyId = property_exists($dto, 'company_id') && $dto->company_id ? $dto->company_id : (company_id() ?? app(\App\Core\Company\CompanyContext::class)->id());
+
+        $planNumber = $dto->plan_number ?: $this->numberService->generateNextNumber($tenantId, $branchId);
 
         // Fetch default approved BOM and active Routing if not provided
         $bomId = $dto->bom_id;
@@ -81,6 +84,8 @@ class ProductionPlanService
 
         $plan = ProductionPlan::create([
             'tenant_id' => $tenantId,
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
             'plan_number' => $planNumber,
             'name' => $dto->name,
             'product_id' => $dto->product_id,

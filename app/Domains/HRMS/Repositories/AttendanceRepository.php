@@ -827,4 +827,252 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
         return ['status' => 'ok', 'tracking' => true];
     }
+
+    /**
+     * Export attendance records as CSV stream.
+     */
+    public function export(array $filters = []): mixed
+    {
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+        $date = $filters['date'] ?? Carbon::today()->format('Y-m-d');
+        $departmentId = $filters['department_id'] ?? null;
+        $employeeId = $filters['employee_id'] ?? null;
+
+        $query = Attendance::with(['employee.department'])
+            ->where('tenant_id', $tenantId)
+            ->whereDate('date', $date);
+
+        if ($departmentId) {
+            $query->whereHas('employee', function ($q) use ($departmentId) {
+                $q->where('department_id', $departmentId);
+            });
+        }
+
+        if ($employeeId) {
+            $query->where('employee_id', $employeeId);
+        }
+
+        $logs = $query->get();
+
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=attendance_export_" . date('Ymd_His') . ".csv",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $columns = ['Employee Code', 'Employee Name', 'Department', 'Date', 'Check In', 'Check Out', 'Status', 'Location Type', 'Total Work Hours'];
+
+        $callback = function() use ($logs, $columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+
+            foreach ($logs as $log) {
+                fputcsv($file, [
+                    $log->employee?->employee_id ?? '',
+                    $log->employee?->full_name ?? '',
+                    $log->employee?->department?->name ?? '',
+                    $log->date ? $log->date->format('Y-m-d') : '',
+                    $log->check_in ? $log->check_in->format('H:i:s') : '',
+                    $log->check_out ? $log->check_out->format('H:i:s') : '',
+                    $log->status ?: 'present',
+                    $log->location_type ?: 'office',
+                    $log->total_work_hours ?: 0.00
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Download Attendance Import CSV Template.
+     */
+    public function downloadTemplate(): mixed
+    {
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=attendance_import_template.csv",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $columns = ['employee_code', 'punch_datetime'];
+
+        $callback = function() use ($columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+            fputcsv($file, ['WRG-001', '2026-09-19 09:00:00']);
+            fputcsv($file, ['WRG-001', '2026-09-19 18:00:00']);
+            fputcsv($file, ['WRG-002', '2026-09-19 09:30:00']);
+            fputcsv($file, ['WRG-002', '2026-09-19 17:30:00']);
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Import attendance records from CSV / Excel file.
+     */
+    public function import(\Illuminate\Http\UploadedFile $file): array
+    {
+        $ext = strtolower($file->getClientOriginalExtension());
+        if (!in_array($ext, ['csv', 'txt', 'xls', 'xlsx'])) {
+            return ['success' => false, 'message' => 'The file must be a file of type: csv, txt, xls, xlsx.'];
+        }
+
+        $path = $file->getRealPath();
+        $rows = [];
+
+        if (in_array($ext, ['xlsx', 'xls'])) {
+            try {
+                $rows = \App\Domains\HRMS\Helpers\XlsxHelper::import($path);
+            } catch (\Throwable $e) {
+                try {
+                    $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+                    $worksheet = $spreadsheet->getActiveSheet();
+                    $rows = $worksheet->toArray(null, true, true, false);
+                } catch (\Throwable $ex) {
+                    return ['success' => false, 'message' => 'Failed to parse Excel file: ' . $ex->getMessage()];
+                }
+            }
+        } else {
+            if (($handle = fopen($path, 'r')) !== false) {
+                while (($row = fgetcsv($handle)) !== false) {
+                    $rows[] = $row;
+                }
+                fclose($handle);
+            }
+        }
+
+        if (empty($rows) || !isset($rows[0])) {
+            return ['success' => false, 'message' => 'The uploaded file is empty or could not be parsed.'];
+        }
+
+        $header = array_shift($rows);
+        $headerNormalized = array_map(fn($col) => strtolower(trim((string)$col)), $header);
+
+        $colEmpCode = false;
+        $colPunchDateTime = false;
+        $colDate = false;
+        $colCheckIn = false;
+        $colCheckOut = false;
+        $colStatus = false;
+
+        foreach ($headerNormalized as $idx => $h) {
+            if ($colEmpCode === false && in_array($h, ['employee_code', 'employee_id', 'emp_code', 'enroll_no', 'enrollno', 'user_id', 'userid', 'badge_no', 'card_no', 'code'])) {
+                $colEmpCode = $idx;
+            }
+            if ($colPunchDateTime === false && in_array($h, ['punch_datetime', 'log_datetime', 'log_time', 'logtime', 'punch_time', 'punchtime', 'datetime', 'date_time', 'timestamp', 'logdate', 'punch'])) {
+                $colPunchDateTime = $idx;
+            }
+            if ($colDate === false && in_array($h, ['date', 'punch_date', 'log_date', 'attendance_date'])) {
+                $colDate = $idx;
+            }
+            if ($colCheckIn === false && in_array($h, ['check_in', 'checkin', 'in_time', 'intime', 'first_in', 'time_in', 'punch_in', 'in'])) {
+                $colCheckIn = $idx;
+            }
+            if ($colCheckOut === false && in_array($h, ['check_out', 'checkout', 'out_time', 'outtime', 'last_out', 'time_out', 'punch_out', 'out'])) {
+                $colCheckOut = $idx;
+            }
+            if ($colStatus === false && in_array($h, ['status', 'attendance_status', 'mode', 'type'])) {
+                $colStatus = $idx;
+            }
+        }
+
+        if ($colEmpCode === false && count($headerNormalized) > 0) {
+            $colEmpCode = 0;
+        }
+
+        if ($colEmpCode === false || ($colPunchDateTime === false && $colDate === false)) {
+            return ['success' => false, 'message' => 'Invalid template. "employee_code" and either "punch_datetime" or "date" column are required.'];
+        }
+
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+        $importedCount = 0;
+        $skippedRows = [];
+        $rowNum = 1;
+        $employeeCache = [];
+
+        foreach ($rows as $row) {
+            $rowNum++;
+            if (empty($row) || !array_filter($row, fn($v) => !is_null($v) && trim((string)$v) !== '')) continue;
+
+            $empCodeStr = trim((string)($row[$colEmpCode] ?? ''));
+            if (!$empCodeStr) {
+                $skippedRows[] = "Row {$rowNum}: Missing employee_code.";
+                continue;
+            }
+
+            if (!isset($employeeCache[$empCodeStr])) {
+                $employeeCache[$empCodeStr] = Employee::where('employee_id', $empCodeStr)->orWhere('id', $empCodeStr)->first();
+            }
+
+            $employee = $employeeCache[$empCodeStr];
+            if (!$employee) {
+                $skippedRows[] = "Row {$rowNum}: Employee code '{$empCodeStr}' not found.";
+                continue;
+            }
+
+            $statusRaw = $colStatus !== false ? strtolower(trim((string)($row[$colStatus] ?? ''))) : 'present';
+            if (!in_array($statusRaw, ['present', 'absent', 'late', 'half_day', 'on_leave', 'wfh', 'weekly_off'])) {
+                $statusRaw = 'present';
+            }
+
+            $dateStr = null;
+            $checkInTime = null;
+            $checkOutTime = null;
+
+            if ($colPunchDateTime !== false && !empty($row[$colPunchDateTime])) {
+                try {
+                    $dt = Carbon::parse(trim((string)$row[$colPunchDateTime]));
+                    $dateStr = $dt->format('Y-m-d');
+                    $checkInTime = $dt->format('H:i:s');
+                } catch (\Throwable $e) {}
+            } elseif ($colDate !== false && !empty($row[$colDate])) {
+                try {
+                    $dateStr = Carbon::parse(trim((string)$row[$colDate]))->format('Y-m-d');
+                    if ($colCheckIn !== false && !empty($row[$colCheckIn])) {
+                        $checkInTime = Carbon::parse(trim((string)$row[$colCheckIn]))->format('H:i:s');
+                    }
+                    if ($colCheckOut !== false && !empty($row[$colCheckOut])) {
+                        $checkOutTime = Carbon::parse(trim((string)$row[$colCheckOut]))->format('H:i:s');
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            if (!$dateStr) {
+                $skippedRows[] = "Row {$rowNum}: Invalid date.";
+                continue;
+            }
+
+            Attendance::updateOrCreate(
+                [
+                    'tenant_id'   => $tenantId,
+                    'employee_id' => $employee->id,
+                    'date'        => $dateStr,
+                ],
+                [
+                    'status'        => $statusRaw,
+                    'check_in'      => $checkInTime,
+                    'check_out'     => $checkOutTime,
+                    'location_type' => 'office',
+                ]
+            );
+
+            $importedCount++;
+        }
+
+        return [
+            'success'        => true,
+            'imported_count' => $importedCount,
+            'warnings'       => $skippedRows,
+            'message'        => "{$importedCount} attendance records processed successfully"
+        ];
+    }
 }
