@@ -29,6 +29,10 @@ class ProductionMaintenanceWorkOrder extends BaseModel
     public const PRIORITY_HIGH     = 'high';
     public const PRIORITY_CRITICAL = 'critical';
 
+    public const MECHANIC_TYPE_INHOUSE = 'inhouse';
+    public const MECHANIC_TYPE_EXTERNAL = 'external';
+    public const MECHANIC_TYPE_BOTH = 'both';
+
     protected $fillable = [
         'tenant_id',
         'work_order_number',
@@ -47,7 +51,15 @@ class ProductionMaintenanceWorkOrder extends BaseModel
         'labor_hours',
         'labor_cost_rate',
         'labor_cost',
+        'repair_hours',
+        'repair_cost',
+        'mechanic_type',
+        'external_mechanic_cost',
+        'internal_mechanic_cost',
         'spare_parts_cost',
+        'scrap_machine',
+        'scrap_value',
+        'decision_note',
         'total_cost',
         'downtime_id',
         'status',
@@ -56,16 +68,22 @@ class ProductionMaintenanceWorkOrder extends BaseModel
     ];
 
     protected $casts = [
-        'planned_start'    => 'datetime',
-        'planned_end'      => 'datetime',
-        'actual_start'     => 'datetime',
-        'actual_end'       => 'datetime',
-        'checklist_json'   => 'array',
-        'labor_hours'      => 'decimal:2',
-        'labor_cost_rate'  => 'decimal:2',
-        'labor_cost'       => 'decimal:2',
-        'spare_parts_cost' => 'decimal:2',
-        'total_cost'       => 'decimal:2',
+        'planned_start'            => 'datetime',
+        'planned_end'              => 'datetime',
+        'actual_start'             => 'datetime',
+        'actual_end'               => 'datetime',
+        'checklist_json'           => 'array',
+        'labor_hours'              => 'decimal:2',
+        'labor_cost_rate'          => 'decimal:2',
+        'labor_cost'               => 'decimal:2',
+        'repair_hours'             => 'decimal:2',
+        'repair_cost'              => 'decimal:2',
+        'external_mechanic_cost'   => 'decimal:2',
+        'internal_mechanic_cost'   => 'decimal:2',
+        'spare_parts_cost'         => 'decimal:2',
+        'scrap_machine'            => 'boolean',
+        'scrap_value'              => 'decimal:2',
+        'total_cost'               => 'decimal:2',
     ];
 
     public function machine(): BelongsTo
@@ -86,6 +104,11 @@ class ProductionMaintenanceWorkOrder extends BaseModel
     public function downtime(): BelongsTo
     {
         return $this->belongsTo(ProductionMachineDowntime::class, 'downtime_id');
+    }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(ProductionMaintenanceWorkOrderLog::class, 'work_order_id');
     }
 
     public function spares(): HasMany

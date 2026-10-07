@@ -292,19 +292,11 @@ class MaintenanceWorkOrderController extends Controller
                 ? trim((string) $validated['other_action'])
                 : ucfirst(str_replace('_', ' ', $validated['action_type']));
 
-            app(\App\Domains\Production\Services\DowntimeService::class)->recordLog(
-                $tenantId,
-                $workOrder->downtime_id,
-                'manual_log',
-                $action,
-                [
-                    'action' => $action,
-                    'notes' => trim((string) $validated['details']),
-                ],
-                $workOrder->machine_id,
-                $workOrder->id,
+            app(\App\Domains\Production\Services\MaintenanceWorkOrderLogService::class)->recordManualLog(
+                $workOrder,
                 auth()->id(),
-                'MaintenanceWorkOrderController'
+                $action,
+                trim((string) $validated['details'])
             );
 
             return redirect()

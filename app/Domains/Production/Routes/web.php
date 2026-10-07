@@ -134,6 +134,7 @@ Route::prefix('production')
             Route::post('work-orders/{id}/complete', [MaintenanceWorkOrderController::class, 'complete'])->name('work-orders.complete');
             Route::post('work-orders/{id}/cancel', [MaintenanceWorkOrderController::class, 'cancel'])->name('work-orders.cancel');
             Route::post('work-orders/{id}/spares', [MaintenanceWorkOrderController::class, 'addSpare'])->name('work-orders.add-spare');
+            Route::post('work-orders/{id}/logs', [MaintenanceWorkOrderController::class, 'storeDowntimeLog'])->name('work-orders.store-downtime-log');
             Route::post('work-orders/spares/{spareId}/issue', [MaintenanceWorkOrderController::class, 'issueSpare'])->name('work-orders.issue-spare');
             Route::resource('work-orders', MaintenanceWorkOrderController::class);
         });
@@ -236,6 +237,10 @@ Route::prefix('production')
 
         // ── MES / Shop Floor ──────────────────────────────────────────────────
         Route::get('mes', [MesController::class, 'dashboard'])->name('mes.dashboard');
+
+        // Keep the concrete downtime endpoint ahead of the generic operation route so
+        // /production/mes/downtime/start resolves to DowntimeController instead of MesController.
+        Route::post('mes/downtime/start', [DowntimeController::class, 'start'])->name('mes.downtime.start');
         Route::post('mes/{op}/start', [MesController::class, 'start'])->name('mes.start');
         Route::post('mes/{op}/pause', [MesController::class, 'pause'])->name('mes.pause');
         Route::post('mes/{op}/resume', [MesController::class, 'resume'])->name('mes.resume');
@@ -291,7 +296,6 @@ Route::prefix('production')
 
         // ── OEE Foundation routes ─────────────────────────────────────────────
         Route::post('mes/machines/override-state', [MachineStateController::class, 'overrideState'])->name('mes.machines.override-state');
-        Route::post('mes/downtime/start', [DowntimeController::class, 'start'])->name('mes.downtime.start');
         Route::post('mes/downtime/{id}/end', [DowntimeController::class, 'end'])->name('mes.downtime.end');
         Route::get('mes/timeline', [ProductionTimelineController::class, 'index'])->name('mes.timeline.index');
 

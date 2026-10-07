@@ -9,7 +9,6 @@ use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionMachineDowntime;
-use App\Domains\Production\Models\ProductionMachineDowntimeLog;
 use App\Domains\Production\Models\ProductionMaintenanceWorkOrder;
 use App\Domains\Production\Models\ProductionPmSchedule;
 use App\Domains\Production\Models\WorkCenter;
@@ -22,6 +21,7 @@ use App\Models\User;
 use App\Support\Tenancy;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Tests\TestCase;
 
@@ -177,10 +177,30 @@ class MaintenanceWorkflowTest extends TestCase
             'problem_description' => 'Regular Preventive Maintenance',
         ]);
 
+        $this->assertDatabaseHas('production_maintenance_work_order_logs', [
+            'work_order_id' => $wo->id,
+            'tenant_id'    => $this->tenant->id,
+            'event_type'   => 'Work Order Created',
+        ]);
+        $this->assertDatabaseMissing('production_maintenance_work_order_logs', [
+            'work_order_id' => $wo->id,
+            'event_type'   => 'Machine DT Started',
+        ]);
+
         // Start Work Order
         $startedWo = $woService->startWorkOrder($wo->id, $this->tenant->id, $this->user->id);
 
         $this->assertEquals('in_progress', $startedWo->status);
+        $this->assertDatabaseHas('production_maintenance_work_order_logs', [
+            'work_order_id' => $wo->id,
+            'tenant_id'    => $this->tenant->id,
+            'event_type'   => 'Machine DT Started',
+        ]);
+        $this->assertDatabaseHas('production_maintenance_work_order_logs', [
+            'work_order_id' => $wo->id,
+            'tenant_id'    => $this->tenant->id,
+            'event_type'   => 'Maintenance Started',
+        ]);
         $this->machine->refresh();
         $this->assertEquals(Machine::STATUS_UNDER_MAINTENANCE, $this->machine->status);
         $this->assertEquals('Maintenance', $this->machine->current_state);
@@ -217,6 +237,21 @@ class MaintenanceWorkflowTest extends TestCase
             ->where('id', $wo->downtime_id)
             ->where('status', ProductionMachineDowntime::STATUS_OPEN)
             ->first());
+        $this->assertDatabaseHas('production_maintenance_work_order_logs', [
+            'work_order_id' => $wo->id,
+            'tenant_id'    => $this->tenant->id,
+            'event_type'   => 'Work Order Created',
+        ]);
+        $this->assertDatabaseHas('production_maintenance_work_order_logs', [
+            'work_order_id' => $wo->id,
+            'downtime_id'  => $wo->downtime_id,
+            'tenant_id'    => $this->tenant->id,
+            'event_type'   => 'Machine DT Started',
+        ]);
+        $this->assertDatabaseMissing('production_maintenance_work_order_logs', [
+            'work_order_id' => $wo->id,
+            'event_type'   => 'Maintenance Started',
+        ]);
 
         $this->machine->refresh();
         $this->assertEquals(Machine::STATUS_INACTIVE, $this->machine->status);
@@ -252,7 +287,7 @@ class MaintenanceWorkflowTest extends TestCase
     }
 
     /** @test */
-    public function it_records_a_machine_downtime_log_for_breakdown_events()
+    public function it_tracks_breakdown_downtime_without_using_the_obsolete_downtime_log_table()
     {
         $woService = app(MaintenanceWorkOrderService::class);
 
@@ -265,15 +300,18 @@ class MaintenanceWorkflowTest extends TestCase
         );
 
         $this->assertNotNull($wo->downtime_id);
-        $this->assertGreaterThanOrEqual(2, ProductionMachineDowntimeLog::where('tenant_id', $this->tenant->id)
-            ->where('downtime_id', $wo->downtime_id)
-            ->count());
-
-        $this->assertDatabaseHas('production_machine_downtime_logs', [
-            'downtime_id' => $wo->downtime_id,
-            'tenant_id'   => $this->tenant->id,
-            'event_type'  => 'downtime_started',
+        $this->assertDatabaseHas('production_machine_downtimes', [
+            'id'        => $wo->downtime_id,
+            'tenant_id' => $this->tenant->id,
+            'machine_id' => $this->machine->id,
+            'status'    => 'open',
         ]);
+        $this->assertDatabaseHas('production_maintenance_work_order_logs', [
+            'work_order_id' => $wo->id,
+            'tenant_id'    => $this->tenant->id,
+            'event_type'   => 'Machine DT Started',
+        ]);
+        $this->assertFalse(Schema::hasTable('production_machine_downtime_logs'));
     }
 
     /** @test */
@@ -336,7 +374,10 @@ class MaintenanceWorkflowTest extends TestCase
         $this->assertEquals(125.00, $completedWo->repair_cost);
         $this->assertEquals(125.00, $completedWo->total_cost);
         $this->assertEquals(0.00, $completedWo->labor_cost);
-        $this->assertNotEmpty($completedWo->repair_log);
+        $this->assertDatabaseHas('production_maintenance_work_order_logs', [
+            'work_order_id' => $completedWo->id,
+            'event_type'   => 'Work Order Completed',
+        ]);
 
         // Verify Machine status restored to active and state to Idle
         $this->machine->refresh();

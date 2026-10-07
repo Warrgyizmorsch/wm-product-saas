@@ -13,7 +13,9 @@ class MaintenanceSpareService
 {
     public function __construct(
         private readonly MaintenanceRepositoryInterface $repository,
-        private readonly ProductionEventService $eventService
+        private readonly ProductionEventService $eventService,
+        private readonly DowntimeService $downtimeService,
+        private readonly MaintenanceWorkOrderLogService $logService
     ) {}
 
     /**
@@ -46,7 +48,7 @@ class MaintenanceSpareService
                 throw new InvalidArgumentException("Insufficient stock in warehouse for product #{$productId}. Available: {$availableStock}, Requested: {$requestedQty}.");
             }
 
-            return $this->repository->addWorkOrderSpare([
+            $spare = $this->repository->addWorkOrderSpare([
                 'tenant_id'                  => $tenantId,
                 'maintenance_work_order_id'  => $workOrderId,
                 'product_id'                 => $productId,
@@ -56,6 +58,10 @@ class MaintenanceSpareService
                 'unit_cost'                  => 0.00,
                 'total_cost'                 => 0.00,
             ]);
+
+            $this->logService->recordSpareRequested($wo, $productId, $warehouseId, $requestedQty, auth()->id());
+
+            return $spare;
         });
     }
 
@@ -136,6 +142,8 @@ class MaintenanceSpareService
                 'spare_parts_cost' => $sumSparesCost,
                 'total_cost'       => round((float) $wo->labor_cost + $sumSparesCost, 2),
             ]);
+
+            $this->logService->recordSpareIssued($wo, $spare->product_id, $spare->warehouse_id, $actualIssueQty, $totalCost, $userId);
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $wo->machine_id,

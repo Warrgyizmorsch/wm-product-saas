@@ -21,7 +21,8 @@ class MaintenanceWorkOrderService
         private readonly MachineStateService $stateService,
         private readonly PmScheduleService $pmScheduleService,
         private readonly MaintenanceCodeService $codeService,
-        private readonly ProductionEventService $eventService
+        private readonly ProductionEventService $eventService,
+        private readonly MaintenanceWorkOrderLogService $logService
     ) {}
 
     /**
@@ -42,6 +43,8 @@ class MaintenanceWorkOrderService
             }
 
             $wo = $this->repository->createWorkOrder($data);
+
+            $this->logService->recordWorkOrderCreated($wo, $userId);
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $wo->machine_id,
@@ -188,12 +191,20 @@ class MaintenanceWorkOrderService
 
             $wo->actual_start = now();
             $wo->status       = ProductionMaintenanceWorkOrder::STATUS_IN_PROGRESS;
-            $wo->appendRepairLogStep('Maintenance started', [
+            $wo->save();
+
+            if ($wo->downtime_id) {
+                $this->logService->recordMachineDowntimeStarted($wo, $wo->downtime_id, $userId, [
+                    'category' => $category,
+                    'machine_name' => $machine->name,
+                    'reason' => "Maintenance Work Order In Progress: {$wo->work_order_number}",
+                ]);
+            }
+
+            $this->logService->recordMaintenanceStarted($wo, $userId, [
                 'category' => $category,
-                'machine_id' => $machine->id,
                 'machine_name' => $machine->name,
             ]);
-            $wo->save();
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $wo->machine_id,
@@ -253,13 +264,14 @@ class MaintenanceWorkOrderService
                 'created_by'          => $userId,
             ]);
 
-            $wo->appendRepairLogStep('Breakdown reported', [
+            $wo->save();
+
+            $this->logService->recordWorkOrderCreated($wo, $userId);
+            $this->logService->recordMachineDowntimeStarted($wo, $downtime->id, $userId, [
                 'reason' => $reason,
                 'priority' => $priority,
-                'machine_id' => $machineId,
-                'downtime_id' => $downtime->id,
+                'category' => 'Breakdown',
             ]);
-            $wo->save();
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $machineId,
@@ -324,21 +336,6 @@ class MaintenanceWorkOrderService
 
             $repairCost = round($externalRepairCost + $internalRepairCost + $sparesCost, 2);
             $now = now();
-            $log = is_array($wo->repair_log) ? $wo->repair_log : [];
-            $log[] = [
-                'timestamp' => $now->toDateTimeString(),
-                'action' => 'Repair completed',
-                'details' => [
-                    'repair_hours' => $repairHours,
-                    'mechanic_type' => $mechanicType,
-                    'external_mechanic_cost' => $externalRepairCost,
-                    'internal_mechanic_cost' => $internalRepairCost,
-                    'spare_parts_cost' => $sparesCost,
-                    'scrap_machine' => $scrapMachine,
-                    'scrap_value' => $scrapValue,
-                    'work_performed' => $workPerformed ?: 'N/A',
-                ],
-            ];
 
             // End associated downtime
             if ($wo->downtime_id) {
@@ -398,7 +395,6 @@ class MaintenanceWorkOrderService
                 'external_mechanic_cost' => $externalRepairCost,
                 'internal_mechanic_cost' => $internalRepairCost,
                 'spare_parts_cost'       => $sparesCost,
-                'repair_log'             => $log,
                 'scrap_machine'          => $scrapMachine,
                 'scrap_value'            => $scrapMachine ? $scrapValue : 0.00,
                 'decision_note'          => $decisionNote ?: ($scrapMachine ? 'Machine scrapped instead of repaired.' : null),
@@ -407,27 +403,16 @@ class MaintenanceWorkOrderService
                 'completed_by'           => $userId,
             ]);
 
-            if ($wo->downtime_id) {
-                $this->downtimeService->recordLog(
-                    $tenantId,
-                    $wo->downtime_id,
-                    'repair_completed',
-                    'Repair completed and machine restored',
-                    [
-                        'repair_hours' => $repairHours,
-                        'mechanic_type' => $mechanicType,
-                        'external_mechanic_cost' => $externalRepairCost,
-                        'internal_mechanic_cost' => $internalRepairCost,
-                        'spare_parts_cost' => $sparesCost,
-                        'scrap_machine' => $scrapMachine,
-                        'scrap_value' => $scrapValue,
-                    ],
-                    $machine->id,
-                    $wo->id,
-                    $userId,
-                    'MaintenanceWorkOrderService'
-                );
-            }
+            $this->logService->recordWorkOrderCompleted($wo, $userId, [
+                'repair_hours' => $repairHours,
+                'mechanic_type' => $mechanicType,
+                'external_mechanic_cost' => $externalRepairCost,
+                'internal_mechanic_cost' => $internalRepairCost,
+                'spare_parts_cost' => $sparesCost,
+                'scrap_machine' => $scrapMachine,
+                'scrap_value' => $scrapValue,
+                'work_performed' => $workPerformed ?: 'N/A',
+            ]);
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $wo->machine_id,
@@ -489,22 +474,9 @@ class MaintenanceWorkOrderService
                 'work_performed' => $wo->work_performed ? $wo->work_performed . " [Cancelled: {$reason}]" : "Cancelled: {$reason}",
             ]);
 
-            if ($wo->downtime_id) {
-                $this->downtimeService->recordLog(
-                    $tenantId,
-                    $wo->downtime_id,
-                    'work_order_cancelled',
-                    'Maintenance work order cancelled',
-                    [
-                        'reason' => $reason ?: 'Cancelled by user',
-                        'work_order_number' => $wo->work_order_number,
-                    ],
-                    $machine->id,
-                    $wo->id,
-                    $userId,
-                    'MaintenanceWorkOrderService'
-                );
-            }
+            $this->logService->recordWorkOrderCancelled($wo, $userId, [
+                'reason' => $reason ?: 'Cancelled by user',
+            ]);
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $wo->machine_id,
