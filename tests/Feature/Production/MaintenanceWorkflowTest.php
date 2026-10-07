@@ -9,6 +9,7 @@ use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionMachineDowntime;
+use App\Domains\Production\Models\ProductionMachineDowntimeLog;
 use App\Domains\Production\Models\ProductionMaintenanceWorkOrder;
 use App\Domains\Production\Models\ProductionPmSchedule;
 use App\Domains\Production\Models\WorkCenter;
@@ -196,7 +197,7 @@ class MaintenanceWorkflowTest extends TestCase
     }
 
     /** @test */
-    public function it_reports_emergency_breakdown_and_creates_downtime_and_wo()
+    public function it_reports_emergency_breakdown_and_creates_a_draft_work_order_without_starting_it()
     {
         $woService = app(MaintenanceWorkOrderService::class);
 
@@ -210,12 +211,17 @@ class MaintenanceWorkflowTest extends TestCase
 
         $this->assertInstanceOf(ProductionMaintenanceWorkOrder::class, $wo);
         $this->assertEquals('breakdown', $wo->type);
-        $this->assertEquals('in_progress', $wo->status);
+        $this->assertEquals('draft', $wo->status);
         $this->assertNotNull($wo->downtime_id);
+        $this->assertNotNull(ProductionMachineDowntime::where('tenant_id', $this->tenant->id)
+            ->where('id', $wo->downtime_id)
+            ->where('status', ProductionMachineDowntime::STATUS_OPEN)
+            ->first());
 
         $this->machine->refresh();
-        $this->assertEquals(Machine::STATUS_UNDER_MAINTENANCE, $this->machine->status);
+        $this->assertEquals(Machine::STATUS_INACTIVE, $this->machine->status);
         $this->assertEquals('Breakdown', $this->machine->current_state);
+        $this->assertEquals('breakdown', $this->machine->maintenance_status);
     }
 
     /** @test */
@@ -246,6 +252,52 @@ class MaintenanceWorkflowTest extends TestCase
     }
 
     /** @test */
+    public function it_records_a_machine_downtime_log_for_breakdown_events()
+    {
+        $woService = app(MaintenanceWorkOrderService::class);
+
+        $wo = $woService->reportBreakdown(
+            $this->tenant->id,
+            $this->machine->id,
+            'Spindle Bearing Failure & Overheating',
+            $this->user->id,
+            'critical'
+        );
+
+        $this->assertNotNull($wo->downtime_id);
+        $this->assertGreaterThanOrEqual(2, ProductionMachineDowntimeLog::where('tenant_id', $this->tenant->id)
+            ->where('downtime_id', $wo->downtime_id)
+            ->count());
+
+        $this->assertDatabaseHas('production_machine_downtime_logs', [
+            'downtime_id' => $wo->downtime_id,
+            'tenant_id'   => $this->tenant->id,
+            'event_type'  => 'downtime_started',
+        ]);
+    }
+
+    /** @test */
+    public function it_routes_the_explicit_downtime_start_endpoint_to_the_downtime_controller()
+    {
+        $response = $this->withHeaders([
+            'X-Tenant' => $this->tenant->slug,
+        ])->post('/production/mes/downtime/start', [
+            'machine_id' => $this->machine->id,
+            'category'   => 'Breakdown',
+            'reason'     => 'Hydraulic pressure drop during cycle.',
+            'remarks'    => 'Operator flagged a sudden drop in pressure.',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('production_machine_downtimes', [
+            'tenant_id'  => $this->tenant->id,
+            'machine_id' => $this->machine->id,
+            'category'   => 'Breakdown',
+            'status'     => 'open',
+        ]);
+    }
+
+    /** @test */
     public function it_completes_work_order_closes_downtime_restores_machine_and_updates_pm_schedule()
     {
         $pmService = app(PmScheduleService::class);
@@ -267,18 +319,24 @@ class MaintenanceWorkflowTest extends TestCase
 
         $woService->startWorkOrder($wo->id, $this->tenant->id, $this->user->id);
 
-        // Complete Work Order (2 hours labor at $50/hr work center rate = $100 labor cost)
+        // Complete Work Order using explicit repair inputs instead of a work-center labor rate.
         $completedWo = $woService->completeWorkOrder(
             $wo->id,
             $this->tenant->id,
             $this->user->id,
             'Inspected machine, adjusted belt tension, completed lubrication.',
-            2.0
+            2.0,
+            ProductionMaintenanceWorkOrder::MECHANIC_TYPE_EXTERNAL,
+            125.00,
+            0.00
         );
 
         $this->assertEquals('completed', $completedWo->status);
-        $this->assertEquals(100.00, $completedWo->labor_cost);
-        $this->assertEquals(100.00, $completedWo->total_cost);
+        $this->assertEquals(2.0, $completedWo->repair_hours);
+        $this->assertEquals(125.00, $completedWo->repair_cost);
+        $this->assertEquals(125.00, $completedWo->total_cost);
+        $this->assertEquals(0.00, $completedWo->labor_cost);
+        $this->assertNotEmpty($completedWo->repair_log);
 
         // Verify Machine status restored to active and state to Idle
         $this->machine->refresh();
@@ -324,7 +382,7 @@ class MaintenanceWorkflowTest extends TestCase
         $woService       = app(MaintenanceWorkOrderService::class);
         $downtimeService = app(\App\Domains\Production\Services\DowntimeService::class);
 
-        // 1. Report emergency breakdown
+        // 1. Report emergency breakdown and keep it in draft until explicitly started
         $wo = $woService->reportBreakdown(
             $this->tenant->id,
             $this->machine->id,
@@ -334,13 +392,19 @@ class MaintenanceWorkflowTest extends TestCase
         );
 
         $this->assertNotNull($wo->downtime_id);
-        $this->assertEquals('in_progress', $wo->status);
+        $this->assertEquals(ProductionMaintenanceWorkOrder::STATUS_DRAFT, $wo->status);
 
         $this->machine->refresh();
-        $this->assertEquals(Machine::STATUS_UNDER_MAINTENANCE, $this->machine->status);
+        $this->assertEquals(Machine::STATUS_INACTIVE, $this->machine->status);
         $this->assertEquals('Breakdown', $this->machine->current_state);
 
-        // 2. Resolve downtime from MES machine monitor screen (endDowntime)
+        // 2. Explicitly start the draft work order through the normal maintenance workflow
+        $startedWo = $woService->startWorkOrder($wo->id, $this->tenant->id, $this->user->id);
+        $this->assertEquals(ProductionMaintenanceWorkOrder::STATUS_IN_PROGRESS, $startedWo->status);
+        $this->assertEquals(Machine::STATUS_UNDER_MAINTENANCE, $this->machine->refresh()->status);
+        $this->assertEquals('Breakdown', $this->machine->current_state);
+
+        // 3. Resolve downtime from MES machine monitor screen (endDowntime)
         $downtimeService->endDowntime(
             $this->tenant->id,
             $wo->downtime_id,
@@ -348,12 +412,12 @@ class MaintenanceWorkflowTest extends TestCase
             'Replaced hydraulic seal ring and refilled fluid.'
         );
 
-        // 3. Verify Work Order is now completed
+        // 4. Verify Work Order is now completed
         $wo->refresh();
         $this->assertEquals(ProductionMaintenanceWorkOrder::STATUS_COMPLETED, $wo->status);
         $this->assertEquals('Replaced hydraulic seal ring and refilled fluid.', $wo->work_performed);
 
-        // 4. Verify Machine is restored to Active, Idle, and none
+        // 5. Verify Machine is restored to Active, Idle, and none
         $this->machine->refresh();
         $this->assertEquals(Machine::STATUS_ACTIVE, $this->machine->status);
         $this->assertEquals('Idle', $this->machine->current_state);

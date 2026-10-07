@@ -144,17 +144,32 @@ class MaintenanceWorkOrderController extends Controller
     {
         $tenantId  = require_tenant_id();
         $validated = $request->validate([
-            'work_performed' => ['required', 'string'],
-            'labor_hours'    => ['required', 'numeric', 'min:0.1'],
+            'work_performed'           => ['required', 'string'],
+            'repair_hours'             => ['nullable', 'numeric', 'min:0'],
+            'labor_hours'              => ['nullable', 'numeric', 'min:0'],
+            'mechanic_type'           => ['nullable', 'in:inhouse,external,both'],
+            'external_mechanic_cost'  => ['nullable', 'numeric', 'min:0'],
+            'internal_mechanic_cost'  => ['nullable', 'numeric', 'min:0'],
+            'scrap_machine'           => ['nullable', 'boolean'],
+            'scrap_value'             => ['nullable', 'numeric', 'min:0'],
+            'decision_note'           => ['nullable', 'string'],
         ]);
 
         try {
+            $repairHours = isset($validated['repair_hours']) ? (float) $validated['repair_hours'] : (float) ($validated['labor_hours'] ?? 0.0);
             $wo = $this->service->completeWorkOrder(
                 $id,
                 $tenantId,
                 auth()->id(),
                 $validated['work_performed'],
-                (float) $validated['labor_hours']
+                $repairHours,
+                $validated['mechanic_type'] ?? null,
+                isset($validated['external_mechanic_cost']) ? (float) $validated['external_mechanic_cost'] : 0.0,
+                isset($validated['internal_mechanic_cost']) ? (float) $validated['internal_mechanic_cost'] : 0.0,
+                null,
+                (bool) ($validated['scrap_machine'] ?? false),
+                isset($validated['scrap_value']) ? (float) $validated['scrap_value'] : 0.0,
+                $validated['decision_note'] ?? null
             );
 
             return redirect()
@@ -201,7 +216,7 @@ class MaintenanceWorkOrderController extends Controller
 
             return redirect()
                 ->route('production.maintenance.work-orders.show', $wo->id)
-                ->with('success', "Breakdown reported for machine. Machine is now under maintenance and Breakdown Work Order '{$wo->work_order_number}' was created.");
+                ->with('success', "Breakdown reported for machine. Work Order '{$wo->work_order_number}' was created in draft with open downtime.");
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -251,6 +266,50 @@ class MaintenanceWorkOrderController extends Controller
             return redirect()
                 ->route('production.maintenance.work-orders.show', $spare->maintenance_work_order_id)
                 ->with('success', "Spare part issued from warehouse. Stock deducted and costs updated.");
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function storeDowntimeLog(Request $request, int $id): RedirectResponse
+    {
+        $tenantId = require_tenant_id();
+        $validated = $request->validate([
+            'action_type' => ['required', 'string', 'in:inspection,repair,adjustment,cleaning,tool_change,other'],
+            'other_action' => ['nullable', 'string', 'required_if:action_type,other'],
+            'details' => ['required', 'string'],
+        ]);
+
+        try {
+            $workOrder = $this->repository->findWorkOrder($id, $tenantId);
+            abort_if(!$workOrder, 404, 'Work Order not found.');
+
+            if (!$workOrder->downtime_id) {
+                return redirect()->back()->with('error', 'No downtime record exists for this work order yet.');
+            }
+
+            $action = $validated['action_type'] === 'other'
+                ? trim((string) $validated['other_action'])
+                : ucfirst(str_replace('_', ' ', $validated['action_type']));
+
+            app(\App\Domains\Production\Services\DowntimeService::class)->recordLog(
+                $tenantId,
+                $workOrder->downtime_id,
+                'manual_log',
+                $action,
+                [
+                    'action' => $action,
+                    'notes' => trim((string) $validated['details']),
+                ],
+                $workOrder->machine_id,
+                $workOrder->id,
+                auth()->id(),
+                'MaintenanceWorkOrderController'
+            );
+
+            return redirect()
+                ->route('production.maintenance.work-orders.show', $workOrder->id)
+                ->with('success', 'Downtime log added successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }

@@ -105,7 +105,7 @@ class MachineRepository implements MachineRepositoryInterface
     public function getDashboardMachines(int $tenantId): Collection
     {
         $machines = Machine::where('tenant_id', $tenantId)
-            ->whereIn('status', [Machine::STATUS_ACTIVE, Machine::STATUS_UNDER_MAINTENANCE])
+            ->whereNotIn('status', ['sold'])
             ->with(['workCenter', 'maintenanceWorkOrders' => function ($q) {
                 $q->whereIn('status', ['draft', 'scheduled', 'in_progress'])->orderByDesc('created_at');
             }])

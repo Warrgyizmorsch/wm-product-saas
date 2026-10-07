@@ -121,7 +121,7 @@ class MaintenanceWorkOrderApiController extends ApiBaseController
 
             return $this->createdResponse(
                 new MaintenanceWorkOrderResource($wo->load(['machine:id,name,code,current_state', 'technician:id,name'])),
-                "Machine breakdown reported. Work order {$wo->work_order_number} created and machine placed under maintenance."
+                "Machine breakdown reported. Work order {$wo->work_order_number} created in draft with open downtime."
             );
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);

@@ -188,6 +188,11 @@ class MaintenanceWorkOrderService
 
             $wo->actual_start = now();
             $wo->status       = ProductionMaintenanceWorkOrder::STATUS_IN_PROGRESS;
+            $wo->appendRepairLogStep('Maintenance started', [
+                'category' => $category,
+                'machine_id' => $machine->id,
+                'machine_name' => $machine->name,
+            ]);
             $wo->save();
 
             $this->eventService->writeEvent($tenantId, [
@@ -219,7 +224,6 @@ class MaintenanceWorkOrderService
         return DB::transaction(function () use ($tenantId, $machineId, $reason, $userId, $priority) {
             $machine = Machine::withoutGlobalScopes()->where('tenant_id', $tenantId)->lockForUpdate()->findOrFail($machineId);
 
-            // 1. Start Breakdown Downtime via DowntimeService
             $downtime = $this->downtimeService->startDowntime(
                 $tenantId,
                 $machineId,
@@ -228,13 +232,13 @@ class MaintenanceWorkOrderService
                 $userId
             );
 
-            // 2. Update Machine status to under_maintenance
             $machine->update([
-                'status'             => Machine::STATUS_UNDER_MAINTENANCE,
+                'status'             => Machine::STATUS_INACTIVE,
                 'maintenance_status' => 'breakdown',
+                'current_state'      => 'Breakdown',
+                'current_state_reason' => $reason,
             ]);
 
-            // 3. Create Breakdown Work Order
             $woNumber = $this->codeService->generateWorkOrderNumber($tenantId);
 
             $wo = $this->repository->createWorkOrder([
@@ -243,18 +247,25 @@ class MaintenanceWorkOrderService
                 'machine_id'          => $machineId,
                 'type'                => ProductionMaintenanceWorkOrder::TYPE_BREAKDOWN,
                 'priority'            => $priority,
-                'actual_start'        => now(),
                 'problem_description' => $reason,
                 'downtime_id'         => $downtime->id,
-                'status'              => ProductionMaintenanceWorkOrder::STATUS_IN_PROGRESS,
+                'status'              => ProductionMaintenanceWorkOrder::STATUS_DRAFT,
                 'created_by'          => $userId,
             ]);
+
+            $wo->appendRepairLogStep('Breakdown reported', [
+                'reason' => $reason,
+                'priority' => $priority,
+                'machine_id' => $machineId,
+                'downtime_id' => $downtime->id,
+            ]);
+            $wo->save();
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $machineId,
                 'event_type'   => 'Machine Breakdown Reported',
                 'title'        => 'Machine Breakdown Reported',
-                'description'  => "Breakdown reported for machine [{$machine->name}]. Reason: {$reason}. Work Order [{$wo->work_order_number}] created.",
+                'description'  => "Breakdown reported for machine [{$machine->name}]. Reason: {$reason}. Work order [{$wo->work_order_number}] created in draft state with open downtime #{$downtime->id}.",
                 'severity'     => 'danger',
                 'event_source' => 'MaintenanceWorkOrderService',
             ]);
@@ -277,9 +288,15 @@ class MaintenanceWorkOrderService
         ?int $userId = null,
         ?string $workPerformed = null,
         float $laborHours = 0.00,
-        ?array $checklistJson = null
+        ?string $mechanicType = null,
+        ?float $externalMechanicCost = 0.00,
+        ?float $internalMechanicCost = 0.00,
+        ?array $checklistJson = null,
+        bool $scrapMachine = false,
+        float $scrapValue = 0.00,
+        ?string $decisionNote = null
     ): ProductionMaintenanceWorkOrder {
-        return DB::transaction(function () use ($id, $tenantId, $userId, $workPerformed, $laborHours, $checklistJson) {
+        return DB::transaction(function () use ($id, $tenantId, $userId, $workPerformed, $laborHours, $mechanicType, $externalMechanicCost, $internalMechanicCost, $checklistJson, $scrapMachine, $scrapValue, $decisionNote) {
             $wo = $this->repository->findWorkOrderForLock($id, $tenantId);
             if (!$wo) {
                 throw new InvalidArgumentException("Work Order #{$id} not found.");
@@ -295,20 +312,33 @@ class MaintenanceWorkOrderService
 
             $machine = Machine::withoutGlobalScopes()->where('tenant_id', $tenantId)->lockForUpdate()->findOrFail($wo->machine_id);
 
-            // Determine labor cost rate from WorkCenter or default
-            $workCenter = WorkCenter::find($machine->work_center_id);
-            $laborRate  = $workCenter ? (float) $workCenter->cost_per_hour : 0.00;
+            $repairHours = max(0.0, (float) $laborHours);
+            $mechanicType = $mechanicType ?: ProductionMaintenanceWorkOrder::MECHANIC_TYPE_INHOUSE;
+            $externalRepairCost = (float) ($externalMechanicCost ?? 0.00);
+            $internalRepairCost = (float) ($internalMechanicCost ?? 0.00);
 
-            $calculatedLaborCost = round($laborHours * $laborRate, 2);
-
-            // Sum issued spare parts cost
+            // Sum issued spare parts cost. Inventory consumption is tracked separately; this is the cost that remains in the WO summary.
             $sparesCost = (float) ProductionMaintenanceWorkOrderSpare::where('tenant_id', $tenantId)
                 ->where('maintenance_work_order_id', $wo->id)
                 ->sum('total_cost');
 
-            $totalCost = round($calculatedLaborCost + $sparesCost, 2);
-
+            $repairCost = round($externalRepairCost + $internalRepairCost + $sparesCost, 2);
             $now = now();
+            $log = is_array($wo->repair_log) ? $wo->repair_log : [];
+            $log[] = [
+                'timestamp' => $now->toDateTimeString(),
+                'action' => 'Repair completed',
+                'details' => [
+                    'repair_hours' => $repairHours,
+                    'mechanic_type' => $mechanicType,
+                    'external_mechanic_cost' => $externalRepairCost,
+                    'internal_mechanic_cost' => $internalRepairCost,
+                    'spare_parts_cost' => $sparesCost,
+                    'scrap_machine' => $scrapMachine,
+                    'scrap_value' => $scrapValue,
+                    'work_performed' => $workPerformed ?: 'N/A',
+                ],
+            ];
 
             // End associated downtime
             if ($wo->downtime_id) {
@@ -356,23 +386,54 @@ class MaintenanceWorkOrderService
 
             // Update Work Order record
             $wo->update([
-                'actual_end'       => $now,
-                'work_performed'   => $workPerformed ?: $wo->work_performed,
-                'checklist_json'   => $checklistJson ?: $wo->checklist_json,
-                'labor_hours'      => $laborHours,
-                'labor_cost_rate'  => $laborRate,
-                'labor_cost'       => $calculatedLaborCost,
-                'spare_parts_cost' => $sparesCost,
-                'total_cost'       => $totalCost,
-                'status'           => ProductionMaintenanceWorkOrder::STATUS_COMPLETED,
-                'completed_by'     => $userId,
+                'actual_end'             => $now,
+                'work_performed'         => $workPerformed ?: $wo->work_performed,
+                'checklist_json'         => $checklistJson ?: $wo->checklist_json,
+                'labor_hours'            => $laborHours,
+                'repair_hours'           => $repairHours,
+                'labor_cost_rate'        => 0.00,
+                'labor_cost'             => 0.00,
+                'repair_cost'            => $repairCost,
+                'mechanic_type'          => $mechanicType,
+                'external_mechanic_cost' => $externalRepairCost,
+                'internal_mechanic_cost' => $internalRepairCost,
+                'spare_parts_cost'       => $sparesCost,
+                'repair_log'             => $log,
+                'scrap_machine'          => $scrapMachine,
+                'scrap_value'            => $scrapMachine ? $scrapValue : 0.00,
+                'decision_note'          => $decisionNote ?: ($scrapMachine ? 'Machine scrapped instead of repaired.' : null),
+                'total_cost'             => $repairCost,
+                'status'                 => ProductionMaintenanceWorkOrder::STATUS_COMPLETED,
+                'completed_by'           => $userId,
             ]);
+
+            if ($wo->downtime_id) {
+                $this->downtimeService->recordLog(
+                    $tenantId,
+                    $wo->downtime_id,
+                    'repair_completed',
+                    'Repair completed and machine restored',
+                    [
+                        'repair_hours' => $repairHours,
+                        'mechanic_type' => $mechanicType,
+                        'external_mechanic_cost' => $externalRepairCost,
+                        'internal_mechanic_cost' => $internalRepairCost,
+                        'spare_parts_cost' => $sparesCost,
+                        'scrap_machine' => $scrapMachine,
+                        'scrap_value' => $scrapValue,
+                    ],
+                    $machine->id,
+                    $wo->id,
+                    $userId,
+                    'MaintenanceWorkOrderService'
+                );
+            }
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $wo->machine_id,
                 'event_type'   => 'Maintenance Completed',
                 'title'        => 'Maintenance Completed',
-                'description'  => "Work Order [{$wo->work_order_number}] completed for machine [{$machine->name}]. Total Cost: \${$totalCost}. Machine restored to active.",
+                'description'  => "Work Order [{$wo->work_order_number}] completed for machine [{$machine->name}]. Repair cost: \${$repairCost}." . ($scrapMachine ? ' Machine marked for scrap.' : ' Machine restored to active.'),
                 'severity'     => 'info',
                 'event_source' => 'MaintenanceWorkOrderService',
             ]);
@@ -427,6 +488,23 @@ class MaintenanceWorkOrderService
                 'status'  => ProductionMaintenanceWorkOrder::STATUS_CANCELLED,
                 'work_performed' => $wo->work_performed ? $wo->work_performed . " [Cancelled: {$reason}]" : "Cancelled: {$reason}",
             ]);
+
+            if ($wo->downtime_id) {
+                $this->downtimeService->recordLog(
+                    $tenantId,
+                    $wo->downtime_id,
+                    'work_order_cancelled',
+                    'Maintenance work order cancelled',
+                    [
+                        'reason' => $reason ?: 'Cancelled by user',
+                        'work_order_number' => $wo->work_order_number,
+                    ],
+                    $machine->id,
+                    $wo->id,
+                    $userId,
+                    'MaintenanceWorkOrderService'
+                );
+            }
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $wo->machine_id,
