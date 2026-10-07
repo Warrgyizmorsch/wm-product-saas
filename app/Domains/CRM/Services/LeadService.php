@@ -113,9 +113,11 @@ class LeadService
         $additionalContacts = $this->cleanAdditionalContacts($validated['additional_contacts'] ?? []);
         $firstAddl = $additionalContacts[0] ?? null;
 
+        $explicitOwner = !empty($validated['lead_owner_id']) ? (int)$validated['lead_owner_id'] : null;
+
         $leadData = [
             'call_date' => $callDateTime,
-            'lead_owner_id' => !empty($validated['lead_owner_id']) ? $validated['lead_owner_id'] : (auth()->id() ?: null),
+            'lead_owner_id' => $explicitOwner,
             'company_name' => !empty($validated['company_name']) ? $validated['company_name'] : (!empty($validated['contact_person']) ? $validated['contact_person'] : 'Individual Customer'),
             'company_email' => $validated['company_email'] ?? null,
             'company_phone' => $validated['company_phone'] ?? null,
@@ -151,14 +153,24 @@ class LeadService
             'Lead created with initial stage: ' . ($lead->status ?: 'New')
         );
 
-        if ($lead->lead_owner_id) {
+        if (!$explicitOwner) {
+            // Auto-assign based on CRM settings if no explicit owner chosen
+            try {
+                app(\App\Domains\CRM\Services\LeadAssignmentService::class)->assignLeadOwner($lead, 'manual_create', $validated);
+            } catch (\Throwable $e) {
+                if (auth()->id()) {
+                    $lead->lead_owner_id = auth()->id();
+                    $lead->save();
+                }
+            }
+        } elseif ($lead->lead_owner_id) {
             $ownerName = User::find($lead->lead_owner_id)?->name ?: 'Unknown';
             LeadHistory::logEvent(
                 $lead,
                 'assigned',
                 null,
                 $ownerName,
-                'Lead automatically assigned to lead owner: ' . $ownerName
+                'Lead assigned to lead owner: ' . $ownerName
             );
         }
 

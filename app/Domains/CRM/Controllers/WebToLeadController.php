@@ -400,6 +400,13 @@ class WebToLeadController extends Controller
         $lead->call_date = now();
         $lead->save();
 
+        // Auto-assign Lead Owner based on CRM Settings (Round-Robin / Territory Rules / Default Owner)
+        try {
+            app(\App\Domains\CRM\Services\LeadAssignmentService::class)->assignLeadOwner($lead, 'web_form', $request->all());
+        } catch (\Throwable $e) {
+            Log::warning('WebToLead auto assignment failed: ' . $e->getMessage());
+        }
+
         // Build Custom Fields Notes summary for Timeline
         $customDetailsSummary = '';
         if (!empty($customFields)) {

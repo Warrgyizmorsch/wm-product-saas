@@ -312,6 +312,9 @@
                 border: none !important;
                 display: block !important;
                 background: transparent !important;
+                position: relative !important;
+                z-index: 10 !important;
+                pointer-events: auto !important;
             }
             .crm-modal-loader {
                 position: absolute !important;
@@ -327,6 +330,7 @@
                 gap: 12px !important;
                 z-index: 5 !important;
                 transition: opacity 0.25s ease !important;
+                pointer-events: none !important;
             }
             .crm-modal-spinner {
                 width: 34px !important;
@@ -387,12 +391,17 @@
         // PRELOAD IMMEDIATELY in background for 0ms open
         iframe.src = buildFormUrl({ source: 'Floating Widget Button' });
 
-        iframe.addEventListener('load', function () {
-            loader.style.opacity = '0';
-            setTimeout(() => {
-                loader.style.display = 'none';
-            }, 200);
-        });
+        function hideLoader() {
+            if (loader) {
+                loader.style.opacity = '0';
+                loader.style.pointerEvents = 'none';
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                }, 100);
+            }
+        }
+
+        iframe.addEventListener('load', hideLoader);
 
         modalBox.appendChild(closeBtn);
         modalBox.appendChild(loader);
@@ -414,6 +423,7 @@
             overlay.style.display = 'flex';
             setTimeout(() => {
                 overlay.classList.add('active');
+                hideLoader();
             }, 10);
             if (document.body) document.body.style.overflow = 'hidden';
             if (document.documentElement) document.documentElement.style.overflow = 'hidden';
@@ -466,6 +476,7 @@
         window.addEventListener('message', function (event) {
             if (!event.data) return;
             if (event.data.type === 'CRM_LEAD_FORM_INIT') {
+                hideLoader();
                 if (event.data.color) {
                     const fBtn = document.querySelector('.crm-floating-btn');
                     if (fBtn && !config.color) {
@@ -473,6 +484,7 @@
                     }
                 }
             } else if (event.data.type === 'CRM_LEAD_RESIZE' && event.data.height) {
+                hideLoader();
                 const modalIframe = overlay.querySelector('.crm-modal-iframe');
                 if (modalIframe) {
                     const cleanH = Math.ceil(Number(event.data.height)) || 480;
