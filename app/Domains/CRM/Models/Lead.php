@@ -85,6 +85,7 @@ class Lead extends Model
         'is_customer',
         'documents',
         'additional_contacts',
+        'custom_fields',
     ];
 
     protected $casts = [
@@ -97,7 +98,24 @@ class Lead extends Model
         'product_items' => 'array',
         'documents' => 'array',
         'additional_contacts' => 'array',
+        'custom_fields' => 'array',
     ];
+
+    /**
+     * Get formatted key-value pairs for dynamic custom fields.
+     */
+    public function getCustomFieldsFormattedAttribute(): array
+    {
+        if (empty($this->custom_fields) || !is_array($this->custom_fields)) {
+            return [];
+        }
+        $result = [];
+        foreach ($this->custom_fields as $key => $value) {
+            $label = ucwords(str_replace('_', ' ', $key));
+            $result[$label] = is_array($value) ? implode(', ', $value) : $value;
+        }
+        return $result;
+    }
 
     /**
      * Get all interested products models.
