@@ -4,16 +4,48 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class NotificationApiController extends Controller
 {
     /**
-     * Get paginated notifications for the authenticated user.
+     * Allowed HRMS module names and sub-modules.
+     */
+    private const HRMS_MODULES = [
+        'hrms',
+        'attendance',
+        'leaves',
+        'leave',
+        'payroll',
+        'holiday',
+        'travel',
+        'claim',
+        'appraisal',
+        'resignation',
+        'recruitment',
+        'training',
+        'asset',
+    ];
+
+    /**
+     * Base query restricted strictly to HRMS notifications for the authenticated user.
+     */
+    private function hrmsQuery(int $userId): Builder
+    {
+        return Notification::forUser($userId)
+            ->where(function (Builder $query) {
+                $query->whereIn('module', self::HRMS_MODULES)
+                      ->orWhereNotNull('employee_id');
+            });
+    }
+
+    /**
+     * Get paginated HRMS notifications for the authenticated user.
      * Response is optimized to be lightweight and fast for mobile apps.
      *
-     * GET /api/notifications?module=hrms&status=unread&page=1&per_page=20
+     * GET /api/notifications?type=leave&status=unread&page=1&per_page=20
      */
     public function index(Request $request): JsonResponse
     {
@@ -28,7 +60,7 @@ class NotificationApiController extends Controller
         $perPage = min((int) $request->input('per_page', 20), 50); // max 50 to avoid oversized responses
         $perPage = $perPage > 0 ? $perPage : 20;
 
-        $query = Notification::forUser($user->id)
+        $query = $this->hrmsQuery($user->id)
             ->select([
                 'id',
                 'module',
@@ -43,9 +75,9 @@ class NotificationApiController extends Controller
             ])
             ->orderBy('created_at', 'desc');
 
-        // Optional module filter (e.g., 'hrms', 'attendance', 'leaves', etc.)
-        if ($request->filled('module') && strtolower($request->input('module')) !== 'all') {
-            $query->forModule($request->input('module'));
+        // Optional sub-type or category filter (e.g. 'leave', 'attendance', 'payroll', 'announcement')
+        if ($request->filled('type')) {
+            $query->where('type', strtolower($request->input('type')));
         }
 
         // Optional status filter ('unread' or 'read')
@@ -58,7 +90,7 @@ class NotificationApiController extends Controller
             }
         }
 
-        $unreadCount = Notification::forUser($user->id)->unread()->count();
+        $unreadCount = $this->hrmsQuery($user->id)->unread()->count();
         $paginator = $query->paginate($perPage);
 
         $items = collect($paginator->items())->map(function ($item) {
@@ -79,16 +111,15 @@ class NotificationApiController extends Controller
         ]);
     }
 
-
     /**
-     * Mark a single notification as read.
+     * Mark a single HRMS notification as read.
      *
      * POST /api/notifications/{id}/read
      */
     public function markAsRead(Request $request, $id): JsonResponse
     {
         $user = $request->user();
-        $notification = Notification::where('user_id', $user->id)->find($id);
+        $notification = $this->hrmsQuery($user->id)->find($id);
 
         if (!$notification) {
             return response()->json([
@@ -101,7 +132,7 @@ class NotificationApiController extends Controller
             $notification->update(['read_at' => now()]);
         }
 
-        $unreadCount = Notification::forUser($user->id)->unread()->count();
+        $unreadCount = $this->hrmsQuery($user->id)->unread()->count();
 
         return response()->json([
             'success' => true,
@@ -111,14 +142,14 @@ class NotificationApiController extends Controller
     }
 
     /**
-     * Mark a single notification as unread.
+     * Mark a single HRMS notification as unread.
      *
      * POST /api/notifications/{id}/unread
      */
     public function markAsUnread(Request $request, $id): JsonResponse
     {
         $user = $request->user();
-        $notification = Notification::where('user_id', $user->id)->find($id);
+        $notification = $this->hrmsQuery($user->id)->find($id);
 
         if (!$notification) {
             return response()->json([
@@ -128,7 +159,7 @@ class NotificationApiController extends Controller
         }
 
         $notification->update(['read_at' => null]);
-        $unreadCount = Notification::forUser($user->id)->unread()->count();
+        $unreadCount = $this->hrmsQuery($user->id)->unread()->count();
 
         return response()->json([
             'success' => true,
@@ -138,31 +169,31 @@ class NotificationApiController extends Controller
     }
 
     /**
-     * Mark all notifications as read for current user.
+     * Mark all HRMS notifications as read for current user.
      *
      * POST /api/notifications/mark-all-read
      */
     public function markAllRead(Request $request): JsonResponse
     {
         $user = $request->user();
-        Notification::forUser($user->id)->unread()->update(['read_at' => now()]);
+        $this->hrmsQuery($user->id)->unread()->update(['read_at' => now()]);
 
         return response()->json([
             'success' => true,
-            'message' => 'All notifications marked as read.',
+            'message' => 'All HRMS notifications marked as read.',
             'unread_count' => 0,
         ]);
     }
 
     /**
-     * Delete a single notification.
+     * Delete a single HRMS notification.
      *
      * DELETE /api/notifications/{id}
      */
     public function destroy(Request $request, $id): JsonResponse
     {
         $user = $request->user();
-        $notification = Notification::where('user_id', $user->id)->find($id);
+        $notification = $this->hrmsQuery($user->id)->find($id);
 
         if (!$notification) {
             return response()->json([
@@ -172,7 +203,7 @@ class NotificationApiController extends Controller
         }
 
         $notification->delete();
-        $unreadCount = Notification::forUser($user->id)->unread()->count();
+        $unreadCount = $this->hrmsQuery($user->id)->unread()->count();
 
         return response()->json([
             'success' => true,
@@ -214,7 +245,7 @@ class NotificationApiController extends Controller
      */
     private function formatNotification(Notification $n): array
     {
-        $module = strtolower($n->module ?? 'system');
+        $module = strtolower($n->module ?? 'hrms');
 
         return [
             'id' => (int) $n->id,
