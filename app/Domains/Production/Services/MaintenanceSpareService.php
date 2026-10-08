@@ -140,7 +140,7 @@ class MaintenanceSpareService
 
             $wo->update([
                 'spare_parts_cost' => $sumSparesCost,
-                'total_cost'       => round((float) $wo->labor_cost + $sumSparesCost, 2),
+                'total_cost'       => round((float) $wo->mechanic_cost + $sumSparesCost, 2),
             ]);
 
             $this->logService->recordSpareIssued($wo, $spare->product_id, $spare->warehouse_id, $actualIssueQty, $totalCost, $userId);

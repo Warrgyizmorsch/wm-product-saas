@@ -152,18 +152,39 @@ class MaintenanceWorkOrderController extends Controller
         $tenantId  = require_tenant_id();
         $validated = $request->validate([
             'work_performed'           => ['required', 'string'],
+            'completion_action'        => ['nullable', 'string', 'in:restore,scrap'],
+            'was_machine_scraped'      => ['nullable'],
+            'scrap_machine'            => ['nullable'],
+            'completed_at'             => ['nullable', 'date'],
+            'additional_cost'          => ['nullable', 'numeric', 'min:0'],
+            'external_parts_purchased' => ['nullable'],
+            'assignments'              => ['nullable', 'array'],
+            'assignments.*.id'         => ['required_with:assignments', 'integer'],
+            'assignments.*.worked_hours'=> ['nullable', 'numeric', 'min:0'],
+            'assignments.*.hourly_rate' => ['nullable', 'numeric', 'min:0'],
             'repair_hours'             => ['nullable', 'numeric', 'min:0'],
             'labor_hours'              => ['nullable', 'numeric', 'min:0'],
-            'mechanic_type'           => ['nullable', 'in:inhouse,external,both'],
-            'external_mechanic_cost'  => ['nullable', 'numeric', 'min:0'],
-            'internal_mechanic_cost'  => ['nullable', 'numeric', 'min:0'],
-            'scrap_machine'           => ['nullable', 'boolean'],
-            'scrap_value'             => ['nullable', 'numeric', 'min:0'],
-            'decision_note'           => ['nullable', 'string'],
+            'mechanic_type'            => ['nullable', 'in:inhouse,external,both'],
+            'external_mechanic_cost'   => ['nullable', 'numeric', 'min:0'],
+            'internal_mechanic_cost'   => ['nullable', 'numeric', 'min:0'],
+            'scrap_value'              => ['nullable', 'numeric', 'min:0'],
+            'decision_note'            => ['nullable', 'string'],
         ]);
 
         try {
+            $isScraped = false;
+            if (isset($validated['completion_action'])) {
+                $isScraped = ($validated['completion_action'] === 'scrap');
+            } elseif (isset($validated['was_machine_scraped'])) {
+                $isScraped = filter_var($validated['was_machine_scraped'], FILTER_VALIDATE_BOOLEAN);
+            } elseif (isset($validated['scrap_machine'])) {
+                $isScraped = filter_var($validated['scrap_machine'], FILTER_VALIDATE_BOOLEAN);
+            }
+
+            $externalPartsPurchased = filter_var($request->input('external_parts_purchased', false), FILTER_VALIDATE_BOOLEAN);
+            $additionalCost = isset($validated['additional_cost']) ? (float) $validated['additional_cost'] : 0.00;
             $repairHours = isset($validated['repair_hours']) ? (float) $validated['repair_hours'] : (float) ($validated['labor_hours'] ?? 0.0);
+
             $wo = $this->service->completeWorkOrder(
                 $id,
                 $tenantId,
@@ -174,14 +195,22 @@ class MaintenanceWorkOrderController extends Controller
                 isset($validated['external_mechanic_cost']) ? (float) $validated['external_mechanic_cost'] : 0.0,
                 isset($validated['internal_mechanic_cost']) ? (float) $validated['internal_mechanic_cost'] : 0.0,
                 null,
-                (bool) ($validated['scrap_machine'] ?? false),
+                $isScraped,
                 isset($validated['scrap_value']) ? (float) $validated['scrap_value'] : 0.0,
-                $validated['decision_note'] ?? null
+                $validated['decision_note'] ?? null,
+                $validated['completed_at'] ?? null,
+                $additionalCost,
+                $externalPartsPurchased,
+                $validated['assignments'] ?? null
             );
+
+            $message = $isScraped
+                ? "Work Order completed. Machine decommissioned and scrap recorded."
+                : "Work Order completed successfully. Downtime closed and machine restored to active.";
 
             return redirect()
                 ->route('production.maintenance.work-orders.show', $wo->id)
-                ->with('success', "Work Order completed successfully. Downtime closed and machine restored to active.");
+                ->with('success', $message);
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }

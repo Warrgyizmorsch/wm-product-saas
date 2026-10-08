@@ -569,9 +569,30 @@ class MaintenanceWorkOrderService
         ?array $checklistJson = null,
         bool $scrapMachine = false,
         float $scrapValue = 0.00,
-        ?string $decisionNote = null
+        ?string $decisionNote = null,
+        mixed $completedAt = null,
+        float $additionalCost = 0.00,
+        bool $externalPartsPurchased = false,
+        ?array $assignmentsData = null
     ): ProductionMaintenanceWorkOrder {
-        return DB::transaction(function () use ($id, $tenantId, $userId, $workPerformed, $laborHours, $mechanicType, $externalMechanicCost, $internalMechanicCost, $checklistJson, $scrapMachine, $scrapValue, $decisionNote) {
+        return DB::transaction(function () use (
+            $id,
+            $tenantId,
+            $userId,
+            $workPerformed,
+            $laborHours,
+            $mechanicType,
+            $externalMechanicCost,
+            $internalMechanicCost,
+            $checklistJson,
+            $scrapMachine,
+            $scrapValue,
+            $decisionNote,
+            $completedAt,
+            $additionalCost,
+            $externalPartsPurchased,
+            $assignmentsData
+        ) {
             $wo = $this->repository->findWorkOrderForLock($id, $tenantId);
             if (!$wo) {
                 throw new InvalidArgumentException("Work Order #{$id} not found.");
@@ -587,20 +608,86 @@ class MaintenanceWorkOrderService
 
             $machine = Machine::withoutGlobalScopes()->where('tenant_id', $tenantId)->lockForUpdate()->findOrFail($wo->machine_id);
 
-            $repairHours = max(0.0, (float) $laborHours);
-            $mechanicType = $mechanicType ?: ProductionMaintenanceWorkOrder::MECHANIC_TYPE_INHOUSE;
-            $externalRepairCost = (float) ($externalMechanicCost ?? 0.00);
-            $internalRepairCost = (float) ($internalMechanicCost ?? 0.00);
+            // Completion timestamp: use captured timestamp if provided, otherwise now()
+            $completionTime = $completedAt ? Carbon::parse($completedAt) : now();
 
-            // Sum issued spare parts cost. Inventory consumption is tracked separately; this is the cost that remains in the WO summary.
+            // 1. Process assignments worked hours & hourly rates if provided
+            if (!empty($assignmentsData) && is_array($assignmentsData)) {
+                foreach ($assignmentsData as $asnInput) {
+                    if (!empty($asnInput['id'])) {
+                        $assignment = ProductionMaintenanceWorkOrderAssignment::where('tenant_id', $tenantId)
+                            ->where('work_order_id', $wo->id)
+                            ->find($asnInput['id']);
+                        if ($assignment) {
+                            $assignmentUpdate = [];
+                            if (isset($asnInput['worked_hours'])) {
+                                $assignmentUpdate['worked_hours'] = max(0.0, (float) $asnInput['worked_hours']);
+                            }
+                            if (isset($asnInput['hourly_rate'])) {
+                                $assignmentUpdate['hourly_rate'] = max(0.0, (float) $asnInput['hourly_rate']);
+                            }
+                            if (!empty($assignmentUpdate)) {
+                                $assignment->update($assignmentUpdate);
+                            }
+                        }
+                    }
+                }
+            } else {
+                $this->syncAssignmentWorkedHoursForCompletion($wo);
+            }
+
+            // 2. Compute mechanic costs from assignments
+            $assignments = $wo->assignments()->get();
+            if ($assignments->isNotEmpty()) {
+                $calcInternalCost = 0.0;
+                $calcExternalCost = 0.0;
+                $totalAssignedWorkedHours = 0.0;
+                $hasInternal = false;
+                $hasExternal = false;
+
+                foreach ($assignments as $asn) {
+                    $cost = round((float) $asn->hourly_rate * (float) $asn->worked_hours, 2);
+                    $totalAssignedWorkedHours += (float) $asn->worked_hours;
+                    if ($asn->assignment_type === ProductionMaintenanceWorkOrderAssignment::TYPE_EXTERNAL) {
+                        $calcExternalCost += $cost;
+                        $hasExternal = true;
+                    } else {
+                        $calcInternalCost += $cost;
+                        $hasInternal = true;
+                    }
+                }
+
+                $internalRepairCost = round($calcInternalCost, 2);
+                $externalRepairCost = round($calcExternalCost, 2);
+                $mechanicCost = round($internalRepairCost + $externalRepairCost, 2);
+                $repairHours = round($totalAssignedWorkedHours, 2);
+
+                if ($hasInternal && $hasExternal) {
+                    $mechanicType = ProductionMaintenanceWorkOrder::MECHANIC_TYPE_BOTH;
+                } elseif ($hasExternal) {
+                    $mechanicType = ProductionMaintenanceWorkOrder::MECHANIC_TYPE_EXTERNAL;
+                } else {
+                    $mechanicType = ProductionMaintenanceWorkOrder::MECHANIC_TYPE_INHOUSE;
+                }
+            } else {
+                $externalRepairCost = (float) ($externalMechanicCost ?? 0.00);
+                $internalRepairCost = (float) ($internalMechanicCost ?? 0.00);
+                $mechanicCost = round($externalRepairCost + $internalRepairCost, 2);
+                $repairHours = max(0.0, (float) $laborHours);
+                $mechanicType = $mechanicType ?: ProductionMaintenanceWorkOrder::MECHANIC_TYPE_INHOUSE;
+            }
+
+            // 3. Sum issued spare parts cost (keep existing logic)
             $sparesCost = (float) ProductionMaintenanceWorkOrderSpare::where('tenant_id', $tenantId)
                 ->where('maintenance_work_order_id', $wo->id)
                 ->sum('total_cost');
 
-            $repairCost = round($externalRepairCost + $internalRepairCost + $sparesCost, 2);
-            $now = now();
+            // 4. Compute total cost: mechanic_cost + spare_parts_cost + additional_cost
+            $additionalExpense = max(0.0, (float) $additionalCost);
+            $totalCost = round($mechanicCost + $sparesCost + $additionalExpense, 2);
+            $repairCost = $totalCost;
 
-            // End associated downtime
+            // 5. End associated downtime
             if ($wo->downtime_id) {
                 $downtime = ProductionMachineDowntime::where('tenant_id', $tenantId)->find($wo->downtime_id);
                 if ($downtime && $downtime->status !== ProductionMachineDowntime::STATUS_CLOSED) {
@@ -608,87 +695,96 @@ class MaintenanceWorkOrderService
                         $tenantId,
                         $downtime->id,
                         $userId,
-                        $workPerformed ?: 'Maintenance Completed',
-                        'Idle'
+                        $workPerformed ?: ($scrapMachine ? 'Maintenance Completed (Machine Scrapped)' : 'Maintenance Completed'),
+                        $scrapMachine ? 'Decommissioned' : 'Idle'
                     );
                 }
             } else {
-                $this->stateService->transitionState($tenantId, $machine->id, 'Idle', 'Maintenance Completed', $userId, $workPerformed);
+                $this->stateService->transitionState(
+                    $tenantId,
+                    $machine->id,
+                    $scrapMachine ? 'Decommissioned' : 'Idle',
+                    $scrapMachine ? 'Machine Scrapped during Maintenance' : 'Maintenance Completed',
+                    $userId,
+                    $workPerformed
+                );
             }
 
-            // Restore machine status to Active
-            $machine->update([
-                'status'                    => Machine::STATUS_ACTIVE,
-                'maintenance_status'        => 'none',
-                'last_maintenance_date'     => $now->toDateString(),
-            ]);
+            // 6. Machine status: Decommissioned if scrapped, Active if restored
+            if ($scrapMachine) {
+                $machine->update([
+                    'status'                    => Machine::STATUS_DECOMMISSIONED,
+                    'maintenance_status'        => 'none',
+                    'last_maintenance_date'     => $completionTime->toDateString(),
+                    'current_state'             => 'Decommissioned',
+                    'current_state_reason'      => 'Machine Scrapped during Maintenance',
+                ]);
+            } else {
+                $machine->update([
+                    'status'                    => Machine::STATUS_ACTIVE,
+                    'maintenance_status'        => 'none',
+                    'last_maintenance_date'     => $completionTime->toDateString(),
+                ]);
 
-            // Update PM Schedule next due date if this was a PM Work Order
-            if ($wo->pm_schedule_id) {
-                $pmSchedule = $this->repository->findPmSchedule($wo->pm_schedule_id, $tenantId);
-                if ($pmSchedule) {
-                    $nextDue = $this->pmScheduleService->computeNextDueDate(
-                        $now,
-                        $pmSchedule->frequency_type,
-                        $pmSchedule->frequency_value
-                    );
+                // Update PM Schedule next due date if PM Work Order and machine is restored
+                if ($wo->pm_schedule_id) {
+                    $pmSchedule = $this->repository->findPmSchedule($wo->pm_schedule_id, $tenantId);
+                    if ($pmSchedule) {
+                        $nextDue = $this->pmScheduleService->computeNextDueDate(
+                            $completionTime,
+                            $pmSchedule->frequency_type,
+                            $pmSchedule->frequency_value
+                        );
 
-                    $pmSchedule->update([
-                        'last_completed_date' => $now->toDateString(),
-                        'next_due_date'       => $nextDue->toDateString(),
-                    ]);
+                        $pmSchedule->update([
+                            'last_completed_date' => $completionTime->toDateString(),
+                            'next_due_date'       => $nextDue->toDateString(),
+                        ]);
 
-                    $machine->update([
-                        'next_maintenance_due_date' => $nextDue->toDateString(),
-                    ]);
+                        $machine->update([
+                            'next_maintenance_due_date' => $nextDue->toDateString(),
+                        ]);
+                    }
                 }
             }
 
-            // Update Work Order record
+            // 7. Update Work Order record
             $wo->update([
-                'actual_end'             => $now,
-                'work_performed'         => $workPerformed ?: $wo->work_performed,
-                'checklist_json'         => $checklistJson ?: $wo->checklist_json,
-                'labor_hours'            => $laborHours,
-                'repair_hours'           => $repairHours,
-                'labor_cost_rate'        => 0.00,
-                'labor_cost'             => 0.00,
-                'repair_cost'            => $repairCost,
-                'mechanic_type'          => $mechanicType,
-                'external_mechanic_cost' => $externalRepairCost,
-                'internal_mechanic_cost' => $internalRepairCost,
-                'spare_parts_cost'       => $sparesCost,
-                'scrap_machine'          => $scrapMachine,
-                'scrap_value'            => $scrapMachine ? $scrapValue : 0.00,
-                'decision_note'          => $decisionNote ?: ($scrapMachine ? 'Machine scrapped instead of repaired.' : null),
-                'total_cost'             => $repairCost,
-                'status'                 => ProductionMaintenanceWorkOrder::STATUS_COMPLETED,
-                'completed_by'           => $userId,
+                'actual_end'               => $completionTime,
+                'work_performed'           => $workPerformed ?: $wo->work_performed,
+                'checklist_json'           => $checklistJson ?: $wo->checklist_json,
+                'mechanic_cost'            => $mechanicCost,
+                'spare_parts_cost'         => $sparesCost,
+                'additional_cost'          => $additionalExpense,
+                'external_parts_purchased' => $externalPartsPurchased,
+                'was_machine_scraped'      => $scrapMachine,
+                'decision_note'            => $decisionNote ?: ($scrapMachine ? 'Machine scrapped instead of repaired.' : null),
+                'total_cost'               => $totalCost,
+                'status'                   => ProductionMaintenanceWorkOrder::STATUS_COMPLETED,
+                'completed_by'             => $userId,
             ]);
 
-            $this->syncAssignmentWorkedHoursForCompletion($wo);
-
+            // 8. Record logs & events
             $this->logService->recordWorkOrderCompleted($wo, $userId, [
-                'repair_hours' => $repairHours,
-                'mechanic_type' => $mechanicType,
-                'external_mechanic_cost' => $externalRepairCost,
-                'internal_mechanic_cost' => $internalRepairCost,
-                'spare_parts_cost' => $sparesCost,
-                'scrap_machine' => $scrapMachine,
-                'scrap_value' => $scrapValue,
-                'work_performed' => $workPerformed ?: 'N/A',
+                'mechanic_cost'            => $mechanicCost,
+                'spare_parts_cost'         => $sparesCost,
+                'additional_cost'          => $additionalExpense,
+                'external_parts_purchased' => $externalPartsPurchased,
+                'was_machine_scraped'      => $scrapMachine,
+                'work_performed'           => $workPerformed ?: 'N/A',
+                'completed_at'             => $completionTime->toIso8601String(),
             ]);
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $wo->machine_id,
                 'event_type'   => 'Maintenance Completed',
                 'title'        => 'Maintenance Completed',
-                'description'  => "Work Order [{$wo->work_order_number}] completed for machine [{$machine->name}]. Repair cost: \${$repairCost}." . ($scrapMachine ? ' Machine marked for scrap.' : ' Machine restored to active.'),
+                'description'  => "Work Order [{$wo->work_order_number}] completed for machine [{$machine->name}]. Total cost: \${$totalCost}." . ($scrapMachine ? ' Machine marked for scrap (Decommissioned).' : ' Machine restored to active.'),
                 'severity'     => 'info',
                 'event_source' => 'MaintenanceWorkOrderService',
             ]);
 
-            return $wo->fresh(['machine', 'technician', 'downtime', 'spares.product']);
+            return $wo->fresh(['machine', 'technician', 'downtime', 'spares.product', 'assignments']);
         });
     }
 

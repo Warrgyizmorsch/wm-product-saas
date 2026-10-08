@@ -131,30 +131,20 @@ class DowntimeService
 
             if ($wo) {
                 $repairHours = max(0.1, round($durationMinutes / 60.0, 2));
-                $mechanicType = $wo->mechanic_type ?: \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::MECHANIC_TYPE_INHOUSE;
-                $externalRepairCost = (float) ($wo->external_mechanic_cost ?? 0.00);
-                $internalRepairCost = (float) ($wo->internal_mechanic_cost ?? 0.00);
+                $mechanicCost = (float) ($wo->mechanic_cost ?? 0.00);
                 $sparesCost = (float) \App\Domains\Production\Models\ProductionMaintenanceWorkOrderSpare::where('tenant_id', $tenantId)
                     ->where('maintenance_work_order_id', $wo->id)
                     ->sum('total_cost');
 
-                $repairCost = round($externalRepairCost + $internalRepairCost + $sparesCost, 2);
+                $totalCost = round($mechanicCost + $sparesCost, 2);
 
                 $wo->update([
-                    'actual_end'             => $endTime,
-                    'work_performed'         => $remarks ?: ($wo->work_performed ?: 'Downtime Resolved & Maintenance Completed'),
-                    'labor_hours'            => $repairHours,
-                    'repair_hours'           => $repairHours,
-                    'labor_cost_rate'        => 0.00,
-                    'labor_cost'             => 0.00,
-                    'repair_cost'            => $repairCost,
-                    'mechanic_type'          => $mechanicType,
-                    'external_mechanic_cost' => $externalRepairCost,
-                    'internal_mechanic_cost' => $internalRepairCost,
-                    'spare_parts_cost'       => $sparesCost,
-                    'total_cost'             => $repairCost,
-                    'status'                 => \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::STATUS_COMPLETED,
-                    'completed_by'           => $userId,
+                    'actual_end'       => $endTime,
+                    'work_performed'   => $remarks ?: ($wo->work_performed ?: 'Downtime Resolved & Maintenance Completed'),
+                    'spare_parts_cost' => $sparesCost,
+                    'total_cost'       => $totalCost,
+                    'status'           => \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::STATUS_COMPLETED,
+                    'completed_by'     => $userId,
                 ]);
 
                 if ($wo->pm_schedule_id) {

@@ -148,14 +148,14 @@ class MaintenanceRepository implements MaintenanceRepositoryInterface
     public function findWorkOrder(int $id, int $tenantId): ?ProductionMaintenanceWorkOrder
     {
         return ProductionMaintenanceWorkOrder::where('tenant_id', $tenantId)
-            ->with(['machine', 'pmSchedule', 'technician', 'downtime', 'spares.product', 'spares.warehouse', 'creator', 'completer'])
+            ->with(['machine', 'pmSchedule', 'technician', 'downtime', 'spares.product', 'spares.warehouse', 'creator', 'completer', 'assignments.technician'])
             ->find($id);
     }
 
     public function findWorkOrderForLock(int $id, int $tenantId): ?ProductionMaintenanceWorkOrder
     {
         return ProductionMaintenanceWorkOrder::where('tenant_id', $tenantId)
-            ->with(['machine', 'spares'])
+            ->with(['machine', 'spares', 'assignments'])
             ->lockForUpdate()
             ->find($id);
     }

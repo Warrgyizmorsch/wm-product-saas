@@ -139,7 +139,6 @@ class MaintenanceWorkOrderApiController extends ApiBaseController
         $tenantId = $this->getTenantId();
         $validated = $request->validate([
             'work_performed' => ['required', 'string', 'max:2000'],
-            'labor_hours'    => ['required', 'numeric', 'min:0.1'],
         ]);
 
         try {
@@ -147,8 +146,7 @@ class MaintenanceWorkOrderApiController extends ApiBaseController
                 $id,
                 $tenantId,
                 auth()->id(),
-                $validated['work_performed'],
-                (float) $validated['labor_hours']
+                $validated['work_performed']
             );
 
             return $this->successResponse(

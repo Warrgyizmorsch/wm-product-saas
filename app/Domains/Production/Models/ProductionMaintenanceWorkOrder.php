@@ -29,6 +29,7 @@ class ProductionMaintenanceWorkOrder extends BaseModel
     public const PRIORITY_HIGH     = 'high';
     public const PRIORITY_CRITICAL = 'critical';
 
+    // Legacy mechanic-type constants kept for backwards-compat with existing log records / test fixtures.
     public const MECHANIC_TYPE_INHOUSE = 'inhouse';
     public const MECHANIC_TYPE_EXTERNAL = 'external';
     public const MECHANIC_TYPE_BOTH = 'both';
@@ -48,17 +49,11 @@ class ProductionMaintenanceWorkOrder extends BaseModel
         'problem_description',
         'work_performed',
         'checklist_json',
-        'labor_hours',
-        'labor_cost_rate',
-        'labor_cost',
-        'repair_hours',
-        'repair_cost',
-        'mechanic_type',
-        'external_mechanic_cost',
-        'internal_mechanic_cost',
+        'mechanic_cost',
         'spare_parts_cost',
-        'scrap_machine',
-        'scrap_value',
+        'additional_cost',
+        'external_parts_purchased',
+        'was_machine_scraped',
         'decision_note',
         'total_cost',
         'downtime_id',
@@ -73,18 +68,23 @@ class ProductionMaintenanceWorkOrder extends BaseModel
         'actual_start'             => 'datetime',
         'actual_end'               => 'datetime',
         'checklist_json'           => 'array',
-        'labor_hours'              => 'decimal:2',
-        'labor_cost_rate'          => 'decimal:2',
-        'labor_cost'               => 'decimal:2',
-        'repair_hours'             => 'decimal:2',
-        'repair_cost'              => 'decimal:2',
-        'external_mechanic_cost'   => 'decimal:2',
-        'internal_mechanic_cost'   => 'decimal:2',
+        'mechanic_cost'            => 'decimal:2',
         'spare_parts_cost'         => 'decimal:2',
-        'scrap_machine'            => 'boolean',
-        'scrap_value'              => 'decimal:2',
+        'additional_cost'          => 'decimal:2',
+        'external_parts_purchased' => 'boolean',
+        'was_machine_scraped'      => 'boolean',
         'total_cost'               => 'decimal:2',
     ];
+
+    public function getWasMachineScrapedAttribute($value): bool
+    {
+        return (bool) ($value ?? false);
+    }
+
+    public function getMechanicCostAttribute($value): float
+    {
+        return (float) ($value ?? 0.0);
+    }
 
     public function machine(): BelongsTo
     {
