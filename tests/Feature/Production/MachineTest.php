@@ -247,4 +247,82 @@ class MachineTest extends TestCase
         $this->assertSoftDeleted('production_machines', ['id' => $m1->id]);
         $this->assertSoftDeleted('production_machines', ['id' => $m2->id]);
     }
+
+    public function test_machine_detail_page_renders_basic_details_and_redirects_breakdown_to_maintenance_dashboard(): void
+    {
+        $machine = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA->id,
+            'name' => 'Stamping Press 01',
+            'code' => 'STAMP-01',
+            'machine_type' => 'Mechanical Press',
+            'manufacturer' => 'Komatsu',
+            'model_number' => 'OB-80',
+            'capacity' => 120.5,
+            'status' => 'active',
+            'installation_date' => now()->subYears(2),
+            'maintenance_status' => 'Standard operating check completed',
+        ]);
+
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->get(route('production.mes.machines.show', $machine->id));
+
+        $response->assertStatus(200);
+        $response->assertSee('Stamping Press 01');
+        $response->assertSee('STAMP-01');
+        $response->assertSee('Mechanical Press');
+        $response->assertSee('Komatsu');
+        $response->assertSee('OB-80');
+        $response->assertSee('120.50 Units/Hr');
+        $response->assertSee('Standard operating check completed');
+
+        // Verify "Report Breakdown" button redirects to maintenance dashboard
+        $response->assertSee(route('production.maintenance.dashboard'));
+        $response->assertSee('Report Breakdown');
+
+        // Verify duplicate state override and downtime start forms are removed
+        $response->assertDontSee(route('production.mes.machines.override-state'));
+        $response->assertDontSee(route('production.mes.downtime.start'));
+    }
+
+    public function test_machine_detail_page_syncs_and_displays_pm_schedule_due_dates(): void
+    {
+        $machine = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA->id,
+            'name' => 'Grinding Station 01',
+            'code' => 'GRIND-01',
+            'status' => 'active',
+        ]);
+
+        \App\Domains\Production\Models\ProductionPmSchedule::create([
+            'tenant_id' => $this->tenantA->id,
+            'machine_id' => $machine->id,
+            'name' => 'Bi-Weekly Dust Collector Filter Cleaning',
+            'code' => 'PM-FIN-01-BW',
+            'maintenance_type' => 'preventive',
+            'frequency_type' => 'weeks',
+            'frequency_value' => 2,
+            'last_completed_date' => '2026-09-28',
+            'next_due_date' => '2026-10-12',
+            'priority' => 'medium',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->get(route('production.mes.machines.show', $machine->id));
+
+        $response->assertStatus(200);
+        $response->assertSee('2026-09-28');
+        $response->assertSee('2026-10-12');
+        $response->assertSee('PM-FIN-01-BW');
+        $response->assertDontSee('Not scheduled');
+
+        // Verify machine record in DB was synchronized
+        $machine->refresh();
+        $this->assertEquals('2026-10-12', $machine->next_maintenance_due_date->toDateString());
+        $this->assertEquals('2026-09-28', $machine->last_maintenance_date->toDateString());
+    }
 }

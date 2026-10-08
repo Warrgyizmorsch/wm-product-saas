@@ -556,6 +556,8 @@ class ProductionExecutionService
             // Create the scrap record (stock_transaction_id null = not yet posted)
             $scrap = ProductionOrderScrap::create([
                 'tenant_id' => $order->tenant_id,
+                'company_id' => $order->company_id ?? company_id(),
+                'branch_id' => $order->branch_id ?? branch_id(),
                 'production_order_id' => $order->id,
                 'production_order_operation_id' => $operationId,
                 'production_batch_id' => $batchId,
@@ -711,6 +713,8 @@ class ProductionExecutionService
 
         return ProductionOrderRework::create([
             'tenant_id' => $order->tenant_id,
+            'company_id' => $order->company_id ?? company_id(),
+            'branch_id' => $order->branch_id ?? branch_id(),
             'production_order_id' => $order->id,
             'production_order_operation_id' => $operationId,
             'production_batch_id' => $batchId,
@@ -872,6 +876,8 @@ class ProductionExecutionService
             // ── Step 2: Create production receipt record ──────────────────────
             $receipt = ProductionOrderReceipt::create([
                 'tenant_id' => $order->tenant_id,
+                'company_id' => $order->company_id ?? company_id(),
+                'branch_id' => $order->branch_id ?? branch_id(),
                 'production_order_id' => $order->id,
                 'product_id' => $order->product_id,
                 'warehouse_id' => $warehouseId,
@@ -905,6 +911,8 @@ class ProductionExecutionService
 
                 ProductionQualityInspection::create([
                     'tenant_id'           => $order->tenant_id,
+                    'company_id'          => $order->company_id ?? company_id(),
+                    'branch_id'           => $order->branch_id ?? branch_id(),
                     'quality_plan_id'     => $plan->id,
                     'stage'               => 'final',
                     'status'              => 'submitted',

@@ -131,7 +131,7 @@ class MachineRepository implements MachineRepositoryInterface
 
     public function getMachineDashboardDetails(int $machineId): array
     {
-        $machine = Machine::with('workCenter')->findOrFail($machineId);
+        $machine = Machine::with(['workCenter', 'asset'])->findOrFail($machineId);
 
         $currentOp = \App\Domains\Production\Models\ProductionScheduleOperation::with(['schedule.order.product', 'orderOperation', 'workCenter'])
             ->where('machine_id', $machine->id)
