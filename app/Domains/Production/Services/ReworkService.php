@@ -433,6 +433,8 @@ class ReworkService
 
             \App\Domains\Production\Models\ProductionOrderScrap::create([
                 'tenant_id' => $rework->tenant_id,
+                'company_id' => $originalOrder?->company_id ?? $rework->company_id ?? company_id(),
+                'branch_id' => $originalOrder?->branch_id ?? $rework->branch_id ?? branch_id(),
                 'production_order_id' => $rework->original_production_order_id,
                 'production_order_operation_id' => $originalOp?->id,
                 'production_batch_id' => $validBatchId,

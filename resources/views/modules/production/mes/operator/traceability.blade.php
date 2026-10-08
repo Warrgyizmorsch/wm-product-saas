@@ -170,7 +170,7 @@
                             </div>
                             <div class="col-6 col-md-3">
                                 <div class="bg-light p-3 rounded border text-center">
-                                    <div class="text-muted fs-11 text-uppercase fw-semibold mb-1">Operations Executed</div>
+                                    <div class="text-muted fs-11 text-uppercase fw-semibold mb-1">{{ __('production.total_operations') }}</div>
                                     <div class="fs-18 fw-bold text-primary">{{ count($orderOperations) }}</div>
                                     <div class="fs-11 text-muted">Shop Floor Steps</div>
                                 </div>
