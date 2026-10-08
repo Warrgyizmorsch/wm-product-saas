@@ -152,20 +152,25 @@ class MaintenanceWorkOrderService
             ->exists();
     }
 
-    private function syncAssignmentWorkedHoursForCompletion(ProductionMaintenanceWorkOrder $workOrder): void
+    private function syncAssignmentWorkedHoursForCompletion(ProductionMaintenanceWorkOrder $workOrder, ?Carbon $completionTime = null): void
     {
-        $actualStart = $workOrder->actual_start ? Carbon::parse($workOrder->actual_start) : null;
-        $actualEnd = $workOrder->actual_end ? Carbon::parse($workOrder->actual_end) : now();
+        $maintStart = $workOrder->actual_start
+            ? Carbon::parse($workOrder->actual_start)
+            : ($workOrder->planned_start ? Carbon::parse($workOrder->planned_start) : Carbon::parse($workOrder->created_at));
 
-        $workOrder->assignments()->each(function (ProductionMaintenanceWorkOrderAssignment $assignment) use ($actualStart, $actualEnd) {
-            $assignmentAt = $assignment->assigned_at ? Carbon::parse($assignment->assigned_at) : $actualEnd;
-            $referenceStart = $actualStart && $assignmentAt->lt($actualStart) ? $actualStart : $assignmentAt;
-            $seconds = max(0, $actualEnd->diffInSeconds($referenceStart, false));
+        $endTime = $completionTime ?: ($workOrder->actual_end ? Carbon::parse($workOrder->actual_end) : now());
+
+        $workOrder->assignments()->each(function (ProductionMaintenanceWorkOrderAssignment $assignment) use ($maintStart, $endTime) {
+            $assignmentAt = $assignment->assigned_at ? Carbon::parse($assignment->assigned_at) : $maintStart;
+            $referenceStart = $assignmentAt->greaterThan($maintStart) ? $assignmentAt : $maintStart;
+            $seconds = max(0, $referenceStart->diffInSeconds($endTime, false));
             $hours = round($seconds / 3600, 2);
 
-            $assignment->update([
-                'worked_hours' => $hours,
-            ]);
+            if (empty($assignment->worked_hours) || (float) $assignment->worked_hours <= 0.0) {
+                $assignment->update([
+                    'worked_hours' => $hours,
+                ]);
+            }
         });
     }
 
@@ -518,7 +523,6 @@ class MaintenanceWorkOrderService
                 'current_state_reason' => $reason,
             ]);
 
-            $woNumber = $this->codeService->generateWorkOrderNumber($tenantId);
             // 3. Create Breakdown Work Order
             $branchId = $machine->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
             $companyId = $machine->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
@@ -644,48 +648,36 @@ class MaintenanceWorkOrderService
                     }
                 }
             } else {
-                $this->syncAssignmentWorkedHoursForCompletion($wo);
+                $this->syncAssignmentWorkedHoursForCompletion($wo, $completionTime);
             }
 
-            // 2. Compute mechanic costs from assignments
+            // 2. Compute mechanic costs from assignments: sum of hourly_rate * worked_hours
             $assignments = $wo->assignments()->get();
             if ($assignments->isNotEmpty()) {
                 $calcInternalCost = 0.0;
                 $calcExternalCost = 0.0;
                 $totalAssignedWorkedHours = 0.0;
-                $hasInternal = false;
-                $hasExternal = false;
 
                 foreach ($assignments as $asn) {
                     $cost = round((float) $asn->hourly_rate * (float) $asn->worked_hours, 2);
                     $totalAssignedWorkedHours += (float) $asn->worked_hours;
                     if ($asn->assignment_type === ProductionMaintenanceWorkOrderAssignment::TYPE_EXTERNAL) {
                         $calcExternalCost += $cost;
-                        $hasExternal = true;
                     } else {
                         $calcInternalCost += $cost;
-                        $hasInternal = true;
                     }
                 }
 
-                $internalRepairCost = round($calcInternalCost, 2);
-                $externalRepairCost = round($calcExternalCost, 2);
-                $mechanicCost = round($internalRepairCost + $externalRepairCost, 2);
-                $repairHours = round($totalAssignedWorkedHours, 2);
-
-                if ($hasInternal && $hasExternal) {
-                    $mechanicType = ProductionMaintenanceWorkOrder::MECHANIC_TYPE_BOTH;
-                } elseif ($hasExternal) {
-                    $mechanicType = ProductionMaintenanceWorkOrder::MECHANIC_TYPE_EXTERNAL;
+                $sumCost = round($calcInternalCost + $calcExternalCost, 2);
+                if ($sumCost > 0.0) {
+                    $mechanicCost = $sumCost;
                 } else {
-                    $mechanicType = ProductionMaintenanceWorkOrder::MECHANIC_TYPE_INHOUSE;
+                    $mechanicCost = round((float) ($externalMechanicCost ?? 0.00) + (float) ($internalMechanicCost ?? 0.00), 2);
                 }
             } else {
                 $externalRepairCost = (float) ($externalMechanicCost ?? 0.00);
                 $internalRepairCost = (float) ($internalMechanicCost ?? 0.00);
                 $mechanicCost = round($externalRepairCost + $internalRepairCost, 2);
-                $repairHours = max(0.0, (float) $laborHours);
-                $mechanicType = $mechanicType ?: ProductionMaintenanceWorkOrder::MECHANIC_TYPE_INHOUSE;
             }
 
             // 3. Sum issued spare parts cost (keep existing logic)

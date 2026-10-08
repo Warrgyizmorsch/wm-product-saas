@@ -154,20 +154,15 @@ class MaintenanceWorkOrderController extends Controller
             'work_performed'           => ['required', 'string'],
             'completion_action'        => ['nullable', 'string', 'in:restore,scrap'],
             'was_machine_scraped'      => ['nullable'],
-            'scrap_machine'            => ['nullable'],
             'completed_at'             => ['nullable', 'date'],
             'additional_cost'          => ['nullable', 'numeric', 'min:0'],
+            'additional_expense'       => ['nullable', 'numeric', 'min:0'],
             'external_parts_purchased' => ['nullable'],
+            'mechanic_cost'            => ['nullable', 'numeric', 'min:0'],
             'assignments'              => ['nullable', 'array'],
             'assignments.*.id'         => ['required_with:assignments', 'integer'],
             'assignments.*.worked_hours'=> ['nullable', 'numeric', 'min:0'],
             'assignments.*.hourly_rate' => ['nullable', 'numeric', 'min:0'],
-            'repair_hours'             => ['nullable', 'numeric', 'min:0'],
-            'labor_hours'              => ['nullable', 'numeric', 'min:0'],
-            'mechanic_type'            => ['nullable', 'in:inhouse,external,both'],
-            'external_mechanic_cost'   => ['nullable', 'numeric', 'min:0'],
-            'internal_mechanic_cost'   => ['nullable', 'numeric', 'min:0'],
-            'scrap_value'              => ['nullable', 'numeric', 'min:0'],
             'decision_note'            => ['nullable', 'string'],
         ]);
 
@@ -177,26 +172,27 @@ class MaintenanceWorkOrderController extends Controller
                 $isScraped = ($validated['completion_action'] === 'scrap');
             } elseif (isset($validated['was_machine_scraped'])) {
                 $isScraped = filter_var($validated['was_machine_scraped'], FILTER_VALIDATE_BOOLEAN);
-            } elseif (isset($validated['scrap_machine'])) {
-                $isScraped = filter_var($validated['scrap_machine'], FILTER_VALIDATE_BOOLEAN);
             }
 
             $externalPartsPurchased = filter_var($request->input('external_parts_purchased', false), FILTER_VALIDATE_BOOLEAN);
-            $additionalCost = isset($validated['additional_cost']) ? (float) $validated['additional_cost'] : 0.00;
-            $repairHours = isset($validated['repair_hours']) ? (float) $validated['repair_hours'] : (float) ($validated['labor_hours'] ?? 0.0);
+            $additionalCost = isset($validated['additional_cost'])
+                ? (float) $validated['additional_cost']
+                : (float) ($validated['additional_expense'] ?? 0.00);
+
+            $mechanicCost = isset($validated['mechanic_cost']) ? (float) $validated['mechanic_cost'] : 0.00;
 
             $wo = $this->service->completeWorkOrder(
                 $id,
                 $tenantId,
                 auth()->id(),
                 $validated['work_performed'],
-                $repairHours,
-                $validated['mechanic_type'] ?? null,
-                isset($validated['external_mechanic_cost']) ? (float) $validated['external_mechanic_cost'] : 0.0,
-                isset($validated['internal_mechanic_cost']) ? (float) $validated['internal_mechanic_cost'] : 0.0,
+                0.0,
+                null,
+                0.0,
+                $mechanicCost,
                 null,
                 $isScraped,
-                isset($validated['scrap_value']) ? (float) $validated['scrap_value'] : 0.0,
+                0.0,
                 $validated['decision_note'] ?? null,
                 $validated['completed_at'] ?? null,
                 $additionalCost,
@@ -263,7 +259,7 @@ class MaintenanceWorkOrderController extends Controller
         $tenantId  = require_tenant_id();
         $validated = $request->validate([
             'product_id'    => ['required', 'integer'],
-            'warehouse_id'  => ['required', 'integer'],
+            'warehouse_id'  => ['nullable', 'integer'],
             'requested_qty' => ['required', 'numeric', 'min:0.0001'],
         ]);
 
@@ -272,7 +268,7 @@ class MaintenanceWorkOrderController extends Controller
                 $id,
                 $tenantId,
                 $validated['product_id'],
-                $validated['warehouse_id'],
+                $validated['warehouse_id'] ?? null,
                 (float) $validated['requested_qty']
             );
 

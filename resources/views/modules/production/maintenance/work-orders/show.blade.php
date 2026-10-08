@@ -226,6 +226,7 @@
                                     <tr>
                                         <th>Product / Component</th>
                                         <th>{{ __('production.warehouse') }}</th>
+                                        <th>{{ __('crm.store_requisition_mr') }}</th>
                                         <th class="text-center">Requested</th>
                                         <th class="text-center">Issued</th>
                                         <th class="text-end">{{ __('production.unit_cost') }}</th>
@@ -240,28 +241,44 @@
                                                 <div class="fw-bold text-dark">{{ $spare->product?->name }}</div>
                                                 <span class="fs-11 text-muted">{{ $spare->product?->sku }}</span>
                                             </td>
-                                            <td>{{ $spare->warehouse?->name }}</td>
+                                            <td>{{ $spare->warehouse?->name ?? '—' }}</td>
+                                            <td>
+                                                @if($spare->requisitionSlip)
+                                                    <a href="{{ route('sales.material-requests.show', $spare->production_requisition_slip_id) }}" class="text-primary font-monospace fw-semibold fs-12 text-decoration-none" title="View Store Material Request">
+                                                        <i class="feather-file-text me-1"></i>{{ $spare->requisitionSlip->requisition_number }}
+                                                    </a>
+                                                    <div class="fs-11 text-muted text-capitalize">{{ $spare->requisitionSlip->status }}</div>
+                                                @else
+                                                    <span class="text-muted fs-12">—</span>
+                                                @endif
+                                            </td>
                                             <td class="text-center fw-bold">{{ number_format($spare->requested_qty, 2) }}</td>
                                             <td class="text-center fw-bold text-{{ $spare->issued_qty > 0 ? 'success' : 'muted' }}">{{ number_format($spare->issued_qty, 2) }}</td>
                                             <td class="text-end">${{ number_format($spare->unit_cost, 2) }}</td>
                                             <td class="text-end fw-bold">${{ number_format($spare->total_cost, 2) }}</td>
                                             <td class="text-end">
                                                 @if($spare->requested_qty > $spare->issued_qty && !in_array($workOrder->status, ['completed', 'cancelled']))
-                                                    <form action="{{ route('production.maintenance.work-orders.issue-spare', $spare->id) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        <input type="hidden" name="issue_qty" value="{{ $spare->requested_qty - $spare->issued_qty }}">
-                                                        <button type="submit" class="btn btn-sm btn-outline-success btn-xs">
-                                                            <i class="feather-download me-1"></i> Issue Stock
-                                                        </button>
-                                                    </form>
+                                                    @if($spare->production_requisition_slip_id)
+                                                        <a href="{{ route('sales.material-requests.show', $spare->production_requisition_slip_id) }}" class="badge bg-soft-warning text-warning text-decoration-none px-2 py-1" title="Fulfill via Store Material Request">
+                                                            <i class="feather-clock me-1"></i>{{ __('crm.pending_issue') }}
+                                                        </a>
+                                                    @else
+                                                        <form action="{{ route('production.maintenance.work-orders.issue-spare', $spare->id) }}" method="POST" class="d-inline">
+                                                            @csrf
+                                                            <input type="hidden" name="issue_qty" value="{{ $spare->requested_qty - $spare->issued_qty }}">
+                                                            <button type="submit" class="btn btn-sm btn-outline-success btn-xs">
+                                                                <i class="feather-download me-1"></i> Issue Stock
+                                                            </button>
+                                                        </form>
+                                                    @endif
                                                 @else
-                                                    <span class="badge bg-soft-success text-success">Issued</span>
+                                                    <span class="badge bg-soft-success text-success"><i class="feather-check me-1"></i>Issued</span>
                                                 @endif
                                             </td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="7" class="text-center text-muted py-4">No spare parts requested for this Work Order.</td>
+                                            <td colspan="8" class="text-center text-muted py-4">No spare parts requested for this Work Order.</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
@@ -351,12 +368,12 @@
                     </div>
                     <div class="card-body p-3 fs-13">
                         <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                            <span class="text-muted">Mechanic / Labor Hours:</span>
-                            <strong class="text-dark">{{ number_format($workOrder->repair_hours ?: $workOrder->labor_hours, 2) }} hrs</strong>
+                            <span class="text-muted">Mechanic / Worked Hours:</span>
+                            <strong class="text-dark">{{ number_format($workOrder->assignments->sum('worked_hours'), 2) }} hrs</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
                             <span class="text-muted">Mechanic Cost:</span>
-                            <strong class="text-dark">${{ number_format($workOrder->mechanic_cost ?: ($workOrder->internal_mechanic_cost + $workOrder->external_mechanic_cost), 2) }}</strong>
+                            <strong class="text-dark">${{ number_format($workOrder->mechanic_cost, 2) }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
                             <span class="text-muted">Spare Parts Subtotal:</span>
@@ -604,12 +621,12 @@
                 </div>
                 <div class="row g-2 mb-2">
                     <div class="col-md-6">
-                        <label class="form-label fs-12 text-muted fw-bold">Actual Repair Hours</label>
-                        <input type="number" step="0.01" min="0" name="repair_hours" class="form-control form-control-sm" value="1.00">
+                        <label class="form-label fs-12 text-muted fw-bold">Actual Worked Hours</label>
+                        <input type="number" step="0.01" min="0" name="general_worked_hours" class="form-control form-control-sm" value="1.00">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fs-12 text-muted fw-bold">Mechanic Cost ($)</label>
-                        <input type="number" step="0.01" min="0" name="internal_mechanic_cost" class="form-control form-control-sm" value="0.00">
+                        <input type="number" step="0.01" min="0" name="mechanic_cost" class="form-control form-control-sm" value="0.00">
                     </div>
                 </div>
             @endif
@@ -707,13 +724,6 @@
             <option value="">Select Spare Part</option>
             @foreach($products as $p)
                 <option value="{{ $p->id }}">{{ $p->name }} ({{ $p->sku }})</option>
-            @endforeach
-        </x-ui.odoo-form-ui>
-
-        <x-ui.odoo-form-ui type="select" label="Warehouse" name="warehouse_id" :required="true">
-            <option value="">Select Warehouse</option>
-            @foreach($warehouses as $wh)
-                <option value="{{ $wh->id }}">{{ $wh->name }}</option>
             @endforeach
         </x-ui.odoo-form-ui>
 

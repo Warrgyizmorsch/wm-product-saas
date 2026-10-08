@@ -1910,4 +1910,10 @@ return array (
   'delivery_challan_pdf' => 'Предавателно-приемателен протокол (PDF)',
   'newest_date_first' => 'Първо най-новите',
   'oldest_date_first' => 'Първо най-старите',
+  'source_document' => 'Изходен документ',
+  'target_machine' => 'Целева машина',
+  'maintenance' => 'Поддръжка',
+  'maintenance_work_order' => 'Работна поръчка за поддръжка',
+  'store_requisition_mr' => 'Складово искане (MR)',
 );
+

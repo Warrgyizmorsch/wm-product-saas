@@ -90,6 +90,16 @@ class ProductionMaintenanceWorkOrder extends BaseModel
         return (float) ($value ?? 0.0);
     }
 
+    public function getAdditionalExpenseAttribute(): float
+    {
+        return (float) ($this->additional_cost ?? 0.0);
+    }
+
+    public function setAdditionalExpenseAttribute($value): void
+    {
+        $this->attributes['additional_cost'] = $value;
+    }
+
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');
@@ -123,6 +133,11 @@ class ProductionMaintenanceWorkOrder extends BaseModel
     public function spares(): HasMany
     {
         return $this->hasMany(ProductionMaintenanceWorkOrderSpare::class, 'maintenance_work_order_id');
+    }
+
+    public function requisitionSlips(): HasMany
+    {
+        return $this->hasMany(ProductionRequisitionSlip::class, 'maintenance_work_order_id');
     }
 
     public function creator(): BelongsTo
