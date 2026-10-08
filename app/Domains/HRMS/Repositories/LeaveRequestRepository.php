@@ -439,20 +439,32 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
 
         if (!$employee || !$leaveType) {
             return [
-                'probation' => ['probation_rule' => 'allow'],
-                'notice' => ['notice_rule' => 'allow'],
-                'attachment' => ['require_attachment' => false],
-                'approval' => ['workflow_level' => '1_level'],
+                'application' => ['apply_in_advance' => false, 'require_attachment' => false],
+                'probation'   => ['rule' => 'allow', 'probation_rule' => 'allow'],
+                'notice'      => ['rule' => 'allow', 'notice_rule' => 'allow'],
+                'attachment'  => ['require_attachment' => false, 'attachment_days' => 3],
+                'approval'    => ['workflow_level' => '1_level'],
+                'accrual'     => [],
+                'yearend'     => [],
+                'encashment'  => [],
             ];
         }
 
         $rules = $leaveType->rules ?? [];
+        $appRules = $rules['application'] ?? ($rules['attachment'] ?? []);
         
         return [
-            'probation'  => $rules['probation']  ?? ['probation_rule' => 'allow'],
-            'notice'     => $rules['notice']      ?? ['notice_rule' => 'allow'],
-            'attachment' => $rules['attachment']  ?? ['require_attachment' => false],
-            'approval'   => $rules['approval']    ?? ['workflow_level' => '1_level'],
+            'application' => $appRules,
+            'probation'   => $rules['probation']   ?? ['rule' => 'allow', 'probation_rule' => 'allow'],
+            'notice'      => $rules['notice']      ?? ['rule' => 'allow', 'notice_rule' => 'allow'],
+            'attachment'  => [
+                'require_attachment' => !empty($appRules['require_attachment']),
+                'attachment_days'    => floatval($appRules['attachment_days'] ?? 3),
+            ],
+            'approval'    => $rules['approval']    ?? ['workflow_level' => '1_level'],
+            'accrual'     => $rules['accrual']     ?? [],
+            'yearend'     => $rules['yearend']     ?? [],
+            'encashment'  => $rules['encashment']  ?? [],
         ];
     }
 
@@ -482,5 +494,60 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
                 $balance->update(['used' => $newUsed]);
             }
         }
+    }
+
+    /**
+     * Export Leave Applications to Excel (.xlsx).
+     */
+    public function export(array $filters = []): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $user = auth()->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $employee = Employee::resolveForUser($user);
+
+        $query = LeaveRequest::with(['employee.department', 'leaveType'])->orderBy('created_at', 'desc');
+
+        if (!$isHrAdmin) {
+            $query->where('employee_id', $employee ? $employee->id : 0);
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+        if (!empty($filters['employee_id']) && $isHrAdmin) {
+            $query->where('employee_id', $filters['employee_id']);
+        }
+
+        $rows = $query->get();
+
+        $headers = [
+            'Employee Name',
+            'Employee ID',
+            'Leave Type',
+            'Start Date',
+            'End Date',
+            'Duration (Days)',
+            'Status',
+            'Applied On',
+            'Reason',
+        ];
+
+        $data = $rows->map(function ($req) {
+            return [
+                $req->employee->full_name ?? '—',
+                $req->employee->employee_id ?? '—',
+                $req->leaveType->name ?? '—',
+                $req->start_date ? $req->start_date->format('d M Y') : '—',
+                $req->end_date   ? $req->end_date->format('d M Y')   : '—',
+                floatval($req->duration),
+                ucfirst($req->status ?? 'pending'),
+                $req->created_at ? $req->created_at->format('d M Y H:i') : '—',
+                $req->reason ?? '',
+            ];
+        })->toArray();
+
+        $filename = 'leave_applications_' . now()->format('Y-m-d') . '.xlsx';
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $data, $filename);
     }
 }

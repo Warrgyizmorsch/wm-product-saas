@@ -6,9 +6,9 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <a href="{{ route('hrms.leave-structure.transition') }}" class="btn btn-outline-primary fw-bold text-uppercase d-flex align-items-center gap-1">
-            <i class="feather-shuffle me-1"></i> {{ __('hrms.leave.plan_transition') }}
-        </a>
+        <x-ui.button href="{{ route('hrms.leave-structure.transition') }}" variant="secondary" icon="feather-shuffle">
+            {{ __('hrms.leave.plan_transition') }}
+        </x-ui.button>
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addLeavePlanModal">
             {{ __('hrms.leave.add_plan') }}
         </x-ui.button>
@@ -48,17 +48,18 @@
                 padding: 0 !important;
             }
             .page-header {
-                padding: 24px 24px 16px 24px !important;
+                padding: 20px 24px 16px 24px !important;
                 margin-bottom: 0 !important;
                 border-bottom: 1px solid #e5e7eb;
                 background-color: #fff;
+                position: relative;
+                z-index: 50;
             }
             .main-content {
                 padding: 0 !important;
             }
             .settings-container {
                 display: flex;
-                min-height: calc(100vh - 120px);
                 background-color: #f8fafc;
             }
             .settings-sidebar-col {
@@ -71,13 +72,18 @@
             }
             .settings-content-col {
                 flex-grow: 1;
-                padding: 24px 30px;
+                padding: 20px 24px;
                 background-color: #f8fafc;
                 min-width: 0;
             }
         }
 
         @media (max-width: 991.98px) {
+            .page-header {
+                position: relative;
+                z-index: 50;
+                background-color: #fff;
+            }
             .settings-sidebar-col {
                 width: 100%;
                 background-color: #fff;
@@ -178,7 +184,7 @@
             #leavePlanMasterCard {
                 display: flex !important;
                 flex-direction: column !important;
-                height: calc(100vh - 160px) !important;
+                height: calc(100vh - 190px) !important;
                 overflow: hidden !important;
             }
 
@@ -186,9 +192,16 @@
             #leavePlanMasterCard > .card-header {
                 flex-shrink: 0 !important;
                 position: relative !important;
-                z-index: 10 !important;
+                z-index: 5 !important;
                 background-color: #fff !important;
                 border-bottom: 1px solid #e5e7eb !important;
+            }
+
+            #leavePlanMasterCard > .card-header .dropdown-menu,
+            #leavePlanMasterCard .erp-filter-dropdown .dropdown-menu,
+            #leavePlanMasterCard .erp-sort-dropdown .dropdown-menu,
+            #leavePlanMasterCard .dropdown-menu {
+                z-index: 1060 !important;
             }
 
             /* 3. Card body fills remaining height as a flex row */
@@ -401,17 +414,13 @@
                                                         <span class="d-inline-flex align-items-center text-primary"><i class="feather-clock text-primary" style="margin-right: 6px; font-size: 13px;"></i>{{ __('hrms.leave.cycle_ends') }}: <strong class="text-primary" style="margin-left: 4px;">{{ $currentCycleEnd->format('d M, Y') }}</strong></span>
                                                     @endif
                                                     <span class="d-inline-flex align-items-center">
-                                                        @if($selectedPlan->status)
-                                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded" style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Active</span>
-                                                        @else
-                                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded" style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Inactive</span>
-                                                        @endif
+                                                        <x-ui.status-badge status="{{ $selectedPlan->status ? 'active' : 'inactive' }}" :label="$selectedPlan->status ? __('hrms.common.active') : __('hrms.common.inactive')" />
                                                     </span>
                                                 </div>
                                             </div>
                                             
                                             <!-- Actions Dropdown for Leave Plan -->
-                                            <form action="{{ route('hrms.leave-structure.plan.destroy', $selectedPlan->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.leave.delete_plan_confirm') }}', { title: 'Delete Leave Plan', variant: 'danger', confirmButtonText: 'Delete' });">
+                                            <form action="{{ route('hrms.leave-structure.plan.destroy', $selectedPlan->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.leave.delete_plan_confirm') }}', { title: '{{ __('hrms.leave.delete_plan') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                                 @csrf
                                                 @method('DELETE')
                                                 <x-ui.action-dropdown>
@@ -460,7 +469,7 @@
                                         </div>
 
                                         <!-- Table (Columns: Leave Type, Quota, Action) -->
-                                        <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center gap-2 mb-3 rounded border" style="position: relative; z-index: 10;">
+                                        <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center gap-2 mb-3 rounded border" style="position: relative; z-index: 2;">
                                             <!-- Search Input -->
                                             <div class="theme-search-container flex-grow-1">
                                                 <i class="feather-search"></i>
@@ -532,14 +541,18 @@
                                                                 </div>
                                                             </td>
                                                             <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
-                                                                <span class="fw-bold text-dark">{{ floatval($type->quota) }} {{ __('hrms.leave.days') }}</span>
+                                                                @php
+                                                                    $calcIn = $type->rules['accrual']['calculate_in'] ?? 'days';
+                                                                    $unitLbl = $calcIn === 'hours' ? __('hrms.leave.hours') : __('hrms.leave.days');
+                                                                @endphp
+                                                                <span class="fw-bold text-dark quota-display-{{ $type->id }}">{{ floatval($type->quota) }} {{ $unitLbl }}</span>
                                                             </td>
                                                             <td class="text-end">
-                                                                <form action="{{ route('hrms.leave-structure.type.destroy', $type->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.leave.delete_type_confirm') }}', { title: 'Delete Leave Type', variant: 'danger', confirmButtonText: 'Delete' });">
+                                                                <form action="{{ route('hrms.leave-structure.type.destroy', $type->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.leave.delete_type_confirm') }}', { title: '{{ __('hrms.leave.delete_type') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                                                     @csrf
                                                                     @method('DELETE')
                                                                     <div class="hstack gap-2 justify-content-end align-items-center">
-                                                                        <a href="javascript:void(0)" class="action-dropdown-btn configure-rules-btn" data-type-id="{{ $type->id }}" data-type-name="{{ $type->name }}" data-type-quota="{{ floatval($type->quota) }}" data-rules="{{ json_encode($type->rules) }}" title="{{ __('hrms.leave.configure_rules') }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;">
+                                                                        <a href="javascript:void(0)" class="action-dropdown-btn configure-rules-btn" data-type-id="{{ $type->id }}" data-type-name="{{ $type->name }}" data-type-quota="{{ floatval($type->quota) }}" data-rules="{{ base64_encode(json_encode($type->rules)) }}" title="{{ __('hrms.leave.configure_rules') }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center;">
                                                                             <i class="feather feather-settings"></i>
                                                                         </a>
                                                                         <x-ui.action-dropdown>
@@ -663,8 +676,9 @@
                     <h5 class="modal-title fw-bold" id="editLeavePlanModalLabel">{{ __('hrms.leave.edit_plan') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="editLeavePlanForm" method="POST">
+                <form id="editLeavePlanForm" method="POST" action="{{ old('edit_plan_id') ? route('hrms.leave-structure.plan.update', ['leavePlan' => old('edit_plan_id')]) : '' }}">
                     @csrf
+                    <input type="hidden" name="edit_plan_id" id="edit_plan_id" value="{{ old('edit_plan_id') }}">
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6 col-12">
@@ -720,34 +734,33 @@
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.type_name') }}" name="name" placeholder="{{ __('hrms.leave.type_name_placeholder') }}" :required="true" :errorText="$errors->first('name')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.color_theme') }}" name="color" inputType="color" value="#3b82f6" class="form-control-color" style="width: 50px;" :required="true" helperText="{{ __('hrms.leave.click_select_color') }}" :errorText="$errors->first('color')" />
-                            </div>
-                            <div class="col-md-6 col-12">
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.code') }}" name="code" placeholder="{{ __('hrms.leave.code_placeholder') }}" :required="true" :errorText="$errors->first('code')" />
                             </div>
                             <div class="col-md-6 col-12">
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.annual_quota') }}" name="quota" inputType="number" step="0.5" placeholder="{{ __('hrms.leave.quota_placeholder') }}" min="0" :required="true" :errorText="$errors->first('quota')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="radio" label="{{ __('hrms.leave.classification') }}" :required="true" :errorText="$errors->first('type')">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="type" id="add_type_paid" value="paid" checked required>
-                                        <label class="form-check-label fw-semibold text-dark" for="add_type_paid">
-                                            {{ __('hrms.leave.paid_leave') }}
-                                        </label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="type" id="add_type_unpaid" value="unpaid" required>
-                                        <label class="form-check-label fw-semibold text-dark" for="add_type_unpaid">
-                                            {{ __('hrms.leave.unpaid_leave') }}
-                                        </label>
-                                    </div>
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="col-md-6 col-12">
                                 <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
                                     <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
                                     <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-md-12 col-12">
+                                <x-ui.odoo-form-ui type="radio" label="{{ __('hrms.leave.classification') }}" :required="true" :errorText="$errors->first('type')">
+                                    <div class="d-flex gap-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="type" id="add_type_paid" value="paid" checked required>
+                                            <label class="form-check-label fw-semibold text-dark" for="add_type_paid">
+                                                {{ __('hrms.leave.paid_leave') }}
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="type" id="add_type_unpaid" value="unpaid" required>
+                                            <label class="form-check-label fw-semibold text-dark" for="add_type_unpaid">
+                                                {{ __('hrms.leave.unpaid_leave') }}
+                                            </label>
+                                        </div>
+                                    </div>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-12 col-12">
@@ -774,16 +787,14 @@
                     <h5 class="modal-title fw-bold" id="editLeaveTypeModalLabel">{{ __('hrms.leave.edit_type_title') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="editLeaveTypeForm" method="POST">
+                <form id="editLeaveTypeForm" method="POST" action="{{ old('edit_type_id') ? route('hrms.leave-structure.type.update', ['leaveType' => old('edit_type_id')]) : '' }}">
                     @csrf
+                    <input type="hidden" name="edit_type_id" id="edit_type_id" value="{{ old('edit_type_id') }}">
                     <div class="modal-body">
                         <div class="row g-3">
                             <input type="hidden" name="leave_plan_id" id="edit_type_plan_id">
                             <div class="col-md-6 col-12">
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.type_name') }}" name="name" id="edit_type_name" :required="true" :errorText="$errors->first('name')" />
-                            </div>
-                            <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.color_theme') }}" name="color" id="edit_type_color" inputType="color" class="form-control-color" style="width: 50px;" :required="true" helperText="{{ __('hrms.leave.click_select_color') }}" :errorText="$errors->first('color')" />
                             </div>
                             <div class="col-md-6 col-12">
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.code') }}" name="code" id="edit_type_code" :required="true" :errorText="$errors->first('code')" />
@@ -792,25 +803,27 @@
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.annual_quota') }}" name="quota" id="edit_type_quota" inputType="number" step="0.5" min="0" :required="true" :errorText="$errors->first('quota')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="radio" label="{{ __('hrms.leave.classification') }}" :required="true" :errorText="$errors->first('type')">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="type" id="edit_type_paid" value="paid" required>
-                                        <label class="form-check-label fw-semibold text-dark" for="edit_type_paid">
-                                            {{ __('hrms.leave.paid_leave') }}
-                                        </label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="type" id="edit_type_unpaid" value="unpaid" required>
-                                        <label class="form-check-label fw-semibold text-dark" for="edit_type_unpaid">
-                                            {{ __('hrms.leave.unpaid_leave') }}
-                                        </label>
-                                    </div>
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="col-md-6 col-12">
                                 <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" id="edit_type_status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
                                     <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
                                     <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-md-12 col-12">
+                                <x-ui.odoo-form-ui type="radio" label="{{ __('hrms.leave.classification') }}" :required="true" :errorText="$errors->first('type')">
+                                    <div class="d-flex gap-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="type" id="edit_type_paid" value="paid" required>
+                                            <label class="form-check-label fw-semibold text-dark" for="edit_type_paid">
+                                                {{ __('hrms.leave.paid_leave') }}
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="type" id="edit_type_unpaid" value="unpaid" required>
+                                            <label class="form-check-label fw-semibold text-dark" for="edit_type_unpaid">
+                                                {{ __('hrms.leave.unpaid_leave') }}
+                                            </label>
+                                        </div>
+                                    </div>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-12 col-12">
@@ -930,7 +943,7 @@
                                                      <div class="col-sm-4 text-muted">{{ __('hrms.leave.yearly_quota') }}:</div>
                                                      <div class="col-sm-8 d-flex align-items-center gap-2">
                                                          <input type="number" id="accrual_quota_value" class="odoo-table-input text-center d-inline-block mx-1" style="width: 70px; background-color: #f1f5f9; cursor: not-allowed;" value="12" readonly> 
-                                                         <span>{{ __('hrms.leave.days') }}</span>
+                                                         <span id="accrual_unit_label">{{ __('hrms.leave.days') }}</span>
                                                      </div>
                                                  </div>
                                             </div>
@@ -948,7 +961,7 @@
                                                       <input type="radio" name="accrual_rate" value="periodic" class="form-check-input mt-1">
                                                       <div>
                                                           <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.accrued_periodically') }}</span>
-                                                          <span class="text-muted fs-11">{{ __('hrms.leave.accrued_periodically_desc') }}</span>
+                                                          <span class="text-muted fs-11" id="accrual_periodic_desc_label">{{ __('hrms.leave.accrued_periodically_desc') }}</span>
                                                       </div>
                                                   </label>
                                                    <div class="ps-4 mt-1 mb-2 d-none" id="accrual_periodic_div">
@@ -963,6 +976,17 @@
                                                                        <option value="half_yearly">{{ __('hrms.leave.half_yearly') }}</option>
                                                                        <option value="yearly">{{ __('hrms.leave.yearly') }}</option>
                                                                    </select>
+                                                               </div>
+                                                           </div>
+                                                           <!-- Calculated Accrual Rate Preview -->
+                                                           <div class="row align-items-center">
+                                                               <div class="col-sm-4 text-muted">{{ __('hrms.leave.accrual_rate_label') }}</div>
+                                                               <div class="col-sm-8">
+                                                                   <div class="d-inline-flex align-items-center gap-2 px-2.5 py-1.5 rounded-2 bg-primary-subtle text-primary fw-semibold fs-12 border border-primary-subtle">
+                                                                       <i class="feather-calendar fs-13"></i>
+                                                                       <span id="accrual_dynamic_calc_rate">1 day / month</span>
+                                                                       <span class="text-muted fw-normal fs-11" id="accrual_dynamic_calc_total">(12 days / year)</span>
+                                                                   </div>
                                                                </div>
                                                            </div>
                                                            <!-- Proportional adjustment -->
@@ -1025,6 +1049,28 @@
                                              </div>
                                          </div>
                                      </div>
+
+                                     <!-- Negative Leave Balance -->
+                                     <div class="card border mt-3 bg-light-subtle rounded-3 shadow-none">
+                                         <div class="card-header bg-white py-3 px-3 d-flex align-items-center justify-content-between">
+                                             <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-minus-circle me-2 text-muted"></i>{{ __('hrms.leave.negative_balance_title') }}</h6>
+                                         </div>
+                                         <div>
+                                             <div class="card-body bg-white border-top p-3 fs-13">
+                                                 <div class="form-check form-switch mb-1">
+                                                     <input class="form-check-input" type="checkbox" id="accrual_allow_negative">
+                                                     <label class="form-check-label fw-bold text-dark ms-2" for="accrual_allow_negative">{{ __('hrms.leave.allow_negative_balance') }}</label>
+                                                     <div class="text-muted fs-11 ms-2">{{ __('hrms.leave.allow_negative_balance_desc') }}</div>
+                                                 </div>
+                                                 <div class="ps-4 mt-2 d-none" id="accrual_max_negative_div">
+                                                     <div class="d-flex align-items-center gap-2">
+                                                         <span>{{ __('hrms.leave.max_negative_limit') }}</span>
+                                                         <input type="number" id="accrual_max_negative" class="odoo-table-input text-center" style="width: 70px;" value="5" min="0" step="0.5"> {{ __('hrms.leave.days') }}
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
                                  </div>
                                  
                                  <!-- Leave Application Tab Pane -->
@@ -1068,7 +1114,7 @@
                                      </div>
                                      
                                      <!-- Attachments -->
-                                     <div class="card border rounded-3 shadow-none">
+                                     <div class="card border rounded-3 shadow-none mb-3">
                                          <div class="card-body p-3 fs-13">
                                              <div class="form-check form-switch mb-1">
                                                  <input class="form-check-input" type="checkbox" id="app_require_attachment">
@@ -1080,6 +1126,17 @@
                                                      <span>{{ __('hrms.leave.mandatory_if_exceeds') }}</span>
                                                      <input type="number" id="app_attachment_days" class="odoo-table-input text-center" style="width: 70px;" value="3"> {{ __('hrms.leave.days') }}.
                                                  </div>
+                                             </div>
+                                         </div>
+                                     </div>
+
+                                     <!-- Sandwich Rule -->
+                                     <div class="card border rounded-3 shadow-none">
+                                         <div class="card-body p-3 fs-13">
+                                             <div class="form-check form-switch mb-1">
+                                                 <input class="form-check-input" type="checkbox" id="app_sandwich_rule">
+                                                 <label class="form-check-label fw-bold text-dark ms-2" for="app_sandwich_rule">{{ __('hrms.leave.sandwich_rule') }}</label>
+                                                 <div class="text-muted fs-11 ms-2">{{ __('hrms.leave.sandwich_rule_desc') }}</div>
                                              </div>
                                          </div>
                                      </div>
@@ -1326,9 +1383,9 @@
                   </div>
                   
                   <div class="modal-footer bg-light border-top d-flex justify-content-end gap-2 px-4 py-3">
-                      <button type="button" class="btn btn-light fs-13" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                      <button type="button" class="btn btn-primary fs-13" onclick="saveLeaveRules()">{{ __('hrms.leave.save_rules') }}</button>
-                  </div></div>
+                      <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                      <x-ui.button type="button" variant="primary" onclick="saveLeaveRules()">{{ __('hrms.leave.save_rules') }}</x-ui.button>
+                  </div>
              </div>
          </div>
      </div>
@@ -1357,6 +1414,20 @@
 
     @push('scripts')
     <script>
+        function safeBase64Decode(str) {
+            if (!str) return null;
+            try {
+                return JSON.parse(decodeURIComponent(escape(atob(str))));
+            } catch(e) {
+                try {
+                    return JSON.parse(atob(str));
+                } catch(e2) {
+                    console.error('Base64 decode error:', e2);
+                    return null;
+                }
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", function() {
             // Initialize Select2 dropdowns on modal open
             $('#addLeavePlanModal, #editLeavePlanModal, #addLeaveTypeModal, #editLeaveTypeModal, #leaveRulesModal').on('shown.bs.modal', function () {
@@ -1450,11 +1521,13 @@
                 let dataStr = $(this).attr('data-plan');
                 if (!dataStr) return;
 
-                let plan = JSON.parse(atob(dataStr));
+                let plan = safeBase64Decode(dataStr);
+                if (!plan) return;
                 
                 $('#editLeavePlanForm').attr('action', `/hrms/leave-structure/plan/update/${plan.id}`);
+                $('#edit_plan_id').val(plan.id);
                 $('#edit_plan_name').val(plan.name);
-                $('#edit_plan_company_id').val(plan.company_id || '');
+                $('#edit_plan_company_id').val(plan.company_id || '').trigger('change');
                 
                 if (plan.effective_from) {
                     // Extract date portion directly from string format YYYY-MM-DD to avoid timezone offset shifts in browser Date parser
@@ -1465,7 +1538,7 @@
                 }
                 
                 let statusVal = (plan.status === true || plan.status === 1 || plan.status === '1') ? '1' : '0';
-                $('#edit_plan_status').val(statusVal);
+                $('#edit_plan_status').val(statusVal).trigger('change');
                 $('#edit_plan_description').val(plan.description || '');
 
                 $('#editLeavePlanModal').modal('show');
@@ -1479,7 +1552,8 @@
                 
                 if (!planId || !typesData) return;
 
-                let types = JSON.parse(atob(typesData));
+                let types = safeBase64Decode(typesData);
+                if (!types) return;
                 
                 $('#renew_plan_id').val(planId);
                 $('#renew_plan_display_name').text(planName);
@@ -1551,14 +1625,15 @@
                 let dataStr = $(this).attr('data-type');
                 if (!dataStr) return;
 
-                let type = JSON.parse(atob(dataStr));
+                let type = safeBase64Decode(dataStr);
+                if (!type) return;
                 
                 $('#editLeaveTypeForm').attr('action', `/hrms/leave-structure/type/update/${type.id}`);
+                $('#edit_type_id').val(type.id);
                 $('#edit_type_plan_id').val(type.leave_plan_id);
                 $('#edit_type_name').val(type.name);
                 $('#edit_type_code').val(type.code);
                 $('#edit_type_quota').val(type.quota);
-                $('#edit_type_color').val(type.color || '#3b82f6');
                 
                 if (type.type === 'paid') {
                     $('#edit_type_paid').prop('checked', true);
@@ -1567,7 +1642,7 @@
                 }
                 
                 let statusVal = (type.status === true || type.status === 1 || type.status === '1') ? '1' : '0';
-                $('#edit_type_status').val(statusVal);
+                $('#edit_type_status').val(statusVal).trigger('change');
                 $('#edit_type_description').val(type.description || '');
 
                 $('#editLeaveTypeModal').modal('show');
@@ -1592,7 +1667,9 @@
                         attendance_earn: 1,
                         attendance_period: 20,
                         limit_carry: false,
-                        max_accum: 30
+                        max_accum: 30,
+                        allow_negative: false,
+                        max_negative: 5
                     },
                     application: {
                         apply_in_advance: false,
@@ -1600,7 +1677,8 @@
                         min_duration: 1,
                         max_duration: 10,
                         require_attachment: false,
-                        attachment_days: 3
+                        attachment_days: 3,
+                        sandwich_rule: false
                     },
                     approval: {
                         workflow_level: '1_level',
@@ -1625,7 +1703,12 @@
                 try {
                     let rulesDataStr = $(this).attr('data-rules');
                     if (rulesDataStr) {
-                        let parsed = JSON.parse(rulesDataStr);
+                        let parsed = safeBase64Decode(rulesDataStr);
+                        if (!parsed) {
+                            try {
+                                parsed = JSON.parse(rulesDataStr);
+                            } catch(e) {}
+                        }
                         if (parsed && typeof parsed === 'object') {
                             rules = parsed;
                         }
@@ -1660,6 +1743,8 @@
 
                 $('#accrual_limit_carry').prop('checked', !!rules.accrual?.limit_carry).trigger('change');
                 $('#accrual_max_accum_val').val(rules.accrual?.max_accum || 30);
+                $('#accrual_allow_negative').prop('checked', !!rules.accrual?.allow_negative).trigger('change');
+                $('#accrual_max_negative').val(rules.accrual?.max_negative !== undefined ? rules.accrual.max_negative : 5);
 
                 $('#app_apply_in_advance').prop('checked', !!rules.application?.apply_in_advance).trigger('change');
                 $('#app_advance_days').val(rules.application?.advance_days || 3);
@@ -1667,6 +1752,7 @@
                 $('#app_max_duration').val(rules.application?.max_duration || 10);
                 $('#app_require_attachment').prop('checked', !!rules.application?.require_attachment).trigger('change');
                 $('#app_attachment_days').val(rules.application?.attachment_days || 3);
+                $('#app_sandwich_rule').prop('checked', !!rules.application?.sandwich_rule);
 
                 $(`input[name="approval_workflow_level"][value="${rules.approval?.workflow_level || '1_level'}"]`).prop('checked', true).trigger('change');
                 $('#approval_first_approver').val(rules.approval?.first_approver || 'reporting_manager');
@@ -1686,8 +1772,54 @@
 
                 $(`input[name="notice_rule"][value="${rules.notice?.rule || 'allow'}"]`).prop('checked', true);
 
+                // Update dynamic preview
+                updateAccrualPreview();
+
                 // Show modal
                 $('#leaveRulesModal').modal('show');
+            });
+
+            // Dynamic calculation helper for periodic accrual
+            function updateAccrualPreview() {
+                let quota = parseFloat($('#accrual_quota_value').val()) || 0;
+                let unit = $('input[name="accrual_calculate_in"]:checked').val() || 'days';
+                let freq = $('#accrual_frequency').val() || 'monthly';
+                let unitSingle = unit === 'hours' ? '{{ __("hrms.leave.hour") }}' : '{{ __("hrms.leave.day") }}';
+                let unitPlural = unit === 'hours' ? '{{ __("hrms.leave.hours") }}' : '{{ __("hrms.leave.days") }}';
+                
+                $('#accrual_unit_label').text(unit === 'hours' ? '{{ __("hrms.leave.hours") }}' : '{{ __("hrms.leave.days") }}');
+
+                let divisor = 12;
+                let freqLabel = '{{ __("hrms.leave.unit_month") }}';
+                if (freq === 'quarterly') {
+                    divisor = 4;
+                    freqLabel = '{{ __("hrms.leave.unit_quarter") }}';
+                } else if (freq === 'half_yearly') {
+                    divisor = 2;
+                    freqLabel = '{{ __("hrms.leave.unit_half_year") }}';
+                } else if (freq === 'yearly') {
+                    divisor = 1;
+                    freqLabel = '{{ __("hrms.leave.unit_year") }}';
+                }
+
+                let rate = divisor > 0 ? (quota / divisor) : 0;
+                let formattedRate = Number.isInteger(rate) ? rate : parseFloat(rate.toFixed(2));
+                let rateUnit = formattedRate === 1 ? unitSingle : unitPlural;
+                let totalUnit = quota === 1 ? unitSingle : unitPlural;
+
+                let rateText = `${formattedRate} ${rateUnit} / ${freqLabel}`;
+                let totalText = `(${quota} ${totalUnit} / {{ __("hrms.leave.unit_year") }})`;
+
+                $('#accrual_dynamic_calc_rate').text(rateText);
+                $('#accrual_dynamic_calc_total').text(totalText);
+
+                let descTemplate = '{{ __("hrms.leave.accrued_periodic_calc_desc", ["rate" => "__RATE__", "unit" => "__UNIT__", "freq" => "__FREQ__"]) }}';
+                let dynamicDesc = descTemplate.replace('__RATE__', formattedRate).replace('__UNIT__', rateUnit).replace('__FREQ__', freqLabel);
+                $('#accrual_periodic_desc_label').text(dynamicDesc);
+            }
+
+            $(document).on('change', 'input[name="accrual_calculate_in"], #accrual_frequency', function() {
+                updateAccrualPreview();
             });
 
             // Toggle logic for conditional fields
@@ -1717,6 +1849,14 @@
                     $('#accrual_max_accum_div').removeClass('d-none');
                 } else {
                     $('#accrual_max_accum_div').addClass('d-none');
+                }
+            });
+
+            $('#accrual_allow_negative').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('#accrual_max_negative_div').removeClass('d-none');
+                } else {
+                    $('#accrual_max_negative_div').addClass('d-none');
                 }
             });
 
@@ -1789,6 +1929,8 @@
                         attendance_period: parseInt($('#accrual_attendance_period').val()) || 20,
                         limit_carry: $('#accrual_limit_carry').is(':checked'),
                         max_accum: parseFloat($('#accrual_max_accum_val').val()) || 30,
+                        allow_negative: $('#accrual_allow_negative').is(':checked'),
+                        max_negative: parseFloat($('#accrual_max_negative').val()) || 0,
                         frequency: $('#accrual_frequency').val(),
                         prorate: $('#accrual_prorate').is(':checked'),
                         rounding: 'half_day'
@@ -1799,7 +1941,8 @@
                         min_duration: parseFloat($('#app_min_duration').val()) || 1,
                         max_duration: parseFloat($('#app_max_duration').val()) || 10,
                         require_attachment: $('#app_require_attachment').is(':checked'),
-                        attachment_days: parseFloat($('#app_attachment_days').val()) || 3
+                        attachment_days: parseFloat($('#app_attachment_days').val()) || 3,
+                        sandwich_rule: $('#app_sandwich_rule').is(':checked')
                     },
                     approval: {
                         workflow_level: $('input[name="approval_workflow_level"]:checked').val(),
@@ -1835,9 +1978,15 @@
                         rules: data
                     },
                     success: function(response) {
-                        // Update settings button's local data-rules attribute
-                        $(`.configure-rules-btn[data-type-id="${typeId}"]`).attr('data-rules', JSON.stringify(data));
+                        // Update settings button's local data-rules attribute in safe Base64
+                        let b64Data = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+                        $(`.configure-rules-btn[data-type-id="${typeId}"]`).attr('data-rules', b64Data);
                         
+                        // Dynamically update the unit (Days vs Hours) in the table row
+                        let unitText = (data.accrual && data.accrual.calculate_in === 'hours') ? '{{ __("hrms.leave.hours") }}' : '{{ __("hrms.leave.days") }}';
+                        let quotaVal = (data.accrual && data.accrual.quota_value !== undefined) ? data.accrual.quota_value : $(`.configure-rules-btn[data-type-id="${typeId}"]`).attr('data-type-quota');
+                        $(`.quota-display-${typeId}`).text(`${parseFloat(quotaVal)} ${unitText}`);
+
                         $('#leaveRulesModal').modal('hide');
 
                         // Floating Toast alert
@@ -1946,6 +2095,11 @@
                 var sort = $('#lt_sort_value').val() || 'name_asc';
                 var type = $('#lt_type_value').val() || '';
                 
+                if (isPlanSwitch) {
+                    search = '';
+                    type = '';
+                }
+
                 var url = '{{ route("hrms.leave-structure.index") }}?plan_id=' + planId + 
                           '&lt_search=' + encodeURIComponent(search) + 
                           '&lt_sort=' + encodeURIComponent(sort) + 
@@ -1961,8 +2115,8 @@
                         
                         if (isPlanSwitch) {
                             // Update active details container completely
-                            var oldContainer = $('#activePlanDetailsContainer');
-                            var newContainer = $(doc).find('#activePlanDetailsContainer');
+                            var oldContainer = $('#leavePlanDetailCol');
+                            var newContainer = $(doc).find('#leavePlanDetailCol');
                             if (newContainer.length && oldContainer.length) {
                                 oldContainer.html(newContainer.html());
                             }
@@ -1979,15 +2133,15 @@
                             if (newPagination.length && oldPagination.length) {
                                 oldPagination.replaceWith(newPagination);
                             } else if (newPagination.length) {
-                                $('#leaveTypesTable').parent().after(newPagination);
+                                $('#leaveTypesTable').closest('.border.rounded').after(newPagination);
                             } else {
-                                oldPagination.empty();
+                                oldPagination.remove();
                             }
                         }
 
                         // Re-initialize Select2 inside active details container (especially the filter select)
                         if (window.jQuery && $.fn.select2) {
-                            $('#activePlanDetailsContainer').find('.odoo-select2').each(function() {
+                            $('#leavePlanDetailCol').find('.odoo-select2').each(function() {
                                 var select = $(this);
                                 if (!select.hasClass('select2-hidden-accessible')) {
                                     select.select2({
@@ -2059,13 +2213,13 @@
                 $('.erp-filter-dropdown.show').removeClass('show');
             };
 
-            $(document).on('click', '#activePlanDetailsContainer .leave-type-pagination-container a', function(e) {
+            $(document).on('click', '.leave-type-pagination-container a', function(e) {
                 e.preventDefault();
                 var url = $(this).attr('href');
-                if (!url) return;
+                if (!url || url === 'javascript:void(0);' || url === '#') return;
                 var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
                 var page = urlParams.get('lt_page') || 1;
-                var planId = $('.leave-type-search-input').attr('data-plan-id');
+                var planId = $('.leave-type-search-input').attr('data-plan-id') || $('.plan-switch-btn.active').attr('data-plan-id') || '{{ $selectedPlan ? $selectedPlan->id : "" }}';
                 loadPlanDetails(planId, page, false);
             });
 
@@ -2090,13 +2244,15 @@
             }
 
             function getValidationMessage(field) {
-                const label = getFieldLabel(field).toLowerCase();
+                const label = getFieldLabel(field);
 
                 if (field.validity.valueMissing) {
-                    return field.tagName === 'SELECT' ? `Please select ${label}.` : `Please enter ${label}.`;
+                    return field.tagName === 'SELECT' 
+                        ? '{{ __("hrms.common.please_select", ["field" => ":field"]) }}'.replace(':field', label) 
+                        : '{{ __("hrms.common.please_enter", ["field" => ":field"]) }}'.replace(':field', label);
                 }
 
-                return field.validationMessage || 'Please enter a valid value.';
+                return field.validationMessage || '{{ __("hrms.common.please_enter_valid") }}';
             }
 
             function getErrorAnchor(field) {

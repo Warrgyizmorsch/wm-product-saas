@@ -5,15 +5,21 @@ namespace App\Domains\Production\Models;
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\StockTransaction;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProductionOrderScrap extends BaseModel
 {
+    use BelongsToCompany, BelongsToBranch;
+
     protected $table = 'production_order_scraps';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'ncr_id',
         'production_order_id',
         'production_order_operation_id',
@@ -45,6 +51,28 @@ class ProductionOrderScrap extends BaseModel
         'weight'      => 'float',
         'recorded_at' => 'datetime',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($scrap) {
+            if (empty($scrap->recorded_at)) {
+                $scrap->recorded_at = now();
+            }
+            if ((empty($scrap->company_id) || empty($scrap->branch_id)) && !empty($scrap->production_order_id)) {
+                $order = $scrap->order ?: ProductionOrder::withoutGlobalScopes()->find($scrap->production_order_id);
+                if ($order) {
+                    if (empty($scrap->company_id)) {
+                        $scrap->company_id = $order->company_id;
+                    }
+                    if (empty($scrap->branch_id)) {
+                        $scrap->branch_id = $order->branch_id;
+                    }
+                }
+            }
+        });
+    }
 
     public function order(): BelongsTo
     {

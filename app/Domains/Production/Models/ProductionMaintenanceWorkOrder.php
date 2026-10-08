@@ -3,6 +3,8 @@
 namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductionMaintenanceWorkOrder extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'production_maintenance_work_orders';
 
@@ -36,6 +38,8 @@ class ProductionMaintenanceWorkOrder extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'work_order_number',
         'machine_id',
         'pm_schedule_id',

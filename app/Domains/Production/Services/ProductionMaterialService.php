@@ -154,6 +154,8 @@ class ProductionMaterialService
 
             $issue = ProductionOrderIssue::create([
                 'tenant_id'           => $res->tenant_id,
+                'company_id'          => $res->productionOrder?->company_id ?? company_id(),
+                'branch_id'           => $res->productionOrder?->branch_id ?? branch_id(),
                 'production_order_id' => $res->production_order_id,
                 'reservation_id'      => $res->id,
                 'product_id'          => $res->product_id,
@@ -252,6 +254,8 @@ class ProductionMaterialService
 
             $issue = ProductionOrderIssue::create([
                 'tenant_id'           => $res->tenant_id,
+                'company_id'          => $res->productionOrder?->company_id ?? company_id(),
+                'branch_id'           => $res->productionOrder?->branch_id ?? branch_id(),
                 'production_order_id' => $res->production_order_id,
                 'reservation_id'      => $res->id,
                 'product_id'          => $res->product_id,
@@ -422,10 +426,15 @@ class ProductionMaterialService
             }
 
             // 1. Dedicated NEW ProductionRequisitionSlip for Operational Scrap Replacement
+            $order = \App\Domains\Production\Models\ProductionOrder::withoutGlobalScopes()->find($productionOrderId);
+            $branchId = $order?->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            $companyId = $order?->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+
             $year = now()->format('Y');
             $prefix = "MR-{$year}-";
             $lastSlip = \App\Domains\Production\Models\ProductionRequisitionSlip::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
+                ->when($branchId !== null, fn($q) => $q->where('branch_id', $branchId))
                 ->where('requisition_number', 'like', "{$prefix}%")
                 ->orderBy('id', 'desc')
                 ->first();
@@ -435,6 +444,14 @@ class ProductionMaterialService
                 $nextNum = ((int) $lastNumStr) + 1;
             }
             $reqNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            while (\App\Domains\Production\Models\ProductionRequisitionSlip::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->when($branchId !== null, fn($q) => $q->where('branch_id', $branchId))
+                ->where('requisition_number', $reqNumber)
+                ->exists()) {
+                $nextNum++;
+                $reqNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            }
 
             $slipNotes = "Operational Scrap Replacement Request ({$matName}: {$replacementMaterialQty} units)";
             if (!empty($reason)) {
@@ -443,6 +460,8 @@ class ProductionMaterialService
 
             $slip = \App\Domains\Production\Models\ProductionRequisitionSlip::create([
                 'tenant_id' => $tenantId,
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
                 'production_order_id' => $productionOrderId,
                 'requisition_number' => $reqNumber,
                 'status' => 'pending',

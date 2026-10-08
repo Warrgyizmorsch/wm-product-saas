@@ -21,4 +21,6 @@ interface LeaveStructureRepositoryInterface
     public function updateType(LeaveType $leaveType, array $validated): bool;
 
     public function destroyType(LeaveType $leaveType): bool;
+
+    public function updateRules(LeaveType $leaveType, array $rules): bool;
 }

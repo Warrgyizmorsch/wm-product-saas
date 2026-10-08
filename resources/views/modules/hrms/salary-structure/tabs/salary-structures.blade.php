@@ -157,7 +157,7 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="hstack gap-2 justify-content-end align-items-center">
-                                        <a href="javascript:void(0)" class="toggle-structure-details text-secondary" data-target="#structure-details-{{ $structure->id }}" title="{{ __('hrms.salary.show_components') }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;">
+                                        <a href="javascript:void(0)" class="toggle-structure-details action-dropdown-btn" data-target="#structure-details-{{ $structure->id }}" title="{{ __('hrms.salary.show_components') }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center;">
                                             <i class="feather feather-chevron-down"></i>
                                         </a>
                                         <x-ui.action-dropdown>
@@ -393,8 +393,9 @@
                 <h5 class="modal-title fw-bold" id="editSalaryStructureModalLabel">{{ __('hrms.salary.edit_slab') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="editSalaryStructureForm" method="POST">
+            <form id="editSalaryStructureForm" method="POST" action="{{ old('edit_structure_id') ? route('hrms.salary-structure.structure.update', ['salaryStructure' => old('edit_structure_id')]) : '' }}">
                 @csrf
+                <input type="hidden" name="edit_structure_id" id="edit_structure_id" value="{{ old('edit_structure_id') }}">
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6 col-12">
@@ -777,6 +778,7 @@
             let items = structure.items;
 
             $('#editSalaryStructureForm').attr('action', `/hrms/salary-structure/structure/update/${id}`);
+            $('#edit_structure_id').val(id);
             $('#edit_name').val(name);
             $('#edit_company_id').val(company_id || '');
             $('#edit_structure_pay_group_id').val(pay_group_id || '');

@@ -6,6 +6,8 @@ use App\Domains\Inventory\Models\Batch as InventoryBatch;
 use App\Domains\Production\Models\ProductionBatch;
 use App\Domains\Production\Models\ProductionLotTrace;
 use App\Domains\Production\Models\ProductionOrder;
+use App\Domains\Production\Models\ProductionOrderIssue;
+use App\Domains\Production\Models\ProductionOrderReceipt;
 use App\Domains\Production\Models\ProductionSerialNumber;
 use App\Domains\Sales\Models\SalesOrder;
 
@@ -136,35 +138,185 @@ class LotTraceabilityService
             'depth' => $currentDepth,
         ], $nodeDetail);
 
+        $addEdge = function (string $sourceKey, string $targetKey, float $qty, ?string $remarks = null) use (&$edges) {
+            foreach ($edges as $e) {
+                if ($e['source_key'] === $sourceKey && $e['target_key'] === $targetKey) {
+                    return;
+                }
+            }
+            $edges[] = [
+                'source_key' => $sourceKey,
+                'target_key' => $targetKey,
+                'quantity'   => $qty,
+                'remarks'    => $remarks,
+            ];
+        };
+
         if ($direction === 'backward') {
+            // 1. Explicit trace table entries
             $traces = ProductionLotTrace::where('tenant_id', $tenantId)
                 ->where('target_type', $type)
                 ->where('target_id', $id)
                 ->get();
 
             foreach ($traces as $trace) {
-                $edges[] = [
-                    'source_key' => "{$trace->source_type}_{$trace->source_id}",
-                    'target_key' => $key,
-                    'quantity'   => (float) $trace->quantity,
-                    'remarks'    => $trace->remarks,
-                ];
+                $addEdge("{$trace->source_type}_{$trace->source_id}", $key, (float) $trace->quantity, $trace->remarks);
                 $this->traverse($tenantId, $trace->source_type, $trace->source_id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
             }
+
+            // 2. Direct domain relationships
+            if ($type === 'order') {
+                $order = ProductionOrder::withoutGlobalScopes()
+                    ->with(['salesOrder.customer'])
+                    ->where('tenant_id', $tenantId)
+                    ->find($id);
+
+                if ($order) {
+                    $issues = ProductionOrderIssue::withoutGlobalScopes()
+                        ->with(['product', 'warehouse', 'batches'])
+                        ->where('tenant_id', $tenantId)
+                        ->where('production_order_id', $order->id)
+                        ->get();
+
+                    foreach ($issues as $issue) {
+                        if ($issue->inventory_batch_id) {
+                            $addEdge("lot_{$issue->inventory_batch_id}", $key, (float) $issue->quantity_issued, 'Material Issue (Lot)');
+                            $this->traverse($tenantId, 'lot', $issue->inventory_batch_id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                        } else {
+                            $hasBatchAlloc = false;
+                            foreach ($issue->batches as $ib) {
+                                if ($ib->inventory_batch_id) {
+                                    $hasBatchAlloc = true;
+                                    $addEdge("lot_{$ib->inventory_batch_id}", $key, (float) $ib->quantity, 'Material Issue (Allocated Lot)');
+                                    $this->traverse($tenantId, 'lot', $ib->inventory_batch_id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                                }
+                            }
+                            if (!$hasBatchAlloc) {
+                                $addEdge("material_{$issue->id}", $key, (float) $issue->quantity_issued, 'Raw Material Consumed');
+                                $this->traverse($tenantId, 'material', $issue->id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                            }
+                        }
+                    }
+
+                    if ($order->sales_order_id) {
+                        $addEdge("sales_order_{$order->sales_order_id}", $key, (float) $order->quantity_ordered, 'Sales Order Demand');
+                        $this->traverse($tenantId, 'sales_order', $order->sales_order_id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                    }
+                }
+            } elseif ($type === 'batch') {
+                $batch = ProductionBatch::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($id);
+                if ($batch && $batch->production_order_id) {
+                    $addEdge("order_{$batch->production_order_id}", $key, (float) ($batch->actual_quantity ?: $batch->planned_quantity), 'Produced by Order');
+                    $this->traverse($tenantId, 'order', $batch->production_order_id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                }
+            } elseif ($type === 'serial') {
+                $serial = ProductionSerialNumber::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($id);
+                if ($serial) {
+                    if ($serial->batch_id) {
+                        $addEdge("batch_{$serial->batch_id}", $key, 1.0, 'Part of Batch');
+                        $this->traverse($tenantId, 'batch', $serial->batch_id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                    } elseif ($serial->production_order_id) {
+                        $addEdge("order_{$serial->production_order_id}", $key, 1.0, 'Produced by Order');
+                        $this->traverse($tenantId, 'order', $serial->production_order_id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                    }
+                }
+            }
         } else {
+            // Forward trace
+            // 1. Explicit trace table entries
             $traces = ProductionLotTrace::where('tenant_id', $tenantId)
                 ->where('source_type', $type)
                 ->where('source_id', $id)
                 ->get();
 
             foreach ($traces as $trace) {
-                $edges[] = [
-                    'source_key' => $key,
-                    'target_key' => "{$trace->target_type}_{$trace->target_id}",
-                    'quantity'   => (float) $trace->quantity,
-                    'remarks'    => $trace->remarks,
-                ];
+                $addEdge($key, "{$trace->target_type}_{$trace->target_id}", (float) $trace->quantity, $trace->remarks);
                 $this->traverse($tenantId, $trace->target_type, $trace->target_id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+            }
+
+            // 2. Direct domain relationships
+            if ($type === 'lot') {
+                $issues = \App\Domains\Production\Models\ProductionOrderIssue::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('inventory_batch_id', $id)
+                    ->get();
+
+                foreach ($issues as $issue) {
+                    $addEdge($key, "order_{$issue->production_order_id}", (float) $issue->quantity_issued, 'Consumed in Order');
+                    $this->traverse($tenantId, 'order', $issue->production_order_id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                }
+
+                $issueBatches = \App\Domains\Production\Models\ProductionOrderIssueBatch::withoutGlobalScopes()
+                    ->where('inventory_batch_id', $id)
+                    ->with('issue')
+                    ->get();
+
+                foreach ($issueBatches as $ib) {
+                    if ($ib->issue && $ib->issue->tenant_id == $tenantId) {
+                        $addEdge($key, "order_{$ib->issue->production_order_id}", (float) $ib->quantity, 'Consumed in Order (Allocated)');
+                        $this->traverse($tenantId, 'order', $ib->issue->production_order_id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                    }
+                }
+            } elseif ($type === 'order') {
+                $order = ProductionOrder::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->find($id);
+
+                if ($order) {
+                    $batches = ProductionBatch::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('production_order_id', $order->id)
+                        ->get();
+
+                    foreach ($batches as $batch) {
+                        $addEdge($key, "batch_{$batch->id}", (float) ($batch->actual_quantity ?: $batch->planned_quantity), 'Output Batch');
+                        $this->traverse($tenantId, 'batch', $batch->id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                    }
+
+                    $receipts = ProductionOrderReceipt::withoutGlobalScopes()
+                        ->with('warehouse')
+                        ->where('tenant_id', $tenantId)
+                        ->where('production_order_id', $order->id)
+                        ->get();
+
+                    foreach ($receipts as $receipt) {
+                        $batchId = $receipt->inventory_batch_id ?? $receipt->batch_id;
+                        if ($batchId) {
+                            $addEdge($key, "lot_{$batchId}", (float) $receipt->quantity_received, 'Received FG Lot');
+                            $this->traverse($tenantId, 'lot', $batchId, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                        } else {
+                            $addEdge($key, "receipt_{$receipt->id}", (float) $receipt->quantity_received, 'Received FG');
+                            $this->traverse($tenantId, 'receipt', $receipt->id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                        }
+                    }
+
+                    $serials = ProductionSerialNumber::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('production_order_id', $id)
+                        ->take(20)
+                        ->get();
+
+                    foreach ($serials as $serial) {
+                        $addEdge($key, "serial_{$serial->id}", 1.0, 'Output Serial Unit');
+                        $this->traverse($tenantId, 'serial', $serial->id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                    }
+
+                    if ($order->sales_order_id) {
+                        $addEdge($key, "sales_order_{$order->sales_order_id}", (float) $order->quantity_ordered, 'Fulfills Sales Demand');
+                        $this->traverse($tenantId, 'sales_order', $order->sales_order_id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                    }
+                }
+            } elseif ($type === 'batch') {
+                $serials = ProductionSerialNumber::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('batch_id', $id)
+                    ->take(20)
+                    ->get();
+
+                foreach ($serials as $serial) {
+                    $addEdge($key, "serial_{$serial->id}", 1.0, 'Output Serial Unit');
+                    $this->traverse($tenantId, 'serial', $serial->id, $direction, $maxDepth, $nodes, $edges, $visited, $currentDepth + 1);
+                }
             }
         }
     }
@@ -208,14 +360,12 @@ class LotTraceabilityService
 
             case 'order':
                 $order = ProductionOrder::withoutGlobalScopes()
-                    ->with('product')
+                    ->with(['product', 'operations.workCenter', 'operations.machine'])
                     ->where('tenant_id', $tenantId)
                     ->find($id);
                 if ($order) {
-                    // Forward trace: Customer attribution via verified SalesOrder relationship
                     $customerName = null;
                     if ($order->sales_order_id) {
-                        // SalesOrder belongs to tenant via BelongsToTenant scope; use withoutGlobalScopes for safety
                         $so = SalesOrder::withoutGlobalScopes()
                             ->with('customer')
                             ->where('tenant_id', $tenantId)
@@ -228,12 +378,34 @@ class LotTraceabilityService
                         $detail .= " | Customer: {$customerName}";
                     }
 
+                    $ops = $order->operations->map(function ($op) {
+                        return [
+                            'sequence'    => $op->sequence,
+                            'name'        => $op->name,
+                            'status'      => $op->status,
+                            'work_center' => $op->workCenter?->name ?? '—',
+                            'machine'     => $op->machine?->name ?? '—',
+                            'produced'    => (float) $op->quantity_produced,
+                            'rejected'    => (float) $op->quantity_rejected,
+                        ];
+                    })->toArray();
+
+                    $materialsCount = ProductionOrderIssue::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('production_order_id', $order->id)
+                        ->count();
+
                     return [
-                        'label'    => "Order: {$order->order_number}",
-                        'detail'   => $detail,
-                        'status'   => $order->status,
-                        'date'     => $order->created_at->format('d/m/Y H:i'),
-                        'customer' => $customerName,
+                        'label'            => "Order: {$order->order_number}",
+                        'detail'           => $detail,
+                        'status'           => $order->status,
+                        'date'             => $order->created_at->format('d/m/Y H:i'),
+                        'customer'         => $customerName,
+                        'operations'       => $ops,
+                        'operations_count' => count($ops),
+                        'materials_count'  => $materialsCount,
+                        'produced_qty'     => (float) $order->quantity_produced,
+                        'ordered_qty'      => (float) $order->quantity_ordered,
                     ];
                 }
                 break;
@@ -249,6 +421,52 @@ class LotTraceabilityService
                         'detail' => "Product: " . ($serial->product?->name ?? '—') . " | Status: {$serial->status}",
                         'status' => $serial->status,
                         'date'   => $serial->created_at->format('d/m/Y H:i'),
+                    ];
+                }
+                break;
+
+            case 'material':
+                $issue = \App\Domains\Production\Models\ProductionOrderIssue::withoutGlobalScopes()
+                    ->with(['product', 'warehouse'])
+                    ->where('tenant_id', $tenantId)
+                    ->find($id);
+                if ($issue) {
+                    return [
+                        'label'  => "Raw Material: " . ($issue->product?->name ?? "Material #{$id}"),
+                        'detail' => "Issued Qty: {$issue->quantity_issued} | Warehouse: " . ($issue->warehouse?->name ?? 'Default') . " | SKU: " . ($issue->product?->sku ?? '—'),
+                        'status' => 'issued',
+                        'date'   => $issue->issued_at?->format('d/m/Y H:i') ?? $issue->created_at->format('d/m/Y H:i'),
+                    ];
+                }
+                break;
+
+            case 'receipt':
+                $rc = \App\Domains\Production\Models\ProductionOrderReceipt::withoutGlobalScopes()
+                    ->with('warehouse')
+                    ->where('tenant_id', $tenantId)
+                    ->find($id);
+                if ($rc) {
+                    return [
+                        'label'  => "FG Receipt #" . ($rc->receipt_number ?? $rc->id),
+                        'detail' => "Received Qty: {$rc->quantity_received} | Warehouse: " . ($rc->warehouse?->name ?? 'Default'),
+                        'status' => $rc->status ?? 'received',
+                        'date'   => $rc->received_at?->format('d/m/Y H:i') ?? $rc->created_at->format('d/m/Y H:i'),
+                    ];
+                }
+                break;
+
+            case 'sales_order':
+                $so = SalesOrder::withoutGlobalScopes()
+                    ->with('customer')
+                    ->where('tenant_id', $tenantId)
+                    ->find($id);
+                if ($so) {
+                    return [
+                        'label'    => "Sales Order: {$so->order_number}",
+                        'detail'   => "Customer: " . ($so->customer?->name ?? 'Direct Customer') . " | Total: " . ($so->total_amount ?? '—'),
+                        'status'   => $so->status ?? 'active',
+                        'date'     => $so->created_at->format('d/m/Y H:i'),
+                        'customer' => $so->customer?->name,
                     ];
                 }
                 break;
@@ -310,11 +528,15 @@ class LotTraceabilityService
     public function getLotSummary(int $tenantId, int $orderId): array
     {
         $order = ProductionOrder::withoutGlobalScopes()
-            ->with(['product', 'batches.currentOperation', 'operations'])
+            ->with(['product', 'operations'])
             ->where('tenant_id', $tenantId)
             ->findOrFail($orderId);
 
-        $batches = $order->batches;
+        $batches = ProductionBatch::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->with('currentOperation')
+            ->get();
 
         $plannedTotal = (float) $batches->sum('planned_quantity');
         if ($plannedTotal <= 0) {
@@ -325,52 +547,61 @@ class LotTraceabilityService
         $firstOp = $order->operations()->orderBy('sequence', 'asc')->first();
         $uniqueProduced = 0.0;
         if ($firstOp) {
-            $uniqueProduced = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
+            $uniqueProduced = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where('operation_id', $firstOp->id)
                 ->sum('quantity_produced');
         }
 
         // Total Operation Throughput (sum across all routing operations)
-        $operationThroughput = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
+        $operationThroughput = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
             ->sum('quantity_produced');
 
         // Total Scrap
-        $totalScrap = (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $tenantId)
+        $totalScrap = (float) \App\Domains\Production\Models\ProductionOrderScrap::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
             ->sum('quantity');
 
         // Total Pending Rework
-        $totalReworkPending = (float) \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
+        $totalReworkPending = (float) \App\Domains\Production\Models\ProductionOrderRework::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
             ->where('status', 'pending')
             ->sum('quantity');
 
         // Total Completed Rework
-        $totalReworkRecovered = (float) \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
+        $totalReworkRecovered = (float) \App\Domains\Production\Models\ProductionOrderRework::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
             ->where('status', 'completed')
             ->sum('quantity');
 
         // Finished Goods Received Qty
-        $totalFinished = (float) \App\Domains\Production\Models\ProductionOrderReceipt::where('tenant_id', $tenantId)
+        $totalFinished = (float) \App\Domains\Production\Models\ProductionOrderReceipt::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
-            ->sum('quantity');
+            ->sum('quantity_received');
 
         // Active WIP in progress
         $currentWip = max(0.0, $uniqueProduced - $totalFinished - $totalScrap);
 
         $batchSummaries = $batches->map(function ($b) use ($tenantId) {
-            $scrap = (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $tenantId)
+            $scrap = (float) \App\Domains\Production\Models\ProductionOrderScrap::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where('production_batch_id', $b->id)
                 ->sum('quantity');
 
-            $reworkPending = (float) \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
+            $reworkPending = (float) \App\Domains\Production\Models\ProductionOrderRework::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where('production_batch_id', $b->id)
                 ->where('status', 'pending')
                 ->sum('quantity');
 
-            $reworkRecovered = (float) \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
+            $reworkRecovered = (float) \App\Domains\Production\Models\ProductionOrderRework::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where('production_batch_id', $b->id)
                 ->where('status', 'completed')
                 ->sum('quantity');

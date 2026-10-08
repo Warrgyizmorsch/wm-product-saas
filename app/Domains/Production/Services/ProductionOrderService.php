@@ -55,9 +55,14 @@ class ProductionOrderService
                 $bomId = $bom?->id;
             }
 
+            $branchId = $data['branch_id'] ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            $companyId = $data['company_id'] ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+
             $order = ProductionOrder::create([
                 'tenant_id' => $tenantId,
-                'order_number' => $data['order_number'] ?? $this->numberService->generateNextNumber($tenantId),
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
+                'order_number' => $data['order_number'] ?? $this->numberService->generateNextNumber($tenantId, $branchId),
                 'product_id' => $productId,
                 'bom_id' => $bomId,
                 'quantity_ordered' => $data['quantity_ordered'] ?? 1,
@@ -96,10 +101,15 @@ class ProductionOrderService
                 ? $plan->production_model
                 : ($product->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING);
 
+            $branchId = $plan->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            $companyId = $plan->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+
             // 1. Create order header
             $order = ProductionOrder::create([
                 'tenant_id' => $plan->tenant_id,
-                'order_number' => $this->numberService->generateNextNumber($plan->tenant_id),
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
+                'order_number' => $this->numberService->generateNextNumber($plan->tenant_id, $branchId),
                 'production_plan_id' => $plan->id,
                 'product_id' => $plan->product_id,
                 'bom_id' => $plan->bom_id,
@@ -371,9 +381,14 @@ class ProductionOrderService
                 ? $data['production_model']
                 : ($product->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING);
 
+            $branchId = $data['branch_id'] ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            $companyId = $data['company_id'] ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+
             $order = ProductionOrder::create([
                 'tenant_id' => $tenantId,
-                'order_number' => $this->numberService->generateNextNumber($tenantId),
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
+                'order_number' => $data['order_number'] ?? $this->numberService->generateNextNumber($tenantId, $branchId),
                 'production_plan_id' => null,
                 'product_id' => $productId,
                 'bom_id' => $bom->id,
@@ -926,10 +941,13 @@ class ProductionOrderService
     public function createAdHocRequisitionSlip(ProductionOrder $order, array $items, ?int $userId = null, ?string $notes = null): ProductionRequisitionSlip
     {
         return DB::transaction(function () use ($order, $items, $userId, $notes) {
+            $branchId = $order->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            $companyId = $order->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
             $year = now()->format('Y');
             $prefix = "MR-{$year}-";
             $lastSlip = ProductionRequisitionSlip::withoutGlobalScopes()
                 ->where('tenant_id', $order->tenant_id)
+                ->when($branchId !== null, fn($q) => $q->where('branch_id', $branchId))
                 ->where('requisition_number', 'like', "{$prefix}%")
                 ->orderBy('id', 'desc')
                 ->first();
@@ -939,6 +957,14 @@ class ProductionOrderService
                 $nextNum = ((int) $lastNumStr) + 1;
             }
             $reqNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            while (ProductionRequisitionSlip::withoutGlobalScopes()
+                ->where('tenant_id', $order->tenant_id)
+                ->when($branchId !== null, fn($q) => $q->where('branch_id', $branchId))
+                ->where('requisition_number', $reqNumber)
+                ->exists()) {
+                $nextNum++;
+                $reqNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            }
 
             $slipNotes = 'Ad-hoc Production Requirement for Order ' . $order->order_number;
             if (!empty($notes)) {
@@ -947,6 +973,8 @@ class ProductionOrderService
 
             $slip = ProductionRequisitionSlip::create([
                 'tenant_id' => $order->tenant_id,
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
                 'production_order_id' => $order->id,
                 'requisition_number' => $reqNumber,
                 'status' => 'pending',
@@ -1014,10 +1042,13 @@ class ProductionOrderService
 
     private function createRequisitionSlip(ProductionOrder $order, array $itemsToResolve): void
     {
+        $branchId = $order->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+        $companyId = $order->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
         $year = now()->format('Y');
         $prefix = "MR-{$year}-";
         $lastSlip = ProductionRequisitionSlip::withoutGlobalScopes()
             ->where('tenant_id', $order->tenant_id)
+            ->when($branchId !== null, fn($q) => $q->where('branch_id', $branchId))
             ->where('requisition_number', 'like', "{$prefix}%")
             ->orderBy('id', 'desc')
             ->first();
@@ -1027,9 +1058,19 @@ class ProductionOrderService
             $nextNum = ((int) $lastNumStr) + 1;
         }
         $reqNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+        while (ProductionRequisitionSlip::withoutGlobalScopes()
+            ->where('tenant_id', $order->tenant_id)
+            ->when($branchId !== null, fn($q) => $q->where('branch_id', $branchId))
+            ->where('requisition_number', $reqNumber)
+            ->exists()) {
+            $nextNum++;
+            $reqNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+        }
 
         $slip = ProductionRequisitionSlip::create([
             'tenant_id' => $order->tenant_id,
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
             'production_order_id' => $order->id,
             'requisition_number' => $reqNumber,
             'status' => 'pending',

@@ -374,15 +374,28 @@ class Employee extends BaseModel
         $processedNewTypeIds = [];
 
         foreach ($newPlan->types as $newType) {
-            // Find matching old type by code
-            $oldType = $oldTypesMap->get($newType->code);
+            // Find matching old type by case-insensitive code or name
+            $oldType = null;
+            if ($oldPlan && $oldPlan->types) {
+                $oldType = $oldPlan->types->first(function ($t) use ($newType) {
+                    return strcasecmp(trim((string)$t->code), trim((string)$newType->code)) === 0;
+                });
+                if (!$oldType) {
+                    $oldType = $oldPlan->types->first(function ($t) use ($newType) {
+                        return strcasecmp(trim((string)$t->name), trim((string)$newType->name)) === 0;
+                    });
+                }
+            }
+
             $oldBalance = $oldType ? $oldBalancesMap->get($oldType->id) : null;
 
             $newAllocated = floatval($newType->quota);
             $newUsed = 0.0;
+            $newEncashed = 0.0;
 
             if ($oldBalance) {
-                $newUsed = floatval($oldBalance->used);
+                $newUsed = floatval($oldBalance->used ?? 0);
+                $newEncashed = floatval($oldBalance->encashed ?? 0);
             }
 
             // Re-link employee's existing leave requests from the old leave type to the new leave type
@@ -447,20 +460,21 @@ class Employee extends BaseModel
                                 'tenant_id' => $this->tenant_id,
                                 'company_id' => $this->company_id,
                                 'employee_id' => $this->id,
-                                'leave_type_id' => $oldType->id,
+                                'leave_type_id' => $newType->id,
                                 'requested_days' => $encashableDays,
                                 'status' => 'approved',
                                 'reason' => 'Plan transition automatic encashment (Migrated to ' . $newPlan->name . ')',
-                                'approved_by' => auth()->id(),
+                                'approved_by' => auth()->id() ?? $this->user_id,
                                 'approved_at' => now(),
                             ]);
+                            $newEncashed += $encashableDays;
                         }
                         $oldUnused = 0.0;
                     } else {
                         $oldUnused = 0.0; // Lapsed
                     }
                 } else {
-                    // Excess leaves taken are always carried forward as a negative deduction
+                    // Excess leaves taken are carried forward as a negative deduction
                     $oldUnused = $netAccruedUnused;
                 }
             } else {
@@ -488,6 +502,7 @@ class Employee extends BaseModel
             ], [
                 'allocated' => round($newAllocated, 2),
                 'used' => round($newUsed, 2),
+                'encashed' => round($newEncashed, 2),
             ]);
 
             $processedNewTypeIds[] = $newType->id;

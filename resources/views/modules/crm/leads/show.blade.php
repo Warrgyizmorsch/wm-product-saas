@@ -415,22 +415,22 @@
                 <div class="d-flex align-items-center justify-content-between border-bottom px-3 py-2 bg-light-50 flex-wrap gap-2 sticky-top" style="z-index: 90; background-color: #f8fafc;">
                     <ul class="nav nav-pills zoho-nav-tabs" id="zohoLeadTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 rounded-pill {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="true">
-                                {{ __('crm.overview') }}
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 rounded-pill" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab" aria-controls="timeline-pane" aria-selected="false">
-                                {{ __('crm.timeline') }}
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') && request('tab') !== 'interactions' && request('tab') !== 'timeline' ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="{{ request('tab') !== 'interactions' && request('tab') !== 'timeline' ? 'true' : 'false' }}">
+                                <i class="feather-grid me-1"></i>{{ __('crm.overview') }}
                             </button>
                         </li>
                         @if ($activeQuotation || request()->has('create_quotation'))
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link px-3 py-1 fw-bold fs-12 rounded-pill {{ request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('view_quotation') ? 'active' : '' }}" id="quotation-tab" data-bs-toggle="tab" data-bs-target="#quotation-pane" type="button" role="tab" aria-controls="quotation-pane" aria-selected="false">
-                                    {{ __('crm.quotation') }}
+                                <button class="nav-link px-3 py-1 fw-bold fs-12 {{ request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('view_quotation') ? 'active' : '' }}" id="quotation-tab" data-bs-toggle="tab" data-bs-target="#quotation-pane" type="button" role="tab" aria-controls="quotation-pane" aria-selected="false">
+                                    <i class="feather-file-text me-1"></i>{{ __('crm.quotation_proposals') }} @if($activeQuotation)({{ $lead->quotations ? $lead->quotations->count() : 1 }})@endif
                                 </button>
                             </li>
                         @endif
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ request('tab') === 'interactions' || request('tab') === 'timeline' ? 'active' : '' }}" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab" aria-controls="timeline-pane" aria-selected="{{ request('tab') === 'interactions' || request('tab') === 'timeline' ? 'true' : 'false' }}">
+                                <i class="feather-clock me-1"></i>{{ __('crm.timeline_audit') }}
+                            </button>
+                        </li>
                     </ul>
 
                     <!-- Clock / Last Update Information -->
@@ -444,7 +444,7 @@
                 <div class="pt-2 px-3 pb-3 tab-content" id="zohoLeadTabsContent">
                     
                     <!-- ==================== TAB 1: OVERVIEW PANE ==================== -->
-                    <div class="tab-pane fade show {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') && old('form_type') !== 'quotation_create' && old('form_type') !== 'quotation_edit' ? 'active' : '' }}" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab">
+                    <div class="tab-pane fade {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') && old('form_type') !== 'quotation_create' && old('form_type') !== 'quotation_edit' && request('tab') !== 'interactions' && request('tab') !== 'timeline' ? 'show active' : '' }}" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab">
                         
                         @if ((request()->has('edit_lead') || old('form_type') === 'lead_edit') && !in_array(strtolower($lead->status ?? ''), ['dealing', 'won']))
                             <!-- ==================== STATE: EDIT LEAD FORM ==================== -->
@@ -1350,7 +1350,7 @@
                     </div> <!-- End TAB 1: OVERVIEW PANE -->
 
                     <!-- ==================== TAB 2: TIMELINE PANE (ACTIVITIES & HISTORY) ==================== -->
-                    <div class="tab-pane fade" id="timeline-pane" role="tabpanel" aria-labelledby="timeline-tab">
+                    <div class="tab-pane fade {{ request('tab') === 'interactions' || request('tab') === 'timeline' ? 'show active' : '' }}" id="timeline-pane" role="tabpanel" aria-labelledby="timeline-tab">
                         <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
                             <div class="card-body p-3">
                                 
@@ -1358,12 +1358,12 @@
                                 <div class="border-bottom pb-1 mb-3">
                                     <ul class="nav nav-tabs border-bottom-0 zoho-timeline-subtabs" id="zohoTimelineSubTabs" role="tablist">
                                         <li class="nav-item" role="presentation">
-                                            <button class="nav-link active py-2 px-3 border-0 bg-transparent" id="subtab-history-tab" data-bs-toggle="tab" data-bs-target="#subtab-history" type="button" role="tab" aria-controls="subtab-history" aria-selected="true">
+                                            <button class="nav-link {{ request('tab') !== 'interactions' ? 'active' : '' }} py-2 px-3 border-0 bg-transparent" id="subtab-history-tab" data-bs-toggle="tab" data-bs-target="#subtab-history" type="button" role="tab" aria-controls="subtab-history" aria-selected="{{ request('tab') !== 'interactions' ? 'true' : 'false' }}">
                                                 {{ __('crm.history') }}
                                             </button>
                                         </li>
                                         <li class="nav-item" role="presentation">
-                                            <button class="nav-link py-2 px-3 border-0 bg-transparent" id="subtab-interactions-tab" data-bs-toggle="tab" data-bs-target="#subtab-interactions" type="button" role="tab" aria-controls="subtab-interactions" aria-selected="false">
+                                            <button class="nav-link {{ request('tab') === 'interactions' ? 'active' : '' }} py-2 px-3 border-0 bg-transparent" id="subtab-interactions-tab" data-bs-toggle="tab" data-bs-target="#subtab-interactions" type="button" role="tab" aria-controls="subtab-interactions" aria-selected="{{ request('tab') === 'interactions' ? 'true' : 'false' }}">
                                                 {{ __('crm.interactions') }}
                                             </button>
                                         </li>
@@ -1374,7 +1374,7 @@
                                 <div class="tab-content" id="zohoTimelineSubTabsContent">
                                     
                                     <!-- SUBTAB 1: HISTORY TIMELINE -->
-                                    <div class="tab-pane fade show active" id="subtab-history" role="tabpanel" aria-labelledby="subtab-history-tab">
+                                    <div class="tab-pane fade {{ request('tab') !== 'interactions' ? 'show active' : '' }}" id="subtab-history" role="tabpanel" aria-labelledby="subtab-history-tab">
                                         <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
                                             <div class="d-flex align-items-center gap-2">
                                                 <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.timeline_history') }}</h5>
@@ -1447,7 +1447,7 @@
                                     </div>
 
                                     <!-- SUBTAB 2: INTERACTIONS (ACTIVITIES) TIMELINE -->
-                                    <div class="tab-pane fade" id="subtab-interactions" role="tabpanel" aria-labelledby="subtab-interactions-tab">
+                                    <div class="tab-pane fade {{ request('tab') === 'interactions' ? 'show active' : '' }}" id="subtab-interactions" role="tabpanel" aria-labelledby="subtab-interactions-tab">
                                         <div class="d-flex align-items-center justify-content-between mb-3 mt-1 flex-wrap gap-2">
                                             <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.interactions_scheduled_activities') }}</h5>
                                         </div>
@@ -2359,20 +2359,24 @@
             border: 1px solid #cbd5e1;
             background-color: #ffffff;
             color: #475569;
-            padding: 6px 16px;
+            padding: 6px 18px;
             font-size: 12px;
+            font-weight: 600;
+            border-radius: 20px !important;
             transition: all 0.2s ease;
         }
 
         .zoho-nav-tabs .nav-link:hover {
             background-color: #f8fafc;
             color: #0f172a;
+            border-color: #94a3b8;
         }
 
         .zoho-nav-tabs .nav-link.active {
-            background-color: #eef2f6 !important;
-            color: #0f172a !important;
-            border-color: #94a3b8 !important;
+            background-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+            border-color: var(--bs-primary) !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
         }
 
         .zoho-quick-info-box {
@@ -2858,18 +2862,21 @@
             var activeTabKey = 'lead_active_tab_' + {{ $lead->id }};
             var activeSubTabKey = 'lead_active_subtab_' + {{ $lead->id }};
             
-            // Check URL Hash first if present and clean it up from address bar
+            // Check URL Query Param & Hash first
+            var urlParams = new URLSearchParams(window.location.search);
+            var tabParam = urlParams.get('tab');
             var hash = window.location.hash;
-            if (hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
+
+            if (tabParam === 'interactions' || tabParam === 'timeline' || hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
                 localStorage.setItem(activeTabKey, 'timeline-tab');
-                if (hash === '#subtab-interactions') {
+                if (tabParam === 'interactions' || hash === '#subtab-interactions') {
                     localStorage.setItem(activeSubTabKey, 'subtab-interactions-tab');
                 } else if (hash === '#subtab-history') {
                     localStorage.setItem(activeSubTabKey, 'subtab-history-tab');
                 }
-            } else if (hash === '#overview' || hash === '#overview-pane') {
+            } else if (tabParam === 'overview' || hash === '#overview' || hash === '#overview-pane') {
                 localStorage.setItem(activeTabKey, 'overview-tab');
-            } else if (hash === '#quotation' || hash === '#quotation-pane') {
+            } else if (tabParam === 'quotation' || hash === '#quotation' || hash === '#quotation-pane') {
                 localStorage.setItem(activeTabKey, 'quotation-tab');
             }
 
@@ -2877,6 +2884,72 @@
             if (window.history && window.history.replaceState) {
                 var cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
                 window.history.replaceState(null, '', cleanUrl);
+            }
+
+            // Scroll Spy for Overview Sections
+            let isManualClick = false;
+            $('#zohoMainScrollable').on('scroll', function() {
+                if (isManualClick) return;
+                const scrollContainer = this;
+                const containerTop = scrollContainer.getBoundingClientRect().top;
+                const stickyHeader = document.querySelector('.sticky-top');
+                const stickyHeaderHeight = stickyHeader ? stickyHeader.offsetHeight : 50;
+
+                const sections = ['#sectionLeadInfo', '#sectionLeadProducts', '#sectionAddressInfo', '#sectionRequirements', '#sectionNotes', '#sectionDocuments'];
+                let currentSection = null;
+
+                sections.forEach(function(secId) {
+                    const el = document.querySelector(secId);
+                    if (el) {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.top - containerTop <= stickyHeaderHeight + 60) {
+                            currentSection = secId;
+                        }
+                    }
+                });
+
+                if (currentSection && $('#overview-pane').hasClass('active')) {
+                    $('#zohoSidebarLinks a').removeClass('active');
+                    $('#zohoSidebarLinks a[href="' + currentSection + '"]').addClass('active');
+                }
+            });
+
+            function syncSidebarWithCurrentTab(targetId) {
+                if (targetId === 'overview-tab' || targetId === '#overview-pane') {
+                    const scrollContainer = document.getElementById('zohoMainScrollable');
+                    if (scrollContainer) {
+                        const containerTop = scrollContainer.getBoundingClientRect().top;
+                        const stickyHeader = document.querySelector('.sticky-top');
+                        const stickyHeaderHeight = stickyHeader ? stickyHeader.offsetHeight : 50;
+                        const sections = ['#sectionLeadInfo', '#sectionLeadProducts', '#sectionAddressInfo', '#sectionRequirements', '#sectionNotes', '#sectionDocuments'];
+                        let currentSection = '#sectionLeadInfo';
+                        sections.forEach(function(secId) {
+                            const el = document.querySelector(secId);
+                            if (el) {
+                                const rect = el.getBoundingClientRect();
+                                if (rect.top - containerTop <= stickyHeaderHeight + 60) {
+                                    currentSection = secId;
+                                }
+                            }
+                        });
+                        $('#zohoSidebarLinks a').removeClass('active');
+                        $('#zohoSidebarLinks a[href="' + currentSection + '"]').addClass('active');
+                    }
+                } else if (targetId === 'quotation-tab' || targetId === '#quotation-pane') {
+                    $('#zohoSidebarLinks a').removeClass('active');
+                    $('#zohoSidebarLinks a[href="#sectionQuotationHistory"]').addClass('active');
+                } else if (targetId === 'timeline-tab' || targetId === '#timeline-pane') {
+                    const isInteractionsActive = $('#subtab-interactions-tab').hasClass('active') || $('#subtab-interactions').hasClass('active') || localStorage.getItem(activeSubTabKey) === 'subtab-interactions-tab';
+                    const activeSubtabHref = isInteractionsActive ? '#subtab-interactions' : '#subtab-history';
+                    $('#zohoSidebarLinks a').removeClass('active');
+                    $('#zohoSidebarLinks a[href="' + activeSubtabHref + '"]').addClass('active');
+                } else if (targetId === 'subtab-interactions-tab' || targetId === '#subtab-interactions') {
+                    $('#zohoSidebarLinks a').removeClass('active');
+                    $('#zohoSidebarLinks a[href="#subtab-interactions"]').addClass('active');
+                } else if (targetId === 'subtab-history-tab' || targetId === '#subtab-history') {
+                    $('#zohoSidebarLinks a').removeClass('active');
+                    $('#zohoSidebarLinks a[href="#subtab-history"]').addClass('active');
+                }
             }
 
             // Restore tab from localStorage
@@ -2896,7 +2969,12 @@
                             bootstrap.Tab.getOrCreateInstance(subTabEl).show();
                         }
                     }
-                }, 50);
+                    syncSidebarWithCurrentTab(savedTabId);
+                }, 60);
+            } else {
+                if ($('#timeline-tab').hasClass('active')) {
+                    syncSidebarWithCurrentTab('timeline-tab');
+                }
             }
 
             var scrollTargetOnTabShown = null;
@@ -2921,6 +2999,7 @@
                 // Remove active class from all sidebar links and add to clicked one
                 $('#zohoSidebarLinks a').removeClass('active');
                 $(this).addClass('active');
+                isManualClick = true;
 
                 // Ensure URL hash is removed from browser bar
                 if (window.history && window.history.replaceState) {
@@ -2956,6 +3035,7 @@
                     if (targetEl.length) {
                         scrollToElement(targetEl);
                     }
+                    setTimeout(function() { isManualClick = false; }, 500);
                 } else if (mainTabEl) {
                     if (targetEl.length) {
                         scrollTargetOnTabShown = targetEl;
@@ -2973,11 +3053,15 @@
                         localStorage.setItem(activeSubTabKey, e.target.id);
                         localStorage.setItem(activeTabKey, 'timeline-tab');
                     }
+                    if (!scrollTargetOnTabShown) {
+                        syncSidebarWithCurrentTab(e.target.id);
+                    }
                 }
 
                 if (scrollTargetOnTabShown) {
                     scrollToElement(scrollTargetOnTabShown);
                     scrollTargetOnTabShown = null;
+                    setTimeout(function() { isManualClick = false; }, 500);
                 }
             });
 

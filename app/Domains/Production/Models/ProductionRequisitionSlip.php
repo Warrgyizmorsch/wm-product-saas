@@ -3,15 +3,21 @@
 namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductionRequisitionSlip extends BaseModel
 {
+    use BelongsToCompany, BelongsToBranch;
+
     protected $table = 'production_requisition_slips';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'production_order_id',
         'requisition_number',
         'status',

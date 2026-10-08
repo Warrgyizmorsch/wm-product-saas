@@ -260,11 +260,16 @@ class MaintenanceWorkOrderService
     public function createWorkOrder(int $tenantId, array $data, ?int $userId = null): ProductionMaintenanceWorkOrder
     {
         return DB::transaction(function () use ($tenantId, $data, $userId) {
+            $branchId = $data['branch_id'] ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            $companyId = $data['company_id'] ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+
             $data['tenant_id']  = $tenantId;
+            $data['company_id'] = $companyId;
+            $data['branch_id']  = $branchId;
             $data['created_by'] = $userId;
 
             if (empty($data['work_order_number'])) {
-                $data['work_order_number'] = $this->codeService->generateWorkOrderNumber($tenantId);
+                $data['work_order_number'] = $this->codeService->generateWorkOrderNumber($tenantId, $branchId);
             }
 
             if (empty($data['status'])) {
@@ -514,9 +519,15 @@ class MaintenanceWorkOrderService
             ]);
 
             $woNumber = $this->codeService->generateWorkOrderNumber($tenantId);
+            // 3. Create Breakdown Work Order
+            $branchId = $machine->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            $companyId = $machine->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+            $woNumber = $this->codeService->generateWorkOrderNumber($tenantId, $branchId);
 
             $wo = $this->repository->createWorkOrder([
                 'tenant_id'           => $tenantId,
+                'company_id'          => $companyId,
+                'branch_id'           => $branchId,
                 'work_order_number'   => $woNumber,
                 'machine_id'          => $machineId,
                 'type'                => ProductionMaintenanceWorkOrder::TYPE_BREAKDOWN,

@@ -4,16 +4,22 @@ namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductionWip extends BaseModel
 {
+    use BelongsToCompany, BelongsToBranch;
+
     protected $table = 'production_wips';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'production_order_id',
         'production_batch_id',
         'product_id',
@@ -56,6 +62,28 @@ class ProductionWip extends BaseModel
         'last_moved_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($wip) {
+            if ((empty($wip->company_id) || empty($wip->branch_id) || empty($wip->product_id)) && !empty($wip->production_order_id)) {
+                $order = $wip->order ?: ProductionOrder::withoutGlobalScopes()->find($wip->production_order_id);
+                if ($order) {
+                    if (empty($wip->company_id)) {
+                        $wip->company_id = $order->company_id;
+                    }
+                    if (empty($wip->branch_id)) {
+                        $wip->branch_id = $order->branch_id;
+                    }
+                    if (empty($wip->product_id)) {
+                        $wip->product_id = $order->product_id;
+                    }
+                }
+            }
+        });
+    }
 
     public function order(): BelongsTo
     {

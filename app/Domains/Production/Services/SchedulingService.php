@@ -207,10 +207,14 @@ class SchedulingService
             }
 
             $tenantId = $order->tenant_id;
+            $branchId = $order->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            $companyId = $order->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
 
             $schedule = ProductionSchedule::create([
                 'tenant_id' => $tenantId,
-                'schedule_number' => $this->numberService->generateNextNumber($tenantId),
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
+                'schedule_number' => $this->numberService->generateNextNumber($tenantId, $branchId),
                 'production_order_id' => $order->id,
                 'scheduling_type' => ProductionSchedule::TYPE_FORWARD,
                 'generated_by' => 'forward',
@@ -411,10 +415,14 @@ class SchedulingService
             }
 
             $tenantId = $order->tenant_id;
+            $branchId = $order->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            $companyId = $order->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
 
             $schedule = ProductionSchedule::create([
                 'tenant_id' => $tenantId,
-                'schedule_number' => $this->numberService->generateNextNumber($tenantId),
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
+                'schedule_number' => $this->numberService->generateNextNumber($tenantId, $branchId),
                 'production_order_id' => $order->id,
                 'scheduling_type' => ProductionSchedule::TYPE_BACKWARD,
                 'generated_by' => 'backward',

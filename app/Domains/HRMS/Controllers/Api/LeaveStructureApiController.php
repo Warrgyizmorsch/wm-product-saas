@@ -189,16 +189,37 @@ class LeaveStructureApiController extends Controller
         if ($request->filled('company_id')) {
             $query->where('company_id', $request->get('company_id'));
         }
-        if ($request->filled('status')) {
-            $query->where('status', $request->get('status') === '1' || $request->get('status') === 'true');
+        if ($request->has('status') && $request->get('status') !== null && $request->get('status') !== '') {
+            $statusVal = $request->get('status');
+            $query->where('status', ($statusVal === '1' || $statusVal === 'true' || $statusVal === 1 || $statusVal === true));
         }
         if ($request->filled('search')) {
             $search = $request->get('search');
             $query->where('name', 'like', "%{$search}%");
         }
 
-        $plans = $query->orderBy('name', 'asc')->get();
-        $formatted = $plans->map(fn($p) => $this->transformLeavePlan($p, false))->values();
+        $sort = $request->get('sort', 'name_asc');
+        switch ($sort) {
+            case 'name_desc':
+                $query->orderBy('name', 'desc');
+                break;
+            case 'newest':
+                $query->orderBy('created_at', 'desc');
+                break;
+            case 'name_asc':
+            default:
+                $query->orderBy('name', 'asc');
+                break;
+        }
+
+        if ($request->has('per_page') || $request->has('page')) {
+            $perPage = min($request->integer('per_page', 10), 100);
+            $plans = $query->paginate($perPage);
+            $formatted = $this->formatPaginatedData($plans, fn($p) => $this->transformLeavePlan($p, false));
+        } else {
+            $plans = $query->get();
+            $formatted = $plans->map(fn($p) => $this->transformLeavePlan($p, false))->values();
+        }
 
         return $this->sendSuccess($formatted, 'Leave plans retrieved successfully.');
     }
@@ -213,9 +234,9 @@ class LeaveStructureApiController extends Controller
             return $authError;
         }
 
-        $leavePlan = LeavePlan::with(['company', 'types'])->find($id);
+        $leavePlan = $id instanceof LeavePlan ? $id->loadMissing(['company', 'types']) : LeavePlan::with(['company', 'types'])->find($id);
         if (!$leavePlan) {
-            return $this->sendError("Leave plan with ID '{$id}' not found.", 404);
+            return $this->sendError("Leave plan not found.", 404);
         }
 
         return $this->sendSuccess($this->transformLeavePlan($leavePlan, true), 'Leave plan details loaded successfully.');
@@ -246,7 +267,7 @@ class LeaveStructureApiController extends Controller
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
 
         $newPlan = LeavePlan::create([
-            'company_id'     => $validated['company_id'] ?: (Company::first()?->id ?? 1),
+            'company_id'     => !empty($validated['company_id']) ? $validated['company_id'] : null,
             'name'           => $validated['name'],
             'effective_from' => $validated['effective_from'],
             'description'    => $validated['description'] ?? null,
@@ -270,9 +291,9 @@ class LeaveStructureApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to update leave plan.', 403);
         }
 
-        $leavePlan = LeavePlan::find($id);
+        $leavePlan = $id instanceof LeavePlan ? $id : LeavePlan::find($id);
         if (!$leavePlan) {
-            return $this->sendError("Leave plan with ID '{$id}' not found.", 404);
+            return $this->sendError("Leave plan not found.", 404);
         }
 
         $validated = $request->validate([
@@ -286,7 +307,7 @@ class LeaveStructureApiController extends Controller
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
 
         $leavePlan->update([
-            'company_id'     => $validated['company_id'] ?: $leavePlan->company_id ?: (Company::first()?->id ?? 1),
+            'company_id'     => !empty($validated['company_id']) ? $validated['company_id'] : null,
             'name'           => $validated['name'],
             'effective_from' => $validated['effective_from'],
             'description'    => $validated['description'] ?? null,
@@ -310,14 +331,15 @@ class LeaveStructureApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to delete leave plan.', 403);
         }
 
-        $leavePlan = LeavePlan::find($id);
+        $leavePlan = $id instanceof LeavePlan ? $id : LeavePlan::find($id);
         if (!$leavePlan) {
-            return $this->sendError("Leave plan with ID '{$id}' not found.", 404);
+            return $this->sendError("Leave plan not found.", 404);
         }
 
+        $deletedId = $leavePlan->id;
         $leavePlan->delete();
 
-        return $this->sendSuccess(['id' => (int)$id], 'Leave plan deleted successfully.');
+        return $this->sendSuccess(['id' => (int)$deletedId], 'Leave plan deleted successfully.');
     }
 
     // ==========================================
@@ -342,8 +364,9 @@ class LeaveStructureApiController extends Controller
         if ($request->filled('type')) {
             $query->where('type', $request->get('type'));
         }
-        if ($request->filled('status')) {
-            $query->where('status', $request->get('status') === '1' || $request->get('status') === 'true');
+        if ($request->has('status') && $request->get('status') !== null && $request->get('status') !== '') {
+            $statusVal = $request->get('status');
+            $query->where('status', ($statusVal === '1' || $statusVal === 'true' || $statusVal === 1 || $statusVal === true));
         }
         if ($request->filled('search')) {
             $search = $request->get('search');
@@ -380,9 +403,9 @@ class LeaveStructureApiController extends Controller
             return $authError;
         }
 
-        $leaveType = LeaveType::with(['plan'])->find($id);
+        $leaveType = $id instanceof LeaveType ? $id->loadMissing(['plan']) : LeaveType::with(['plan'])->find($id);
         if (!$leaveType) {
-            return $this->sendError("Leave type with ID '{$id}' not found.", 404);
+            return $this->sendError("Leave type not found.", 404);
         }
 
         return $this->sendSuccess($this->transformLeaveType($leaveType), 'Leave type details loaded successfully.');
@@ -443,13 +466,13 @@ class LeaveStructureApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to update leave type.', 403);
         }
 
-        $leaveType = LeaveType::find($id);
+        $leaveType = $id instanceof LeaveType ? $id : LeaveType::find($id);
         if (!$leaveType) {
-            return $this->sendError("Leave type with ID '{$id}' not found.", 404);
+            return $this->sendError("Leave type not found.", 404);
         }
 
         $validated = $request->validate([
-            'leave_plan_id' => 'required|integer|exists:leave_plans,id',
+            'leave_plan_id' => 'nullable|integer|exists:leave_plans,id',
             'name'          => 'required|string|max:255',
             'code'          => 'required|string|max:50',
             'type'          => 'required|in:paid,unpaid',
@@ -462,11 +485,11 @@ class LeaveStructureApiController extends Controller
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
 
         $leaveType->update([
-            'leave_plan_id' => $validated['leave_plan_id'],
+            'leave_plan_id' => $validated['leave_plan_id'] ?? $leaveType->leave_plan_id,
             'name'          => $validated['name'],
             'code'          => $validated['code'],
             'type'          => $validated['type'],
-            'color'         => $validated['color'] ?: '#3b82f6',
+            'color'         => !empty($validated['color']) ? $validated['color'] : ($leaveType->color ?: '#3b82f6'),
             'quota'         => $validated['quota'],
             'description'   => $validated['description'] ?? null,
             'status'        => $status,
@@ -489,9 +512,9 @@ class LeaveStructureApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to update leave policy rules.', 403);
         }
 
-        $leaveType = LeaveType::find($id);
+        $leaveType = $id instanceof LeaveType ? $id : LeaveType::find($id);
         if (!$leaveType) {
-            return $this->sendError("Leave type with ID '{$id}' not found.", 404);
+            return $this->sendError("Leave type not found.", 404);
         }
 
         $validated = $request->validate([
@@ -519,14 +542,15 @@ class LeaveStructureApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to delete leave type.', 403);
         }
 
-        $leaveType = LeaveType::find($id);
+        $leaveType = $id instanceof LeaveType ? $id : LeaveType::find($id);
         if (!$leaveType) {
-            return $this->sendError("Leave type with ID '{$id}' not found.", 404);
+            return $this->sendError("Leave type not found.", 404);
         }
 
+        $deletedId = $leaveType->id;
         $leaveType->delete();
 
-        return $this->sendSuccess(['id' => (int)$id], 'Leave type deleted successfully.');
+        return $this->sendSuccess(['id' => (int)$deletedId], 'Leave type deleted successfully.');
     }
 
     // ==========================================
@@ -686,20 +710,23 @@ class LeaveStructureApiController extends Controller
                 return $this->sendError('Cannot transition leave plans. The following employee(s) have pending leave or encashment requests: ' . implode(', ', $pendingEmployees), 422);
             }
 
-            $count = 0;
-            foreach ($employeeIds as $empId) {
-                $employee = Employee::find($empId);
-                if ($employee && (int)$employee->leave_plan_id !== (int)$newPlanId) {
-                    $oldPlanId = $employee->leave_plan_id;
-                    
-                    $employee->update([
-                        'leave_plan_id' => $newPlanId
-                    ]);
+            $count = \Illuminate\Support\Facades\DB::transaction(function () use ($employeeIds, $newPlanId, $action, $unusedAction) {
+                $processedCount = 0;
+                foreach ($employeeIds as $empId) {
+                    $employee = Employee::find($empId);
+                    if ($employee && (int)$employee->leave_plan_id !== (int)$newPlanId) {
+                        $oldPlanId = $employee->leave_plan_id;
+                        
+                        $employee->update([
+                            'leave_plan_id' => $newPlanId
+                        ]);
 
-                    $employee->migrateToLeavePlan($oldPlanId, $newPlanId, $action, $unusedAction);
-                    $count++;
+                        $employee->migrateToLeavePlan($oldPlanId, $newPlanId, $action, $unusedAction);
+                        $processedCount++;
+                    }
                 }
-            }
+                return $processedCount;
+            });
 
             return $this->sendSuccess([
                 'transitioned_count' => $count,
