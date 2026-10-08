@@ -872,6 +872,8 @@ class ProductionExecutionService
             // ── Step 2: Create production receipt record ──────────────────────
             $receipt = ProductionOrderReceipt::create([
                 'tenant_id' => $order->tenant_id,
+                'company_id' => $order->company_id ?? company_id(),
+                'branch_id' => $order->branch_id ?? branch_id(),
                 'production_order_id' => $order->id,
                 'product_id' => $order->product_id,
                 'warehouse_id' => $warehouseId,

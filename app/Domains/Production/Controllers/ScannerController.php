@@ -45,7 +45,12 @@ class ScannerController extends Controller
         // Same gate as the other shop-floor (MES) screens.
         abort_unless(auth()->user()?->hasProductionPermission('production.mes.execute'), 403);
 
-        return view('modules.production.mes.operator.scanner');
+        $tenantId = require_tenant_id();
+        $orders   = ProductionOrder::withoutGlobalScopes()->where('tenant_id', $tenantId)->latest()->take(3)->get();
+        $batches  = ProductionBatch::withoutGlobalScopes()->where('tenant_id', $tenantId)->latest()->take(3)->get();
+        $serials  = ProductionSerialNumber::withoutGlobalScopes()->where('tenant_id', $tenantId)->latest()->take(3)->get();
+
+        return view('modules.production.mes.operator.scanner', compact('orders', 'batches', 'serials'));
     }
 
     /**

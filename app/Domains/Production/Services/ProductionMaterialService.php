@@ -154,6 +154,8 @@ class ProductionMaterialService
 
             $issue = ProductionOrderIssue::create([
                 'tenant_id'           => $res->tenant_id,
+                'company_id'          => $res->productionOrder?->company_id ?? company_id(),
+                'branch_id'           => $res->productionOrder?->branch_id ?? branch_id(),
                 'production_order_id' => $res->production_order_id,
                 'reservation_id'      => $res->id,
                 'product_id'          => $res->product_id,
@@ -252,6 +254,8 @@ class ProductionMaterialService
 
             $issue = ProductionOrderIssue::create([
                 'tenant_id'           => $res->tenant_id,
+                'company_id'          => $res->productionOrder?->company_id ?? company_id(),
+                'branch_id'           => $res->productionOrder?->branch_id ?? branch_id(),
                 'production_order_id' => $res->production_order_id,
                 'reservation_id'      => $res->id,
                 'product_id'          => $res->product_id,
