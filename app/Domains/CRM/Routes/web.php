@@ -13,6 +13,7 @@ use App\Domains\CRM\Controllers\QuotationController;
 use App\Domains\CRM\Controllers\CrmSettingsController;
 use App\Domains\CRM\Controllers\CrmDashboardController;
 use App\Domains\CRM\Controllers\GoogleCalendarController;
+use App\Domains\CRM\Controllers\WebToLeadController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('crm')
@@ -23,10 +24,15 @@ Route::prefix('crm')
         Route::get('dashboard', [CrmDashboardController::class, 'index'])->name('dashboard');
         Route::get('dashboard/export/{format}', [CrmDashboardController::class, 'export'])->name('dashboard.export');
 
+        // Web-to-Lead Forms & Widget Builder
+        Route::get('web-forms', [WebToLeadController::class, 'index'])->name('web-forms.index');
+        Route::post('web-forms/save-schema', [WebToLeadController::class, 'saveSchema'])->name('web-forms.save-schema');
+
         // CRM Settings Routes
         Route::get('settings', [CrmSettingsController::class, 'index'])->name('settings.index');
         Route::post('settings/invoicing-policy', [CrmSettingsController::class, 'updateInvoicingPolicy'])->name('settings.update-invoicing-policy');
         Route::post('settings/quotation-approval-policy', [CrmSettingsController::class, 'updateQuotationApprovalPolicy'])->name('settings.update-quotation-approval-policy');
+        Route::post('settings/lead-assignment', [CrmSettingsController::class, 'updateLeadAssignment'])->name('settings.update-lead-assignment');
         // CRM Masters Routes
         Route::prefix('masters')->as('masters.')->group(function (): void {
             Route::get('lead-statuses', [LeadStatusController::class, 'index'])->name('lead-statuses.index');

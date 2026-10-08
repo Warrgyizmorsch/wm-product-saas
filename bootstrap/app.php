@@ -45,6 +45,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhooks/razorpay',
             'webhooks/meta-leadgen',
             'api/webhooks/meta-leadgen',
+            'forms/lead-capture',
+            'forms/lead-capture/*',
+            'api/crm/public/lead-capture',
             'api/*',
         ]);
 
