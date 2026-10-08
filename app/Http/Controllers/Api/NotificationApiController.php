@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
+use App\Models\UserDeviceToken;
+use App\Services\Firebase\FcmService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class NotificationApiController extends Controller
 {
@@ -221,22 +224,129 @@ class NotificationApiController extends Controller
     {
         $request->validate([
             'fcm_token' => 'required|string',
-            'device_type' => 'nullable|string|in:android,ios,web',
+            'device_type' => 'nullable|string|in:android,ios,web,other',
+            'device_name' => 'nullable|string|max:150',
         ]);
 
         $user = $request->user();
+        $token = trim($request->input('fcm_token'));
+        $deviceType = $request->input('device_type', 'android');
+        $deviceName = $request->input('device_name');
+
+        // 1. Maintain backward compatibility with $user->settings
         $settings = is_array($user->settings) ? $user->settings : json_decode($user->settings ?? '{}', true) ?? [];
-
-        $settings['fcm_token'] = $request->input('fcm_token');
-        $settings['device_type'] = $request->input('device_type', 'android');
+        $settings['fcm_token'] = $token;
+        $settings['device_type'] = $deviceType;
         $settings['fcm_updated_at'] = now()->toISOString();
-
         $user->settings = $settings;
-        $user->save();
+        $user->saveQuietly();
+
+        // 2. Multi-device table support
+        try {
+            if (Schema::hasTable('user_device_tokens')) {
+                $hash = hash('sha256', $token);
+                UserDeviceToken::updateOrCreate(
+                    [
+                        'token_hash' => $hash,
+                    ],
+                    [
+                        'tenant_id' => $user->tenant_id ?? 1,
+                        'user_id' => $user->id,
+                        'fcm_token' => $token,
+                        'device_type' => $deviceType,
+                        'device_name' => $deviceName,
+                        'is_active' => true,
+                        'last_used_at' => now(),
+                    ]
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to store user device token in table: " . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Device token registered successfully.',
+        ]);
+    }
+
+    /**
+     * Unregister / Deactivate a device token upon logout or toggle.
+     *
+     * DELETE /api/notifications/device-token
+     */
+    public function removeDeviceToken(Request $request): JsonResponse
+    {
+        $request->validate([
+            'fcm_token' => 'required|string',
+        ]);
+
+        $user = $request->user();
+        $token = trim($request->input('fcm_token'));
+
+        // Deactivate in dedicated table
+        FcmService::deactivateToken($token);
+
+        // Clear settings if matching
+        $settings = is_array($user->settings) ? $user->settings : json_decode($user->settings ?? '{}', true) ?? [];
+        if (!empty($settings['fcm_token']) && $settings['fcm_token'] === $token) {
+            unset($settings['fcm_token']);
+            $user->settings = $settings;
+            $user->saveQuietly();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device token removed successfully.',
+        ]);
+    }
+
+    /**
+     * Authenticated endpoint to test FCM push notification delivery to the caller's device(s).
+     *
+     * POST /api/notifications/test-fcm
+     */
+    public function testFcm(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!FcmService::isConfigured()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Firebase credentials are not configured or incomplete on the server.',
+            ], 422);
+        }
+
+        $targetToken = $request->input('fcm_token');
+        $title = $request->input('title', 'MossiERP Push Notification Test');
+        $message = $request->input('message', 'Firebase FCM is configured and working perfectly! 🚀');
+
+        if (!empty($targetToken)) {
+            $result = FcmService::sendToToken(
+                token: $targetToken,
+                title: $title,
+                body: $message,
+                data: [
+                    'type' => 'test',
+                    'timestamp' => now()->toIso8601String(),
+                ]
+            );
+        } else {
+            $result = FcmService::sendToUser(
+                user: $user,
+                title: $title,
+                body: $message,
+                extraData: [
+                    'type' => 'test',
+                    'timestamp' => now()->toIso8601String(),
+                ]
+            );
+        }
+
+        return response()->json([
+            'success' => $result['success'] ?? false,
+            'message' => ($result['success'] ?? false) ? 'Test push notification sent successfully.' : 'Failed to send test push notification.',
+            'result' => $result,
         ]);
     }
 

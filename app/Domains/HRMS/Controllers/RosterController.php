@@ -34,12 +34,27 @@ class RosterController extends Controller
     {
         $this->authorize('create', \App\Domains\HRMS\Models\Roster::class);
 
+        $tenantId = auth()->user()?->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : 1) ?? 1;
+
         $validated = $request->validate([
-            'company_id'            => 'required|exists:companies,id',
+            'company_id'            => 'nullable|exists:companies,id',
             'name'                  => 'required|string|max:255',
-            'code'                  => 'required|string|max:50|unique:production_shifts,code',
-            'start_time'            => 'required|date_format:H:i',
-            'end_time'              => 'required|date_format:H:i',
+            'code'                  => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('production_shifts', 'code')->where(function ($query) use ($tenantId, $request) {
+                    $q = $query->where('tenant_id', $tenantId);
+                    if ($request->filled('company_id')) {
+                        $q->where('company_id', $request->company_id);
+                    } else {
+                        $q->whereNull('company_id');
+                    }
+                    return $q;
+                }),
+            ],
+            'start_time'            => 'required',
+            'end_time'              => 'required',
             'break_minutes'         => 'nullable|integer|min:0',
             'grace_period_minutes'  => 'nullable|integer|min:0',
             'overtime_allowed'      => 'nullable|boolean',
@@ -47,23 +62,43 @@ class RosterController extends Controller
             'description'           => 'nullable|string',
         ]);
 
+        $validated['tenant_id']        = $tenantId;
+        $validated['company_id']       = $request->filled('company_id') ? (int) $request->company_id : null;
+        $validated['break_minutes']    = (int) ($request->input('break_minutes', 0));
         $validated['overtime_allowed'] = ($request->overtime_allowed === '1' || $request->overtime_allowed === 1 || $request->overtime_allowed === true);
         $validated['active']           = ($request->active === '1' || $request->active === 1 || $request->active === true);
 
         $this->rosterRepository->storeShift($validated);
 
         return redirect()->route('hrms.roster.index', ['tab' => 'shifts'])
-            ->with('success', 'Shift created successfully.');
+            ->with('success', __('hrms.roster.shift_created'));
     }
 
     public function updateShift(Request $request, ProductionShift $shift): RedirectResponse
     {
         $this->authorize('update', \App\Domains\HRMS\Models\Roster::class);
 
+        $tenantId = auth()->user()?->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : 1) ?? 1;
+
         $validated = $request->validate([
-            'company_id'           => 'required|exists:companies,id',
+            'company_id'           => 'nullable|exists:companies,id',
             'name'                 => 'required|string|max:255',
-            'code'                 => ['required', 'string', 'max:50', Rule::unique('production_shifts', 'code')->ignore($shift->id)],
+            'code'                 => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('production_shifts', 'code')
+                    ->where(function ($query) use ($tenantId, $request) {
+                        $q = $query->where('tenant_id', $tenantId);
+                        if ($request->filled('company_id')) {
+                            $q->where('company_id', $request->company_id);
+                        } else {
+                            $q->whereNull('company_id');
+                        }
+                        return $q;
+                    })
+                    ->ignore($shift->id),
+            ],
             'start_time'           => 'required',
             'end_time'             => 'required',
             'break_minutes'        => 'nullable|integer|min:0',
@@ -73,13 +108,15 @@ class RosterController extends Controller
             'description'          => 'nullable|string',
         ]);
 
+        $validated['company_id']       = $request->filled('company_id') ? (int) $request->company_id : null;
+        $validated['break_minutes']    = (int) ($request->input('break_minutes', 0));
         $validated['overtime_allowed'] = ($request->overtime_allowed === '1' || $request->overtime_allowed === 1 || $request->overtime_allowed === true);
         $validated['active']           = ($request->active === '1' || $request->active === 1 || $request->active === true);
 
         $this->rosterRepository->updateShift($shift, $validated);
 
         return redirect()->route('hrms.roster.index', ['tab' => 'shifts'])
-            ->with('success', 'Shift updated successfully.');
+            ->with('success', __('hrms.roster.shift_updated'));
     }
 
     public function destroyShift(ProductionShift $shift): RedirectResponse
@@ -89,7 +126,7 @@ class RosterController extends Controller
         $this->rosterRepository->deleteShift($shift);
 
         return redirect()->route('hrms.roster.index', ['tab' => 'shifts'])
-            ->with('success', 'Shift deleted successfully.');
+            ->with('success', __('hrms.roster.shift_deleted'));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -116,7 +153,7 @@ class RosterController extends Controller
             'shift_id'                 => 'nullable|exists:production_shifts,id',
             'start_date'               => 'required|date',
             'end_date'                 => 'required|date|after_or_equal:start_date',
-            'status'                   => 'required|string',
+            'status'                   => 'nullable|string',
             'notes'                    => 'nullable|string',
         ]);
 
@@ -124,11 +161,12 @@ class RosterController extends Controller
         $shiftId     = $validated['shift_id'] ?? null;
         $startDate   = Carbon::parse($validated['start_date']);
         $endDate     = Carbon::parse($validated['end_date']);
-        $status      = $validated['status'] ?? 'scheduled';
+        $status      = !empty($validated['status']) ? $validated['status'] : 'scheduled';
         $notes       = $validated['notes'] ?? null;
 
         if (empty($employeeIds)) {
             $query = Employee::query()->where('status', true);
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($query, auth()->user());
             if ($request->filled('bulk_company_ids'))       { $query->whereIn('company_id', $validated['bulk_company_ids']); }
             if ($request->filled('bulk_business_unit_ids')) { $query->whereIn('business_unit_id', $validated['bulk_business_unit_ids']); }
             if ($request->filled('bulk_branch_ids'))        { $query->whereIn('branch_id', $validated['bulk_branch_ids']); }
@@ -138,7 +176,7 @@ class RosterController extends Controller
         }
 
         if (empty($employeeIds)) {
-            return redirect()->back()->with('error', 'No matching active employees found for shift assignment.');
+            return redirect()->back()->with('error', __('hrms.roster.no_emp_found'));
         }
 
         $period   = CarbonPeriod::create($startDate, $endDate);
@@ -154,7 +192,7 @@ class RosterController extends Controller
         }
 
         return redirect()->route('hrms.roster.index', ['tab' => 'roster', 'start_date' => $validated['start_date']])
-            ->with('success', 'Shifts assigned successfully.');
+            ->with('success', __('hrms.roster.shifts_assigned'));
     }
 
     public function updateCell(Request $request)
@@ -176,9 +214,9 @@ class RosterController extends Controller
         if ($value === 'default' || $value === '') {
             ShiftRoster::where(['employee_id' => $validated['employee_id'], 'date' => $validated['date']])->delete();
             if ($request->wantsJson() || $request->ajax()) {
-                return response()->json(['success' => true, 'message' => 'Shift roster cell reset to default.']);
+                return response()->json(['success' => true, 'message' => __('hrms.roster.cell_reset')]);
             }
-            return redirect()->back()->with('success', 'Shift roster cell reset to default.');
+            return redirect()->back()->with('success', __('hrms.roster.cell_reset'));
         }
 
         $shiftId  = $value === 'off' ? null : (int)$value;
@@ -190,10 +228,10 @@ class RosterController extends Controller
         );
 
         if ($request->wantsJson() || $request->ajax()) {
-            return response()->json(['success' => true, 'message' => 'Shift roster cell updated.']);
+            return response()->json(['success' => true, 'message' => __('hrms.roster.cell_updated')]);
         }
 
-        return redirect()->back()->with('success', 'Shift roster cell updated.');
+        return redirect()->back()->with('success', __('hrms.roster.cell_updated'));
     }
 
     public function updateWeeklyPattern(Request $request)
@@ -221,10 +259,10 @@ class RosterController extends Controller
         $employee->update(['weekly_pattern' => $pattern]);
 
         if ($request->wantsJson() || $request->ajax()) {
-            return response()->json(['success' => true, 'message' => 'Weekly pattern updated.']);
+            return response()->json(['success' => true, 'message' => __('hrms.roster.weekly_pattern_updated')]);
         }
 
-        return redirect()->back()->with('success', 'Weekly pattern updated.');
+        return redirect()->back()->with('success', __('hrms.roster.weekly_pattern_updated'));
     }
 
     public function assignWeekly(Request $request): RedirectResponse
@@ -232,24 +270,75 @@ class RosterController extends Controller
         $this->authorizeHrms('hrms.rosters.update');
 
         $validated = $request->validate([
-            'employee_ids'   => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
-            'pattern'        => 'required|array',
+            'employee_ids'             => 'nullable|array',
+            'employee_ids.*'           => 'exists:employees,id',
+            'bulk_company_ids'         => 'nullable|array',
+            'bulk_company_ids.*'       => 'exists:companies,id',
+            'bulk_business_unit_ids'   => 'nullable|array',
+            'bulk_business_unit_ids.*' => 'exists:business_units,id',
+            'bulk_branch_ids'          => 'nullable|array',
+            'bulk_branch_ids.*'        => 'exists:branches,id',
+            'bulk_department_ids'      => 'nullable|array',
+            'bulk_department_ids.*'    => 'exists:departments,id',
+            'bulk_designation_ids'     => 'nullable|array',
+            'bulk_designation_ids.*'   => 'exists:designations,id',
+            'days'                     => 'nullable|array',
+            'days.*'                   => 'integer|between:0,6',
+            'shift_id'                 => 'nullable',
+            'pattern'                  => 'nullable|array',
         ]);
 
-        foreach ($validated['employee_ids'] as $empId) {
-            $employee = Employee::find($empId);
-            if ($employee) {
-                $pattern = [];
-                foreach ($validated['pattern'] as $day => $shiftId) {
-                    $pattern[(int)$day] = $shiftId === 'off' ? 'off' : (int)$shiftId;
-                }
-                ksort($pattern);
-                $employee->update(['weekly_pattern' => $pattern]);
-            }
+        $employeeIds = $validated['employee_ids'] ?? [];
+
+        if (empty($employeeIds)) {
+            $query = Employee::query()->where('status', true);
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($query, auth()->user());
+            if ($request->filled('bulk_company_ids'))       { $query->whereIn('company_id', $validated['bulk_company_ids']); }
+            if ($request->filled('bulk_business_unit_ids')) { $query->whereIn('business_unit_id', $validated['bulk_business_unit_ids']); }
+            if ($request->filled('bulk_branch_ids'))        { $query->whereIn('branch_id', $validated['bulk_branch_ids']); }
+            if ($request->filled('bulk_department_ids'))    { $query->whereIn('department_id', $validated['bulk_department_ids']); }
+            if ($request->filled('bulk_designation_ids'))   { $query->whereIn('designation_id', $validated['bulk_designation_ids']); }
+            $employeeIds = $query->pluck('id')->toArray();
         }
 
-        return redirect()->back()->with('success', 'Weekly shift pattern assigned successfully.');
+        if (empty($employeeIds)) {
+            return redirect()->route('hrms.roster.index', ['tab' => 'weekly_patterns'])
+                ->with('error', __('hrms.roster.no_emp_found'));
+        }
+
+        $employees     = Employee::whereIn('id', $employeeIds)->get();
+        $days          = $validated['days'] ?? [];
+        $shiftId       = $validated['shift_id'] ?? null;
+        $directPattern = $validated['pattern'] ?? null;
+
+        foreach ($employees as $employee) {
+            $pattern = is_array($employee->weekly_pattern) ? $employee->weekly_pattern : [];
+
+            if (!empty($directPattern)) {
+                foreach ($directPattern as $d => $sId) {
+                    if ($sId === '' || $sId === null || $sId === 'default') {
+                        unset($pattern[(int)$d]);
+                    } else {
+                        $pattern[(int)$d] = $sId === 'off' ? 'off' : (int)$sId;
+                    }
+                }
+            } elseif (!empty($days)) {
+                foreach ($days as $day) {
+                    $dayInt = (int)$day;
+                    if ($shiftId === '' || $shiftId === null || $shiftId === 'default') {
+                        unset($pattern[$dayInt]);
+                    } else {
+                        $pattern[$dayInt] = $shiftId === 'off' ? 'off' : (int)$shiftId;
+                    }
+                }
+            }
+
+            ksort($pattern);
+            $employee->update(['weekly_pattern' => !empty($pattern) ? $pattern : null]);
+        }
+
+        return redirect()->route('hrms.roster.index', ['tab' => 'weekly_patterns'])
+            ->with('success', __('hrms.roster.weekly_shift_pattern_assigned'));
     }
 
     public function clearWeekly(Request $request): RedirectResponse
@@ -257,13 +346,39 @@ class RosterController extends Controller
         $this->authorizeHrms('hrms.rosters.update');
 
         $validated = $request->validate([
-            'employee_ids'   => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
+            'employee_ids'             => 'nullable|array',
+            'employee_ids.*'           => 'exists:employees,id',
+            'bulk_company_ids'         => 'nullable|array',
+            'bulk_company_ids.*'       => 'exists:companies,id',
+            'bulk_business_unit_ids'   => 'nullable|array',
+            'bulk_business_unit_ids.*' => 'exists:business_units,id',
+            'bulk_branch_ids'          => 'nullable|array',
+            'bulk_branch_ids.*'        => 'exists:branches,id',
+            'bulk_department_ids'      => 'nullable|array',
+            'bulk_department_ids.*'    => 'exists:departments,id',
+            'bulk_designation_ids'     => 'nullable|array',
+            'bulk_designation_ids.*'   => 'exists:designations,id',
         ]);
 
-        Employee::whereIn('id', $validated['employee_ids'])->update(['weekly_pattern' => null]);
+        $employeeIds = $validated['employee_ids'] ?? [];
 
-        return redirect()->back()->with('success', 'Weekly patterns cleared.');
+        if (empty($employeeIds)) {
+            $query = Employee::query()->where('status', true);
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($query, auth()->user());
+            if ($request->filled('bulk_company_ids'))       { $query->whereIn('company_id', $validated['bulk_company_ids']); }
+            if ($request->filled('bulk_business_unit_ids')) { $query->whereIn('business_unit_id', $validated['bulk_business_unit_ids']); }
+            if ($request->filled('bulk_branch_ids'))        { $query->whereIn('branch_id', $validated['bulk_branch_ids']); }
+            if ($request->filled('bulk_department_ids'))    { $query->whereIn('department_id', $validated['bulk_department_ids']); }
+            if ($request->filled('bulk_designation_ids'))   { $query->whereIn('designation_id', $validated['bulk_designation_ids']); }
+            $employeeIds = $query->pluck('id')->toArray();
+        }
+
+        if (!empty($employeeIds)) {
+            Employee::whereIn('id', $employeeIds)->update(['weekly_pattern' => null]);
+        }
+
+        return redirect()->route('hrms.roster.index', ['tab' => 'weekly_patterns'])
+            ->with('success', __('hrms.roster.weekly_patterns_cleared'));
     }
 
     public function clear(Request $request): RedirectResponse
@@ -293,6 +408,7 @@ class RosterController extends Controller
 
         if (empty($employeeIds)) {
             $query = Employee::query()->where('status', true);
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($query, auth()->user());
             if ($request->filled('bulk_company_ids'))       { $query->whereIn('company_id', $validated['bulk_company_ids']); }
             if ($request->filled('bulk_business_unit_ids')) { $query->whereIn('business_unit_id', $validated['bulk_business_unit_ids']); }
             if ($request->filled('bulk_branch_ids'))        { $query->whereIn('branch_id', $validated['bulk_branch_ids']); }
@@ -302,7 +418,7 @@ class RosterController extends Controller
         }
 
         if (empty($employeeIds)) {
-            return redirect()->back()->with('error', 'No matching active employees found for roster clearance.');
+            return redirect()->back()->with('error', __('hrms.roster.no_emp_found'));
         }
 
         ShiftRoster::query()
@@ -311,7 +427,7 @@ class RosterController extends Controller
             ->delete();
 
         return redirect()->route('hrms.roster.index', ['tab' => 'roster', 'start_date' => $startDate])
-            ->with('success', 'Roster entries cleared successfully.');
+            ->with('success', __('hrms.roster.entries_cleared'));
     }
 
     // Legacy aliases

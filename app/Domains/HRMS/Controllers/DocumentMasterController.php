@@ -4,10 +4,16 @@ namespace App\Domains\HRMS\Controllers;
 
 use App\Domains\HRMS\Models\DocumentCategory;
 use App\Domains\HRMS\Models\DocumentMaster;
+use App\Domains\HRMS\Models\DocumentTemplate;
+use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Repositories\DocumentMasterRepositoryInterface;
+use App\Domains\HRMS\Services\DocumentTemplateService;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -22,7 +28,7 @@ class DocumentMasterController extends Controller
      */
     public function index(Request $request): View
     {
-        $this->authorize('viewAny', \App\Domains\HRMS\Models\DocumentType::class);
+        $this->authorize('viewAny', DocumentMaster::class);
 
         $data = $this->documentMasterRepository->getIndexData($request->all());
 
@@ -34,18 +40,17 @@ class DocumentMasterController extends Controller
      */
     public function storeCategory(Request $request): RedirectResponse
     {
-        $this->authorize('create', \App\Domains\HRMS\Models\DocumentType::class);
+        $this->authorize('create', DocumentCategory::class);
         $validated = $request->validate([
-            'company_id' => 'required|exists:companies,id',
-            'name' => 'required|string|max:255',
+            'company_id'  => 'required|exists:companies,id',
+            'name'        => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
         ]);
 
-        // tenant_id is automatically handled by BaseModel's creating event
         $this->documentMasterRepository->storeCategory($validated);
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'categories'])
-            ->with('success', 'Document category created successfully.');
+            ->with('success', __('hrms.document_master.category_created_success'));
     }
 
     /**
@@ -53,17 +58,17 @@ class DocumentMasterController extends Controller
      */
     public function updateCategory(Request $request, DocumentCategory $category): RedirectResponse
     {
-        $this->authorize('update', \App\Domains\HRMS\Models\DocumentType::class);
+        $this->authorize('update', $category);
         $validated = $request->validate([
-            'company_id' => 'required|exists:companies,id',
-            'name' => 'required|string|max:255',
+            'company_id'  => 'required|exists:companies,id',
+            'name'        => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
         ]);
 
         $this->documentMasterRepository->updateCategory($category, $validated);
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'categories'])
-            ->with('success', 'Document category updated successfully.');
+            ->with('success', __('hrms.document_master.category_updated_success'));
     }
 
     /**
@@ -71,17 +76,17 @@ class DocumentMasterController extends Controller
      */
     public function destroyCategory(DocumentCategory $category): RedirectResponse
     {
-        $this->authorize('delete', \App\Domains\HRMS\Models\DocumentType::class);
+        $this->authorize('delete', $category);
         // Prevent deleting category if it has associated document masters
         if ($category->documentMasters()->exists()) {
             return redirect()->route('hrms.documents-master.index', ['active_tab' => 'categories'])
-                ->with('error', 'Cannot delete category because it has associated document masters.');
+                ->with('error', __('hrms.document_master.cannot_delete_category_has_docs'));
         }
 
         $this->documentMasterRepository->deleteCategory($category);
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'categories'])
-            ->with('success', 'Document category deleted successfully.');
+            ->with('success', __('hrms.document_master.category_deleted_success'));
     }
 
     /**
@@ -89,28 +94,28 @@ class DocumentMasterController extends Controller
      */
     public function storeDocument(Request $request): RedirectResponse
     {
-        $this->authorize('create', \App\Domains\HRMS\Models\DocumentType::class);
-        $tenantId = auth()->user()->tenant_id;
+        $this->authorize('create', DocumentMaster::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
 
         $validated = $request->validate([
-            'document_category_id' => 'required|exists:document_categories,id',
-            'name' => 'required|string|max:255',
-            'code' => [
+            'document_category_id'  => 'required|exists:document_categories,id',
+            'name'                  => 'required|string|max:255',
+            'code'                  => [
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('document_masters', 'code')->where('tenant_id', $tenantId),
+                Rule::unique('document_masters', 'code')->where(fn($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q->whereNull('tenant_id')),
             ],
-            'description' => 'nullable|string|max:1000',
-            'is_required' => 'nullable|boolean',
+            'description'           => 'nullable|string|max:1000',
+            'is_required'           => 'nullable|boolean',
             'upload_responsibility' => 'required|string|in:employee,hr,both',
-            'approval_required' => 'nullable|boolean',
-            'requires_signature' => 'nullable|boolean',
-            'expiry_applicable' => 'nullable|boolean',
-            'reminder_days_before' => 'nullable|required_if:expiry_applicable,1|integer|min:1',
-            'employee_can_view' => 'nullable|boolean',
+            'approval_required'     => 'nullable|boolean',
+            'requires_signature'    => 'nullable|boolean',
+            'expiry_applicable'     => 'nullable|boolean',
+            'reminder_days_before'  => 'nullable|required_if:expiry_applicable,1,true,on|integer|min:1',
+            'employee_can_view'     => 'nullable|boolean',
             'employee_can_download' => 'nullable|boolean',
-            'status' => 'required|string|in:active,inactive',
+            'status'                => 'required|string|in:active,inactive',
         ]);
 
         // Normalize checkboxes
@@ -118,8 +123,15 @@ class DocumentMasterController extends Controller
         $validated['approval_required'] = $request->boolean('approval_required');
         $validated['requires_signature'] = $request->boolean('requires_signature');
         $validated['expiry_applicable'] = $request->boolean('expiry_applicable');
-        $validated['employee_can_view'] = $request->boolean('employee_can_view');
-        $validated['employee_can_download'] = $request->boolean('employee_can_download');
+        if ($validated['upload_responsibility'] !== 'hr') {
+            $validated['employee_can_view'] = true;
+            $validated['employee_can_download'] = true;
+        } else {
+            $validated['employee_can_view'] = $request->boolean('employee_can_view');
+            $validated['employee_can_download'] = $request->has('employee_can_download')
+                ? $request->boolean('employee_can_download')
+                : $validated['employee_can_view'];
+        }
 
         if (!$validated['expiry_applicable']) {
             $validated['reminder_days_before'] = null;
@@ -128,7 +140,7 @@ class DocumentMasterController extends Controller
         $this->documentMasterRepository->storeDocument($validated);
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'documents'])
-            ->with('success', 'Document master created successfully.');
+            ->with('success', __('hrms.document_master.document_created_success'));
     }
 
     /**
@@ -136,28 +148,28 @@ class DocumentMasterController extends Controller
      */
     public function updateDocument(Request $request, DocumentMaster $document): RedirectResponse
     {
-        $this->authorize('update', \App\Domains\HRMS\Models\DocumentType::class);
-        $tenantId = $document->tenant_id ?? auth()->user()->tenant_id;
+        $this->authorize('update', $document);
+        $tenantId = $document->tenant_id ?? tenant_id() ?? auth()->user()?->tenant_id;
 
         $validated = $request->validate([
-            'document_category_id' => 'required|exists:document_categories,id',
-            'name' => 'required|string|max:255',
-            'code' => [
+            'document_category_id'  => 'required|exists:document_categories,id',
+            'name'                  => 'required|string|max:255',
+            'code'                  => [
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('document_masters', 'code')->where('tenant_id', $tenantId)->ignore($document->id),
+                Rule::unique('document_masters', 'code')->where(fn($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q->whereNull('tenant_id'))->ignore($document->id),
             ],
-            'description' => 'nullable|string|max:1000',
-            'is_required' => 'nullable|boolean',
+            'description'           => 'nullable|string|max:1000',
+            'is_required'           => 'nullable|boolean',
             'upload_responsibility' => 'required|string|in:employee,hr,both',
-            'approval_required' => 'nullable|boolean',
-            'requires_signature' => 'nullable|boolean',
-            'expiry_applicable' => 'nullable|boolean',
-            'reminder_days_before' => 'nullable|required_if:expiry_applicable,1|integer|min:1',
-            'employee_can_view' => 'nullable|boolean',
+            'approval_required'     => 'nullable|boolean',
+            'requires_signature'    => 'nullable|boolean',
+            'expiry_applicable'     => 'nullable|boolean',
+            'reminder_days_before'  => 'nullable|required_if:expiry_applicable,1,true,on|integer|min:1',
+            'employee_can_view'     => 'nullable|boolean',
             'employee_can_download' => 'nullable|boolean',
-            'status' => 'required|string|in:active,inactive',
+            'status'                => 'required|string|in:active,inactive',
         ]);
 
         // Normalize checkboxes
@@ -165,8 +177,15 @@ class DocumentMasterController extends Controller
         $validated['approval_required'] = $request->boolean('approval_required');
         $validated['requires_signature'] = $request->boolean('requires_signature');
         $validated['expiry_applicable'] = $request->boolean('expiry_applicable');
-        $validated['employee_can_view'] = $request->boolean('employee_can_view');
-        $validated['employee_can_download'] = $request->boolean('employee_can_download');
+        if ($validated['upload_responsibility'] !== 'hr') {
+            $validated['employee_can_view'] = true;
+            $validated['employee_can_download'] = true;
+        } else {
+            $validated['employee_can_view'] = $request->boolean('employee_can_view');
+            $validated['employee_can_download'] = $request->has('employee_can_download')
+                ? $request->boolean('employee_can_download')
+                : $validated['employee_can_view'];
+        }
 
         if (!$validated['expiry_applicable']) {
             $validated['reminder_days_before'] = null;
@@ -175,7 +194,7 @@ class DocumentMasterController extends Controller
         $this->documentMasterRepository->updateDocument($document, $validated);
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'documents'])
-            ->with('success', 'Document master updated successfully.');
+            ->with('success', __('hrms.document_master.document_updated_success'));
     }
 
     /**
@@ -183,26 +202,29 @@ class DocumentMasterController extends Controller
      */
     public function destroyDocument(DocumentMaster $document): RedirectResponse
     {
-        $this->authorize('delete', \App\Domains\HRMS\Models\DocumentType::class);
+        $this->authorize('delete', $document);
         $this->documentMasterRepository->deleteDocument($document);
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'documents'])
-            ->with('success', 'Document master deleted successfully.');
+            ->with('success', __('hrms.document_master.document_deleted_success'));
     }
 
     /**
      * Toggle the status (active/inactive) of an existing document master.
      */
-    public function toggleStatus(DocumentMaster $document): RedirectResponse
+    public function toggleStatus(Request $request, DocumentMaster $document): RedirectResponse
     {
-        $newStatus = $document->status === 'active' ? 'inactive' : 'active';
+        $this->authorize('update', $document);
+        $newStatus = $request->has('status')
+            ? ($request->input('status') === 'active' ? 'active' : 'inactive')
+            : ($document->status === 'active' ? 'inactive' : 'active');
         
         $this->documentMasterRepository->updateDocument($document, [
             'status' => $newStatus
         ]);
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'documents'])
-            ->with('success', 'Document status updated successfully.');
+            ->with('success', __('hrms.document_master.document_status_updated_success'));
     }
 
     /**
@@ -210,7 +232,8 @@ class DocumentMasterController extends Controller
      */
     public function storeTemplate(Request $request): RedirectResponse
     {
-        $tenantId = auth()->user()->tenant_id;
+        $this->authorize('create', DocumentTemplate::class);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
 
         $validated = $request->validate([
             'company_id'           => 'nullable|exists:companies,id',
@@ -220,7 +243,7 @@ class DocumentMasterController extends Controller
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('document_templates', 'code')->where('tenant_id', $tenantId),
+                Rule::unique('document_templates', 'code')->where(fn($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q->whereNull('tenant_id')),
             ],
             'template_file'        => 'nullable|file|mimes:html,htm,txt,docx|max:10240',
             'header_content'       => 'nullable|string',
@@ -233,7 +256,7 @@ class DocumentMasterController extends Controller
 
         $validated['requires_signature'] = $request->boolean('requires_signature');
 
-        $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+        $templateService = app(DocumentTemplateService::class);
 
         // If file is uploaded, extract content to populate body_content
         if ($request->hasFile('template_file')) {
@@ -245,18 +268,19 @@ class DocumentMasterController extends Controller
             $validated['template_file_path'] = $file->store('document_templates', 'public');
         }
 
-        \App\Domains\HRMS\Models\DocumentTemplate::create($validated);
+        DocumentTemplate::create($validated);
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'templates'])
-            ->with('success', 'Document template created successfully.');
+            ->with('success', __('hrms.document_master.template_created_success'));
     }
 
     /**
      * Update an existing document template.
      */
-    public function updateTemplate(Request $request, \App\Domains\HRMS\Models\DocumentTemplate $template): RedirectResponse
+    public function updateTemplate(Request $request, DocumentTemplate $template): RedirectResponse
     {
-        $tenantId = $template->tenant_id ?? auth()->user()->tenant_id;
+        $this->authorize('update', $template);
+        $tenantId = $template->tenant_id ?? tenant_id() ?? auth()->user()?->tenant_id;
 
         $validated = $request->validate([
             'company_id'           => 'nullable|exists:companies,id',
@@ -266,7 +290,7 @@ class DocumentMasterController extends Controller
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('document_templates', 'code')->where('tenant_id', $tenantId)->ignore($template->id),
+                Rule::unique('document_templates', 'code')->where(fn($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q->whereNull('tenant_id'))->ignore($template->id),
             ],
             'template_file'        => 'nullable|file|mimes:html,htm,txt,docx|max:10240',
             'header_content'       => 'nullable|string',
@@ -279,7 +303,7 @@ class DocumentMasterController extends Controller
 
         $validated['requires_signature'] = $request->boolean('requires_signature');
 
-        $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+        $templateService = app(DocumentTemplateService::class);
 
         if ($request->hasFile('template_file')) {
             $file = $request->file('template_file');
@@ -287,27 +311,31 @@ class DocumentMasterController extends Controller
             if (!empty($extractedContent)) {
                 $validated['body_content'] = $extractedContent;
             }
+            if ($template->template_file_path && Storage::disk('public')->exists($template->template_file_path)) {
+                Storage::disk('public')->delete($template->template_file_path);
+            }
             $validated['template_file_path'] = $file->store('document_templates', 'public');
         }
 
         $template->update($validated);
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'templates'])
-            ->with('success', 'Document template updated successfully.');
+            ->with('success', __('hrms.document_master.template_updated_success'));
     }
 
     /**
      * Parse an uploaded template file (.html, .txt, .docx) and return extracted content for Quill editor.
      */
-    public function parseTemplateFile(Request $request): \Illuminate\Http\JsonResponse
+    public function parseTemplateFile(Request $request): JsonResponse
     {
+        $this->authorize('create', DocumentTemplate::class);
         $request->validate([
             'template_file' => 'required|file|mimes:html,htm,txt,docx|max:10240',
         ]);
 
         try {
             $file = $request->file('template_file');
-            $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+            $templateService = app(DocumentTemplateService::class);
             $extractedContent = $templateService->importTemplateFromFile($file);
 
             return response()->json([
@@ -325,55 +353,63 @@ class DocumentMasterController extends Controller
     /**
      * Delete an existing document template.
      */
-    public function destroyTemplate(\App\Domains\HRMS\Models\DocumentTemplate $template): RedirectResponse
+    public function destroyTemplate(DocumentTemplate $template): RedirectResponse
     {
+        $this->authorize('delete', $template);
+        if ($template->template_file_path && Storage::disk('public')->exists($template->template_file_path)) {
+            Storage::disk('public')->delete($template->template_file_path);
+        }
+
         $template->delete();
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'templates'])
-            ->with('success', 'Document template deleted successfully.');
+            ->with('success', __('hrms.document_master.template_deleted_success'));
     }
 
     /**
      * Toggle status of an existing document template.
      */
-    public function toggleTemplateStatus(\App\Domains\HRMS\Models\DocumentTemplate $template): RedirectResponse
+    public function toggleTemplateStatus(Request $request, DocumentTemplate $template): RedirectResponse
     {
+        $this->authorize('update', $template);
+        $newStatus = $request->has('status')
+            ? ($request->input('status') === 'active' ? 'active' : 'inactive')
+            : ($template->status === 'active' ? 'inactive' : 'active');
+
         $template->update([
-            'status' => $template->status === 'active' ? 'inactive' : 'active'
+            'status' => $newStatus
         ]);
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'templates'])
-            ->with('success', 'Template status updated successfully.');
+            ->with('success', __('hrms.document_master.template_status_updated_success'));
     }
 
     /**
-     * Return live JSON preview of template rendered for an employee.
+     * Return live JSON preview of template rendered for an employee or template placeholders.
      */
-    public function previewTemplate(Request $request, \App\Domains\HRMS\Models\DocumentTemplate $template): \Illuminate\Http\JsonResponse
+    public function previewTemplate(Request $request, DocumentTemplate $template): JsonResponse
     {
+        $this->authorize('view', $template);
         try {
             $employeeId = $request->query('employee_id');
-            $employee = $employeeId ? \App\Domains\HRMS\Models\Employee::find($employeeId) : \App\Domains\HRMS\Models\Employee::first();
+            $employee = $employeeId ? Employee::find($employeeId) : null;
 
-            if (!$employee) {
-                return response()->json(['error' => 'No employee records found for preview.'], 404);
-            }
-
-            $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+            $templateService = app(DocumentTemplateService::class);
             $renderedHtml = $templateService->renderTemplate($template, $employee);
 
             return response()->json([
-                'success' => true,
+                'success'       => true,
                 'template_name' => $template->name,
-                'employee_name' => $employee->full_name,
-                'html' => $renderedHtml,
+                'employee_name' => $employee?->full_name ?? 'Template Preview',
+                'html'          => $renderedHtml,
             ]);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error("Template Preview Exception: " . $e->getMessage());
+            Log::error("Template Preview Exception: " . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'error' => 'Error rendering document: ' . $e->getMessage(),
+                'error'   => 'Error rendering document: ' . $e->getMessage(),
             ], 500);
         }
     }
 }
+

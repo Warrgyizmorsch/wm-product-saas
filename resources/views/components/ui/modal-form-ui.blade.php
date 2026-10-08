@@ -20,6 +20,8 @@
 
 @once
     @push('styles')
+        <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
         <style>
             .form-ui-group {
                 margin-bottom: 0.85rem;
@@ -66,7 +68,14 @@
                 box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
             }
             select.form-ui-control {
-                appearance: auto;
+                appearance: none;
+                -webkit-appearance: none;
+                -moz-appearance: none;
+                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+                background-repeat: no-repeat;
+                background-position: right 0.75rem center;
+                background-size: 14px 10px;
+                padding-right: 2.25rem;
                 cursor: pointer;
                 background-color: #ffffff;
             }
@@ -120,26 +129,67 @@
                 border-bottom-left-radius: 8px !important;
                 border-bottom-right-radius: 8px !important;
                 box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+                background-color: #ffffff !important;
             }
             .select2-container--bootstrap-5 .select2-results__option {
                 font-size: 13px !important;
                 padding: 8px 12px !important;
+                color: #1e293b !important;
             }
             .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] {
                 background-color: #3b82f6 !important;
+                color: #ffffff !important;
+            }
+
+            /* Dark Mode Support for Modal Form UI */
+            html.app-skin-dark .form-ui-label {
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .form-ui-control {
+                background-color: #121a2d !important;
+                border-color: #283c50 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark select.form-ui-control {
+                background-color: #121a2d !important;
+                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+            }
+            html.app-skin-dark .form-ui-control[readonly],
+            html.app-skin-dark .form-ui-control[disabled] {
+                background-color: #0f172a !important;
+                border-color: #1b2436 !important;
+            }
+            html.app-skin-dark .form-ui-select2-container .select2-container--bootstrap-5 .select2-selection--single,
+            html.app-skin-dark .form-ui-select2-container .select2-container--bootstrap-5 .select2-selection--multiple {
+                background-color: #121a2d !important;
+                border-color: #283c50 !important;
+            }
+            html.app-skin-dark .form-ui-select2-container .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .select2-dropdown {
+                background-color: #0f172a !important;
+                border-color: #283c50 !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-results__option {
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] {
+                background-color: #2563eb !important;
                 color: #ffffff !important;
             }
         </style>
     @endpush
 
     @push('scripts')
+        <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
         <script>
             function initFormUiComponents() {
                 if (typeof $ !== 'undefined' && $.fn.select2) {
                     $('.form-ui-select2').each(function() {
                         var select = $(this);
                         if (!select.hasClass('select2-hidden-accessible')) {
-                            var parentContainer = select.closest('.modal-content, .offcanvas-body, .offcanvas, .modal');
+                            var parentContainer = select.closest('.modal-content, .modal, .offcanvas-body, .offcanvas');
                             select.select2({
                                 theme: "bootstrap-5",
                                 width: "100%",
@@ -154,8 +204,8 @@
                 initFormUiComponents();
             });
 
-            $(document).on('show.bs.modal show.bs.offcanvas shown.bs.modal shown.bs.offcanvas', function () {
-                setTimeout(initFormUiComponents, 100);
+            $(document).on('show.bs.modal show.bs.offcanvas shown.bs.modal shown.bs.offcanvas shown.bs.tab', function () {
+                setTimeout(initFormUiComponents, 60);
             });
         </script>
     @endpush

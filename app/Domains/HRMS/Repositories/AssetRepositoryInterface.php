@@ -42,13 +42,13 @@ interface AssetRepositoryInterface
 
     public function storeAssetItem(array $validated): AssetItem;
 
-    public function export(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
+    public function export(array $filters = []): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
 
     public function import(\Illuminate\Http\UploadedFile $file): array;
 
     public function downloadTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
 
-    public function exportCategories(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
+    public function exportCategories(array $filters = []): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
 
     public function importCategories(\Illuminate\Http\UploadedFile $file): array;
 

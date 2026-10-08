@@ -1,19 +1,19 @@
 @extends('layouts.duralux')
 
-@section('title', 'My Assets | SaaS ERP')
-@section('page-title', 'My Assets')
-@section('breadcrumb', 'HRMS / Assets / My Assets')
+@section('title', __('hrms.assets.my_assets') . ' | SaaS ERP')
+@section('page-title', __('hrms.assets.my_assets'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.assets.title') . ' / ' . __('hrms.assets.my_assets'))
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <!-- Toggle View Button: Switch between history and log -->
-        <button type="button" class="btn btn-outline-light border text-dark fw-bold text-uppercase d-flex align-items-center gap-1.5" id="btn-toggle-asset-view" style="height: 38px; border-radius: 6px; font-size: 11px; padding-inline: 14px; background-color: #fff; border-color: #cbd5e1 !important; color: #334155 !important;">
+        <x-ui.button type="button" variant="light" class="border text-dark fw-bold text-uppercase d-flex align-items-center gap-1.5" id="btn-toggle-asset-view" style="height: 38px; border-radius: 6px; font-size: 11px; padding-inline: 14px; background-color: #fff; border-color: #cbd5e1 !important; color: #334155 !important;">
             <i class="feather-git-pull-request text-muted" id="toggle-view-icon"></i>
-            <span id="toggle-view-text">Request Log</span>
-        </button>
+            <span id="toggle-view-text">{{ __('hrms.assets.request_log') }}</span>
+        </x-ui.button>
 
         <!-- Action: Request Asset -->
-        <x-ui.button type="button" variant="primary" class="fw-bold text-uppercase d-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#requestAssetModal" style="height: 38px; border-radius: 6px; font-size: 11px;">
-            <i class="feather-plus-circle"></i> Request Asset
+        <x-ui.button type="button" variant="primary" icon="feather-plus-circle" class="fw-bold text-uppercase d-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#requestAssetModal" style="height: 38px; border-radius: 6px; font-size: 11px;">
+            {{ __('hrms.assets.request_asset') }}
         </x-ui.button>
     </div>
 @endsection
@@ -369,7 +369,7 @@
                                             @if($request->status === 'pending')
                                                 <form action="{{ route('hrms.assets.requests.reject', $request->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_withdraw_request') }}', { title: '{{ __('hrms.employees.lbl_withdraw_request') }}', variant: 'warning', confirmButtonText: '{{ __('hrms.employees.btn_withdraw') }}' });" class="m-0">
                                                     @csrf
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px;" title="Withdraw Request">
+                                                    <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px;" title="{{ __('hrms.employees.lbl_withdraw_request') }}">
                                                         <i class="feather-trash-2 fs-13"></i>
                                                     </button>
                                                 </form>
@@ -425,7 +425,7 @@
                             <div id="my_return_checklist_error" class="d-none mt-2">
                                 <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style="background: #fff3f3; border: 1px solid #f5c2c7;">
                                     <i class="feather-alert-circle text-danger" style="font-size: 15px; flex-shrink: 0;"></i>
-                                    <span class="text-danger fs-12 fw-semibold">Please select at least one unit to return.</span>
+                                    <span class="text-danger fs-12 fw-semibold">{{ __('hrms.assets.alert_select_unit_to_return') }}</span>
                                 </div>
                             </div>
                             <small class="text-muted mt-1 d-block">{{ __('hrms.employees.mdl_select_units_desc') }}</small>
@@ -567,6 +567,17 @@
 
 @push('scripts')
 <script>
+    const langAssets = {
+        code: "{{ __('hrms.assets.asset_code_label') }}",
+        serial: "{{ __('hrms.assets.serial_number') }}",
+        na: "{{ __('hrms.common.na') }}",
+        condGood: "{{ __('hrms.assets.cond_good') }}",
+        condNew: "{{ __('hrms.assets.cond_new') }}",
+        condFair: "{{ __('hrms.assets.cond_fair') }}",
+        condDamaged: "{{ __('hrms.assets.cond_damaged') }}",
+        condScrapped: "{{ __('hrms.assets.cond_scrapped') }}"
+    };
+
     $(document).ready(function() {
         // Append modals to body
         $('#returnAssetModal').appendTo('body');
@@ -858,6 +869,36 @@
             }
         });
 
+        // Client-side validation for Multi-Item Asset Request Form
+        $('#requestAssetMultiForm').on('submit', function(e) {
+            var form = $(this);
+            var reason = form.find('textarea[name="reason"]').val() ? form.find('textarea[name="reason"]').val().trim() : '';
+            var hasInvalidItem = false;
+            var selectedItems = 0;
+
+            form.find('.req-item-select').each(function() {
+                var val = $(this).val();
+                if (!val) {
+                    hasInvalidItem = true;
+                } else {
+                    selectedItems++;
+                }
+            });
+
+            if (selectedItems === 0 || hasInvalidItem) {
+                e.preventDefault();
+                alert("{{ __('hrms.assets.alert_select_item_all_rows') }}");
+                return false;
+            }
+
+            if (!reason) {
+                e.preventDefault();
+                alert("{{ __('hrms.assets.alert_provide_reason') }}");
+                form.find('textarea[name="reason"]').focus();
+                return false;
+            }
+        });
+
         // Handle Return modal binding
         $('#returnAssetModal').on('show.bs.modal', function(event) {
             var button = $(event.relatedTarget);
@@ -880,7 +921,7 @@
             }
 
             if (assets.length === 0) {
-                checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No active allocations found.</span>');
+                checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>{{ __("hrms.assets.alert_no_active_allocations") }}</span>');
             } else {
                 assets.forEach(function(asset) {
                     var checkboxId = 'my_return_asset_check_' + asset.id;
@@ -888,7 +929,7 @@
                         <div class="form-check py-1 border-bottom-dashed d-flex align-items-center">
                             <input class="form-check-input return-allocated-asset-checkbox" type="checkbox" name="allocated_asset_ids[]" value="${asset.id}" id="${checkboxId}" style="cursor: pointer;">
                             <label class="form-check-label fs-12 ms-2 text-dark mb-0" for="${checkboxId}" style="cursor: pointer;">
-                                <strong>Code:</strong> ${asset.asset_code} | <strong>Serial:</strong> ${asset.serial_number || 'N/A'}
+                                <strong>${langAssets.code}:</strong> ${asset.asset_code} | <strong>${langAssets.serial}:</strong> ${asset.serial_number || langAssets.na}
                             </label>
                         </div>
                     `;
@@ -931,25 +972,25 @@
             }
 
             if (assets.length === 0) {
-                tbody.append('<tr><td colspan="5" class="py-3 text-muted">No units assigned.</td></tr>');
+                tbody.append('<tr><td colspan="5" class="py-3 text-muted">{{ __("hrms.assets.no_units_assigned") }}</td></tr>');
             } else {
                 assets.forEach(function(asset) {
-                    var dateStr = asset.allocated_at ? new Date(asset.allocated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
+                    var dateStr = asset.allocated_at ? new Date(asset.allocated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : langAssets.na;
                     var condBadge = {
-                        'new': 'bg-soft-success text-success',
-                        'good': 'bg-soft-info text-info',
-                        'fair': 'bg-soft-warning text-warning',
-                        'damaged': 'bg-soft-danger text-danger',
-                        'scrapped': 'bg-soft-secondary text-secondary'
+                        'new': { cls: 'bg-soft-success text-success', label: langAssets.condNew },
+                        'good': { cls: 'bg-soft-info text-info', label: langAssets.condGood },
+                        'fair': { cls: 'bg-soft-warning text-warning', label: langAssets.condFair },
+                        'damaged': { cls: 'bg-soft-danger text-danger', label: langAssets.condDamaged },
+                        'scrapped': { cls: 'bg-soft-secondary text-secondary', label: langAssets.condScrapped }
                     };
-                    var badgeClass = condBadge[asset.condition] || 'bg-light text-muted';
+                    var condInfo = condBadge[asset.condition] || { cls: 'bg-light text-muted', label: asset.condition || langAssets.na };
                     var rowHtml = `
                         <tr>
                             <td class="text-start py-2 px-3 fw-bold text-dark"><code>${asset.asset_code}</code></td>
-                            <td class="py-2">${asset.serial_number || 'N/A'}</td>
+                            <td class="py-2">${asset.serial_number || langAssets.na}</td>
                             <td class="py-2 text-muted">${dateStr}</td>
                             <td class="py-2">
-                                <span class="badge ${badgeClass} rounded-pill px-2 py-0.5" style="font-size: 11px;">${asset.condition.charAt(0).toUpperCase() + asset.condition.slice(1)}</span>
+                                <span class="badge ${condInfo.cls} rounded-pill px-2 py-0.5" style="font-size: 11px;">${condInfo.label}</span>
                             </td>
                             <td class="text-start py-2 px-3 text-muted" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; max-width: 320px;" title="${asset.notes || ''}">${asset.notes || '-'}</td>
                         </tr>
@@ -965,8 +1006,8 @@
             if (activeAssetView === 'assigned') {
                 // Change to requests log view
                 activeAssetView = 'requests';
-                $('#my_assets_card_title').html('<i class="feather-git-pull-request text-primary"></i> Asset Requests History');
-                $('#my_assets_card_desc').text('History of submitted asset requests.');
+                $('#my_assets_card_title').html('<i class="feather-git-pull-request text-primary"></i> {{ __("hrms.assets.asset_requests_history") }}');
+                $('#my_assets_card_desc').text('{{ __("hrms.assets.asset_requests_history_desc") }}');
                 
                 $('#search_assigned_wrapper').addClass('d-none');
                 $('#search_requests_wrapper').removeClass('d-none');
@@ -978,7 +1019,7 @@
                 $('#view_request_log').removeClass('d-none');
                 
                 $('#toggle-view-icon').attr('class', 'feather-package');
-                $('#toggle-view-text').text('Asset History');
+                $('#toggle-view-text').text('{{ __("hrms.assets.asset_history") }}');
             } else {
                 // Change back to assigned assets history view
                 activeAssetView = 'assigned';
@@ -995,7 +1036,7 @@
                 $('#view_request_log').addClass('d-none');
                 
                 $('#toggle-view-icon').attr('class', 'feather-git-pull-request');
-                $('#toggle-view-text').text('Request Log');
+                $('#toggle-view-text').text('{{ __("hrms.assets.request_log") }}');
             }
         });
     });

@@ -30,7 +30,7 @@ class RosterRepository implements RosterRepositoryInterface
         $shiftSort = !empty($inputs['shift_sort']) ? (string) $inputs['shift_sort'] : 'name_asc';
         $shiftStatus = isset($inputs['shift_status']) && $inputs['shift_status'] !== '' ? (string) $inputs['shift_status'] : null;
         $shiftOvertime = isset($inputs['shift_overtime']) && $inputs['shift_overtime'] !== '' ? (string) $inputs['shift_overtime'] : null;
-        $shiftCompanyId = !empty($inputs['shift_company_id']) ? (int) $inputs['shift_company_id'] : null;
+        $shiftCompanyId = isset($inputs['shift_company_id']) && $inputs['shift_company_id'] !== '' ? $inputs['shift_company_id'] : null;
 
         $shiftsQuery = ProductionShift::with('company');
         if ($shiftSearch !== '') {
@@ -50,8 +50,10 @@ class RosterRepository implements RosterRepositoryInterface
             $shiftsQuery->where('overtime_allowed', $shiftOvertime === '1');
         }
 
-        if ($shiftCompanyId) {
-            $shiftsQuery->where('company_id', $shiftCompanyId);
+        if ($shiftCompanyId === 'shared') {
+            $shiftsQuery->whereNull('company_id');
+        } elseif ($shiftCompanyId !== null && (int) $shiftCompanyId > 0) {
+            $shiftsQuery->where('company_id', (int) $shiftCompanyId);
         }
 
         switch ($shiftSort) {
@@ -96,7 +98,7 @@ class RosterRepository implements RosterRepositoryInterface
 
         $endDate = $dates[6];
 
-        $employeesQuery = Employee::with(['company', 'department', 'designation']);
+        $employeesQuery = Employee::with(['company', 'department', 'designation', 'shift']);
         app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($employeesQuery, auth()->user());
 
         if ($selectedCompanyId) {
@@ -124,6 +126,17 @@ class RosterRepository implements RosterRepositoryInterface
                 break;
             case 'id-desc':
                 $employeesQuery->orderBy('employee_id', 'desc');
+                break;
+            case 'designation-asc':
+            case 'designation':
+                $employeesQuery->leftJoin('designations', 'employees.designation_id', '=', 'designations.id')
+                    ->orderBy('designations.name', 'asc')
+                    ->select('employees.*');
+                break;
+            case 'designation-desc':
+                $employeesQuery->leftJoin('designations', 'employees.designation_id', '=', 'designations.id')
+                    ->orderBy('designations.name', 'desc')
+                    ->select('employees.*');
                 break;
             case 'name-asc':
             default:
@@ -190,6 +203,9 @@ class RosterRepository implements RosterRepositoryInterface
 
     public function deleteShift(ProductionShift $shift): bool
     {
+        Employee::where('shift_id', $shift->id)->update(['shift_id' => null]);
+        ShiftRoster::where('shift_id', $shift->id)->delete();
+
         return $shift->delete();
     }
 

@@ -18,7 +18,7 @@
     @elseif($tab === 'weekly_patterns')
         <div class="d-flex gap-2">
             <x-ui.button variant="primary" icon="feather-calendar" data-bs-toggle="modal" data-bs-target="#assignWeeklyModal">
-                Assign Weekly Defaults
+                {{ __('hrms.roster.assign_weekly_defaults') }}
             </x-ui.button>
         </div>
     @endif
@@ -77,23 +77,6 @@
             }
         }
 
-        /* Underlined Horizontal Tabs */
-        #rosterTabs .nav-link {
-            border: none !important;
-            background-color: transparent !important;
-            color: #64748b;
-            font-weight: 500;
-            padding: 12px 20px;
-            border-bottom: 2px solid transparent !important;
-            transition: all 0.2s ease-in-out;
-        }
-        #rosterTabs .nav-link:hover {
-            color: var(--bs-primary);
-        }
-        #rosterTabs .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom: 2px solid var(--bs-primary) !important;
-        }
 
         /* ── Shifts Table: Consistent Font Sizes ── */
         #shiftsTable thead th {
@@ -450,25 +433,34 @@
             <div class="tab-content" id="rosterSettingsContent">
                 <div class="tab-pane fade show active" id="roster-pane" role="tabpanel">
                     <div class="row">
-                        <!-- Horizontal Navigation directly above content (Shift Master is now First/Default) -->
+                        @php
+                            $rosterNavTabs = [
+                                [
+                                    'id' => 'shifts',
+                                    'label' => __('hrms.roster.shift_master'),
+                                    'icon' => 'feather-clock',
+                                    'url' => route('hrms.roster.index', ['tab' => 'shifts']),
+                                    'active' => $tab === 'shifts' || empty($tab),
+                                ],
+                                [
+                                    'id' => 'weekly_patterns',
+                                    'label' => __('hrms.roster.weekly_patterns'),
+                                    'icon' => 'feather-repeat',
+                                    'url' => route('hrms.roster.index', ['tab' => 'weekly_patterns']),
+                                    'active' => $tab === 'weekly_patterns',
+                                ],
+                                [
+                                    'id' => 'roster',
+                                    'label' => __('hrms.roster.roster_board'),
+                                    'icon' => 'feather-calendar',
+                                    'url' => route('hrms.roster.index', ['tab' => 'roster']),
+                                    'active' => $tab === 'roster',
+                                ],
+                            ];
+                        @endphp
+                        <!-- Horizontal Navigation using Common UI Horizontal Tabs Component -->
                         <div class="col-12 mb-3">
-                            <ul class="nav gap-2 border-bottom pb-2" id="rosterTabs" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <a class="nav-link {{ $tab === 'shifts' ? 'active' : '' }}" href="{{ route('hrms.roster.index', ['tab' => 'shifts']) }}">
-                                        <i class="feather-clock me-2"></i>{{ __('hrms.roster.shift_master') }}
-                                    </a>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <a class="nav-link {{ $tab === 'weekly_patterns' ? 'active' : '' }}" href="{{ route('hrms.roster.index', ['tab' => 'weekly_patterns']) }}">
-                                        <i class="feather-repeat me-2"></i>{{ __('hrms.roster.weekly_patterns') }}
-                                    </a>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <a class="nav-link {{ $tab === 'roster' ? 'active' : '' }}" href="{{ route('hrms.roster.index', ['tab' => 'roster']) }}">
-                                        <i class="feather-calendar me-2"></i>{{ __('hrms.roster.roster_board') }}
-                                    </a>
-                                </li>
-                            </ul>
+                            <x-ui.horizontal-tabs id="rosterTabs" :tabs="$rosterNavTabs" class="mb-3" />
                         </div>
 
                         <!-- Tab Content Views -->
@@ -528,6 +520,7 @@
                                                                   <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.roster.companies') }}</label>
                                                                   <x-ui.odoo-form-ui type="select" name="shift_company_id" id="shift_filter_company_id">
                                                                       <option value="">{{ __('hrms.common.all_companies') }}</option>
+                                                                      <option value="shared" @selected(request('shift_company_id') === 'shared')>{{ __('hrms.roster.shared_all') }}</option>
                                                                       @foreach($companies as $company)
                                                                           <option value="{{ $company->id }}" @selected((string) request('shift_company_id') === (string) $company->id)>{{ $company->company_name }}</option>
                                                                       @endforeach
@@ -535,11 +528,11 @@
                                                               </div>
 
                                                               <div class="mb-3">
-                                                                  <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.org.status') }}</label>
+                                                                  <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.common.status') }}</label>
                                                                   <x-ui.odoo-form-ui type="select" name="shift_status" id="shift_filter_status">
                                                                       <option value="">{{ __('hrms.common.all_statuses') }}</option>
-                                                                      <option value="1" @selected($shiftStatus === '1')>{{ __('hrms.employees.frm_status_active') }}</option>
-                                                                      <option value="0" @selected($shiftStatus === '0')>{{ __('hrms.employees.frm_status_inactive') }}</option>
+                                                                      <option value="1" @selected($shiftStatus === '1')>{{ __('hrms.common.active') }}</option>
+                                                                      <option value="0" @selected($shiftStatus === '0')>{{ __('hrms.common.inactive') }}</option>
                                                                   </x-ui.odoo-form-ui>
                                                               </div>
 
@@ -553,8 +546,8 @@
                                                               </div>
 
                                                               <div class="d-flex gap-2 justify-content-end mt-4">
-                                                                  <a href="#" id="btn-reset-shift-filters" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3 border" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border-color: #cbd5e1; color: #475569;">{{ __('hrms.common.reset') }}</a>
-                                                                  <button type="submit" class="btn btn-sm btn-primary text-uppercase fw-bold py-2 px-3 text-white" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em;">{{ __('hrms.common.apply') }}</button>
+                                                                  <x-ui.button type="button" variant="light" size="sm" id="btn-reset-shift-filters" class="text-uppercase fw-bold py-2 px-3 border">{{ __('hrms.common.reset') }}</x-ui.button>
+                                                                  <x-ui.button type="submit" variant="primary" size="sm" class="text-uppercase fw-bold py-2 px-3 text-white">{{ __('hrms.common.apply') }}</x-ui.button>
                                                               </div>
                                                          </form>
                                                       </x-ui.filter>
@@ -568,12 +561,12 @@
                                                           <tr>
                                                               <th style="width: 5%; white-space: nowrap;">#</th>
                                                               <th style="width: 17%; white-space: nowrap;">{{ __('hrms.roster.shift_name') }}</th>
-                                                              <th style="width: 16%; white-space: nowrap;">{{ __('hrms.org.company') }}</th>
+                                                              <th style="width: 16%; white-space: nowrap;">{{ __('hrms.roster.company') }}</th>
                                                               <th style="width: 15%; white-space: nowrap;">{{ __('hrms.roster.shift_timing') }}</th>
                                                               <th style="width: 15%; white-space: nowrap;">{{ __('hrms.roster.break_duration') }}</th>
                                                               <th style="width: 15%; white-space: nowrap;">{{ __('hrms.roster.overtime_allowed') }}</th>
-                                                              <th style="width: 9%; white-space: nowrap;">{{ __('hrms.org.status') }}</th>
-                                                              <th style="width: 8%; white-space: nowrap;" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
+                                                              <th style="width: 9%; white-space: nowrap;">{{ __('hrms.common.status') }}</th>
+                                                              <th style="width: 8%; white-space: nowrap;" class="text-end">{{ __('hrms.common.actions') }}</th>
                                                           </tr>
                                                       </thead>
                                                       <tbody>
@@ -592,7 +585,7 @@
                                                                    @if($sf->company)
                                                                        <span class="text-muted fs-12" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $sf->company->company_name }}</span>
                                                                    @else
-                                                                       <span class="badge bg-soft-secondary text-secondary" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.roster.shared_all') }}</span>
+                                                                       <x-ui.badge variant="secondary" soft>{{ __('hrms.roster.shared_all') }}</x-ui.badge>
                                                                    @endif
                                                                </td>
                                                               <td><span class="font-monospace text-dark">{{ substr($sf->start_time, 0, 5) }} - {{ substr($sf->end_time, 0, 5) }}</span></td>
@@ -606,13 +599,13 @@
                                                              </td>
                                                              <td>
                                                                  @if($sf->active)
-                                                                     <x-ui.badge variant="success" soft>{{ __('hrms.employees.frm_status_active') }}</x-ui.badge>
+                                                                     <x-ui.badge variant="success" soft>{{ __('hrms.common.active') }}</x-ui.badge>
                                                                  @else
-                                                                     <x-ui.badge variant="danger" soft>{{ __('hrms.employees.frm_status_inactive') }}</x-ui.badge>
+                                                                     <x-ui.badge variant="danger" soft>{{ __('hrms.common.inactive') }}</x-ui.badge>
                                                                  @endif
                                                              </td>
                                                              <td class="text-end">
-                                                                 <form action="{{ route('hrms.shift.destroy', $sf->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.roster.delete_shift_confirm') }}', { title: 'Delete Shift', variant: 'danger', confirmButtonText: 'Delete' });">
+                                                                 <form action="{{ route('hrms.shift.destroy', $sf->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.roster.delete_shift_confirm') }}', { title: '{{ __('hrms.common.delete') }} {{ __('hrms.roster.shifts') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                                                      @csrf
                                                                      @method('DELETE')
                                                                     <div class="hstack gap-2 justify-content-end">
@@ -701,7 +694,7 @@
                                                  <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
                                                  
                                                  <div class="mb-3">
-                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.employees.tbl_company') }}</label>
+                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.roster.company') }}</label>
                                                      <x-ui.odoo-form-ui type="select" name="company_id" id="weekly_filter_company">
                                                          <option value="">{{ __('hrms.common.all_companies') }}</option>
                                                          @foreach($companies as $company)
@@ -713,7 +706,7 @@
                                                  </div>
  
                                                  <div class="mb-3">
-                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.employees.tbl_department') }}</label>
+                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.roster.department') }}</label>
                                                      <x-ui.odoo-form-ui type="select" name="department_id" id="weekly_filter_department">
                                                          <option value="">{{ __('hrms.roster.all_departments') }}</option>
                                                          @foreach($departments as $dept)
@@ -725,7 +718,7 @@
                                                  </div>
  
                                                  <div class="mb-3">
-                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.employees.tbl_designation') }}</label>
+                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.roster.designation') }}</label>
                                                      <x-ui.odoo-form-ui type="select" name="designation_id" id="weekly_filter_designation">
                                                          <option value="">{{ __('hrms.roster.all_designations') }}</option>
                                                          @foreach($designations as $desg)
@@ -739,8 +732,8 @@
                                                  <div class="dropdown-divider my-3"></div>
  
                                                  <div class="d-flex gap-2">
-                                                     <button type="submit" class="btn btn-sm roster-filter-apply-btn w-100 fw-bold py-2 text-uppercase">{{ __('hrms.common.apply') }}</button>
-                                                     <a href="#" id="btn-reset-weekly-filters" class="btn btn-sm roster-filter-reset-btn w-100 fw-bold py-2 text-center text-uppercase">{{ __('hrms.common.reset') }}</a>
+                                                     <x-ui.button type="submit" variant="primary" size="sm" class="roster-filter-apply-btn w-100 fw-bold py-2 text-uppercase">{{ __('hrms.common.apply') }}</x-ui.button>
+                                                     <x-ui.button type="button" variant="light" size="sm" id="btn-reset-weekly-filters" class="roster-filter-reset-btn w-100 fw-bold py-2 text-center text-uppercase border">{{ __('hrms.common.reset') }}</x-ui.button>
                                                  </div>
                                              </x-ui.filter>
                                          </form>
@@ -753,10 +746,10 @@
                                              <thead class="table-light">
                                                  <tr>
                                                      <th class="employee-head">{{ __('hrms.roster.employee_name') }}</th>
-                                                     @foreach([1 => 'monday', 2 => 'tuesday', 3 => 'wednesday', 4 => 'thursday', 5 => 'friday', 6 => 'saturday', 0 => 'sunday'] as $dayVal => $dayName)
+                                                     @foreach([1 => 'mon', 2 => 'tue', 3 => 'wed', 4 => 'thu', 5 => 'fri', 6 => 'sat', 0 => 'sun'] as $dayVal => $dayKey)
                                                          <th class="date-head">
                                                              <div class="fw-bold text-dark text-uppercase">
-                                                                 {{ \Carbon\Carbon::parse('2026-07-20')->addDays($dayVal === 0 ? 6 : $dayVal - 1)->translatedFormat('D') }}
+                                                                 {{ __('hrms.roster.' . $dayKey) }}
                                                              </div>
                                                          </th>
                                                      @endforeach
@@ -776,7 +769,7 @@
                                                                   </div>
                                                              </div>
                                                          </td>
-                                                         @foreach([1 => 'monday', 2 => 'tuesday', 3 => 'wednesday', 4 => 'thursday', 5 => 'friday', 6 => 'saturday', 0 => 'sunday'] as $dayVal => $dayName)
+                                                         @foreach([1 => 'mon', 2 => 'tue', 3 => 'wed', 4 => 'thu', 5 => 'fri', 6 => 'sat', 0 => 'sun'] as $dayVal => $dayKey)
                                                              @php
                                                                  $assignedVal = (isset($employee->weekly_pattern) && isset($employee->weekly_pattern[$dayVal])) ? $employee->weekly_pattern[$dayVal] : '';
                                                                  if ($assignedVal === '' && $dayVal === 0) {
@@ -880,7 +873,7 @@
                                                  </div>
  
                                                  <div class="mb-3">
-                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.employees.tbl_company') }}</label>
+                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.roster.company') }}</label>
                                                      <x-ui.odoo-form-ui type="select" name="company_id" id="roster_filter_company">
                                                          <option value="">{{ __('hrms.common.all_companies') }}</option>
                                                          @foreach($companies as $company)
@@ -892,7 +885,7 @@
                                                  </div>
  
                                                  <div class="mb-3">
-                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.employees.tbl_department') }}</label>
+                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.roster.department') }}</label>
                                                      <x-ui.odoo-form-ui type="select" name="department_id" id="roster_filter_department">
                                                          <option value="">{{ __('hrms.roster.all_departments') }}</option>
                                                          @foreach($departments as $dept)
@@ -904,7 +897,7 @@
                                                  </div>
  
                                                  <div class="mb-3">
-                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.employees.tbl_designation') }}</label>
+                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.roster.designation') }}</label>
                                                      <x-ui.odoo-form-ui type="select" name="designation_id" id="roster_filter_designation">
                                                          <option value="">{{ __('hrms.roster.all_designations') }}</option>
                                                          @foreach($designations as $desg)
@@ -923,8 +916,8 @@
                                                  <div class="dropdown-divider my-3"></div>
  
                                                  <div class="d-flex gap-2">
-                                                     <button type="submit" class="btn btn-sm roster-filter-apply-btn w-100 fw-bold py-2 text-uppercase">{{ __('hrms.common.apply') }}</button>
-                                                     <a href="#" id="btn-reset-roster-filters" class="btn btn-sm roster-filter-reset-btn w-100 fw-bold py-2 text-center text-uppercase">{{ __('hrms.common.reset') }}</a>
+                                                     <x-ui.button type="submit" variant="primary" size="sm" class="roster-filter-apply-btn w-100 fw-bold py-2 text-uppercase">{{ __('hrms.common.apply') }}</x-ui.button>
+                                                     <x-ui.button type="button" variant="light" size="sm" id="btn-reset-roster-filters" class="roster-filter-reset-btn w-100 fw-bold py-2 text-center text-uppercase border">{{ __('hrms.common.reset') }}</x-ui.button>
                                                  </div>
                                              </x-ui.filter>
                                          </form>
@@ -938,9 +931,14 @@
                                                  <tr>
                                                      <th class="employee-head">{{ __('hrms.roster.employee_name') }}</th>
                                                      @foreach($dates as $date)
+                                                         @php
+                                                             $dayKey = strtolower($date->format('D'));
+                                                             $monthKey = strtolower($date->format('F'));
+                                                             $monthName = __('hrms.months.' . $monthKey);
+                                                         @endphp
                                                          <th class="date-head">
-                                                             <div class="fw-bold text-dark">{{ $date->format('D') }}</div>
-                                                             <div class="text-muted" style="font-size: 10px; font-weight: 500;">{{ $date->format('d M') }}</div>
+                                                             <div class="fw-bold text-dark">{{ __('hrms.roster.' . $dayKey) }}</div>
+                                                             <div class="text-muted" style="font-size: 10px; font-weight: 500;">{{ $date->format('d') }} {{ $monthName }}</div>
                                                          </th>
                                                      @endforeach
                                                  </tr>
@@ -1144,7 +1142,7 @@
                                                 <label class="form-check-label text-dark fs-12" for="emp_assign_{{ $emp->id }}">
                                                     {{ $emp->full_name }} 
                                                     <span class="text-muted" style="font-size: 10px;">
-                                                        ({{ $emp->department?->name ?? __('hrms.roster.no_dept') }} / {{ $emp->designation?->name ?? __('hrms.roster.no_desg') }})
+                                                        ({{ $emp->department?->name ?? __('hrms.roster.no_dept') }} / {{ $emp->designation?->name ?? __('hrms.roster.no_designation') }})
                                                     </span>
                                                 </label>
                                             </div>
@@ -1156,33 +1154,24 @@
                                 </div>
                                 <div class="text-muted fs-11 mt-1">{{ __('hrms.roster.assign_help') }}</div>
                             </div>
- 
-                            <!-- 3. Scheduling Settings (Vertical Date Fields, No cut-offs) -->
+
+                            <!-- 3. Scheduling Settings -->
                             <div class="col-12 mt-4">
                                 <hr class="my-2">
                             </div>
-                            <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="select" :label="__('hrms.roster.shift_to_assign')" name="shift_id" :searchable="false">
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.roster.shift_to_assign') }}" name="shift_id" id="assign_roster_shift_id" select2-selector="default">
                                     <option value="">{{ __('hrms.roster.day_off') }}</option>
                                     @foreach($activeShifts as $ashift)
                                         <option value="{{ $ashift->id }}">{{ $ashift->name }} ({{ $ashift->code }})</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
-                            <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="select" :label="__('hrms.org.status')" name="status" :searchable="false" :required="true">
-                                    <option value="scheduled" selected>{{ __('hrms.roster.scheduled') }}</option>
-                                    <option value="approved">{{ __('hrms.roster.approved') }}</option>
-                                    <option value="cancelled">{{ __('hrms.roster.cancelled') }}</option>
-                                </x-ui.odoo-form-ui>
+                            <div class="col-6">
+                                <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.roster.start_date') }}" name="start_date" :required="true" value="{{ $startDate->format('Y-m-d') }}" />
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold fs-12 mb-1" style="color: #dc3545 !important;">{{ __('hrms.roster.start_date') }} <span class="text-danger">*</span></label>
-                                <input type="date" name="start_date" class="form-control form-control-sm" required value="{{ $startDate->format('Y-m-d') }}">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold fs-12 mb-1" style="color: #dc3545 !important;">{{ __('hrms.roster.end_date') }} <span class="text-danger">*</span></label>
-                                <input type="date" name="end_date" class="form-control form-control-sm" required value="{{ $startDate->copy()->addDays(6)->format('Y-m-d') }}">
+                            <div class="col-6">
+                                <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.roster.end_date') }}" name="end_date" :required="true" value="{{ $startDate->copy()->addDays(6)->format('Y-m-d') }}" />
                             </div>
                             <div class="col-12">
                                 <x-ui.odoo-form-ui type="textarea" :label="__('hrms.roster.notes')" name="notes" :placeholder="__('hrms.roster.notes_placeholder')" rows="2" />
@@ -1190,8 +1179,8 @@
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                        <button type="submit" class="btn btn-primary">{{ __('hrms.roster.assign_shift') }}</button>
+                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.roster.assign_shift') }}</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -1203,7 +1192,7 @@
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="assignWeeklyModalLabel"><i class="feather-calendar me-2 text-primary"></i>Assign Weekly Defaults</h5>
+                    <h5 class="modal-title fw-bold" id="assignWeeklyModalLabel"><i class="feather-calendar me-2 text-primary"></i>{{ __('hrms.roster.assign_weekly_defaults') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ route('hrms.roster.assign-weekly') }}" method="POST">
@@ -1269,7 +1258,7 @@
                                     <hr class="my-2">
                                     <div id="assignWeeklyEmployeeList">
                                         @foreach($employees as $emp)
-                                            <div class="form-check mb-1 assign_weekly-emp-item" 
+                                             <div class="form-check mb-1 assign_weekly-emp-item" 
                                                  data-company-id="{{ $emp->company_id }}" 
                                                  data-business-unit-id="{{ $emp->business_unit_id }}"
                                                  data-branch-id="{{ $emp->branch_id }}"
@@ -1280,7 +1269,7 @@
                                                 <label class="form-check-label text-dark fs-12" for="emp_assign_weekly_{{ $emp->id }}">
                                                     {{ $emp->full_name }} 
                                                     <span class="text-muted" style="font-size: 10px;">
-                                                        ({{ $emp->department?->name ?? __('hrms.roster.no_dept') }} / {{ $emp->designation?->name ?? __('hrms.roster.no_desg') }})
+                                                        ({{ $emp->department?->name ?? __('hrms.roster.no_dept') }} / {{ $emp->designation?->name ?? __('hrms.roster.no_designation') }})
                                                     </span>
                                                 </label>
                                             </div>
@@ -1298,30 +1287,30 @@
                                 <hr class="my-2">
                             </div>
                             <div class="col-12">
-                                <label class="form-label fw-bold fs-12 mb-2" style="color: #dc3545 !important;">Select Weekdays <span class="text-danger">*</span></label>
+                                <label class="form-label fw-bold fs-12 mb-2" style="color: #dc3545 !important;">{{ __('hrms.roster.select_weekdays') }} <span class="text-danger">*</span></label>
                                 <div class="d-flex flex-wrap gap-3 mb-1 border rounded p-3 bg-white">
-                                    @foreach([1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 0 => 'Sun'] as $val => $label)
+                                    @foreach([1 => 'mon', 2 => 'tue', 3 => 'wed', 4 => 'thu', 5 => 'fri', 6 => 'sat', 0 => 'sun'] as $val => $dayKey)
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" name="days[]" value="{{ $val }}" id="day_assign_weekly_{{ $val }}">
-                                            <label class="form-check-label text-dark fs-12 fw-bold" for="day_assign_weekly_{{ $val }}">{{ $label }}</label>
+                                            <label class="form-check-label text-dark fs-12 fw-bold" for="day_assign_weekly_{{ $val }}">{{ __('hrms.roster.' . $dayKey) }}</label>
                                         </div>
                                     @endforeach
                                 </div>
                             </div>
-                             <div class="col-12 mt-3">
-                                 <x-ui.odoo-form-ui type="select" label="Shift to Assign" name="shift_id" :searchable="false">
-                                     <option value="">Default (Use Profile Default / Reset)</option>
-                                     <option value="off">Day Off (OFF)</option>
-                                     @foreach($activeShifts as $ashift)
-                                         <option value="{{ $ashift->id }}">{{ $ashift->name }} ({{ $ashift->code }})</option>
-                                     @endforeach
-                                 </x-ui.odoo-form-ui>
-                             </div>
+                            <div class="col-12 mt-3">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.roster.shift_to_assign') }}" name="shift_id" id="assign_weekly_shift_id" select2-selector="default">
+                                    <option value="">{{ __('hrms.roster.default_shift_option') }}</option>
+                                    <option value="off">{{ __('hrms.roster.day_off') }}</option>
+                                    @foreach($activeShifts as $ashift)
+                                        <option value="{{ $ashift->id }}">{{ $ashift->name }} ({{ $ashift->code }})</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                        <button type="submit" class="btn btn-primary">Assign Weekly Defaults</button>
+                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.roster.assign_weekly_defaults') }}</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -1336,7 +1325,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="addShiftModalLabel"><i class="feather-plus me-2 text-primary"></i>{{ __('hrms.org.add_shift') }}</h5>
+                    <h5 class="modal-title fw-bold" id="addShiftModalLabel"><i class="feather-plus me-2 text-primary"></i>{{ __('hrms.roster.add_shift') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ route('hrms.shift.store') }}" method="POST">
@@ -1352,37 +1341,37 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.shift_name') }}" name="name" :required="true" placeholder="{{ __('hrms.org.shift_name_placeholder') }}" :errorText="$errors->first('name')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.roster.shift_name') }}" name="name" :required="true" placeholder="{{ __('hrms.roster.shift_name_placeholder') }}" :errorText="$errors->first('name')" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.shift_code') }}" name="code" :required="true" placeholder="{{ __('hrms.org.shift_code_placeholder') }}" :errorText="$errors->first('code')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.roster.shift_code') }}" name="code" :required="true" placeholder="{{ __('hrms.roster.shift_code_placeholder') }}" :errorText="$errors->first('code')" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.start_time') }}" name="start_time" :required="true" :errorText="$errors->first('start_time')" />
+                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.roster.start_time') }}" name="start_time" :required="true" :errorText="$errors->first('start_time')" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.end_time') }}" name="end_time" :required="true" :errorText="$errors->first('end_time')" />
+                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.roster.end_time') }}" name="end_time" :required="true" :errorText="$errors->first('end_time')" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.break_minutes') }}" name="break_minutes" inputType="number" :required="true" placeholder="{{ __('hrms.org.break_minutes_placeholder') }}" value="0" :errorText="$errors->first('break_minutes')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.roster.break_minutes') }}" name="break_minutes" inputType="number" :required="true" placeholder="{{ __('hrms.roster.break_minutes_placeholder') }}" value="0" :errorText="$errors->first('break_minutes')" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.overtime_allowed') }}" name="overtime_allowed" select2-selector="default" :errorText="$errors->first('overtime_allowed')">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.roster.overtime_allowed') }}" name="overtime_allowed" select2-selector="default" :errorText="$errors->first('overtime_allowed')">
                                     <option value="1">{{ __('hrms.common.yes') }}</option>
                                     <option value="0" selected>{{ __('hrms.common.no') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="active" select2-selector="default" :errorText="$errors->first('active')">
-                                    <option value="1" selected>{{ __('hrms.employees.frm_status_active') }}</option>
-                                    <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.common.status') }}" name="active" select2-selector="default" :errorText="$errors->first('active')">
+                                    <option value="1" selected>{{ __('hrms.common.active') }}</option>
+                                    <option value="0">{{ __('hrms.common.inactive') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                        <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_shift') }}</button>
+                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.roster.save_shift') }}</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -1394,7 +1383,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="editShiftModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.common.edit') }} {{ __('hrms.org.shifts') }}</h5>
+                    <h5 class="modal-title fw-bold" id="editShiftModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.roster.edit_shift') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="shift_edit_form" method="POST">
@@ -1410,37 +1399,37 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.shift_name') }}" name="name" id="edit_shift_name" :required="true" :errorText="$errors->first('name')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.roster.shift_name') }}" name="name" id="edit_shift_name" :required="true" :errorText="$errors->first('name')" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.shift_code') }}" name="code" id="edit_shift_code" :required="true" :errorText="$errors->first('code')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.roster.shift_code') }}" name="code" id="edit_shift_code" :required="true" :errorText="$errors->first('code')" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.start_time') }}" name="start_time" id="edit_shift_start" :required="true" :errorText="$errors->first('start_time')" />
+                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.roster.start_time') }}" name="start_time" id="edit_shift_start" :required="true" :errorText="$errors->first('start_time')" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.end_time') }}" name="end_time" id="edit_shift_end" :required="true" :errorText="$errors->first('end_time')" />
+                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.roster.end_time') }}" name="end_time" id="edit_shift_end" :required="true" :errorText="$errors->first('end_time')" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.break_minutes') }}" name="break_minutes" id="edit_shift_break" inputType="number" :required="true" :errorText="$errors->first('break_minutes')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.roster.break_minutes') }}" name="break_minutes" id="edit_shift_break" inputType="number" :required="true" :errorText="$errors->first('break_minutes')" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.overtime_allowed') }}" name="overtime_allowed" id="edit_shift_overtime" select2-selector="default" :errorText="$errors->first('overtime_allowed')">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.roster.overtime_allowed') }}" name="overtime_allowed" id="edit_shift_overtime" select2-selector="default" :errorText="$errors->first('overtime_allowed')">
                                     <option value="1">{{ __('hrms.common.yes') }}</option>
                                     <option value="0">{{ __('hrms.common.no') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="active" id="edit_shift_active" select2-selector="default" :errorText="$errors->first('active')">
-                                    <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
-                                    <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.common.status') }}" name="active" id="edit_shift_active" select2-selector="default" :errorText="$errors->first('active')">
+                                    <option value="1">{{ __('hrms.common.active') }}</option>
+                                    <option value="0">{{ __('hrms.common.inactive') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                        <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_shift') }}</button>
+                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.roster.update_shift') }}</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -1573,7 +1562,7 @@
                         var oldGrid = $('#weeklyPatternsGrid');
                         var newGrid = $(doc).find('#weeklyPatternsGrid');
                         if (newGrid.length && oldGrid.length) {
-                            oldGrid.replaceWith(newGrid);
+                            oldGrid.html(newGrid.html());
                             initGridSelect2();
                         }
                         
@@ -1881,7 +1870,7 @@
                     }
 
                     initModalSelect2();
-                    $(document).on('shown.bs.modal', function () {
+                    $(document).on('shown.bs.modal show.bs.modal', function () {
                         initModalSelect2();
                     });
 
@@ -1902,7 +1891,7 @@
                             if (daysChecked === 0) {
                                 isValid = false;
                                 daysContainer.addClass('is-invalid');
-                                daysContainer.after('<div class="invalid-feedback dynamic-error d-block fs-11 mt-1">Please select at least one weekday.</div>');
+                                daysContainer.after('<div class="invalid-feedback dynamic-error d-block fs-11 mt-1">{{ __('hrms.roster.val_select_weekday') }}</div>');
                             }
                         }
 
@@ -1916,16 +1905,16 @@
                             if (!startDateVal) {
                                 isValid = false;
                                 startDateInput.addClass('is-invalid');
-                                startDateInput.after('<div class="invalid-feedback dynamic-error d-block fs-11 mt-1">Start date is required.</div>');
+                                startDateInput.after('<div class="invalid-feedback dynamic-error d-block fs-11 mt-1">{{ __('hrms.roster.val_start_date_required') }}</div>');
                             }
                             if (!endDateVal) {
                                 isValid = false;
                                 endDateInput.addClass('is-invalid');
-                                endDateInput.after('<div class="invalid-feedback dynamic-error d-block fs-11 mt-1">End date is required.</div>');
+                                endDateInput.after('<div class="invalid-feedback dynamic-error d-block fs-11 mt-1">{{ __('hrms.roster.val_end_date_required') }}</div>');
                             } else if (startDateVal && endDateVal && endDateVal < startDateVal) {
                                 isValid = false;
                                 endDateInput.addClass('is-invalid');
-                                endDateInput.after('<div class="invalid-feedback dynamic-error d-block fs-11 mt-1">End date cannot be earlier than start date.</div>');
+                                endDateInput.after('<div class="invalid-feedback dynamic-error d-block fs-11 mt-1">{{ __('hrms.roster.val_end_date_before_start') }}</div>');
                             }
                         }
 
@@ -2002,16 +1991,16 @@
                         
                         if (typeof Swal !== 'undefined') {
                             Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true })
-                                .fire({ icon: 'success', title: data.message || "Roster updated successfully." });
+                                .fire({ icon: 'success', title: data.message || "{{ __('hrms.roster.cell_updated') }}" });
                         }
                     } else {
-                        alert(data.message || "Error updating roster.");
+                        alert(data.message || "{{ __('hrms.roster.cell_update_error') }}");
                     }
                 })
                 .catch(error => {
                     $(this).css('opacity', '1').next('.select2-container').css('opacity', '1');
                     console.error('Error updating roster:', error);
-                    alert("Network error: " + error.message);
+                    alert("{{ __('hrms.roster.network_error') }}");
                 });
             });
 
@@ -2052,50 +2041,67 @@
 
                         if (typeof Swal !== 'undefined') {
                             Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true })
-                                .fire({ icon: 'success', title: data.message || "Weekly pattern updated successfully." });
+                                .fire({ icon: 'success', title: data.message || "{{ __('hrms.roster.weekly_pattern_updated') }}" });
                         }
-                    } else alert(data.message || "Error saving weekly pattern.");
+                    } else alert(data.message || "{{ __('hrms.roster.weekly_pattern_error') }}");
                 })
                 .catch(error => {
                     $(this).css('opacity', '1').next('.select2-container').css('opacity', '1');
                     console.error('Error updating weekly pattern:', error);
-                    alert("Network error: " + error.message);
+                    alert("{{ __('hrms.roster.network_error') }}");
                 });
             });
 
-            // 4. SHIFT MASTER VIEW & EDIT BINDINGS (Vanilla JS)
+            // 4. SHIFT MASTER VIEW & EDIT BINDINGS (Delegated for AJAX compatibility)
+            $(document).on('click', '.btn-edit-shift', function(e) {
+                e.preventDefault();
+                let rawData = $(this).attr('data-shift');
+                if (!rawData) return;
 
-            const btnEditShift = document.querySelector('.btn-edit-shift');
-            if (btnEditShift) {
-                document.querySelectorAll('.btn-edit-shift').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        let shift = JSON.parse(atob(this.dataset.shift));
-                        document.getElementById('edit_shift_name').value = shift.name || '';
-                        document.getElementById('edit_shift_code').value = shift.code || '';
-                        document.getElementById('edit_shift_start').value = shift.start_time ? shift.start_time.substring(0, 5) : '';
-                        document.getElementById('edit_shift_end').value = shift.end_time ? shift.end_time.substring(0, 5) : '';
-                        document.getElementById('edit_shift_break').value = shift.break_minutes || 0;
-                        
-                        let companySelect = document.getElementById('edit_shift_company_id');
-                        if (companySelect && window.jQuery) {
-                            companySelect.value = shift.company_id || '';
-                            if (window.jQuery(companySelect).hasClass('select2-hidden-accessible')) window.jQuery(companySelect).trigger('change');
-                        }
-                        let overtimeSelect = document.getElementById('edit_shift_overtime');
-                        if (overtimeSelect && window.jQuery) {
-                            overtimeSelect.value = (shift.overtime_allowed ? '1' : '0');
-                            if (window.jQuery(overtimeSelect).hasClass('select2-hidden-accessible')) window.jQuery(overtimeSelect).trigger('change');
-                        }
-                        let activeSelect = document.getElementById('edit_shift_active');
-                        if (activeSelect && window.jQuery) {
-                            activeSelect.value = (shift.active ? '1' : '0');
-                            if (window.jQuery(activeSelect).hasClass('select2-hidden-accessible')) window.jQuery(activeSelect).trigger('change');
-                        }
-                        let form = document.getElementById('shift_edit_form');
-                        if (form) form.action = '/hrms/roster/shift/update/' + shift.id;
-                    });
-                });
-            }
+                let shift;
+                try {
+                    shift = JSON.parse(atob(rawData));
+                } catch (err) {
+                    console.error("Failed to parse shift payload:", err);
+                    return;
+                }
+
+                $('#edit_shift_name').val(shift.name || '');
+                $('#edit_shift_code').val(shift.code || '');
+                $('#edit_shift_start').val(shift.start_time ? shift.start_time.substring(0, 5) : '');
+                $('#edit_shift_end').val(shift.end_time ? shift.end_time.substring(0, 5) : '');
+                $('#edit_shift_break').val(shift.break_minutes || 0);
+
+                let companySelect = $('#edit_shift_company_id');
+                if (companySelect.length) {
+                    companySelect.val(shift.company_id || '');
+                    if (companySelect.hasClass('select2-hidden-accessible')) {
+                        companySelect.trigger('change');
+                    }
+                }
+
+                let overtimeSelect = $('#edit_shift_overtime');
+                if (overtimeSelect.length) {
+                    overtimeSelect.val(shift.overtime_allowed ? '1' : '0');
+                    if (overtimeSelect.hasClass('select2-hidden-accessible')) {
+                        overtimeSelect.trigger('change');
+                    }
+                }
+
+                let activeSelect = $('#edit_shift_active');
+                if (activeSelect.length) {
+                    activeSelect.val(shift.active ? '1' : '0');
+                    if (activeSelect.hasClass('select2-hidden-accessible')) {
+                        activeSelect.trigger('change');
+                    }
+                }
+
+                let form = document.getElementById('shift_edit_form');
+                if (form) {
+                    let updateUrl = '{{ route("hrms.shift.update", ":id") }}'.replace(':id', shift.id);
+                    form.action = updateUrl;
+                }
+            });
 
             // AJAX-based search, sort and filter for Shifts
             function loadShifts(page = 1) {

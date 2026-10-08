@@ -328,7 +328,7 @@ class AttendanceApiController extends Controller
         }
 
         $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
+            'employee_id' => 'nullable|exists:employees,id',
             'latitude'    => 'nullable|numeric|between:-90,90',
             'longitude'   => 'nullable|numeric|between:-180,180',
             'selfie'      => 'nullable|string',
@@ -337,13 +337,19 @@ class AttendanceApiController extends Controller
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
 
-        if (!$isHrAdmin && $authEmployee && (int)$validated['employee_id'] !== (int)$authEmployee->id) {
+        $targetEmployeeId = $validated['employee_id'] ?? $authEmployee?->id;
+
+        if (!$targetEmployeeId) {
+            return $this->sendError('Employee profile not found for the authenticated user.', 404);
+        }
+
+        if (!$isHrAdmin && $authEmployee && (int)$targetEmployeeId !== (int)$authEmployee->id) {
             return $this->sendError('Unauthorized action. You can only clock in for yourself.', 403);
         }
 
         try {
             $attendance = $this->attendanceRepository->checkIn(
-                $validated['employee_id'],
+                (int) $targetEmployeeId,
                 $validated['latitude'] ?? null,
                 $validated['longitude'] ?? null,
                 $request->input('selfie')

@@ -214,7 +214,7 @@ class PenalizationPolicyApiController extends Controller
                         'max_occurrence' => isset($tier['max_occurrence']) && $tier['max_occurrence'] !== '' && $tier['max_occurrence'] !== null ? (int) $tier['max_occurrence'] : null,
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value'  => (float) $tier['penalty_value'],
-                        'leave_type_id'  => null,
+                        'leave_type_id'  => !empty($tier['leave_type_id']) ? (int)$tier['leave_type_id'] : null,
                     ];
                 }
             }
@@ -234,7 +234,7 @@ class PenalizationPolicyApiController extends Controller
                         'max_occurrence' => isset($tier['max_occurrence']) && $tier['max_occurrence'] !== '' && $tier['max_occurrence'] !== null ? (int) $tier['max_occurrence'] : null,
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value'  => (float) $tier['penalty_value'],
-                        'leave_type_id'  => null,
+                        'leave_type_id'  => !empty($tier['leave_type_id']) ? (int)$tier['leave_type_id'] : null,
                     ];
                 }
             }
@@ -252,7 +252,7 @@ class PenalizationPolicyApiController extends Controller
                         'hours_threshold' => (float) $tier['hours_threshold'],
                         'penalty_action'  => $tier['penalty_action'],
                         'penalty_value'   => (float) $tier['penalty_value'],
-                        'leave_type_id'   => null,
+                        'leave_type_id'   => !empty($tier['leave_type_id']) ? (int)$tier['leave_type_id'] : null,
                     ];
                 }
             }

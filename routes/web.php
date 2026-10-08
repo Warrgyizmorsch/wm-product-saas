@@ -28,6 +28,12 @@ Route::match(['get', 'post'], '/webhooks/meta-leadgen', [\App\Domains\Platform\C
 Route::match(['get', 'post'], '/api/webhooks/meta-leadgen', [\App\Domains\Platform\Controllers\MetaWebhookController::class, 'handle'])
     ->name('api.webhooks.meta-leadgen');
 
+// Public Biometric ADMS Webhook Route (for physical terminals pushing punch records)
+Route::match(['get', 'post'], '/api/hrms/biometric/webhook', [\App\Domains\HRMS\Controllers\Api\BiometricWebhookController::class, 'handleAdmsRequest'])
+    ->name('api.hrms.biometric.webhook');
+Route::match(['get', 'post'], '/hrms/biometric/webhook', [\App\Domains\HRMS\Controllers\Api\BiometricWebhookController::class, 'handleAdmsRequest'])
+    ->name('hrms.biometric.webhook');
+
 Route::middleware(['tenant'])->group(function (): void {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store'])
