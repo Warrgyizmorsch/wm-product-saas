@@ -159,9 +159,13 @@
             </table>
         </div>
 
-        <div class="mt-3">
-            {{ $workOrders->links() }}
-        </div>
+        <x-ui.pagination 
+            :paginator="$workOrders"
+            :currentPage="$workOrders->currentPage()" 
+            :totalPages="$workOrders->lastPage()" 
+            :totalResults="$workOrders->total()" 
+            :perPage="$workOrders->perPage()" 
+        />
     </div>
 
     <!-- Report Breakdown Modal Component -->
