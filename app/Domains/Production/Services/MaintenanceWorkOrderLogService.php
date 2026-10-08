@@ -57,6 +57,64 @@ class MaintenanceWorkOrderLogService
         );
     }
 
+    public function recordWorkOrderScheduled(ProductionMaintenanceWorkOrder $workOrder, ?int $userId = null, array $details = []): ProductionMaintenanceWorkOrderLog
+    {
+        return $this->recordEvent(
+            $workOrder->tenant_id,
+            'Work Order Scheduled',
+            "Maintenance Work Order [{$workOrder->work_order_number}] scheduled.",
+            array_merge([
+                'work_order_number' => $workOrder->work_order_number,
+                'machine_id' => $workOrder->machine_id,
+                'planned_start' => $workOrder->planned_start?->toDateTimeString(),
+                'planned_end' => $workOrder->planned_end?->toDateTimeString(),
+            ], $details),
+            $workOrder,
+            $workOrder->downtime_id,
+            $workOrder->machine_id,
+            $userId,
+            'MaintenanceWorkOrderService'
+        );
+    }
+
+    public function recordWorkOrderRescheduled(ProductionMaintenanceWorkOrder $workOrder, ?int $userId = null, array $details = []): ProductionMaintenanceWorkOrderLog
+    {
+        return $this->recordEvent(
+            $workOrder->tenant_id,
+            'Work Order Rescheduled',
+            "Maintenance Work Order [{$workOrder->work_order_number}] rescheduled.",
+            array_merge([
+                'work_order_number' => $workOrder->work_order_number,
+                'machine_id' => $workOrder->machine_id,
+                'planned_start' => $workOrder->planned_start?->toDateTimeString(),
+                'planned_end' => $workOrder->planned_end?->toDateTimeString(),
+            ], $details),
+            $workOrder,
+            $workOrder->downtime_id,
+            $workOrder->machine_id,
+            $userId,
+            'MaintenanceWorkOrderService'
+        );
+    }
+
+    public function recordAssignmentCreated(ProductionMaintenanceWorkOrder $workOrder, array $assignmentData, ?int $userId = null): ProductionMaintenanceWorkOrderLog
+    {
+        return $this->recordEvent(
+            $workOrder->tenant_id,
+            'Assignment Added',
+            "Assignment added to work order [{$workOrder->work_order_number}].",
+            array_merge([
+                'work_order_number' => $workOrder->work_order_number,
+                'machine_id' => $workOrder->machine_id,
+            ], $assignmentData),
+            $workOrder,
+            $workOrder->downtime_id,
+            $workOrder->machine_id,
+            $userId,
+            'MaintenanceWorkOrderService'
+        );
+    }
+
     public function recordMachineDowntimeStarted(ProductionMaintenanceWorkOrder $workOrder, int $downtimeId, ?int $userId = null, array $details = []): ProductionMaintenanceWorkOrderLog
     {
         return $this->recordEvent(

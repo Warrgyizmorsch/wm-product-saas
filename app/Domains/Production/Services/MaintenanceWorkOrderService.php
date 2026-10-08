@@ -6,8 +6,10 @@ use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionMachineDowntime;
 use App\Domains\Production\Models\ProductionMaintenanceWorkOrder;
+use App\Domains\Production\Models\ProductionMaintenanceWorkOrderAssignment;
 use App\Domains\Production\Models\ProductionMaintenanceWorkOrderSpare;
 use App\Domains\Production\Models\WorkCenter;
+use App\Models\User;
 use App\Domains\Production\Repositories\MaintenanceRepositoryInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +26,233 @@ class MaintenanceWorkOrderService
         private readonly ProductionEventService $eventService,
         private readonly MaintenanceWorkOrderLogService $logService
     ) {}
+
+    private function isBlankAssignment(array $assignment): bool
+    {
+        $assignmentType = trim((string) ($assignment['assignment_type'] ?? $assignment['type'] ?? ''));
+        $technicianId = $assignment['technician_id'] ?? null;
+        $technicianName = trim((string) ($assignment['technician_name'] ?? ''));
+        $workedHours = $assignment['worked_hours'] ?? null;
+        $hourlyRate = $assignment['hourly_rate'] ?? null;
+        $notes = trim((string) ($assignment['notes'] ?? ''));
+
+        return $assignmentType === ''
+            && (empty($technicianId) || $technicianId === '')
+            && $technicianName === ''
+            && ($workedHours === null || $workedHours === '')
+            && ($hourlyRate === null || $hourlyRate === '')
+            && $notes === '';
+    }
+
+    private function normalizeAssignmentInput(array $assignment): array
+    {
+        $type = strtolower((string) ($assignment['assignment_type'] ?? $assignment['type'] ?? ProductionMaintenanceWorkOrderAssignment::TYPE_INTERNAL));
+        if (!in_array($type, [ProductionMaintenanceWorkOrderAssignment::TYPE_INTERNAL, ProductionMaintenanceWorkOrderAssignment::TYPE_EXTERNAL], true)) {
+            throw new InvalidArgumentException('Assignment type must be internal or external.');
+        }
+
+        $normalized = [
+            'assignment_type' => $type,
+            'technician_id' => null,
+            'technician_name' => '',
+            'expected_work_hours' => isset($assignment['expected_work_hours']) ? (float) $assignment['expected_work_hours'] : (isset($assignment['worked_hours']) ? (float) $assignment['worked_hours'] : 0.0),
+            'worked_hours' => 0.0,
+            'hourly_rate' => isset($assignment['hourly_rate']) ? (float) $assignment['hourly_rate'] : 0.0,
+            'notes' => trim((string) ($assignment['notes'] ?? '')),
+            'assigned_at' => $assignment['assigned_at'] ?? now(),
+        ];
+
+        if ($type === ProductionMaintenanceWorkOrderAssignment::TYPE_INTERNAL) {
+            $technicianId = isset($assignment['technician_id']) ? (int) $assignment['technician_id'] : null;
+            $user = $technicianId ? User::find($technicianId) : null;
+            $technicianName = trim((string) ($assignment['technician_name'] ?? ($user?->name ?? '')));
+
+            if (!$technicianId || $technicianName === '') {
+                throw new InvalidArgumentException('Internal assignments require a valid technician and a technician name.');
+            }
+
+            $normalized['technician_id'] = $technicianId;
+            $normalized['technician_name'] = $technicianName;
+        } else {
+            $technicianName = trim((string) ($assignment['technician_name'] ?? ''));
+            if ($technicianName === '') {
+                throw new InvalidArgumentException('External mechanic name is required.');
+            }
+
+            $normalized['technician_name'] = $technicianName;
+        }
+
+        return $normalized;
+    }
+
+    private function syncLegacyAssignedTechnician(ProductionMaintenanceWorkOrder $workOrder): void
+    {
+        $primaryInternal = $workOrder->assignments()
+            ->where('assignment_type', ProductionMaintenanceWorkOrderAssignment::TYPE_INTERNAL)
+            ->whereNotNull('technician_id')
+            ->orderByDesc('assigned_at')
+            ->first();
+
+        $workOrder->update([
+            'assigned_technician_id' => $primaryInternal?->technician_id,
+        ]);
+    }
+
+    private function buildAssignmentsFromData(array $data): array
+    {
+        $assignments = $data['assignments'] ?? [];
+
+        if (!empty($assignments)) {
+            return array_values(array_filter($assignments, fn ($assignment) => is_array($assignment) && !$this->isBlankAssignment($assignment)));
+        }
+
+        $legacyTechnicianId = $data['assigned_technician_id'] ?? $data['technician_id'] ?? null;
+        $legacyTechnicianName = $data['technician_name'] ?? null;
+        $legacyAssignmentType = $data['assignment_type'] ?? ProductionMaintenanceWorkOrderAssignment::TYPE_INTERNAL;
+
+        if ($legacyTechnicianId || $legacyTechnicianName) {
+            $technicianId = $legacyTechnicianId ? (int) $legacyTechnicianId : null;
+            $user = $technicianId ? User::find($technicianId) : null;
+            $technicianName = trim((string) ($legacyTechnicianName ?? ($user?->name ?? '')));
+
+            return [[
+                'assignment_type' => $legacyAssignmentType,
+                'technician_id' => $technicianId,
+                'technician_name' => $technicianName,
+                'worked_hours' => $data['worked_hours'] ?? 0,
+                'hourly_rate' => $data['hourly_rate'] ?? 0,
+                'notes' => $data['notes'] ?? null,
+            ]];
+        }
+
+        if (isset($data['assignment_type']) || isset($data['technician_id']) || isset($data['technician_name'])) {
+            return [[
+                'assignment_type' => $data['assignment_type'] ?? ProductionMaintenanceWorkOrderAssignment::TYPE_INTERNAL,
+                'technician_id' => $data['technician_id'] ?? null,
+                'technician_name' => $data['technician_name'] ?? null,
+                'worked_hours' => $data['worked_hours'] ?? 0,
+                'hourly_rate' => $data['hourly_rate'] ?? 0,
+                'notes' => $data['notes'] ?? null,
+            ]];
+        }
+
+        return [];
+    }
+
+    public function hasValidAssignment(ProductionMaintenanceWorkOrder $workOrder): bool
+    {
+        return $workOrder->assignments()
+            ->where(function ($query) {
+                $query->where('assignment_type', ProductionMaintenanceWorkOrderAssignment::TYPE_INTERNAL)
+                    ->whereNotNull('technician_id')
+                    ->where('technician_name', '!=', '')
+                    ->orWhere('assignment_type', ProductionMaintenanceWorkOrderAssignment::TYPE_EXTERNAL)
+                    ->where('technician_name', '!=', '');
+            })
+            ->exists();
+    }
+
+    private function syncAssignmentWorkedHoursForCompletion(ProductionMaintenanceWorkOrder $workOrder): void
+    {
+        $actualStart = $workOrder->actual_start ? Carbon::parse($workOrder->actual_start) : null;
+        $actualEnd = $workOrder->actual_end ? Carbon::parse($workOrder->actual_end) : now();
+
+        $workOrder->assignments()->each(function (ProductionMaintenanceWorkOrderAssignment $assignment) use ($actualStart, $actualEnd) {
+            $assignmentAt = $assignment->assigned_at ? Carbon::parse($assignment->assigned_at) : $actualEnd;
+            $referenceStart = $actualStart && $assignmentAt->lt($actualStart) ? $actualStart : $assignmentAt;
+            $seconds = max(0, $actualEnd->diffInSeconds($referenceStart, false));
+            $hours = round($seconds / 3600, 2);
+
+            $assignment->update([
+                'worked_hours' => $hours,
+            ]);
+        });
+    }
+
+    public function createAssignmentsForWorkOrder(ProductionMaintenanceWorkOrder $workOrder, array $assignments, ?int $userId = null): void
+    {
+        if (empty($assignments)) {
+            return;
+        }
+
+        foreach ($assignments as $assignment) {
+            if (!is_array($assignment) || $this->isBlankAssignment($assignment)) {
+                continue;
+            }
+
+            $normalized = $this->normalizeAssignmentInput($assignment);
+
+            $record = ProductionMaintenanceWorkOrderAssignment::create([
+                'tenant_id' => $workOrder->tenant_id,
+                'work_order_id' => $workOrder->id,
+                'technician_id' => $normalized['technician_id'],
+                'technician_name' => $normalized['technician_name'],
+                'assignment_type' => $normalized['assignment_type'],
+                'assigned_at' => $normalized['assigned_at'],
+                'expected_work_hours' => $normalized['expected_work_hours'],
+                'worked_hours' => $normalized['worked_hours'],
+                'hourly_rate' => $normalized['hourly_rate'],
+                'notes' => $normalized['notes'],
+            ]);
+
+            $this->logService->recordAssignmentCreated($workOrder, [
+                'assignment_id' => $record->id,
+                'assignment_type' => $record->assignment_type,
+                'technician_id' => $record->technician_id,
+                'technician_name' => $record->technician_name,
+                'worked_hours' => $record->worked_hours,
+                'hourly_rate' => $record->hourly_rate,
+                'notes' => $record->notes,
+            ], $userId);
+        }
+
+        $this->syncLegacyAssignedTechnician($workOrder);
+    }
+
+    public function addAssignment(int $workOrderId, int $tenantId, array $data, ?int $userId = null): ProductionMaintenanceWorkOrderAssignment
+    {
+        $workOrder = $this->repository->findWorkOrderForLock($workOrderId, $tenantId);
+        if (!$workOrder) {
+            throw new InvalidArgumentException("Work Order #{$workOrderId} not found.");
+        }
+
+        if (in_array($workOrder->status, [ProductionMaintenanceWorkOrder::STATUS_COMPLETED, ProductionMaintenanceWorkOrder::STATUS_CANCELLED], true)) {
+            throw new InvalidArgumentException('Assignments cannot be added after a work order is completed or cancelled.');
+        }
+
+        if ($this->isBlankAssignment($data)) {
+            throw new InvalidArgumentException('Assignment payload cannot be empty.');
+        }
+
+        $normalized = $this->normalizeAssignmentInput($data);
+
+        $assignment = ProductionMaintenanceWorkOrderAssignment::create([
+            'tenant_id' => $tenantId,
+            'work_order_id' => $workOrder->id,
+            'technician_id' => $normalized['technician_id'],
+            'technician_name' => $normalized['technician_name'],
+            'assignment_type' => $normalized['assignment_type'],
+            'assigned_at' => $normalized['assigned_at'],
+            'expected_work_hours' => $normalized['expected_work_hours'],
+            'worked_hours' => $normalized['worked_hours'],
+            'hourly_rate' => $normalized['hourly_rate'],
+            'notes' => $normalized['notes'],
+        ]);
+
+        $this->logService->recordAssignmentCreated($workOrder, [
+            'assignment_id' => $assignment->id,
+            'assignment_type' => $assignment->assignment_type,
+            'technician_id' => $assignment->technician_id,
+            'technician_name' => $assignment->technician_name,
+            'worked_hours' => $assignment->worked_hours,
+            'hourly_rate' => $assignment->hourly_rate,
+            'notes' => $assignment->notes,
+        ], $userId);
+
+        $this->syncLegacyAssignedTechnician($workOrder);
+
+        return $assignment;
+    }
 
     /**
      * Create a Maintenance Work Order (Draft state).
@@ -46,6 +275,12 @@ class MaintenanceWorkOrderService
 
             $this->logService->recordWorkOrderCreated($wo, $userId);
 
+            $assignments = $this->buildAssignmentsFromData($data);
+
+            if (!empty($assignments)) {
+                $this->createAssignmentsForWorkOrder($wo, $assignments, $userId);
+            }
+
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $wo->machine_id,
                 'event_type'   => 'Work Order Created',
@@ -55,7 +290,7 @@ class MaintenanceWorkOrderService
                 'event_source' => 'MaintenanceWorkOrderService',
             ]);
 
-            return $wo;
+            return $wo->fresh(['machine', 'technician', 'downtime', 'assignments.technician']);
         });
     }
 
@@ -76,8 +311,8 @@ class MaintenanceWorkOrderService
                 throw new InvalidArgumentException("Work Order #{$id} not found.");
             }
 
-            if ($wo->status === ProductionMaintenanceWorkOrder::STATUS_COMPLETED || $wo->status === ProductionMaintenanceWorkOrder::STATUS_CANCELLED) {
-                throw new InvalidArgumentException("Cannot schedule a completed or cancelled Work Order.");
+            if (in_array($wo->status, [ProductionMaintenanceWorkOrder::STATUS_IN_PROGRESS, ProductionMaintenanceWorkOrder::STATUS_COMPLETED, ProductionMaintenanceWorkOrder::STATUS_CANCELLED], true)) {
+                throw new InvalidArgumentException('Scheduling and rescheduling are not allowed once the work order has started, been completed, or been cancelled.');
             }
 
             $machine = Machine::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($wo->machine_id);
@@ -120,11 +355,35 @@ class MaintenanceWorkOrderService
                 $wo->downtime_id = $downtime->id;
             }
 
+            $previousStatus = $wo->status;
             $wo->planned_start          = $start;
             $wo->planned_end            = $end;
             $wo->assigned_technician_id = $technicianId ?: $wo->assigned_technician_id;
             $wo->status                 = ProductionMaintenanceWorkOrder::STATUS_SCHEDULED;
             $wo->save();
+
+            if ($technicianId && !$wo->assignments()->where('technician_id', $technicianId)->exists()) {
+                $user = User::find($technicianId);
+                $this->addAssignment($wo->id, $tenantId, [
+                    'assignment_type' => ProductionMaintenanceWorkOrderAssignment::TYPE_INTERNAL,
+                    'technician_id' => $technicianId,
+                    'technician_name' => $user?->name ?? '',
+                    'assigned_at' => now(),
+                ], $userId);
+            }
+
+            if ($previousStatus === ProductionMaintenanceWorkOrder::STATUS_SCHEDULED) {
+                $this->logService->recordWorkOrderRescheduled($wo, $userId, [
+                    'previous_status' => $previousStatus,
+                    'planned_start' => $start->toDateTimeString(),
+                    'planned_end' => $end->toDateTimeString(),
+                ]);
+            } else {
+                $this->logService->recordWorkOrderScheduled($wo, $userId, [
+                    'planned_start' => $start->toDateTimeString(),
+                    'planned_end' => $end->toDateTimeString(),
+                ]);
+            }
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $wo->machine_id,
@@ -137,7 +396,7 @@ class MaintenanceWorkOrderService
 
             app(ProductionNotificationService::class)->notifyMaintenanceScheduled($wo);
 
-            return $wo->fresh(['machine', 'technician', 'downtime']);
+            return $wo->fresh(['machine', 'technician', 'downtime', 'assignments.technician']);
         });
     }
 
@@ -161,6 +420,10 @@ class MaintenanceWorkOrderService
 
             if ($wo->status === ProductionMaintenanceWorkOrder::STATUS_COMPLETED || $wo->status === ProductionMaintenanceWorkOrder::STATUS_CANCELLED) {
                 throw new InvalidArgumentException("Cannot start a completed or cancelled Work Order.");
+            }
+
+            if (!$this->hasValidAssignment($wo)) {
+                throw new InvalidArgumentException('At least one valid assignment must exist before the work order can start.');
             }
 
             $machine = Machine::withoutGlobalScopes()->where('tenant_id', $tenantId)->lockForUpdate()->findOrFail($wo->machine_id);
@@ -402,6 +665,8 @@ class MaintenanceWorkOrderService
                 'status'                 => ProductionMaintenanceWorkOrder::STATUS_COMPLETED,
                 'completed_by'           => $userId,
             ]);
+
+            $this->syncAssignmentWorkedHoursForCompletion($wo);
 
             $this->logService->recordWorkOrderCompleted($wo, $userId, [
                 'repair_hours' => $repairHours,

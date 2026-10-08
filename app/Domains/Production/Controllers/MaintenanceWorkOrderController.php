@@ -57,6 +57,13 @@ class MaintenanceWorkOrderController extends Controller
             'planned_start'          => ['nullable', 'date'],
             'planned_end'            => ['nullable', 'date'],
             'problem_description'    => ['required', 'string'],
+            'assignments'            => ['nullable', 'array'],
+            'assignments.*.assignment_type' => ['nullable', 'in:internal,external'],
+            'assignments.*.technician_id' => ['nullable', 'integer'],
+            'assignments.*.technician_name' => ['nullable', 'string'],
+            'assignments.*.expected_work_hours' => ['nullable', 'numeric', 'min:0'],
+            'assignments.*.hourly_rate' => ['nullable', 'numeric', 'min:0'],
+            'assignments.*.notes' => ['nullable', 'string'],
         ]);
 
         try {
@@ -266,6 +273,32 @@ class MaintenanceWorkOrderController extends Controller
             return redirect()
                 ->route('production.maintenance.work-orders.show', $spare->maintenance_work_order_id)
                 ->with('success', "Spare part issued from warehouse. Stock deducted and costs updated.");
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function addAssignment(Request $request, int $id): RedirectResponse
+    {
+        $tenantId = require_tenant_id();
+        $validated = $request->validate([
+            'assignments' => ['required', 'array', 'min:1'],
+            'assignments.*.assignment_type' => ['required', 'in:internal,external'],
+            'assignments.*.technician_id' => ['nullable', 'integer'],
+            'assignments.*.technician_name' => ['nullable', 'string'],
+            'assignments.*.expected_work_hours' => ['required', 'numeric', 'min:0'],
+            'assignments.*.hourly_rate' => ['required', 'numeric', 'min:0'],
+            'assignments.*.notes' => ['nullable', 'string'],
+        ]);
+
+        try {
+            foreach ($validated['assignments'] as $assignment) {
+                $this->service->addAssignment($id, $tenantId, $assignment, auth()->id());
+            }
+
+            return redirect()
+                ->route('production.maintenance.work-orders.show', $id)
+                ->with('success', 'Assignments added successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }

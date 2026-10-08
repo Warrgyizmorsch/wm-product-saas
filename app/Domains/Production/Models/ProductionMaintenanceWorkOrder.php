@@ -106,6 +106,11 @@ class ProductionMaintenanceWorkOrder extends BaseModel
         return $this->belongsTo(ProductionMachineDowntime::class, 'downtime_id');
     }
 
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(ProductionMaintenanceWorkOrderAssignment::class, 'work_order_id');
+    }
+
     public function logs(): HasMany
     {
         return $this->hasMany(ProductionMaintenanceWorkOrderLog::class, 'work_order_id');

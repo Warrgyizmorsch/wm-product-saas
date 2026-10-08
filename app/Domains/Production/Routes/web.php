@@ -130,6 +130,7 @@ Route::prefix('production')
 
             // Work Orders
             Route::post('work-orders/{id}/schedule', [MaintenanceWorkOrderController::class, 'schedule'])->name('work-orders.schedule');
+            Route::post('work-orders/{id}/assignments', [MaintenanceWorkOrderController::class, 'addAssignment'])->name('work-orders.add-assignment');
             Route::post('work-orders/{id}/start', [MaintenanceWorkOrderController::class, 'start'])->name('work-orders.start');
             Route::post('work-orders/{id}/complete', [MaintenanceWorkOrderController::class, 'complete'])->name('work-orders.complete');
             Route::post('work-orders/{id}/cancel', [MaintenanceWorkOrderController::class, 'cancel'])->name('work-orders.cancel');

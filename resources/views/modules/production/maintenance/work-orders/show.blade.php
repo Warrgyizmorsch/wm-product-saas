@@ -6,9 +6,15 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        @if($workOrder->status === 'draft')
+        @if(!in_array($workOrder->status, ['in_progress', 'completed', 'cancelled']))
             <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#scheduleModal">
                 <i class="feather-calendar me-2"></i>Schedule
+            </button>
+        @endif
+
+        @if(!in_array($workOrder->status, ['completed', 'cancelled']))
+            <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#assignModal">
+                <i class="feather-user-plus me-2"></i>Assign
             </button>
         @endif
 
@@ -94,6 +100,66 @@
                                 <div class="p-3 bg-soft-success text-dark rounded fs-13">{{ $workOrder->work_performed }}</div>
                             </div>
                         @endif
+
+                        @php
+                            $existingAssignments = $workOrder->assignments()->with('technician')->orderBy('assigned_at')->get();
+                            $assignedPeople = $existingAssignments->map(function ($assignment) {
+                                return $assignment->assignment_type === 'internal'
+                                    ? ($assignment->technician?->name ?? $assignment->technician_name)
+                                    : ($assignment->technician_name ?: 'External technician');
+                            })->filter()->values();
+                            $assignmentSummary = $assignedPeople->isNotEmpty() ? $assignedPeople->implode(', ') : 'No assigned people yet';
+                        @endphp
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="fs-12 text-muted fw-bold d-block mb-0">Assignments</label>
+                                <button
+                                    type="button"
+                                    class="btn btn-xs btn-light border rounded-pill d-inline-flex align-items-center gap-1"
+                                    data-bs-toggle="popover"
+                                    data-bs-trigger="hover focus"
+                                    data-bs-placement="top"
+                                    data-bs-content="{{ e($assignmentSummary) }}"
+                                    title="Assigned people"
+                                >
+                                    <i class="feather-users fs-11"></i>
+                                    <span class="fw-bold">{{ $assignedPeople->count() }}</span>
+                                </button>
+                            </div>
+                            @if($existingAssignments->isNotEmpty())
+                                <div class="list-group list-group-flush border rounded">
+                                    @foreach($existingAssignments as $assignment)
+                                        <div class="list-group-item py-3 fs-13">
+                                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                                <div>
+                                                    <strong class="text-dark">
+                                                        {{ $assignment->assignment_type === 'internal' ? 'Internal / In-House' : 'External' }}
+                                                    </strong>
+                                                    <div class="text-muted mt-1">
+                                                        @if($assignment->assignment_type === 'internal')
+                                                            {{ $assignment->technician?->name ?? $assignment->technician_name }}
+                                                        @else
+                                                            {{ $assignment->technician_name }}
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <span class="badge bg-light text-dark">
+                                                    {{ number_format((float) $assignment->worked_hours, 2) }} hrs
+                                                </span>
+                                            </div>
+                                            @if($assignment->hourly_rate > 0)
+                                                <small class="text-muted d-block mt-1">Rate: ${{ number_format((float) $assignment->hourly_rate, 2) }}/hr</small>
+                                            @endif
+                                            @if($assignment->notes)
+                                                <small class="text-muted d-block mt-1">Notes: {{ $assignment->notes }}</small>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="text-muted fs-13 border rounded p-3 bg-light">No assignments added yet.</div>
+                            @endif
+                        </div>
 
                         @if($workOrder->logs->isNotEmpty())
                             <div class="mb-3">
@@ -307,15 +373,109 @@
 
     <!-- Schedule Modal -->
     <x-ui.modal id="scheduleModal" title="Schedule Work Order" formAction="{{ route('production.maintenance.work-orders.schedule', $workOrder->id) }}" submitText="Save Schedule">
-        <x-ui.odoo-form-ui type="select" label="Assigned Technician" name="assigned_technician_id">
-            <option value="">Unassigned</option>
-            @foreach($technicians as $tech)
-                <option value="{{ $tech->id }}" @selected($workOrder->assigned_technician_id == $tech->id)>{{ $tech->name }}</option>
-            @endforeach
-        </x-ui.odoo-form-ui>
-
         <x-ui.odoo-form-ui type="input" inputType="datetime-local" label="Planned Start Date & Time" name="planned_start" :required="true" :value="$workOrder->planned_start?->format('Y-m-d\TH:i')" />
         <x-ui.odoo-form-ui type="input" inputType="datetime-local" label="Planned End Date & Time" name="planned_end" :required="true" :value="$workOrder->planned_end?->format('Y-m-d\TH:i')" />
+    </x-ui.modal>
+
+    <!-- Assign Modal -->
+    <x-ui.modal id="assignModal" title="Assign People to Work Order" formAction="{{ route('production.maintenance.work-orders.add-assignment', $workOrder->id) }}" submitText="Save Assignments">
+        <div x-data="{
+            rows: [{ assignment_type: 'internal', technician_id: '', technician_name: '', expected_work_hours: '', hourly_rate: '', notes: '' }],
+            addRow() {
+                this.rows.push({ assignment_type: 'internal', technician_id: '', technician_name: '', expected_work_hours: '', hourly_rate: '', notes: '' });
+            },
+            removeRow(index) {
+                if (this.rows.length > 1) this.rows.splice(index, 1);
+            }
+        }">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <strong class="text-dark mb-0">Assigned People</strong>
+                    <span class="badge bg-soft-secondary text-secondary border" x-text="rows.length"></span>
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm" x-on:click="addRow()">
+                    <i class="feather-plus me-1"></i> Add Person
+                </button>
+            </div>
+
+            <template x-for="(row, index) in rows" :key="index">
+                <div class="border rounded p-3 mb-3 bg-light">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <strong class="text-dark">Assignment #<span x-text="index + 1"></span></strong>
+                        <button type="button" class="btn btn-sm btn-outline-danger" x-on:click="removeRow(index)" x-show="rows.length > 1">Remove</button>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fs-12 text-muted fw-bold">Assignment Type</label>
+                        <select :name="'assignments[' + index + '][assignment_type]'" x-model="row.assignment_type" class="form-select form-select-sm">
+                            <option value="internal">Internal / In-House</option>
+                            <option value="external">External</option>
+                        </select>
+                    </div>
+
+                    <template x-if="row.assignment_type === 'internal'">
+                        <div class="row g-2">
+                            <div class="col-md-12">
+                                <label class="form-label fs-12 text-muted fw-bold">Person</label>
+                                <select
+                                    :name="'assignments[' + index + '][technician_id]'"
+                                    x-model="row.technician_id"
+                                    x-on:change="
+                                        const option = $event.target.selectedOptions[0];
+                                        const monthlyBasicSalary = Number(option?.dataset?.salary ?? 0);
+                                        row.technician_name = option?.dataset?.name || '';
+                                        row.hourly_rate = monthlyBasicSalary > 0 ? Number((monthlyBasicSalary / (30 * 24)).toFixed(2)) : (row.hourly_rate || '');
+                                    "
+                                    class="form-select form-select-sm">
+                                    <option value="">Select employee</option>
+                                    @foreach($technicians as $tech)
+                                        @php
+                                            $monthlyBasicSalary = 0.0;
+                                            $employee = $tech->employee()->with('salaryStructure.items.component')->first();
+                                            if ($employee && $employee->salaryStructure) {
+                                                $basicItem = $employee->salaryStructure->items()->with('component')->get()->first(function ($item) {
+                                                    return $item->component && strtolower($item->component->code ?? '') === 'basic';
+                                                });
+                                                if ($basicItem && $basicItem->value !== null) {
+                                                    $monthlyBasicSalary = (float) $basicItem->value;
+                                                }
+                                            }
+                                        @endphp
+                                        <option value="{{ $tech->id }}" data-name="{{ $tech->name }}" data-salary="{{ $monthlyBasicSalary }}">{{ $tech->name }}</option>
+                                    @endforeach
+                                </select>
+                                <input type="hidden" :name="'assignments[' + index + '][technician_name]'" x-model="row.technician_name" />
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="row.assignment_type === 'external'">
+                        <div class="row g-2">
+                            <div class="col-md-12">
+                                <label class="form-label fs-12 text-muted fw-bold">Person</label>
+                                <input type="text" :name="'assignments[' + index + '][technician_name]'" x-model="row.technician_name" class="form-control form-control-sm" placeholder="Mechanic name" />
+                            </div>
+                        </div>
+                    </template>
+
+                    <div class="row g-2 mt-2">
+                        <div class="col-md-6">
+                            <label class="form-label fs-12 text-muted fw-bold">Expected Work Hours</label>
+                            <input type="number" step="0.01" min="0" :name="'assignments[' + index + '][expected_work_hours]'" x-model="row.expected_work_hours" class="form-control form-control-sm" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fs-12 text-muted fw-bold">Hourly Rate</label>
+                            <input type="number" step="0.01" min="0" :name="'assignments[' + index + '][hourly_rate]'" x-model="row.hourly_rate" class="form-control form-control-sm" />
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="form-label fs-12 text-muted fw-bold">Notes</label>
+                        <input type="text" :name="'assignments[' + index + '][notes]'" x-model="row.notes" class="form-control form-control-sm" placeholder="Optional notes" />
+                    </div>
+                </div>
+            </template>
+        </div>
     </x-ui.modal>
 
     <!-- Complete Modal -->

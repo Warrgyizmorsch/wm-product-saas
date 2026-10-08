@@ -175,6 +175,11 @@ class MaintenanceWorkflowTest extends TestCase
             'type'                => 'preventive',
             'priority'            => 'high',
             'problem_description' => 'Regular Preventive Maintenance',
+            'assignments' => [[
+                'assignment_type' => 'internal',
+                'technician_id' => $this->user->id,
+                'technician_name' => $this->user->name,
+            ]],
         ]);
 
         $this->assertDatabaseHas('production_maintenance_work_order_logs', [
@@ -269,6 +274,11 @@ class MaintenanceWorkflowTest extends TestCase
             'machine_id'          => $this->machine->id,
             'type'                => 'preventive',
             'problem_description' => 'Replace Main Drive Bearing',
+            'assignments' => [[
+                'assignment_type' => 'internal',
+                'technician_id' => $this->user->id,
+                'technician_name' => $this->user->name,
+            ]],
         ]);
 
         $spare = $spareService->addSpareRequest($wo->id, $this->tenant->id, $this->spareProduct->id, $this->warehouse->id, 2.0);
@@ -354,6 +364,11 @@ class MaintenanceWorkflowTest extends TestCase
 
         $woList = $pmService->generateDueWorkOrders($this->tenant->id);
         $wo = $woList[0];
+        $woService->createAssignmentsForWorkOrder($wo, [[
+            'assignment_type' => 'internal',
+            'technician_id' => $this->user->id,
+            'technician_name' => $this->user->name,
+        ]], $this->user->id);
 
         $woService->startWorkOrder($wo->id, $this->tenant->id, $this->user->id);
 
@@ -440,6 +455,12 @@ class MaintenanceWorkflowTest extends TestCase
         $this->assertEquals('Breakdown', $this->machine->current_state);
 
         // 2. Explicitly start the draft work order through the normal maintenance workflow
+        $woService->createAssignmentsForWorkOrder($wo, [[
+            'assignment_type' => 'internal',
+            'technician_id' => $this->user->id,
+            'technician_name' => $this->user->name,
+        ]], $this->user->id);
+
         $startedWo = $woService->startWorkOrder($wo->id, $this->tenant->id, $this->user->id);
         $this->assertEquals(ProductionMaintenanceWorkOrder::STATUS_IN_PROGRESS, $startedWo->status);
         $this->assertEquals(Machine::STATUS_UNDER_MAINTENANCE, $this->machine->refresh()->status);
