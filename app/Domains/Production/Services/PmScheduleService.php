@@ -63,9 +63,20 @@ class PmScheduleService
     {
         return DB::transaction(function () use ($id, $tenantId, $data) {
             $schedule = $this->repository->findPmSchedule($id, $tenantId);
+
             if (!$schedule) {
                 throw new InvalidArgumentException("PM Schedule #{$id} not found.");
             }
+
+            $baseDate = !empty($data['last_completed_date'])
+                ? Carbon::parse($data['last_completed_date'])
+                : Carbon::today();
+
+            $data['next_due_date'] = $this->computeNextDueDate(
+                $baseDate,
+                $data['frequency_type'] ?? ProductionPmSchedule::FREQ_DAYS,
+                (int) ($data['frequency_value'] ?? 30)
+            )->toDateString();
 
             return $this->repository->updatePmSchedule($id, $tenantId, $data);
         });
