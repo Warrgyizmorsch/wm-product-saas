@@ -58,13 +58,6 @@
                             </div>
                         </div>
 
-                        <x-ui.odoo-form-ui type="select" label="Assigned Technician" name="assigned_technician_id"
-                            :error-text="$errors->first('assigned_technician_id')">
-                            <option value="">Unassigned</option>
-                            @foreach($technicians as $tech)
-                                <option value="{{ $tech->id }}" @selected(old('assigned_technician_id') == $tech->id)>{{ $tech->name }}</option>
-                            @endforeach
-                        </x-ui.odoo-form-ui>
                     </div>
 
                     <div class="col-md-6">
@@ -79,6 +72,105 @@
                         <x-ui.odoo-form-ui type="textarea" label="Problem Description / Maintenance Scope" name="problem_description"
                             rows="3" :required="true" placeholder="Describe the maintenance requirement, symptoms, or repair task details..."
                             :error-text="$errors->first('problem_description')">{{ old('problem_description') }}</x-ui.odoo-form-ui>
+                    </div>
+
+                    <div class="col-12" x-data="{
+                        rows: [],
+                        addRow() {
+                            this.rows.push({ assignment_type: 'internal', technician_id: '', technician_name: '', expected_work_hours: '', hourly_rate: '', notes: '' });
+                        },
+                        removeRow(index) {
+                            if (this.rows.length > 0) this.rows.splice(index, 1);
+                        }
+                    }">
+                        <div class="border rounded p-3 bg-light-subtle">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <h6 class="fw-bold text-dark mb-0">Assignments</h6>
+                                    <span class="badge bg-soft-secondary text-secondary border" x-text="rows.length" x-show="rows.length > 0"></span>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" x-on:click="addRow()">
+                                    <i class="feather-plus me-1"></i> Add Person
+                                </button>
+                            </div>
+
+                            <template x-if="rows.length === 0">
+                                <div class="border rounded p-3 bg-white text-muted fs-12">No technician assigned yet. Add people only if needed before starting the work order.</div>
+                            </template>
+
+                            <template x-for="(row, index) in rows" :key="index">
+                                <div class="border rounded p-3 mb-3 bg-white">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <strong class="text-dark">Assignment #<span x-text="index + 1"></span></strong>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" x-on:click="removeRow(index)" x-show="rows.length > 0">Remove</button>
+                                    </div>
+
+                                    <div class="row g-3">
+                                        <div class="col-md-3">
+                                            <label class="form-label fs-12 text-muted fw-bold">Type</label>
+                                            <select :name="'assignments[' + index + '][assignment_type]'" x-model="row.assignment_type" class="form-select form-select-sm">
+                                                <option value="internal">Internal</option>
+                                                <option value="external">External</option>
+                                            </select>
+                                        </div>
+
+                                        <template x-if="row.assignment_type === 'internal'">
+                                            <div class="col-md-4">
+                                                <label class="form-label fs-12 text-muted fw-bold">Person</label>
+                                                <select
+                                                    :name="'assignments[' + index + '][technician_id]'"
+                                                    x-model="row.technician_id"
+                                                    x-on:change="
+                                                        const option = $event.target.selectedOptions[0];
+                                                        const monthlyBasicSalary = Number(option?.dataset?.salary ?? 0);
+                                                        row.technician_name = option?.dataset?.name || '';
+                                                        row.hourly_rate = monthlyBasicSalary > 0 ? Number((monthlyBasicSalary / (30 * 24)).toFixed(2)) : (row.hourly_rate || '');
+                                                    "
+                                                    class="form-select form-select-sm">
+                                                    <option value="">Select employee</option>
+                                                    @foreach($technicians as $tech)
+                                                        @php
+                                                            $monthlyBasicSalary = 0.0;
+                                                            $employee = $tech->employee()->with('salaryStructure.items.component')->first();
+                                                            if ($employee && $employee->salaryStructure) {
+                                                                $basicItem = $employee->salaryStructure->items()->with('component')->get()->first(function ($item) {
+                                                                    return $item->component && strtolower($item->component->code ?? '') === 'basic';
+                                                                });
+                                                                if ($basicItem && $basicItem->value !== null) {
+                                                                    $monthlyBasicSalary = (float) $basicItem->value;
+                                                                }
+                                                            }
+                                                        @endphp
+                                                        <option value="{{ $tech->id }}" data-name="{{ $tech->name }}" data-salary="{{ $monthlyBasicSalary }}">{{ $tech->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <input type="hidden" :name="'assignments[' + index + '][technician_name]'" x-model="row.technician_name" />
+                                            </div>
+                                        </template>
+
+                                        <template x-if="row.assignment_type === 'external'">
+                                            <div class="col-md-4">
+                                                <label class="form-label fs-12 text-muted fw-bold">Person</label>
+                                                <input type="text" :name="'assignments[' + index + '][technician_name]'" x-model="row.technician_name" class="form-control form-control-sm" placeholder="Mechanic name" />
+                                            </div>
+                                        </template>
+
+                                        <div class="col-md-2">
+                                            <label class="form-label fs-12 text-muted fw-bold">Expected Hours</label>
+                                            <input type="number" step="0.01" min="0" :name="'assignments[' + index + '][expected_work_hours]'" x-model="row.expected_work_hours" class="form-control form-control-sm" />
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label fs-12 text-muted fw-bold">Hourly Rate</label>
+                                            <input type="number" step="0.01" min="0" :name="'assignments[' + index + '][hourly_rate]'" x-model="row.hourly_rate" class="form-control form-control-sm" />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fs-12 text-muted fw-bold">Notes</label>
+                                            <input type="text" :name="'assignments[' + index + '][notes]'" x-model="row.notes" class="form-control form-control-sm" placeholder="Optional notes" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
                     </div>
                 </div>
 

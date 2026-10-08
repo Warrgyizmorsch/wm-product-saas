@@ -6,6 +6,7 @@ use App\Core\Database\BaseModel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductionMachineDowntime extends BaseModel
 {
@@ -67,5 +68,10 @@ class ProductionMachineDowntime extends BaseModel
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function workOrderLogs(): HasMany
+    {
+        return $this->hasMany(ProductionMaintenanceWorkOrderLog::class, 'downtime_id');
     }
 }

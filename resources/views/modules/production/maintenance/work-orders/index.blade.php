@@ -159,13 +159,17 @@
             </table>
         </div>
 
-        <div class="mt-3">
-            {{ $workOrders->links() }}
-        </div>
+        <x-ui.pagination 
+            :paginator="$workOrders"
+            :currentPage="$workOrders->currentPage()" 
+            :totalPages="$workOrders->lastPage()" 
+            :totalResults="$workOrders->total()" 
+            :perPage="$workOrders->perPage()" 
+        />
     </div>
 
     <!-- Report Breakdown Modal Component -->
-    <x-ui.modal id="reportBreakdownModal" title="<span class='text-danger fw-bold'><i class='feather-alert-octagon me-2'></i>Report Emergency Breakdown</span>" formAction="{{ route('production.maintenance.work-orders.breakdown') }}" submitText="Report & Start Breakdown WO">
+    <x-ui.modal id="reportBreakdownModal" title="<span class='text-danger fw-bold'><i class='feather-alert-octagon me-2'></i>Report Emergency Breakdown</span>" formAction="{{ route('production.maintenance.work-orders.breakdown') }}" submitText="Report Breakdown">
         <x-ui.odoo-form-ui type="select" label="Machine" name="machine_id" :required="true">
             <option value="">Select Machine</option>
             @foreach($machines as $m)

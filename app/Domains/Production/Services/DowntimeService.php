@@ -130,24 +130,17 @@ class DowntimeService
                 ->first();
 
             if ($wo) {
-                $workCenter = \App\Domains\Production\Models\WorkCenter::find($downtime->work_center_id);
-                $laborRate  = $workCenter ? (float) $workCenter->cost_per_hour : 0.00;
-
-                $laborHours = max(0.1, round($durationMinutes / 60.0, 2));
-                $calculatedLaborCost = round($laborHours * $laborRate, 2);
-
+                $repairHours = max(0.1, round($durationMinutes / 60.0, 2));
+                $mechanicCost = (float) ($wo->mechanic_cost ?? 0.00);
                 $sparesCost = (float) \App\Domains\Production\Models\ProductionMaintenanceWorkOrderSpare::where('tenant_id', $tenantId)
                     ->where('maintenance_work_order_id', $wo->id)
                     ->sum('total_cost');
 
-                $totalCost = round($calculatedLaborCost + $sparesCost, 2);
+                $totalCost = round($mechanicCost + $sparesCost, 2);
 
                 $wo->update([
                     'actual_end'       => $endTime,
                     'work_performed'   => $remarks ?: ($wo->work_performed ?: 'Downtime Resolved & Maintenance Completed'),
-                    'labor_hours'      => $laborHours,
-                    'labor_cost_rate'  => $laborRate,
-                    'labor_cost'       => $calculatedLaborCost,
                     'spare_parts_cost' => $sparesCost,
                     'total_cost'       => $totalCost,
                     'status'           => \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::STATUS_COMPLETED,
