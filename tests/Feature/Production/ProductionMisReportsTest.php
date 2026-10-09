@@ -416,8 +416,8 @@ class ProductionMisReportsTest extends TestCase
         $csvContent = $exportResponse->streamedContent();
 
         $this->assertStringContainsString('"Order Number"', $csvContent);
-        $this->assertStringContainsString('"Planned Cost"', $csvContent);
-        $this->assertStringContainsString('"Actual Total Cost"', $csvContent);
+        $this->assertStringContainsString('Planned Cost (' . active_currency() . ')', $csvContent);
+        $this->assertStringContainsString('Actual Total Cost (' . active_currency() . ')', $csvContent);
         $this->assertStringContainsString('PO-2026-0001', $csvContent);
         $this->assertStringContainsString('FG-DESK-001', $csvContent);
     }
