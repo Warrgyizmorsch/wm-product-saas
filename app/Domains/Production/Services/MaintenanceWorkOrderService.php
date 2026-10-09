@@ -862,4 +862,118 @@ class MaintenanceWorkOrderService
             return $wo->fresh(['machine', 'technician', 'downtime']);
         });
     }
+
+    /**
+     * Calculate an employee technician's hourly rate derived from their HRMS salary structure,
+     * returned denominated in the active or requested target currency.
+     *
+     * @param User|int|null $user
+     * @param string|null $targetCurrency Optional target currency code (defaults to active_currency())
+     * @return float Hourly rate rounded to 2 decimal places, or 0.00 if unresolvable
+     */
+    public function calculateTechnicianHourlyRate(User|int|null $user, ?string $targetCurrency = null): float
+    {
+        if (empty($user)) {
+            return 0.00;
+        }
+
+        if (is_numeric($user)) {
+            $user = User::find($user);
+        }
+
+        if (!$user instanceof User) {
+            return 0.00;
+        }
+
+        /** @var \App\Domains\HRMS\Models\Employee|null $employee */
+        $employee = $user->relationLoaded('employee') && $user->employee
+            ? $user->employee
+            : (class_exists(\App\Domains\HRMS\Models\Employee::class)
+                ? (\App\Domains\HRMS\Models\Employee::withoutGlobalScopes()->where('user_id', $user->id)->first()
+                    ?: \App\Domains\HRMS\Models\Employee::resolveForUser($user))
+                : null);
+
+        if (!$employee || empty($employee->current_salary) || (float) $employee->current_salary <= 0) {
+            return 0.00;
+        }
+
+        // 1. Resolve salary structure: pay group match preferred, then direct assignment
+        $structure = null;
+        if ($employee->pay_group_id && class_exists(\App\Domains\HRMS\Models\SalaryStructure::class)) {
+            $structure = \App\Domains\HRMS\Models\SalaryStructure::where('pay_group_id', $employee->pay_group_id)
+                ->where('min_ctc', '<=', $employee->current_salary)
+                ->where('max_ctc', '>=', $employee->current_salary)
+                ->where('status', true)
+                ->first();
+        }
+
+        if (!$structure) {
+            $structure = $employee->salaryStructure;
+        }
+
+        if (!$structure || !$structure->relationLoaded('items') && !method_exists($structure, 'items')) {
+            return 0.00;
+        }
+
+        // 2. Identify the BASIC salary component item
+        $items = $structure->items()->with('component')->get();
+        /** @var \App\Domains\HRMS\Models\SalaryStructureItem|null $basicItem */
+        $basicItem = $items->first(function ($item) {
+            return $item->component && (
+                strtolower($item->component->code ?? '') === 'basic' ||
+                ($item->component->type === 'earning' && in_array($item->calculation_type, ['fixed', 'percentage_of_ctc']))
+            );
+        });
+
+        if (!$basicItem || $basicItem->value === null || (float) $basicItem->value <= 0) {
+            return 0.00;
+        }
+
+        // 3. Calculate monthly basic salary based on calculation_type
+        $monthlyBasic = 0.00;
+        if ($basicItem->calculation_type === 'percentage_of_ctc') {
+            // value represents a percentage of annual CTC (e.g. 50.00 = 50%)
+            $annualBasic = ((float) $employee->current_salary * (float) $basicItem->value) / 100.0;
+            $monthlyBasic = $annualBasic / 12.0;
+        } elseif ($basicItem->calculation_type === 'fixed') {
+            // Per HRMS PayrollCalculationService convention, fixed components are stored as annual amounts
+            $monthlyBasic = (float) $basicItem->value / 12.0;
+        } else {
+            // Unknown or unsupported calculation type; do not guess
+            return 0.00;
+        }
+
+        if ($monthlyBasic <= 0) {
+            return 0.00;
+        }
+
+        // 4. Derive hourly rate using configurable standard working-hours basis
+        $workingHours = max(1.0, (float) config('production.maintenance_working_hours_per_month', 208.0));
+        $hourlyRateInEmpCurrency = $monthlyBasic / $workingHours;
+
+        // 5. Currency normalization:
+        // Employee salary is denominated in the company's local payroll currency (default INR)
+        $employeeCurrency = $employee->company?->currency ?? 'INR';
+        $baseCurrency = config('currency.base', 'USD');
+
+        if ($employeeCurrency === $baseCurrency) {
+            $rateInBase = $hourlyRateInEmpCurrency;
+        } else {
+            $empFxRate = (float) (config("currency.currencies.{$employeeCurrency}.rate") ?? 1.0);
+            $rateInBase = $empFxRate > 0 ? ($hourlyRateInEmpCurrency / $empFxRate) : $hourlyRateInEmpCurrency;
+        }
+
+        // 6. Convert to target/active display currency
+        if ($targetCurrency !== null) {
+            $targetFxRate = (float) (config("currency.currencies.{$targetCurrency}.rate") ?? 1.0);
+            $finalRate = $rateInBase * $targetFxRate;
+        } else {
+            $finalRate = function_exists('convert_from_base')
+                ? convert_from_base($rateInBase)
+                : $rateInBase;
+        }
+
+        return round($finalRate, 2);
+    }
 }
+

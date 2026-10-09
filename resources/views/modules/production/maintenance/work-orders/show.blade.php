@@ -153,7 +153,7 @@
                                                 </span>
                                             </div>
                                             @if($assignment->hourly_rate > 0)
-                                                <small class="text-muted d-block mt-1">Rate: ${{ number_format((float) $assignment->hourly_rate, 2) }}/hr</small>
+                                                <small class="text-muted d-block mt-1">Rate: {{ format_currency((float) $assignment->hourly_rate) }}/hr</small>
                                             @endif
                                             @if($assignment->notes)
                                                 <small class="text-muted d-block mt-1">Notes: {{ $assignment->notes }}</small>
@@ -243,8 +243,8 @@
                                             <td>{{ $spare->warehouse?->name }}</td>
                                             <td class="text-center fw-bold">{{ number_format($spare->requested_qty, 2) }}</td>
                                             <td class="text-center fw-bold text-{{ $spare->issued_qty > 0 ? 'success' : 'muted' }}">{{ number_format($spare->issued_qty, 2) }}</td>
-                                            <td class="text-end">${{ number_format($spare->unit_cost, 2) }}</td>
-                                            <td class="text-end fw-bold">${{ number_format($spare->total_cost, 2) }}</td>
+                                            <td class="text-end">{{ format_currency($spare->unit_cost) }}</td>
+                                            <td class="text-end fw-bold">{{ format_currency($spare->total_cost) }}</td>
                                             <td class="text-end">
                                                 @if($spare->requested_qty > $spare->issued_qty && !in_array($workOrder->status, ['completed', 'cancelled']))
                                                     <form action="{{ route('production.maintenance.work-orders.issue-spare', $spare->id) }}" method="POST" class="d-inline">
@@ -356,15 +356,15 @@
                         </div>
                         <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
                             <span class="text-muted">Mechanic Cost:</span>
-                            <strong class="text-dark">${{ number_format($workOrder->mechanic_cost ?: ($workOrder->internal_mechanic_cost + $workOrder->external_mechanic_cost), 2) }}</strong>
+                            <strong class="text-dark">{{ format_currency($workOrder->mechanic_cost ?: ($workOrder->internal_mechanic_cost + $workOrder->external_mechanic_cost)) }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
                             <span class="text-muted">Spare Parts Subtotal:</span>
-                            <strong class="text-dark">${{ number_format($workOrder->spare_parts_cost, 2) }}</strong>
+                            <strong class="text-dark">{{ format_currency($workOrder->spare_parts_cost) }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
                             <span class="text-muted">Additional / Overhead Cost:</span>
-                            <strong class="text-dark">${{ number_format($workOrder->additional_cost, 2) }}</strong>
+                            <strong class="text-dark">{{ format_currency($workOrder->additional_cost) }}</strong>
                         </div>
                         @if($workOrder->external_parts_purchased)
                             <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
@@ -380,7 +380,7 @@
                         @endif
                         <div class="d-flex justify-content-between pt-2">
                             <span class="fw-bold text-dark fs-14">Total Maintenance Cost:</span>
-                            <strong class="text-primary fs-16">${{ number_format($workOrder->total_cost, 2) }}</strong>
+                            <strong class="text-primary fs-16">{{ format_currency($workOrder->total_cost) }}</strong>
                         </div>
                     </div>
                 </div>
@@ -439,26 +439,16 @@
                                     x-model="row.technician_id"
                                     x-on:change="
                                         const option = $event.target.selectedOptions[0];
-                                        const monthlyBasicSalary = Number(option?.dataset?.salary ?? 0);
+                                        const autoRate = Number(option?.dataset?.rate ?? 0);
                                         row.technician_name = option?.dataset?.name || '';
-                                        row.hourly_rate = monthlyBasicSalary > 0 ? Number((monthlyBasicSalary / (30 * 24)).toFixed(2)) : (row.hourly_rate || '');
+                                        if (autoRate > 0) {
+                                            row.hourly_rate = autoRate;
+                                        }
                                     "
                                     class="form-select form-select-sm">
                                     <option value="">Select employee</option>
                                     @foreach($technicians as $tech)
-                                        @php
-                                            $monthlyBasicSalary = 0.0;
-                                            $employee = $tech->employee()->with('salaryStructure.items.component')->first();
-                                            if ($employee && $employee->salaryStructure) {
-                                                $basicItem = $employee->salaryStructure->items()->with('component')->get()->first(function ($item) {
-                                                    return $item->component && strtolower($item->component->code ?? '') === 'basic';
-                                                });
-                                                if ($basicItem && $basicItem->value !== null) {
-                                                    $monthlyBasicSalary = (float) $basicItem->value;
-                                                }
-                                            }
-                                        @endphp
-                                        <option value="{{ $tech->id }}" data-name="{{ $tech->name }}" data-salary="{{ $monthlyBasicSalary }}">{{ $tech->name }}</option>
+                                        <option value="{{ $tech->id }}" data-name="{{ $tech->name }}" data-rate="{{ $tech->calculated_hourly_rate ?? 0 }}">{{ $tech->name }}</option>
                                     @endforeach
                                 </select>
                                 <input type="hidden" :name="'assignments[' + index + '][technician_name]'" x-model="row.technician_name" />
@@ -481,8 +471,11 @@
                             <input type="number" step="0.01" min="0" :name="'assignments[' + index + '][expected_work_hours]'" x-model="row.expected_work_hours" class="form-control form-control-sm" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fs-12 text-muted fw-bold">Hourly Rate</label>
-                            <input type="number" step="0.01" min="0" :name="'assignments[' + index + '][hourly_rate]'" x-model="row.hourly_rate" class="form-control form-control-sm" />
+                            <label class="form-label fs-12 text-muted fw-bold">Hourly Rate ({{ active_currency_symbol() }})</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">{{ active_currency_symbol() }}</span>
+                                <input type="number" step="0.01" min="0" :name="'assignments[' + index + '][hourly_rate]'" x-model="row.hourly_rate" class="form-control form-control-sm" placeholder="0.00" />
+                            </div>
                         </div>
                     </div>
 
@@ -564,13 +557,13 @@
                                     </td>
                                     <td>
                                         <div class="input-group input-group-sm">
-                                            <span class="input-group-text">$</span>
+                                            <span class="input-group-text">{{ active_currency_symbol() }}</span>
                                             <input type="number"
                                                    step="0.01"
                                                    min="0"
                                                    name="assignments[{{ $idx }}][hourly_rate]"
                                                    class="form-control form-control-sm assignment-rate-input"
-                                                   value="{{ number_format($rateVal, 2, '.', '') }}">
+                                                   value="{{ number_format(convert_from_base($rateVal), 2, '.', '') }}">
                                         </div>
                                     </td>
                                     <td>
@@ -585,7 +578,7 @@
                                         </div>
                                     </td>
                                     <td class="text-end pe-3 fw-bold text-dark assignment-subtotal">
-                                        ${{ number_format($rateVal * $hoursVal, 2) }}
+                                        {{ active_currency_symbol() }} {{ number_format(convert_from_base($rateVal) * $hoursVal, 2) }}
                                     </td>
                                 </tr>
                             @endforeach
@@ -593,7 +586,7 @@
                         <tfoot class="table-light">
                             <tr>
                                 <td colspan="4" class="text-end fw-bold ps-3">Total Mechanic Cost:</td>
-                                <td class="text-end pe-3 fw-bold text-primary" id="modalMechanicTotal">$0.00</td>
+                                <td class="text-end pe-3 fw-bold text-primary" id="modalMechanicTotal">{{ active_currency_symbol() }} 0.00</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -608,7 +601,7 @@
                         <input type="number" step="0.01" min="0" name="repair_hours" class="form-control form-control-sm" value="1.00">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fs-12 text-muted fw-bold">Mechanic Cost ($)</label>
+                        <label class="form-label fs-12 text-muted fw-bold">Mechanic Cost ({{ active_currency_symbol() }})</label>
                         <input type="number" step="0.01" min="0" name="internal_mechanic_cost" class="form-control form-control-sm" value="0.00">
                     </div>
                 </div>
@@ -619,7 +612,7 @@
         <div class="mb-3">
             <label class="form-label fs-12 text-muted fw-bold">Additional Cost / Overhead Expense (Optional)</label>
             <div class="input-group">
-                <span class="input-group-text">$</span>
+                <span class="input-group-text">{{ active_currency_symbol() }}</span>
                 <input type="number"
                        step="0.01"
                        min="0"
@@ -627,7 +620,7 @@
                        id="modal_additional_cost"
                        class="form-control"
                        placeholder="0.00"
-                       value="{{ number_format((float) ($workOrder->additional_cost ?? 0.00), 2, '.', '') }}">
+                       value="{{ number_format(convert_from_base((float) ($workOrder->additional_cost ?? 0.00)), 2, '.', '') }}">
             </div>
             <small class="text-muted fs-11">Contractor fees, transit, or miscellaneous overhead incurred during maintenance.</small>
         </div>
@@ -671,19 +664,19 @@
                 <div class="row text-center g-2">
                     <div class="col-sm-3 col-6">
                         <span class="text-muted fs-11 d-block">Mechanic Cost</span>
-                        <strong class="text-dark fs-13" id="modalMechanicCostSummary">$0.00</strong>
+                        <strong class="text-dark fs-13" id="modalMechanicCostSummary">{{ active_currency_symbol() }} 0.00</strong>
                     </div>
                     <div class="col-sm-3 col-6 border-start-sm">
                         <span class="text-muted fs-11 d-block">Spare Parts Cost</span>
-                        <strong class="text-dark fs-13" id="modalSparesCostSummary">${{ number_format($workOrder->spare_parts_cost, 2) }}</strong>
+                        <strong class="text-dark fs-13" id="modalSparesCostSummary">{{ format_currency($workOrder->spare_parts_cost) }}</strong>
                     </div>
                     <div class="col-sm-3 col-6 border-start-sm">
                         <span class="text-muted fs-11 d-block">Additional Cost</span>
-                        <strong class="text-dark fs-13" id="modalAdditionalCostSummary">$0.00</strong>
+                        <strong class="text-dark fs-13" id="modalAdditionalCostSummary">{{ active_currency_symbol() }} 0.00</strong>
                     </div>
                     <div class="col-sm-3 col-6 border-start-sm">
                         <span class="text-muted fs-11 d-block fw-bold">Total Cost</span>
-                        <strong class="text-primary fs-14 fw-bold" id="modalTotalCostSummary">$0.00</strong>
+                        <strong class="text-primary fs-14 fw-bold" id="modalTotalCostSummary">{{ format_currency($workOrder->total_cost) }}</strong>
                     </div>
                 </div>
             </div>
@@ -776,8 +769,9 @@
             const wasMachineScrapedInput = document.getElementById('was_machine_scraped_input');
             const completionActionInput = document.getElementById('completion_action_input');
             const displayCompletionTime = document.getElementById('display_completion_time');
+            const activeCurrencySymbol = @json(active_currency_symbol());
             const additionalCostInput = document.getElementById('modal_additional_cost');
-            const sparesCost = parseFloat("{{ (float) $workOrder->spare_parts_cost }}") || 0;
+            const sparesCost = parseFloat("{{ (float) convert_from_base($workOrder->spare_parts_cost) }}") || 0;
 
             function recalculateCosts() {
                 let mechanicCost = 0;
@@ -790,27 +784,27 @@
                     const hours = parseFloat(hoursInput?.value) || 0;
                     const subtotal = Math.round(rate * hours * 100) / 100;
                     if (subtotalEl) {
-                        subtotalEl.textContent = '$' + subtotal.toFixed(2);
+                        subtotalEl.textContent = activeCurrencySymbol + ' ' + subtotal.toFixed(2);
                     }
                     mechanicCost += subtotal;
                 });
 
                 const mechanicTotalEl = document.getElementById('modalMechanicTotal');
                 if (mechanicTotalEl) {
-                    mechanicTotalEl.textContent = '$' + mechanicCost.toFixed(2);
+                    mechanicTotalEl.textContent = activeCurrencySymbol + ' ' + mechanicCost.toFixed(2);
                 }
 
                 const additionalCost = parseFloat(additionalCostInput?.value) || 0;
                 const totalCost = Math.round((mechanicCost + sparesCost + additionalCost) * 100) / 100;
 
                 const summaryMechanic = document.getElementById('modalMechanicCostSummary');
-                if (summaryMechanic) summaryMechanic.textContent = '$' + mechanicCost.toFixed(2);
+                if (summaryMechanic) summaryMechanic.textContent = activeCurrencySymbol + ' ' + mechanicCost.toFixed(2);
 
                 const summaryAdditional = document.getElementById('modalAdditionalCostSummary');
-                if (summaryAdditional) summaryAdditional.textContent = '$' + additionalCost.toFixed(2);
+                if (summaryAdditional) summaryAdditional.textContent = activeCurrencySymbol + ' ' + additionalCost.toFixed(2);
 
                 const summaryTotal = document.getElementById('modalTotalCostSummary');
-                if (summaryTotal) summaryTotal.textContent = '$' + totalCost.toFixed(2);
+                if (summaryTotal) summaryTotal.textContent = activeCurrencySymbol + ' ' + totalCost.toFixed(2);
             }
 
             // Capture timestamp and calculate initial worked hours on modal opening

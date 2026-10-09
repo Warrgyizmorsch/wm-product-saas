@@ -41,6 +41,9 @@ class MaintenanceWorkOrderController extends Controller
         $tenantId    = require_tenant_id();
         $machines    = $this->machineRepository->getAll();
         $technicians = User::where('tenant_id', $tenantId)->get();
+        foreach ($technicians as $tech) {
+            $tech->calculated_hourly_rate = $this->service->calculateTechnicianHourlyRate($tech);
+        }
 
         return view('modules.production.maintenance.work-orders.create', compact('machines', 'technicians'));
     }
@@ -66,6 +69,17 @@ class MaintenanceWorkOrderController extends Controller
             'assignments.*.notes' => ['nullable', 'string'],
         ]);
 
+        if (!empty($validated['assignments'])) {
+            foreach ($validated['assignments'] as &$assignment) {
+                if (isset($assignment['hourly_rate'])) {
+                    $assignment['hourly_rate'] = function_exists('convert_to_base')
+                        ? convert_to_base((float) $assignment['hourly_rate'])
+                        : (float) $assignment['hourly_rate'];
+                }
+            }
+            unset($assignment);
+        }
+
         try {
             $wo = $this->service->createWorkOrder($tenantId, $validated, auth()->id());
 
@@ -85,6 +99,9 @@ class MaintenanceWorkOrderController extends Controller
         abort_if(!$workOrder, 404, 'Work Order not found.');
 
         $technicians = User::where('tenant_id', $tenantId)->get();
+        foreach ($technicians as $tech) {
+            $tech->calculated_hourly_rate = $this->service->calculateTechnicianHourlyRate($tech);
+        }
         $products    = Product::where('tenant_id', $tenantId)->get();
         $warehouses  = Warehouse::where('tenant_id', $tenantId)->get();
 
@@ -182,8 +199,28 @@ class MaintenanceWorkOrderController extends Controller
             }
 
             $externalPartsPurchased = filter_var($request->input('external_parts_purchased', false), FILTER_VALIDATE_BOOLEAN);
-            $additionalCost = isset($validated['additional_cost']) ? (float) $validated['additional_cost'] : 0.00;
+            $additionalCost = isset($validated['additional_cost'])
+                ? (function_exists('convert_to_base') ? convert_to_base((float) $validated['additional_cost']) : (float) $validated['additional_cost'])
+                : (isset($validated['additional_expense']) ? (function_exists('convert_to_base') ? convert_to_base((float) $validated['additional_expense']) : (float) $validated['additional_expense']) : 0.00);
             $repairHours = isset($validated['repair_hours']) ? (float) $validated['repair_hours'] : (float) ($validated['labor_hours'] ?? 0.0);
+
+            $externalMechanicCost = isset($validated['external_mechanic_cost'])
+                ? (function_exists('convert_to_base') ? convert_to_base((float) $validated['external_mechanic_cost']) : (float) $validated['external_mechanic_cost'])
+                : 0.0;
+            $internalMechanicCost = isset($validated['internal_mechanic_cost'])
+                ? (function_exists('convert_to_base') ? convert_to_base((float) $validated['internal_mechanic_cost']) : (float) $validated['internal_mechanic_cost'])
+                : 0.0;
+
+            if (!empty($validated['assignments'])) {
+                foreach ($validated['assignments'] as &$assignment) {
+                    if (isset($assignment['hourly_rate'])) {
+                        $assignment['hourly_rate'] = function_exists('convert_to_base')
+                            ? convert_to_base((float) $assignment['hourly_rate'])
+                            : (float) $assignment['hourly_rate'];
+                    }
+                }
+                unset($assignment);
+            }
 
             $wo = $this->service->completeWorkOrder(
                 $id,
@@ -192,8 +229,8 @@ class MaintenanceWorkOrderController extends Controller
                 $validated['work_performed'],
                 $repairHours,
                 $validated['mechanic_type'] ?? null,
-                isset($validated['external_mechanic_cost']) ? (float) $validated['external_mechanic_cost'] : 0.0,
-                isset($validated['internal_mechanic_cost']) ? (float) $validated['internal_mechanic_cost'] : 0.0,
+                $externalMechanicCost,
+                $internalMechanicCost,
                 null,
                 $isScraped,
                 isset($validated['scrap_value']) ? (float) $validated['scrap_value'] : 0.0,
@@ -322,6 +359,11 @@ class MaintenanceWorkOrderController extends Controller
 
         try {
             foreach ($validated['assignments'] as $assignment) {
+                if (isset($assignment['hourly_rate'])) {
+                    $assignment['hourly_rate'] = function_exists('convert_to_base')
+                        ? convert_to_base((float) $assignment['hourly_rate'])
+                        : (float) $assignment['hourly_rate'];
+                }
                 $this->service->addAssignment($id, $tenantId, $assignment, auth()->id());
             }
 

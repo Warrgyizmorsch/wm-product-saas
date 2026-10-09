@@ -122,26 +122,16 @@
                                                     x-model="row.technician_id"
                                                     x-on:change="
                                                         const option = $event.target.selectedOptions[0];
-                                                        const monthlyBasicSalary = Number(option?.dataset?.salary ?? 0);
+                                                        const autoRate = Number(option?.dataset?.rate ?? 0);
                                                         row.technician_name = option?.dataset?.name || '';
-                                                        row.hourly_rate = monthlyBasicSalary > 0 ? Number((monthlyBasicSalary / (30 * 24)).toFixed(2)) : (row.hourly_rate || '');
+                                                        if (autoRate > 0) {
+                                                            row.hourly_rate = autoRate;
+                                                        }
                                                     "
                                                     class="form-select form-select-sm">
                                                     <option value="">Select employee</option>
                                                     @foreach($technicians as $tech)
-                                                        @php
-                                                            $monthlyBasicSalary = 0.0;
-                                                            $employee = $tech->employee()->with('salaryStructure.items.component')->first();
-                                                            if ($employee && $employee->salaryStructure) {
-                                                                $basicItem = $employee->salaryStructure->items()->with('component')->get()->first(function ($item) {
-                                                                    return $item->component && strtolower($item->component->code ?? '') === 'basic';
-                                                                });
-                                                                if ($basicItem && $basicItem->value !== null) {
-                                                                    $monthlyBasicSalary = (float) $basicItem->value;
-                                                                }
-                                                            }
-                                                        @endphp
-                                                        <option value="{{ $tech->id }}" data-name="{{ $tech->name }}" data-salary="{{ $monthlyBasicSalary }}">{{ $tech->name }}</option>
+                                                        <option value="{{ $tech->id }}" data-name="{{ $tech->name }}" data-rate="{{ $tech->calculated_hourly_rate ?? 0 }}">{{ $tech->name }}</option>
                                                     @endforeach
                                                 </select>
                                                 <input type="hidden" :name="'assignments[' + index + '][technician_name]'" x-model="row.technician_name" />
@@ -160,8 +150,11 @@
                                             <input type="number" step="0.01" min="0" :name="'assignments[' + index + '][expected_work_hours]'" x-model="row.expected_work_hours" class="form-control form-control-sm" />
                                         </div>
                                         <div class="col-md-3">
-                                            <label class="form-label fs-12 text-muted fw-bold">Hourly Rate</label>
-                                            <input type="number" step="0.01" min="0" :name="'assignments[' + index + '][hourly_rate]'" x-model="row.hourly_rate" class="form-control form-control-sm" />
+                                            <label class="form-label fs-12 text-muted fw-bold">Hourly Rate ({{ active_currency_symbol() }})</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">{{ active_currency_symbol() }}</span>
+                                                <input type="number" step="0.01" min="0" :name="'assignments[' + index + '][hourly_rate]'" x-model="row.hourly_rate" class="form-control form-control-sm" placeholder="0.00" />
+                                            </div>
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label fs-12 text-muted fw-bold">Notes</label>
