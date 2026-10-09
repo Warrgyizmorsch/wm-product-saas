@@ -58,6 +58,9 @@ class WorkCenterController extends Controller
             if (isset($data['cost_per_hour'])) {
                 $data['cost_per_hour'] = convert_to_base($data['cost_per_hour']);
             }
+            if (isset($data['overhead_rate'])) {
+                $data['overhead_rate'] = convert_to_base($data['overhead_rate']);
+            }
             $dto = WorkCenterDTO::fromArray($data);
             $wc  = $this->service->create($dto, $tenantId);
 
@@ -114,6 +117,9 @@ class WorkCenterController extends Controller
             $data = $request->validated();
             if (isset($data['cost_per_hour'])) {
                 $data['cost_per_hour'] = convert_to_base($data['cost_per_hour']);
+            }
+            if (isset($data['overhead_rate'])) {
+                $data['overhead_rate'] = convert_to_base($data['overhead_rate']);
             }
             $dto = WorkCenterDTO::fromArray($data);
             $wc  = $this->service->update($id, $dto);

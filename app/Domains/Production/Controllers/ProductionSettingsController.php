@@ -19,7 +19,7 @@ class ProductionSettingsController extends Controller
             'tenant' => $tenant,
             'settings' => $settings,
             'currentWorkflow' => $settings['subcontract_procurement_workflow'] ?? 'manual_pr_po',
-            'autoApprovalLimit' => $settings['subcontract_auto_approval_limit'] ?? 10000.00,
+            'autoApprovalLimit' => convert_from_base((float) ($settings['subcontract_auto_approval_limit'] ?? 10000.00)),
             'remnantReleasePolicy' => $settings['remnant_release_policy'] ?? 'immediate',
         ]);
     }
@@ -60,7 +60,9 @@ class ProductionSettingsController extends Controller
 
         $currentSettings = is_array($tenant->settings) ? $tenant->settings : [];
         $currentSettings['subcontract_procurement_workflow'] = $validated['subcontract_procurement_workflow'];
-        $currentSettings['subcontract_auto_approval_limit'] = (float) ($validated['subcontract_auto_approval_limit'] ?? 0.0);
+        $currentSettings['subcontract_auto_approval_limit'] = isset($validated['subcontract_auto_approval_limit'])
+            ? convert_to_base((float) $validated['subcontract_auto_approval_limit'])
+            : 0.0;
 
         $tenant->update(['settings' => $currentSettings]);
 

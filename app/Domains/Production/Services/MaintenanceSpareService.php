@@ -240,7 +240,7 @@ class MaintenanceSpareService
                 'machine_id'   => $wo->machine_id,
                 'event_type'   => 'Spare Part Issued',
                 'title'        => 'Maintenance Spare Issued',
-                'description'  => "Issued {$actualIssueQty} of product #{$spare->product_id} for Work Order [{$wo->work_order_number}]. Cost: \${$totalCost}.",
+                'description'  => "Issued {$actualIssueQty} of product #{$spare->product_id} for Work Order [{$wo->work_order_number}]. Cost: " . format_currency((float) $totalCost) . ".",
                 'severity'     => 'info',
                 'event_source' => 'MaintenanceSpareService',
             ]);

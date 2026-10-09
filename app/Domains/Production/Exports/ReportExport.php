@@ -61,7 +61,7 @@ class ReportExport implements WithMultipleSheets
             ),
             new ReportSheetExport(
                 'Cost Estimation',
-                ['Cost Element', 'Estimated Cost', 'Actual Incurred Cost', 'Variance Cost', 'Status'],
+                ['Cost Element', 'Estimated Cost (' . active_currency() . ')', 'Actual Incurred Cost (' . active_currency() . ')', 'Variance Cost (' . active_currency() . ')', 'Status'],
                 $costEstRows
             ),
             new ReportSheetExport(
@@ -89,7 +89,7 @@ class ReportExport implements WithMultipleSheets
             ),
             new ReportSheetExport(
                 'Material Consumption',
-                ['Material', 'SKU', 'Consuming Operation', 'Work Center', 'UOM', 'Planned Qty', 'Issued Qty', 'Consumed Qty', 'Floor Stock WIP', 'Consumption %', 'Unit Cost', 'Planned Cost', 'Consumed Cost', 'Variance Cost'],
+                ['Material', 'SKU', 'Consuming Operation', 'Work Center', 'UOM', 'Planned Qty', 'Issued Qty', 'Consumed Qty', 'Floor Stock WIP', 'Consumption %', 'Unit Cost (' . active_currency() . ')', 'Planned Cost (' . active_currency() . ')', 'Consumed Cost (' . active_currency() . ')', 'Variance Cost (' . active_currency() . ')'],
                 collect($data['materials'])->map(fn($m) => [
                     $m['material_name'],
                     $m['material_sku'],
@@ -133,7 +133,7 @@ class ReportExport implements WithMultipleSheets
             ),
             new ReportSheetExport(
                 'Reusable Offcuts',
-                ['Remnant Code', 'Product', 'SKU', 'Type', 'Dimensions', 'Available for Reuse', 'Warehouse', 'Location', 'Valuation', 'Status', 'Recorded At'],
+                ['Remnant Code', 'Product', 'SKU', 'Type', 'Dimensions', 'Available for Reuse', 'Warehouse', 'Location', 'Valuation (' . active_currency() . ')', 'Status', 'Recorded At'],
                 collect($data['remnants'] ?? [])->map(fn($r) => [
                     $r['remnant_code'],
                     $r['product_name'],

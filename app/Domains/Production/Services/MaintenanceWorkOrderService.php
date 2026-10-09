@@ -782,7 +782,7 @@ class MaintenanceWorkOrderService
                 'machine_id'   => $wo->machine_id,
                 'event_type'   => 'Maintenance Completed',
                 'title'        => 'Maintenance Completed',
-                'description'  => "Work Order [{$wo->work_order_number}] completed for machine [{$machine->name}]. Total cost: \${$totalCost}." . ($scrapMachine ? ' Machine marked for scrap (Decommissioned).' : ' Machine restored to active.'),
+                'description'  => "Work Order [{$wo->work_order_number}] completed for machine [{$machine->name}]. Total cost: " . format_currency((float) $totalCost) . "." . ($scrapMachine ? ' Machine marked for scrap (Decommissioned).' : ' Machine restored to active.'),
                 'severity'     => 'info',
                 'event_source' => 'MaintenanceWorkOrderService',
             ]);
