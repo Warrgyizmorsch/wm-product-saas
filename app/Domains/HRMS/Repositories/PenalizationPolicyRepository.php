@@ -72,9 +72,14 @@ class PenalizationPolicyRepository implements PenalizationPolicyRepositoryInterf
     {
         $statusBool = filter_var($validated['status'] ?? true, FILTER_VALIDATE_BOOLEAN);
 
+        $gracePeriodMinutes = $validated['grace_period_minutes'] ?? null;
+        if (isset($validated['grace_period_hours'])) {
+            $gracePeriodMinutes = (int) (floatval($validated['grace_period_hours']) * 60);
+        }
+
         $payload = [
             'status' => $statusBool,
-            'grace_period_minutes' => $validated['grace_period_minutes'] ?? null,
+            'grace_period_minutes' => $gracePeriodMinutes,
             'threshold_count' => $validated['threshold_count'] ?? null,
             'penalty_tiers' => $validated['penalty_tiers'] ?? null,
         ];

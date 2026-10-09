@@ -472,10 +472,7 @@ Route::prefix('api/hrms/attendance')
         Route::get('/employee/{employee}', [AttendanceApiController::class, 'getEmployeeLocationLogs'])->name('employee-logs');
     });
 
-// Public Webhook route for ADMS devices
-Route::post('api/hrms/biometric/webhook', [BiometricWebhookController::class, 'handleAdmsRequest'])
-    ->middleware(['throttle:100,1'])
-    ->name('api.hrms.biometric.webhook');
+
 
 // ==========================================
 // 12. EMPLOYEE DOCUMENTS API ROUTES
@@ -981,6 +978,7 @@ Route::prefix('api/hrms/biometric-devices')
         Route::get('/', [BiometricDeviceApiController::class, 'index'])->name('index');
         Route::post('/', [BiometricDeviceApiController::class, 'store'])->name('store');
         Route::post('/simulate-punch', [BiometricDeviceApiController::class, 'simulatePunch'])->name('simulate-punch');
+        Route::post('/{id}/test-connection', [BiometricDeviceApiController::class, 'testConnection'])->name('test-connection')->whereNumber('id');
         Route::get('/{id}', [BiometricDeviceApiController::class, 'show'])->name('show')->whereNumber('id');
         Route::put('/{id}', [BiometricDeviceApiController::class, 'update'])->name('update')->whereNumber('id');
         Route::delete('/{id}', [BiometricDeviceApiController::class, 'destroy'])->name('destroy')->whereNumber('id');

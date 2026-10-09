@@ -591,6 +591,11 @@ class AssetApiController extends Controller
             return $this->sendError("Cannot delete category {$category->name} because it contains {$assetCount} linked asset(s).", 422);
         }
 
+        $itemCount = \App\Domains\HRMS\Models\AssetItem::where('asset_category_id', $category->id)->count();
+        if ($itemCount > 0) {
+            return $this->sendError("Cannot delete category {$category->name} because it contains {$itemCount} linked item catalog master(s).", 422);
+        }
+
         $requestCount = AssetRequest::where('asset_category_id', $category->id)->count();
         if ($requestCount > 0) {
             return $this->sendError("Cannot delete category {$category->name} because it has {$requestCount} asset request(s).", 422);
@@ -737,6 +742,19 @@ class AssetApiController extends Controller
         $allocatedCount = $assetItem->assets()->where('status', 'allocated')->count();
         if ($allocatedCount > 0) {
             return $this->sendError("Cannot delete item '{$assetItem->name}' because {$allocatedCount} unit(s) are currently allocated.", 422);
+        }
+
+        foreach ($assetItem->assets as $asset) {
+            if ($reason = $asset->blockingAccountingRecords()) {
+                return $this->sendError("Cannot delete item '{$assetItem->name}' because unit '{$asset->asset_code}' {$reason}.", 422);
+            }
+        }
+
+        $requestCount = AssetRequest::where('asset_item_id', $assetItem->id)
+            ->whereIn('status', ['pending', 'partially_allocated'])
+            ->count();
+        if ($requestCount > 0) {
+            return $this->sendError("Cannot delete item '{$assetItem->name}' because it has {$requestCount} pending or partially allocated request(s).", 422);
         }
 
         $assetItem->assets()->delete();
@@ -1089,8 +1107,8 @@ class AssetApiController extends Controller
             return $this->sendError("Asset request with ID '{$id}' not found.", 404);
         }
 
-        if ($assetRequest->status !== 'pending') {
-            return $this->sendError('Only pending asset requests can be allocated.', 422);
+        if (!in_array($assetRequest->status, ['pending', 'partially_allocated'])) {
+            return $this->sendError('Only pending or partially allocated requests can be allocated.', 422);
         }
 
         $asset = null;
@@ -1098,6 +1116,15 @@ class AssetApiController extends Controller
             $asset = Asset::find($assetRequest->requested_asset_id);
             if (!$asset || $asset->status !== 'available') {
                 return $this->sendError('The specifically requested asset is not currently available.', 422);
+            }
+        } elseif ($assetRequest->asset_item_id) {
+            $asset = Asset::query()
+                ->where('asset_item_id', $assetRequest->asset_item_id)
+                ->where('status', 'available')
+                ->first();
+
+            if (!$asset) {
+                return $this->sendError('No available unit found for this asset item.', 422);
             }
         } else {
             $asset = Asset::query()
@@ -1111,29 +1138,40 @@ class AssetApiController extends Controller
             }
         }
 
-        $asset->update([
-            'status'               => 'allocated',
-            'assigned_employee_id' => $assetRequest->employee_id,
-            'allocated_at'         => date('Y-m-d'),
-            'expected_return_date' => null,
-        ]);
+        $hasRequestColumn = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
 
-        $asset->allocations()->create([
-            'employee_id'          => $assetRequest->employee_id,
-            'allocated_at'         => date('Y-m-d'),
-            'allocation_condition' => $asset->condition,
-            'notes'                => $asset->notes,
-        ]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($asset, $assetRequest, $hasRequestColumn) {
+            $upd = [
+                'status'               => 'allocated',
+                'assigned_employee_id' => $assetRequest->employee_id,
+                'allocated_at'         => date('Y-m-d'),
+                'expected_return_date' => null,
+            ];
+            if ($hasRequestColumn) {
+                $upd['asset_request_id'] = $assetRequest->id;
+            }
+            $asset->update($upd);
 
-        $assetRequest->update([
-            'status'             => 'allocated',
-            'allocated_asset_id' => $asset->id,
-            'admin_notes'        => "Allocated asset {$asset->asset_code} ({$asset->name}) directly on " . date('d M, Y'),
-        ]);
+            $asset->allocations()->create([
+                'employee_id'          => $assetRequest->employee_id,
+                'allocated_at'         => date('Y-m-d'),
+                'allocation_condition' => $asset->condition,
+                'notes'                => $asset->notes ?? 'Direct allocation',
+            ]);
+
+            $totalAllocatedUnits = $hasRequestColumn ? $assetRequest->allocatedAssets()->count() : 1;
+            $newStatus = ($totalAllocatedUnits >= $assetRequest->quantity) ? 'allocated' : 'partially_allocated';
+
+            $assetRequest->update([
+                'status'             => $newStatus,
+                'allocated_asset_id' => $asset->id,
+                'admin_notes'        => trim(($assetRequest->admin_notes ? $assetRequest->admin_notes . ' | ' : '') . "Allocated asset {$asset->asset_code} ({$asset->name}) directly on " . date('d M, Y')),
+            ]);
+        });
 
         return $this->sendSuccess([
-            'request' => $assetRequest,
-            'asset'   => $asset,
+            'request' => $assetRequest->fresh(),
+            'asset'   => $asset->fresh(),
         ], 'Asset allocated directly for request');
     }
 
@@ -1149,7 +1187,6 @@ class AssetApiController extends Controller
 
         $validated = $request->validate([
             'allocations'          => 'required|array',
-            'allocations.*'        => 'nullable|exists:assets,id',
             'allocated_at'         => 'required|date',
             'expected_return_date' => 'nullable|date|after_or_equal:allocated_at',
         ]);
@@ -1157,39 +1194,65 @@ class AssetApiController extends Controller
         $allocatedAt        = $validated['allocated_at'];
         $expectedReturnDate = $validated['expected_return_date'] ?? null;
         $allocatedCount     = 0;
+        $hasRequestColumn   = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
 
-        foreach ($validated['allocations'] as $requestId => $assetId) {
-            if (empty($assetId)) {
-                continue;
-            }
+        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $allocatedAt, $expectedReturnDate, &$allocatedCount, $hasRequestColumn) {
+            foreach ($validated['allocations'] as $requestId => $assetIds) {
+                if (empty($assetIds)) {
+                    continue;
+                }
 
-            $assetRequest = AssetRequest::find($requestId);
-            $asset        = Asset::find($assetId);
+                $assetRequest = AssetRequest::find($requestId);
+                if (!$assetRequest || !in_array($assetRequest->status, ['pending', 'partially_allocated'])) {
+                    continue;
+                }
 
-            if ($assetRequest && $asset && $asset->status === 'available') {
-                $asset->update([
-                    'status'               => 'allocated',
-                    'assigned_employee_id' => $assetRequest->employee_id,
-                    'allocated_at'         => $allocatedAt,
-                    'expected_return_date' => $expectedReturnDate,
-                ]);
+                $unitIds = is_array($assetIds) ? $assetIds : [$assetIds];
+                $unitIds = array_filter($unitIds);
+                if (empty($unitIds)) {
+                    continue;
+                }
 
-                $asset->allocations()->create([
-                    'employee_id'          => $assetRequest->employee_id,
-                    'allocated_at'         => $allocatedAt,
-                    'allocation_condition' => $asset->condition,
-                    'notes'                => $asset->notes,
-                ]);
+                $assets = Asset::whereIn('id', $unitIds)->where('status', 'available')->get();
+                if ($assets->isEmpty()) {
+                    continue;
+                }
+
+                $allocatedCodes = [];
+                foreach ($assets as $asset) {
+                    $upd = [
+                        'status'               => 'allocated',
+                        'assigned_employee_id' => $assetRequest->employee_id,
+                        'allocated_at'         => $allocatedAt,
+                        'expected_return_date' => $expectedReturnDate,
+                    ];
+                    if ($hasRequestColumn) {
+                        $upd['asset_request_id'] = $assetRequest->id;
+                    }
+                    $asset->update($upd);
+
+                    $asset->allocations()->create([
+                        'employee_id'          => $assetRequest->employee_id,
+                        'allocated_at'         => $allocatedAt,
+                        'allocation_condition' => $asset->condition,
+                        'notes'                => $asset->notes ?? 'Bulk allocated',
+                    ]);
+
+                    $allocatedCodes[] = $asset->asset_code;
+                }
+
+                $totalAllocatedUnits = $hasRequestColumn ? $assetRequest->allocatedAssets()->count() : count($allocatedCodes);
+                $newStatus = ($totalAllocatedUnits >= $assetRequest->quantity) ? 'allocated' : 'partially_allocated';
 
                 $assetRequest->update([
-                    'status'             => 'allocated',
-                    'allocated_asset_id' => $asset->id,
-                    'admin_notes'        => "Bulk allocated asset {$asset->asset_code} ({$asset->name}) on " . date('d M, Y'),
+                    'status'             => $newStatus,
+                    'allocated_asset_id' => $assets->first()->id,
+                    'admin_notes'        => trim(($assetRequest->admin_notes ? $assetRequest->admin_notes . ' | ' : '') . "Allocated: " . implode(', ', $allocatedCodes) . " on " . date('d M, Y')),
                 ]);
 
                 $allocatedCount++;
             }
-        }
+        });
 
         return $this->sendSuccess([
             'allocated_requests_count' => $allocatedCount,
@@ -1211,6 +1274,12 @@ class AssetApiController extends Controller
             return $this->sendError("Asset request with ID '{$id}' not found.", 404);
         }
 
+        if ($request->has('allocated_asset_ids') && !$request->has('asset_ids')) {
+            $request->merge([
+                'asset_ids' => $request->input('allocated_asset_ids'),
+            ]);
+        }
+
         $validated = $request->validate([
             'asset_ids'            => 'required|array|min:1',
             'asset_ids.*'          => 'required|exists:assets,id',
@@ -1227,15 +1296,21 @@ class AssetApiController extends Controller
             }
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($assets, $assetRequest, $validated, $assetIds) {
+        $hasRequestColumn = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($assets, $assetRequest, $validated, $assetIds, $hasRequestColumn) {
             $assetCodes = [];
             foreach ($assets as $asset) {
-                $asset->update([
+                $upd = [
                     'status'               => 'allocated',
                     'assigned_employee_id' => $assetRequest->employee_id,
                     'allocated_at'         => $validated['allocated_at'],
                     'expected_return_date' => $validated['expected_return_date'] ?? null,
-                ]);
+                ];
+                if ($hasRequestColumn) {
+                    $upd['asset_request_id'] = $assetRequest->id;
+                }
+                $asset->update($upd);
 
                 $asset->allocations()->create([
                     'employee_id'          => $assetRequest->employee_id,
@@ -1247,14 +1322,17 @@ class AssetApiController extends Controller
                 $assetCodes[] = $asset->asset_code;
             }
 
+            $totalAllocatedUnits = $hasRequestColumn ? $assetRequest->allocatedAssets()->count() : count($assetCodes);
+            $newStatus = ($totalAllocatedUnits >= $assetRequest->quantity) ? 'allocated' : 'partially_allocated';
+
             $assetRequest->update([
-                'status'             => 'allocated',
+                'status'             => $newStatus,
                 'allocated_asset_id' => $assetIds[0],
-                'admin_notes'        => "Allocated asset(s): " . implode(', ', $assetCodes) . " on " . date('d M, Y'),
+                'admin_notes'        => trim(($assetRequest->admin_notes ? $assetRequest->admin_notes . ' | ' : '') . "Allocated: " . implode(', ', $assetCodes) . " on " . date('d M, Y')),
             ]);
         });
 
-        return $this->sendSuccess($assetRequest->load('allocatedAsset'), 'Asset request allocated successfully');
+        return $this->sendSuccess($assetRequest->fresh()->load('allocatedAsset'), 'Asset request allocated successfully');
     }
 
     public function bulkRejectRequests(Request $request): JsonResponse
@@ -1492,12 +1570,16 @@ class AssetApiController extends Controller
     }
 
     /**
-     * Export all assets to Excel (.xlsx).
+     * Export assets to Excel (.xlsx) with matching web filters.
      */
-    public function export(): mixed
+    public function export(Request $request): mixed
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
-        return $repo->export();
+        return $repo->export($request->all());
     }
 
     /**
@@ -1505,6 +1587,14 @@ class AssetApiController extends Controller
      */
     public function import(Request $request): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to import assets.', 403);
+        }
+
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
         ]);
@@ -1524,17 +1614,25 @@ class AssetApiController extends Controller
      */
     public function downloadTemplate(): mixed
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
         return $repo->downloadTemplate();
     }
 
     /**
-     * Export all asset categories to Excel (.xlsx).
+     * Export asset categories to Excel (.xlsx) with matching web filters.
      */
-    public function exportCategories(): mixed
+    public function exportCategories(Request $request): mixed
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
-        return $repo->exportCategories();
+        return $repo->exportCategories($request->all());
     }
 
     /**
@@ -1542,6 +1640,14 @@ class AssetApiController extends Controller
      */
     public function importCategories(Request $request): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to import asset categories.', 403);
+        }
+
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
         ]);
@@ -1561,6 +1667,10 @@ class AssetApiController extends Controller
      */
     public function downloadCategoriesTemplate(): mixed
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
         return $repo->downloadCategoriesTemplate();
     }

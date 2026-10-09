@@ -516,6 +516,11 @@ class Employee extends BaseModel
         }
     }
 
+    public function rosters(): HasMany
+    {
+        return $this->hasMany(\App\Domains\HRMS\Models\ShiftRoster::class, 'employee_id');
+    }
+
     public function defaultShift(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Production\Models\ProductionShift::class, 'shift_id');
@@ -528,44 +533,81 @@ class Employee extends BaseModel
      * 2. Weekly pattern default (from employee's weekly_pattern JSON field)
      * 3. General default shift (from employee's default shift_id)
      *
-     * @param string|\Carbon\Carbon $date
+     * @param string|\Carbon\Carbon|null $date
      * @return \App\Domains\Production\Models\ProductionShift|null
      */
     public function resolveShiftForDate($date)
     {
-        $carbonDate = \Carbon\Carbon::parse($date);
-        $dateStr = $carbonDate->format('Y-m-d');
-        $dayOfWeek = $carbonDate->dayOfWeek;
-
-        // 1. Check for specific date override in shift_rosters
-        $roster = \App\Domains\HRMS\Models\ShiftRoster::where([
-            'employee_id' => $this->id,
-            'date' => $dateStr
-        ])->first();
-
-        if ($roster) {
-            if (is_null($roster->shift_id)) {
-                return null; // Day Off override
-            }
-            return \App\Domains\Production\Models\ProductionShift::find($roster->shift_id);
+        if (empty($date)) {
+            return $this->defaultShift ?? $this->shift;
         }
 
-        // 2. Check for weekly pattern default (fallback to 'off' for Sunday if not set)
+        try {
+            $carbonDate = $date instanceof \Carbon\Carbon ? $date->copy() : \Carbon\Carbon::parse($date);
+        } catch (\Throwable $e) {
+            return $this->defaultShift ?? $this->shift;
+        }
+
+        $dateStr = $carbonDate->format('Y-m-d');
+        $dayOfWeek = (int) $carbonDate->dayOfWeek;
+
+        // 1. Check for specific date override in shift_rosters
+        if ($this->relationLoaded('rosters')) {
+            $roster = $this->rosters->first(function ($r) use ($dateStr) {
+                $rDate = $r->date instanceof \Carbon\Carbon ? $r->date->format('Y-m-d') : (string) $r->date;
+                return $rDate === $dateStr;
+            });
+        } else {
+            $roster = \App\Domains\HRMS\Models\ShiftRoster::where([
+                'employee_id' => $this->id,
+                'date' => $dateStr
+            ])->first();
+        }
+
+        if ($roster) {
+            if (is_null($roster->shift_id) || $roster->shift_id === 0 || $roster->shift_id === 'off') {
+                return null; // Day Off override
+            }
+            $shiftModel = ($roster->relationLoaded('shift') && $roster->shift) 
+                ? $roster->shift 
+                : \App\Domains\Production\Models\ProductionShift::find($roster->shift_id);
+            if ($shiftModel) {
+                return $shiftModel;
+            }
+        }
+
+        // 2. Check for weekly pattern default (fallback to 'off' for Sunday if not explicitly set)
+        $pattern = is_array($this->weekly_pattern) 
+            ? $this->weekly_pattern 
+            : (is_string($this->weekly_pattern) ? json_decode($this->weekly_pattern, true) : null);
+
         $weeklyShiftId = null;
-        if (isset($this->weekly_pattern) && isset($this->weekly_pattern[$dayOfWeek])) {
-            $weeklyShiftId = $this->weekly_pattern[$dayOfWeek];
-        } elseif ($dayOfWeek === 0) {
+        if (is_array($pattern)) {
+            if (array_key_exists($dayOfWeek, $pattern)) {
+                $weeklyShiftId = $pattern[$dayOfWeek];
+            } elseif (array_key_exists((string) $dayOfWeek, $pattern)) {
+                $weeklyShiftId = $pattern[(string) $dayOfWeek];
+            }
+        }
+
+        // Sunday defaults to off if not explicitly set in weekly pattern
+        if (is_null($weeklyShiftId) && $dayOfWeek === 0) {
             $weeklyShiftId = 'off';
         }
 
         if ($weeklyShiftId === 'off') {
             return null; // Weekly Off
-        } elseif ($weeklyShiftId) {
-            return \App\Domains\Production\Models\ProductionShift::find($weeklyShiftId);
+        }
+
+        if (!empty($weeklyShiftId) && $weeklyShiftId !== 'default') {
+            $patternShift = \App\Domains\Production\Models\ProductionShift::find((int) $weeklyShiftId);
+            if ($patternShift) {
+                return $patternShift;
+            }
         }
 
         // 3. Fall back to general default shift
-        return $this->defaultShift;
+        return $this->defaultShift ?? $this->shift;
     }
 
     public function revisions(): HasMany

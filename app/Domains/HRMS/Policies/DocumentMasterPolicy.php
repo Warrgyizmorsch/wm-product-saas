@@ -18,6 +18,11 @@ class DocumentMasterPolicy
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $user->tenant_id]);
     }
 
+    public function view(User $user, mixed $model = null): bool
+    {
+        return $this->viewAny($user);
+    }
+
     public function create(User $user): bool
     {
         return $this->access->allows($user, 'hrms.document_templates.manage', ['tenant_id' => $user->tenant_id])

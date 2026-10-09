@@ -354,7 +354,7 @@
                                         'under_hours' => [__('hrms.penalization.under_hours'), 'feather-trending-down'],
                                         'missing_logs' => [__('hrms.penalization.missing_logs'), 'feather-alert-triangle'],
                                         'attendance_rules' => [__('hrms.penalization.attendance_rules'), 'feather-check-square'],
-                                        'overtime_rules' => [__('hrms.overtime.title') ?? 'Overtime Policy', 'feather-briefcase'],
+                                        'overtime_rules' => [__('hrms.penalization.overtime_rules'), 'feather-briefcase'],
                                     ];
                                     $lateArrivalRule = $rules->get('late_arrival');
                                     $savedLateTiers = ($lateArrivalRule && $lateArrivalRule->penalty_tiers) ? $lateArrivalRule->penalty_tiers : null;
@@ -402,16 +402,16 @@
                                                 <h5 class="fw-bold text-dark mb-1" style="font-size: 16px;">
                                                     <i class="{{ $typeData[1] }} text-primary me-2 fs-18"></i>
                                                     @if($typeKey === 'attendance_rules')
-                                                        Configure Attendance Rules
+                                                        {{ __('hrms.penalization.configure_attendance_rules') }}
                                                     @elseif($typeKey === 'overtime_rules')
-                                                        Configure Overtime Rules
+                                                        {{ __('hrms.penalization.configure_overtime_rules') }}
                                                     @else
                                                         {{ __('hrms.penalization.configure_rules', ['type' => $typeData[0]]) }}
                                                     @endif
                                                 </h5>
                                                 <span class="text-muted fs-12">
                                                     @if($typeKey === 'overtime_rules')
-                                                        Configure overtime threshold and minimum manual request hours rules.
+                                                        {{ __('hrms.penalization.overtime_desc') }}
                                                      @else
                                                         {{ __('hrms.penalization.set_thresholds_desc') }}
                                                      @endif
@@ -429,7 +429,7 @@
                                             <div class="col-md-6 col-12">
                                                 <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.company_scope') }}" name="company_id" select2-selector="default" id="{{ $typeKey === 'attendance_rules' ? 'sel_company_id' : 'company_id_' . $typeKey }}">
                                                     @if($typeKey === 'attendance_rules')
-                                                        <option value="" disabled selected>-- Select a Company (Required) --</option>
+                                                        <option value="" disabled selected>{{ __('hrms.penalization.select_company_required') }}</option>
                                                     @else
                                                         <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
                                                     @endif
@@ -445,612 +445,564 @@
                                             <div class="col-md-6 col-12">
                                                 <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.policy_status') }}" name="status" select2-selector="default" :required="true" id="{{ $typeKey === 'attendance_rules' ? 'sel_status' : 'status_' . $typeKey }}">
                                                     <option value="1" {{ $statusVal === '1' ? 'selected' : '' }}>{{ __('hrms.penalization.active_enforce') }}</option>
-                                                    <option value="0" {{ $statusVal === '0' ? 'selected' : '' }}>{{ __('hrms.penalization.inactive_ignore') }}</option>
+                                                    <option value="0" {{ $statusVal === '0' ? 'selected' : '' }}>{{ __('hrms.penalization.inactive') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
 
                                             @if($typeKey === 'overtime_rules')
                                                 <div class="col-12 d-flex flex-column gap-3">
-                                                     {{-- Overtime Threshold Rule --}}
-                                                     <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
-                                                         <div class="d-flex align-items-start gap-2">
-                                                             <i class="feather-info text-primary fs-16 mt-0.5"></i>
-                                                             <div>
-                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                     System automatically logs and approves overtime if actual worked extra hours equal or exceed 
-                                                                     <input type="number" name="auto_overtime_threshold_hours" step="0.5" min="0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['auto_overtime_threshold_hours'] }}" placeholder="2.0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
-                                                                     hours.
-                                                                 </p>
-                                                             </div>
-                                                         </div>
-                                                     </div>
+                                                    {{-- Overtime Threshold Rule --}}
+                                                    <x-ui.alert variant="light" icon="feather-info" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                        <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                            {{ __('hrms.penalization.auto_overtime_desc_prefix') }}
+                                                            <input type="number" name="auto_overtime_threshold_hours" step="0.5" min="0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['auto_overtime_threshold_hours'] }}" placeholder="2.0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                            {{ __('hrms.penalization.hours') }}
+                                                        </p>
+                                                    </x-ui.alert>
  
-                                                     {{-- Minimum Overtime Request Rule --}}
-                                                     <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
-                                                         <div class="d-flex align-items-start gap-2">
-                                                             <i class="feather-alert-circle text-primary fs-16 mt-0.5"></i>
-                                                             <div>
-                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                     Minimum hours required for a manual overtime request is 
-                                                                     <input type="number" name="min_overtime_request_hours" step="0.5" min="0.5" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['min_overtime_request_hours'] }}" placeholder="1.5" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
-                                                                     hours.
-                                                                 </p>
-                                                             </div>
-                                                         </div>
-                                                     </div>
+                                                    {{-- Minimum Overtime Request Rule --}}
+                                                    <x-ui.alert variant="light" icon="feather-alert-circle" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                        <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                            {{ __('hrms.penalization.min_overtime_request_desc') }}
+                                                            <input type="number" name="min_overtime_request_hours" step="0.5" min="0.5" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['min_overtime_request_hours'] }}" placeholder="1.5" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                            {{ __('hrms.penalization.hours') }}
+                                                        </p>
+                                                    </x-ui.alert>
 
-                                                     {{-- Monthly Maximum Paid Overtime Hours Cap --}}
-                                                     <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
-                                                         <div class="d-flex align-items-start gap-2">
-                                                             <i class="feather-clock text-primary fs-16 mt-0.5"></i>
-                                                             <div>
-                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                     Maximum paid overtime hours allowed per employee in a month is 
-                                                                     <input type="number" name="overtime_max_monthly_hours" step="0.5" min="0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['overtime_max_monthly_hours'] ?? '' }}" placeholder="No Limit" style="width: 80px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
-                                                                     hours. (Leave blank for no limit)
-                                                                 </p>
-                                                             </div>
-                                                         </div>
-                                                     </div>
+                                                    {{-- Monthly Maximum Paid Overtime Hours Cap --}}
+                                                    <x-ui.alert variant="light" icon="feather-clock" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                        <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                            {{ __('hrms.penalization.max_monthly_ot_desc') }}
+                                                            <input type="number" name="overtime_max_monthly_hours" step="0.5" min="0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['overtime_max_monthly_hours'] ?? '' }}" placeholder="{{ __('hrms.penalization.no_limit') }}" style="width: 80px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                            {{ __('hrms.penalization.hours') }} {{ __('hrms.penalization.leave_blank_no_limit') }}
+                                                        </p>
+                                                    </x-ui.alert>
 
-                                                     {{-- Weekend Multiplier --}}
-                                                     <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
-                                                         <div class="d-flex align-items-start gap-2">
-                                                             <i class="feather-calendar text-primary fs-16 mt-0.5"></i>
-                                                             <div>
-                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                     Overtime worked on a <strong>Weekly Off / Weekend</strong> is calculated at a multiplier of 
-                                                                     <input type="number" name="overtime_weekend_multiplier" step="0.1" min="1.0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['overtime_weekend_multiplier'] ?? '' }}" placeholder="2.0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
-                                                                     times the standard hourly rate.
-                                                                 </p>
-                                                             </div>
-                                                         </div>
-                                                     </div>
+                                                    {{-- Weekend Multiplier --}}
+                                                    <x-ui.alert variant="light" icon="feather-calendar" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                        <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                            {!! __('hrms.penalization.weekend_ot_desc', ['weekend' => '<strong>' . __('hrms.penalization.weekend_label') . '</strong>']) !!}
+                                                            <input type="number" name="overtime_weekend_multiplier" step="0.1" min="1.0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['overtime_weekend_multiplier'] ?? '' }}" placeholder="2.0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                            {{ __('hrms.penalization.times_standard_rate') }}
+                                                        </p>
+                                                    </x-ui.alert>
 
-                                                     {{-- Public Holiday Multiplier --}}
-                                                     <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
-                                                         <div class="d-flex align-items-start gap-2">
-                                                             <i class="feather-award text-primary fs-16 mt-0.5"></i>
-                                                             <div>
-                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                     Overtime worked on a <strong>Public Holiday</strong> is calculated at a multiplier of 
-                                                                     <input type="number" name="overtime_holiday_multiplier" step="0.1" min="1.0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['overtime_holiday_multiplier'] ?? '' }}" placeholder="2.5" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
-                                                                     times the standard hourly rate.
-                                                                 </p>
-                                                             </div>
-                                                         </div>
-                                                     </div>
+                                                    {{-- Public Holiday Multiplier --}}
+                                                    <x-ui.alert variant="light" icon="feather-award" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                        <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                            {!! __('hrms.penalization.holiday_ot_desc', ['holiday' => '<strong>' . __('hrms.penalization.holiday_label') . '</strong>']) !!}
+                                                            <input type="number" name="overtime_holiday_multiplier" step="0.1" min="1.0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['overtime_holiday_multiplier'] ?? '' }}" placeholder="2.5" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                            {{ __('hrms.penalization.times_standard_rate') }}
+                                                        </p>
+                                                    </x-ui.alert>
 
-                                                     {{-- Duration Slabs Table --}}
-                                                     <div class="card border mt-2">
-                                                         <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
-                                                             <span class="fw-bold text-dark fs-13"><i class="feather-list me-1 text-primary"></i>Regular Work Days OT Tiers</span>
-                                                             <button type="button" class="btn btn-xs btn-primary text-white" id="btnAddOtTier"><i class="feather-plus me-1"></i>Add Slab</button>
-                                                         </div>
-                                                         <div class="card-body p-0">
-                                                             <table class="table table-sm align-middle fs-12 mb-0" id="otTiersTable">
-                                                                 <thead>
-                                                                     <tr class="table-light">
-                                                                         <th class="ps-3" style="width: 30%;">Min Hours</th>
-                                                                         <th style="width: 30%;">Max Hours</th>
-                                                                         <th style="width: 30%;">Multiplier (e.g. 1.5)</th>
-                                                                         <th class="text-center" style="width: 10%;">Action</th>
-                                                                     </tr>
-                                                                 </thead>
-                                                                 <tbody id="otTiersBody">
-                                                                     @php
-                                                                         $hasSavedTiers = isset($tenantSettings['overtime_tiers']);
-                                                                         $tiers = $tenantSettings['overtime_tiers'] ?? [
-                                                                             ['min_hours' => null, 'max_hours' => 2.0, 'multiplier' => 1.5, 'placeholder_min' => '0', 'placeholder_max' => '2', 'placeholder_mult' => '1.5'],
-                                                                             ['min_hours' => 2.0, 'max_hours' => null, 'multiplier' => 2.0, 'placeholder_min' => '2', 'placeholder_max' => 'Any', 'placeholder_mult' => '2.0']
-                                                                         ];
-                                                                     @endphp
-                                                                     @foreach($tiers as $index => $tier)
-                                                                         <tr>
-                                                                             <td class="ps-3">
-                                                                                 <input type="number" name="overtime_tiers[{{ $index }}][min_hours]" step="0.5" min="0" class="form-control form-control-sm text-center fw-semibold" value="{{ $hasSavedTiers ? $tier['min_hours'] : '' }}" placeholder="{{ $tier['placeholder_min'] ?? '0' }}" required style="height: 30px;">
-                                                                             </td>
-                                                                             <td>
-                                                                                 <input type="number" name="overtime_tiers[{{ $index }}][max_hours]" step="0.5" min="0" class="form-control form-control-sm text-center fw-semibold" value="{{ $hasSavedTiers ? $tier['max_hours'] : '' }}" placeholder="{{ $tier['placeholder_max'] ?? 'Any' }}" style="height: 30px;">
-                                                                             </td>
-                                                                             <td>
-                                                                                 <input type="number" name="overtime_tiers[{{ $index }}][multiplier]" step="0.1" min="1.0" class="form-control form-control-sm text-center fw-semibold" value="{{ $hasSavedTiers ? $tier['multiplier'] : '' }}" placeholder="{{ $tier['placeholder_mult'] ?? '1.5' }}" required style="height: 30px;">
-                                                                             </td>
-                                                                             <td class="text-center">
-                                                                                 <button type="button" class="btn btn-icon btn-sm rounded-circle btn-soft-danger btn-remove-ot-tier"><i class="feather-trash-2"></i></button>
-                                                                             </td>
-                                                                         </tr>
-                                                                     @endforeach
-                                                                 </tbody>
-                                                             </table>
-                                                         </div>
-                                                     </div>
-                                                 </div>
-                                             @endif
-
-                                             @if($typeKey === 'late_arrival')
-                                                  <!-- Grace Period -->
-                                                  <div class="col-12 d-flex flex-column gap-2">
-                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
-                                                          <div class="d-flex align-items-start gap-2">
-                                                              <i class="feather-info text-primary fs-16 mt-0.5"></i>
-                                                              <div>
-                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                      {{ __('hrms.penalization.grace_period_set_to') }} 
-                                                                      <input type="number" name="grace_period_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->grace_period_minutes : 15 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
-                                                                      {{ __('hrms.penalization.minutes_relative_to_shift') }}
-                                                                  </p>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
-                                                          <div class="d-flex align-items-start gap-2">
-                                                              <i class="feather-calendar text-primary fs-16 mt-0.5"></i>
-                                                              <div>
-                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                      {{ __('hrms.penalization.employee_allowed_up_to') }} 
-                                                                      <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
-                                                                      {{ __('hrms.penalization.late_occurrences_without_penalty') }}
-                                                                  </p>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                  </div>
-
-                                                 <div class="col-12 border-top my-4 pt-4">
-                                                     <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
-                                                         <i class="feather-grid text-primary fs-16"></i> {{ __('hrms.penalization.configure_tiers') }}
-                                                     </h6>
-                                                     <span class="text-muted fs-11 d-block mb-3">{{ __('hrms.penalization.define_boundaries') }}</span>
-                                                 </div>
-
-                                                 <div class="col-12">
-                                                     <div class="table-responsive border rounded bg-white">
-                                                         <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="late-arrival-tiers-table" style="font-size: 13px;">
-                                                              <thead class="table-light">
-                                                                  <tr>
-                                                                      <th style="width: 15%;">{{ __('hrms.penalization.min_occurrences') }}</th>
-                                                                      <th style="width: 15%;">{{ __('hrms.penalization.max_occurrences') }}</th>
-                                                                      <th style="width: 45%;">{{ __('hrms.penalization.settlement_method') }}</th>
-                                                                      <th style="width: 15%;">Deduction Value (Days)</th>
-                                                                      <th style="width: 10%;" class="text-center">{{ __('hrms.penalization.action') }}</th>
-                                                                  </tr>
-                                                              </thead>
-                                                             <tbody id="late-arrival-tiers-tbody">
-                                                                 <!-- Tiers will be dynamically rendered here -->
-                                                             </tbody>
-                                                         </table>
-                                                     </div>
-                                                     <div class="mt-3">
-                                                         <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-tier" icon="feather-plus">
-                                                             {{ __('hrms.penalization.add_tier') }}
-                                                         </x-ui.button>
-                                                     </div>
-                                                 </div>
-                                             @endif
-
-                                              @if($typeKey === 'under_hours')
-                                                  <!-- Shift Deficit Parameters -->
-                                                  <div class="col-12 d-flex flex-column gap-2">
-                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
-                                                          <div class="d-flex align-items-start gap-2">
-                                                              <i class="feather-info text-primary fs-16 mt-0.5"></i>
-                                                              <div>
-                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                      {{ __('hrms.penalization.shift_target_hours') }}
-                                                                      <input type="number" name="grace_period_hours" step="0.5" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? ($rule->grace_period_minutes / 60) : 8 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
-                                                                      {{ __('hrms.penalization.hours') }}
-                                                                  </p>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
-                                                          <div class="d-flex align-items-start gap-2">
-                                                              <i class="feather-calendar text-primary fs-16 mt-0.5"></i>
-                                                              <div>
-                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                      {{ __('hrms.penalization.allowed_monthly_grace') }}
-                                                                      <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
-                                                                      {{ __('hrms.penalization.deficit_before_trigger') }}
-                                                                  </p>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                  </div>
-
-                                                 <div class="col-12 border-top my-4 pt-4">
-                                                     <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
-                                                         <i class="feather-grid text-primary fs-16"></i> {{ __('hrms.penalization.configure_tiers') }}
-                                                     </h6>
-                                                     <span class="text-muted fs-11 d-block mb-3">{{ __('hrms.penalization.define_boundaries') }}</span>
-                                                 </div>
-
-                                                 <div class="col-12">
-                                                     <div class="table-responsive border rounded bg-white">
-                                                         <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="under-hours-tiers-table" style="font-size: 13px;">
-                                                             <thead class="table-light">
-                                                                 <tr>
-                                                                     <th style="width: 25%;">{{ __('hrms.penalization.if_hours_less') }}</th>
-                                                                     <th style="width: 50%;">{{ __('hrms.penalization.settlement_method') }}</th>
-                                                                     <th style="width: 15%;">Deduction Value (Days)</th>
-                                                                     <th style="width: 10%;" class="text-center">{{ __('hrms.penalization.action') }}</th>
-                                                                 </tr>
-                                                             </thead>
-                                                             <tbody id="under-hours-tiers-tbody">
-                                                                 <!-- Tiers will be dynamically rendered here -->
-                                                             </tbody>
-                                                         </table>
-                                                     </div>
-                                                     <div class="mt-3">
-                                                         <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-deficit-tier" icon="feather-plus">
-                                                             {{ __('hrms.penalization.add_tier') }}
-                                                         </x-ui.button>
-                                                     </div>
-                                                 </div>
-                                             @endif
-
-                                              @if($typeKey === 'missing_logs')
-                                                  <!-- Allowed Free Missing Log Counts (Per Month) -->
-                                                  <div class="col-12">
-                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
-                                                          <div class="d-flex align-items-start gap-2">
-                                                              <i class="feather-info text-primary fs-16 mt-0.5"></i>
-                                                              <div>
-                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                      {{ __('hrms.penalization.employees_allowed_grace') }}
-                                                                      <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
-                                                                      {{ __('hrms.penalization.missing_before_trigger') }}
-                                                                  </p>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                  </div>
-
-                                                 <div class="col-12 border-top my-4 pt-4">
-                                                     <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
-                                                         <i class="feather-grid text-primary fs-16"></i> {{ __('hrms.penalization.configure_tiers') }}
-                                                     </h6>
-                                                     <span class="text-muted fs-11 d-block mb-3">{{ __('hrms.penalization.define_boundaries') }}</span>
-                                                 </div>
-
-                                                 <div class="col-12">
-                                                     <div class="table-responsive border rounded bg-white">
-                                                         <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="missing-logs-tiers-table" style="font-size: 13px;">
-                                                              <thead class="table-light">
-                                                                  <tr>
-                                                                      <th style="width: 15%;">{{ __('hrms.penalization.min_occurrences') }}</th>
-                                                                      <th style="width: 15%;">{{ __('hrms.penalization.max_occurrences') }}</th>
-                                                                      <th style="width: 45%;">{{ __('hrms.penalization.settlement_method') }}</th>
-                                                                      <th style="width: 15%;">Deduction Value (Days)</th>
-                                                                      <th style="width: 10%;" class="text-center">{{ __('hrms.penalization.action') }}</th>
-                                                                  </tr>
-                                                              </thead>
-                                                             <tbody id="missing-logs-tiers-tbody">
-                                                                 <!-- Tiers will be dynamically rendered here -->
-                                                             </tbody>
-                                                         </table>
-                                                     </div>
-                                                     <div class="mt-3">
-                                                         <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-missing-tier" icon="feather-plus">
-                                                             {{ __('hrms.penalization.add_tier') }}
-                                                         </x-ui.button>
-                                                     </div>
-                                                 </div>
-                                              @endif
-
-                                              @if($typeKey === 'attendance_rules')
-                                                  <!-- Scope Selection: Business Unit & Branch -->
-                                                  <div class="row g-3 mb-4 border-bottom pb-4">
-                                                      <!-- Business Unit -->
-                                                      <div class="col-md-6 col-12" id="div_business_unit">
-                                                          <x-ui.odoo-form-ui type="select" label="Business Unit (Optional)" name="business_unit_id" id="sel_business_unit_id" onchange="loadAttendanceRulesForScope()">
-                                                              <option value="">All Business Units</option>
-                                                              @foreach($businessUnits as $bu)
-                                                                  <option value="{{ $bu->id }}" data-company="{{ $bu->company_id }}" {{ request('business_unit_id') == $bu->id ? 'selected' : '' }}>{{ $bu->name }}</option>
-                                                              @endforeach
-                                                          </x-ui.odoo-form-ui>
-                                                      </div>
-                                                      <!-- Branch -->
-                                                      <div class="col-md-6 col-12" id="div_branch">
-                                                          <x-ui.odoo-form-ui type="select" label="Branch (Optional)" name="branch_id" id="sel_branch_id" onchange="loadAttendanceRulesForScope()">
-                                                              <option value="">All Branches</option>
-                                                              @foreach($branches as $branch)
-                                                                  <option value="{{ $branch->id }}" data-company="{{ $branch->company_id }}" data-bu="{{ $branch->business_unit_id }}" {{ request('branch_id') == $branch->id ? 'selected' : '' }}>{{ $branch->name }}</option>
-                                                              @endforeach
-                                                          </x-ui.odoo-form-ui>
-                                                      </div>
-                                                  </div>
-
-                                                  <!-- Office Rules -->
-                                                  <div class="col-12 border-bottom pb-4 mb-4">
-                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
-                                                          <i class="feather-home text-primary fs-16"></i> Office Settings
-                                                      </h6>
-                                                      <span class="text-muted fs-11 d-block mb-3">Define how employees working in the office can check in and out. Note: Checks will lookup employee's Legal Entity (Company), and optional Business Unit and Branch.</span>
-                                                      
-                                                      <div class="d-flex flex-column gap-3 px-2">
-                                                          <div>
-                                                              <x-ui.checkbox name="office_biometric" id="office_biometric" label="Enable Biometric Device Check-In" />
-                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Allow check-in and check-out logs to sync from biometric devices.</span>
-                                                          </div>
-                                                          <div>
-                                                              <x-ui.checkbox name="office_web" id="office_web" label="Enable Web/Mobile App Check-In" onchange="toggleOfficeGeofenceFields()" />
-                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Allow employees to check in/out via the web portal or mobile app.</span>
-
-                                                              {{-- Sub-options shown when office_web is enabled --}}
-                                                              <div class="ms-4 ps-1 mt-3 flex-column gap-3 d-none" id="office_geofence_fields">
-
-                                                                  {{-- Geofence toggle --}}
-                                                                      <x-ui.checkbox name="office_geofence" id="office_geofence" label="Require Location Coordinate Capture" onchange="toggleOfficeCoordinateFields()" />
-                                                                      <span class="text-muted fs-11 d-block ms-4 ps-1">Only allow check-in when employee is within the office geofence radius.</span>
-
-                                                                      {{-- Lat/Lng/Radius shown when office_geofence is enabled --}}
-                                                                      <div class="row g-2 mt-3 mb-3 align-items-end d-none" id="office_coordinate_fields">
-                                                                           <div class="col-md-3">
-                                                                               <label class="form-label fs-12 text-muted mb-1">Office Latitude</label>
-                                                                               <input type="text" name="office_latitude" id="office_latitude" class="form-control fs-12" placeholder="e.g. 28.6139">
-                                                                           </div>
-                                                                           <div class="col-md-3">
-                                                                               <label class="form-label fs-12 text-muted mb-1">Office Longitude</label>
-                                                                               <input type="text" name="office_longitude" id="office_longitude" class="form-control fs-12" placeholder="e.g. 77.2090">
-                                                                           </div>
-                                                                           <div class="col-md-3">
-                                                                               <label class="form-label fs-12 text-muted mb-1">Allowed Radius (m)</label>
-                                                                               <input type="number" name="office_radius" id="office_radius" class="form-control fs-12" value="100" min="1">
-                                                                           </div>
-                                                                           <div class="col-md-3 d-flex align-items-end">
-                                                                               <div class="d-flex gap-2 w-100">
-                                                                                   <button type="button" class="btn btn-sm btn-primary flex-fill" onclick="detectCurrentCoordinates(event)" style="font-size: 11px;">
-                                                                                       <i class="feather-crosshair me-1"></i>Detect
-                                                                                   </button>
-                                                                                   <button type="button" class="btn btn-sm btn-light-brand flex-fill" id="btn_toggle_office_map" onclick="toggleOfficeMap()" style="font-size: 11px;">
-                                                                                       <i class="feather-map me-1"></i>Map
-                                                                                   </button>
-                                                                               </div>
-                                                                           </div>
-                                                                           <div class="position-relative mt-3 w-100" id="office_map_container_wrap" style="display: none;">
-                                                                               <input type="text" id="office_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="Search address or subarea (Press Enter)...">
-                                                                               <div id="office_map_picker" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #ced4da; z-index: 1;"></div>
-                                                                           </div>
-                                                                      </div>
-
-                                                                  {{-- Live tracking toggle --}}
-                                                                  <div class="mt-4">
-                                                                      <x-ui.checkbox name="office_tracking" id="office_tracking" label="Enable Live Location Tracking During Shift" onchange="toggleOfficeTrackingMinutes()" />
-                                                                      <span class="text-muted fs-11 d-block ms-4 ps-1">Periodically log employee GPS coordinates while checked in at the office.</span>
-                                                                      <div class="ms-4 ps-1 mt-2 d-none" id="office_tracking_minutes_wrap">
-                                                                          <label class="form-label fs-12 text-muted mb-1">Tracking Interval (Minutes)</label>
-                                                                          <input type="number" name="office_tracking_minutes" id="office_tracking_minutes" class="form-control fs-12" style="max-width: 160px;" value="15" min="1" max="120" placeholder="e.g. 15">
-                                                                          <span class="text-muted fs-11 d-block mt-1">Location will be recorded every N minutes during an active shift.</span>
-                                                                      </div>
-                                                                  </div>
-
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                    </div>
-
-                                                  <!-- WFH Rules -->
-                                                  <div class="col-12 border-bottom pt-4 pb-4 mb-4">
-                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
-                                                          <i class="feather-rss text-primary fs-16"></i> WFH Settings
-                                                      </h6>
-                                                      <span class="text-muted fs-11 d-block mb-3">Configure check-in methods, validations, and location tracking for remote employees. Note: Validation methods are uniform on check-in and check-out.</span>
-                                                      
-                                                      <div class="d-flex flex-column gap-3 px-2">
-                                                          <div>
-                                                              <x-ui.checkbox name="wfh_location" id="wfh_location" label="Require Location Coordinate Capture" />
-                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Record GPS coordinates when checking in or out.</span>
-                                                          </div>
-                                                          <div>
-                                                              <x-ui.checkbox name="wfh_selfie" id="wfh_selfie" label="Require Selfie Capture" />
-                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Mandate employee to snap a selfie photo on check-in and check-out.</span>
-                                                          </div>
-                                                          <div>
-                                                              <x-ui.checkbox name="wfh_geofence" id="wfh_geofence" label="Enforce Home Location Geofence (Strict)" />
-                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">If checked, they must check-in from their home location (tracking anchor is assigned location). If unchecked, home location is optional (tracking anchor is first check-in location).</span>
-                                                          </div>
-                                                          <div>
-                                                              <x-ui.checkbox name="wfh_tracking" id="wfh_tracking" label="Enable Live Location Tracking during Shift" onchange="toggleTrackingThreshold('wfh')" />
-                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Track and record location updates in the background. Note: Live movement tracking requires this to be enabled.</span>
-                                                          </div>
-                                                          <div class="alert bg-light border-0 p-3 mt-3 mb-2 rounded-3 text-dark fs-13 d-none" id="wfh_tracking_meters_container">
-                                                              <div class="d-flex align-items-center gap-2">
-                                                                  <i class="feather-map-pin text-primary fs-16"></i>
-                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                      Track new coordinates if the employee moves more than 
-                                                                      <input type="number" name="wfh_tracking_meters" id="wfh_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="50" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
-                                                                      meters from the last/first check-in coordinates, and fetch every
-                                                                      <input type="number" name="wfh_tracking_minutes" id="wfh_tracking_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="15" min="1" max="120" style="width: 55px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
-                                                                      minutes.
-                                                                  </p>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                  </div>
-
-                                                  <!-- On-Site Rules -->
-                                                  <div class="col-12 pt-4 mb-2">
-                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
-                                                          <i class="feather-map text-primary fs-16"></i> On-Site Settings
-                                                      </h6>
-                                                      <span class="text-muted fs-11 d-block mb-3">Configure check-in methods, validations, and location tracking for client-site deployments. Note: Validation methods are uniform on check-in and check-out.</span>
-                                                      
-                                                      <div class="d-flex flex-column gap-3 px-2">
-                                                          <div>
-                                                              <x-ui.checkbox name="site_location" id="site_location" label="Require Location Coordinate Capture" />
-                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Record GPS coordinates when checking in or out.</span>
-                                                          </div>
-                                                          <div>
-                                                              <x-ui.checkbox name="site_selfie" id="site_selfie" label="Require Selfie Capture" />
-                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Mandate employee to snap a selfie photo on check-in and check-out.</span>
-                                                          </div>
-                                                          <div>
-                                                              <x-ui.checkbox name="site_tracking" id="site_tracking" label="Enable Live Location Tracking during Shift" onchange="toggleTrackingThreshold('site')" />
-                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Track and record location updates in the background. Note: Live movement tracking requires this to be enabled.</span>
-                                                          </div>
-                                                          <div class="alert bg-light border-0 p-3 mt-3 mb-2 rounded-3 text-dark fs-13 d-none" id="site_tracking_meters_container">
-                                                              <div class="d-flex align-items-center gap-2">
-                                                                  <i class="feather-map-pin text-primary fs-16"></i>
-                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                      Track new coordinates if the employee moves more than 
-                                                                      <input type="number" name="site_tracking_meters" id="site_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="50" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
-                                                                      meters from the last/first check-in coordinates, and fetch every
-                                                                      <input type="number" name="site_tracking_minutes" id="site_tracking_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="15" min="1" max="120" style="width: 55px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
-                                                                      minutes.
-                                                                  </p>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                  </div>
-                                               @endif
-
-                                               @if($typeKey === 'expense_rules')
-                                                    <div class="col-12">
-                                                        {{-- Section header --}}
-                                                        <div class="alert bg-light border-0 p-3 mb-4 rounded-3 text-dark fs-13">
-                                                            <div class="d-flex align-items-start gap-2">
-                                                                <i class="feather-info text-primary fs-16 mt-0"></i>
-                                                                <p class="mb-0" style="line-height:1.6;">
-                                                                    Define expense limits per <strong>category</strong> and optionally per <strong>designation</strong>.
-                                                                    Scope can be restricted to a specific Company, Business Unit, or Branch.
-                                                                    Multiple rules can coexist — a more specific rule (e.g. by designation) will take priority over a global one.
-                                                                </p>
+                                                    {{-- Duration Slabs Table --}}
+                                                    <div class="col-12 border-top my-4 pt-4">
+                                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                                            <div>
+                                                                <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                                    <i class="feather-list text-primary fs-16"></i> {{ __('hrms.penalization.regular_ot_tiers') }}
+                                                                </h6>
+                                                                <span class="text-muted fs-11 d-block">{{ __('hrms.penalization.ot_tiers_desc') }}</span>
                                                             </div>
+                                                            <x-ui.button type="button" variant="soft-primary" size="sm" id="btnAddOtTier" icon="feather-plus">
+                                                                {{ __('hrms.penalization.add_slab') }}
+                                                            </x-ui.button>
                                                         </div>
-
-                                                        {{-- Row 1: Scope --}}
-                                                        <div class="row g-3 mb-3">
-                                                            <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="select" label="Company (Optional)" name="company_id" select2-selector="default" id="expense_company_id">
-                                                                    <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
-                                                                    @foreach($companies as $company)
-                                                                        <option value="{{ $company->id }}">{{ $company->company_name }}</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                            </div>
-                                                            <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="select" label="Business Unit (Optional)" name="business_unit_id" select2-selector="default" id="expense_bu_id">
-                                                                    <option value="">All Business Units</option>
-                                                                    @foreach($businessUnits as $bu)
-                                                                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                            </div>
-                                                            <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="select" label="Branch (Optional)" name="branch_id" select2-selector="default" id="expense_branch_id">
-                                                                    <option value="">All Branches</option>
-                                                                    @foreach($branches as $branch)
-                                                                        <option value="{{ $branch->id }}">{{ $branch->name }}</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                            </div>
-                                                        </div>
-
-                                                        {{-- Row 2: Category, Designation, Rule Name --}}
-                                                        <div class="row g-3 mb-3">
-                                                            <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="select" label="Expense Category *" name="expense_category_id" select2-selector="default" id="expense_category_sel" :required="true">
-                                                                    <option value="" disabled selected>-- Select Category --</option>
-                                                                    @foreach($expenseCategories as $category)
-                                                                        <option value="{{ $category->id }}">{{ $category->name }} ({{ $category->code }})</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                            </div>
-                                                            <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="select" label="Designation (Optional)" name="designation_id" select2-selector="default" id="expense_designation_sel">
-                                                                    <option value="">Apply Globally (All Grades)</option>
-                                                                    @foreach($designations as $desig)
-                                                                        <option value="{{ $desig->id }}">{{ $desig->name }}</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                            </div>
-                                                            <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="text" label="Rule Name *" name="name" id="expense_rule_name" placeholder="e.g. Executive Food Policy" :required="true" />
-                                                            </div>
-                                                        </div>
-
-                                                        {{-- Row 3: Limits --}}
-                                                        <div class="row g-3 mb-3">
-                                                            <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="number" label="Max Limit per Claim (₹)" name="max_limit_per_claim" id="expense_max_claim" placeholder="e.g. 500" step="0.01" min="0" />
-                                                            </div>
-                                                            <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="number" label="Max Monthly Limit (₹)" name="max_monthly_limit" id="expense_max_monthly" placeholder="e.g. 5000" step="0.01" min="0" />
-                                                            </div>
-                                                            <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="number" label="Receipt Required Above (₹)" name="receipt_required_threshold" id="expense_receipt_threshold" placeholder="e.g. 250" step="0.01" min="0" />
-                                                            </div>
-                                                        </div>
-
-                                                        {{-- List of current policies --}}
-                                                        <div class="border-top pt-4 mt-2">
-                                                            <h6 class="fw-bold text-dark mb-3" style="font-size: 13px;">Currently Configured Expense Policies</h6>
-                                                            <div class="table-responsive">
-                                                                <table class="table table-hover align-middle mb-0" style="font-size: 12.5px;">
-                                                                    <thead class="table-light">
+                                                        <div class="table-responsive border rounded bg-white">
+                                                            <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="otTiersTable" style="font-size: 13px;">
+                                                                <thead class="table-light">
+                                                                    <tr>
+                                                                        <th style="width: 30%;">{{ __('hrms.penalization.min_hours') }}</th>
+                                                                        <th style="width: 30%;">{{ __('hrms.penalization.max_hours') }}</th>
+                                                                        <th style="width: 30%;">{{ __('hrms.penalization.multiplier') }}</th>
+                                                                        <th style="width: 10%;" class="text-center">{{ __('hrms.penalization.action') }}</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody id="otTiersBody">
+                                                                    @php
+                                                                        $savedTiersList = (isset($tenantSettings['overtime_tiers']) && is_array($tenantSettings['overtime_tiers']) && count($tenantSettings['overtime_tiers']) > 0)
+                                                                            ? $tenantSettings['overtime_tiers']
+                                                                            : null;
+                                                                        $tiers = $savedTiersList ?? [
+                                                                            ['min_hours' => 0, 'max_hours' => 2.0, 'multiplier' => 1.5],
+                                                                            ['min_hours' => 2.0, 'max_hours' => null, 'multiplier' => 2.0]
+                                                                        ];
+                                                                    @endphp
+                                                                    @foreach($tiers as $index => $tier)
                                                                         <tr>
-                                                                            <th>Category</th>
-                                                                            <th>Scope</th>
-                                                                            <th>Designation</th>
-                                                                            <th>Rule Name</th>
-                                                                            <th>Claim Limit</th>
-                                                                            <th>Monthly Limit</th>
-                                                                            <th>Receipt Above</th>
-                                                                            <th>Status</th>
-                                                                            <th class="text-end">Action</th>
+                                                                            <td>
+                                                                                <input type="number" name="overtime_tiers[{{ $index }}][min_hours]" step="0.5" min="0" class="odoo-table-input text-center" value="{{ isset($tier['min_hours']) && $tier['min_hours'] !== '' ? $tier['min_hours'] : '0' }}" placeholder="0" required>
+                                                                            </td>
+                                                                            <td>
+                                                                                <input type="number" name="overtime_tiers[{{ $index }}][max_hours]" step="0.5" min="0" class="odoo-table-input text-center" value="{{ isset($tier['max_hours']) && $tier['max_hours'] !== '' ? $tier['max_hours'] : '' }}" placeholder="{{ __('hrms.penalization.any') }}">
+                                                                            </td>
+                                                                            <td>
+                                                                                <input type="number" name="overtime_tiers[{{ $index }}][multiplier]" step="0.1" min="1.0" class="odoo-table-input text-center" value="{{ isset($tier['multiplier']) && $tier['multiplier'] !== '' ? $tier['multiplier'] : '1.5' }}" placeholder="1.5" required>
+                                                                            </td>
+                                                                            <td class="text-center">
+                                                                                @if($index === 0)
+                                                                                    <span class="text-muted fs-12">—</span>
+                                                                                @else
+                                                                                    <button type="button" class="btn btn-sm btn-icon rounded-circle btn-soft-danger btn-remove-ot-tier" title="{{ __('hrms.penalization.remove_slab') }}"><i class="feather-trash-2"></i></button>
+                                                                                @endif
+                                                                            </td>
                                                                         </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        @forelse($expensePolicies as $policy)
-                                                                            <tr>
-                                                                                <td class="fw-bold text-primary">{{ $policy->category->name }}</td>
-                                                                                <td class="text-muted fs-12">
-                                                                                    @if($policy->company_id && isset($policy->company))
-                                                                                        {{ $policy->company->company_name }}
-                                                                                        @if($policy->businessUnit) / {{ $policy->businessUnit->name }} @endif
-                                                                                        @if($policy->branch) / {{ $policy->branch->name }} @endif
-                                                                                    @else
-                                                                                        Global
-                                                                                    @endif
-                                                                                </td>
-                                                                                <td class="text-dark">{{ $policy->designation ? $policy->designation->name : 'All Grades' }}</td>
-                                                                                <td class="text-muted">{{ $policy->name }}</td>
-                                                                                <td>{{ $policy->max_limit_per_claim ? '₹' . number_format($policy->max_limit_per_claim, 2) : 'No Limit' }}</td>
-                                                                                <td>{{ $policy->max_monthly_limit ? '₹' . number_format($policy->max_monthly_limit, 2) : 'No Limit' }}</td>
-                                                                                <td>{{ $policy->receipt_required_threshold ? '₹' . number_format($policy->receipt_required_threshold, 2) : 'Always' }}</td>
-                                                                                <td>
-                                                                                    <x-ui.badge variant="{{ $policy->status ? 'success' : 'danger' }}" soft class="px-2 py-1">
-                                                                                        {{ $policy->status ? 'Active' : 'Inactive' }}
-                                                                                    </x-ui.badge>
-                                                                                </td>
-                                                                                <td class="text-end">
-                                                                                    <button type="button" class="btn btn-sm btn-light border text-danger btn-delete-policy" data-id="{{ $policy->id }}">
-                                                                                        <i class="feather-trash-2"></i>
-                                                                                    </button>
-                                                                                </td>
-                                                                            </tr>
-                                                                        @empty
-                                                                            <tr>
-                                                                                <td colspan="9" class="text-center text-muted py-3">No expense policies defined yet. Use the form above to add one.</td>
-                                                                            </tr>
-                                                                        @endforelse
-                                                                    </tbody>
-                                                                </table>
+                                                                    @endforeach
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endif
+
+                                            @if($typeKey === 'late_arrival')
+                                                <!-- Grace Period -->
+                                                <div class="col-12 d-flex flex-column gap-2">
+                                                    <x-ui.alert variant="light" icon="feather-info" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                        <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                             {{ __('hrms.penalization.grace_period_set_to') }} 
+                                                            <input type="number" name="grace_period_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->grace_period_minutes : 15 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
+                                                            {{ __('hrms.penalization.minutes_relative_to_shift') }}
+                                                        </p>
+                                                    </x-ui.alert>
+                                                    <x-ui.alert variant="light" icon="feather-calendar" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                        <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                            {{ __('hrms.penalization.employee_allowed_up_to') }} 
+                                                            <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
+                                                            {{ __('hrms.penalization.late_occurrences_without_penalty') }}
+                                                        </p>
+                                                    </x-ui.alert>
+                                                </div>
+
+                                                <div class="col-12 border-top my-4 pt-4">
+                                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                                        <div>
+                                                            <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                                <i class="feather-grid text-primary fs-16"></i> {{ __('hrms.penalization.configure_tiers') }}
+                                                            </h6>
+                                                            <span class="text-muted fs-11 d-block">{{ __('hrms.penalization.define_boundaries') }}</span>
+                                                        </div>
+                                                        <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-tier" icon="feather-plus">
+                                                            {{ __('hrms.penalization.add_tier') }}
+                                                        </x-ui.button>
+                                                    </div>
+                                                    <div class="table-responsive border rounded bg-white">
+                                                        <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="late-arrival-tiers-table" style="font-size: 13px;">
+                                                            <thead class="table-light">
+                                                                <tr>
+                                                                    <th style="width: 15%;">{{ __('hrms.penalization.min_occurrences') }}</th>
+                                                                    <th style="width: 15%;">{{ __('hrms.penalization.max_occurrences') }}</th>
+                                                                    <th style="width: 45%;">{{ __('hrms.penalization.settlement_method') }}</th>
+                                                                    <th style="width: 15%;">{{ __('hrms.penalization.deduction_value') }}</th>
+                                                                    <th style="width: 10%;" class="text-center">{{ __('hrms.penalization.action') }}</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody id="late-arrival-tiers-tbody">
+                                                                <!-- Tiers will be dynamically rendered here -->
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            @endif
+
+                                            @if($typeKey === 'under_hours')
+                                                <!-- Shift Deficit Parameters -->
+                                                <div class="col-12 d-flex flex-column gap-2">
+                                                    <x-ui.alert variant="light" icon="feather-info" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                        <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                            {{ __('hrms.penalization.shift_target_hours') }}
+                                                            <input type="number" name="grace_period_hours" step="0.5" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? ($rule->grace_period_minutes / 60) : 8 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
+                                                            {{ __('hrms.penalization.hours') }}
+                                                        </p>
+                                                    </x-ui.alert>
+                                                    <x-ui.alert variant="light" icon="feather-calendar" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                        <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                            {{ __('hrms.penalization.allowed_monthly_grace') }}
+                                                            <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
+                                                            {{ __('hrms.penalization.deficit_before_trigger') }}
+                                                        </p>
+                                                    </x-ui.alert>
+                                                </div>
+
+                                                <div class="col-12 border-top my-4 pt-4">
+                                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                                        <div>
+                                                            <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                                <i class="feather-grid text-primary fs-16"></i> {{ __('hrms.penalization.configure_tiers') }}
+                                                            </h6>
+                                                            <span class="text-muted fs-11 d-block">{{ __('hrms.penalization.define_boundaries') }}</span>
+                                                        </div>
+                                                        <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-deficit-tier" icon="feather-plus">
+                                                            {{ __('hrms.penalization.add_tier') }}
+                                                        </x-ui.button>
+                                                    </div>
+                                                    <div class="table-responsive border rounded bg-white">
+                                                        <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="under-hours-tiers-table" style="font-size: 13px;">
+                                                            <thead class="table-light">
+                                                                <tr>
+                                                                    <th style="width: 25%;">{{ __('hrms.penalization.if_hours_less') }}</th>
+                                                                    <th style="width: 50%;">{{ __('hrms.penalization.settlement_method') }}</th>
+                                                                    <th style="width: 15%;">{{ __('hrms.penalization.deduction_value') }}</th>
+                                                                    <th style="width: 10%;" class="text-center">{{ __('hrms.penalization.action') }}</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody id="under-hours-tiers-tbody">
+                                                                <!-- Tiers will be dynamically rendered here -->
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            @endif
+
+                                            @if($typeKey === 'missing_logs')
+                                                <!-- Allowed Free Missing Log Counts (Per Month) -->
+                                                <div class="col-12">
+                                                    <x-ui.alert variant="light" icon="feather-info" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                        <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                            {{ __('hrms.penalization.employees_allowed_grace') }}
+                                                            <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
+                                                            {{ __('hrms.penalization.missing_before_trigger') }}
+                                                        </p>
+                                                    </x-ui.alert>
+                                                </div>
+
+                                                <div class="col-12 border-top my-4 pt-4">
+                                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                                        <div>
+                                                            <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                                <i class="feather-grid text-primary fs-16"></i> {{ __('hrms.penalization.configure_tiers') }}
+                                                            </h6>
+                                                            <span class="text-muted fs-11 d-block">{{ __('hrms.penalization.define_boundaries') }}</span>
+                                                        </div>
+                                                        <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-missing-tier" icon="feather-plus">
+                                                            {{ __('hrms.penalization.add_tier') }}
+                                                        </x-ui.button>
+                                                    </div>
+                                                    <div class="table-responsive border rounded bg-white">
+                                                        <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="missing-logs-tiers-table" style="font-size: 13px;">
+                                                            <thead class="table-light">
+                                                                <tr>
+                                                                    <th style="width: 15%;">{{ __('hrms.penalization.min_occurrences') }}</th>
+                                                                    <th style="width: 15%;">{{ __('hrms.penalization.max_occurrences') }}</th>
+                                                                    <th style="width: 45%;">{{ __('hrms.penalization.settlement_method') }}</th>
+                                                                    <th style="width: 15%;">{{ __('hrms.penalization.deduction_value') }}</th>
+                                                                    <th style="width: 10%;" class="text-center">{{ __('hrms.penalization.action') }}</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody id="missing-logs-tiers-tbody">
+                                                                <!-- Tiers will be dynamically rendered here -->
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            @endif
+
+                                            @if($typeKey === 'attendance_rules')
+                                                <!-- Scope Selection: Business Unit & Branch -->
+                                                <div class="row g-3 mb-4 border-bottom pb-4">
+                                                    <!-- Business Unit -->
+                                                    <div class="col-md-6 col-12" id="div_business_unit">
+                                                        <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.business_unit_opt') }}" name="business_unit_id" id="sel_business_unit_id" onchange="loadAttendanceRulesForScope()">
+                                                            <option value="">{{ __('hrms.penalization.all_business_units') }}</option>
+                                                            @foreach($businessUnits as $bu)
+                                                                <option value="{{ $bu->id }}" data-company="{{ $bu->company_id }}" {{ request('business_unit_id') == $bu->id ? 'selected' : '' }}>{{ $bu->name }}</option>
+                                                            @endforeach
+                                                        </x-ui.odoo-form-ui>
+                                                    </div>
+                                                    <!-- Branch -->
+                                                    <div class="col-md-6 col-12" id="div_branch">
+                                                        <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.branch_opt') }}" name="branch_id" id="sel_branch_id" onchange="loadAttendanceRulesForScope()">
+                                                            <option value="">{{ __('hrms.penalization.all_branches') }}</option>
+                                                            @foreach($branches as $branch)
+                                                                <option value="{{ $branch->id }}" data-company="{{ $branch->company_id }}" data-bu="{{ $branch->business_unit_id }}" {{ request('branch_id') == $branch->id ? 'selected' : '' }}>{{ $branch->name }}</option>
+                                                            @endforeach
+                                                        </x-ui.odoo-form-ui>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Office Rules -->
+                                                <div class="col-12 border-bottom pb-4 mb-4">
+                                                    <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                        <i class="feather-home text-primary fs-16"></i> {{ __('hrms.penalization.office_settings') }}
+                                                    </h6>
+                                                    <span class="text-muted fs-11 d-block mb-3">{{ __('hrms.penalization.office_settings_desc') }}</span>
+                                                    
+                                                    <div class="d-flex flex-column gap-3 px-2">
+                                                        <div>
+                                                            <x-ui.checkbox name="office_biometric" id="office_biometric" label="{{ __('hrms.penalization.enable_biometric') }}" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.enable_biometric_desc') }}</span>
+                                                        </div>
+                                                        <div>
+                                                            <x-ui.checkbox name="office_web" id="office_web" label="{{ __('hrms.penalization.enable_web') }}" onchange="toggleOfficeGeofenceFields()" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.enable_web_desc') }}</span>
+
+                                                            {{-- Sub-options shown when office_web is enabled --}}
+                                                            <div class="ms-4 ps-1 mt-3 flex-column gap-3 d-none" id="office_geofence_fields">
+
+                                                                {{-- Geofence toggle --}}
+                                                                <x-ui.checkbox name="office_geofence" id="office_geofence" label="{{ __('hrms.penalization.require_coordinates') }}" onchange="toggleOfficeCoordinateFields()" />
+                                                                <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.office_geofence_desc') }}</span>
+
+                                                                {{-- Lat/Lng/Radius shown when office_geofence is enabled --}}
+                                                                <div class="row g-2 mt-3 mb-3 align-items-end d-none" id="office_coordinate_fields">
+                                                                     <div class="col-md-3">
+                                                                         <label class="form-label fs-12 text-muted mb-1">{{ __('hrms.penalization.office_latitude') }}</label>
+                                                                         <input type="text" name="office_latitude" id="office_latitude" class="form-control fs-12" placeholder="e.g. 28.6139">
+                                                                     </div>
+                                                                     <div class="col-md-3">
+                                                                         <label class="form-label fs-12 text-muted mb-1">{{ __('hrms.penalization.office_longitude') }}</label>
+                                                                         <input type="text" name="office_longitude" id="office_longitude" class="form-control fs-12" placeholder="e.g. 77.2090">
+                                                                     </div>
+                                                                     <div class="col-md-3">
+                                                                         <label class="form-label fs-12 text-muted mb-1">{{ __('hrms.penalization.allowed_radius_m') }}</label>
+                                                                         <input type="number" name="office_radius" id="office_radius" class="form-control fs-12" value="100" min="1">
+                                                                     </div>
+                                                                     <div class="col-md-3 d-flex align-items-end">
+                                                                         <div class="d-flex gap-2 w-100">
+                                                                             <x-ui.button type="button" variant="primary" size="sm" class="flex-fill" onclick="detectCurrentCoordinates(event)" icon="feather-crosshair">
+                                                                                 {{ __('hrms.penalization.detect') }}
+                                                                             </x-ui.button>
+                                                                             <x-ui.button type="button" variant="light-brand" size="sm" class="flex-fill" id="btn_toggle_office_map" onclick="toggleOfficeMap()" icon="feather-map">
+                                                                                 {{ __('hrms.penalization.map') }}
+                                                                             </x-ui.button>
+                                                                         </div>
+                                                                     </div>
+                                                                     <div class="position-relative mt-3 w-100" id="office_map_container_wrap" style="display: none;">
+                                                                         <input type="text" id="office_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="{{ __('hrms.penalization.search_map_placeholder') }}">
+                                                                         <div id="office_map_picker" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #ced4da; z-index: 1;"></div>
+                                                                     </div>
+                                                                </div>
+
+                                                                {{-- Live tracking toggle --}}
+                                                                <div class="mt-4">
+                                                                    <x-ui.checkbox name="office_tracking" id="office_tracking" label="{{ __('hrms.penalization.enable_office_tracking') }}" onchange="toggleOfficeTrackingMinutes()" />
+                                                                    <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.office_tracking_desc') }}</span>
+                                                                    <div class="ms-4 ps-1 mt-2 d-none" id="office_tracking_minutes_wrap">
+                                                                        <label class="form-label fs-12 text-muted mb-1">{{ __('hrms.penalization.tracking_interval_mins') }}</label>
+                                                                        <input type="number" name="office_tracking_minutes" id="office_tracking_minutes" class="form-control fs-12" style="max-width: 160px;" value="15" min="1" max="120" placeholder="e.g. 15">
+                                                                        <span class="text-muted fs-11 d-block mt-1">{{ __('hrms.penalization.tracking_interval_desc') }}</span>
+                                                                    </div>
+                                                                </div>
+
                                                             </div>
                                                         </div>
                                                     </div>
-                                               @endif
-                                           </div>
+                                                </div>
 
-                                           <div class="row mt-4 border-top pt-4">
-                                               <div class="col-12 d-flex justify-content-end">
-                                                   <x-ui.button type="submit" variant="primary" size="sm" class="d-flex align-items-center gap-2">
-                                                       <i class="feather-save" style="font-size: 14px;"></i>
-                                                       Save {{ $typeData[0] }} Settings
-                                                   </x-ui.button>
-                                               </div>
-                                           </div>
+                                                <!-- WFH Rules -->
+                                                <div class="col-12 border-bottom pt-4 pb-4 mb-4">
+                                                    <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                        <i class="feather-rss text-primary fs-16"></i> {{ __('hrms.penalization.wfh_settings') }}
+                                                    </h6>
+                                                    <span class="text-muted fs-11 d-block mb-3">{{ __('hrms.penalization.wfh_settings_desc') }}</span>
+                                                    
+                                                    <div class="d-flex flex-column gap-3 px-2">
+                                                        <div>
+                                                            <x-ui.checkbox name="wfh_location" id="wfh_location" label="{{ __('hrms.penalization.require_coordinates') }}" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.wfh_location_desc') }}</span>
+                                                        </div>
+                                                        <div>
+                                                            <x-ui.checkbox name="wfh_selfie" id="wfh_selfie" label="{{ __('hrms.penalization.require_selfie') }}" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.selfie_desc') }}</span>
+                                                        </div>
+                                                        <div>
+                                                            <x-ui.checkbox name="wfh_geofence" id="wfh_geofence" label="{{ __('hrms.penalization.enforce_home_geofence') }}" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.home_geofence_desc') }}</span>
+                                                        </div>
+                                                        <div>
+                                                            <x-ui.checkbox name="wfh_tracking" id="wfh_tracking" label="{{ __('hrms.penalization.enable_live_tracking') }}" onchange="toggleTrackingThreshold('wfh')" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.live_tracking_desc') }}</span>
+                                                        </div>
+                                                        <div class="mt-3 mb-2 d-none" id="wfh_tracking_meters_container">
+                                                            <x-ui.alert variant="light" icon="feather-map-pin" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                                <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                    {{ __('hrms.penalization.track_movement_prefix') }} 
+                                                                    <input type="number" name="wfh_tracking_meters" id="wfh_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="50" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                    {{ __('hrms.penalization.track_movement_middle') }}
+                                                                    <input type="number" name="wfh_tracking_minutes" id="wfh_tracking_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="15" min="1" max="120" style="width: 55px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                    {{ __('hrms.penalization.minutes') }}
+                                                                </p>
+                                                            </x-ui.alert>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- On-Site Rules -->
+                                                <div class="col-12 pt-4 mb-2">
+                                                    <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                        <i class="feather-map text-primary fs-16"></i> {{ __('hrms.penalization.site_settings') }}
+                                                    </h6>
+                                                    <span class="text-muted fs-11 d-block mb-3">{{ __('hrms.penalization.site_settings_desc') }}</span>
+                                                    
+                                                    <div class="d-flex flex-column gap-3 px-2">
+                                                        <div>
+                                                            <x-ui.checkbox name="site_location" id="site_location" label="{{ __('hrms.penalization.require_coordinates') }}" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.wfh_location_desc') }}</span>
+                                                        </div>
+                                                        <div>
+                                                            <x-ui.checkbox name="site_selfie" id="site_selfie" label="{{ __('hrms.penalization.require_selfie') }}" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.selfie_desc') }}</span>
+                                                        </div>
+                                                        <div>
+                                                            <x-ui.checkbox name="site_tracking" id="site_tracking" label="{{ __('hrms.penalization.enable_live_tracking') }}" onchange="toggleTrackingThreshold('site')" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.live_tracking_desc') }}</span>
+                                                        </div>
+                                                        <div class="mt-3 mb-2 d-none" id="site_tracking_meters_container">
+                                                            <x-ui.alert variant="light" icon="feather-map-pin" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                                <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                    {{ __('hrms.penalization.track_movement_prefix') }} 
+                                                                    <input type="number" name="site_tracking_meters" id="site_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="50" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                    {{ __('hrms.penalization.track_movement_middle') }}
+                                                                    <input type="number" name="site_tracking_minutes" id="site_tracking_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="15" min="1" max="120" style="width: 55px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                    {{ __('hrms.penalization.minutes') }}
+                                                                </p>
+                                                            </x-ui.alert>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endif
+
+                                            @if($typeKey === 'expense_rules')
+                                                <div class="col-12">
+                                                    {{-- Section header --}}
+                                                    <x-ui.alert variant="light" icon="feather-info" class="border-0 p-3 mb-4 rounded-3 text-dark fs-13">
+                                                        <p class="mb-0 text-dark" style="line-height:1.6;">
+                                                            {{ __('hrms.penalization.expense_rules_desc') }}
+                                                        </p>
+                                                    </x-ui.alert>
+
+                                                    {{-- Row 1: Scope --}}
+                                                    <div class="row g-3 mb-3">
+                                                        <div class="col-md-4 col-12">
+                                                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.company_opt') }}" name="company_id" select2-selector="default" id="expense_company_id">
+                                                                <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
+                                                                @foreach($companies as $company)
+                                                                    <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                                                @endforeach
+                                                            </x-ui.odoo-form-ui>
+                                                        </div>
+                                                        <div class="col-md-4 col-12">
+                                                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.business_unit_opt') }}" name="business_unit_id" select2-selector="default" id="expense_bu_id">
+                                                                <option value="">{{ __('hrms.penalization.all_business_units') }}</option>
+                                                                @foreach($businessUnits as $bu)
+                                                                    <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                                                                @endforeach
+                                                            </x-ui.odoo-form-ui>
+                                                        </div>
+                                                        <div class="col-md-4 col-12">
+                                                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.branch_opt') }}" name="branch_id" select2-selector="default" id="expense_branch_id">
+                                                                <option value="">{{ __('hrms.penalization.all_branches') }}</option>
+                                                                @foreach($branches as $branch)
+                                                                    <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                                                @endforeach
+                                                            </x-ui.odoo-form-ui>
+                                                        </div>
+                                                    </div>
+
+                                                    {{-- Row 2: Category, Designation, Rule Name --}}
+                                                    <div class="row g-3 mb-3">
+                                                        <div class="col-md-4 col-12">
+                                                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.expense_category') }}" name="expense_category_id" select2-selector="default" id="expense_category_sel" :required="true">
+                                                                <option value="" disabled selected>{{ __('hrms.penalization.select_category') }}</option>
+                                                                @foreach(($expenseCategories ?? []) as $category)
+                                                                    <option value="{{ $category->id }}">{{ $category->name }} ({{ $category->code }})</option>
+                                                                @endforeach
+                                                            </x-ui.odoo-form-ui>
+                                                        </div>
+                                                        <div class="col-md-4 col-12">
+                                                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.designation_opt') }}" name="designation_id" select2-selector="default" id="expense_designation_sel">
+                                                                <option value="">{{ __('hrms.penalization.apply_globally_grades') }}</option>
+                                                                @foreach(($designations ?? []) as $desig)
+                                                                    <option value="{{ $desig->id }}">{{ $desig->name }}</option>
+                                                                @endforeach
+                                                            </x-ui.odoo-form-ui>
+                                                        </div>
+                                                        <div class="col-md-4 col-12">
+                                                            <x-ui.odoo-form-ui type="text" label="{{ __('hrms.penalization.rule_name') }}" name="name" id="expense_rule_name" placeholder="e.g. Executive Food Policy" :required="true" />
+                                                        </div>
+                                                    </div>
+
+                                                    {{-- Row 3: Limits --}}
+                                                    <div class="row g-3 mb-3">
+                                                        <div class="col-md-4 col-12">
+                                                            <x-ui.odoo-form-ui type="number" label="{{ __('hrms.penalization.max_limit_per_claim') }}" name="max_limit_per_claim" id="expense_max_claim" placeholder="e.g. 500" step="0.01" min="0" />
+                                                        </div>
+                                                        <div class="col-md-4 col-12">
+                                                            <x-ui.odoo-form-ui type="number" label="{{ __('hrms.penalization.max_monthly_limit') }}" name="max_monthly_limit" id="expense_max_monthly" placeholder="e.g. 5000" step="0.01" min="0" />
+                                                        </div>
+                                                        <div class="col-md-4 col-12">
+                                                            <x-ui.odoo-form-ui type="number" label="{{ __('hrms.penalization.receipt_required_threshold') }}" name="receipt_required_threshold" id="expense_receipt_threshold" placeholder="e.g. 250" step="0.01" min="0" />
+                                                        </div>
+                                                    </div>
+
+                                                    {{-- List of current policies --}}
+                                                    <div class="border-top pt-4 mt-2">
+                                                        <h6 class="fw-bold text-dark mb-3" style="font-size: 13px;">{{ __('hrms.penalization.configured_expense_policies') }}</h6>
+                                                        <div class="table-responsive border rounded bg-white">
+                                                            <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" style="font-size: 12.5px;">
+                                                                <thead class="table-light">
+                                                                    <tr>
+                                                                        <th>{{ __('hrms.penalization.category') }}</th>
+                                                                        <th>{{ __('hrms.penalization.scope') }}</th>
+                                                                        <th>{{ __('hrms.penalization.designation') }}</th>
+                                                                        <th>{{ __('hrms.penalization.rule_name') }}</th>
+                                                                        <th>{{ __('hrms.penalization.claim_limit') }}</th>
+                                                                        <th>{{ __('hrms.penalization.monthly_limit') }}</th>
+                                                                        <th>{{ __('hrms.penalization.receipt_above') }}</th>
+                                                                        <th>{{ __('hrms.penalization.status') }}</th>
+                                                                        <th class="text-end">{{ __('hrms.penalization.action') }}</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    @forelse(($expensePolicies ?? []) as $policy)
+                                                                        <tr>
+                                                                            <td class="fw-bold text-primary">{{ $policy->category->name }}</td>
+                                                                            <td class="text-muted fs-12">
+                                                                                @if($policy->company_id && isset($policy->company))
+                                                                                    {{ $policy->company->company_name }}
+                                                                                    @if($policy->businessUnit) / {{ $policy->businessUnit->name }} @endif
+                                                                                    @if($policy->branch) / {{ $policy->branch->name }} @endif
+                                                                                @else
+                                                                                    {{ __('hrms.penalization.global') }}
+                                                                                @endif
+                                                                            </td>
+                                                                            <td class="text-dark">{{ $policy->designation ? $policy->designation->name : __('hrms.penalization.all_grades') }}</td>
+                                                                            <td class="text-muted">{{ $policy->name }}</td>
+                                                                            <td>{{ $policy->max_limit_per_claim ? '₹' . number_format($policy->max_limit_per_claim, 2) : __('hrms.penalization.no_limit') }}</td>
+                                                                            <td>{{ $policy->max_monthly_limit ? '₹' . number_format($policy->max_monthly_limit, 2) : __('hrms.penalization.no_limit') }}</td>
+                                                                            <td>{{ $policy->receipt_required_threshold ? '₹' . number_format($policy->receipt_required_threshold, 2) : __('hrms.penalization.always') }}</td>
+                                                                            <td>
+                                                                                <x-ui.badge variant="{{ $policy->status ? 'success' : 'danger' }}" soft class="px-2 py-1">
+                                                                                    {{ $policy->status ? __('hrms.penalization.active') : __('hrms.penalization.inactive') }}
+                                                                                </x-ui.badge>
+                                                                            </td>
+                                                                            <td class="text-end">
+                                                                                <button type="button" class="btn btn-sm btn-icon rounded-circle btn-soft-danger btn-delete-policy" data-id="{{ $policy->id }}" title="{{ __('hrms.penalization.delete_policy') }}">
+                                                                                    <i class="feather-trash-2"></i>
+                                                                                </button>
+                                                                            </td>
+                                                                        </tr>
+                                                                    @empty
+                                                                        <tr>
+                                                                            <td colspan="9" class="text-center text-muted py-3">{{ __('hrms.penalization.no_expense_policies') }}</td>
+                                                                        </tr>
+                                                                    @endforelse
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        </div>
+
+                                        <div class="row mt-4 border-top pt-4">
+                                            <div class="col-12 d-flex justify-content-end">
+                                                <x-ui.button type="submit" variant="primary" size="sm" icon="feather-save">
+                                                    {{ __('hrms.penalization.save_settings', ['type' => $typeData[0]]) }}
+                                                </x-ui.button>
+                                            </div>
+                                        </div>
                                       </form>
                                  </div>
                              @endforeach
@@ -1202,6 +1154,10 @@
             function addTierRow(min_occ = '', max_occ = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
                 let tbody = $('#late-arrival-tiers-tbody');
                 let valueReadonly = (penalty_action === 'no_deduction') ? 'readonly' : '';
+                let isFirst = tbody.find('tr').length === 0;
+                let actionHtml = isFirst
+                    ? '<span class="text-muted fs-12">—</span>'
+                    : '<button type="button" class="btn btn-icon btn-sm rounded-circle btn-soft-danger btn-remove-tier" title="{{ __('hrms.penalization.remove_tier') }}"><i class="feather-trash-2"></i></button>';
 
                 let rowHtml = `
                     <tr class="tier-row" data-index="${tierIndex}">
@@ -1213,17 +1169,17 @@
                         </td>
                         <td>
                             <select name="penalty_tiers[${tierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
-                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction</option>
-                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Deduct Salary (Loss of Pay)</option>
-                                <option value="working_hour_deduction" ${penalty_action === 'working_hour_deduction' ? 'selected' : ''}>Deduct Working Day</option>
-                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Working Day)</option>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.no_deduction') }}</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_salary') }}</option>
+                                <option value="working_hour_deduction" ${penalty_action === 'working_hour_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_working_day') }}</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>{{ __('hrms.penalization.both_deductions') }}</option>
                             </select>
                         </td>
                         <td>
                             <input type="number" step="any" name="penalty_tiers[${tierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
                         </td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-tier"><i class="feather-trash-2"></i></button>
+                            ${actionHtml}
                         </td>
                     </tr>
                 `;
@@ -1268,9 +1224,6 @@
             $(document).on('click', '.btn-remove-tier', function() {
                 let row = $(this).closest('tr');
                 row.remove();
-                if ($('#late-arrival-tiers-tbody tr').length === 0) {
-                    addTierRow(1, '', 'no_deduction', 0, '');
-                }
             });
 
             // Work Hours Deficit Tiers Builder Logic
@@ -1279,6 +1232,10 @@
             function addDeficitTierRow(hours_threshold = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
                 let tbody = $('#under-hours-tiers-tbody');
                 let valueReadonly = (penalty_action === 'no_deduction') ? 'readonly' : '';
+                let isFirst = tbody.find('tr').length === 0;
+                let actionHtml = isFirst
+                    ? '<span class="text-muted fs-12">—</span>'
+                    : '<button type="button" class="btn btn-icon btn-sm rounded-circle btn-soft-danger btn-remove-deficit-tier" title="{{ __('hrms.penalization.remove_tier') }}"><i class="feather-trash-2"></i></button>';
 
                 let rowHtml = `
                     <tr class="deficit-tier-row" data-index="${deficitTierIndex}">
@@ -1287,17 +1244,17 @@
                         </td>
                         <td>
                             <select name="penalty_tiers[${deficitTierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
-                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction</option>
-                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Deduct Salary (Loss of Pay)</option>
-                                <option value="working_hour_deduction" ${penalty_action === 'working_hour_deduction' ? 'selected' : ''}>Deduct Working Day</option>
-                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Working Day)</option>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.no_deduction') }}</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_salary') }}</option>
+                                <option value="working_hour_deduction" ${penalty_action === 'working_hour_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_working_day') }}</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>{{ __('hrms.penalization.both_deductions') }}</option>
                             </select>
                         </td>
                         <td>
                             <input type="number" step="any" name="penalty_tiers[${deficitTierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
                         </td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-deficit-tier"><i class="feather-trash-2"></i></button>
+                            ${actionHtml}
                         </td>
                     </tr>
                 `;
@@ -1332,9 +1289,6 @@
             $(document).on('click', '.btn-remove-deficit-tier', function() {
                 let row = $(this).closest('tr');
                 row.remove();
-                if ($('#under-hours-tiers-tbody tr').length === 0) {
-                    addDeficitTierRow(6, 'salary_deduction', 1, '');
-                }
             });
 
             // Missing Logs Tiers Builder Logic
@@ -1343,6 +1297,10 @@
             function addMissingTierRow(min_occ = '', max_occ = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
                 let tbody = $('#missing-logs-tiers-tbody');
                 let valueReadonly = (penalty_action === 'no_deduction') ? 'readonly' : '';
+                let isFirst = tbody.find('tr').length === 0;
+                let actionHtml = isFirst
+                    ? '<span class="text-muted fs-12">—</span>'
+                    : '<button type="button" class="btn btn-icon btn-sm rounded-circle btn-soft-danger btn-remove-missing-tier" title="{{ __('hrms.penalization.remove_tier') }}"><i class="feather-trash-2"></i></button>';
 
                 let rowHtml = `
                     <tr class="missing-tier-row" data-index="${missingTierIndex}">
@@ -1354,17 +1312,17 @@
                         </td>
                         <td>
                             <select name="penalty_tiers[${missingTierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
-                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction</option>
-                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Deduct Salary (Loss of Pay)</option>
-                                <option value="working_hour_deduction" ${penalty_action === 'working_hour_deduction' ? 'selected' : ''}>Deduct Working Day</option>
-                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Working Day)</option>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.no_deduction') }}</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_salary') }}</option>
+                                <option value="working_hour_deduction" ${penalty_action === 'working_hour_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_working_day') }}</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>{{ __('hrms.penalization.both_deductions') }}</option>
                             </select>
                         </td>
                         <td>
                             <input type="number" step="any" name="penalty_tiers[${missingTierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
                         </td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-missing-tier"><i class="feather-trash-2"></i></button>
+                            ${actionHtml}
                         </td>
                     </tr>
                 `;
@@ -1409,9 +1367,6 @@
             $(document).on('click', '.btn-remove-missing-tier', function() {
                 let row = $(this).closest('tr');
                 row.remove();
-                if ($('#missing-logs-tiers-tbody tr').length === 0) {
-                    addMissingTierRow(1, '', 'no_deduction', 0, '');
-                }
             });
 
             // Handle action select changes dynamically
@@ -1710,7 +1665,7 @@
                     updateDropdownPosition();
 
                     if (!currentResults || currentResults.length === 0) {
-                        dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">No locations found</div>';
+                        dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">{{ __('hrms.penalization.no_locations_found') }}</div>';
                         dropdown.style.display = 'block';
                         return;
                     }
@@ -1955,7 +1910,7 @@
             // Always hide map when toggling coordinate fields — user must click "Pick on Map" to open
             if (mapWrap) mapWrap.style.display = 'none';
             if (toggleBtn) {
-                toggleBtn.innerHTML = '<i class="feather-map me-1"></i>Map';
+                toggleBtn.innerHTML = '<i class="feather-map me-1"></i>{{ __('hrms.penalization.map') }}';
                 toggleBtn.classList.remove('btn-secondary');
                 toggleBtn.classList.add('btn-soft-secondary');
             }
@@ -1970,14 +1925,14 @@
             if (isVisible) {
                 mapWrap.style.display = 'none';
                 if (toggleBtn) {
-                    toggleBtn.innerHTML = '<i class="feather-map me-1"></i>Map';
+                    toggleBtn.innerHTML = '<i class="feather-map me-1"></i>{{ __('hrms.penalization.map') }}';
                     toggleBtn.classList.remove('btn-secondary');
                     toggleBtn.classList.add('btn-soft-secondary');
                 }
             } else {
                 mapWrap.style.display = 'block';
                 if (toggleBtn) {
-                    toggleBtn.innerHTML = '<i class="feather-x me-1"></i>Close Map';
+                    toggleBtn.innerHTML = '<i class="feather-x me-1"></i>{{ __('hrms.penalization.close_map') }}';
                     toggleBtn.classList.remove('btn-soft-secondary');
                     toggleBtn.classList.add('btn-secondary');
                 }
@@ -2006,13 +1961,13 @@
         // Geolocation Coordinates Detection Logic
         window.detectCurrentCoordinates = function(event) {
             if (!navigator.geolocation) {
-                showAppToast('error', 'Geolocation is not supported by your browser.');
+                showAppToast('error', "{{ __('hrms.penalization.geo_not_supported') }}");
                 return;
             }
             
             var $btn = $(event.currentTarget || 'button[onclick^="detectCurrentCoordinates"]');
             var originalText = $btn.html();
-            $btn.prop('disabled', true).html('<i class="feather-loader animate-spin me-1"></i> Detecting...');
+            $btn.prop('disabled', true).html('<i class="feather-loader animate-spin me-1"></i> {{ __('hrms.penalization.detecting') }}');
 
             navigator.geolocation.getCurrentPosition(
                 function(position) {
@@ -2030,17 +1985,17 @@
                     }
                     
                     $btn.prop('disabled', false).html(originalText);
-                    showAppToast('success', 'Location coordinates detected successfully!');
+                    showAppToast('success', "{{ __('hrms.penalization.geo_detected_success') }}");
                 },
                 function(error) {
                     $btn.prop('disabled', false).html(originalText);
-                    var msg = 'Unable to retrieve location.';
+                    var msg = "{{ __('hrms.penalization.geo_unable') }}";
                     if (error.code === error.PERMISSION_DENIED) {
-                        msg = 'Permission denied. Please allow location access in your browser settings.';
+                        msg = "{{ __('hrms.penalization.geo_denied') }}";
                     } else if (error.code === error.POSITION_UNAVAILABLE) {
-                        msg = 'Location position unavailable.';
+                        msg = "{{ __('hrms.penalization.geo_unavailable') }}";
                     } else if (error.code === error.TIMEOUT) {
-                        msg = 'Location detection request timed out.';
+                        msg = "{{ __('hrms.penalization.geo_timeout') }}";
                     }
                     showAppToast('error', msg);
                 },
@@ -2100,7 +2055,7 @@
                 $('#div_business_unit').removeClass('d-none');
 
                 // Rebuild Business Unit select options
-                $buSelect.empty().append('<option value="">All Business Units</option>');
+                $buSelect.empty().append('<option value="">{{ __('hrms.penalization.all_business_units') }}</option>');
                 filteredBUs.forEach(function(bu) {
                     var selectedAttr = (currentBu == bu.id) ? ' selected' : '';
                     $buSelect.append('<option value="' + bu.id + '" data-company="' + bu.company + '"' + selectedAttr + '>' + bu.text + '</option>');
@@ -2127,7 +2082,7 @@
 
                     if (hasBranchesForBu) {
                         $('#div_branch').removeClass('d-none');
-                        $branchSelect.empty().append('<option value="">All Branches</option>');
+                        $branchSelect.empty().append('<option value="">{{ __('hrms.penalization.all_branches') }}</option>');
                         filteredBranchesForBu.forEach(function(b) {
                             var selectedAttr = (currentBranch == b.id) ? ' selected' : '';
                             $branchSelect.append('<option value="' + b.id + '" data-company="' + b.company + '" data-bu="' + b.bu + '"' + selectedAttr + '>' + b.text + '</option>');
@@ -2158,7 +2113,7 @@
                 if (hasBranchesForCompany) {
                     // Show Branch selector directly, skipping Business Unit
                     $('#div_branch').removeClass('d-none');
-                    $branchSelect.empty().append('<option value="">All Branches</option>');
+                    $branchSelect.empty().append('<option value="">{{ __('hrms.penalization.all_branches') }}</option>');
                     filteredBranchesForCompany.forEach(function(b) {
                         var selectedAttr = (currentBranch == b.id) ? ' selected' : '';
                         $branchSelect.append('<option value="' + b.id + '" data-company="' + b.company + '" data-bu="' + b.bu + '"' + selectedAttr + '>' + b.text + '</option>');
@@ -2250,17 +2205,17 @@
                 var rowCount = $('#otTiersBody tr').length;
                 var html = `
                     <tr>
-                        <td class="ps-3">
-                            <input type="number" name="overtime_tiers[${rowCount}][min_hours]" step="0.5" min="0" class="form-control form-control-sm text-center fw-semibold" value="" placeholder="0" required style="height: 30px;">
+                        <td>
+                            <input type="number" name="overtime_tiers[${rowCount}][min_hours]" step="0.5" min="0" class="odoo-table-input text-center" value="" placeholder="0" required>
                         </td>
                         <td>
-                            <input type="number" name="overtime_tiers[${rowCount}][max_hours]" step="0.5" min="0" class="form-control form-control-sm text-center fw-semibold" value="" placeholder="Any" style="height: 30px;">
+                            <input type="number" name="overtime_tiers[${rowCount}][max_hours]" step="0.5" min="0" class="odoo-table-input text-center" value="" placeholder="{{ __('hrms.penalization.any') }}">
                         </td>
                         <td>
-                            <input type="number" name="overtime_tiers[${rowCount}][multiplier]" step="0.1" min="1.0" class="form-control form-control-sm text-center fw-semibold" value="" placeholder="1.5" required style="height: 30px;">
+                            <input type="number" name="overtime_tiers[${rowCount}][multiplier]" step="0.1" min="1.0" class="odoo-table-input text-center" value="" placeholder="1.5" required>
                         </td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-icon btn-sm rounded-circle btn-soft-danger btn-remove-ot-tier"><i class="feather-trash-2"></i></button>
+                            <button type="button" class="btn btn-icon btn-sm rounded-circle btn-soft-danger btn-remove-ot-tier" title="{{ __('hrms.penalization.remove_slab') }}"><i class="feather-trash-2"></i></button>
                         </td>
                     </tr>
                 `;
@@ -2270,7 +2225,7 @@
             // Remove OT tier row
             $(document).on('click', '.btn-remove-ot-tier', function() {
                 if ($('#otTiersBody tr').length <= 1) {
-                    alert('At least one overtime tier slab must be configured.');
+                    alert("{{ __('hrms.penalization.at_least_one_ot_tier') }}");
                     return;
                 }
                 $(this).closest('tr').remove();
@@ -2279,7 +2234,7 @@
                     $(this).find('input').each(function() {
                         var name = $(this).attr('name');
                         if (name) {
-                            var newName = name.replace(/overtime_tiers\\[\\d+\\]/, 'overtime_tiers[' + index + ']');
+                            var newName = name.replace(/overtime_tiers\[\d+\]/, 'overtime_tiers[' + index + ']');
                             $(this).attr('name', newName);
                         }
                     });

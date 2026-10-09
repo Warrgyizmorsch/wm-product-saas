@@ -76,16 +76,42 @@
                     <div class="tab-pane fade {{ $activeTab === 'profile' ? 'show active' : '' }}" id="profile-section" role="tabpanel" aria-labelledby="profile-section-tab">
                         <x-ui.odoo-form-ui type="sheet">
                             <!-- Account Details Form -->
-                            <h5 class="fw-bold text-dark mb-3 pb-2 border-bottom">
-                                <i class="feather-user text-primary me-2"></i>{{ __('Account Information') }}
-                            </h5>
+                            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                <h5 class="fw-bold text-dark mb-0">
+                                    <i class="feather-user text-primary me-2"></i>{{ __('Account Information') }}
+                                </h5>
+                                @if($employee)
+                                    <span class="badge bg-soft-info text-info border border-info px-2 py-1 fs-12">
+                                        <i class="feather-shield me-1"></i>{{ __('HRMS Linked Employee') }}
+                                    </span>
+                                @endif
+                            </div>
+
+                            @if($employee)
+                                <div class="alert alert-info d-flex align-items-center mb-3 fs-13 py-2 px-3 border border-info rounded">
+                                    <i class="feather-info me-2 fs-16 text-info"></i>
+                                    <div>
+                                        {{ __('Your official Name and Email are managed by HRMS.') }}
+                                        <a href="{{ route('profile.show', ['tab' => 'overview']) }}" class="fw-bold text-decoration-underline ms-1">
+                                            {{ __('Submit an Edit Profile Request') }} &rarr;
+                                        </a>
+                                    </div>
+                                </div>
+                            @endif
+
                             <form action="{{ route('account.settings.profile') }}" method="POST">
                                 @csrf
                                 @method('PUT')
 
-                                <x-ui.odoo-form-ui type="input" :label="__('Full Name')" name="name" id="profile_name" :value="old('name', $user->name)" :required="true" :error-text="$errors->first('name')" />
+                                @if($employee)
+                                    <x-ui.odoo-form-ui type="input" :label="__('Full Name')" name="name_locked" id="profile_name" :value="$user->name" :readonly="true" :disabled="true" helperText="{{ __('Official employee name is locked. Submit a profile edit request to change.') }}" />
 
-                                <x-ui.odoo-form-ui type="input" inputType="email" :label="__('Email Address')" name="email" id="profile_email" :value="old('email', $user->email)" :required="true" :error-text="$errors->first('email')" />
+                                    <x-ui.odoo-form-ui type="input" inputType="email" :label="__('Email Address')" name="email_locked" id="profile_email" :value="$user->email" :readonly="true" :disabled="true" helperText="{{ __('Official work email is locked. Submit a profile edit request to change.') }}" />
+                                @else
+                                    <x-ui.odoo-form-ui type="input" :label="__('Full Name')" name="name" id="profile_name" :value="old('name', $user->name)" :required="true" :error-text="$errors->first('name')" />
+
+                                    <x-ui.odoo-form-ui type="input" inputType="email" :label="__('Email Address')" name="email" id="profile_email" :value="old('email', $user->email)" :required="true" :error-text="$errors->first('email')" />
+                                @endif
 
                                 <x-ui.odoo-form-ui type="input" inputType="tel" :label="__('Phone Number')" name="phone" id="profile_phone" :value="old('phone', $user->effective_phone)" placeholder="+91 9876543210" :error-text="$errors->first('phone')" />
 

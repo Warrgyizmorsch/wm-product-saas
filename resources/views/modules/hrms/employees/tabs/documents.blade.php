@@ -182,6 +182,13 @@
                             <tbody>
                                 @forelse($documents as $doc)
                                     @php
+                                        // Option A: If document master is not visible to employee, hide it completely from non-HR employee portal
+                                        $isRestrictedFromEmployee = (!$canManageDocStatus) && ($doc->documentMaster && !$doc->documentMaster->employee_can_view);
+                                    @endphp
+                                    @if($isRestrictedFromEmployee)
+                                        @continue
+                                    @endif
+                                    @php
                                          $isExpired = $doc->expiry_date && $doc->expiry_date->isPast();
                                          $reminderDays = $doc->documentMaster?->reminder_days_before ?? 30;
                                          $isExpiringSoon = $doc->expiry_date && !$isExpired && now()->greaterThanOrEqualTo($doc->expiry_date->copy()->subDays($reminderDays));
@@ -210,7 +217,12 @@
                                         data-expiry="{{ $doc->expiry_date ? $doc->expiry_date->timestamp : 9999999999 }}"
                                         data-title-raw="{{ $doc->name }}">
                                         <td class="ps-3">
-                                            <div class="fw-bold text-dark fs-14 mb-1" style="word-break: break-word; white-space: normal; line-height: 1.4;" title="{{ $doc->name }}">{{ $doc->name }}</div>
+                                            <div class="d-flex align-items-center gap-1.5 flex-wrap mb-1">
+                                                <span class="fw-bold text-dark fs-14" style="word-break: break-word; white-space: normal; line-height: 1.4;" title="{{ $doc->name }}">{{ $doc->name }}</span>
+                                                @if($doc->documentMaster && !$doc->documentMaster->employee_can_view)
+                                                    <span class="badge bg-soft-secondary text-secondary border px-1.5 py-0.5 fs-10" title="Internal / Hidden from Employee Portal"><i class="feather-lock me-0.5"></i> HR Only</span>
+                                                @endif
+                                            </div>
                                             @if($doc->description)
                                                 <div class="doc-desc-wrapper" style="max-width: 100%;">
                                                     <div class="text-muted fs-12 mb-0 doc-desc-text" 
@@ -279,7 +291,7 @@
                                                         </div>
                                                     </div>
                                                     <div class="d-flex align-items-center gap-1 ms-1 flex-shrink-0">
-                                                         @if(($doc->documentMaster?->employee_can_view ?? true) || $doc->file_path)
+                                                         @if($canManageDocStatus || ($doc->documentMaster?->employee_can_view ?? true))
                                                              <a href="{{ $doc->is_signed ? route('hrms.employees.documents.view-signed', $doc->id) : asset('storage/' . $doc->file_path) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.common.view') }}">
                                                                  <i class="feather-eye fs-11"></i>
                                                              </a>
@@ -289,7 +301,7 @@
                                                                  <i class="feather-refresh-cw fs-10"></i>
                                                              </a>
                                                          @endif
-                                                         @if(($doc->documentMaster?->employee_can_download ?? true) || $doc->file_path)
+                                                         @if($canManageDocStatus || ($doc->documentMaster?->employee_can_view ?? true))
                                                              <a href="{{ asset('storage/' . ($doc->signed_file_path ?: $doc->file_path)) }}" download class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.employees.lbl_download_doc') ?? 'Download' }}">
                                                                  <i class="feather-download fs-11"></i>
                                                              </a>

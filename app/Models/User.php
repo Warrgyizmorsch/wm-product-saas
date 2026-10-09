@@ -134,6 +134,39 @@ class User extends Authenticatable
         return $this->hasMany(UserPermissionOverride::class);
     }
 
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(UserDeviceToken::class, 'user_id');
+    }
+
+    /**
+     * Get all active FCM tokens for this user (both dedicated device tokens table and settings fallback).
+     *
+     * @return string[]
+     */
+    public function getActiveFcmTokens(): array
+    {
+        $tokens = [];
+
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('user_device_tokens')) {
+                $tokens = $this->deviceTokens()->active()->pluck('fcm_token')->filter()->all();
+            }
+        } catch (\Throwable $e) {
+            // Schema or query fallback
+        }
+
+        // Fallback to settings if no tokens in table
+        if (empty($tokens)) {
+            $settings = is_array($this->settings) ? $this->settings : json_decode($this->settings ?? '{}', true) ?? [];
+            if (!empty($settings['fcm_token'])) {
+                $tokens[] = $settings['fcm_token'];
+            }
+        }
+
+        return array_values(array_unique(array_filter($tokens)));
+    }
+
     public function employee(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(\App\Domains\HRMS\Models\Employee::class);

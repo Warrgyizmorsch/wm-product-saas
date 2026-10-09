@@ -23,6 +23,7 @@ whatsapp_sessions/
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/app/firebase/*.json
 /vendor
 Homestead.json
 Homestead.yaml

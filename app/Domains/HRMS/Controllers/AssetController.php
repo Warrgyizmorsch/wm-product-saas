@@ -91,13 +91,13 @@ class AssetController extends Controller
             $serial = trim($u['serial_number'] ?? '');
             if ($code !== '') {
                 if (in_array($code, $submittedCodes)) {
-                    return redirect()->back()->withInput()->with('error', "Asset code '{$code}' is duplicated within the unit list.");
+                    return redirect()->back()->withInput()->with('error', __('hrms.assets.error_dup_code', ['code' => $code]));
                 }
                 $submittedCodes[] = $code;
             }
             if ($serial !== '') {
                 if (in_array($serial, $submittedSerials)) {
-                    return redirect()->back()->withInput()->with('error', "Serial number '{$serial}' is duplicated within the unit list.");
+                    return redirect()->back()->withInput()->with('error', __('hrms.assets.error_dup_serial', ['serial' => $serial]));
                 }
                 $submittedSerials[] = $serial;
             }
@@ -148,11 +148,11 @@ class AssetController extends Controller
         $this->authorize('delete', $asset);
 
         if ($asset->status === 'allocated' || $asset->assigned_employee_id !== null) {
-            return redirect()->back()->with('error', "Cannot delete asset '{$asset->asset_code}' because it is currently allocated to an employee. Please return or deallocate it first.");
+            return redirect()->back()->with('error', __('hrms.assets.error_asset_allocated', ['code' => $asset->asset_code]));
         }
 
         if ($reason = $asset->blockingAccountingRecords()) {
-            return redirect()->back()->with('error', "Cannot delete asset '{$asset->asset_code}' because {$reason}.");
+            return redirect()->back()->with('error', __('hrms.assets.error_asset_blocked_accounting', ['code' => $asset->asset_code, 'reason' => $reason]));
         }
 
         $this->assetRepository->deleteAsset($asset);
@@ -205,6 +205,11 @@ class AssetController extends Controller
             return redirect()->back()->with('error', __('hrms.assets.error_cat_has_assets', ['name' => $assetCategory->name, 'count' => $assetCount]));
         }
 
+        $itemCount = AssetItem::where('asset_category_id', $assetCategory->id)->count();
+        if ($itemCount > 0) {
+            return redirect()->back()->with('error', __('hrms.assets.error_cat_has_items', ['name' => $assetCategory->name, 'count' => $itemCount]));
+        }
+
         $requestCount = AssetRequest::where('asset_category_id', $assetCategory->id)->count();
         if ($requestCount > 0) {
             return redirect()->back()->with('error', __('hrms.assets.error_cat_has_requests', ['name' => $assetCategory->name, 'count' => $requestCount]));
@@ -235,8 +240,16 @@ class AssetController extends Controller
     {
         $this->authorize('approve', $asset);
 
+        if (!$request->has('condition_on_return') && $request->has('return_condition')) {
+            $request->merge([
+                'condition_on_return' => $request->input('return_condition'),
+            ]);
+        }
+
         $validated = $request->validate([
             'condition_on_return' => 'required|string|in:new,good,fair,damaged,scrapped',
+            'return_notes'        => 'nullable|string|max:1000',
+            'returned_at'         => 'nullable|date',
         ]);
 
         $this->assetRepository->returnAsset($asset, $validated);
@@ -250,15 +263,15 @@ class AssetController extends Controller
 
         $validated = $request->validate([
             'assigned_employee_id' => 'required|exists:employees,id',
-            'quantity' => 'required|integer|min:1',
-            'allocated_at' => 'required|date',
+            'quantity'             => 'required|integer|min:1',
+            'allocated_at'         => 'required|date',
             'expected_return_date' => 'nullable|date|after_or_equal:allocated_at',
-            'request_id' => 'nullable|exists:asset_requests,id',
+            'request_id'           => 'nullable|exists:asset_requests,id',
         ]);
 
         $success = $this->assetRepository->allocateItem($assetItem, $validated);
         if (!$success) {
-            return redirect()->back()->withErrors(['quantity' => 'Insufficient available units left to allocate.']);
+            return redirect()->back()->withErrors(['quantity' => __('hrms.assets.error_insufficient_units')]);
         }
 
         return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_allocated'));
@@ -270,21 +283,29 @@ class AssetController extends Controller
 
         if (!$request->has('quantity') && $request->has('allocated_asset_ids')) {
             $request->merge([
-                'quantity' => count($request->input('allocated_asset_ids', []))
+                'quantity' => count($request->input('allocated_asset_ids', [])),
+            ]);
+        }
+
+        if (!$request->has('condition_on_return') && $request->has('return_condition')) {
+            $request->merge([
+                'condition_on_return' => $request->input('return_condition'),
             ]);
         }
 
         $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'quantity' => 'required|integer|min:1',
+            'employee_id'         => 'required|exists:employees,id',
+            'quantity'            => 'required|integer|min:1',
             'condition_on_return' => 'required|string|in:new,good,fair,damaged,scrapped',
             'allocated_asset_ids' => 'nullable|array',
             'allocated_asset_ids.*' => 'exists:assets,id',
+            'return_notes'        => 'nullable|string|max:1000',
+            'returned_at'         => 'nullable|date',
         ]);
 
         $success = $this->assetRepository->returnItem($assetItem, $validated);
         if (!$success) {
-            return redirect()->back()->withErrors(['quantity' => 'Could not find that many allocated units for this employee.']);
+            return redirect()->back()->withErrors(['quantity' => __('hrms.assets.error_not_enough_allocated_units')]);
         }
 
         return redirect()->back()->with('success', __('hrms.assets.success_returned'));
@@ -294,12 +315,42 @@ class AssetController extends Controller
     {
         $this->authorize('update', Asset::class);
 
-        $validated = $request->validate([
-            'asset_category_id' => 'required|exists:asset_categories,id',
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string|max:500',
-        ]);
+        $rules = [
+            'asset_category_id'     => 'required|exists:asset_categories,id',
+            'name'                  => 'required|string|max:255',
+            'description'           => 'nullable|string|max:500',
+            'brand'                 => 'nullable|string|max:255',
+            'model_number'          => 'nullable|string|max:255',
+            'purchase_date'         => 'nullable|date',
+            'purchase_cost'         => 'nullable|numeric|min:0',
+            'notes'                 => 'nullable|string|max:1000',
+            'units'                 => 'nullable|array',
+            'units.*.id'            => 'nullable|integer|exists:assets,id',
+            'units.*.asset_code'    => 'required_with:units|string|max:255',
+            'units.*.serial_number' => 'nullable|string|max:255',
+            'units.*.condition'     => 'nullable|string|in:new,good,fair,damaged,scrapped',
+        ];
 
+        $submittedCodes = [];
+        $submittedSerials = [];
+        foreach ($request->input('units', []) as $u) {
+            $code = trim($u['asset_code'] ?? '');
+            $serial = trim($u['serial_number'] ?? '');
+            if ($code !== '') {
+                if (in_array($code, $submittedCodes)) {
+                    return redirect()->back()->withInput()->with('error', __('hrms.assets.error_dup_code', ['code' => $code]));
+                }
+                $submittedCodes[] = $code;
+            }
+            if ($serial !== '') {
+                if (in_array($serial, $submittedSerials)) {
+                    return redirect()->back()->withInput()->with('error', __('hrms.assets.error_dup_serial', ['serial' => $serial]));
+                }
+                $submittedSerials[] = $serial;
+            }
+        }
+
+        $validated = $request->validate($rules);
         $this->assetRepository->updateAssetItem($assetItem, $validated);
 
         return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_updated'));
@@ -311,7 +362,20 @@ class AssetController extends Controller
 
         $allocatedCount = $assetItem->assets()->where('status', 'allocated')->count();
         if ($allocatedCount > 0) {
-            return redirect()->back()->with('error', "Cannot delete item '{$assetItem->name}' because {$allocatedCount} unit(s) are currently allocated.");
+            return redirect()->back()->with('error', __('hrms.assets.error_item_has_allocated_units', ['name' => $assetItem->name, 'count' => $allocatedCount]));
+        }
+
+        foreach ($assetItem->assets as $asset) {
+            if ($reason = $asset->blockingAccountingRecords()) {
+                return redirect()->back()->with('error', __('hrms.assets.error_item_blocked_accounting', ['name' => $assetItem->name, 'code' => $asset->asset_code, 'reason' => $reason]));
+            }
+        }
+
+        $requestCount = AssetRequest::where('asset_item_id', $assetItem->id)
+            ->whereIn('status', ['pending', 'partially_allocated'])
+            ->count();
+        if ($requestCount > 0) {
+            return redirect()->back()->with('error', __('hrms.assets.error_item_has_pending_requests', ['name' => $assetItem->name, 'count' => $requestCount]));
         }
 
         $assetItem->assets()->delete();
@@ -332,14 +396,14 @@ class AssetController extends Controller
 
         $this->assetRepository->storeAssetItem($validated);
 
-        return redirect()->back()->with('success', 'Asset item created successfully.');
+        return redirect()->back()->with('success', __('hrms.assets.success_item_created'));
     }
 
-    public function export(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function export(Request $request): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $this->authorize('viewAny', Asset::class);
 
-        return $this->assetRepository->export();
+        return $this->assetRepository->export($request->all());
     }
 
     public function import(Request $request): RedirectResponse
@@ -352,7 +416,11 @@ class AssetController extends Controller
 
         $result = $this->assetRepository->import($request->file('file'));
 
-        return redirect()->back()->with('success', $result['message'] ?? 'Assets imported successfully.');
+        if (isset($result['success']) && !$result['success']) {
+            return redirect()->back()->with('error', $result['message'] ?? __('hrms.assets.error_import_assets'));
+        }
+
+        return redirect()->back()->with('success', $result['message'] ?? __('hrms.assets.success_assets_imported', ['count' => '']));
     }
 
     public function downloadTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
@@ -362,11 +430,11 @@ class AssetController extends Controller
         return $this->assetRepository->downloadTemplate();
     }
 
-    public function exportCategories(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function exportCategories(Request $request): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $this->authorize('viewAny', Asset::class);
 
-        return $this->assetRepository->exportCategories();
+        return $this->assetRepository->exportCategories($request->all());
     }
 
     public function importCategories(Request $request): RedirectResponse
@@ -379,7 +447,11 @@ class AssetController extends Controller
 
         $result = $this->assetRepository->importCategories($request->file('file'));
 
-        return redirect()->back()->with('success', $result['message'] ?? 'Categories imported successfully.');
+        if (isset($result['success']) && !$result['success']) {
+            return redirect()->back()->with('error', $result['message'] ?? __('hrms.assets.error_import_categories'));
+        }
+
+        return redirect()->back()->with('success', $result['message'] ?? __('hrms.assets.success_categories_imported', ['count' => '']));
     }
 
     public function downloadCategoriesTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
@@ -434,49 +506,66 @@ class AssetController extends Controller
             iconClass: 'feather-box'
         );
 
-        return redirect()->back()->with('success', 'Asset request(s) submitted successfully.');
+        return redirect()->back()->with('success', __('hrms.assets.success_req_submitted'));
     }
 
 
     public function rejectRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
     {
-        $this->authorize('approve', Asset::class);
+        $user = auth()->user();
+        $isOwner = $user && $assetRequest->employee && (int)$assetRequest->employee->user_id === (int)$user->id;
+
+        if (!$isOwner) {
+            $this->authorize('approve', Asset::class);
+        }
 
         $validated = $request->validate([
             'admin_notes' => 'nullable|string|max:1000',
         ]);
 
+        $defaultNote = $isOwner ? 'Withdrawn by employee.' : 'Rejected by administrator.';
         $assetRequest->update([
             'status'      => 'rejected',
-            'admin_notes' => $validated['admin_notes'] ?? 'Withdrawn by employee.',
+            'admin_notes' => $validated['admin_notes'] ?? $defaultNote,
         ]);
 
-        \App\Services\Notification\NotificationService::sendToEmployee(
-            employee: $assetRequest->employee_id,
-            title: 'Asset Request Rejected',
-            message: 'Your asset request has been rejected.',
-            actionUrl: 'hrms.assets-module.my-assets',
-            module: 'hrms',
-            type: 'asset_request',
-            iconClass: 'feather-x-circle'
-        );
+        if (!$isOwner) {
+            \App\Services\Notification\NotificationService::sendToEmployee(
+                employee: $assetRequest->employee_id,
+                title: 'Asset Request Rejected',
+                message: 'Your asset request has been rejected.',
+                actionUrl: 'hrms.assets-module.my-assets',
+                module: 'hrms',
+                type: 'asset_request',
+                iconClass: 'feather-x-circle'
+            );
+        }
 
-        return redirect()->back()->with('success', 'Asset request rejected successfully.');
+        return redirect()->back()->with('success', $isOwner ? __('hrms.assets.success_req_withdrawn') : __('hrms.assets.success_req_rejected'));
     }
 
     public function allocateDirect(AssetRequest $assetRequest): RedirectResponse
     {
         $this->authorize('approve', Asset::class);
 
-        if ($assetRequest->status !== 'pending') {
-            return redirect()->back()->with('error', 'Only pending asset requests can be allocated.');
+        if (!in_array($assetRequest->status, ['pending', 'partially_allocated'])) {
+            return redirect()->back()->with('error', __('hrms.assets.error_req_not_pending'));
         }
 
         $asset = null;
         if ($assetRequest->requested_asset_id) {
             $asset = Asset::find($assetRequest->requested_asset_id);
             if (!$asset || $asset->status !== 'available') {
-                return redirect()->back()->with('error', 'The specifically requested asset is not currently available.');
+                return redirect()->back()->with('error', __('hrms.assets.error_spec_asset_not_avail'));
+            }
+        } elseif ($assetRequest->asset_item_id) {
+            $asset = Asset::query()
+                ->where('asset_item_id', $assetRequest->asset_item_id)
+                ->where('status', 'available')
+                ->first();
+
+            if (!$asset) {
+                return redirect()->back()->with('error', __('hrms.assets.error_no_avail_item_unit'));
             }
         } else {
             $asset = Asset::query()
@@ -486,29 +575,40 @@ class AssetController extends Controller
                 ->first();
 
             if (!$asset) {
-                return redirect()->back()->with('error', 'No available asset found in this category for allocation.');
+                return redirect()->back()->with('error', __('hrms.assets.error_no_avail_asset_cat'));
             }
         }
 
-        $asset->update([
-            'status'               => 'allocated',
-            'assigned_employee_id' => $assetRequest->employee_id,
-            'allocated_at'         => date('Y-m-d'),
-            'expected_return_date' => null,
-        ]);
+        $hasRequestColumn = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
 
-        $asset->allocations()->create([
-            'employee_id'          => $assetRequest->employee_id,
-            'allocated_at'         => date('Y-m-d'),
-            'allocation_condition' => $asset->condition,
-            'notes'                => $asset->notes,
-        ]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($asset, $assetRequest, $hasRequestColumn) {
+            $upd = [
+                'status'               => 'allocated',
+                'assigned_employee_id' => $assetRequest->employee_id,
+                'allocated_at'         => date('Y-m-d'),
+                'expected_return_date' => null,
+            ];
+            if ($hasRequestColumn) {
+                $upd['asset_request_id'] = $assetRequest->id;
+            }
+            $asset->update($upd);
 
-        $assetRequest->update([
-            'status'             => 'allocated',
-            'allocated_asset_id' => $asset->id,
-            'admin_notes'        => "Allocated asset {$asset->asset_code} ({$asset->name}) directly on " . date('d M, Y'),
-        ]);
+            $asset->allocations()->create([
+                'employee_id'          => $assetRequest->employee_id,
+                'allocated_at'         => date('Y-m-d'),
+                'allocation_condition' => $asset->condition,
+                'notes'                => $asset->notes ?? 'Direct allocation',
+            ]);
+
+            $totalAllocatedUnits = $hasRequestColumn ? $assetRequest->allocatedAssets()->count() : 1;
+            $newStatus = ($totalAllocatedUnits >= $assetRequest->quantity) ? 'allocated' : 'partially_allocated';
+
+            $assetRequest->update([
+                'status'             => $newStatus,
+                'allocated_asset_id' => $asset->id,
+                'admin_notes'        => trim(($assetRequest->admin_notes ? $assetRequest->admin_notes . ' | ' : '') . "Allocated asset {$asset->asset_code} ({$asset->name}) directly on " . date('d M, Y')),
+            ]);
+        });
 
         \App\Services\Notification\NotificationService::sendToEmployee(
             employee: $assetRequest->employee_id,
@@ -520,7 +620,7 @@ class AssetController extends Controller
             iconClass: 'feather-box'
         );
 
-        return redirect()->back()->with('success', 'Asset allocated directly for request.');
+        return redirect()->back()->with('success', __('hrms.assets.success_req_allocated_dir'));
     }
 
     public function allocateRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
@@ -529,7 +629,7 @@ class AssetController extends Controller
 
         if ($request->has('allocated_asset_ids') && !$request->has('asset_ids')) {
             $request->merge([
-                'asset_ids' => $request->input('allocated_asset_ids')
+                'asset_ids' => $request->input('allocated_asset_ids'),
             ]);
         }
 
@@ -545,19 +645,25 @@ class AssetController extends Controller
 
         foreach ($assets as $asset) {
             if ($asset->status !== 'available') {
-                return redirect()->back()->with('error', "Asset {$asset->asset_code} ({$asset->name}) is not currently available.");
+                return redirect()->back()->with('error', __('hrms.assets.error_asset_not_avail', ['code' => $asset->asset_code, 'name' => $asset->name]));
             }
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($assets, $assetRequest, $validated, $assetIds) {
+        $hasRequestColumn = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($assets, $assetRequest, $validated, $assetIds, $hasRequestColumn) {
             $assetCodes = [];
             foreach ($assets as $asset) {
-                $asset->update([
+                $upd = [
                     'status'               => 'allocated',
                     'assigned_employee_id' => $assetRequest->employee_id,
                     'allocated_at'         => $validated['allocated_at'],
                     'expected_return_date' => $validated['expected_return_date'] ?? null,
-                ]);
+                ];
+                if ($hasRequestColumn) {
+                    $upd['asset_request_id'] = $assetRequest->id;
+                }
+                $asset->update($upd);
 
                 $asset->allocations()->create([
                     'employee_id'          => $assetRequest->employee_id,
@@ -569,10 +675,13 @@ class AssetController extends Controller
                 $assetCodes[] = $asset->asset_code;
             }
 
+            $totalAllocatedUnits = $hasRequestColumn ? $assetRequest->allocatedAssets()->count() : count($assetCodes);
+            $newStatus = ($totalAllocatedUnits >= $assetRequest->quantity) ? 'allocated' : 'partially_allocated';
+
             $assetRequest->update([
-                'status'             => 'allocated',
+                'status'             => $newStatus,
                 'allocated_asset_id' => $assetIds[0],
-                'admin_notes'        => "Allocated asset(s): " . implode(', ', $assetCodes) . " on " . date('d M, Y'),
+                'admin_notes'        => trim(($assetRequest->admin_notes ? $assetRequest->admin_notes . ' | ' : '') . "Allocated: " . implode(', ', $assetCodes) . " on " . date('d M, Y')),
             ]);
         });
 
@@ -586,7 +695,7 @@ class AssetController extends Controller
             iconClass: 'feather-box'
         );
 
-        return redirect()->back()->with('success', 'Asset request allocated successfully.');
+        return redirect()->back()->with('success', __('hrms.assets.success_allocated'));
     }
 
     public function bulkAllocate(Request $request): RedirectResponse
@@ -595,7 +704,6 @@ class AssetController extends Controller
 
         $validated = $request->validate([
             'allocations'          => 'required|array',
-            'allocations.*'        => 'nullable|exists:assets,id',
             'allocated_at'         => 'required|date',
             'expected_return_date' => 'nullable|date|after_or_equal:allocated_at',
         ]);
@@ -603,41 +711,77 @@ class AssetController extends Controller
         $allocatedAt        = $validated['allocated_at'];
         $expectedReturnDate = $validated['expected_return_date'] ?? null;
         $allocatedCount     = 0;
+        $hasRequestColumn   = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
 
-        foreach ($validated['allocations'] as $requestId => $assetId) {
-            if (empty($assetId)) {
-                continue;
-            }
+        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $allocatedAt, $expectedReturnDate, &$allocatedCount, $hasRequestColumn) {
+            foreach ($validated['allocations'] as $requestId => $assetIds) {
+                if (empty($assetIds)) {
+                    continue;
+                }
 
-            $assetRequest = AssetRequest::find($requestId);
-            $asset        = Asset::find($assetId);
+                $assetRequest = AssetRequest::find($requestId);
+                if (!$assetRequest || !in_array($assetRequest->status, ['pending', 'partially_allocated'])) {
+                    continue;
+                }
 
-            if ($assetRequest && $asset && $asset->status === 'available') {
-                $asset->update([
-                    'status'               => 'allocated',
-                    'assigned_employee_id' => $assetRequest->employee_id,
-                    'allocated_at'         => $allocatedAt,
-                    'expected_return_date' => $expectedReturnDate,
-                ]);
+                $unitIds = is_array($assetIds) ? $assetIds : [$assetIds];
+                $unitIds = array_filter($unitIds);
+                if (empty($unitIds)) {
+                    continue;
+                }
 
-                $asset->allocations()->create([
-                    'employee_id'          => $assetRequest->employee_id,
-                    'allocated_at'         => $allocatedAt,
-                    'allocation_condition' => $asset->condition,
-                    'notes'                => $asset->notes,
-                ]);
+                $assets = Asset::whereIn('id', $unitIds)->where('status', 'available')->get();
+                if ($assets->isEmpty()) {
+                    continue;
+                }
+
+                $allocatedCodes = [];
+                foreach ($assets as $asset) {
+                    $upd = [
+                        'status'               => 'allocated',
+                        'assigned_employee_id' => $assetRequest->employee_id,
+                        'allocated_at'         => $allocatedAt,
+                        'expected_return_date' => $expectedReturnDate,
+                    ];
+                    if ($hasRequestColumn) {
+                        $upd['asset_request_id'] = $assetRequest->id;
+                    }
+                    $asset->update($upd);
+
+                    $asset->allocations()->create([
+                        'employee_id'          => $assetRequest->employee_id,
+                        'allocated_at'         => $allocatedAt,
+                        'allocation_condition' => $asset->condition,
+                        'notes'                => $asset->notes ?? 'Bulk allocated',
+                    ]);
+
+                    $allocatedCodes[] = $asset->asset_code;
+                }
+
+                $totalAllocatedUnits = $hasRequestColumn ? $assetRequest->allocatedAssets()->count() : count($allocatedCodes);
+                $newStatus = ($totalAllocatedUnits >= $assetRequest->quantity) ? 'allocated' : 'partially_allocated';
 
                 $assetRequest->update([
-                    'status'             => 'allocated',
-                    'allocated_asset_id' => $asset->id,
-                    'admin_notes'        => "Bulk allocated asset {$asset->asset_code} ({$asset->name}) on " . date('d M, Y'),
+                    'status'             => $newStatus,
+                    'allocated_asset_id' => $assets->first()->id,
+                    'admin_notes'        => trim(($assetRequest->admin_notes ? $assetRequest->admin_notes . ' | ' : '') . "Allocated: " . implode(', ', $allocatedCodes) . " on " . date('d M, Y')),
                 ]);
 
                 $allocatedCount++;
-            }
-        }
 
-        return redirect()->back()->with('success', "Successfully allocated {$allocatedCount} asset request(s).");
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $assetRequest->employee_id,
+                    title: 'Asset Allocated',
+                    message: "Asset unit(s) (" . implode(', ', $allocatedCodes) . ") have been allocated for your request.",
+                    actionUrl: 'hrms.assets-module.my-assets',
+                    module: 'hrms',
+                    type: 'asset_allocation',
+                    iconClass: 'feather-box'
+                );
+            }
+        });
+
+        return redirect()->back()->with('success', __('hrms.assets.success_bulk_allocated', ['count' => $allocatedCount]));
     }
 
     public function bulkReject(Request $request): RedirectResponse
@@ -657,7 +801,7 @@ class AssetController extends Controller
                 'admin_notes' => $validated['admin_notes'] ?? 'Bulk rejected.',
             ]);
 
-        return redirect()->back()->with('success', 'Selected asset requests have been rejected.');
+        return redirect()->back()->with('success', __('hrms.assets.success_bulk_rejected'));
     }
 }
 

@@ -447,18 +447,23 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
                     if ($action === 'salary_deduction' || $action === 'both_deductions') {
                         if ($val > 0) {
-                            $dailyRate = ($employee->current_salary > 0) ? ($employee->current_salary / 30) : 500;
-                            $penaltyAmount = round($dailyRate * $val, 2);
-                            
-                            \App\Domains\HRMS\Models\EmployeePenalty::create([
-                                'employee_id' => $employee->id,
-                                'date' => $date,
-                                'rule_type' => $ruleType,
-                                'penalty_amount' => $penaltyAmount,
-                                'status' => 'pending',
-                                'payroll_month' => Carbon::parse($date)->format('Y-m'),
-                                'remarks' => "Late check-in occurrence #{$occurrenceNum}. Automated salary deduction applied ({$val} Day(s)).",
-                            ]);
+                            $payrollMonth = Carbon::parse($date)->format('Y-m');
+                            $tenantId = $employee->tenant_id ?? (auth()->user()?->tenant_id);
+
+                            \App\Domains\HRMS\Models\EmployeePenalty::updateOrCreate(
+                                [
+                                    'employee_id' => $employee->id,
+                                    'date'        => $date,
+                                    'rule_type'   => $ruleType,
+                                ],
+                                [
+                                    'tenant_id'      => $tenantId,
+                                    'penalty_amount' => round($val, 2),
+                                    'status'         => 'pending',
+                                    'payroll_month'  => $payrollMonth,
+                                    'remarks'        => "Late check-in occurrence #{$occurrenceNum}. Automated salary deduction applied ({$val} Day(s)).",
+                                ]
+                            );
                         }
                     }
                     break;
@@ -501,18 +506,23 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
                     if ($action === 'salary_deduction' || $action === 'both_deductions') {
                         if ($val > 0) {
-                            $dailyRate = ($employee->current_salary > 0) ? ($employee->current_salary / 30) : 500;
-                            $penaltyAmount = round($dailyRate * $val, 2);
+                            $payrollMonth = Carbon::parse($date)->format('Y-m');
+                            $tenantId = $employee->tenant_id ?? (auth()->user()?->tenant_id);
 
-                            \App\Domains\HRMS\Models\EmployeePenalty::create([
-                                'employee_id' => $employee->id,
-                                'date' => $date,
-                                'rule_type' => $ruleType,
-                                'penalty_amount' => $penaltyAmount,
-                                'status' => 'pending',
-                                'payroll_month' => Carbon::parse($date)->format('Y-m'),
-                                'remarks' => "Work hours deficit today ({$valToCheck} hours). Automated salary deduction applied ({$val} Day(s)).",
-                            ]);
+                            \App\Domains\HRMS\Models\EmployeePenalty::updateOrCreate(
+                                [
+                                    'employee_id' => $employee->id,
+                                    'date'        => $date,
+                                    'rule_type'   => $ruleType,
+                                ],
+                                [
+                                    'tenant_id'      => $tenantId,
+                                    'penalty_amount' => round($val, 2),
+                                    'status'         => 'pending',
+                                    'payroll_month'  => $payrollMonth,
+                                    'remarks'        => "Work hours deficit today ({$valToCheck} hours). Automated salary deduction applied ({$val} Day(s)).",
+                                ]
+                            );
                         }
                     }
                     break;
@@ -566,18 +576,23 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
                 if ($action === 'salary_deduction' || $action === 'both_deductions') {
                     if ($val > 0) {
-                        $dailyRate = ($employee->current_salary > 0) ? ($employee->current_salary / 30) : 500;
-                        $penaltyAmount = round($dailyRate * $val, 2);
-                        
-                        \App\Domains\HRMS\Models\EmployeePenalty::create([
-                            'employee_id' => $employee->id,
-                            'date' => $date,
-                            'rule_type' => 'missing_logs',
-                            'penalty_amount' => $penaltyAmount,
-                            'status' => 'pending',
-                            'payroll_month' => Carbon::parse($date)->format('Y-m'),
-                            'remarks' => "Missing check-out on {$date} (occurrence #{$occurrenceNum}). Automated salary deduction applied ({$val} Day(s)).",
-                        ]);
+                        $payrollMonth = Carbon::parse($date)->format('Y-m');
+                        $tenantId = $employee->tenant_id ?? (auth()->user()?->tenant_id);
+
+                        \App\Domains\HRMS\Models\EmployeePenalty::updateOrCreate(
+                            [
+                                'employee_id' => $employee->id,
+                                'date'        => $date,
+                                'rule_type'   => 'missing_logs',
+                            ],
+                            [
+                                'tenant_id'      => $tenantId,
+                                'penalty_amount' => round($val, 2),
+                                'status'         => 'pending',
+                                'payroll_month'  => $payrollMonth,
+                                'remarks'        => "Missing check-out on {$date} (occurrence #{$occurrenceNum}). Automated salary deduction applied ({$val} Day(s)).",
+                            ]
+                        );
                     }
                 }
                 break;
