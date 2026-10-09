@@ -190,6 +190,10 @@ class MaintenanceWorkOrderLogService
 
     public function recordManualLog(ProductionMaintenanceWorkOrder $workOrder, ?int $userId = null, string $action = 'Manual Maintenance Log', string $notes = ''): ProductionMaintenanceWorkOrderLog
     {
+        if (in_array($workOrder->status, [ProductionMaintenanceWorkOrder::STATUS_COMPLETED, ProductionMaintenanceWorkOrder::STATUS_CANCELLED], true)) {
+            throw new \InvalidArgumentException('Manual logs cannot be added to a completed or cancelled work order.');
+        }
+
         return $this->recordEvent(
             $workOrder->tenant_id,
             'manual_log',

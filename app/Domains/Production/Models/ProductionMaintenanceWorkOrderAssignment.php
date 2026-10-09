@@ -45,4 +45,31 @@ class ProductionMaintenanceWorkOrderAssignment extends BaseModel
     {
         return $this->belongsTo(User::class, 'technician_id');
     }
+
+    public function getEffectiveWorkedHoursAttribute(): float
+    {
+        $workOrder = $this->workOrder;
+        if (! $workOrder) {
+            return (float) ($this->worked_hours ?: 0.0);
+        }
+
+        if (in_array($workOrder->status, [ProductionMaintenanceWorkOrder::STATUS_COMPLETED, ProductionMaintenanceWorkOrder::STATUS_CANCELLED])) {
+            return (float) ($this->worked_hours ?: 0.0);
+        }
+
+        if ($workOrder->status === ProductionMaintenanceWorkOrder::STATUS_IN_PROGRESS) {
+            $maintStart = $workOrder->actual_start
+                ? \Carbon\Carbon::parse($workOrder->actual_start)
+                : ($workOrder->planned_start ? \Carbon\Carbon::parse($workOrder->planned_start) : \Carbon\Carbon::parse($workOrder->created_at));
+
+            $assignmentAt = $this->assigned_at ? \Carbon\Carbon::parse($this->assigned_at) : $maintStart;
+            $referenceStart = $assignmentAt->greaterThan($maintStart) ? $assignmentAt : $maintStart;
+            $seconds = max(0, $referenceStart->diffInSeconds(now(), false));
+            $accumulated = round($seconds / 3600, 2);
+
+            return max((float) ($this->worked_hours ?: 0.0), $accumulated);
+        }
+
+        return (float) ($this->worked_hours ?: 0.0);
+    }
 }

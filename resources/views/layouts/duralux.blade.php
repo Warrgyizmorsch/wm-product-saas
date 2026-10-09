@@ -79,6 +79,13 @@
 
 
     <style>
+        .modal {
+            z-index: 1060 !important;
+        }
+        .modal-backdrop {
+            z-index: 1050 !important;
+        }
+
         .dark-light-theme .light-button {
             display: none;
         }
@@ -731,6 +738,15 @@
     @endif
 
     <script src="{{ asset('assets/js/dynamic-geography.js') }}"></script>
+    <script>
+        // Global safety: automatically hoist any opened Bootstrap modal to document.body
+        // to prevent CSS stacking context traps (e.g. nested inside .nxl-container or .main-content)
+        document.addEventListener('show.bs.modal', function (e) {
+            if (e.target && e.target.classList && e.target.classList.contains('modal') && e.target.parentElement !== document.body) {
+                document.body.appendChild(e.target);
+            }
+        }, true);
+    </script>
     @stack('scripts')
 </body>
 

@@ -71,7 +71,27 @@ class MaintenanceWorkOrderController extends Controller
 
         try {
             if (!empty($validated['assignments'])) {
+                $internalSeen = [];
+                $externalSeen = [];
+
                 foreach ($validated['assignments'] as &$assignment) {
+                    $type = $assignment['assignment_type'] ?? 'internal';
+                    if ($type === 'internal' && !empty($assignment['technician_id'])) {
+                        $techId = (int) $assignment['technician_id'];
+                        if (isset($internalSeen[$techId])) {
+                            throw new \InvalidArgumentException('Duplicate technician assignment detected. Each person can only be assigned once.');
+                        }
+                        $internalSeen[$techId] = true;
+                    } elseif ($type === 'external' && !empty($assignment['technician_name'])) {
+                        $normName = strtolower(trim($assignment['technician_name']));
+                        if ($normName !== '') {
+                            if (isset($externalSeen[$normName])) {
+                                throw new \InvalidArgumentException("Duplicate external technician '{$assignment['technician_name']}' detected in submission. Each person can only be assigned once.");
+                            }
+                            $externalSeen[$normName] = true;
+                        }
+                    }
+
                     if (isset($assignment['hourly_rate'])) {
                         $assignment['hourly_rate'] = convert_to_base((float) $assignment['hourly_rate']);
                     }
@@ -239,14 +259,29 @@ class MaintenanceWorkOrderController extends Controller
     public function cancel(Request $request, int $id): RedirectResponse
     {
         $tenantId = require_tenant_id();
-        $reason   = $request->input('reason', 'Cancelled by user');
+
+        $wo = ProductionMaintenanceWorkOrder::where('tenant_id', $tenantId)->with('machine')->findOrFail($id);
+        $isBreakdown = $wo->type === ProductionMaintenanceWorkOrder::TYPE_BREAKDOWN
+            || ($wo->machine && ($wo->machine->maintenance_status === 'breakdown' || $wo->machine->current_state === 'Breakdown'));
+
+        if ($isBreakdown) {
+            $request->validate([
+                'reason' => ['required', 'string', 'min:3'],
+            ], [
+                'reason.required' => 'Please provide a cancellation reason for the broken down machine work order.',
+                'reason.min'      => 'The cancellation reason must be at least 3 characters.',
+            ]);
+            $reason = $request->input('reason');
+        } else {
+            $reason = $request->input('reason') ?: 'Cancelled by user';
+        }
 
         try {
             $wo = $this->service->cancelWorkOrder($id, $tenantId, auth()->id(), $reason);
 
             return redirect()
                 ->route('production.maintenance.work-orders.show', $wo->id)
-                ->with('success', "Work Order cancelled.");
+                ->with('success', "Work Order cancelled successfully.");
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -341,24 +376,58 @@ class MaintenanceWorkOrderController extends Controller
         ]);
 
         try {
-            foreach ($validated['assignments'] as $assignment) {
-                if (isset($assignment['hourly_rate'])) {
-                    $assignment['hourly_rate'] = convert_to_base((float) $assignment['hourly_rate']);
+            // Check for duplicates within the submitted batch itself
+            $internalSeen = [];
+            $externalSeen = [];
+
+            foreach ($validated['assignments'] as $idx => $assignment) {
+                $type = $assignment['assignment_type'] ?? 'internal';
+                if ($type === 'internal' && !empty($assignment['technician_id'])) {
+                    $techId = (int) $assignment['technician_id'];
+                    if (isset($internalSeen[$techId])) {
+                        throw new \InvalidArgumentException('Duplicate technician in submission. Each person can only be assigned once.');
+                    }
+                    $internalSeen[$techId] = true;
+                } elseif ($type === 'external' && !empty($assignment['technician_name'])) {
+                    $normName = strtolower(trim($assignment['technician_name']));
+                    if (isset($externalSeen[$normName])) {
+                        throw new \InvalidArgumentException("Duplicate external hire '{$assignment['technician_name']}' in submission.");
+                    }
+                    $externalSeen[$normName] = true;
                 }
-                $this->service->addAssignment($id, $tenantId, $assignment, auth()->id());
             }
+
+            \Illuminate\Support\Facades\DB::transaction(function () use ($id, $tenantId, $validated) {
+                foreach ($validated['assignments'] as $assignment) {
+                    if (isset($assignment['hourly_rate'])) {
+                        $assignment['hourly_rate'] = convert_to_base((float) $assignment['hourly_rate']);
+                    }
+                    $this->service->addAssignment($id, $tenantId, $assignment, auth()->id());
+                }
+            });
 
             return redirect()
                 ->route('production.maintenance.work-orders.show', $id)
                 ->with('success', 'Assignments added successfully.');
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $e->getMessage())->withInput();
         }
     }
 
     public function storeDowntimeLog(Request $request, int $id): RedirectResponse
     {
         $tenantId = require_tenant_id();
+
+        $workOrder = $this->repository->findWorkOrder($id, $tenantId);
+        abort_if(!$workOrder, 404, 'Work Order not found.');
+
+        // Disable manual-log creation after the work order is completed or cancelled
+        if (in_array($workOrder->status, [ProductionMaintenanceWorkOrder::STATUS_COMPLETED, ProductionMaintenanceWorkOrder::STATUS_CANCELLED], true)) {
+            return redirect()->back()->with('error', 'Manual logs cannot be added after a work order is completed or cancelled.');
+        }
+
+        \Illuminate\Support\Facades\Gate::authorize('update', $workOrder->machine);
+
         $validated = $request->validate([
             'action_type' => ['required', 'string', 'in:inspection,repair,adjustment,cleaning,tool_change,other'],
             'other_action' => ['nullable', 'string', 'required_if:action_type,other'],
@@ -366,13 +435,6 @@ class MaintenanceWorkOrderController extends Controller
         ]);
 
         try {
-            $workOrder = $this->repository->findWorkOrder($id, $tenantId);
-            abort_if(!$workOrder, 404, 'Work Order not found.');
-
-            if (!$workOrder->downtime_id) {
-                return redirect()->back()->with('error', 'No downtime record exists for this work order yet.');
-            }
-
             $action = $validated['action_type'] === 'other'
                 ? trim((string) $validated['other_action'])
                 : ucfirst(str_replace('_', ' ', $validated['action_type']));
@@ -386,7 +448,7 @@ class MaintenanceWorkOrderController extends Controller
 
             return redirect()
                 ->route('production.maintenance.work-orders.show', $workOrder->id)
-                ->with('success', 'Downtime log added successfully.');
+                ->with('success', 'Maintenance log added successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }

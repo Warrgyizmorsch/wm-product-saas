@@ -167,9 +167,21 @@ class MaintenanceWorkOrderApiController extends ApiBaseController
         Gate::authorize('create', Machine::class);
 
         $tenantId = $this->getTenantId();
-        $reason = $request->input('reason', 'Cancelled via API');
 
         try {
+            $wo = ProductionMaintenanceWorkOrder::where('tenant_id', $tenantId)->with('machine')->findOrFail($id);
+            $isBreakdown = $wo->type === ProductionMaintenanceWorkOrder::TYPE_BREAKDOWN
+                || ($wo->machine && ($wo->machine->maintenance_status === 'breakdown' || $wo->machine->current_state === 'Breakdown'));
+
+            if ($isBreakdown) {
+                $request->validate([
+                    'reason' => ['required', 'string', 'min:3'],
+                ]);
+                $reason = $request->input('reason');
+            } else {
+                $reason = $request->input('reason') ?: 'Cancelled via API';
+            }
+
             $wo = $this->service->cancelWorkOrder($id, $tenantId, auth()->id(), $reason);
 
             return $this->successResponse(
