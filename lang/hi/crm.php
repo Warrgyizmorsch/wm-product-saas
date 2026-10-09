@@ -1911,4 +1911,10 @@ return array (
   'delivery_challan_pdf' => 'डिलीवरी चालान पीडीएफ',
   'newest_date_first' => 'नवीनतम तिथि पहले',
   'oldest_date_first' => 'प्राचीनतम तिथि पहले',
+  'source_document' => 'स्रोत दस्तावेज़',
+  'target_machine' => 'लक्षित मशीन',
+  'maintenance' => 'रखरखाव',
+  'maintenance_work_order' => 'रखरखाव कार्य आदेश',
+  'store_requisition_mr' => 'स्टोर मांगपत्र (MR)',
 );
+

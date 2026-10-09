@@ -148,7 +148,7 @@ class MaintenanceRepository implements MaintenanceRepositoryInterface
     public function findWorkOrder(int $id, int $tenantId): ?ProductionMaintenanceWorkOrder
     {
         return ProductionMaintenanceWorkOrder::where('tenant_id', $tenantId)
-            ->with(['machine', 'pmSchedule', 'technician', 'downtime', 'spares.product', 'spares.warehouse', 'creator', 'completer', 'assignments.technician'])
+            ->with(['machine', 'pmSchedule', 'technician', 'downtime', 'spares.product', 'spares.warehouse', 'spares.requisitionSlip', 'creator', 'completer', 'assignments.technician'])
             ->find($id);
     }
 

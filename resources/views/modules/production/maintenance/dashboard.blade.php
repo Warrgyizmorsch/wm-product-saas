@@ -109,7 +109,7 @@
                                         <th>{{ __('production.routing_type') }}</th>
                                         <th>{{ __('production.priority') }}</th>
                                         <th>{{ __('production.status') }}</th>
-                                        <th class="text-end">Cost</th>
+                                        <th class="text-end">{{ __('production.cost') }} ({{ active_currency_symbol() }})</th>
                                     </tr>
                                 </thead>
                                 <tbody>

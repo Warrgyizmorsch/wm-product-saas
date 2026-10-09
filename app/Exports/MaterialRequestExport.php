@@ -18,7 +18,7 @@ class MaterialRequestExport implements FromCollection, WithHeadings, WithMapping
     public function collection()
     {
         $query = ProductionRequisitionSlip::where('tenant_id', $this->tenantId)
-            ->with(['order.product', 'items.product']);
+            ->with(['order.product', 'maintenanceWorkOrder.machine', 'items.product']);
 
         // 1. Status Filter
         if (!empty($this->filters['status']) && $this->filters['status'] !== 'all') {
@@ -36,6 +36,10 @@ class MaterialRequestExport implements FromCollection, WithHeadings, WithMapping
                         ->orWhereHas('product', function ($pq) use ($search) {
                             $pq->where('name', 'like', "%{$search}%");
                         });
+                  })
+                  ->orWhereHas('maintenanceWorkOrder', function ($mq) use ($search) {
+                      $mq->where('work_order_number', 'like', "%{$search}%")
+                        ->orWhereHas('machine', fn($mac) => $mac->where('name', 'like', "%{$search}%"));
                   });
             });
         }
@@ -98,10 +102,18 @@ class MaterialRequestExport implements FromCollection, WithHeadings, WithMapping
             ->filter()
             ->implode(', ');
 
+        $sourceDoc = $slip->isMaintenance()
+            ? ($slip->maintenanceWorkOrder?->work_order_number ?? 'MWO #' . $slip->maintenance_work_order_id)
+            : ($slip->order?->order_number ?? '—');
+
+        $targetProductOrMachine = $slip->isMaintenance()
+            ? ('Machine: ' . ($slip->maintenanceWorkOrder?->machine?->name ?? '—'))
+            : ($slip->order?->product?->name ?? '—');
+
         $values = [
             'requisition_number' => $slip->requisition_number,
-            'production_order'   => $slip->order?->order_number ?? '—',
-            'product_name'       => $slip->order?->product?->name ?? '—',
+            'production_order'   => $sourceDoc,
+            'product_name'       => $targetProductOrMachine,
             'requisition_date'   => $slip->requisition_date ? date('Y-m-d', strtotime($slip->requisition_date)) : '—',
             'status'             => ucfirst((string)$slip->status),
             'items_count'        => $slip->items?->count() ?? 0,

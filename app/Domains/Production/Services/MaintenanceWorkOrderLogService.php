@@ -206,7 +206,7 @@ class MaintenanceWorkOrderLogService
         );
     }
 
-    public function recordSpareRequested(ProductionMaintenanceWorkOrder $workOrder, int $productId, int $warehouseId, float $requestedQty, ?int $userId = null): ProductionMaintenanceWorkOrderLog
+    public function recordSpareRequested(ProductionMaintenanceWorkOrder $workOrder, int $productId, ?int $warehouseId = null, float $requestedQty = 1.0, ?int $userId = null): ProductionMaintenanceWorkOrderLog
     {
         return $this->recordEvent(
             $workOrder->tenant_id,

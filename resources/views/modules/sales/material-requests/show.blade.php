@@ -91,18 +91,39 @@
 
             <!-- Metadata Row -->
             <div class="row g-3 mb-4 fs-13 text-dark pb-3 border-bottom">
-                <div class="col-md-3">
-                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.production_order') }}</span>
-                    <strong class="fs-14 font-monospace text-primary">{{ $slip->order->order_number ?? 'MO #' . $slip->production_order_id }}</strong>
-                </div>
-                <div class="col-md-6">
-                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.target_product_mfg') }}</span>
-                    <strong>{{ $slip->order->product->name ?? '—' }} ({{ $slip->order->product->sku ?? '—' }})</strong>
-                </div>
-                <div class="col-md-3">
-                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.qty_ordered') }}</span>
-                    <strong class="fs-14 font-monospace">{{ (float) ($slip->order->quantity_ordered ?? 0.0) }}</strong>
-                </div>
+                @if($slip->isMaintenance())
+                    <div class="col-md-3">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.source_document') ?? 'Source Document' }}</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-soft-warning text-warning fw-bold fs-10 text-uppercase">Maintenance</span>
+                            <a href="{{ route('production.maintenance.work-orders.show', $slip->maintenance_work_order_id) }}" class="fs-14 font-monospace text-primary fw-bold text-decoration-none">
+                                {{ $slip->maintenanceWorkOrder?->work_order_number ?? 'MWO #' . $slip->maintenance_work_order_id }}
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('production.machine') ?? 'Target Machine' }}</span>
+                        <strong class="text-dark">{{ $slip->maintenanceWorkOrder?->machine?->name ?? '—' }} ({{ $slip->maintenanceWorkOrder?->machine?->code ?? '—' }})</strong>
+                        <span class="text-muted fs-11 d-block">{{ $slip->maintenanceWorkOrder?->machine?->workCenter?->name ?? '' }}</span>
+                    </div>
+                    <div class="col-md-4">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">Breakdown / Issue</span>
+                        <span class="text-dark fs-12">{{ Str::limit($slip->maintenanceWorkOrder?->problem_description ?? '—', 60) }}</span>
+                    </div>
+                @else
+                    <div class="col-md-3">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.production_order') }}</span>
+                        <strong class="fs-14 font-monospace text-primary">{{ $slip->order?->order_number ?? 'MO #' . $slip->production_order_id }}</strong>
+                    </div>
+                    <div class="col-md-6">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.target_product_mfg') }}</span>
+                        <strong>{{ $slip->order?->product?->name ?? '—' }} ({{ $slip->order?->product?->sku ?? '—' }})</strong>
+                    </div>
+                    <div class="col-md-3">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.qty_ordered') }}</span>
+                        <strong class="fs-14 font-monospace">{{ (float) ($slip->order?->quantity_ordered ?? 0.0) }}</strong>
+                    </div>
+                @endif
             </div>
 
             <!-- Items Table -->

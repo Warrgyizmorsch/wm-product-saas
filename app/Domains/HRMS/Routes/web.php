@@ -256,6 +256,7 @@ Route::prefix('hrms')
             Route::get('/', [BiometricDeviceController::class, 'index'])->name('biometric-devices.index');
             Route::post('/', [BiometricDeviceController::class, 'store'])->name('biometric-devices.store');
             Route::post('/simulate-punch', [BiometricDeviceController::class, 'simulatePunch'])->name('biometric-devices.simulate-punch');
+            Route::post('/{biometricDevice}/test-connection', [BiometricDeviceController::class, 'testConnection'])->name('biometric-devices.test-connection');
             Route::put('/{biometricDevice}', [BiometricDeviceController::class, 'update'])->name('biometric-devices.update');
             Route::delete('/{biometricDevice}', [BiometricDeviceController::class, 'destroy'])->name('biometric-devices.destroy');
         });

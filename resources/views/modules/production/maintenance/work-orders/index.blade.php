@@ -113,7 +113,7 @@
                         <th>Technician</th>
                         <th>{{ __('production.status') }}</th>
                         <th>{{ __('production.modal_planned_start_label') }}</th>
-                        <th class="text-end">{{ __('production.total_cost') }}</th>
+                        <th class="text-end">{{ __('production.total_cost') }} ({{ active_currency_symbol() }})</th>
                         <th class="text-end">{{ __('production.actions') }}</th>
                     </tr>
                 </thead>

@@ -181,7 +181,7 @@ class ReportsController extends Controller
                 fputcsv($file, [
                     'Order Number', 'Finished Good', 'Consuming Operation', 'Work Center', 'Component SKU', 'Component Name', 'UOM',
                     'Planned Qty', 'Issued Qty', 'Consumed Qty', 'Floor Stock WIP', 'Consumption (%)',
-                    'Unit Cost', 'Planned Cost', 'Consumed Cost', 'Issued Cost', 'Variance Cost'
+                    'Unit Cost (' . active_currency() . ')', 'Planned Cost (' . active_currency() . ')', 'Consumed Cost (' . active_currency() . ')', 'Issued Cost (' . active_currency() . ')', 'Variance Cost (' . active_currency() . ')'
                 ]);
                 foreach ($reportData['data'] as $row) {
                     fputcsv($file, [
@@ -207,8 +207,8 @@ class ReportsController extends Controller
             } elseif ($type === 'cost-variance') {
                 fputcsv($file, [
                     'Order Number', 'Product SKU', 'Product Name', 'Status',
-                    'Planned Cost', 'Actual Material Cost', 'Actual Labor Cost', 'Actual Machine Cost',
-                    'Actual Overhead Cost', 'Adjustments', 'Actual Total Cost', 'Variance Amount', 'Variance (%)'
+                    'Planned Cost (' . active_currency() . ')', 'Actual Material Cost (' . active_currency() . ')', 'Actual Labor Cost (' . active_currency() . ')', 'Actual Machine Cost (' . active_currency() . ')',
+                    'Actual Overhead Cost (' . active_currency() . ')', 'Adjustments (' . active_currency() . ')', 'Actual Total Cost (' . active_currency() . ')', 'Variance Amount (' . active_currency() . ')', 'Variance (%)'
                 ]);
                 foreach ($reportData['data'] as $row) {
                     fputcsv($file, [
@@ -384,7 +384,7 @@ class ReportsController extends Controller
                 $ce = $data['cost_estimation'];
                 fputcsv($f, []);
                 fputcsv($f, ['=== COST ESTIMATION VS ACTUAL BREAKDOWN ===']);
-                fputcsv($f, ['Cost Element', 'Estimated (Planned)', 'Actual Incurred', 'Variance', 'Status']);
+                fputcsv($f, ['Cost Element', 'Estimated (Planned) (' . active_currency() . ')', 'Actual Incurred (' . active_currency() . ')', 'Variance (' . active_currency() . ')', 'Status']);
                 fputcsv($f, ['Direct Materials', number_format($ce['estimated']['material_cost'] ?? 0, 2, '.', ''), number_format($ce['actual']['material_cost'] ?? 0, 2, '.', ''), number_format($ce['variance']['material'] ?? 0, 2, '.', ''), ($ce['variance']['material'] ?? 0) > 0 ? 'Unfavorable' : 'Favorable']);
                 fputcsv($f, ['Direct Labor', number_format($ce['estimated']['labor_cost'] ?? 0, 2, '.', ''), number_format($ce['actual']['labor_cost'] ?? 0, 2, '.', ''), number_format($ce['variance']['labor'] ?? 0, 2, '.', ''), ($ce['variance']['labor'] ?? 0) > 0 ? 'Unfavorable' : 'Favorable']);
                 fputcsv($f, ['Machine / Equipment', number_format($ce['estimated']['machine_cost'] ?? 0, 2, '.', ''), number_format($ce['actual']['machine_cost'] ?? 0, 2, '.', ''), number_format($ce['variance']['machine'] ?? 0, 2, '.', ''), ($ce['variance']['machine'] ?? 0) > 0 ? 'Unfavorable' : 'Favorable']);
@@ -409,7 +409,7 @@ class ReportsController extends Controller
             // Section 3: Materials
             fputcsv($f, []);
             fputcsv($f, ['=== MATERIAL CONSUMPTION & OPERATION ALLOCATION ===']);
-            fputcsv($f, ['Material', 'SKU', 'Consuming Operation', 'Work Center', 'UOM', 'Planned Qty', 'Issued Qty', 'Consumed Qty', 'Floor Stock WIP', 'Consumption %', 'Unit Cost', 'Planned Cost', 'Consumed Cost', 'Variance Cost']);
+            fputcsv($f, ['Material', 'SKU', 'Consuming Operation', 'Work Center', 'UOM', 'Planned Qty', 'Issued Qty', 'Consumed Qty', 'Floor Stock WIP', 'Consumption %', 'Unit Cost (' . active_currency() . ')', 'Planned Cost (' . active_currency() . ')', 'Consumed Cost (' . active_currency() . ')', 'Variance Cost (' . active_currency() . ')']);
             foreach ($data['materials'] as $mat) {
                 fputcsv($f, [
                     $mat['material_name'],
@@ -452,7 +452,7 @@ class ReportsController extends Controller
             // Section 5: Reusable Offcuts & Remnants
             fputcsv($f, []);
             fputcsv($f, ['=== REUSABLE OFFCUTS & REMNANTS ===']);
-            fputcsv($f, ['Remnant Code', 'Product', 'SKU', 'Type', 'Dimensions', 'Available for Reuse', 'Warehouse', 'Location', 'Valuation', 'Status', 'Recorded At']);
+            fputcsv($f, ['Remnant Code', 'Product', 'SKU', 'Type', 'Dimensions', 'Available for Reuse', 'Warehouse', 'Location', 'Valuation (' . active_currency() . ')', 'Status', 'Recorded At']);
             foreach ($data['remnants'] ?? [] as $rem) {
                 fputcsv($f, [
                     $rem['remnant_code'], $rem['product_name'], $rem['product_sku'],

@@ -372,23 +372,21 @@ class MaintenanceWorkflowTest extends TestCase
 
         $woService->startWorkOrder($wo->id, $this->tenant->id, $this->user->id);
 
-        // Complete Work Order using explicit repair inputs instead of a work-center labor rate.
+        // Complete Work Order using the standard completion flow with mechanic cost.
         $completedWo = $woService->completeWorkOrder(
             $wo->id,
             $this->tenant->id,
             $this->user->id,
             'Inspected machine, adjusted belt tension, completed lubrication.',
-            2.0,
-            ProductionMaintenanceWorkOrder::MECHANIC_TYPE_EXTERNAL,
-            125.00,
-            0.00
+            0.0,
+            null,
+            0.0,
+            125.00
         );
 
         $this->assertEquals('completed', $completedWo->status);
-        $this->assertEquals(2.0, $completedWo->repair_hours);
-        $this->assertEquals(125.00, $completedWo->repair_cost);
+        $this->assertEquals(125.00, $completedWo->mechanic_cost);
         $this->assertEquals(125.00, $completedWo->total_cost);
-        $this->assertEquals(0.00, $completedWo->labor_cost);
         $this->assertDatabaseHas('production_maintenance_work_order_logs', [
             'work_order_id' => $completedWo->id,
             'event_type'   => 'Work Order Completed',
@@ -484,5 +482,213 @@ class MaintenanceWorkflowTest extends TestCase
         $this->assertEquals(Machine::STATUS_ACTIVE, $this->machine->status);
         $this->assertEquals('Idle', $this->machine->current_state);
         $this->assertEquals('none', $this->machine->maintenance_status);
+    }
+
+    /** @test */
+    public function it_completes_work_order_with_erp_completion_modal_flow_and_restores_machine()
+    {
+        $woService    = app(MaintenanceWorkOrderService::class);
+        $spareService = app(MaintenanceSpareService::class);
+
+        $wo = $woService->createWorkOrder($this->tenant->id, [
+            'machine_id'          => $this->machine->id,
+            'type'                => 'preventive',
+            'problem_description' => 'Semi-annual calibration and parts check',
+            'assignments' => [[
+                'assignment_type' => 'internal',
+                'technician_id'   => $this->user->id,
+                'technician_name' => $this->user->name,
+                'hourly_rate'     => 50.00,
+            ]],
+        ]);
+
+        $woService->startWorkOrder($wo->id, $this->tenant->id, $this->user->id);
+
+        // Issue spare parts: 2 x $25.00 = $50.00
+        $spare = $spareService->addSpareRequest($wo->id, $this->tenant->id, $this->spareProduct->id, $this->warehouse->id, 2.0);
+        $spareService->issueSparePart($spare->id, $this->tenant->id, 2.0, $this->user->id);
+
+        $assignment = $wo->assignments()->first();
+
+        // Submit completion using the ERP completion form data
+        $captureTime = now()->toISOString();
+        $response = $this->withHeaders([
+            'X-Tenant' => $this->tenant->slug,
+        ])->post("/production/maintenance/work-orders/{$wo->id}/complete", [
+            'work_performed'           => 'Calibrated sensors, replaced drive bearings, aligned spindle.',
+            'completion_action'        => 'restore',
+            'was_machine_scraped'      => '0',
+            'completed_at'             => $captureTime,
+            'additional_cost'          => 25.00,
+            'external_parts_purchased' => '1',
+            'assignments' => [
+                [
+                    'id'           => $assignment->id,
+                    'hourly_rate'  => 60.00, // edited hourly rate
+                    'worked_hours' => 2.50,  // edited worked hours (60 * 2.5 = 150)
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $wo->refresh();
+
+        // Mechanic cost: 60 * 2.5 = 150.00
+        $this->assertEquals(150.00, $wo->mechanic_cost);
+        // Preserved spare parts cost: 50.00
+        $this->assertEquals(50.00, $wo->spare_parts_cost);
+        // Additional expense / overhead: 25.00
+        $this->assertEquals(25.00, $wo->additional_cost);
+        $this->assertEquals(25.00, $wo->additional_expense);
+        // Total cost: 150 + 50 + 25 = 225.00
+        $this->assertEquals(225.00, $wo->total_cost);
+        // Flags
+        $this->assertTrue($wo->external_parts_purchased);
+        $this->assertFalse($wo->was_machine_scraped);
+        $this->assertEquals(ProductionMaintenanceWorkOrder::STATUS_COMPLETED, $wo->status);
+
+        // Machine restored
+        $this->machine->refresh();
+        $this->assertEquals(Machine::STATUS_ACTIVE, $this->machine->status);
+        $this->assertEquals('Idle', $this->machine->current_state);
+    }
+
+    /** @test */
+    public function it_completes_work_order_with_complete_and_scrap_and_decommissions_machine()
+    {
+        $woService = app(MaintenanceWorkOrderService::class);
+
+        $wo = $woService->createWorkOrder($this->tenant->id, [
+            'machine_id'          => $this->machine->id,
+            'type'                => 'breakdown',
+            'problem_description' => 'Motor catastrophic burn-out',
+            'assignments' => [[
+                'assignment_type' => 'internal',
+                'technician_id'   => $this->user->id,
+                'technician_name' => $this->user->name,
+                'hourly_rate'     => 40.00,
+            ]],
+        ]);
+
+        $woService->startWorkOrder($wo->id, $this->tenant->id, $this->user->id);
+
+        $response = $this->withHeaders([
+            'X-Tenant' => $this->tenant->slug,
+        ])->post("/production/maintenance/work-orders/{$wo->id}/complete", [
+            'work_performed'      => 'Inspected internal coils; severe unrecoverable damage. Recommended scrapping.',
+            'completion_action'   => 'scrap',
+            'was_machine_scraped' => '1',
+            'decision_note'       => 'Cost to rewind motor exceeds machine book value.',
+            'additional_cost'     => 0.00,
+        ]);
+
+        $response->assertRedirect();
+        $wo->refresh();
+
+        $this->assertTrue($wo->was_machine_scraped);
+        $this->assertEquals(ProductionMaintenanceWorkOrder::STATUS_COMPLETED, $wo->status);
+
+        // Machine decommissioned
+        $this->machine->refresh();
+        $this->assertEquals(Machine::STATUS_DECOMMISSIONED, $this->machine->status);
+        $this->assertEquals('Decommissioned', $this->machine->current_state);
+    }
+
+    /** @test */
+    public function it_calculates_worked_hours_from_completion_time_minus_max_start_and_assignment_time()
+    {
+        $woService = app(MaintenanceWorkOrderService::class);
+
+        // Maintenance started at 10:00
+        $maintStart = Carbon::parse('2026-10-08 10:00:00');
+        // Assignment created at 10:30 (after maintenance start)
+        $assignedAt = Carbon::parse('2026-10-08 10:30:00');
+        // Completion modal opened at 12:30 (2 hours after assignment)
+        $completedAt = Carbon::parse('2026-10-08 12:30:00');
+
+        $wo = $woService->createWorkOrder($this->tenant->id, [
+            'machine_id'          => $this->machine->id,
+            'type'                => 'preventive',
+            'problem_description' => 'Timing test',
+            'actual_start'        => $maintStart,
+        ]);
+
+        $assignment = \App\Domains\Production\Models\ProductionMaintenanceWorkOrderAssignment::create([
+            'tenant_id'       => $this->tenant->id,
+            'work_order_id'   => $wo->id,
+            'technician_id'   => $this->user->id,
+            'technician_name' => $this->user->name,
+            'assignment_type' => 'internal',
+            'assigned_at'     => $assignedAt,
+            'hourly_rate'     => 40.00,
+            'worked_hours'    => 0.00,
+        ]);
+
+        // Complete without assignmentsData: syncAssignmentWorkedHoursForCompletion calculates worked_hours
+        $woService->completeWorkOrder(
+            $wo->id,
+            $this->tenant->id,
+            $this->user->id,
+            'Finished timing check.',
+            0.0,
+            null,
+            0.0,
+            0.0,
+            null,
+            false,
+            0.0,
+            null,
+            $completedAt
+        );
+
+        $assignment->refresh();
+        // MAX(10:00, 10:30) is 10:30; 12:30 - 10:30 = 2.0 hours
+        $this->assertEquals(2.0, (float) $assignment->worked_hours);
+
+        $wo->refresh();
+        // Mechanic cost = 40.00 * 2.0 = 80.00
+        $this->assertEquals(80.00, $wo->mechanic_cost);
+    }
+
+    /** @test */
+    public function it_verifies_obsolete_columns_removed_and_new_columns_present_in_database_schema()
+    {
+        $table = 'production_maintenance_work_orders';
+
+        $obsoleteCols = [
+            'labor_hours',
+            'repair_hours',
+            'labor_cost_rate',
+            'labor_cost',
+            'repair_cost',
+            'mechanic_type',
+            'external_mechanic_cost',
+            'internal_mechanic_cost',
+            'scrap_machine',
+            'scrap_value',
+        ];
+
+        foreach ($obsoleteCols as $col) {
+            $this->assertFalse(
+                Schema::hasColumn($table, $col),
+                "Obsolete column [{$col}] should NOT exist in [{$table}]."
+            );
+        }
+
+        $expectedCols = [
+            'spare_parts_cost',
+            'total_cost',
+            'mechanic_cost',
+            'additional_cost',
+            'was_machine_scraped',
+            'external_parts_purchased',
+        ];
+
+        foreach ($expectedCols as $col) {
+            $this->assertTrue(
+                Schema::hasColumn($table, $col),
+                "Expected column [{$col}] should exist in [{$table}]."
+            );
+        }
     }
 }

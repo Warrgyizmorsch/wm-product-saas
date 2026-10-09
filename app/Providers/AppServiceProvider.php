@@ -1010,6 +1010,21 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\DocumentMaster::class,
+            \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\DocumentCategory::class,
+            \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\DocumentTemplate::class,
+            \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\DocumentType::class,
             \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
         );

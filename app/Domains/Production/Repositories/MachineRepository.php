@@ -106,9 +106,15 @@ class MachineRepository implements MachineRepositoryInterface
     {
         $machines = Machine::where('tenant_id', $tenantId)
             ->whereNotIn('status', ['sold'])
-            ->with(['workCenter', 'maintenanceWorkOrders' => function ($q) {
-                $q->whereIn('status', ['draft', 'scheduled', 'in_progress'])->orderByDesc('created_at');
-            }])
+            ->with([
+                'workCenter',
+                'maintenanceWorkOrders' => function ($q) {
+                    $q->whereIn('status', ['draft', 'scheduled', 'in_progress'])->orderByDesc('created_at');
+                },
+                'downtimes' => function ($q) {
+                    $q->where('status', 'open')->orderByDesc('id');
+                },
+            ])
             ->orderBy('name')
             ->get();
 
@@ -124,6 +130,7 @@ class MachineRepository implements MachineRepositoryInterface
         $machines->each(function ($machine) use ($runningOps) {
             $machine->currentOp = $runningOps->get($machine->id);
             $machine->activeMaintenanceWo = $machine->maintenanceWorkOrders->first();
+            $machine->activeDowntime = $machine->downtimes->first();
         });
 
         return $machines;

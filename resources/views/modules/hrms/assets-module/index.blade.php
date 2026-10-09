@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Assets Custody & Requests | SaaS ERP')
-@section('page-title', 'Assets Custody & Requests')
-@section('breadcrumb', 'HRMS / Assets')
+@@section('title', __('hrms.assets.assets_custody_requests') . ' | SaaS ERP')
+@section('page-title', __('hrms.assets.assets_custody_requests'))
+@section('breadcrumb', __('hrms.common.hrms') . ' / ' . __('hrms.assets.title'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -35,23 +35,6 @@
         }
         .table-responsive {
             overflow-x: auto !important;
-        }
-        /* Custom Tabs styling */
-        #assetsModuleTabs .nav-link {
-            border: none !important;
-            background-color: transparent !important;
-            color: #64748b;
-            font-weight: 600;
-            padding: 12px 20px;
-            border-bottom: 2px solid transparent !important;
-            transition: all 0.2s ease-in-out;
-        }
-        #assetsModuleTabs .nav-link:hover {
-            color: var(--bs-primary);
-        }
-        #assetsModuleTabs .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom: 2px solid var(--bs-primary) !important;
         }
         #alloc-items-table .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
             white-space: normal !important;
@@ -92,8 +75,8 @@
 <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3 border-bottom">
             <div>
-                <h5 class="fw-bold text-dark mb-0 fs-16">Assets Custody & Requests Dashboard</h5>
-                <p class="text-muted fs-12 mb-0">Manage employee requests, direct allocations, custody records and histories</p>
+                <h5 class="fw-bold text-dark mb-0 fs-16">{{ __('hrms.assets.assets_custody_requests_dashboard') }}</h5>
+                <p class="text-muted fs-12 mb-0">{{ __('hrms.assets.assets_custody_dashboard_desc') }}</p>
             </div>
             @php
                 $canManageAssets = auth()->user() && (
@@ -111,39 +94,41 @@
             @endphp
             @if($canManageAssets)
                 <div>
-                    <button type="button" class="btn btn-primary fw-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px; border-radius: 6px; padding: 8px 16px;" data-bs-toggle="modal" data-bs-target="#directAllocateModal">
-                        <i class="feather-plus me-1"></i> Allocate Asset
-                    </button>
+                    <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#directAllocateModal" class="fw-bold text-uppercase">
+                        {{ __('hrms.assets.btn_allocate_asset') }}
+                    </x-ui.button>
                 </div>
             @endif
         </div>
 
 
             <!-- Tabs Navigation -->
-            <ul class="nav nav-tabs tab-nav-custom border-bottom mb-4" id="assetsModuleTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="requests-tab" data-bs-toggle="tab" data-bs-target="#requests-pane" type="button" role="tab" aria-controls="requests-pane" aria-selected="true">
-                        <i class="feather-user-check me-2"></i>Asset Requests
-                        @if($pendingRequestsCount > 0)
-                            <span class="badge bg-danger rounded-circle p-1 ms-1" style="font-size: 9px; min-width: 16px; min-height: 16px; line-height: 8px;">
-                                {{ $pendingRequestsCount }}
-                            </span>
-                        @endif
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab" aria-controls="history-pane" aria-selected="false">
-                        <i class="feather-clock me-2"></i>Allocation History
-                    </button>
-                </li>
-            </ul>
+            <x-ui.horizontal-tabs 
+                id="assetsModuleTabs" 
+                :tabs="[
+                    [
+                        'id' => 'requests-pane',
+                        'label' => __('hrms.assets.tab_requests'),
+                        'icon' => 'feather-user-check',
+                        'badge' => $pendingRequestsCount > 0 ? $pendingRequestsCount : null,
+                        'badgeClass' => 'badge bg-danger text-white rounded-circle',
+                        'active' => true,
+                    ],
+                    [
+                        'id' => 'history-pane',
+                        'label' => __('hrms.assets.allocation_history'),
+                        'icon' => 'feather-clock',
+                        'active' => false,
+                    ]
+                ]" 
+            />
 
             <div class="tab-content" id="assetsModuleTabsContent">
                 <!-- 1. ASSET REQUESTS TAB PANE -->
                 <div class="tab-pane fade show active" id="requests-pane" role="tabpanel" aria-labelledby="requests-tab">
                     <!-- Filters Toolbar -->
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
-                        <h6 class="fw-bold mb-0 text-dark fs-14">Requests Registry</h6>
+                        <h6 class="fw-bold mb-0 text-dark fs-14">{{ __('hrms.assets.requests_registry') }}</h6>
                         <div class="d-flex align-items-center gap-2 flex-wrap">
                             <form method="GET" action="{{ route('hrms.assets-module.index') }}" class="d-flex align-items-center gap-2 m-0">
                                 @foreach(['history_search', 'history_category_id', 'history_company_id'] as $param)
@@ -155,24 +140,24 @@
                                 
                                 <div class="d-flex align-items-center border rounded px-3 py-1 bg-light" style="min-width: 220px; max-width: 280px; height: 38px;">
                                     <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                    <input type="text" name="request_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search requests..." value="{{ request('request_search') }}" style="box-shadow: none; height: 32px;">
+                                    <input type="text" name="request_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.assets.search_requests_placeholder') }}" value="{{ request('request_search') }}" style="box-shadow: none; height: 32px;">
                                 </div>
 
                                 <div class="d-flex gap-2 align-items-center">
-                                    <x-ui.sort-dropdown label="Sort">
-                                        <a class="dropdown-item py-2 {{ request('request_sort', 'newest') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'newest', this); event.preventDefault();">Newest</a>
-                                        <a class="dropdown-item py-2 {{ request('request_sort') == 'oldest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'oldest', this); event.preventDefault();">Oldest</a>
-                                        <a class="dropdown-item py-2 {{ request('request_sort', 'status_asc') == 'status_asc' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'status_asc', this); event.preventDefault();">Status (Asc)</a>
-                                        <a class="dropdown-item py-2 {{ request('request_sort') == 'status_desc' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'status_desc', this); event.preventDefault();">Status (Desc)</a>
+                                    <x-ui.sort-dropdown :label="__('hrms.common.sort')">
+                                        <a class="dropdown-item py-2 {{ request('request_sort', 'newest') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'newest', this); event.preventDefault();">{{ __('hrms.common.newest') }}</a>
+                                        <a class="dropdown-item py-2 {{ request('request_sort') == 'oldest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'oldest', this); event.preventDefault();">{{ __('hrms.common.oldest') }}</a>
+                                        <a class="dropdown-item py-2 {{ request('request_sort', 'status_asc') == 'status_asc' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'status_asc', this); event.preventDefault();">{{ __('hrms.assets.sort_status_asc') }}</a>
+                                        <a class="dropdown-item py-2 {{ request('request_sort', 'status_desc') == 'status_desc' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'status_desc', this); event.preventDefault();">{{ __('hrms.assets.sort_status_desc') }}</a>
                                     </x-ui.sort-dropdown>
 
-                                    <x-ui.filter label="Filter" offset="0, 5">
-                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                                    <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5">
+                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                                         
                                         <div class="mb-3" style="min-width: 250px;">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Requested Category</label>
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.requested_category') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="request_category_id">
-                                                <option value="">All Categories</option>
+                                                <option value="">{{ __('hrms.assets.all_categories') }}</option>
                                                 @foreach($categories as $category)
                                                     <option value="{{ $category->id }}" {{ request('request_category_id') == $category->id ? 'selected' : '' }}>
                                                         {{ $category->name }}
@@ -182,9 +167,9 @@
                                         </div>
 
                                         <div class="mb-3" style="min-width: 250px;">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Org Entity</label>
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.org_entity') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="request_company_id">
-                                                <option value="">All Companies</option>
+                                                <option value="">{{ __('hrms.assets.all_companies') }}</option>
                                                 @foreach($companies as $company)
                                                     <option value="{{ $company->id }}" {{ request('request_company_id') == $company->id ? 'selected' : '' }}>
                                                         {{ $company->company_name }}
@@ -194,24 +179,24 @@
                                         </div>
 
                                         <div class="mb-3" style="min-width: 250px;">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.status') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="request_status">
-                                                <option value="">All Statuses</option>
-                                                <option value="pending" {{ request('request_status') === 'pending' ? 'selected' : '' }}>Pending</option>
-                                                <option value="partially_allocated" {{ request('request_status') === 'partially_allocated' ? 'selected' : '' }}>Partially Allocated</option>
-                                                <option value="allocated" {{ request('request_status') === 'allocated' ? 'selected' : '' }}>Allocated</option>
-                                                <option value="rejected" {{ request('request_status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
+                                                <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                                <option value="pending" {{ request('request_status') === 'pending' ? 'selected' : '' }}>{{ __('hrms.assets.status_pending') }}</option>
+                                                <option value="partially_allocated" {{ request('request_status') === 'partially_allocated' ? 'selected' : '' }}>{{ __('hrms.assets.status_partially_allocated') }}</option>
+                                                <option value="allocated" {{ request('request_status') === 'allocated' ? 'selected' : '' }}>{{ __('hrms.assets.status_allocated') }}</option>
+                                                <option value="rejected" {{ request('request_status') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.assets.status_rejected') }}</option>
                                             </x-ui.odoo-form-ui>
                                         </div>
 
                                         <div class="d-flex gap-2 justify-content-end mt-4">
-                                            <a href="{{ route('hrms.assets-module.index', request()->except(['request_search', 'request_category_id', 'request_company_id', 'request_status'])) }}" class="btn btn-sm btn-light border">Reset</a>
-                                            <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+                                            <a href="{{ route('hrms.assets-module.index', request()->except(['request_search', 'request_category_id', 'request_company_id', 'request_status'])) }}" class="btn btn-sm btn-light border">{{ __('hrms.common.reset') }}</a>
+                                            <button type="submit" class="btn btn-sm btn-primary">{{ __('hrms.common.apply') }}</button>
                                         </div>
                                     </x-ui.filter>
 
                                     @if(request()->anyFilled(['request_search', 'request_category_id', 'request_company_id', 'request_status']))
-                                        <a href="{{ route('hrms.assets-module.index', request()->except(['request_search', 'request_category_id', 'request_company_id', 'request_status'])) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="Clear Filters">
+                                        <a href="{{ route('hrms.assets-module.index', request()->except(['request_search', 'request_category_id', 'request_company_id', 'request_status'])) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="{{ __('hrms.common.clear_filters') }}">
                                             <i class="feather-x"></i>
                                         </a>
                                     @endif
@@ -223,12 +208,12 @@
                     <!-- Bulk Actions Toolbar -->
                     <div id="bulkActionsToolbar" class="d-none border-bottom px-4 py-2 bg-light mb-3 rounded">
                         <div class="d-flex justify-content-end align-items-center gap-2">
-                            <span class="fs-12 text-muted fw-bold me-1"><span id="selectedRequestsCount">0</span> Selected</span>
+                            <span class="fs-12 text-muted fw-bold me-1"><span id="selectedRequestsCount">0</span> {{ __('hrms.assets.selected') }}</span>
                             <button type="button" class="btn btn-sm btn-primary text-uppercase fw-bold px-3 py-1.5" id="btnBulkAllocate" style="font-size: 11px; border-radius: 6px; letter-spacing: 0.5px;">
-                                <i class="feather-user-check me-1"></i> Bulk Allocate
+                                <i class="feather-user-check me-1"></i> {{ __('hrms.assets.bulk_allocate') }}
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-danger text-uppercase fw-bold px-3 py-1.5" id="btnBulkReject" style="font-size: 11px; border-radius: 6px; letter-spacing: 0.5px;">
-                                <i class="feather-x me-1"></i> Bulk Reject
+                                <i class="feather-x me-1"></i> {{ __('hrms.assets.bulk_reject') }}
                             </button>
                         </div>
                     </div>
@@ -239,15 +224,21 @@
                             <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
                                 <tr>
                                     <th style="width: 45px; padding-left: 20px;"><input type="checkbox" id="selectAllRequests" class="form-check-input"></th>
-                                    <th class="text-start" style="width: 35%;">Employee & Org Entity</th>
-                                    <th class="text-start" style="width: 35%;">Requested Item & Status</th>
-                                    <th class="text-end px-4" style="width: 180px; white-space: nowrap;">Actions</th>
+                                    <th class="text-start" style="width: 35%;">{{ __('hrms.assets.emp_org') }}</th>
+                                    <th class="text-start" style="width: 35%;">{{ __('hrms.assets.req_item_status') }}</th>
+                                    <th class="text-end px-4" style="width: 180px; white-space: nowrap;">{{ __('hrms.assets.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($requests as $req)
                                     @php 
-                                        $allocatedCount = $req->status === 'allocated' ? $req->quantity : ($req->allocated_asset_id ? 1 : 0);
+                                        if (isset($req->allocated_assets_count)) {
+                                            $allocatedCount = $req->allocated_assets_count;
+                                        } elseif ($req->relationLoaded('allocatedAssets')) {
+                                            $allocatedCount = $req->allocatedAssets->count();
+                                        } else {
+                                            $allocatedCount = ($req->status === 'allocated' ? $req->quantity : ($req->allocated_asset_id ? 1 : 0));
+                                        }
                                         $remainingQty = max(0, $req->quantity - $allocatedCount); 
                                     @endphp
                                     <tr>
@@ -265,7 +256,7 @@
                                                 @endif
                                             </div>
                                             <div class="fs-11 text-muted mt-0.5">
-                                                <i class="feather-calendar me-1 text-primary"></i>Requested <span class="fw-medium text-dark">{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}</span>
+                                                <i class="feather-calendar me-1 text-primary"></i>{{ __('hrms.assets.lbl_req_short') }} <span class="fw-medium text-dark">{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}</span>
                                             </div>
                                         </td>
                                         <td class="text-start" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
@@ -274,19 +265,19 @@
                                                 <span class="badge bg-light text-secondary border px-2 py-0.5 fs-11">{{ $req->category->name }}</span>
                                             </div>
                                             <div class="fs-11 text-muted mb-1">
-                                                Req: <strong class="text-dark">{{ $req->quantity }}</strong> | 
-                                                Allocated: <strong class="text-success">{{ $allocatedCount }}</strong> | 
-                                                Remaining: <strong class="{{ $remainingQty > 0 ? 'text-danger' : 'text-muted' }}">{{ $remainingQty }}</strong>
+                                                {{ __('hrms.assets.req') }}: <strong class="text-dark">{{ $req->quantity }}</strong> | 
+                                                {{ __('hrms.assets.lbl_alloc_short') }}: <strong class="text-success">{{ $allocatedCount }}</strong> | 
+                                                {{ __('hrms.assets.lbl_rem_short') }}: <strong class="{{ $remainingQty > 0 ? 'text-danger' : 'text-muted' }}">{{ $remainingQty }}</strong>
                                             </div>
                                             <div>
                                                 @if($req->status === 'pending')
-                                                    <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11 text-capitalize">Pending</span>
+                                                    <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11 text-capitalize">{{ __('hrms.assets.status_pending') }}</span>
                                                 @elseif($req->status === 'partially_allocated')
-                                                    <span class="badge bg-soft-info text-info px-2.5 py-1 rounded-pill fs-11 text-capitalize">Partially Allocated</span>
+                                                    <span class="badge bg-soft-info text-info px-2.5 py-1 rounded-pill fs-11 text-capitalize">{{ __('hrms.assets.status_partially_allocated') }}</span>
                                                 @elseif($req->status === 'allocated')
-                                                    <span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11 text-capitalize">Allocated</span>
+                                                    <span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11 text-capitalize">{{ __('hrms.assets.status_allocated') }}</span>
                                                 @elseif($req->status === 'rejected')
-                                                    <span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded-pill fs-11 text-capitalize" title="{{ $req->admin_notes }}">Rejected</span>
+                                                    <span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded-pill fs-11 text-capitalize" title="{{ $req->admin_notes }}">{{ __('hrms.assets.status_rejected') }}</span>
                                                 @else
                                                     <span class="badge bg-light text-secondary px-2.5 py-1 rounded-pill fs-11 text-capitalize">{{ $req->status }}</span>
                                                 @endif
@@ -321,7 +312,7 @@
                                             @endphp
                                             <x-ui.action-dropdown align="end">
                                                 <x-slot:extraActions>
-                                                    <button type="button" class="action-dropdown-btn view-req-details-btn" title="View Details"
+                                                    <button type="button" class="action-dropdown-btn view-req-details-btn" title="{{ __('hrms.assets.view_details') }}"
                                                         data-emp-name="{{ $req->employee->display_name }}"
                                                         data-emp-id="{{ $req->employee->employee_id }}"
                                                         data-company="{{ $req->company->company_name ?? '' }}"
@@ -331,10 +322,10 @@
                                                         data-alloc-qty="{{ $allocatedCount }}"
                                                         data-rem-qty="{{ $remainingQty }}"
                                                         data-status-raw="{{ $req->status }}"
-                                                        data-status="{{ ucfirst(str_replace('_', ' ', $req->status)) }}"
+                                                        data-status="{{ $req->status === 'partially_allocated' ? __('hrms.assets.status_partially_allocated') : ($req->status === 'allocated' ? __('hrms.assets.status_allocated') : ($req->status === 'rejected' ? __('hrms.assets.status_rejected') : __('hrms.assets.status_pending'))) }}"
                                                         data-date="{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}"
                                                         data-action-date="{{ $req->updated_at ? $req->updated_at->format('d M, Y') : '-' }}"
-                                                        data-reason="{{ $req->reason ?: 'No reason provided.' }}"
+                                                        data-reason="{{ $req->reason ?: __('hrms.assets.no_reason_provided') }}"
                                                         data-admin-notes="{{ $req->formatted_admin_notes ?: ($req->admin_notes ?: '') }}"
                                                         data-allocated-units="{{ base64_encode(json_encode($allocatedUnitsData)) }}">
                                                         <i class="feather feather-eye"></i>
@@ -352,14 +343,14 @@
                                                         data-alloc-qty="{{ $allocatedCount }}"
                                                         data-rem-qty="{{ $remainingQty }}"
                                                         data-status-raw="{{ $req->status }}"
-                                                        data-status="{{ ucfirst(str_replace('_', ' ', $req->status)) }}"
+                                                        data-status="{{ $req->status === 'partially_allocated' ? __('hrms.assets.status_partially_allocated') : ($req->status === 'allocated' ? __('hrms.assets.status_allocated') : ($req->status === 'rejected' ? __('hrms.assets.status_rejected') : __('hrms.assets.status_pending'))) }}"
                                                         data-date="{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}"
                                                         data-action-date="{{ $req->updated_at ? $req->updated_at->format('d M, Y') : '-' }}"
-                                                        data-reason="{{ $req->reason ?: 'No reason provided.' }}"
+                                                        data-reason="{{ $req->reason ?: __('hrms.assets.no_reason_provided') }}"
                                                         data-admin-notes="{{ $req->formatted_admin_notes ?: ($req->admin_notes ?: '') }}"
                                                         data-allocated-units="{{ base64_encode(json_encode($allocatedUnitsData)) }}">
                                                         <i class="feather feather-eye me-2 text-primary"></i>
-                                                        <span>View Details</span>
+                                                        <span>{{ __('hrms.assets.view_details') }}</span>
                                                     </a>
                                                 </li>
                                                 @if(in_array($req->status, ['pending', 'approved', 'partially_allocated']) && $canApproveAssets)
@@ -371,19 +362,19 @@
                                                             data-employee-id="{{ $req->employee_id }}"
                                                             data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})"
                                                             data-asset-item-id="{{ $req->asset_item_id }}"
-                                                            data-item-name="{{ $req->item->name ?? 'N/A' }}"
+                                                            data-item-name="{{ $req->item->name ?? __('hrms.common.na') }}"
                                                             data-quantity="{{ $req->quantity }}"
                                                             data-allocated-count="{{ $allocatedCount }}"
                                                             data-remaining-qty="{{ $remainingQty }}">
                                                             <i class="feather feather-check-circle me-2 text-success"></i>
-                                                            <span>Fulfill / Allocate</span>
+                                                            <span>{{ __('hrms.assets.fulfill_allocate') }}</span>
                                                         </a>
                                                     </li>
                                                     <li>
                                                         <a class="dropdown-item reject-request-btn d-flex align-items-center text-danger" href="javascript:void(0)"
                                                             data-request-id="{{ $req->id }}">
                                                             <i class="feather feather-x-circle me-2 text-danger"></i>
-                                                            <span>Reject Request</span>
+                                                            <span>{{ __('hrms.assets.reject_request') }}</span>
                                                         </a>
                                                     </li>
                                                 @endif
@@ -394,14 +385,14 @@
                                     <tr>
                                         <td colspan="4" class="text-center py-5 text-muted fs-12">
                                             <i class="feather-user-check fs-32 d-block mb-3 text-secondary"></i>
-                                            <div class="fw-bold mb-1">No Asset Requests Found</div>
-                                            <div>There are no requests submitted by employees.</div>
+                                            <div class="fw-bold mb-1">{{ __('hrms.assets.empty_requests_title') }}</div>
+                                            <div>{{ __('hrms.assets.empty_requests_desc') }}</div>
                                         </td>
                                     </tr>
                                 @endforelse
                             </tbody>
                         </table>
-                    </div>
+                    </div>v>
 
                     @if($requests->hasPages())
                         <div class="bg-white border-top px-4 py-3 mt-3">
@@ -421,7 +412,7 @@
                 <div class="tab-pane fade" id="history-pane" role="tabpanel" aria-labelledby="history-tab">
                     <!-- Filters Toolbar -->
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
-                        <h6 class="fw-bold mb-0 text-dark fs-14">Custody & Assignment Registry</h6>
+                        <h6 class="fw-bold mb-0 text-dark fs-14">{{ __('hrms.assets.custody_assignment_registry') }}</h6>
                         <div class="d-flex align-items-center gap-2 flex-wrap">
                             <form method="GET" action="{{ route('hrms.assets-module.index') }}" class="d-flex align-items-center gap-2 m-0">
                                 @foreach(['request_search', 'request_category_id', 'request_company_id', 'request_status'] as $param)
@@ -432,17 +423,17 @@
                                 
                                 <div class="d-flex align-items-center border rounded px-3 py-1 bg-light" style="min-width: 220px; max-width: 280px; height: 38px;">
                                     <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                    <input type="text" name="history_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search history..." value="{{ request('history_search') }}" style="box-shadow: none; height: 32px;">
+                                    <input type="text" name="history_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.assets.search_history_placeholder') }}" value="{{ request('history_search') }}" style="box-shadow: none; height: 32px;">
                                 </div>
 
                                 <div class="d-flex gap-2 align-items-center">
-                                    <x-ui.filter label="Filter" offset="0, 5">
-                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                                    <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5">
+                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                                         
                                         <div class="mb-3" style="min-width: 250px;">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Asset Category</label>
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.category') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="history_category_id">
-                                                <option value="">All Categories</option>
+                                                <option value="">{{ __('hrms.assets.all_categories') }}</option>
                                                 @foreach($categories as $category)
                                                     <option value="{{ $category->id }}" {{ request('history_category_id') == $category->id ? 'selected' : '' }}>
                                                         {{ $category->name }}
@@ -452,9 +443,9 @@
                                         </div>
 
                                         <div class="mb-3" style="min-width: 250px;">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Org Entity</label>
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.org_entity') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="history_company_id">
-                                                <option value="">All Companies</option>
+                                                <option value="">{{ __('hrms.assets.all_companies') }}</option>
                                                 @foreach($companies as $company)
                                                     <option value="{{ $company->id }}" {{ request('history_company_id') == $company->id ? 'selected' : '' }}>
                                                         {{ $company->company_name }}
@@ -464,13 +455,13 @@
                                         </div>
 
                                         <div class="d-flex gap-2 justify-content-end mt-4">
-                                            <a href="{{ route('hrms.assets-module.index', request()->except(['history_search', 'history_category_id', 'history_company_id'])) }}" class="btn btn-sm btn-light border">Reset</a>
-                                            <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+                                            <a href="{{ route('hrms.assets-module.index', request()->except(['history_search', 'history_category_id', 'history_company_id'])) }}" class="btn btn-sm btn-light border">{{ __('hrms.common.reset') }}</a>
+                                            <button type="submit" class="btn btn-sm btn-primary">{{ __('hrms.common.apply') }}</button>
                                         </div>
                                     </x-ui.filter>
 
                                     @if(request()->anyFilled(['history_search', 'history_category_id', 'history_company_id']))
-                                        <a href="{{ route('hrms.assets-module.index', request()->except(['history_search', 'history_category_id', 'history_company_id'])) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="Clear Filters">
+                                        <a href="{{ route('hrms.assets-module.index', request()->except(['history_search', 'history_category_id', 'history_company_id'])) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="{{ __('hrms.common.clear_filters') }}">
                                             <i class="feather-x"></i>
                                         </a>
                                     @endif
@@ -484,10 +475,10 @@
                         <table class="table table-hover align-middle mb-0 text-center" style="table-layout: fixed; width: 100%;">
                             <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
                                 <tr>
-                                    <th class="text-start" style="width: 25%; padding-left: 20px;">Custodian Employee</th>
-                                    <th class="text-start" style="width: 50%;">Allocated Assets (Item Details)</th>
-                                    <th style="width: 13%;">Total Qty</th>
-                                    <th class="text-center" style="width: 12%; white-space: nowrap;">Actions</th>
+                                    <th class="text-start" style="width: 25%; padding-left: 20px;">{{ __('hrms.assets.custodian_employee') }}</th>
+                                    <th class="text-start" style="width: 50%;">{{ __('hrms.assets.allocated_assets_item_details') }}</th>
+                                    <th style="width: 13%;">{{ __('hrms.assets.total_qty') }}</th>
+                                    <th class="text-center" style="width: 12%; white-space: nowrap;">{{ __('hrms.assets.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -536,7 +527,7 @@
                                                         data-employee-name="{{ $empAlloc->display_name }} ({{ $empAlloc->employee_id }})"
                                                         data-company-name="{{ $empAlloc->company->company_name ?? '' }}"
                                                         data-allocated-assets="{{ $encodedUnits }}">
-                                                        <span class="badge bg-light text-secondary border d-inline-flex align-items-center justify-content-center" style="font-size: 11px; cursor: pointer; border-radius: 4px; width: 28px; height: 28px; padding: 0;" title="View all {{ $totalUnique }} asset(s)">
+                                                        <span class="badge bg-light text-secondary border d-inline-flex align-items-center justify-content-center" style="font-size: 11px; cursor: pointer; border-radius: 4px; width: 28px; height: 28px; padding: 0;" title="{{ __('hrms.assets.view_all_assets', ['count' => $totalUnique]) }}">
                                                             <i class="feather-plus fs-13"></i>
                                                         </span>
                                                     </button>
@@ -554,7 +545,7 @@
                                                         data-employee-name="{{ $empAlloc->display_name }} ({{ $empAlloc->employee_id }})"
                                                         data-allocated-assets="{{ $encodedUnits }}">
                                                         <i class="feather-corner-up-left me-2 text-danger"></i>
-                                                        <span>Return Asset</span>
+                                                        <span>{{ __('hrms.assets.return_asset') }}</span>
                                                     </a>
                                                 </li>
                                             </x-ui.action-dropdown>
@@ -564,8 +555,8 @@
                                     <tr>
                                         <td colspan="4" class="text-center py-5 text-muted fs-12">
                                             <i class="feather-clock fs-32 d-block mb-3 text-secondary"></i>
-                                            <div class="fw-bold mb-1">No Custody History Found</div>
-                                            <div>There are no active asset allocations.</div>
+                                            <div class="fw-bold mb-1">{{ __('hrms.assets.no_custody_history_found') }}</div>
+                                            <div>{{ __('hrms.assets.no_active_allocations_desc') }}</div>
                                         </td>
                                     </tr>
                                 @endforelse
@@ -595,7 +586,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold text-dark" id="directAllocateModalLabel">
-                    <i class="feather-plus me-2 text-primary"></i>Allocate Asset Directly
+                    <i class="feather-plus me-2 text-primary"></i>{{ __('hrms.assets.allocate_asset_directly') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -604,8 +595,8 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="Select Employee" name="employee_id" :required="true" class="select2-modal">
-                                <option value="">Select Employee...</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('hrms.assets.select_employee')" name="employee_id" :required="true" class="select2-modal">
+                                <option value="">{{ __('hrms.assets.select_employee_placeholder') }}</option>
                                 @foreach($employees as $emp)
                                     <option value="{{ $emp->id }}">{{ $emp->display_name }} ({{ $emp->employee_id }})</option>
                                 @endforeach
@@ -613,26 +604,26 @@
                         </div>
                         <div class="col-12">
                             <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
-                                <h6 class="fw-bold text-dark mb-0">Allocated Assets & Quantities</h6>
+                                <h6 class="fw-bold text-dark mb-0">{{ __('hrms.assets.allocated_assets_quantities') }}</h6>
                                 <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" id="btn-add-alloc-item-row" style="font-size: 11px;">
-                                    <i class="feather-plus me-1"></i>Add Another Asset
+                                    <i class="feather-plus me-1"></i>{{ __('hrms.assets.add_another_asset') }}
                                 </button>
                             </div>
                             <x-ui.odoo-form-ui type="table" id="alloc-items-table" style="table-layout: fixed; width: 100%;">
                                 <thead>
                                     <tr>
-                                        <th style="width: 62%;">Asset</th>
-                                        <th style="width: 95px;" class="text-center">Quantity</th>
-                                        <th style="width: 50px;" class="text-center">Action</th>
+                                        <th style="width: 62%;">{{ __('hrms.assets.asset_lbl_plain') }}</th>
+                                        <th style="width: 95px;" class="text-center">{{ __('hrms.assets.quantity') }}</th>
+                                        <th style="width: 50px;" class="text-center">{{ __('hrms.assets.action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody id="alloc-items-tbody">
                                     <tr>
                                         <td class="py-2 px-3">
                                             <x-ui.odoo-form-ui type="select" name="items[0][asset_id]" :required="true" class="alloc-item-select">
-                                                <option value="">Select Asset...</option>
+                                                <option value="">{{ __('hrms.assets.select_asset_placeholder') }}</option>
                                                 @foreach($availableAssets as $ast)
-                                                    <option value="{{ $ast->id }}">{{ $ast->name }} - {{ $ast->asset_code }} (Category: {{ $ast->category->name ?? 'N/A' }})</option>
+                                                    <option value="{{ $ast->id }}">{{ $ast->name }} - {{ $ast->asset_code }} ({{ __('hrms.assets.category') }}: {{ $ast->category->name ?? __('hrms.common.na') }})</option>
                                                 @endforeach
                                             </x-ui.odoo-form-ui>
                                         </td>
@@ -647,19 +638,19 @@
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Allocation Date" name="allocated_at" value="{{ date('Y-m-d') }}" :required="true" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.assets.allocation_date')" name="allocated_at" value="{{ date('Y-m-d') }}" :required="true" />
                         </div>
                         <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Expected Return Date" name="expected_return_date" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.assets.expected_return_date')" name="expected_return_date" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="notes" placeholder="Reason for allocation, condition details..." />
+                            <x-ui.odoo-form-ui type="textarea" :label="__('hrms.assets.internal_notes')" name="notes" :placeholder="__('hrms.assets.placeholder_alloc_notes')" />
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Allocate</button>
-                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.allocate') }}</button>
+                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</button>
                 </div>
             </form>
         </div>
@@ -672,7 +663,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold text-dark" id="returnAssetModalLabel">
-                    <i class="feather-corner-up-left me-2 text-primary"></i>Return Asset to Inventory
+                    <i class="feather-corner-up-left me-2 text-primary"></i>{{ __('hrms.assets.return_asset_to_inventory') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -682,39 +673,39 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="Custodian Employee" id="return_employee_name_display" name="employee_name_display" readonly="true" class="bg-light" />
+                            <x-ui.odoo-form-ui type="input" :label="__('hrms.assets.custodian_employee')" id="return_employee_name_display" name="employee_name_display" readonly="true" class="bg-light" />
                         </div>
 
                         <div class="col-12">
-                            <label class="info-label" style="color: #dc3545 !important;">Select Serialized Unit(s) to Return <span class="text-danger">*</span></label>
+                            <label class="info-label" style="color: #dc3545 !important;">{{ __('hrms.assets.select_units_to_return') }} <span class="text-danger">*</span></label>
                             <div id="return_assets_checklist" style="max-height: 280px; overflow-y: auto;">
                                 <!-- Checklist populated via JS -->
                             </div>
                             <div id="return_checklist_error" class="d-none mt-2">
                                 <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style="background: #fff3f3; border: 1px solid #f5c2c7;">
                                     <i class="feather-alert-circle text-danger" style="font-size: 15px; flex-shrink: 0;"></i>
-                                    <span class="text-danger fs-12 fw-semibold">Please select at least one unit to return.</span>
+                                    <span class="text-danger fs-12 fw-semibold">{{ __('hrms.assets.alert_select_unit_to_return') }}</span>
                                 </div>
                             </div>
-                            <small class="text-muted mt-1 d-block">Check the specific physical units being returned.</small>
+                            <small class="text-muted mt-1 d-block">{{ __('hrms.assets.select_physical_units_returned') }}</small>
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="Condition on Return" name="condition_on_return" :required="true">
-                                <option value="good">Good</option>
-                                <option value="new">New</option>
-                                <option value="fair">Fair</option>
-                                <option value="damaged">Damaged (Send to Maintenance)</option>
-                                <option value="scrapped">Scrapped</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('hrms.assets.return_condition')" name="condition_on_return" :required="true">
+                                <option value="good">{{ __('hrms.assets.cond_good') }}</option>
+                                <option value="new">{{ __('hrms.assets.cond_new') }}</option>
+                                <option value="fair">{{ __('hrms.assets.cond_fair') }}</option>
+                                <option value="damaged">{{ __('hrms.assets.cond_damaged_maintenance') }}</option>
+                                <option value="scrapped">{{ __('hrms.assets.cond_scrapped') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="Return Notes" name="notes" placeholder="Condition details, reason for return..." />
+                            <x-ui.odoo-form-ui type="textarea" :label="__('hrms.assets.return_notes')" name="notes" :placeholder="__('hrms.assets.placeholder_return_notes')" />
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">Confirm Return</button>
-                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.confirm_return') }}</button>
+                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</button>
                 </div>
             </form>
         </div>
@@ -727,7 +718,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold text-dark" id="rejectRequestModalLabel">
-                    <i class="feather-alert-octagon me-2 text-danger"></i>Reject Request
+                    <i class="feather-alert-octagon me-2 text-danger"></i>{{ __('hrms.assets.reject_request') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -736,13 +727,13 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="Rejection Reason" name="admin_notes" placeholder="Explain why this request is being rejected..." :required="true" />
+                            <x-ui.odoo-form-ui type="textarea" :label="__('hrms.assets.rejection_reason')" name="admin_notes" :placeholder="__('hrms.assets.rejection_reason_placeholder')" :required="true" />
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">Reject Request</button>
-                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.reject_request_btn') }}</button>
+                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</button>
                 </div>
             </form>
         </div>
@@ -755,7 +746,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold text-dark" id="allocateAssetModalLabel">
-                    <i class="feather-user-check me-2 text-primary"></i>Allocate Asset for Request
+                    <i class="feather-user-check me-2 text-primary"></i>{{ __('hrms.assets.allocate_asset_for_request') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -763,34 +754,34 @@
                 @csrf
                 <div class="modal-body">
                     <div class="bg-light p-3 rounded border mb-3 text-dark fs-13">
-                        <div>Requester: <strong id="alloc_modal_emp_name">-</strong></div>
-                        <div class="mt-1">Requesting: <strong id="alloc_modal_item_name">-</strong></div>
+                        <div>{{ __('hrms.assets.requester') }}: <strong id="alloc_modal_emp_name">-</strong></div>
+                        <div class="mt-1">{{ __('hrms.assets.requesting') }}: <strong id="alloc_modal_item_name">-</strong></div>
                     </div>
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="info-label" style="color: #dc3545 !important;">Select Physical Unit(s) to Allocate <span class="text-danger">*</span></label>
+                            <label class="info-label" style="color: #dc3545 !important;">{{ __('hrms.assets.select_units_to_allocate') }} <span class="text-danger">*</span></label>
                             <div id="alloc_modal_checklist" class="border rounded p-2 bg-white" style="max-height: 220px; overflow-y: auto;">
                                 <!-- Checklist populated via JS -->
                             </div>
                             <div id="alloc_modal_checklist_error" class="d-none mt-2">
                                 <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style="background: #fff3f3; border: 1px solid #f5c2c7;">
                                     <i class="feather-alert-circle text-danger" style="font-size: 15px; flex-shrink: 0;"></i>
-                                    <span class="text-danger fs-12 fw-semibold">Please select at least one unit to allocate.</span>
+                                    <span class="text-danger fs-12 fw-semibold">{{ __('hrms.assets.alert_select_unit_to_fulfill') }}</span>
                                 </div>
                             </div>
-                            <small class="text-muted mt-1 d-block">Check all physical units to assign to this employee.</small>
+                            <small class="text-muted mt-1 d-block">{{ __('hrms.assets.check_all_units_help') }}</small>
                         </div>
                         <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Allocation Date" name="allocated_at" value="{{ date('Y-m-d') }}" :required="true" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.assets.allocation_date')" name="allocated_at" value="{{ date('Y-m-d') }}" :required="true" />
                         </div>
                         <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Expected Return Date" name="expected_return_date" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.assets.expected_return_date')" name="expected_return_date" />
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;" id="alloc_modal_submit_btn">Fulfill Allocation</button>
-                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;" id="alloc_modal_submit_btn">{{ __('hrms.assets.fulfill_allocation') }}</button>
+                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</button>
                 </div>
             </form>
         </div>
@@ -803,7 +794,7 @@
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header border-bottom py-2.5 px-4">
                 <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="viewRequestDetailsModalLabel">
-                    <i class="feather-eye me-2 text-primary"></i>Request Details
+                    <i class="feather-eye me-2 text-primary"></i>{{ __('hrms.assets.details_modal_title') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -812,20 +803,20 @@
                     <div class="card-body p-3">
                         <div class="d-flex align-items-start justify-content-between">
                             <div>
-                                <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-0.5">Requested By</span>
-                                <h6 class="fw-bold text-dark mb-0 fs-14" id="req_detail_emp_name">Employee Name</h6>
+                                <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-0.5">{{ __('hrms.assets.lbl_requested_by') }}</span>
+                                <h6 class="fw-bold text-dark mb-0 fs-14" id="req_detail_emp_name">{{ __('hrms.assets.employee') }}</h6>
                                 <div class="fs-11 text-muted fw-medium" id="req_detail_emp_id">EMP0000</div>
                             </div>
                             <div class="text-end">
-                                <span class="badge bg-white text-secondary border px-2.5 py-1 fs-11 fw-semibold mb-1 d-inline-block" id="req_detail_company">Company</span>
+                                <span class="badge bg-white text-secondary border px-2.5 py-1 fs-11 fw-semibold mb-1 d-inline-block" id="req_detail_company">{{ __('hrms.assets.company') }}</span>
                                 <div class="fs-11 text-muted fw-medium mt-0.5">
                                     <i class="feather-calendar me-1 text-primary"></i><span id="req_detail_date">-</span>
                                 </div>
                             </div>
                         </div>
                         <div class="mt-2.5 pt-2 border-top">
-                            <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1"><i class="feather-message-square me-1 text-primary"></i>Reason for Request</span>
-                            <div class="fs-12 text-dark" id="req_detail_reason" style="white-space: pre-wrap; line-height: 1.4;">No reason provided.</div>
+                            <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1"><i class="feather-message-square me-1 text-primary"></i>{{ __('hrms.assets.lbl_reason_for_request') }}</span>
+                            <div class="fs-12 text-dark" id="req_detail_reason" style="white-space: pre-wrap; line-height: 1.4;">{{ __('hrms.assets.no_reason_provided') }}</div>
                         </div>
                     </div>
                 </div>
@@ -833,26 +824,26 @@
                 <div class="border rounded-3 p-3 bg-white mb-2.5">
                     <div class="d-flex align-items-center justify-content-between mb-1">
                         <div>
-                            <span class="fs-10 text-uppercase fw-bold text-muted me-2">Requested Item</span>
-                            <span class="badge bg-light text-secondary border px-2 py-0.5 fs-10" id="req_detail_category">Category</span>
+                            <span class="fs-10 text-uppercase fw-bold text-muted me-2">{{ __('hrms.assets.requested_item') }}</span>
+                            <span class="badge bg-light text-secondary border px-2 py-0.5 fs-10" id="req_detail_category">{{ __('hrms.assets.category') }}</span>
                         </div>
                         <div id="req_detail_status_container">
-                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11" id="req_detail_status">Pending</span>
+                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11" id="req_detail_status">{{ __('hrms.assets.status_pending') }}</span>
                         </div>
                     </div>
-                    <h6 class="fw-bold text-dark mb-2 fs-14" id="req_detail_asset_name">Asset Name</h6>
+                    <h6 class="fw-bold text-dark mb-2 fs-14" id="req_detail_asset_name">{{ __('hrms.assets.asset_name_label') }}</h6>
 
                     <div class="d-flex align-items-center gap-2 mt-1">
                         <div class="flex-fill border rounded py-1 px-2 text-center bg-light">
-                            <span class="fs-10 text-uppercase text-muted d-block" style="font-size: 9px;">Req</span>
+                            <span class="fs-10 text-uppercase text-muted d-block" style="font-size: 9px;">{{ __('hrms.assets.req') }}</span>
                             <strong class="fs-12 text-dark" id="req_detail_req_qty">0</strong>
                         </div>
                         <div class="flex-fill border rounded py-1 px-2 text-center bg-soft-success border-success-subtle">
-                            <span class="fs-10 text-uppercase text-success d-block" style="font-size: 9px;">Allocated</span>
+                            <span class="fs-10 text-uppercase text-success d-block" style="font-size: 9px;">{{ __('hrms.assets.lbl_alloc_short') }}</span>
                             <strong class="fs-12 text-success" id="req_detail_alloc_qty">0</strong>
                         </div>
                         <div class="flex-fill border rounded py-1 px-2 text-center bg-soft-danger border-danger-subtle">
-                            <span class="fs-10 text-uppercase text-danger d-block" style="font-size: 9px;">Remaining</span>
+                            <span class="fs-10 text-uppercase text-danger d-block" style="font-size: 9px;">{{ __('hrms.assets.lbl_rem_short') }}</span>
                             <strong class="fs-12 text-danger" id="req_detail_rem_qty">0</strong>
                         </div>
                     </div>
@@ -862,11 +853,11 @@
                     <!-- Allocation Details Box -->
                     <div id="req_detail_allocation_box" class="border rounded-3 p-3 bg-soft-success border-success-subtle d-none">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="fs-10 text-uppercase fw-bold text-success"><i class="feather-check-circle me-1"></i>Allocation Details</span>
+                            <span class="fs-10 text-uppercase fw-bold text-success"><i class="feather-check-circle me-1"></i>{{ __('hrms.assets.allocation_details') }}</span>
                             <span class="fs-11 fw-semibold text-dark" id="req_detail_alloc_date">-</span>
                         </div>
                         <div>
-                            <span class="fs-10 text-uppercase text-muted d-block mb-1">Allocated Asset Units</span>
+                            <span class="fs-10 text-uppercase text-muted d-block mb-1">{{ __('hrms.assets.allocated_asset_units') }}</span>
                             <div id="req_detail_allocated_units_list" class="d-flex flex-wrap gap-1.5">
                             </div>
                         </div>
@@ -875,18 +866,18 @@
                     <!-- Rejection Details Box -->
                     <div id="req_detail_rejection_box" class="border rounded-3 p-3 bg-soft-danger border-danger-subtle d-none">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="fs-10 text-uppercase fw-bold text-danger"><i class="feather-x-circle me-1"></i>Rejection Details</span>
+                            <span class="fs-10 text-uppercase fw-bold text-danger"><i class="feather-x-circle me-1"></i>{{ __('hrms.assets.rejection_details') }}</span>
                             <span class="fs-11 fw-semibold text-dark" id="req_detail_reject_date">-</span>
                         </div>
                         <div>
-                            <span class="fs-10 text-uppercase text-muted d-block mb-1">Reason / Admin Notes</span>
-                            <div class="fs-12 text-dark fw-medium" id="req_detail_reject_notes">No specific reason provided.</div>
+                            <span class="fs-10 text-uppercase text-muted d-block mb-1">{{ __('hrms.assets.reason_admin_notes') }}</span>
+                            <div class="fs-12 text-dark fw-medium" id="req_detail_reject_notes">{{ __('hrms.assets.no_specific_reason_provided') }}</div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer py-2">
-                <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
             </div>
         </div>
     </div>
@@ -898,7 +889,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold text-dark" id="bulkAllocateModalLabel">
-                    <i class="feather-user-check me-2 text-primary"></i>Bulk Allocate Assets
+                    <i class="feather-user-check me-2 text-primary"></i>{{ __('hrms.assets.bulk_allocate_assets') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -909,9 +900,9 @@
                         <table class="table table-bordered align-middle mb-0" id="bulk_allocate_table">
                             <thead class="table-light fs-11 text-uppercase">
                                 <tr>
-                                    <th class="text-start" style="width: 25%;">Employee</th>
-                                    <th class="text-start" style="width: 30%;">Requested Item</th>
-                                    <th class="text-start" style="width: 45%;">Select Unit(s) to Allocate</th>
+                                    <th class="text-start" style="width: 25%;">{{ __('hrms.assets.employee') }}</th>
+                                    <th class="text-start" style="width: 30%;">{{ __('hrms.assets.requested_item') }}</th>
+                                    <th class="text-start" style="width: 45%;">{{ __('hrms.assets.select_units_to_allocate') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -922,14 +913,14 @@
                     <div id="bulk_alloc_checklist_error" class="d-none mb-2">
                         <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style="background: #fff3f3; border: 1px solid #f5c2c7;">
                             <i class="feather-alert-circle text-danger" style="font-size: 15px; flex-shrink: 0;"></i>
-                            <span class="text-danger fs-12 fw-semibold">Please select at least one unit for every request row.</span>
+                            <span class="text-danger fs-12 fw-semibold">{{ __('hrms.assets.alert_bulk_select_unit_every_row') }}</span>
                         </div>
                     </div>
                     <input type="hidden" name="allocated_at" value="{{ date('Y-m-d') }}">
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Confirm Bulk Allocation</button>
-                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.confirm_bulk_allocation') }}</button>
+                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</button>
                 </div>
             </form>
         </div>
@@ -942,7 +933,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold text-dark" id="bulkRejectModalLabel">
-                    <i class="feather-x me-2 text-danger"></i>Bulk Reject Requests
+                    <i class="feather-x me-2 text-danger"></i>{{ __('hrms.assets.bulk_reject_requests') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -952,30 +943,30 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="Bulk Rejection Reason" name="admin_notes" placeholder="Explain why the selected requests are rejected..." :required="true" />
+                            <x-ui.odoo-form-ui type="textarea" :label="__('hrms.assets.bulk_rejection_reason')" name="admin_notes" :placeholder="__('hrms.assets.bulk_rejection_placeholder')" :required="true" />
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">Reject All Selected</button>
-                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.reject_all_selected') }}</button>
+                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 <!-- OFFCANVAS: VIEW ALL EMPLOYEE ASSETS -->
-<x-ui.drawer id="employeeAssetsOffcanvas" title="Custodian Assets List" position="end" style="width: 420px; border-left: 1px solid #e2e8f0; box-shadow: -4px 0 24px rgba(0,0,0,0.08);">
+<x-ui.drawer id="employeeAssetsOffcanvas" :title="__('hrms.assets.custodian_assets_list')" position="end" style="width: 420px; border-left: 1px solid #e2e8f0; box-shadow: -4px 0 24px rgba(0,0,0,0.08);">
     <div class="card border bg-light shadow-none mb-4">
         <div class="card-body p-3">
-            <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1">Custodian Employee</span>
+            <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1">{{ __('hrms.assets.custodian_employee') }}</span>
             <h6 class="fw-bold text-dark mb-0.5 fs-13" id="offcanvas_emp_name">-</h6>
             <span class="text-secondary fs-11" id="offcanvas_emp_company">-</span>
         </div>
     </div>
     
     <div>
-        <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-2.5">Currently Allocated Items</span>
+        <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-2.5">{{ __('hrms.assets.currently_allocated_items') }}</span>
         <div id="offcanvas_assets_list" class="d-flex flex-column gap-2">
             <!-- Populated via JS -->
         </div>
@@ -985,6 +976,24 @@
 
 @push('scripts')
 <script>
+    const langAssets = {
+        qtyExceedsStock: "{{ __('hrms.assets.qty_exceeds_stock') }}",
+        noUnitsAvailableItem: "{{ __('hrms.assets.no_units_available_item') }}",
+        noUnitsAvailable: "{{ __('hrms.assets.no_units_available') }}",
+        serial: "{{ __('hrms.assets.serial_number') }}",
+        noSpecificCodes: "{{ __('hrms.assets.no_specific_codes') }}",
+        noSpecificNotes: "{{ __('hrms.assets.no_specific_notes') }}",
+        noActiveAllocations: "{{ __('hrms.assets.no_active_allocations_desc') }}",
+        qty: "{{ __('hrms.assets.quantity') }}",
+        qtyRemaining: "{{ __('hrms.assets.lbl_rem_short') }}",
+        returnBtn: "{{ __('hrms.assets.btn_return') }}",
+        statusPending: "{{ __('hrms.assets.status_pending') }}",
+        statusPartiallyAllocated: "{{ __('hrms.assets.status_partially_allocated') }}",
+        statusAllocated: "{{ __('hrms.assets.status_allocated') }}",
+        statusRejected: "{{ __('hrms.assets.status_rejected') }}",
+        na: "{{ __('hrms.common.na') }}"
+    };
+
     const allAvailableAssets = {!! json_encode($availableAssets->map(function($a) {
         return [
             'id' => $a->id,
@@ -1121,7 +1130,7 @@
                     input.addClass('is-invalid');
                     
                     // Create error element exactly matching common UI element style
-                    var errorEl = $('<div class="invalid-feedback dynamic-error-feedback d-block fs-11 mt-1">Quantity cannot exceed available stock (1).</div>');
+                    var errorEl = $('<div class="invalid-feedback dynamic-error-feedback d-block fs-11 mt-1">' + langAssets.qtyExceedsStock + '</div>');
                     input.parent().append(errorEl);
                 }
             });
@@ -1178,7 +1187,7 @@
             });
 
             if (filteredAssets.length === 0) {
-                checklist.html('<div class="d-flex align-items-center gap-2 px-2 py-2 text-danger fs-12"><i class="feather-alert-triangle"></i> No available units found for this item.</div>');
+                checklist.html('<div class="d-flex align-items-center gap-2 px-2 py-2 text-danger fs-12"><i class="feather-alert-triangle"></i> ' + langAssets.noUnitsAvailableItem + '</div>');
                 $('#alloc_modal_submit_btn').prop('disabled', true);
             } else {
                 $('#alloc_modal_submit_btn').prop('disabled', false);
@@ -1223,7 +1232,7 @@
             
             $('#req_detail_emp_name').text(btn.attr('data-emp-name'));
             $('#req_detail_emp_id').text(btn.attr('data-emp-id'));
-            $('#req_detail_company').text(btn.attr('data-company') || 'N/A');
+            $('#req_detail_company').text(btn.attr('data-company') || langAssets.na);
             $('#req_detail_date').text(btn.attr('data-date'));
             $('#req_detail_reason').text(btn.attr('data-reason'));
             $('#req_detail_category').text(btn.attr('data-category'));
@@ -1272,12 +1281,12 @@
                                 listContainer.append(
                                     '<div class="badge bg-light text-dark border px-2.5 py-1.5 text-start w-100 rounded-3 mb-1.5">' +
                                         '<div class="fw-bold fs-11">' + unit.code + '</div>' +
-                                        '<div class="text-muted fs-10 mt-0.5">' + unit.name + ' • Serial: ' + unit.serial + '</div>' +
+                                        '<div class="text-muted fs-10 mt-0.5">' + unit.name + ' • ' + langAssets.serial + ': ' + unit.serial + '</div>' +
                                     '</div>'
                                 );
                             });
                         } else {
-                            listContainer.append('<span class="text-muted fs-12">No specific asset codes mapped.</span>');
+                            listContainer.append('<span class="text-muted fs-12">' + langAssets.noSpecificCodes + '</span>');
                         }
                     }
                 } catch(e) {
@@ -1287,7 +1296,7 @@
                 fulfillSection.removeClass('d-none');
                 rejectBox.removeClass('d-none');
                 $('#req_detail_reject_date').text(btn.attr('data-action-date'));
-                $('#req_detail_reject_notes').text(btn.attr('data-admin-notes') || 'No specific notes provided.');
+                $('#req_detail_reject_notes').text(btn.attr('data-admin-notes') || langAssets.noSpecificNotes);
             }
 
             var detailModal = new bootstrap.Modal(document.getElementById('viewRequestDetailsModal'));
@@ -1368,12 +1377,12 @@
 
                 var checklistHtml = '';
                 if (itemAssets.length === 0) {
-                    checklistHtml = '<div class="text-danger fs-12 py-1"><i class="feather-alert-triangle me-1"></i>No units available.</div>';
+                    checklistHtml = '<div class="text-danger fs-12 py-1"><i class="feather-alert-triangle me-1"></i>' + langAssets.noUnitsAvailable + '</div>';
                 } else {
                     itemAssets.forEach(function(a, idx) {
                         var cbId = 'bulk_alloc_unit_' + reqId + '_' + a.id;
                         var label = '<strong>' + a.asset_code + '</strong>';
-                        if (a.serial_number) label += ' <span class="text-muted fs-11">(S/N: ' + a.serial_number + ')</span>';
+                        if (a.serial_number) label += ' <span class="text-muted fs-11">(' + langAssets.serial + ': ' + a.serial_number + ')</span>';
                         var borderStyle = idx < itemAssets.length - 1 ? 'border-bottom: 1px dashed #e9ecef;' : '';
                         checklistHtml += '<div class="form-check py-1 d-flex align-items-center" style="' + borderStyle + '">' +
                             '<input class="form-check-input bulk-alloc-unit-checkbox me-2" type="checkbox" name="allocations[' + reqId + '][]" value="' + a.id + '" id="' + cbId + '" data-req-id="' + reqId + '" style="cursor:pointer;">' +
@@ -1387,7 +1396,7 @@
                     '<td class="text-start align-top py-2">' +
                         '<div class="fs-12 fw-semibold text-dark">' + itemName + '</div>' +
                         '<div class="text-muted fs-10">' + catName + '</div>' +
-                        '<div class="mt-1"><span class="badge bg-soft-warning text-warning fs-10">Qty Remaining: ' + remainingQty + '</span></div>' +
+                        '<div class="mt-1"><span class="badge bg-soft-warning text-warning fs-10">' + langAssets.qtyRemaining + ': ' + remainingQty + '</span></div>' +
                     '</td>' +
                     '<td class="text-start align-top py-2">' +
                         '<div class="border rounded p-2 bg-white" style="max-height: 160px; overflow-y: auto;">' +
@@ -1460,7 +1469,7 @@
             var rawAssets = button.attr('data-allocated-assets');
 
             $('#offcanvas_emp_name').text(empName);
-            $('#offcanvas_emp_company').text(compName || 'N/A');
+            $('#offcanvas_emp_company').text(compName || langAssets.na);
 
             var listDiv = $('#offcanvas_assets_list');
             listDiv.empty();
@@ -1493,7 +1502,7 @@
                         <div class="d-flex align-items-center">
                             <div class="d-flex flex-column">
                                 <span class="fw-bold text-dark fs-12">${name}</span>
-                                <span class="text-muted fs-10 mt-0.5">Qty: ${group.qty} (${group.codes.join(', ')})</span>
+                                <span class="text-muted fs-10 mt-0.5">${langAssets.qty}: ${group.qty} (${group.codes.join(', ')})</span>
                             </div>
                         </div>
                         <button type="button" class="btn btn-xs btn-soft-danger return-from-drawer-btn px-2.5 py-1 text-uppercase fw-bold" 
@@ -1503,7 +1512,7 @@
                                 data-raw-assets='${rawAssets}'
                                 data-item-name="${name}"
                                 style="font-size: 10px; border-radius: 4px;">
-                            Return
+                            ${langAssets.returnBtn}
                         </button>
                     </div>
                 `;
@@ -1563,7 +1572,7 @@
             $('#return_checklist_error').addClass('d-none');
 
             if (assets.length === 0) {
-                checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No active allocations found.</span>');
+                checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>' + langAssets.noActiveAllocations + '</span>');
                 return;
             }
 
@@ -1602,7 +1611,7 @@
                         <div class="form-check py-1.5 d-flex align-items-center ms-1">
                             <input class="form-check-input return-allocated-asset-checkbox me-2" type="checkbox" name="allocated_asset_ids[]" value="${asset.id}" id="${checkboxId}" data-parent-group="${groupCheckboxId}" ${isChecked} style="cursor: pointer;">
                             <label class="form-check-label fs-12 text-dark mb-0" for="${checkboxId}" style="cursor: pointer;">
-                                <strong>${asset.asset_code}</strong> <span class="text-muted">(Serial: ${asset.serial_number || 'N/A'})</span>
+                                <strong>${asset.asset_code}</strong> <span class="text-muted">(${langAssets.serial}: ${asset.serial_number || langAssets.na})</span>
                             </label>
                         </div>
                     `;
@@ -1622,7 +1631,7 @@
                                 </label>
                             </div>
                             <div class="d-flex align-items-center gap-2">
-                                <span class="badge fs-10 fw-bold rounded-pill selected-qty-badge ${groupBadgeClass}">Qty: ${checkedCount} / ${groupItems.length}</span>
+                                <span class="badge fs-10 fw-bold rounded-pill selected-qty-badge ${groupBadgeClass}">${langAssets.qty}: ${checkedCount} / ${groupItems.length}</span>
                             </div>
                         </div>
                         <div class="collapse ${collapseClass}" id="${collapseId}">
@@ -1644,7 +1653,7 @@
             var collapseEl = groupCard.find('.collapse')[0];
             var groupCheckbox = groupCard.find('.return-group-checkbox');
 
-            badge.text('Qty: ' + checkedChildren + ' / ' + totalChildren);
+            badge.text(langAssets.qty + ': ' + checkedChildren + ' / ' + totalChildren);
 
             if (checkedChildren > 0) {
                 badge.removeClass('d-none').addClass('bg-soft-success text-success');

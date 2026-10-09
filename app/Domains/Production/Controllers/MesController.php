@@ -537,7 +537,7 @@ class MesController extends Controller
                         'machine_id' => $request->input('machine_id') ?? $orderOp->machine_id,
                         'instructions' => $request->input('instructions') ?? "Rework for {$qty} rejected units.",
                         'assigned_to' => $request->input('assigned_to') ?? $userId,
-                        'cost_estimate' => (float) ($request->input('cost_estimate') ?? 150.00),
+                        'cost_estimate' => $request->filled('cost_estimate') ? convert_to_base((float) $request->input('cost_estimate')) : convert_to_base(150.00),
                     ]);
 
                     \App\Domains\Production\Models\ProductionOrderRework::create([

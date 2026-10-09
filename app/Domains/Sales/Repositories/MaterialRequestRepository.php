@@ -11,7 +11,7 @@ class MaterialRequestRepository
     {
         $query = ProductionRequisitionSlip::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->with(['order.product']);
+            ->with(['order.product', 'maintenanceWorkOrder.machine.workCenter']);
 
         if (!empty($filters['search'])) {
             $search = '%' . $filters['search'] . '%';
@@ -19,6 +19,10 @@ class MaterialRequestRepository
                 $q->where('requisition_number', 'like', $search)
                     ->orWhereHas('order', function ($o) use ($search) {
                         $o->where('order_number', 'like', $search);
+                    })
+                    ->orWhereHas('maintenanceWorkOrder', function ($m) use ($search) {
+                        $m->where('work_order_number', 'like', $search)
+                          ->orWhereHas('machine', fn($mac) => $mac->where('name', 'like', $search)->orWhere('code', 'like', $search));
                     });
             });
         }
@@ -41,7 +45,7 @@ class MaterialRequestRepository
     {
         return ProductionRequisitionSlip::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->with(['order.product', 'items.product', 'items.warehouse'])
+            ->with(['order.product', 'maintenanceWorkOrder.machine.workCenter', 'items.product', 'items.warehouse'])
             ->find($id);
     }
 }

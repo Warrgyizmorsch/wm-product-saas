@@ -325,7 +325,7 @@ class ReworkService
                     'production_order_id' => $rework->original_production_order_id,
                     'event_type' => 'Rework Completed',
                     'title' => 'Rework Order Finalized',
-                    'description' => "Rework order {$rework->rework_number} completed. Actual Rework Cost: \${$rework->actual_cost}.",
+                    'description' => "Rework order {$rework->rework_number} completed. Actual Rework Cost: " . format_currency((float) $rework->actual_cost) . ".",
                     'severity' => 'success',
                     'event_source' => 'ReworkService',
                 ]);

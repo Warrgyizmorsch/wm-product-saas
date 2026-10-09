@@ -6,6 +6,7 @@ use App\Domains\HRMS\Models\Company;
 use App\Domains\HRMS\Models\BusinessUnit;
 use App\Domains\HRMS\Models\Branch;
 use App\Domains\HRMS\Models\HolidayCalendar;
+use Illuminate\Support\Facades\DB;
 
 class HolidayCalendarRepository implements HolidayCalendarRepositoryInterface
 {
@@ -19,10 +20,11 @@ class HolidayCalendarRepository implements HolidayCalendarRepositoryInterface
 
         // Search text
         if (!empty($inputs['search'])) {
-            $search = $inputs['search'];
+            $search = trim($inputs['search']);
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('holiday_date', 'like', "%{$search}%");
             });
         }
 
@@ -44,36 +46,56 @@ class HolidayCalendarRepository implements HolidayCalendarRepositoryInterface
 
         // Year filter
         if (!empty($inputs['year'])) {
-            $query->whereYear('holiday_date', $inputs['year']);
+            $query->whereYear('holiday_date', (int) $inputs['year']);
         }
 
         // Sorting
         $sort = $inputs['sort'] ?? 'date_asc';
         if ($sort === 'date_desc') {
-            $query->orderBy('holiday_date', 'desc');
+            $query->orderBy('holiday_date', 'desc')->orderBy('id', 'desc');
         } elseif ($sort === 'name_asc') {
-            $query->orderBy('name', 'asc');
+            $query->orderBy('name', 'asc')->orderBy('id', 'asc');
         } elseif ($sort === 'name_desc') {
-            $query->orderBy('name', 'desc');
+            $query->orderBy('name', 'desc')->orderBy('id', 'desc');
         } else {
-            $query->orderBy('holiday_date', 'asc');
+            $query->orderBy('holiday_date', 'asc')->orderBy('id', 'asc');
         }
 
         $holidays = $query->paginate(10)->withQueryString();
 
-        // Get unique years that have holidays for the year filter dropdown
-        $availableYears = HolidayCalendar::query()
-            ->selectRaw('YEAR(holiday_date) as year')
-            ->distinct()
-            ->orderBy('year', 'desc')
-            ->pluck('year')
-            ->toArray();
-
-        // If current year is not in available years, prepopulate it
-        $currentYear = now()->year;
-        if (!in_array($currentYear, $availableYears)) {
-            array_unshift($availableYears, $currentYear);
+        // Get unique years that have holidays for the year filter dropdown (DB-agnostic)
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'sqlite') {
+            $availableYears = HolidayCalendar::query()
+                ->selectRaw("strftime('%Y', holiday_date) as year")
+                ->distinct()
+                ->orderBy('year', 'desc')
+                ->pluck('year')
+                ->map(fn($y) => (int) $y)
+                ->filter(fn($y) => $y > 0)
+                ->values()
+                ->toArray();
+        } else {
+            $availableYears = HolidayCalendar::query()
+                ->selectRaw('YEAR(holiday_date) as year')
+                ->distinct()
+                ->orderBy('year', 'desc')
+                ->pluck('year')
+                ->map(fn($y) => (int) $y)
+                ->filter(fn($y) => $y > 0)
+                ->values()
+                ->toArray();
         }
+
+        $filters = array_merge([
+            'search' => '',
+            'company_id' => '',
+            'business_unit_id' => '',
+            'branch_id' => '',
+            'status' => '',
+            'year' => '',
+            'sort' => 'date_asc',
+        ], $inputs);
 
         return [
             'holidays' => $holidays,
@@ -81,7 +103,7 @@ class HolidayCalendarRepository implements HolidayCalendarRepositoryInterface
             'businessUnits' => $businessUnits,
             'branches' => $branches,
             'availableYears' => $availableYears,
-            'filters' => $inputs,
+            'filters' => $filters,
         ];
     }
 
