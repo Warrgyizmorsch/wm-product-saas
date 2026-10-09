@@ -1911,4 +1911,10 @@ return array (
   'delivery_challan_pdf' => 'Delivery Challan PDF',
   'newest_date_first' => 'Newest Date First',
   'oldest_date_first' => 'Oldest Date First',
+  'source_document' => 'Source Document',
+  'target_machine' => 'Target Machine',
+  'maintenance' => 'Maintenance',
+  'maintenance_work_order' => 'Maintenance Work Order',
+  'store_requisition_mr' => 'Store Requisition (MR)',
 );
+

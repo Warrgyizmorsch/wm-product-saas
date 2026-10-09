@@ -48,7 +48,7 @@ class MaterialRequestController extends Controller
         $tenantId = require_tenant_id();
         $slip = ProductionRequisitionSlip::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->with(['order.product', 'items.product', 'items.uom', 'items.warehouse'])
+            ->with(['order.product', 'maintenanceWorkOrder.machine.workCenter', 'items.product', 'items.uom', 'items.warehouse'])
             ->findOrFail($id);
 
         // Group items by product_id so duplicate items in the same slip merge into a single row
