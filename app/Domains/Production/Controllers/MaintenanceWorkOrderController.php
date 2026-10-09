@@ -67,6 +67,15 @@ class MaintenanceWorkOrderController extends Controller
         ]);
 
         try {
+            if (!empty($validated['assignments'])) {
+                foreach ($validated['assignments'] as &$assignment) {
+                    if (isset($assignment['hourly_rate'])) {
+                        $assignment['hourly_rate'] = convert_to_base((float) $assignment['hourly_rate']);
+                    }
+                }
+                unset($assignment);
+            }
+
             $wo = $this->service->createWorkOrder($tenantId, $validated, auth()->id());
 
             return redirect()
@@ -176,10 +185,19 @@ class MaintenanceWorkOrderController extends Controller
 
             $externalPartsPurchased = filter_var($request->input('external_parts_purchased', false), FILTER_VALIDATE_BOOLEAN);
             $additionalCost = isset($validated['additional_cost'])
-                ? (float) $validated['additional_cost']
-                : (float) ($validated['additional_expense'] ?? 0.00);
+                ? convert_to_base((float) $validated['additional_cost'])
+                : (isset($validated['additional_expense']) ? convert_to_base((float) $validated['additional_expense']) : 0.00);
 
-            $mechanicCost = isset($validated['mechanic_cost']) ? (float) $validated['mechanic_cost'] : 0.00;
+            $mechanicCost = isset($validated['mechanic_cost']) ? convert_to_base((float) $validated['mechanic_cost']) : 0.00;
+
+            if (!empty($validated['assignments'])) {
+                foreach ($validated['assignments'] as &$assignment) {
+                    if (isset($assignment['hourly_rate'])) {
+                        $assignment['hourly_rate'] = convert_to_base((float) $assignment['hourly_rate']);
+                    }
+                }
+                unset($assignment);
+            }
 
             $wo = $this->service->completeWorkOrder(
                 $id,
@@ -318,6 +336,9 @@ class MaintenanceWorkOrderController extends Controller
 
         try {
             foreach ($validated['assignments'] as $assignment) {
+                if (isset($assignment['hourly_rate'])) {
+                    $assignment['hourly_rate'] = convert_to_base((float) $assignment['hourly_rate']);
+                }
                 $this->service->addAssignment($id, $tenantId, $assignment, auth()->id());
             }
 

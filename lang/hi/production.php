@@ -414,7 +414,7 @@ return [
     'physical_location' => 'भौतिक स्थान',
     'capacity_per_hour' => 'प्रति घंटा क्षमता',
     'efficiency' => 'दक्षता (%)',
-    'cost_per_hour' => 'प्रति घंटा लागत ($)',
+    'cost_per_hour' => 'प्रति घंटा लागत',
     'active_shifts' => 'सक्रिय पारियां',
     'save_work_center' => 'कार्य केंद्र सहेजें',
     'update_work_center' => 'कार्य केंद्र अपडेट करें',
