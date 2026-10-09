@@ -25,8 +25,14 @@ class QualityInspectionService
         return DB::transaction(function () use ($tenantId, $data) {
             $plan = ProductionQualityPlan::where('tenant_id', $tenantId)->findOrFail($data['quality_plan_id']);
 
+            $order = !empty($data['production_order_id'])
+                ? \App\Domains\Production\Models\ProductionOrder::withoutGlobalScopes()->find($data['production_order_id'])
+                : null;
+
             $inspection = ProductionQualityInspection::create([
                 'tenant_id' => $tenantId,
+                'company_id' => $data['company_id'] ?? $order?->company_id ?? company_id(),
+                'branch_id' => $data['branch_id'] ?? $order?->branch_id ?? branch_id(),
                 'quality_plan_id' => $plan->id,
                 'stage' => $data['stage'],
                 'status' => 'draft',
@@ -106,6 +112,8 @@ class QualityInspectionService
 
             $inspection = ProductionQualityInspection::create([
                 'tenant_id' => $tenantId,
+                'company_id' => $data['company_id'] ?? $orderOp?->company_id ?? $orderOp?->order?->company_id ?? $order?->company_id ?? company_id(),
+                'branch_id' => $data['branch_id'] ?? $orderOp?->branch_id ?? $orderOp?->order?->branch_id ?? $order?->branch_id ?? branch_id(),
                 'quality_plan_id' => $planId,
                 'inspection_number' => 'INSP-OP-' . date('Ymd') . '-' . rand(1000, 9999),
                 'stage' => $data['stage'] ?? 'in_process',
@@ -361,6 +369,8 @@ class QualityInspectionService
 
             $inspection = ProductionQualityInspection::create([
                 'tenant_id' => $tenantId,
+                'company_id' => $data['company_id'] ?? $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
+                'branch_id' => $data['branch_id'] ?? $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
                 'quality_plan_id' => $planId,
                 'inspection_number' => 'INSP-SF-' . date('Ymd') . '-' . rand(1000, 9999),
                 'stage' => 'in_process',

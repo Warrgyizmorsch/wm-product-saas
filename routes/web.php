@@ -33,6 +33,22 @@ Route::match(['get', 'post'], '/api/hrms/biometric/webhook', [\App\Domains\HRMS\
     ->name('api.hrms.biometric.webhook');
 Route::match(['get', 'post'], '/hrms/biometric/webhook', [\App\Domains\HRMS\Controllers\Api\BiometricWebhookController::class, 'handleAdmsRequest'])
     ->name('hrms.biometric.webhook');
+// Public Web-to-Lead Form, Floating Widget JS & API Endpoints
+Route::get('/forms/lead-capture/{tenant}', [\App\Domains\CRM\Controllers\WebToLeadController::class, 'renderForm'])
+    ->name('forms.lead-capture');
+Route::get('/forms/lead/{tenant}', [\App\Domains\CRM\Controllers\WebToLeadController::class, 'renderForm']);
+Route::get('/forms/config/{tenant}', [\App\Domains\CRM\Controllers\WebToLeadController::class, 'getFormConfig'])
+    ->name('forms.lead-config');
+Route::get('/api/crm/public/form-config/{tenant}', [\App\Domains\CRM\Controllers\WebToLeadController::class, 'getFormConfig'])
+    ->name('api.crm.public.form-config');
+Route::get('/embed/lead-widget.js', [\App\Domains\CRM\Controllers\WebToLeadController::class, 'renderWidgetJs'])
+    ->name('embed.lead-widget');
+Route::match(['post', 'options'], '/forms/lead-capture', [\App\Domains\CRM\Controllers\WebToLeadController::class, 'submit'])
+    ->middleware('throttle:30,1')
+    ->name('forms.lead-capture.submit');
+Route::match(['post', 'options'], '/api/crm/public/lead-capture', [\App\Domains\CRM\Controllers\WebToLeadController::class, 'submit'])
+    ->middleware('throttle:30,1')
+    ->name('api.crm.public.lead-capture');
 
 Route::middleware(['tenant'])->group(function (): void {
     Route::get('/login', [LoginController::class, 'create'])->name('login');

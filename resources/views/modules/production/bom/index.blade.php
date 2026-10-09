@@ -447,9 +447,13 @@
             </x-ui.odoo-form-ui>
         </div>
 
-        <div class="mt-4">
-            {{ $boms->links() }}
-        </div>
+        <x-ui.pagination 
+            :paginator="$boms"
+            :currentPage="$boms->currentPage()" 
+            :totalPages="$boms->lastPage()" 
+            :totalResults="$boms->total()" 
+            :perPage="$boms->perPage()" 
+        />
     </div>
 
     {{-- Import BOMs Modal --}}

@@ -143,8 +143,12 @@
             </table>
         </div>
         
-        <div class="mt-3">
-            {{ $schedules->links() }}
-        </div>
+        <x-ui.pagination 
+            :paginator="$schedules"
+            :currentPage="$schedules->currentPage()" 
+            :totalPages="$schedules->lastPage()" 
+            :totalResults="$schedules->total()" 
+            :perPage="$schedules->perPage()" 
+        />
     </div>
 @endsection

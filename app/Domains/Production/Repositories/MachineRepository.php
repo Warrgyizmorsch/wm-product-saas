@@ -105,7 +105,7 @@ class MachineRepository implements MachineRepositoryInterface
     public function getDashboardMachines(int $tenantId): Collection
     {
         $machines = Machine::where('tenant_id', $tenantId)
-            ->whereIn('status', [Machine::STATUS_ACTIVE, Machine::STATUS_UNDER_MAINTENANCE])
+            ->whereNotIn('status', ['sold'])
             ->with(['workCenter', 'maintenanceWorkOrders' => function ($q) {
                 $q->whereIn('status', ['draft', 'scheduled', 'in_progress'])->orderByDesc('created_at');
             }])
@@ -131,7 +131,7 @@ class MachineRepository implements MachineRepositoryInterface
 
     public function getMachineDashboardDetails(int $machineId): array
     {
-        $machine = Machine::with('workCenter')->findOrFail($machineId);
+        $machine = Machine::with(['workCenter', 'asset'])->findOrFail($machineId);
 
         $currentOp = \App\Domains\Production\Models\ProductionScheduleOperation::with(['schedule.order.product', 'orderOperation', 'workCenter'])
             ->where('machine_id', $machine->id)

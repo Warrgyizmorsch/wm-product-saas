@@ -649,6 +649,8 @@ class MesExecutionService
                 if ($scrapped > 0 && $order) {
                     \App\Domains\Production\Models\ProductionOrderScrap::create([
                         'tenant_id' => $order->tenant_id,
+                        'company_id' => $order->company_id ?? company_id(),
+                        'branch_id' => $order->branch_id ?? branch_id(),
                         'production_order_id' => $schedOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'production_batch_id' => $batchId,

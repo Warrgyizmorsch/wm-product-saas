@@ -36,16 +36,16 @@
                         <div class="list-group list-group-flush">
                             {{-- We can find some active orders and batches to mock --}}
                             @php
-                                $orders = \App\Domains\Production\Models\ProductionOrder::take(3)->get();
-                                $batches = \App\Domains\Production\Models\ProductionBatch::take(3)->get();
-                                $serials = \App\Domains\Production\Models\ProductionSerialNumber::take(3)->get();
+                                $orders = $orders ?? \App\Domains\Production\Models\ProductionOrder::take(3)->get();
+                                $batches = $batches ?? \App\Domains\Production\Models\ProductionBatch::take(3)->get();
+                                $serials = $serials ?? \App\Domains\Production\Models\ProductionSerialNumber::take(3)->get();
                             @endphp
 
                             @if($orders->isNotEmpty())
                                 <div class="fs-11 text-muted uppercase font-semibold mb-2 mt-2">{{ __('production.step_production_orders') }}</div>
                                 @foreach($orders as $o)
                                     @php $oCode = "ORD-" . str_pad($o->id, 8, '0', STR_PAD_LEFT); @endphp
-                                    <button class="list-group-item list-group-item-action font-monospace fs-13 d-flex justify-content-between align-items-center rounded border mb-2 py-2" onclick="simulateScan('{{ $oCode }}')">
+                                    <button type="button" class="list-group-item list-group-item-action font-monospace fs-13 d-flex justify-content-between align-items-center rounded border mb-2 py-2" onclick="simulateScan('{{ $oCode }}')">
                                         <span>{{ $oCode }} <small class="text-muted">({{ $o->order_number }})</small></span>
                                         <i class="feather-arrow-right"></i>
                                     </button>
@@ -56,7 +56,7 @@
                                 <div class="fs-11 text-muted uppercase font-semibold mb-2 mt-3">{{ __('production.production_batches') }}</div>
                                 @foreach($batches as $b)
                                     @php $bCode = "BAT-" . str_pad($b->id, 8, '0', STR_PAD_LEFT); @endphp
-                                    <button class="list-group-item list-group-item-action font-monospace fs-13 d-flex justify-content-between align-items-center rounded border mb-2 py-2" onclick="simulateScan('{{ $bCode }}')">
+                                    <button type="button" class="list-group-item list-group-item-action font-monospace fs-13 d-flex justify-content-between align-items-center rounded border mb-2 py-2" onclick="simulateScan('{{ $bCode }}')">
                                         <span>{{ $bCode }} <small class="text-muted">({{ $b->batch_number }})</small></span>
                                         <i class="feather-arrow-right"></i>
                                     </button>
@@ -67,7 +67,7 @@
                                 <div class="fs-11 text-muted uppercase font-semibold mb-2 mt-3">{{ __('production.serial_numbers') }}</div>
                                 @foreach($serials as $s)
                                     @php $sCode = "SER-" . str_pad($s->id, 8, '0', STR_PAD_LEFT); @endphp
-                                    <button class="list-group-item list-group-item-action font-monospace fs-13 d-flex justify-content-between align-items-center rounded border mb-2 py-2" onclick="simulateScan('{{ $sCode }}')">
+                                    <button type="button" class="list-group-item list-group-item-action font-monospace fs-13 d-flex justify-content-between align-items-center rounded border mb-2 py-2" onclick="simulateScan('{{ $sCode }}')">
                                         <span>{{ $sCode }} <small class="text-muted">({{ $s->serial_number }})</small></span>
                                         <i class="feather-arrow-right"></i>
                                     </button>

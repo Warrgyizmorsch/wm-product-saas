@@ -14,8 +14,11 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\CustomerPayment;
 use App\Domains\Sales\Models\DeliveryOrder;
+use App\Domains\Production\Models\ProductionBatch;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionRequisitionSlip;
+use App\Domains\Production\Models\ProductionSerialNumber;
+use App\Domains\Inventory\Models\Batch as InventoryBatch;
 use App\Domains\Sales\Models\MaterialRequirement;
 use App\Domains\Sales\Models\SalesOrder;
 
@@ -509,6 +512,10 @@ class AppServiceProvider extends ServiceProvider
             'material_request' => ProductionRequisitionSlip::class,
             'material_requirement' => MaterialRequirement::class,
             'so' => SalesOrder::class,
+            'order' => ProductionOrder::class,
+            'batch' => ProductionBatch::class,
+            'serial' => ProductionSerialNumber::class,
+            'lot' => InventoryBatch::class,
         ]);
 
         // ── Domain Event Listeners ───────────────────────────────────────────

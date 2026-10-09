@@ -17,6 +17,7 @@ return [
             ['label' => 'crm.accounts_sidebar', 'default' => 'Accounts (Companies)', 'route' => 'crm.accounts.index'],
             ['label' => 'crm.customers_sidebar', 'default' => 'Customers', 'route' => 'crm.customers.index', 'permission' => 'crm.customers.view'],
             ['label' => 'crm.track_status_sidebar', 'default' => 'Track Status', 'route' => 'crm.leads.trackStatus', 'permission' => 'crm.leads.view'],
+            ['label' => 'crm.web_forms_sidebar', 'default' => 'Web-to-Lead Forms', 'route' => 'crm.web-forms.index', 'permission' => 'crm.leads.view'],
         ],
     ],
     [

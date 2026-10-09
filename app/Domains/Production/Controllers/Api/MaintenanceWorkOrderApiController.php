@@ -121,7 +121,7 @@ class MaintenanceWorkOrderApiController extends ApiBaseController
 
             return $this->createdResponse(
                 new MaintenanceWorkOrderResource($wo->load(['machine:id,name,code,current_state', 'technician:id,name'])),
-                "Machine breakdown reported. Work order {$wo->work_order_number} created and machine placed under maintenance."
+                "Machine breakdown reported. Work order {$wo->work_order_number} created in draft with open downtime."
             );
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);
@@ -139,7 +139,6 @@ class MaintenanceWorkOrderApiController extends ApiBaseController
         $tenantId = $this->getTenantId();
         $validated = $request->validate([
             'work_performed' => ['required', 'string', 'max:2000'],
-            'labor_hours'    => ['required', 'numeric', 'min:0.1'],
         ]);
 
         try {
@@ -147,8 +146,7 @@ class MaintenanceWorkOrderApiController extends ApiBaseController
                 $id,
                 $tenantId,
                 auth()->id(),
-                $validated['work_performed'],
-                (float) $validated['labor_hours']
+                $validated['work_performed']
             );
 
             return $this->successResponse(

@@ -194,13 +194,19 @@ class MesController extends Controller
     }
 
 
-    public function start(Request $request, int $op)
+    public function start(Request $request, mixed $op)
     {
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
+        if ($op === 'downtime') {
+            return app(DowntimeController::class)->start($request);
+        }
+
+        $operationId = (int) $op;
+
         try {
             $machineId = $request->input('machine_id') ? (int) $request->input('machine_id') : null;
-            $this->mesService->startOperation($op, $machineId, auth()->id());
+            $this->mesService->startOperation($operationId, $machineId, auth()->id());
             return redirect()->back()->with('success', 'Operation started successfully.');
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -425,6 +431,8 @@ class MesController extends Controller
             DB::transaction(function () use ($tenantId, $orderOp, $qty, $reason, $batchId, $productId, $userId, $isOutputProduct, $scrapType, $scrapWarehouseId, $storageLocation, $measurementType, $request) {
                 ProductionOrderScrap::create([
                     'tenant_id' => $tenantId,
+                    'company_id' => $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
+                    'branch_id' => $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
                     'production_order_id' => $orderOp->production_order_id,
                     'production_order_operation_id' => $orderOp->id,
                     'production_batch_id' => $batchId,
@@ -534,6 +542,8 @@ class MesController extends Controller
 
                     \App\Domains\Production\Models\ProductionOrderRework::create([
                         'tenant_id' => $tenantId,
+                        'company_id' => $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
+                        'branch_id' => $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
                         'production_order_id' => $orderOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'production_batch_id' => $batchId,
@@ -560,6 +570,8 @@ class MesController extends Controller
                 } else { // scrap
                     ProductionOrderScrap::create([
                         'tenant_id' => $tenantId,
+                        'company_id' => $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
+                        'branch_id' => $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
                         'production_order_id' => $orderOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'production_batch_id' => $batchId,
