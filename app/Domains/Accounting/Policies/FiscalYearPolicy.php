@@ -43,4 +43,15 @@ class FiscalYearPolicy
             'tenant_id' => $fiscalYear->tenant_id,
         ]);
     }
+
+    /**
+     * Reopening reverses the year-end closing journal and lets the year's
+     * periods be reopened — kept apart from close() for the same reason.
+     */
+    public function reopen(User $user, FiscalYear $fiscalYear): bool
+    {
+        return $this->access->allows($user, 'accounting.fiscal_years.reopen', [
+            'tenant_id' => $fiscalYear->tenant_id,
+        ]);
+    }
 }

@@ -1089,7 +1089,7 @@ class TravelExpenseController extends Controller
 
                 try {
                     $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
-                    $journalService->post($lines, [
+                    $journalService->postOnce($lines, [
                         'tenant_id' => $tenantId,
                         'journal_date' => now(),
                         'source' => 'expense',

@@ -34,10 +34,8 @@ class SalesAccountingService
     {
         $tenantId = $invoice->tenant_id;
 
-        $existing = Journal::where('tenant_id', $tenantId)
-            ->where('reference_type', 'Invoice')
-            ->where('reference_id', $invoice->id)
-            ->first();
+        // Standing posting only: once reversed, the document can post again.
+        $existing = $this->journalService->activePosting((int) $tenantId, 'Invoice', $invoice->id);
 
         if ($existing) {
             return $existing;
@@ -219,7 +217,7 @@ class SalesAccountingService
                 'journal_number_prefix' => 'INV-JNL',
             ];
 
-            return $this->journalService->post($lines, $meta);
+            return $this->journalService->postOnce($lines, $meta);
         } catch (\Exception $e) {
             Log::error("SalesAccountingService Exception posting invoice journal: " . $e->getMessage());
             $this->failures->record($tenantId, InvoicePosted::class, $invoice, $e->getMessage());
@@ -240,10 +238,8 @@ class SalesAccountingService
         $dispatch->loadMissing('items.product');
 
         // Check if journal already posted for this Dispatch Order
-        $existing = Journal::where('tenant_id', $tenantId)
-            ->where('reference_type', 'DispatchOrder')
-            ->where('reference_id', $dispatch->id)
-            ->first();
+        // Standing posting only: once reversed, the document can post again.
+        $existing = $this->journalService->activePosting((int) $tenantId, 'DispatchOrder', $dispatch->id);
 
         if ($existing) {
             return $existing;
@@ -354,7 +350,7 @@ class SalesAccountingService
                 'journal_number_prefix' => 'COGS-JNL',
             ];
 
-            return $this->journalService->post($lines, $meta);
+            return $this->journalService->postOnce($lines, $meta);
         } catch (\Exception $e) {
             Log::error("SalesAccountingService Exception posting COGS journal: " . $e->getMessage());
             return null;

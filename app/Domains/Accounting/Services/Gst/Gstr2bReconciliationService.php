@@ -437,7 +437,7 @@ class Gstr2bReconciliationService
     /** Bills of the import's company, across all its branches (2B is per GSTIN). */
     private function billQuery(Gstr2bImport $import)
     {
-        return VendorBill::query()
+        return VendorBill::withoutGlobalScope('branch')
             ->withoutGlobalScopes(['branch', 'company'])
             ->when($import->company_id, fn ($q) => $q->where('company_id', $import->company_id))
             ->whereNotIn('status', ['Cancelled', 'Draft']);

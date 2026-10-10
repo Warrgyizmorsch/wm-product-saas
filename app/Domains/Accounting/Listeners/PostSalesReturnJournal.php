@@ -26,7 +26,7 @@ class PostSalesReturnJournal
     {
         $salesReturn = $event->salesReturn;
 
-        if ($this->journals->findByReference('sales_return', $salesReturn->id)->isNotEmpty()) {
+        if ($this->journals->activePosting((int) ($salesReturn->tenant_id ?: tenant_id()), 'sales_return', $salesReturn->id) !== null) {
             return;
         }
 
@@ -153,7 +153,7 @@ class PostSalesReturnJournal
                 'party_id'            => $salesReturn->customer_id,
             ];
 
-            $creditNoteJournal = $this->journals->post($lines, [
+            $creditNoteJournal = $this->journals->postOnce($lines, [
                 'tenant_id'              => $tenantId,
                 'journal_date'           => $salesReturn->return_date ?: now(),
                 'source'                 => Journal::SOURCE_SALES,
@@ -236,7 +236,7 @@ class PostSalesReturnJournal
                     }
                 }
 
-                $this->journals->post($cogsLines, [
+                $this->journals->postOnce($cogsLines, [
                     'tenant_id'      => $tenantId,
                     'journal_date'   => $salesReturn->return_date ?: now(),
                     'source'         => Journal::SOURCE_INVENTORY,

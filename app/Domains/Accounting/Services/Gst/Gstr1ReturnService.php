@@ -122,13 +122,13 @@ class Gstr1ReturnService
         $fp = $this->returnPeriod($from, $to);
         $periodKey = $fp ?? $to->format('mY');
 
-        $invoices = Invoice::query()
+        $invoices = Invoice::withoutGlobalScope('branch')
             ->with(['customer', 'items.product.uom'])
             ->whereBetween('invoice_date', [$from->toDateString(), $to->toDateString()])
             ->orderBy('invoice_date')->orderBy('id')
             ->get();
 
-        $returns = SalesReturn::query()
+        $returns = SalesReturn::withoutGlobalScope('branch')
             ->with(['customer', 'invoice.customer', 'invoice.items', 'items.product.uom'])
             ->whereBetween('return_date', [$from->toDateString(), $to->toDateString()])
             ->orderBy('return_date')->orderBy('id')

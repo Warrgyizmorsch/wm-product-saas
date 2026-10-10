@@ -3,7 +3,7 @@
 namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
-use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\RecordsBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BankStatementUpload extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch;
+    use HasFactory, BelongsToCompany, RecordsBranch;
 
     public const STATUS_PENDING = 'pending';
     public const STATUS_COMPLETED = 'completed';

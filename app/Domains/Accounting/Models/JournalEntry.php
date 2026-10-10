@@ -3,14 +3,14 @@
 namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
-use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\RecordsBranch;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class JournalEntry extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch;
+    use HasFactory, BelongsToCompany, RecordsBranch;
 
     public const PARTY_CUSTOMER = 'customer';
     public const PARTY_VENDOR = 'vendor';
@@ -24,6 +24,7 @@ class JournalEntry extends BaseModel
         'journal_id',
         'chart_of_account_id',
         'cost_center_id',
+        'project_id',
         'party_type',
         'party_id',
         'debit',
@@ -60,6 +61,12 @@ class JournalEntry extends BaseModel
     public function costCenter(): BelongsTo
     {
         return $this->belongsTo(CostCenter::class, 'cost_center_id');
+    }
+
+    /** Optional Project dimension; a read-only reference into the Projects module. */
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Projects\Models\Project::class, 'project_id');
     }
 
     public function bankReconciliation(): BelongsTo

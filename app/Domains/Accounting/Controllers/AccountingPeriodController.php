@@ -6,6 +6,7 @@ use App\Domains\Accounting\Models\AccountingPeriod;
 use App\Domains\Accounting\Services\FiscalPeriodService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
+use InvalidArgumentException;
 
 class AccountingPeriodController extends Controller
 {
@@ -36,9 +37,13 @@ class AccountingPeriodController extends Controller
 
     public function reopen(AccountingPeriod $period): RedirectResponse
     {
-        $this->authorize('manage', $period);
+        $this->authorize('reopen', $period);
 
-        $this->periods->reopenPeriod($period->id);
+        try {
+            $this->periods->reopenPeriod($period->id);
+        } catch (InvalidArgumentException $e) {
+            return back()->withErrors(['period' => $e->getMessage()]);
+        }
 
         return redirect()->route('accounting.fiscal-years.index')
             ->with('success', "Period '{$period->name}' reopened.");

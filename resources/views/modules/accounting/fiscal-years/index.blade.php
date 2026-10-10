@@ -41,11 +41,19 @@
                                 @csrf
                                 <x-ui.button type="button" variant="danger" size="sm"
                                         data-confirm-title="Close Fiscal Year"
-                                        data-confirm-message="Close {{ $fiscalYear->name }}? This cannot be undone.">Close Fiscal Year</x-ui.button>
+                                        data-confirm-message="Close {{ $fiscalYear->name }}? Its profit or loss moves to Reserves &amp; Surplus and every open period in it is closed.">Close Fiscal Year</x-ui.button>
                             </form>
                         @endcan
                     @else
                         <x-ui.badge variant="secondary" soft>Closed</x-ui.badge>
+                        @can('reopen', $fiscalYear)
+                            <form action="{{ route('accounting.fiscal-years.reopen', $fiscalYear) }}" method="POST" class="d-inline">
+                                @csrf
+                                <x-ui.button type="button" variant="warning" size="sm"
+                                        data-confirm-title="Reopen Fiscal Year"
+                                        data-confirm-message="Reopen {{ $fiscalYear->name }}? The year-end closing entry is reversed; its periods stay closed until you reopen one.">Reopen</x-ui.button>
+                            </form>
+                        @endcan
                     @endif
                 </div>
             </div>
@@ -89,14 +97,18 @@
                                                 @csrf
                                                 <x-ui.button type="button" variant="secondary" size="sm"
                                                         data-confirm-title="Lock Period"
-                                                        data-confirm-message="Lock {{ $period->name }}? Locked periods cannot be reopened from here.">Lock</x-ui.button>
+                                                        data-confirm-message="Lock {{ $period->name }}? Locked periods cannot be reopened.">Lock</x-ui.button>
                                             </form>
+                                        @endif
+                                    @endcan
+                                    @if ($period->status === 'closed' && $fiscalYear->isOpen())
+                                        @can('reopen', $period)
                                             <form action="{{ route('accounting.periods.reopen', $period) }}" method="POST" class="d-inline ms-1">
                                                 @csrf
                                                 <x-ui.button type="submit" variant="success" size="sm">Reopen</x-ui.button>
                                             </form>
-                                        @endif
-                                    @endcan
+                                        @endcan
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

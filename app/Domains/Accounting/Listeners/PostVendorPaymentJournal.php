@@ -26,7 +26,7 @@ class PostVendorPaymentJournal
     {
         $payment = $event->payment;
 
-        if ($this->journals->findByReference('vendor_payment', $payment->id)->isNotEmpty()) {
+        if ($this->journals->activePosting((int) $payment->tenant_id, 'vendor_payment', $payment->id) !== null) {
             return;
         }
 
@@ -59,7 +59,7 @@ class PostVendorPaymentJournal
                 ? "Advance Payment to Vendor {$vendorName} ({$payment->payment_number})"
                 : "Vendor Payment {$payment->payment_number} for Bill";
 
-            $this->journals->post([
+            $this->journals->postOnce([
                 [
                     'chart_of_account_id' => $debitAccount->id,
                     'debit' => (float) $payment->amount,

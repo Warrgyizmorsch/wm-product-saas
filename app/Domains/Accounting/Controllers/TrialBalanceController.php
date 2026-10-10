@@ -34,12 +34,13 @@ class TrialBalanceController extends Controller
             : $this->periods->periodForDate(now());
 
         $costCenterId = $request->filled('cost_center_id') ? $request->integer('cost_center_id') : null;
+        $projectId = $request->filled('project_id') ? $request->integer('project_id') : null;
 
         $rows = collect();
         $totals = ['debit' => 0.0, 'credit' => 0.0];
 
         if ($period) {
-            $rows = $this->journals->trialBalance($period, $costCenterId)->map(function ($row) {
+            $rows = $this->journals->trialBalance($period, $costCenterId, $projectId)->map(function ($row) {
                 $account = $row->account;
 
                 return [
@@ -61,6 +62,8 @@ class TrialBalanceController extends Controller
             'totals' => $totals,
             'costCenters' => CostCenter::active()->orderBy('code')->get(),
             'costCenterId' => $costCenterId,
+            'projects' => \App\Domains\Projects\Models\Project::query()->orderBy('name')->get(['id', 'project_code', 'name']),
+            'projectId' => $projectId,
         ]);
     }
 }

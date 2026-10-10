@@ -27,10 +27,10 @@ class GstSummaryService
      */
     public function summary(Carbon $from, Carbon $to): array
     {
-        $invoices = Invoice::whereBetween('invoice_date', [$from, $to])->where('status', '!=', 'Cancelled')->get();
-        $salesReturns = SalesReturn::with('invoice')->whereBetween('return_date', [$from, $to])->where('status', 'Completed')->get();
-        $bills = VendorBill::whereBetween('bill_date', [$from, $to])->where('status', '!=', 'Cancelled')->get();
-        $purchaseReturns = PurchaseReturn::with('vendorBill')->whereBetween('return_date', [$from, $to])->where('status', 'Completed')->get();
+        $invoices = Invoice::withoutGlobalScope('branch')->whereBetween('invoice_date', [$from, $to])->where('status', '!=', 'Cancelled')->get();
+        $salesReturns = SalesReturn::withoutGlobalScope('branch')->with('invoice')->whereBetween('return_date', [$from, $to])->where('status', 'Completed')->get();
+        $bills = VendorBill::withoutGlobalScope('branch')->whereBetween('bill_date', [$from, $to])->where('status', '!=', 'Cancelled')->get();
+        $purchaseReturns = PurchaseReturn::withoutGlobalScope('branch')->with('vendorBill')->whereBetween('return_date', [$from, $to])->where('status', 'Completed')->get();
 
         $output = ['taxable' => 0.0, 'cgst' => 0.0, 'sgst' => 0.0, 'igst' => 0.0];
         foreach ($invoices as $invoice) {

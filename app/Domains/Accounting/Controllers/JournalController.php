@@ -36,6 +36,7 @@ class JournalController extends Controller
             'canCreate' => $canCreate,
             'accounts' => $canCreate ? $this->accounts->active() : collect(),
             'costCenters' => $canCreate ? CostCenter::active()->orderBy('code')->get() : collect(),
+            'projects' => $canCreate ? \App\Domains\Projects\Models\Project::query()->orderBy('name')->get(['id', 'project_code', 'name']) : collect(),
             'summary' => [
                 'total' => Journal::query()->count(),
                 'posted' => Journal::query()->where('status', Journal::STATUS_POSTED)->count(),
@@ -53,6 +54,7 @@ class JournalController extends Controller
         return view('modules.accounting.journals.create', [
             'accounts' => $this->accounts->active(),
             'costCenters' => CostCenter::active()->orderBy('code')->get(),
+            'projects' => \App\Domains\Projects\Models\Project::query()->orderBy('name')->get(['id', 'project_code', 'name']),
         ]);
     }
 
@@ -66,6 +68,13 @@ class JournalController extends Controller
             'items' => ['required', 'array', 'min:2'],
             'items.*.chart_of_account_id' => ['required', 'integer', 'exists:chart_of_accounts,id'],
             'items.*.cost_center_id' => ['nullable', 'integer', 'exists:cost_centers,id'],
+            // Tenant-scoped lookup, unlike a bare exists: rule, so another
+            // tenant's project id can't be tagged onto a line.
+            'items.*.project_id' => ['nullable', 'integer', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! \App\Domains\Projects\Models\Project::query()->whereKey($value)->exists()) {
+                    $fail('The selected project is invalid.');
+                }
+            }],
             'items.*.debit' => ['nullable', 'numeric', 'min:0'],
             'items.*.credit' => ['nullable', 'numeric', 'min:0'],
             'items.*.description' => ['nullable', 'string', 'max:255'],

@@ -784,8 +784,12 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.fiscal_years.view', 'module' => 'accounting', 'entity' => 'fiscal_years', 'action' => 'view'],
             ['name' => 'accounting.fiscal_years.create', 'module' => 'accounting', 'entity' => 'fiscal_years', 'action' => 'create'],
             ['name' => 'accounting.fiscal_years.close', 'module' => 'accounting', 'entity' => 'fiscal_years', 'action' => 'close'],
+            // Reopening closed books is separate from closing them, so a tenant
+            // can let someone close periods/years without letting them reopen.
+            ['name' => 'accounting.fiscal_years.reopen', 'module' => 'accounting', 'entity' => 'fiscal_years', 'action' => 'reopen'],
             ['name' => 'accounting.periods.view', 'module' => 'accounting', 'entity' => 'periods', 'action' => 'view'],
             ['name' => 'accounting.periods.manage', 'module' => 'accounting', 'entity' => 'periods', 'action' => 'manage'],
+            ['name' => 'accounting.periods.reopen', 'module' => 'accounting', 'entity' => 'periods', 'action' => 'reopen'],
             ['name' => 'accounting.journals.view', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'view'],
             ['name' => 'accounting.journals.post', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'post'],
             ['name' => 'accounting.journals.reverse', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'reverse'],

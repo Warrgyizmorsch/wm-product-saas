@@ -25,9 +25,21 @@ class FiscalPeriodService
      */
     public function createFiscalYearWithMonthlyPeriods(array $data): FiscalYear
     {
-        return DB::transaction(function () use ($data) {
+        $tenantId = $data['tenant_id'] ?? tenant_id();
+
+        // Periods are looked up by date across the whole tenant, so two years
+        // covering the same day would make "which period does this posting
+        // go into" ambiguous.
+        $overlapping = $this->overlappingFiscalYear((int) $tenantId, $data['start_date'], $data['end_date']);
+        if ($overlapping !== null) {
+            throw new InvalidArgumentException(
+                "These dates overlap fiscal year '{$overlapping->name}' ({$overlapping->start_date->toDateString()} to {$overlapping->end_date->toDateString()})."
+            );
+        }
+
+        return DB::transaction(function () use ($data, $tenantId) {
             $fiscalYear = $this->fiscalYears->create([
-                'tenant_id' => $data['tenant_id'] ?? tenant_id(),
+                'tenant_id' => $tenantId,
                 'name' => $data['name'],
                 'start_date' => $data['start_date'],
                 'end_date' => $data['end_date'],
@@ -77,13 +89,9 @@ class FiscalPeriodService
         $startDate = now()->setDate($fyStartYear, 4, 1)->startOfDay();
         $endDate = (clone $startDate)->addYear()->subDay()->endOfDay();
 
-        $existing = FiscalYear::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->whereDate('start_date', $startDate->toDateString())
-            ->exists();
-
-        if ($existing) {
+        // Any year already covering these dates (not just one starting on
+        // 1 April) means the tenant has set up its own calendar; leave it be.
+        if ($this->overlappingFiscalYear($tenantId, $startDate, $endDate) !== null) {
             return null;
         }
 
@@ -93,6 +101,16 @@ class FiscalPeriodService
             'start_date' => $startDate->toDateString(),
             'end_date' => $endDate->toDateString(),
         ]);
+    }
+
+    public function overlappingFiscalYear(int $tenantId, \DateTimeInterface|string $startDate, \DateTimeInterface|string $endDate): ?FiscalYear
+    {
+        return FiscalYear::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereDate('start_date', '<=', Carbon::parse($endDate)->toDateString())
+            ->whereDate('end_date', '>=', Carbon::parse($startDate)->toDateString())
+            ->first();
     }
 
     public function periodForDate(\DateTimeInterface $date): ?AccountingPeriod
@@ -137,17 +155,23 @@ class FiscalPeriodService
 
     public function reopenPeriod(int $periodId): AccountingPeriod
     {
+        $period = AccountingPeriod::with('fiscalYear')->findOrFail($periodId);
+
+        if ($period->status === AccountingPeriod::STATUS_LOCKED) {
+            throw new InvalidArgumentException("'{$period->name}' is locked. Locked periods stay shut for good.");
+        }
+
+        // Its profit has already been moved into Reserves & Surplus; new
+        // postings would land after that transfer. Reopen the year first.
+        if ($period->fiscalYear !== null && !$period->fiscalYear->isOpen()) {
+            throw new InvalidArgumentException(
+                "Fiscal year '{$period->fiscalYear->name}' is closed. Reopen the year before reopening '{$period->name}'."
+            );
+        }
+
         return $this->periods->update($periodId, [
             'status' => AccountingPeriod::STATUS_OPEN,
             'closed_at' => null,
-        ]);
-    }
-
-    public function closeFiscalYear(int $fiscalYearId): FiscalYear
-    {
-        return $this->fiscalYears->update($fiscalYearId, [
-            'status' => FiscalYear::STATUS_CLOSED,
-            'closed_at' => now(),
         ]);
     }
 }

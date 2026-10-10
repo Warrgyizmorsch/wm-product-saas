@@ -187,6 +187,7 @@ class DashboardService
     public function sanitize(array $widgets, User $user, int $tenantId, string $dashboard = 'common'): array
     {
         $clean = [];
+        $seen = [];
 
         foreach ($widgets as $item) {
             $key = (string) ($item['key'] ?? '');
@@ -197,6 +198,14 @@ class DashboardService
 
             $w = max(2, min(self::COLUMNS, (int) ($item['w'] ?? 3)));
             $config = $this->sanitizeConfig((array) ($item['config'] ?? []), $this->registry->find($key)['settings']);
+
+            // A second copy with the same settings shows exactly the same
+            // numbers; keep the first. Copies with their own period/limit stay.
+            $signature = $key.'|'.json_encode($config);
+            if (isset($seen[$signature])) {
+                continue;
+            }
+            $seen[$signature] = true;
 
             $clean[] = [
                 'id' => preg_match('/^[A-Za-z0-9_.-]{1,64}$/', (string) ($item['id'] ?? '')) ? $item['id'] : $key.'-'.Str::lower(Str::random(6)),

@@ -49,15 +49,49 @@ final class DashboardPeriod
 
         $from = $from->copy()->startOfDay();
         $to = $to->copy()->endOfDay();
-        $days = self::daysBetween($from, $to);
 
-        return new self(
-            $preset,
-            $from,
-            $to,
-            $from->copy()->subDays($days)->startOfDay(),
-            $from->copy()->subDay()->endOfDay(),
-        );
+        [$previousFrom, $previousTo] = self::comparative($preset, $from, $to, $fiscalYearStart);
+
+        return new self($preset, $from, $to, $previousFrom->startOfDay(), $previousTo->endOfDay());
+    }
+
+    /**
+     * Like-for-like comparison: MTD against the same days of last month, QTD
+     * against the same days into last quarter, YTD against the same span of
+     * last fiscal year, a whole month against the whole month before. Only a
+     * custom range falls back to the equal-length window just before it.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private static function comparative(string $preset, Carbon $from, Carbon $to, ?Carbon $fiscalYearStart): array
+    {
+        $span = self::daysBetween($from, $to) - 1;
+        $sameSpanFrom = fn (Carbon $start, Carbon $limit) => [$start, $start->copy()->addDays($span)->min($limit)];
+
+        return match ($preset) {
+            'this_month' => $sameSpanFrom(
+                $from->copy()->subMonthNoOverflow()->startOfMonth(),
+                $from->copy()->subMonthNoOverflow()->endOfMonth(),
+            ),
+            'last_month' => [
+                $from->copy()->subMonthNoOverflow()->startOfMonth(),
+                $from->copy()->subMonthNoOverflow()->endOfMonth(),
+            ],
+            'this_quarter' => $sameSpanFrom(
+                $from->copy()->subMonthsNoOverflow(3)->firstOfQuarter(),
+                $from->copy()->subMonthsNoOverflow(3)->lastOfQuarter(),
+            ),
+            'fiscal_year' => $sameSpanFrom(
+                $from->copy()->subYearNoOverflow(),
+                ($fiscalYearStart ?? $from)->copy()->subDay(),
+            ),
+            default => [$from->copy()->subDays($span + 1), $from->copy()->subDay()],
+        };
+    }
+
+    public function presetLabel(): string
+    {
+        return self::PRESETS[$this->preset] ?? self::PRESETS['custom'];
     }
 
     public function days(): int

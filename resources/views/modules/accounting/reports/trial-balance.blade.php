@@ -11,18 +11,26 @@
 @section('content')
     <x-ui.card class="mb-4">
         <x-ui.filter-toolbar :resetUrl="route('accounting.reports.trial-balance')" searchLabel="View">
-            <x-ui.filter-field label="Accounting Period" col="col-md-6">
+            <x-ui.filter-field label="Accounting Period" col="col-md-4">
                 <select name="period_id" class="form-select form-select-sm">
                     @foreach ($allPeriods as $p)
                         <option value="{{ $p->id }}" @selected($period?->id == $p->id)>{{ $p->fiscalYear?->name }} — {{ $p->name }} ({{ $p->status }})</option>
                     @endforeach
                 </select>
             </x-ui.filter-field>
-            <x-ui.filter-field label="Cost Center" col="col-md-6">
+            <x-ui.filter-field label="Cost Center" col="col-md-4">
                 <select name="cost_center_id" class="form-select form-select-sm">
                     <option value="" @selected(!$costCenterId)>All Cost Centers</option>
                     @foreach ($costCenters as $c)
                         <option value="{{ $c->id }}" @selected($costCenterId == $c->id)>{{ $c->code }} — {{ $c->name }}</option>
+                    @endforeach
+                </select>
+            </x-ui.filter-field>
+            <x-ui.filter-field label="Project" col="col-md-4">
+                <select name="project_id" class="form-select form-select-sm">
+                    <option value="" @selected(!$projectId)>All Projects</option>
+                    @foreach ($projects as $p)
+                        <option value="{{ $p->id }}" @selected($projectId == $p->id)>{{ $p->project_code ? $p->project_code . ' — ' : '' }}{{ $p->name }}</option>
                     @endforeach
                 </select>
             </x-ui.filter-field>

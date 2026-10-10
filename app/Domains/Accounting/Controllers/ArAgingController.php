@@ -33,7 +33,7 @@ class ArAgingController extends Controller
 
         $asOf = $request->filled('as_of') ? Carbon::parse($request->string('as_of')) : Carbon::today();
 
-        $invoices = Invoice::with('customer')
+        $invoices = Invoice::withoutGlobalScope('branch')->with('customer')
             ->whereIn('status', self::OPEN_STATUSES)
             ->where('balance_due', '>', 0)
             ->orderBy('due_date')

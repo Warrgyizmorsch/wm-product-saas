@@ -27,12 +27,22 @@ class AccountingPeriodPolicy
     }
 
     /**
-     * Covers close/lock/reopen — all three are the same "control which
-     * periods accept postings" capability, not separate day-to-day actions.
+     * Covers close/lock — shutting a period to new postings.
      */
     public function manage(User $user, AccountingPeriod $period): bool
     {
         return $this->access->allows($user, 'accounting.periods.manage', [
+            'tenant_id' => $period->tenant_id,
+        ]);
+    }
+
+    /**
+     * Reopening lets postings back into books that were closed, so it's a
+     * separate, stricter permission than closing them.
+     */
+    public function reopen(User $user, AccountingPeriod $period): bool
+    {
+        return $this->access->allows($user, 'accounting.periods.reopen', [
             'tenant_id' => $period->tenant_id,
         ]);
     }
