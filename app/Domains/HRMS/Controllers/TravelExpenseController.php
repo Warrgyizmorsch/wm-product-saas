@@ -793,8 +793,12 @@ class TravelExpenseController extends Controller
 
             $advance = !empty($validated['cash_advance_id']) ? CashAdvance::find($validated['cash_advance_id']) : null;
 
+            $emp = Employee::find($validated['employee_id']);
+            $appRes = $this->resolveApprovalLevels($emp, $totalAmount, $tenantId);
+
             // Update main report
-            $expenseReport->update([
+            $updatePayload = [
+                'employee_id'                => $validated['employee_id'],
                 'travel_request_id'          => $validated['travel_request_id'] ?: null,
                 'title'                      => $validated['title'],
                 'total_amount'               => $totalAmount,
@@ -802,7 +806,11 @@ class TravelExpenseController extends Controller
                 'net_reimbursement'          => $netReimbursement,
                 'approved_amount'            => null,
                 'approved_net_reimbursement' => null,
-            ]);
+            ];
+            if (in_array($expenseReport->status, ['draft', 'rejected'])) {
+                $updatePayload['approval_levels'] = $appRes['approval_levels'];
+            }
+            $expenseReport->update($updatePayload);
 
             // Unlink any previously linked Cash Advance
             CashAdvance::where('expense_report_id', $expenseReport->id)->update(['expense_report_id' => null]);
@@ -951,7 +959,7 @@ class TravelExpenseController extends Controller
 
         $levels = $expenseReport->approval_levels ?: 1;
         $currentLevel = $expenseReport->current_approval_level ?: 1;
-        $isFirstStage = ($levels == 2 && ($expenseReport->status === 'pending' || $expenseReport->status === 'submitted' || $currentLevel == 1));
+        $isFirstStage = ($levels == 2 && (int) $currentLevel === 1 && $expenseReport->status !== 'l1_approved');
 
         if ($isFirstStage) {
             $approvedAmount = floatval($request->input('approved_amount', $expenseReport->total_amount));
@@ -1319,46 +1327,17 @@ class TravelExpenseController extends Controller
     {
         $this->authorizeHrms('hrms.expense_policies.manage');
 
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-
-        $validated = $request->validate([
-            'expense_category_id'        => 'required|exists:expense_categories,id',
-            'name'                       => 'required|string|max:255',
-            'company_id'                 => 'nullable|exists:companies,id',
-            'business_unit_id'           => 'nullable|exists:business_units,id',
-            'branch_id'                  => 'nullable|exists:branches,id',
-            'designation_id'             => 'nullable|exists:designations,id',
-            'max_limit_per_claim'        => 'nullable|numeric|min:0',
-            'max_monthly_limit'          => 'nullable|numeric|min:0',
-            'receipt_required_threshold' => 'nullable|numeric|min:0',
-            'status'                     => 'nullable|boolean',
-        ]);
-
-        $validated['tenant_id'] = $tenantId;
-        $validated['status']    = true; // Active by default; status comes from the top Status dropdown
-
-        ExpensePolicy::updateOrCreate(
-            [
-                'tenant_id'           => $tenantId,
-                'expense_category_id' => $validated['expense_category_id'],
-                'designation_id'      => $validated['designation_id'] ?: null,
-                'company_id'          => $validated['company_id'] ?: null,
-                'business_unit_id'    => $validated['business_unit_id'] ?: null,
-                'branch_id'           => $validated['branch_id'] ?: null,
-            ],
-            $validated
-        );
-
-        return redirect()->route('hrms.penalization-policy.index', ['policy_type' => 'expense_rules'])
-            ->with('success', 'Expense policy configuration saved successfully.');
+        return redirect()->route('hrms.expense-policy.index')
+            ->with('info', 'Expense policies and category limits are now managed in Expense Master.');
     }
 
     public function deleteExpensePolicy(ExpensePolicy $expensePolicy): RedirectResponse
     {
         $this->authorizeHrms('hrms.expense_policies.manage');
 
+        $expensePolicy->rules()->delete();
         $expensePolicy->delete();
-        return redirect()->route('hrms.penalization-policy.index', ['tab' => 'expense_rules'])
+        return redirect()->route('hrms.expense-policy.index')
             ->with('success', 'Expense policy deleted successfully.');
     }
 
@@ -1384,13 +1363,14 @@ class TravelExpenseController extends Controller
                 WHEN company_id IS NOT NULL THEN 3 
                 ELSE 4 
             END')
+            ->with(['rules.category'])
             ->first();
 
         $rules = [];
-        if ($policy) {
+        if ($policy && $policy->rules) {
             foreach ($policy->rules as $rule) {
                 $rules[$rule->expense_category_id] = [
-                    'category_name'              => $rule->category->name,
+                    'category_name'              => $rule->category?->name ?? 'Category #' . $rule->expense_category_id,
                     'max_limit_per_claim'        => $rule->max_limit_per_claim ? floatval($rule->max_limit_per_claim) : null,
                     'receipt_required'           => (bool)$rule->receipt_required,
                     'receipt_required_threshold' => $rule->receipt_required_threshold ? floatval($rule->receipt_required_threshold) : null,

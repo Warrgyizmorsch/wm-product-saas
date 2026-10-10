@@ -132,14 +132,14 @@
             <!-- Adhoc Components Card -->
             <div class="card-custom">
                 <div class="card-custom-header d-flex justify-content-between align-items-center py-3">
-                    <h5 class="card-custom-title mb-0 fs-14 fw-bold"><i class="feather-plus-circle text-success me-1"></i> Ad-hoc Components</h5>
+                    <h5 class="card-custom-title mb-0 fs-14 fw-bold"><i class="feather-plus-circle text-success me-1"></i> {{ __('hrms.salary.adhoc_components') }}</h5>
                     @php
                         $authUser = auth()->user();
                         $canManageCompensation = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
                     @endphp
                     @if($canManageCompensation)
                         <button type="button" class="btn btn-xs btn-soft-primary fw-bold py-1 px-2.5 rounded-pill fs-11" data-bs-toggle="modal" data-bs-target="#addAdhocModal">
-                            <i class="feather-plus me-1"></i> Add
+                            <i class="feather-plus me-1"></i> {{ __('hrms.common.add') }}
                         </button>
                     @endif
                 </div>
@@ -147,16 +147,16 @@
                     @if(($adhocComponents ?? collect())->isEmpty())
                         <div class="p-4 text-center text-muted">
                             <i class="feather-alert-circle fs-24 d-block mb-2 text-secondary"></i>
-                            <div class="fs-12">No ad-hoc earnings or deductions applied.</div>
+                            <div class="fs-12">{{ __('hrms.employees.lbl_no_adhoc_components') }}</div>
                         </div>
                     @else
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0 fs-12">
                                 <thead class="table-light">
                                     <tr>
-                                        <th class="py-2 px-3">Component</th>
-                                        <th class="py-2">Month</th>
-                                        <th class="py-2 px-3 text-end">Amount</th>
+                                        <th class="py-2 px-3">{{ __('hrms.employees.tbl_component') }}</th>
+                                        <th class="py-2">{{ __('hrms.employees.tbl_month') }}</th>
+                                        <th class="py-2 px-3 text-end">{{ __('hrms.employees.tbl_amount') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>

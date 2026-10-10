@@ -44,7 +44,20 @@ class ExpensePolicyRepository implements ExpensePolicyRepositoryInterface
 
         if ($activeTab === 'policies') {
             if ($policyFilters['search'] !== '') {
-                $policyQuery->where('name', 'like', '%' . $policyFilters['search'] . '%');
+                $search = $policyFilters['search'];
+                $policyQuery->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%")
+                      ->orWhereHas('designation', function ($sq) use ($search) {
+                          $sq->where('name', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('department', function ($sq) use ($search) {
+                          $sq->where('name', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('company', function ($sq) use ($search) {
+                          $sq->where('company_name', 'like', "%{$search}%");
+                      });
+                });
             }
             if ($policyFilters['status'] !== '') {
                 $policyQuery->where('status', (bool) $policyFilters['status']);
@@ -86,7 +99,7 @@ class ExpensePolicyRepository implements ExpensePolicyRepositoryInterface
         } else {
             $catQuery->orderBy('name', 'asc');
         }
-        $categoriesList = $catQuery->get();
+        $categoriesList = $catQuery->paginate(10)->withQueryString();
 
         // 3. Query Approval Workflows
         $wfQuery = ExpenseApprovalWorkflow::where('tenant_id', $tenantId)
@@ -97,7 +110,16 @@ class ExpensePolicyRepository implements ExpensePolicyRepositoryInterface
                 $search = $workflowFilters['search'];
                 $wfQuery->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
+                      ->orWhere('description', 'like', "%{$search}%")
+                      ->orWhereHas('designation', function ($sq) use ($search) {
+                          $sq->where('name', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('department', function ($sq) use ($search) {
+                          $sq->where('name', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('company', function ($sq) use ($search) {
+                          $sq->where('company_name', 'like', "%{$search}%");
+                      });
                 });
             }
             if ($workflowFilters['status'] !== '') {

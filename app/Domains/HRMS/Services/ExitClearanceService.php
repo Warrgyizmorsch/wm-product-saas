@@ -113,6 +113,15 @@ class ExitClearanceService
     }
 
     /**
+     * Check if all department clearance items have been reviewed/completed.
+     */
+    public function checkAllClearancesCompleted(EmployeeExit $exit): bool
+    {
+        $hasPending = $exit->clearances()->where('status', 'pending')->exists();
+        return !$hasPending;
+    }
+
+    /**
      * Clean and normalize department keys and remove accidental duplicates for an exit.
      */
     public function cleanDuplicateClearancesForExit(EmployeeExit $exit): void

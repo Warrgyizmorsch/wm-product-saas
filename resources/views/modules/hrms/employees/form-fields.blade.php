@@ -38,12 +38,12 @@
                     <i class="feather-shield fs-14"></i>
                 </div>
                 <div>
-                    <h6 class="fw-bold text-dark mb-0 fs-13">1. Official & Company Configuration</h6>
-                    <span class="text-muted fs-11">Organizational hierarchy, job mapping, system access, and official employment terms.</span>
+                    <h6 class="fw-bold text-dark mb-0 fs-13">{{ __('hrms.employees.sec_official_config') }}</h6>
+                    <span class="text-muted fs-11">{{ __('hrms.employees.sec_official_config_desc') }}</span>
                 </div>
             </div>
             <x-ui.badge soft variant="primary" class="border fs-11 px-2.5 py-1 fw-bold">
-                <i class="feather-lock me-1"></i>Company Controlled
+                <i class="feather-lock me-1"></i>{{ __('hrms.employees.lbl_company_controlled') }}
             </x-ui.badge>
         </div>
         <div class="card-body p-4">
@@ -54,8 +54,8 @@
                         <i class="feather-file-text fs-16"></i>
                     </div>
                     <div>
-                        <h6 class="fw-bold text-dark mb-0 fs-13">Candidate Resume / CV Document</h6>
-                        <span class="text-muted fs-11">Attach official resume file (PDF, DOC, DOCX - max 5MB).</span>
+                        <h6 class="fw-bold text-dark mb-0 fs-13">{{ __('hrms.employees.lbl_candidate_resume') }}</h6>
+                        <span class="text-muted fs-11">{{ __('hrms.employees.lbl_candidate_resume_desc') }}</span>
                     </div>
                 </div>
                 <div style="min-width: 280px;" class="flex-grow-1 flex-md-grow-0">
@@ -74,7 +74,7 @@
                         }
                     @endphp
                     <div id="{{ $prefix }}_resume_preview_container" class="mt-1 fs-11 text-muted {{ !empty($existingResume) ? '' : 'd-none' }}">
-                        Attached Resume: <a href="{{ $resumeDownloadUrl }}" id="{{ $prefix }}_resume_preview_link" target="_blank" class="text-primary fw-semibold"><i class="feather-paperclip me-1"></i>View Resume</a>
+                        {{ __('hrms.employees.lbl_attached_resume') }} <a href="{{ $resumeDownloadUrl }}" id="{{ $prefix }}_resume_preview_link" target="_blank" class="text-primary fw-semibold"><i class="feather-paperclip me-1"></i>{{ __('hrms.employees.lbl_view_resume') }}</a>
                     </div>
                 </div>
             </div>
@@ -178,14 +178,14 @@
             </div>
 
             <!-- 1.3 Official Employment Terms & System Access -->
-            <div class="employee-modal-section-title">Official Employment & System Access</div>
+            <div class="employee-modal-section-title">{{ __('hrms.employees.sec_official_employment') }}</div>
             <div class="row g-3">
                 <div class="col-md-6">
                     @php
                         $usersList = $isEdit ? ($allTenantUsers ?? $unmappedUsers ?? collect()) : ($unmappedUsers ?? collect());
                     @endphp
-                    <x-ui.odoo-form-ui type="select" label="User Account" name="user_id" id="{{ $prefix }}_user_id" :required="true" select2-selector="default" :errorText="$errors->first('user_id')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService">
-                        <option value="auto_create" @selected((string) $fieldValue('user_id', $isEdit ? ($employee->user_id ?? '') : '') === 'auto_create' || (!$isEdit && empty($fieldValue('user_id'))))>Auto-Create New User (Pass: 12345678)</option>
+                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_user_account') }}" name="user_id" id="{{ $prefix }}_user_id" :required="true" select2-selector="default" :errorText="$errors->first('user_id')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService">
+                        <option value="auto_create" @selected((string) $fieldValue('user_id', $isEdit ? ($employee->user_id ?? '') : '') === 'auto_create' || (!$isEdit && empty($fieldValue('user_id'))))>{{ __('hrms.employees.frm_auto_create_user') }}</option>
                         @foreach($usersList as $u)
                             <option value="{{ $u->id }}" data-user-name="{{ $u->name }}" data-user-email="{{ $u->email }}" data-user-role-id="{{ $u->role_id ?? $u->roles->first()?->id ?? '' }}" @selected((string) $fieldValue('user_id', $isEdit ? ($employee->user_id ?? '') : '') === (string) $u->id)>
                                 {{ $u->name }} ({{ $u->email }})
@@ -194,11 +194,11 @@
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_full_name') }}" name="full_name" id="{{ $prefix }}_full_name" :required="true" :value="$fieldValue('full_name', $isEdit ? ($employee->full_name ?? '') : '')" placeholder="Enter Full Name" data-field-group="hr_admin" :disabled="$isEmployeeSelfService" />
+                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_full_name') }}" name="full_name" id="{{ $prefix }}_full_name" :required="true" :value="$fieldValue('full_name', $isEdit ? ($employee->full_name ?? '') : '')" placeholder="{{ __('hrms.employees.frm_full_name_placeholder') }}" data-field-group="hr_admin" :disabled="$isEmployeeSelfService" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="select" label="System Role" name="role_id" id="{{ $prefix }}_role_id" :required="true" select2-selector="default" :errorText="$errors->first('role_id')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService">
-                        <option value="">Select Role</option>
+                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_role') }}" name="role_id" id="{{ $prefix }}_role_id" :required="true" select2-selector="default" :errorText="$errors->first('role_id')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService">
+                        <option value="">{{ __('hrms.employees.frm_select_role') }}</option>
                         @foreach($roles as $r)
                             <option value="{{ $r->id }}" @selected((string) old('role_id', ($isEdit && isset($employee) && $employee->user) ? $employee->user->role_id : '') === (string) $r->id)>
                                 {{ $r->name }}
@@ -218,7 +218,7 @@
                     @endphp
                     <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_office_email') }}" name="office_email" id="{{ $prefix }}_office_email" inputType="email" :value="$officeEmailVal" placeholder="{{ __('hrms.employees.frm_office_email_placeholder') }}" :errorText="$errors->first('office_email')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService" :readonly="$isExistingUserLinked" class="{{ $isExistingUserLinked ? 'bg-light' : '' }}" />
                     <small id="{{ $prefix }}_office_email_help" class="text-muted fs-11 mt-1 d-block {{ $isExistingUserLinked ? '' : 'd-none' }}">
-                        <i class="feather-lock me-1"></i>Synced from User account
+                        <i class="feather-lock me-1"></i>{{ __('hrms.employees.synced_from_user') }}
                     </small>
                     <small id="{{ $prefix }}_office_email_autocreate_help" class="text-primary fs-11 mt-1 d-block {{ !$isExistingUserLinked ? '' : 'd-none' }}">
                         <i class="feather-user-plus me-1"></i>Auto-creates user (Pass: 12345678)
@@ -271,9 +271,9 @@
                 </div>
                 <div class="col-md-4">
                     <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_location') }}" name="office" id="{{ $prefix }}_office" :errorText="$errors->first('office')" select2-selector="default" data-field-group="hr_admin" :disabled="$isEmployeeSelfService">
-                        <option value="office" @selected($fieldValue('office') === 'office' || !$fieldValue('office'))>Office</option>
-                        <option value="wfh" @selected($fieldValue('office') === 'wfh')>Work From Home (WFH)</option>
-                        <option value="onsite" @selected($fieldValue('office') === 'onsite')>On-Site (Client/Project)</option>
+                        <option value="office" @selected($fieldValue('office') === 'office' || !$fieldValue('office'))>{{ __('hrms.employees.loc_office') }}</option>
+                        <option value="wfh" @selected($fieldValue('office') === 'wfh')>{{ __('hrms.employees.loc_wfh') }}</option>
+                        <option value="onsite" @selected($fieldValue('office') === 'onsite')>{{ __('hrms.employees.loc_onsite') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
                 <!-- WFH Coordinates -->
@@ -299,7 +299,7 @@
                             </div>
                         </div>
                         <div class="position-relative mt-3" id="{{ $prefix }}_wfh_map_wrap" style="display: none;">
-                            <input type="text" id="{{ $prefix }}_wfh_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="Search address or subarea (Press Enter)...">
+                            <input type="text" id="{{ $prefix }}_wfh_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="{{ __('hrms.employees.lbl_search_wfh_location') }}">
                             <div id="{{ $prefix }}_wfh_map_picker" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #ced4da; z-index: 1;"></div>
                         </div>
                     </div>
@@ -319,12 +319,12 @@
                     <i class="feather-user fs-14"></i>
                 </div>
                 <div>
-                    <h6 class="fw-bold text-dark mb-0 fs-13">2. Personal & Employee Self-Service Information</h6>
-                    <span class="text-muted fs-11">Personal details, identity compliance, addresses, and banking. Editable by employee during onboarding.</span>
+                    <h6 class="fw-bold text-dark mb-0 fs-13">{{ __('hrms.employees.sec_personal_info') }}</h6>
+                    <span class="text-muted fs-11">{{ __('hrms.employees.sec_personal_info_desc') }}</span>
                 </div>
             </div>
             <x-ui.badge soft variant="info" class="border fs-11 px-2.5 py-1 fw-bold">
-                <i class="feather-user-check me-1"></i>Employee Editable
+                <i class="feather-user-check me-1"></i>{{ __('hrms.employees.lbl_employee_editable') }}
             </x-ui.badge>
         </div>
         <div class="card-body p-4">
@@ -478,7 +478,7 @@
                     </div>
 
                     <!-- 2.3 Addresses -->
-                    <div class="employee-modal-section-title">Address Information</div>
+                    <div class="employee-modal-section-title">{{ __('hrms.employees.sec_address_info') }}</div>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_city') }}" name="city" id="{{ $prefix }}_city" :value="$fieldValue('city')" placeholder="{{ __('hrms.employees.frm_city_placeholder') }}" :errorText="$errors->first('city')" data-field-group="employee" />
@@ -506,7 +506,7 @@
                     </div>
 
                     <!-- 2.4 Statutory & Identity Compliance -->
-                    <div class="employee-modal-section-title">Identity & Statutory Numbers</div>
+                    <div class="employee-modal-section-title">{{ __('hrms.employees.sec_identity_statutory') }}</div>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_aadhaar') }}" name="aadhaar_card_number" id="{{ $prefix }}_aadhaar_card_number" :value="$fieldValue('aadhaar_card_number')" placeholder="{{ __('hrms.employees.frm_aadhaar_placeholder') }}" :errorText="$errors->first('aadhaar_card_number')" data-field-group="employee" />
@@ -531,7 +531,7 @@
                     </div>
 
                     <!-- 2.6 Professional & Educational Qualifications -->
-                    <div class="employee-modal-section-title">Qualifications & Skill Set</div>
+                    <div class="employee-modal-section-title">{{ __('hrms.employees.sec_qualifications_skills') }}</div>
                     <div class="row g-3">
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_qualification') }}" name="qualification" id="{{ $prefix }}_qualification" :value="$fieldValue('qualification')" placeholder="{{ __('hrms.employees.frm_qualification_placeholder') }}" :errorText="$errors->first('qualification')" data-field-group="employee" />

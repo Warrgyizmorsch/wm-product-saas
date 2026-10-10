@@ -172,8 +172,8 @@ class ExpensePolicyApiController extends Controller
             'branch_id'                    => 'nullable|exists:branches,id',
             'status'                       => 'nullable|boolean',
             'approval_type'                => 'required|string|in:1_level,2_level,conditional_threshold',
-            'first_approver'               => 'required|string|in:reporting_manager,department_head,hr_admin',
-            'second_approver'              => 'required|string|in:finance_manager,hr_admin,department_head',
+            'first_approver'               => 'required|string|in:reporting_manager,department_head,hr_admin,finance_manager',
+            'second_approver'              => 'required|string|in:finance_manager,hr_admin,department_head,reporting_manager',
             'amount_threshold_for_2_level' => 'nullable|numeric|min:0',
         ]);
 
@@ -243,8 +243,8 @@ class ExpensePolicyApiController extends Controller
             'branch_id'                    => 'nullable|exists:branches,id',
             'status'                       => 'nullable|boolean',
             'approval_type'                => 'required|string|in:1_level,2_level,conditional_threshold',
-            'first_approver'               => 'required|string|in:reporting_manager,department_head,hr_admin',
-            'second_approver'              => 'required|string|in:finance_manager,hr_admin,department_head',
+            'first_approver'               => 'required|string|in:reporting_manager,department_head,hr_admin,finance_manager',
+            'second_approver'              => 'required|string|in:finance_manager,hr_admin,department_head,reporting_manager',
             'amount_threshold_for_2_level' => 'nullable|numeric|min:0',
         ]);
 
@@ -423,8 +423,8 @@ class ExpensePolicyApiController extends Controller
             'business_unit_id'             => 'nullable|exists:business_units,id',
             'branch_id'                    => 'nullable|exists:branches,id',
             'approval_type'                => 'required|string|in:1_level,2_level,conditional_threshold',
-            'first_approver'               => 'required|string|in:reporting_manager,department_head,hr_admin',
-            'second_approver'              => 'required|string|in:finance_manager,hr_admin,department_head',
+            'first_approver'               => 'required|string|in:reporting_manager,department_head,hr_admin,finance_manager',
+            'second_approver'              => 'required|string|in:finance_manager,hr_admin,department_head,reporting_manager',
             'amount_threshold_for_2_level' => 'nullable|numeric|min:0',
             'is_default'                   => 'nullable|boolean',
             'status'                       => 'nullable|boolean',
@@ -468,8 +468,8 @@ class ExpensePolicyApiController extends Controller
             'business_unit_id'             => 'nullable|exists:business_units,id',
             'branch_id'                    => 'nullable|exists:branches,id',
             'approval_type'                => 'required|string|in:1_level,2_level,conditional_threshold',
-            'first_approver'               => 'required|string|in:reporting_manager,department_head,hr_admin',
-            'second_approver'              => 'required|string|in:finance_manager,hr_admin,department_head',
+            'first_approver'               => 'required|string|in:reporting_manager,department_head,hr_admin,finance_manager',
+            'second_approver'              => 'required|string|in:finance_manager,hr_admin,department_head,reporting_manager',
             'amount_threshold_for_2_level' => 'nullable|numeric|min:0',
             'is_default'                   => 'nullable|boolean',
             'status'                       => 'nullable|boolean',
