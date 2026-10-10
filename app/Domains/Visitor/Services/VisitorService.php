@@ -273,18 +273,19 @@ class VisitorService
                 ? trim($customData['inquiry_notes']) 
                 : ($pass->notes ?: "Walk-in inquiry at Front Desk (Pass #{$pass->pass_number})"));
 
+        $isB2bVisitor = !empty(trim((string)($visitor?->company_name ?? '')));
         $lead = \App\Domains\CRM\Models\Lead::create([
             'tenant_id'          => $tenantId,
             'company_id'         => $companyId,
             'branch_id'          => $branchId,
             'contact_person'     => $visitor?->full_name ?? 'Walk-in Visitor',
-            'company_name'       => $visitor?->company_name ?? ($visitor?->full_name ? $visitor->full_name . ' (Individual)' : 'Walk-in Visitor'),
+            'company_name'       => $isB2bVisitor ? $visitor->company_name : null,
             'designation'        => $visitor?->designation,
             'phone'              => $visitor?->phone,
             'email'              => $visitor?->email,
             'lead_owner_id'      => !empty($customData['lead_owner_id']) ? (int)$customData['lead_owner_id'] : ($pass->host_user_id ?: (auth()->id() ?: 1)),
             'source'             => 'Walk-in (Front Desk)',
-            'lead_type'          => $customData['lead_type'] ?? 'warm',
+            'lead_type'          => $isB2bVisitor ? 'b2b' : 'b2c',
             'priority'           => $customData['priority'] ?? 'Medium',
             'status'             => 'New',
             'product_ids'        => !empty($productIds) ? $productIds : null,

@@ -596,7 +596,7 @@ class WhatsAppBotService
                 'gstin'          => $gstin,
                 'phone'          => $senderNumber,
                 'company_phone'  => $senderNumber,
-                'lead_type'      => $isB2b ? 'B2B' : 'B2C',
+                'lead_type'      => $isB2b ? 'b2b' : 'b2c',
                 'requirement'    => $requirement,
                 'city'           => $city,
                 'source'         => 'WhatsApp Bot',

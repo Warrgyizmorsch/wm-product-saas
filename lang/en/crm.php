@@ -1978,5 +1978,8 @@ return array (
   'update_activity_mark_not_connected' => 'Update Activity: Mark as Not Connected',
   'update_activity_cancel' => 'Update Activity: Cancel Activity',
   'reschedule_activity' => 'Reschedule Activity',
+  'activity' => 'Activity',
+  'note' => 'Note',
+  'filter' => 'Filter',
 );
 

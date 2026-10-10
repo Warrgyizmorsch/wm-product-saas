@@ -807,7 +807,6 @@
 
 @php
     $isQuotationTabActive = request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('quotation_id') || old('form_type') === 'quotation_create' || old('form_type') === 'quotation_edit';
-    $isSalesOrdersTabActive = request()->has('sales_orders_tab');
     
     // Stages array with probabilities dynamically built from DealStatus master
     if (isset($dealStatuses) && $dealStatuses->isNotEmpty()) {
@@ -1144,12 +1143,6 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="#sectionSalesOrders" class="nav-link">
-                                <i class="feather-shopping-cart fs-13 text-muted"></i> {{ __('crm.sales_orders') }}
-                                <span class="badge bg-soft-secondary text-muted border">{{ $deal->salesOrders->count() }}</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
                             <a href="#subtab-interactions" class="nav-link">
                                 <i class="feather-calendar fs-13 text-muted"></i> {{ __('crm.activities') }}
                                 <span class="badge bg-soft-secondary text-muted border">{{ $followups->count() }}</span>
@@ -1177,18 +1170,13 @@
                 <div class="d-flex align-items-center justify-content-between border-bottom px-3 py-2 flex-wrap gap-2 sticky-top" style="z-index: 90; background-color: #f8fafc;">
                     <ul class="nav nav-pills zoho-nav-tabs" id="zohoDealTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ (!$isQuotationTabActive && !$isSalesOrdersTabActive && request('tab') !== 'interactions' && request('tab') !== 'timeline') ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ (!$isQuotationTabActive && request('tab') !== 'interactions' && request('tab') !== 'timeline') ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
                                 <i class="feather-grid me-1"></i>{{ __('crm.overview') }}
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link px-3 py-1 fw-bold fs-12 {{ $isQuotationTabActive ? 'active' : '' }}" id="quotations-tab" data-bs-toggle="tab" data-bs-target="#quotations-pane" type="button" role="tab">
                                 <i class="feather-file-text me-1"></i>{{ __('crm.quotation_proposals') }} ({{ $deal->quotations->count() }})
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ $isSalesOrdersTabActive ? 'active' : '' }}" id="salesorders-tab" data-bs-toggle="tab" data-bs-target="#salesorders-pane" type="button" role="tab">
-                                <i class="feather-shopping-cart me-1"></i>{{ __('crm.sales_orders') }} ({{ $deal->salesOrders->count() }})
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
@@ -1208,7 +1196,7 @@
                 <div class="pt-2 px-3 pb-3 tab-content" id="zohoDealTabsContent">
                     
                     <!-- ==================== TAB 1: OVERVIEW PANE ==================== -->
-                    <div class="tab-pane fade {{ (!$isQuotationTabActive && !$isSalesOrdersTabActive && request('tab') !== 'interactions' && request('tab') !== 'timeline') ? 'show active' : '' }}" id="overview-pane" role="tabpanel">
+                    <div class="tab-pane fade {{ (!$isQuotationTabActive && request('tab') !== 'interactions' && request('tab') !== 'timeline') ? 'show active' : '' }}" id="overview-pane" role="tabpanel">
                         
                         <!-- ZOHO DEAL KPI METRICS CARDS STRIP -->
                         <div class="row g-3 mb-3 align-items-stretch">
@@ -2341,67 +2329,6 @@
                         @endif
                     </div>
 
-                    <!-- ==================== TAB 3: SALES ORDERS & REVENUE REALIZATION PANE ==================== -->
-                    <div class="tab-pane fade {{ $isSalesOrdersTabActive ? 'show active' : '' }}" id="salesorders-pane" role="tabpanel">
-                        <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionSalesOrders">
-                            <div class="card-body p-4">
-                                <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4">
-                                    <div>
-                                        <h5 class="fs-15 text-dark fw-bold mb-0"><i class="feather-shopping-cart text-success me-2"></i>{{ __('crm.converted_sales_orders_revenue') }}</h5>
-                                        <span class="text-muted fs-12">{{ __('crm.track_sales_orders_desc') }}</span>
-                                    </div>
-                                    @if($activeQuotation && $activeQuotation->status === 'Accepted')
-                                        <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-success fw-bold px-3">
-                                            <i class="feather-plus me-1"></i>{{ __('crm.new_sales_order') }}
-                                        </a>
-                                    @endif
-                                </div>
-
-                                @if($deal->salesOrders->isEmpty())
-                                    <div class="text-center py-5 text-muted border border-dashed rounded bg-light-50">
-                                        <i class="feather-shopping-bag fs-36 text-muted mb-2 d-block opacity-50"></i>
-                                        <h6 class="fw-bold text-dark fs-13">{{ __('crm.no_sales_orders_generated') }}</h6>
-                                        <p class="fs-12 text-muted max-w-md mx-auto">{{ __('crm.sales_order_convert_desc') }}</p>
-                                    </div>
-                                @else
-                                    <div class="table-responsive">
-                                        <x-ui.odoo-form-ui type="table">
-                                            <thead>
-                                                <tr>
-                                                    <th>{{ __('crm.sales_order_num') }}</th>
-                                                    <th>{{ __('crm.order_date') }}</th>
-                                                    <th>{{ __('crm.customer_name') }}</th>
-                                                    <th>{{ __('crm.total_amount') }} ({{ active_currency_symbol() }})</th>
-                                                    <th>{{ __('crm.order_status') }}</th>
-                                                    <th class="text-end pe-3">{{ __('crm.actions') }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="fs-13 text-dark">
-                                                @foreach($deal->salesOrders as $so)
-                                                    <tr>
-                                                        <td class="font-monospace fw-bold text-primary">{{ $so->order_number }}</td>
-                                                        <td>{{ $so->order_date ? \Illuminate\Support\Carbon::parse($so->order_date)->format('d/m/Y') : '—' }}</td>
-                                                        <td class="fw-bold text-dark">{{ $so->customer_name }}</td>
-                                                        <td class="fw-bold text-success font-monospace">{{ format_currency($so->total_amount) }}</td>
-                                                        <td>
-                                                            <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fw-bold">
-                                                                {{ $so->status }}
-                                                            </span>
-                                                        </td>
-                                                        <td class="text-end pe-3">
-                                                            <a href="{{ route('sales.orders.show', $so) }}" class="btn btn-xs btn-soft-primary fw-bold">
-                                                                <i class="feather-eye me-1"></i>{{ __('crm.view_order') }}
-                                                            </a>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </x-ui.odoo-form-ui>
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
 
                     <!-- ==================== TAB 4: TIMELINE & AUDIT LOG PANE ==================== -->
                     <div class="tab-pane fade {{ (request('tab') === 'interactions' || request('tab') === 'timeline') ? 'show active' : '' }}" id="timeline-pane" role="tabpanel">
@@ -3262,7 +3189,7 @@
                     const stickyHeaderHeight = stickyHeader ? (stickyHeader.offsetHeight + 10) : 65;
                     const offset = targetTop - containerTop + scrollContainer.scrollTop - stickyHeaderHeight;
                     scrollContainer.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
-                } else if (scrollContainer && (targetHash === '#sectionQuotations' || targetHash === '#sectionSalesOrders')) {
+                } else if (scrollContainer && (targetHash === '#sectionQuotations')) {
                     scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
                 }
             }
@@ -3284,8 +3211,6 @@
                     targetTabBtnId = 'overview-tab';
                 } else if (targetHash === '#sectionQuotations' || targetHash === '#sectionQuotationHistory') {
                     targetTabBtnId = 'quotations-tab';
-                } else if (targetHash === '#sectionSalesOrders') {
-                    targetTabBtnId = 'salesorders-tab';
                 } else if (targetHash === '#subtab-interactions' || targetHash === '#subtab-history') {
                     targetTabBtnId = 'timeline-tab';
                     targetSubtabBtnId = (targetHash === '#subtab-interactions') ? 'subtab-interactions-tab' : 'subtab-history-tab';
@@ -3319,11 +3244,8 @@
             var activeSubTabKey = 'deal_active_subtab_' + {{ $deal->id }};
 
             const isQTabActive = @json($isQuotationTabActive);
-            const isSOTabActive = @json($isSalesOrdersTabActive);
             if (isQTabActive) {
                 localStorage.setItem(activeTabKey, 'quotations-tab');
-            } else if (isSOTabActive) {
-                localStorage.setItem(activeTabKey, 'salesorders-tab');
             }
 
             // Check URL Query Param & Hash first
@@ -3342,8 +3264,6 @@
                 localStorage.setItem(activeTabKey, 'overview-tab');
             } else if (tabParam === 'quotations' || hash === '#quotations' || hash === '#quotations-pane') {
                 localStorage.setItem(activeTabKey, 'quotations-tab');
-            } else if (tabParam === 'salesorders' || hash === '#salesorders' || hash === '#salesorders-pane') {
-                localStorage.setItem(activeTabKey, 'salesorders-tab');
             }
 
             // Restore saved tab from localStorage
@@ -3367,7 +3287,7 @@
 
             $(document).on('shown.bs.tab', 'button[data-bs-toggle="tab"], a[data-bs-toggle="tab"]', function (e) {
                 if (e.target.id) {
-                    if (['overview-tab', 'timeline-tab', 'quotations-tab', 'salesorders-tab'].includes(e.target.id)) {
+                    if (['overview-tab', 'timeline-tab', 'quotations-tab'].includes(e.target.id)) {
                         localStorage.setItem(activeTabKey, e.target.id);
                     } else if (['subtab-history-tab', 'subtab-interactions-tab'].includes(e.target.id)) {
                         localStorage.setItem(activeSubTabKey, e.target.id);
@@ -3393,9 +3313,6 @@
                     } else if (targetPaneId === '#quotations-pane') {
                         $('#zohoSidebarLinks a').removeClass('active');
                         $('#zohoSidebarLinks a[href="#sectionQuotations"]').addClass('active');
-                    } else if (targetPaneId === '#salesorders-pane') {
-                        $('#zohoSidebarLinks a').removeClass('active');
-                        $('#zohoSidebarLinks a[href="#sectionSalesOrders"]').addClass('active');
                     } else if (targetPaneId === '#timeline-pane') {
                         $('#zohoSidebarLinks a').removeClass('active');
                         $('#zohoSidebarLinks a[href="#subtab-history"]').addClass('active');

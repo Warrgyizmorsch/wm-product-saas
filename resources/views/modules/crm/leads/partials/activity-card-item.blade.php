@@ -34,58 +34,114 @@
     }
     $meetLink = $item->google_meet_link ?? $meetUrlFromNotes;
 
+    // Google Calendar Link
+    $calEventLink = null;
+    if (!empty($item->google_event_id) || $item->is_google_meet || $meetLink) {
+        $calEventLink = 'https://calendar.google.com/calendar/r';
+    }
+
     // Assigned / Tagged user string
     $assignedNames = $item->taggedUsers->pluck('name')->join(', ') ?: ($lead->owner?->name ?: 'Unassigned');
 
     // Phone
     $phoneToCall = $lead->phone ?: ($lead->mobile ?: '');
+
+    // Parse structured details (Activity, Schedule, Notes, Next Step, etc.)
+    $parsedFields = [];
+    $hasActivityKey = false;
+    $hasScheduleKey = false;
+    $hasNotesKey = false;
+
+    if (!empty($cleanNotes)) {
+        $rawLines = preg_split('/\r\n|\r|\n/', trim($cleanNotes));
+        foreach ($rawLines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+
+            if (preg_match('/^([^:]+):\s*(.*)$/', $line, $matches)) {
+                $label = trim($matches[1]);
+                $val = trim($matches[2]);
+
+                // Normalize common internal labels
+                if (strcasecmp($label, 'Scheduled action') === 0) {
+                    $label = 'Activity';
+                    $hasActivityKey = true;
+                } elseif (strcasecmp($label, 'Context from call') === 0) {
+                    $label = 'Notes';
+                    $hasNotesKey = true;
+                } elseif (strcasecmp($label, 'Activity') === 0) {
+                    $hasActivityKey = true;
+                } elseif (strcasecmp($label, 'Schedule') === 0) {
+                    $hasScheduleKey = true;
+                } elseif (strcasecmp($label, 'Notes') === 0 || strcasecmp($label, 'Note') === 0) {
+                    $hasNotesKey = true;
+                }
+
+                $parsedFields[] = ['label' => $label, 'value' => $val];
+            } else {
+                $parsedFields[] = ['label' => null, 'value' => $line];
+            }
+        }
+    }
+
+    // Default Activity row if none found and title exists
+    if (!$hasActivityKey && !empty($item->title)) {
+        array_unshift($parsedFields, ['label' => 'Activity', 'value' => $item->title]);
+        $hasActivityKey = true;
+    }
+
+    // Default Schedule row if none found in notes
+    if (!$hasScheduleKey && $item->followup_date) {
+        $typeLabel = __('crm.activity_types.' . $item->type) ?: $item->type;
+        $scheduleText = "{$typeLabel} scheduled for " . $item->followup_date->format('d F Y \a\t h:i A') . ".";
+
+        $inserted = false;
+        for ($i = 0; $i < count($parsedFields); $i++) {
+            if ($parsedFields[$i]['label'] === 'Activity') {
+                array_splice($parsedFields, $i + 1, 0, [['label' => 'Schedule', 'value' => $scheduleText]]);
+                $inserted = true;
+                break;
+            }
+        }
+        if (!$inserted) {
+            array_unshift($parsedFields, ['label' => 'Schedule', 'value' => $scheduleText]);
+        }
+    }
 @endphp
 
 <div class="odoo-activity-item">
     <div class="d-flex align-items-start gap-3">
-        
-        <!-- User Avatar -->
-        <div class="odoo-avatar-wrap flex-shrink-0 pt-0.5">
-            <div class="odoo-user-avatar d-flex align-items-center justify-content-center text-white fw-bold shadow-2xs" style="background-color: {{ $avatarBg }}; width: 36px; height: 36px; border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif;">
+
+        <!-- User Avatar with Green Check Badge -->
+        <div class="position-relative flex-shrink-0 pt-0.5" style="width: 36px; height: 36px;">
+            <div class="d-flex align-items-center justify-content-center text-white fw-bold shadow-2xs" 
+                 style="background-color: #1e1b4b; width: 34px; height: 34px; border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif;">
                 {{ $avatarInitial }}
             </div>
+            <span class="position-absolute d-flex align-items-center justify-content-center bg-success text-white rounded-circle shadow-xs" 
+                  style="bottom: -1px; right: -1px; width: 16px; height: 16px; border: 2px solid #ffffff; font-size: 8px;">
+                <i class="feather-check" style="stroke-width: 3.5;"></i>
+            </span>
         </div>
 
         <!-- Main Content Area -->
         <div class="flex-grow-1 overflow-hidden">
-            
-            <!-- Line 1: Header Row (Left: Due Badge + Title + Popover | Right: Due Date & Time + Badges) -->
-            <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-2">
-                <div class="d-flex align-items-center flex-wrap gap-1 fs-13">
-                    @if(!$isHistory)
-                        @if($category === 'overdue')
-                            <span class="text-danger fw-bold">{{ __('crm.overdue_in', ['time' => $item->followup_date->diffForHumans(null, true)]) }}</span>
-                        @elseif($item->followup_date->isToday())
-                            <span class="text-warning fw-bold">{{ __('crm.due_today') }}</span>
-                        @else
-                            <span class="text-success fw-bold">{{ __('crm.due_in', ['time' => $item->followup_date->diffForHumans(null, true)]) }}</span>
-                        @endif
-                        <strong class="text-dark">{{ __('crm.activity_types.' . $item->type) ?: $item->type }}</strong>
-                        @if($lead->contact_person || $lead->company_name)
-                            <span class="text-secondary">for {{ $lead->contact_person ?: $lead->company_name }}</span>
-                        @endif
+
+            <!-- Line 1: Header Row (Left: Due Badge + Title + for Lead + Popover) -->
+            <div class="d-flex align-items-baseline flex-wrap gap-1.5 fs-13 mb-1">
+                @if(!$isHistory)
+                    @if($category === 'overdue')
+                        <span class="text-danger fw-bold me-1">{{ rtrim(__('crm.overdue_in', ['time' => $item->followup_date->diffForHumans(null, true)]), ':') }}:</span>
+                    @elseif($item->followup_date->isToday())
+                        <span class="text-warning fw-bold me-1">{{ rtrim(__('crm.due_today'), ':') }}:</span>
                     @else
-                        <strong class="text-dark">{{ $item->user?->name ?: ($lead->owner?->name ?: 'System') }}</strong>
-                        <span class="text-muted fs-11 ms-1">{{ $item->updated_at->format('h:i A') }}</span>
-                        <span class="badge rounded-pill {{ $statusBadgeClass }} px-2 py-0.5 fs-10 ms-1 fw-semibold">{{ __('crm.' . strtolower(str_replace(' ', '_', $statusLabel))) ?: $statusLabel }}</span>
-                        <span class="text-secondary fs-12 ms-1">&bull; {{ __('crm.activity_types.' . $item->type) ?: $item->type }} {{ __('crm.activity_log') }}</span>
+                        <span class="text-success fw-bold me-1">{{ rtrim(__('crm.due_in', ['time' => $item->followup_date->diffForHumans(null, true)]), ':') }}:</span>
                     @endif
 
-                    <!-- Google Calendar / Meet Indicators in Header -->
-                    @if(!empty($item->google_event_id) || $item->is_google_meet || $meetLink)
-                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-1.5 py-0.5 fs-10 fw-medium d-inline-flex align-items-center gap-1 ms-1" title="{{ __('crm.synced_google_calendar') }}">
-                            <i class="feather-calendar fs-10"></i> {{ __('crm.google_calendar') }}
-                        </span>
-                    @endif
-                    @if($meetLink && $item->is_google_meet)
-                        <a href="{{ $meetLink }}" target="_blank" class="badge bg-success-subtle text-success border border-success-subtle px-1.5 py-0.5 fs-10 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1 hover-opacity ms-0.5" title="{{ __('crm.join_google_meet_conf') }}">
-                            <i class="feather-video fs-10"></i> {{ __('crm.google_meet') }}
-                        </a>
+                    <span class="fw-bold activity-title-text">{{ __('crm.activity_types.' . $item->type) ?: $item->type }}</span>
+
+                    @if($lead->contact_person || $lead->company_name)
+                        <span class="text-secondary ms-1">for {{ $lead->contact_person ?: $lead->company_name }}</span>
                     @endif
 
                     <!-- Info (i) Tooltip/Popover Icon -->
@@ -96,53 +152,44 @@
                        data-bs-html="true"
                        data-bs-title="{{ __('crm.activity_details') }}"
                        data-bs-content="<div class='fs-11'><strong>{{ __('crm.activity_type_label') }}</strong> {{ $item->type }}<br><strong>{{ __('crm.created_on_label') }}</strong> {{ $item->created_at->format('d/m/Y h:i A') }}<br><strong>{{ __('crm.created_by_label') }}</strong> {{ $lead->owner?->name ?: 'System' }}<br><strong>{{ __('crm.assigned_to_label') }}</strong> {{ $assignedNames }}<br><strong>{{ __('crm.due_on_label') }}</strong> {{ $item->followup_date->format('d/m/Y h:i A') }}</div>"
-                       style="font-size: 11.5px;"></i>
-                </div>
+                       style="font-size: 12px;"></i>
+                @else
+                    <strong class="activity-title-text">{{ $item->user?->name ?: ($lead->owner?->name ?: 'System') }}</strong>
+                    <span class="text-muted fs-11 ms-1">{{ $item->updated_at->format('h:i A') }}</span>
+                    <span class="badge rounded-pill {{ $statusBadgeClass }} px-2 py-0.5 fs-10 ms-1 fw-semibold">{{ __('crm.' . strtolower(str_replace(' ', '_', $statusLabel))) ?: $statusLabel }}</span>
+                    <span class="text-secondary fs-12 ms-1">&bull; {{ __('crm.activity_types.' . $item->type) ?: $item->type }} {{ __('crm.activity_log') }}</span>
+                @endif
 
-                <!-- Right Side Date & Time / Assigned Tag -->
-                <div class="text-muted fs-11 d-flex align-items-center gap-2">
-                    <span>
-                        <i class="feather-clock fs-10 me-1 opacity-75"></i>{{ !$isHistory ? $item->followup_date->format('d M, h:i A') : $item->updated_at->format('d M, h:i A') }}
-                    </span>
-                    @if($assignedNames && $assignedNames !== 'Unassigned')
-                        <span class="d-none d-md-inline text-muted opacity-75">&bull;</span>
-                        <span class="d-none d-md-inline text-muted" title="{{ __('crm.assigned_to_label') }}"><i class="feather-user fs-10 me-1"></i>{{ $assignedNames }}</span>
-                    @endif
-                </div>
+                <!-- Google Calendar / Meet Indicators in Header -->
+                @if($calEventLink)
+                    <a href="{{ $calEventLink }}" target="_blank" class="badge bg-primary-subtle text-primary border border-primary-subtle px-1.5 py-0.5 fs-10 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1 hover-opacity ms-1" title="{{ __('crm.view_in_google_calendar') ?? __('crm.synced_google_calendar') }}">
+                        <i class="feather-calendar fs-10"></i> {{ __('crm.google_calendar') }}
+                    </a>
+                @endif
+                @if($meetLink && $item->is_google_meet)
+                    <a href="{{ $meetLink }}" target="_blank" class="badge bg-success-subtle text-success border border-success-subtle px-1.5 py-0.5 fs-10 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1 hover-opacity ms-0.5" title="{{ __('crm.join_google_meet_conf') }}">
+                        <i class="feather-video fs-10"></i> {{ __('crm.google_meet') }}
+                    </a>
+                @endif
             </div>
 
-            <!-- Line 2: Phone Link & Click-to-Call Button (if present and pending) -->
-            @if($phoneToCall && !$isHistory)
-                <div class="mt-1.5 mb-2.5 fs-12 d-flex align-items-center gap-2 flex-wrap">
-                    <a href="javascript:void(0)" 
-                       class="text-dark text-decoration-none fw-semibold hover-primary d-inline-flex align-items-center px-1.5 py-0.5 bg-light rounded border btn-crm-click-to-call cursor-pointer"
-                       data-lead-id="{{ $lead->id }}"
-                       data-lead-name="{{ $lead->contact_person ?: $lead->company_name }}"
-                       data-lead-company="{{ $lead->company_name }}"
-                       data-lead-phone="{{ $phoneToCall }}"
-                       title="{{ __('crm.click_to_call_softphone') }}">
-                        <span>{{ $phoneToCall }}</span>
-                    </a>
-                    <a href="javascript:void(0)" 
-                       class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 fs-10 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1 hover-opacity btn-crm-click-to-call cursor-pointer"
-                       data-lead-id="{{ $lead->id }}"
-                       data-lead-name="{{ $lead->contact_person ?: $lead->company_name }}"
-                       data-lead-company="{{ $lead->company_name }}"
-                       data-lead-phone="{{ $phoneToCall }}"
-                       title="{{ __('crm.click_to_call_softphone') }}">
-                        <i class="feather-phone-call fs-10"></i> {{ __('crm.call_now') }}
-                    </a>
+            <!-- Structured Activity Details (Activity, Schedule, Notes, Next Step, etc.) -->
+            @if(count($parsedFields) > 0)
+                <div class="activity-details-block mb-1.5">
+                    @foreach($parsedFields as $field)
+                        <div class="mb-0.5 fs-12 activity-detail-row">
+                            @if($field['label'])
+                                <span class="activity-detail-key">{{ $field['label'] }}:</span>
+                            @endif
+                            <span class="activity-detail-val">{{ $field['value'] }}</span>
+                        </div>
+                    @endforeach
                 </div>
-            @endif
-
-            <!-- Line 3: Description / Notes -->
-            @if($cleanNotes)
-                <div class="text-muted fs-12 mb-2.5 lh-base" style="white-space: pre-wrap;">{{ $cleanNotes }}</div>
             @endif
 
             <!-- Call Recording Player (if present) -->
             @if(!empty($item->recording_url))
-                <div class="d-flex align-items-center gap-2 my-2.5" style="max-width: 340px;">
+                <div class="d-flex align-items-center gap-2 my-2" style="max-width: 340px;">
                     <audio controls preload="none" style="height: 26px; width: 220px; outline: none;">
                         <source src="{{ asset($item->recording_url) }}" type="audio/mpeg">
                         <source src="{{ asset($item->recording_url) }}" type="audio/mp3">
@@ -153,33 +200,39 @@
                 </div>
             @endif
 
-            <!-- Line 4: Clean Odoo Action Text Links (Connected, Not Connected, Reschedule, Cancel, Meet) -->
+            <!-- Line 3: Direct Action Options (Connected, Not Connected, Reschedule, Cancel, Call) -->
             @if($isPending)
-                <div class="d-flex align-items-center flex-wrap pt-1 fs-12" style="gap: 20px; row-gap: 8px;">
+                <div class="d-flex align-items-center flex-wrap pt-1.5 fs-12" style="column-gap: 16px; row-gap: 6px;">
                     <!-- Connected -->
-                    <a href="javascript:void(0)" class="text-success text-decoration-none fw-semibold d-inline-flex align-items-center gap-1.5 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed">
-                        <i class="feather-check fs-11"></i> <span>{{ __('crm.connected') }}</span>
+                    <a href="javascript:void(0)" class="text-success text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed">
+                        <i class="feather-check fs-12"></i> <span>Connected</span>
                     </a>
 
                     <!-- Not Connected -->
-                    <a href="javascript:void(0)" class="text-warning text-decoration-none fw-semibold d-inline-flex align-items-center gap-1.5 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected">
-                        <i class="feather-phone-off fs-11"></i> <span>{{ __('crm.not_connected') }}</span>
+                    <a href="javascript:void(0)" class="text-warning text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected">
+                        <i class="feather-phone-off fs-12"></i> <span>Not Connected</span>
                     </a>
 
                     <!-- Reschedule -->
-                    <a href="javascript:void(0)" class="text-info text-decoration-none fw-semibold d-inline-flex align-items-center gap-1.5 hover-underline" data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">
-                        <i class="feather-edit fs-11"></i> <span>{{ __('crm.reschedule') }}</span>
+                    <a href="javascript:void(0)" class="text-info text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">
+                        <i class="feather-repeat fs-12"></i> <span>Reschedule</span>
                     </a>
 
                     <!-- Cancel -->
-                    <a href="javascript:void(0)" class="text-danger text-decoration-none fw-semibold d-inline-flex align-items-center gap-1.5 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">
-                        <i class="feather-x fs-11"></i> <span>{{ __('crm.cancel') }}</span>
+                    <a href="javascript:void(0)" class="text-danger text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">
+                        <i class="feather-x fs-12"></i> <span>Cancel</span>
                     </a>
 
-                    <!-- Google Meet -->
-                    @if($meetLink && $item->is_google_meet)
-                        <a href="{{ $meetLink }}" target="_blank" class="text-primary text-decoration-none fw-semibold d-inline-flex align-items-center gap-1.5 hover-underline" title="{{ __('crm.join_google_meet') }}">
-                            <i class="feather-video fs-11 text-primary"></i> <span>{{ __('crm.google_meet') }}</span>
+                    @if($phoneToCall)
+                        <!-- Call Now Button -->
+                        <a href="javascript:void(0)" 
+                           class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 fs-10 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1 hover-opacity btn-crm-click-to-call ms-auto"
+                           data-lead-id="{{ $lead->id }}"
+                           data-lead-name="{{ $lead->contact_person ?: $lead->company_name }}"
+                           data-lead-company="{{ $lead->company_name }}"
+                           data-lead-phone="{{ $phoneToCall }}"
+                           title="{{ __('crm.click_to_call_softphone') }}">
+                            <i class="feather-phone-call fs-10"></i> <span>Call {{ $phoneToCall }}</span>
                         </a>
                     @endif
                 </div>

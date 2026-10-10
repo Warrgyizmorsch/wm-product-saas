@@ -297,6 +297,7 @@ class WebToLeadController extends Controller
             'email' => ['nullable', 'email', 'max:150'],
             'phone' => ['nullable', 'string', 'max:30'],
             'company_name' => ['nullable', 'string', 'max:150'],
+            'lead_type' => ['nullable', 'string', 'max:20'],
             'requirement' => ['nullable', 'string', 'max:3000'],
             'message' => ['nullable', 'string', 'max:3000'],
             'city' => ['nullable', 'string', 'max:100'],
@@ -352,7 +353,7 @@ class WebToLeadController extends Controller
         // Extract Custom Dynamic Fields
         $coreKeys = [
             'tenant_id', 'tenant', 'company_id', 'branch_id', 'source', 'redirect_url', '_token', '_hp_website', 'custom_fields',
-            'contact_person', 'name', 'company_name', 'email', 'phone', 'city', 'state', 'address',
+            'contact_person', 'name', 'company_name', 'lead_type', 'email', 'phone', 'city', 'state', 'address',
             'requirement', 'message', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'page_url', 'priority'
         ];
 
@@ -379,6 +380,7 @@ class WebToLeadController extends Controller
 
         $lead->contact_person = $contactPerson ?: 'Website Visitor';
         $lead->company_name = $request->input('company_name');
+        $lead->lead_type = $request->input('lead_type') ?: (!empty(trim((string)$request->input('company_name'))) ? 'b2b' : 'b2c');
         $lead->email = $email ?: null;
         $lead->phone = $phone ?: null;
         $lead->requirement = $requirement;
