@@ -100,6 +100,34 @@ class ProductionMaintenanceWorkOrder extends BaseModel
         $this->attributes['additional_cost'] = $value;
     }
 
+    public function getDowntimeHoursAttribute(): string
+    {
+        $totalMinutes = 0;
+        if ($this->downtime) {
+            if ($this->downtime->status === 'closed' || $this->downtime->duration_minutes !== null) {
+                if ($this->downtime->duration_minutes !== null) {
+                    $totalMinutes = (int) round((float) $this->downtime->duration_minutes);
+                } elseif ($this->downtime->start_time && $this->downtime->end_time) {
+                    $start = \Illuminate\Support\Carbon::parse($this->downtime->start_time);
+                    $end = \Illuminate\Support\Carbon::parse($this->downtime->end_time);
+                    $totalMinutes = max(0, (int) round($start->diffInSeconds($end) / 60));
+                }
+            } elseif ($this->downtime->status === 'open') {
+                $start = $this->downtime->start_time ? \Illuminate\Support\Carbon::parse($this->downtime->start_time) : null;
+                $totalMinutes = $start ? max(0, (int) round($start->diffInSeconds(now()) / 60)) : 0;
+            }
+        } elseif ($this->actual_start) {
+            $start = \Illuminate\Support\Carbon::parse($this->actual_start);
+            $end = $this->actual_end ? \Illuminate\Support\Carbon::parse($this->actual_end) : ($this->status === 'in_progress' ? now() : null);
+            $totalMinutes = $end ? max(0, (int) round($start->diffInSeconds($end) / 60)) : 0;
+        }
+
+        $h = intdiv($totalMinutes, 60);
+        $m = $totalMinutes % 60;
+
+        return sprintf('%d.%02d', $h, $m);
+    }
+
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');
