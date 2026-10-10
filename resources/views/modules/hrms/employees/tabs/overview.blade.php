@@ -48,7 +48,7 @@
                                     };
                                 @endphp
                                 <x-ui.badge soft :variant="$stageVariant" class="fs-12 fw-semibold px-2.5 py-0.5">
-                                    {{ $employee->employee_stage ?: 'Not Set' }}
+                                    {{ $employee->employee_stage ?: __('hrms.common.not_set') }}
                                 </x-ui.badge>
                             </div>
                         </div>

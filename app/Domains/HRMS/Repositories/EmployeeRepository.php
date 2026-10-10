@@ -37,7 +37,18 @@ class EmployeeRepository implements EmployeeRepositoryInterface
                     $inner->where('full_name', 'like', "%{$search}%")
                         ->orWhere('employee_id', 'like', "%{$search}%")
                         ->orWhere('personal_email', 'like', "%{$search}%")
-                        ->orWhere('personal_mobile_number', 'like', "%{$search}%");
+                        ->orWhere('office_email', 'like', "%{$search}%")
+                        ->orWhere('personal_mobile_number', 'like', "%{$search}%")
+                        ->orWhereHas('user', function ($uq) use ($search) {
+                            $uq->where('email', 'like', "%{$search}%")
+                               ->orWhere('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('designation', function ($dq) use ($search) {
+                            $dq->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('department', function ($dpq) use ($search) {
+                            $dpq->where('name', 'like', "%{$search}%");
+                        });
                 });
             })
             ->when($filters['company_id'], fn ($query, int $companyId) => $query->where('company_id', $companyId))
@@ -271,23 +282,28 @@ class EmployeeRepository implements EmployeeRepositoryInterface
 
         $userIdInput = $validated['user_id'] ?? $request->input('user_id');
         if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
-            if (!empty($validated['office_email'])) {
-                $existingUser = \App\Models\User::where('email', $validated['office_email'])->first();
+            $userEmail = !empty($validated['office_email']) ? $validated['office_email'] : (!empty($validated['personal_email']) ? $validated['personal_email'] : null);
+            if (!empty($userEmail)) {
+                $existingUser = \App\Models\User::where('email', $userEmail)->first();
                 if ($existingUser) {
                     $validated['user_id'] = $existingUser->id;
+                    $validated['office_email'] = $validated['office_email'] ?: $existingUser->email;
                 } else {
                     $newUser = \App\Models\User::create([
-                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id'),
+                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id') ?? 1,
                         'company_id'    => $validated['company_id'] ?? null,
                         'branch_id'     => $validated['branch_id'] ?? null,
                         'department_id' => $validated['department_id'] ?? null,
                         'role_id'       => $request->input('role_id') ?: null,
                         'name'          => $validated['full_name'],
-                        'email'         => $validated['office_email'],
+                        'email'         => $userEmail,
                         'password'      => \Illuminate\Support\Facades\Hash::make('12345678'),
                     ]);
                     $validated['user_id'] = $newUser->id;
+                    $validated['office_email'] = $validated['office_email'] ?: $userEmail;
                 }
+            } else {
+                $validated['user_id'] = null;
             }
         } elseif (!empty($validated['user_id'])) {
             $user = \App\Models\User::find($validated['user_id']);

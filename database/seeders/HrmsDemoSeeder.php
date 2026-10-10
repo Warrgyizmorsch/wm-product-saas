@@ -1133,7 +1133,7 @@ class HrmsDemoSeeder extends Seeder
                 'description' => 'Level 1: Reporting Manager, Level 2: Finance for > 10,000 INR',
                 'approval_type' => '2_level',
                 'first_approver' => 'reporting_manager',
-                'second_approver' => 'finance',
+                'second_approver' => 'finance_manager',
                 'amount_threshold_for_2_level' => 10000,
                 'is_default' => true,
                 'status' => true,

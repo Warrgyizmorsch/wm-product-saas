@@ -60,15 +60,17 @@ class EmployeeExitController extends Controller
 
         $validated = $request->validate([
             'employee_id'        => 'required|exists:employees,id',
-            'separation_type'    => 'required|string|in:resignation,termination,retirement,absconding,death',
+            'separation_type'    => 'required|string|in:resignation,termination,retirement,absconding,death,layoff,contract_end',
             'resignation_date'   => 'required|date',
             'preferred_lwd'      => 'nullable|date|after_or_equal:resignation_date',
             'notice_period_days' => 'nullable|integer|min:0',
             'reason_category'    => 'required|string|max:255',
             'reason_details'     => 'nullable|string',
             'feedback_text'      => 'nullable|string',
-            'initiated_by'       => 'required|in:employee,employer',
+            'initiated_by'       => 'nullable|in:employee,employer',
         ]);
+
+        $validated['initiated_by'] = $validated['initiated_by'] ?? 'employee';
 
         $exit = $this->exitRepository->storeExit($validated, auth()->id(), $tenantId);
 
@@ -129,7 +131,7 @@ class EmployeeExitController extends Controller
     public function updateClearance(Request $request, EmployeeExitClearance $clearance): RedirectResponse
     {
         $validated = $request->validate([
-            'status'           => 'required|in:cleared,pending,waived,issue_found',
+            'status'           => 'required|in:cleared,pending,waived,issue_found,issues_found',
             'remarks'          => 'nullable|string',
             'deduction_amount' => 'nullable|numeric|min:0',
             'recovery_amount'  => 'nullable|numeric|min:0',
@@ -149,7 +151,7 @@ class EmployeeExitController extends Controller
 
     public function updateDepartmentClearances(Request $request, EmployeeExit $exit, string $department): RedirectResponse
     {
-        $items = $request->input('items', []);
+        $items = $request->input('clearances') ?: $request->input('items', []);
         $userId = auth()->id();
 
         DB::transaction(function () use ($items, $userId, $exit) {
@@ -172,6 +174,7 @@ class EmployeeExitController extends Controller
             }
         });
 
+        $this->clearanceService->checkAllClearancesCompleted($exit);
         $this->exitRepository->recalculateFnf($exit);
 
         return redirect()->back()->with('success', "Clearances for department updated successfully.");
@@ -180,18 +183,20 @@ class EmployeeExitController extends Controller
     public function storeAdhocExitClearance(Request $request, EmployeeExit $exit): RedirectResponse
     {
         $validated = $request->validate([
-            'department'         => 'required|string|max:100',
+            'department'         => 'nullable|string|max:100',
+            'clearance_category' => 'nullable|string|max:100',
             'item_name'          => 'required|string|max:255',
             'remarks'            => 'nullable|string',
             'deduction_amount'   => 'nullable|numeric|min:0',
         ]);
 
         $tenantId = $exit->tenant_id ?: (tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id());
+        $department = $validated['department'] ?? ($validated['clearance_category'] ?? 'hr_operations');
 
         EmployeeExitClearance::create([
             'tenant_id'        => $tenantId,
             'employee_exit_id' => $exit->id,
-            'department'       => $validated['department'],
+            'department'       => $department,
             'item_name'        => $validated['item_name'],
             'status'           => 'pending',
             'remarks'          => $validated['remarks'] ?? null,
@@ -219,37 +224,64 @@ class EmployeeExitController extends Controller
     public function returnAssetDirect(Request $request, EmployeeExit $exit, Asset $asset): RedirectResponse
     {
         $validated = $request->validate([
-            'condition_on_return' => 'required|string|in:new,good,fair,damaged,scrapped',
+            'condition'           => 'nullable|string|in:good,fair,damaged,lost,scrapped,new',
+            'condition_on_return' => 'nullable|string|in:good,fair,damaged,lost,scrapped,new',
+            'damage_deduction'    => 'nullable|numeric|min:0',
+            'remarks'             => 'nullable|string|max:1000',
             'notes'               => 'nullable|string|max:1000',
         ]);
+
+        $condition = $validated['condition'] ?? ($validated['condition_on_return'] ?? 'good');
+        $remarks = $validated['remarks'] ?? ($validated['notes'] ?? null);
+        $damageDeduction = floatval($validated['damage_deduction'] ?? 0);
 
         $allocation = AssetAllocation::where('asset_id', $asset->id)
             ->where('employee_id', $exit->employee_id)
             ->whereNull('returned_at')
             ->first();
 
-        DB::transaction(function () use ($asset, $allocation, $validated) {
-            $newStatus = match ($validated['condition_on_return']) {
-                'damaged'  => 'maintenance',
-                'scrapped' => 'scrapped',
-                default    => 'available',
+        DB::transaction(function () use ($asset, $allocation, $condition, $remarks, $exit, $damageDeduction) {
+            $newStatus = match ($condition) {
+                'damaged'          => 'maintenance',
+                'lost', 'scrapped' => 'scrapped',
+                default            => 'available',
             };
 
             if ($allocation) {
                 $allocation->update([
                     'returned_at'      => now(),
-                    'return_condition' => $validated['condition_on_return'],
-                    'notes'            => $validated['notes'] ?? $allocation->notes,
+                    'return_condition' => $condition,
+                    'notes'            => $remarks ?: $allocation->notes,
                 ]);
             }
 
             $asset->update([
                 'status'               => $newStatus,
-                'condition'            => $validated['condition_on_return'],
+                'condition'            => $condition,
                 'assigned_employee_id' => null,
                 'allocated_at'         => null,
                 'expected_return_date' => null,
             ]);
+
+            // If damage/loss penalty is applied, create or update clearance record in IT Assets
+            if ($damageDeduction > 0) {
+                $tenantId = $exit->tenant_id ?: (tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id());
+                EmployeeExitClearance::updateOrCreate(
+                    [
+                        'employee_exit_id' => $exit->id,
+                        'department'       => 'it_assets',
+                        'item_name'        => "Hardware Recovery: {$asset->name}",
+                    ],
+                    [
+                        'tenant_id'        => $tenantId,
+                        'status'           => 'issues_found',
+                        'deduction_amount' => $damageDeduction,
+                        'recovery_amount'  => $damageDeduction,
+                        'remarks'          => "Asset condition: {$condition}. " . ($remarks ?: 'Deduction applied on asset return.'),
+                        'cleared_by'       => auth()->id(),
+                    ]
+                );
+            }
         });
 
         $this->exitRepository->recalculateFnf($exit);
@@ -267,22 +299,40 @@ class EmployeeExitController extends Controller
     public function finalizeFnF(Request $request, EmployeeExit $exit): RedirectResponse
     {
         $validated = $request->validate([
-            'unpaid_salary'           => 'required|numeric|min:0',
-            'leave_encashment_amount' => 'required|numeric|min:0',
-            'gratuity_amount'         => 'required|numeric|min:0',
-            'bonus_amount'            => 'required|numeric|min:0',
-            'other_earnings'          => 'nullable|numeric|min:0',
-            'notice_recovery_amount'  => 'required|numeric|min:0',
-            'asset_recovery_amount'   => 'required|numeric|min:0',
-            'loan_deduction_amount'   => 'required|numeric|min:0',
-            'tax_deduction_amount'    => 'required|numeric|min:0',
-            'other_deductions'        => 'nullable|numeric|min:0',
-            'remarks'                 => 'nullable|string',
+            'payment_method'      => 'nullable|string|max:100',
+            'payment_mode'        => 'nullable|string|max:100',
+            'settlement_channel'  => 'nullable|string|in:monthly_payroll,off_cycle',
+            'payment_reference'   => 'nullable|string|max:255',
+            'notes'               => 'nullable|string',
+            'override_clearances' => 'nullable|boolean',
+            'override_reason'     => 'nullable|string',
+            'unpaid_salary'       => 'nullable|numeric|min:0',
+            'leave_encashment_amount' => 'nullable|numeric|min:0',
+            'gratuity_amount'     => 'nullable|numeric|min:0',
+            'bonus_amount'        => 'nullable|numeric|min:0',
+            'other_earnings'      => 'nullable|numeric|min:0',
+            'notice_recovery_amount' => 'nullable|numeric|min:0',
+            'asset_recovery_amount'  => 'nullable|numeric|min:0',
+            'loan_deduction_amount'  => 'nullable|numeric|min:0',
+            'tax_deduction_amount'   => 'nullable|numeric|min:0',
+            'other_deductions'    => 'nullable|numeric|min:0',
         ]);
 
-        $this->exitRepository->saveFnf($exit, $validated);
+        $settlement = $exit->fnfSettlement ?: $this->fnfService->saveSettlement($exit, $this->fnfService->calculateFnF($exit));
 
-        return redirect()->back()->with('success', 'FnF settlement finalized and saved successfully.');
+        $validated['payment_mode'] = $validated['payment_method'] ?? ($validated['payment_mode'] ?? 'Bank Transfer');
+        $validated['payment_method'] = $validated['payment_mode'];
+        $validated['paid_at'] = now();
+
+        $this->exitRepository->settleFnf($settlement, $validated, auth()->id());
+
+        // Pre-generate all exit certificates upon settlement
+        $this->docService->generateRelievingLetter($exit);
+        $this->docService->generateExperienceCertificate($exit);
+        $this->docService->generateNocCertificate($exit);
+
+        return redirect()->route('hrms.exits.index', ['tab' => 'documents'])
+            ->with('success', "FnF settlement finalized and paid. Relieving letter & certificates generated for {$exit->employee->full_name}.");
     }
 
     public function saveFnf(Request $request, EmployeeExit $exit): RedirectResponse
@@ -292,41 +342,58 @@ class EmployeeExitController extends Controller
 
     public function viewDocument(EmployeeExitDocument $document): View
     {
+        $exit = $document->employeeExit;
+        $employee = $document->employee ?? $exit?->employee;
+        $company = $employee?->company ?: \App\Domains\HRMS\Models\Company::first();
+
         $data = [
-            'document' => $document,
-            'exit'     => $document->employeeExit,
-            'employee' => $document->employee,
-            'company'  => $document->employee?->company ?? \App\Domains\HRMS\Models\Company::first(),
+            'document'         => $document,
+            'doc'              => $document,
+            'exit'             => $exit,
+            'employee'         => $employee,
+            'company'          => $company,
+            'title'            => ucfirst(str_replace('_', ' ', $document->document_type)),
+            'employeeName'     => $employee?->full_name,
+            'renderedContent'  => is_array($document->content_data) ? ($document->content_data['body'] ?? json_encode($document->content_data)) : $document->content_data,
         ];
 
-        return view('modules.hrms.employees.exits.documents.custom_template_preview', $data);
+        return match ($document->document_type) {
+            'relieving_letter'       => view('modules.hrms.employees.exits.documents.relieving-letter', $data),
+            'experience_certificate' => view('modules.hrms.employees.exits.documents.experience-certificate', $data),
+            'noc_certificate'        => view('modules.hrms.employees.exits.documents.noc-certificate', $data),
+            'fnf_statement'          => view('modules.hrms.employees.exits.documents.fnf-statement', array_merge($data, ['fnf' => $exit?->fnfSettlement])),
+            default                  => view('modules.hrms.employees.exits.documents.custom_template_preview', $data),
+        };
     }
 
     public function viewRelievingLetter(EmployeeExit $exit): View
     {
-        $doc = $this->docService->generateRelievingLetter($exit);
+        $document = $this->docService->generateRelievingLetter($exit);
+        $doc = $document;
         $employee = $exit->employee;
         $company = $employee?->company ?: \App\Domains\HRMS\Models\Company::first();
 
-        return view('modules.hrms.employees.exits.documents.relieving-letter', compact('exit', 'employee', 'company', 'doc'));
+        return view('modules.hrms.employees.exits.documents.relieving-letter', compact('exit', 'employee', 'company', 'document', 'doc'));
     }
 
     public function viewExperienceCertificate(EmployeeExit $exit): View
     {
-        $doc = $this->docService->generateExperienceCertificate($exit);
+        $document = $this->docService->generateExperienceCertificate($exit);
+        $doc = $document;
         $employee = $exit->employee;
         $company = $employee?->company ?: \App\Domains\HRMS\Models\Company::first();
 
-        return view('modules.hrms.employees.exits.documents.experience-certificate', compact('exit', 'employee', 'company', 'doc'));
+        return view('modules.hrms.employees.exits.documents.experience-certificate', compact('exit', 'employee', 'company', 'document', 'doc'));
     }
 
     public function viewNocCertificate(EmployeeExit $exit): View
     {
-        $doc = $this->docService->generateNocCertificate($exit);
+        $document = $this->docService->generateNocCertificate($exit);
+        $doc = $document;
         $employee = $exit->employee;
         $company = $employee?->company ?: \App\Domains\HRMS\Models\Company::first();
 
-        return view('modules.hrms.employees.exits.documents.noc-certificate', compact('exit', 'employee', 'company', 'doc'));
+        return view('modules.hrms.employees.exits.documents.noc-certificate', compact('exit', 'employee', 'company', 'document', 'doc'));
     }
 
     public function viewFnFStatement(EmployeeExit $exit): View

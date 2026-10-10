@@ -21,11 +21,19 @@ class ExpenseCategory extends BaseModel
     ];
 
     /**
-     * Category has many policies.
+     * Category has many policy rules (limits).
+     */
+    public function policyRules()
+    {
+        return $this->hasMany(ExpensePolicyRule::class, 'expense_category_id');
+    }
+
+    /**
+     * Category belongs to many expense policies through policy rules.
      */
     public function policies()
     {
-        return $this->hasMany(ExpensePolicy::class, 'expense_category_id');
+        return $this->belongsToMany(ExpensePolicy::class, 'expense_policy_rules', 'expense_category_id', 'expense_policy_id');
     }
 
     /**

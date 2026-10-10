@@ -54,6 +54,13 @@ class EmployeeProfileRequestRepository implements EmployeeProfileRequestReposito
             ->orderBy('name')
             ->get();
 
+        $counts = [
+            'all'      => EmployeeProfileUpdateRequest::when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))->count(),
+            'pending'  => EmployeeProfileUpdateRequest::when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))->where('status', 'pending')->count(),
+            'approved' => EmployeeProfileUpdateRequest::when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))->where('status', 'approved')->count(),
+            'rejected' => EmployeeProfileUpdateRequest::when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))->where('status', 'rejected')->count(),
+        ];
+
         return [
             'profileRequests' => $profileRequests,
             'status'          => $status,
@@ -62,6 +69,7 @@ class EmployeeProfileRequestRepository implements EmployeeProfileRequestReposito
             'departments'     => $departments,
             'sortBy'          => $sortBy,
             'sortOrder'       => $sortOrder,
+            'counts'          => $counts,
         ];
     }
 

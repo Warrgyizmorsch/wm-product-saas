@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'Employee Profile Edit Requests | SaaS ERP')
-@section('page-title', 'Profile Edit Requests')
-@section('breadcrumb', 'HRMS / Employees / Profile Edit Requests')
+@section('title', __('hrms.employees.profile_requests') . ' | SaaS ERP')
+@section('page-title', __('hrms.employees.profile_requests'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.employees.title') . ' / ' . __('hrms.employees.profile_requests'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button href="{{ route('hrms.employees.index') }}" variant="light" icon="feather-arrow-left">
-            Back to Employees
+            {{ __('hrms.employees.back_to_registry') }}
         </x-ui.button>
     </div>
 @endsection
@@ -26,74 +26,20 @@
             font-weight: 700;
             font-size: 13px;
         }
-        .erp-horizontal-tabs {
-            gap: 8px;
-            overflow-x: auto;
-            overflow-y: visible;
-            flex-wrap: nowrap;
-            white-space: nowrap;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-            padding-bottom: 2px;
-        }
-        .erp-horizontal-tabs::-webkit-scrollbar {
-            display: none;
-        }
-        .erp-horizontal-tabs .nav-item {
-            margin-bottom: 0;
-            flex-shrink: 0;
-            position: relative;
-        }
-        .erp-horizontal-tabs .nav-link {
-            border: 1px solid transparent !important;
-            background: transparent !important;
-            color: #64748b !important;
-            font-size: 13px;
-            font-weight: 600;
-            padding: 7px 16px;
-            transition: all 0.2s ease-in-out;
-            display: inline-flex;
-            align-items: center;
-            border-radius: 8px !important;
-            white-space: nowrap;
-            flex-shrink: 0;
-            text-decoration: none !important;
-            position: relative !important;
-            cursor: pointer;
-        }
-        .erp-horizontal-tabs .nav-link:hover {
-            color: var(--bs-primary) !important;
-            background-color: color-mix(in srgb, var(--bs-primary) 10%, transparent) !important;
-            border-color: color-mix(in srgb, var(--bs-primary) 20%, transparent) !important;
-        }
-        .erp-horizontal-tabs .nav-link.active {
-            background-color: var(--bs-primary) !important;
-            color: #ffffff !important;
-            font-weight: 700;
-            border-color: var(--bs-primary) !important;
-            box-shadow: 0 2px 6px color-mix(in srgb, var(--bs-primary) 30%, transparent);
-        }
-        .erp-horizontal-tabs .nav-link.active i {
-            color: #ffffff !important;
-        }
     </style>
 @endpush
 
 @section('content')
     @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show mb-4 text-dark shadow-sm border-0" role="alert">
-            <i class="feather-check-circle me-2 text-success"></i>
-            {{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <x-ui.alert variant="success" dismissible class="mb-4">
+            <i class="feather-check-circle me-2"></i>{{ session('success') }}
+        </x-ui.alert>
     @endif
 
     @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show mb-4 text-dark shadow-sm border-0" role="alert">
-            <i class="feather-alert-circle me-2 text-danger"></i>
-            {{ session('error') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <x-ui.alert variant="danger" dismissible class="mb-4">
+            <i class="feather-alert-circle me-2"></i>{{ session('error') }}
+        </x-ui.alert>
     @endif
 
     <!-- ERP Single Panel Workspace -->
@@ -104,52 +50,49 @@
 
             $tabs = [
                 [
-                    'id'     => 'tab-all',
-                    'label'  => 'All Requests',
-                    'icon'   => 'feather-layers',
-                    'active' => $status === 'all' || empty($status),
-                    'url'    => route('hrms.employees.profile-requests.index', array_merge($currentParams, ['status' => 'all'])),
+                    'id'         => 'tab-all',
+                    'label'      => __('hrms.employees.all_requests'),
+                    'icon'       => 'feather-layers',
+                    'active'     => $status === 'all' || empty($status),
+                    'url'        => route('hrms.employees.profile-requests.index', array_merge($currentParams, ['status' => 'all'])),
+                    'badge'      => $counts['all'] ?? null,
+                    'badgeClass' => 'bg-secondary-subtle text-secondary',
                 ],
                 [
-                    'id'     => 'tab-pending',
-                    'label'  => 'Pending',
-                    'icon'   => 'feather-clock',
-                    'active' => $status === 'pending',
-                    'url'    => route('hrms.employees.profile-requests.index', array_merge($currentParams, ['status' => 'pending'])),
+                    'id'         => 'tab-pending',
+                    'label'      => __('hrms.common.pending'),
+                    'icon'       => 'feather-clock',
+                    'active'     => $status === 'pending',
+                    'url'        => route('hrms.employees.profile-requests.index', array_merge($currentParams, ['status' => 'pending'])),
+                    'badge'      => $counts['pending'] ?? null,
+                    'badgeClass' => 'bg-warning-subtle text-warning',
                 ],
                 [
-                    'id'     => 'tab-approved',
-                    'label'  => 'Approved',
-                    'icon'   => 'feather-check-circle',
-                    'active' => $status === 'approved',
-                    'url'    => route('hrms.employees.profile-requests.index', array_merge($currentParams, ['status' => 'approved'])),
+                    'id'         => 'tab-approved',
+                    'label'      => __('hrms.employees.status_approved'),
+                    'icon'       => 'feather-check-circle',
+                    'active'     => $status === 'approved',
+                    'url'        => route('hrms.employees.profile-requests.index', array_merge($currentParams, ['status' => 'approved'])),
+                    'badge'      => $counts['approved'] ?? null,
+                    'badgeClass' => 'bg-success-subtle text-success',
                 ],
                 [
-                    'id'     => 'tab-rejected',
-                    'label'  => 'Rejected',
-                    'icon'   => 'feather-x-circle',
-                    'active' => $status === 'rejected',
-                    'url'    => route('hrms.employees.profile-requests.index', array_merge($currentParams, ['status' => 'rejected'])),
+                    'id'         => 'tab-rejected',
+                    'label'      => __('hrms.employees.status_rejected'),
+                    'icon'       => 'feather-x-circle',
+                    'active'     => $status === 'rejected',
+                    'url'        => route('hrms.employees.profile-requests.index', array_merge($currentParams, ['status' => 'rejected'])),
+                    'badge'      => $counts['rejected'] ?? null,
+                    'badgeClass' => 'bg-danger-subtle text-danger',
                 ],
             ];
         @endphp
 
         <!-- Top Navigation Tabs & Toolbar Container -->
         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4 pb-2 border-bottom">
-            <!-- Left: Tab Navigation Links -->
-            <div class="erp-horizontal-tabs d-flex align-items-center border-0 mb-0 p-0" id="profileRequestTabs">
-                @foreach($tabs as $t)
-                    <div class="nav-item">
-                        <a class="nav-link {{ $t['active'] ? 'active' : '' }}" 
-                           href="{{ $t['url'] }}" 
-                           id="{{ $t['id'] }}-tab">
-                            @if(!empty($t['icon']))
-                                <i class="{{ $t['icon'] }} me-2"></i>
-                            @endif
-                            {{ $t['label'] }}
-                        </a>
-                    </div>
-                @endforeach
+            <!-- Left: Tab Navigation Links via Horizontal Tabs Component -->
+            <div class="w-auto">
+                <x-ui.horizontal-tabs id="profileRequestTabs" :tabs="$tabs" class="border-0 mb-0 p-0" />
             </div>
 
             <!-- Right: Search, Sort Dropdown & Filter Dropdown (Common UI Components) -->
@@ -161,27 +104,27 @@
                     <input type="hidden" name="sort_order" value="{{ $sortOrder }}">
                     <input type="hidden" name="department_id" value="{{ $departmentId }}">
                     <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                    <input type="text" name="search" id="profile_requests_search_input" value="{{ $search }}" class="w-100 border-0 bg-transparent p-0 fs-13 text-dark" placeholder="Search employee..." autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
+                    <input type="text" name="search" id="profile_requests_search_input" value="{{ $search }}" class="w-100 border-0 bg-transparent p-0 fs-13 text-dark" placeholder="{{ __('hrms.employees.search_employees') }}" autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
                 </form>
 
                 <!-- Sort Dropdown -->
-                <x-ui.sort-dropdown label="Sort">
+                <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'desc']) }}" class="dropdown-item {{ ($sortBy === 'created_at' && $sortOrder === 'desc') ? 'active' : '' }}">
-                        <span>Requested Date (Newest)</span>
+                        <span>{{ __('hrms.employees.req_date_newest') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => 'asc']) }}" class="dropdown-item {{ ($sortBy === 'created_at' && $sortOrder === 'asc') ? 'active' : '' }}">
-                        <span>Requested Date (Oldest)</span>
+                        <span>{{ __('hrms.employees.req_date_oldest') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'full_name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ ($sortBy === 'full_name' && $sortOrder === 'asc') ? 'active' : '' }}">
-                        <span>Employee Name (A - Z)</span>
+                        <span>{{ __('hrms.employees.emp_name_az') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'full_name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ ($sortBy === 'full_name' && $sortOrder === 'desc') ? 'active' : '' }}">
-                        <span>Employee Name (Z - A)</span>
+                        <span>{{ __('hrms.employees.emp_name_za') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'reviewed_at', 'sort_order' => 'desc']) }}" class="dropdown-item {{ ($sortBy === 'reviewed_at' && $sortOrder === 'desc') ? 'active' : '' }}">
-                        <span>Reviewed Date (Newest)</span>
+                        <span>{{ __('hrms.employees.reviewed_date_newest') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
@@ -192,14 +135,14 @@
                     <input type="hidden" name="sort_by" value="{{ $sortBy }}">
                     <input type="hidden" name="sort_order" value="{{ $sortOrder }}">
 
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter label="{{ __('hrms.common.filter') }}" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                         
                         <!-- Department -->
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Department</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_department') }}</label>
                             <x-ui.odoo-form-ui type="select" name="department_id" id="filter_department_id">
-                                <option value="">All Departments</option>
+                                <option value="">{{ __('hrms.common.all_departments') }}</option>
                                 @foreach($departments as $dept)
                                     <option value="{{ $dept->id }}" {{ (string)$departmentId === (string)$dept->id ? 'selected' : '' }}>{{ $dept->name }}</option>
                                 @endforeach
@@ -209,8 +152,8 @@
                         <div class="dropdown-divider my-3"></div>
 
                         <div class="d-flex gap-2">
-                            <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply Filters</x-ui.button>
-                            <x-ui.button href="{{ route('hrms.employees.profile-requests.index', array_filter(['status' => $status !== 'all' ? $status : null, 'search' => $search, 'sort_by' => $sortBy, 'sort_order' => $sortOrder])) }}" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+                            <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
+                            <x-ui.button href="{{ route('hrms.employees.profile-requests.index', array_filter(['status' => $status !== 'all' ? $status : null, 'search' => $search, 'sort_by' => $sortBy, 'sort_order' => $sortOrder])) }}" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -223,12 +166,12 @@
                 <table class="table table-hover align-middle mb-0 text-dark">
                     <thead class="table-light fs-11 text-uppercase tracking-wider">
                         <tr>
-                            <th class="ps-3 py-3" style="width: 25%;">Employee Details</th>
-                            <th class="py-3" style="width: 22%;">Edited Fields</th>
-                            <th class="py-3" style="width: 15%;">Requested On</th>
-                            <th class="py-3" style="width: 14%;">Status</th>
-                            <th class="py-3" style="width: 14%;">Reviewed By</th>
-                            <th class="text-end pe-3 py-3" style="width: 10%;">Actions</th>
+                            <th class="ps-3 py-3" style="width: 25%;">{{ __('hrms.employees.tbl_employee') }}</th>
+                            <th class="py-3" style="width: 22%;">{{ __('hrms.employees.edited_fields') }}</th>
+                            <th class="py-3" style="width: 15%;">{{ __('hrms.employees.requested_on') }}</th>
+                            <th class="py-3" style="width: 14%;">{{ __('hrms.employees.tbl_status') }}</th>
+                            <th class="py-3" style="width: 14%;">{{ __('hrms.employees.reviewed_by') }}</th>
+                            <th class="text-end pe-3 py-3" style="width: 10%;">{{ __('hrms.employees.tbl_actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -283,15 +226,15 @@
                                 <td>
                                     @if($req->status === 'pending')
                                         <x-ui.badge variant="warning" soft class="border border-warning-subtle px-2.5 py-1 fw-bold fs-11">
-                                            <i class="feather-clock me-1"></i>Pending
+                                            <i class="feather-clock me-1"></i>{{ __('hrms.common.pending') }}
                                         </x-ui.badge>
                                     @elseif($req->status === 'approved')
                                         <x-ui.badge variant="success" soft class="border border-success-subtle px-2.5 py-1 fw-bold fs-11">
-                                            <i class="feather-check-circle me-1"></i>Approved
+                                            <i class="feather-check-circle me-1"></i>{{ __('hrms.employees.status_approved') }}
                                         </x-ui.badge>
                                     @elseif($req->status === 'rejected')
                                         <x-ui.badge variant="danger" soft class="border border-danger-subtle px-2.5 py-1 fw-bold fs-11" title="{{ $req->rejection_reason }}">
-                                            <i class="feather-x-circle me-1"></i>Rejected
+                                            <i class="feather-x-circle me-1"></i>{{ __('hrms.employees.status_rejected') }}
                                         </x-ui.badge>
                                     @endif
                                 </td>
@@ -307,7 +250,7 @@
                                 </td>
                                 <td class="text-end pe-3">
                                     <x-ui.button type="button" variant="outline-primary" size="sm" icon="feather-eye" data-bs-toggle="modal" data-bs-target="#viewRequestModal_{{ $req->id }}">
-                                        Review
+                                        {{ __('hrms.employees.review') }}
                                     </x-ui.button>
                                 </td>
                             </tr>
@@ -328,33 +271,33 @@
                             <div class="modal-header bg-light border-bottom px-4 py-3">
                                 <div>
                                     <h5 class="modal-title fw-bold mb-0 text-dark">
-                                        <i class="feather-user-check me-2 text-primary"></i>Profile Edit Request #{{ $req->id }}
+                                        <i class="feather-user-check me-2 text-primary"></i>{{ __('hrms.employees.review_request') }} #{{ $req->id }}
                                     </h5>
                                     <span class="text-muted fs-12">
-                                        Submitted by <strong>{{ $emp?->full_name }}</strong> on {{ $req->created_at ? $req->created_at->format('d M Y, h:i A') : 'N/A' }}
+                                        {{ __('hrms.employees.submitted_by_on', ['name' => $emp?->full_name, 'date' => $req->created_at ? $req->created_at->format('d M Y, h:i A') : 'N/A']) }}
                                     </span>
                                 </div>
                                 <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body p-4">
                                 @if($req->status === 'rejected' && $req->rejection_reason)
-                                    <div class="alert alert-danger border-0 rounded-3 mb-4 py-2 px-3 fs-13">
-                                        <div class="fw-bold mb-1"><i class="feather-alert-circle me-1"></i>Rejection Reason:</div>
+                                    <x-ui.alert variant="danger" class="border-0 rounded-3 mb-4 py-2 px-3 fs-13">
+                                        <div class="fw-bold mb-1"><i class="feather-alert-circle me-1"></i>{{ __('hrms.employees.rejection_reason_title') }}:</div>
                                         <div>{{ $req->rejection_reason }}</div>
-                                    </div>
+                                    </x-ui.alert>
                                 @endif
 
                                 <h6 class="fw-bold text-dark mb-3">
-                                    <i class="feather-layers text-primary me-2"></i>Comparison (Current vs. Requested Edit)
+                                    <i class="feather-layers text-primary me-2"></i>{{ __('hrms.employees.comparison_title') }}
                                 </h6>
 
                                 <div class="border rounded-3 overflow-hidden mb-3">
                                     <table class="table table-bordered align-middle mb-0 fs-13" style="table-layout: fixed; width: 100%;">
                                         <thead class="bg-light text-uppercase fs-11 text-muted">
                                             <tr>
-                                                <th style="width: 28%;" class="ps-3">Field Name</th>
-                                                <th style="width: 36%;" class="text-danger bg-soft-danger">Current Value</th>
-                                                <th style="width: 36%;" class="text-success bg-soft-success">Requested Value</th>
+                                                <th style="width: 28%;" class="ps-3">{{ __('hrms.employees.field_name') }}</th>
+                                                <th style="width: 36%;" class="text-danger bg-soft-danger">{{ __('hrms.employees.current_value') }}</th>
+                                                <th style="width: 36%;" class="text-success bg-soft-success">{{ __('hrms.employees.requested_value') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -368,7 +311,7 @@
                                                             @if(!empty($fData['old']) && $fData['old'] !== '—')
                                                                 <img src="{{ asset('storage/' . $fData['old']) }}" alt="Old Photo" style="width: 48px; height: 48px; object-fit: cover; border-radius: 8px;">
                                                             @else
-                                                                <span class="text-muted">No photo</span>
+                                                                <span class="text-muted">{{ __('hrms.employees.no_photo') }}</span>
                                                             @endif
                                                         @else
                                                             @if(empty($fData['old']) || $fData['old'] === '—')
@@ -397,7 +340,7 @@
                             </div>
                             <div class="modal-footer bg-light border-top px-4 py-3 d-flex justify-content-between">
                                 <x-ui.button type="button" variant="light" class="border" data-bs-dismiss="modal">
-                                    Close
+                                    {{ __('hrms.common.close') }}
                                 </x-ui.button>
                                 
                                 @if($req->status === 'pending')
@@ -410,14 +353,14 @@
                                         <div class="d-flex align-items-center gap-2">
                                             <!-- Reject Form Trigger -->
                                             <x-ui.button type="button" variant="danger" icon="feather-x" data-bs-toggle="collapse" data-bs-target="#rejectCollapse_{{ $req->id }}">
-                                                Reject
+                                                {{ __('hrms.common.reject') }}
                                             </x-ui.button>
 
                                             <!-- Approve Form -->
                                             <form action="{{ route('hrms.employees.profile-requests.approve', $req->id) }}" method="POST" class="m-0">
                                                 @csrf
                                                 <x-ui.button type="submit" variant="success" icon="feather-check" class="fw-bold">
-                                                    Approve & Update
+                                                    {{ __('hrms.employees.approve_and_update') }}
                                                 </x-ui.button>
                                             </form>
                                         </div>
@@ -431,15 +374,15 @@
                                     <form action="{{ route('hrms.employees.profile-requests.reject', $req->id) }}" method="POST">
                                         @csrf
                                         <div class="mb-3">
-                                            <label class="form-label fs-12 fw-bold text-dark">Reason for Rejection (Optional):</label>
-                                            <textarea name="rejection_reason" class="form-control fs-13 rounded-3" rows="2" placeholder="Explain why these changes are rejected..."></textarea>
+                                            <label class="form-label fs-12 fw-bold text-dark">{{ __('hrms.employees.rejection_reason_label') }}</label>
+                                            <textarea name="rejection_reason" class="form-control fs-13 rounded-3" rows="2" placeholder="{{ __('hrms.employees.rejection_reason_placeholder') }}"></textarea>
                                         </div>
                                         <div class="d-flex justify-content-end gap-2">
                                             <x-ui.button type="button" variant="light" size="sm" class="border" data-bs-toggle="collapse" data-bs-target="#rejectCollapse_{{ $req->id }}">
-                                                Cancel
+                                                {{ __('hrms.common.cancel') }}
                                             </x-ui.button>
                                             <x-ui.button type="submit" variant="danger" size="sm" class="fw-bold">
-                                                Confirm Rejection
+                                                {{ __('hrms.employees.confirm_rejection') }}
                                             </x-ui.button>
                                         </div>
                                     </form>
@@ -465,12 +408,12 @@
                 <div class="p-3 d-inline-block rounded-circle bg-soft-primary text-primary mb-3">
                     <i class="feather-user-check fs-24"></i>
                 </div>
-                <h5 class="fw-bold text-dark">No Profile Edit Requests Found</h5>
+                <h5 class="fw-bold text-dark">{{ __('hrms.employees.no_profile_requests_found') }}</h5>
                 <p class="text-muted fs-13 mb-0">
                     @if($status === 'pending')
-                        All employee profile edit requests have been reviewed and processed.
+                        {{ __('hrms.employees.all_profile_requests_processed') }}
                     @else
-                        No profile edit requests match the selected filters.
+                        {{ __('hrms.employees.no_profile_requests_match') }}
                     @endif
                 </p>
             </div>
@@ -518,14 +461,6 @@
                 e.preventDefault();
                 clearTimeout(profileSearchDebounceTimer);
                 $('#profileRequestsSearchForm').submit();
-            }
-        });
-
-        // Ensure tab navigation redirects to the proper URL
-        $(document).on('click', '#profileRequestTabs a.nav-link', function(e) {
-            const targetUrl = $(this).attr('href');
-            if (targetUrl && targetUrl !== '#' && !targetUrl.startsWith('javascript')) {
-                window.location.href = targetUrl;
             }
         });
     });

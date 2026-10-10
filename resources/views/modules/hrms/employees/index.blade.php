@@ -2,7 +2,7 @@
 
 @section('title', __('hrms.employees.title') . ' | SaaS ERP')
 @section('page-title', __('hrms.employees.title'))
-@section('breadcrumb', 'HRMS / Employees')
+@section('breadcrumb', 'HRMS / ' . __('hrms.employees.title'))
 
 @section('page-actions')
     @php
@@ -16,7 +16,7 @@
     @endphp
     <div class="d-flex align-items-center gap-2 flex-wrap">
         <x-ui.button variant="outline-info" icon="feather-user-check" href="{{ route('hrms.employees.profile-requests.index') }}" class="fw-semibold position-relative">
-            Profile Edit Requests
+            {{ __('hrms.employees.profile_requests') }}
             @php
                 $pendingProfileRequestsCount = \App\Domains\HRMS\Models\EmployeeProfileUpdateRequest::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->where('status', 'pending')->count();
             @endphp
@@ -25,10 +25,10 @@
             @endif
         </x-ui.button>
         <x-ui.button variant="outline-primary" icon="feather-award" href="{{ route('hrms.probation.index') }}" class="fw-semibold">
-            Probation Reviews
+            {{ __('hrms.employees.probation_reviews') }}
         </x-ui.button>
         <x-ui.button variant="outline-secondary" icon="feather-log-out" href="{{ route('hrms.exits.index') }}" class="fw-semibold">
-            Exit & Offboarding
+            {{ __('hrms.employees.exit_offboarding') }}
         </x-ui.button>
         @if($canCreateEmployee)
             <x-ui.import-export-dropdown 
@@ -560,8 +560,8 @@
                                     <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.employees.tbl_status') }}</label>
                                     <select name="status" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
                                         <option value="">{{ __('hrms.common.all_statuses') }}</option>
-                                        <option value="1" @selected($filters['status'] === '1')>{{ __('hrms.employees.tbl_status') }} - Active</option>
-                                        <option value="0" @selected($filters['status'] === '0')>{{ __('hrms.employees.tbl_status') }} - Inactive</option>
+                                        <option value="1" @selected($filters['status'] === '1')>{{ __('hrms.employees.tbl_status') }} - {{ __('hrms.employees.lbl_active') }}</option>
+                                        <option value="0" @selected($filters['status'] === '0')>{{ __('hrms.employees.tbl_status') }} - {{ __('hrms.employees.lbl_inactive') }}</option>
                                     </select>
                                 </div>
                                 <div class="d-flex gap-2 justify-content-end mt-4">
@@ -602,13 +602,13 @@
                                             <div>
                                                 <div class="fw-bold text-dark">{{ $employee->display_name }}</div>
                                                 <div class="mt-1" style="font-size: 11px;"><code>{{ $employee->employee_id }}</code></div>
-                                                <div class="text-muted fs-12">{{ $employee->office_email ?: ($employee->user?->email ?: ($employee->personal_email ?: 'No email')) }}</div>
+                                                <div class="text-muted fs-12">{{ $employee->office_email ?: ($employee->user?->email ?: ($employee->personal_email ?: __('hrms.employees.lbl_no_email'))) }}</div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td>{{ $employee->department?->name ?? 'Not assigned' }}</td>
-                                    <td>{{ $employee->designation?->name ?? 'Not assigned' }}</td>
-                                    <td>{{ $employee->company?->company_name ?? 'Not assigned' }}</td>
+                                    <td>{{ $employee->department?->name ?? __('hrms.employees.lbl_not_assigned') }}</td>
+                                    <td>{{ $employee->designation?->name ?? __('hrms.employees.lbl_not_assigned') }}</td>
+                                    <td>{{ $employee->company?->company_name ?? __('hrms.employees.lbl_not_assigned') }}</td>
                                     <td>
                                         @php
                                             $stageVariant = match($employee->employee_stage) {
@@ -618,7 +618,7 @@
                                                 'Exited'        => 'secondary',
                                                 default         => 'light',
                                             };
-                                            $stageLabel = $employee->employee_stage ?: 'Not Set';
+                                            $stageLabel = $employee->employee_stage ?: __('hrms.common.not_set');
                                         @endphp
                                         <x-ui.badge soft :variant="$stageVariant" class="fs-12 fw-semibold px-2.5 py-1">
                                             {{ $stageLabel }}
@@ -626,7 +626,7 @@
                                     </td>
                                     <td>
                                         <x-ui.badge soft :variant="$employee->status ? 'success' : 'danger'" class="fs-12 fw-semibold px-2.5 py-1">
-                                            {{ $employee->status ? 'Active' : 'Inactive' }}
+                                            {{ $employee->status ? __('hrms.employees.lbl_active') : __('hrms.employees.lbl_inactive') }}
                                         </x-ui.badge>
                                     </td>
                                     <td class="text-end">
@@ -700,7 +700,7 @@
                                             @endif
                                             @if($canDeleteEmployee)
                                                 <li>
-                                                    <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete') }}', { title: 'Delete Employee Profile', variant: 'danger', confirmButtonText: 'Delete' })">
+                                                    <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete') }}', { title: '{{ __('hrms.employees.delete_profile') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' })">
                                                         @csrf
                                                         @method('DELETE')
                                                         <button type="submit" class="dropdown-item text-danger">
@@ -717,8 +717,8 @@
                                 <tr>
                                     <td colspan="8" class="text-center py-5">
                                         <i class="feather-users fs-32 d-block mb-3 text-secondary"></i>
-                                        <div class="fw-semibold text-dark mb-1">No employees found.</div>
-                                        <div>Create your first employee record or broaden the filters.</div>
+                                        <div class="fw-semibold text-dark mb-1">{{ __('hrms.employees.lbl_no_employees_found') }}</div>
+                                        <div>{{ __('hrms.employees.lbl_no_employees_hint') }}</div>
                                     </td>
                                 </tr>
                             @endforelse
@@ -776,7 +776,7 @@
                                 <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="employee_import_file">
                                     <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
                                     <span class="file-text text-muted" id="import_file_text">{{ __('hrms.employees.mdl_select_xlsx') }}</span>
-                                    <input type="file" name="file" id="employee_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('import_file_text').innerText = this.files[0]?.name || '{{ __('hrms.employees.mdl_select_xlsx') }}'">
+                                    <input type="file" name="file" id="employee_import_file" class="d-none" required accept=".csv,.txt,.xlsx" onchange="document.getElementById('import_file_text').innerText = this.files[0]?.name || 'Select CSV / Excel File'">
                                 </label>
                             </div>
                         </div>
@@ -859,11 +859,11 @@
                     <div class="mb-3 text-warning">
                         <i class="feather feather-alert-triangle" style="font-size: 48px;"></i>
                     </div>
-                    <h5 class="modal-title fw-bold text-dark mb-2" id="statusConfirmModalLabel">Deactivate Employee?</h5>
-                    <p class="text-muted fs-13 mb-4">Are you sure you want to change this employee's status to Inactive? They will be excluded from active rosters, attendance sheets, and asset assignments.</p>
+                    <h5 class="modal-title fw-bold text-dark mb-2" id="statusConfirmModalLabel">{{ __('hrms.employees.deactivate_employee_title') }}</h5>
+                    <p class="text-muted fs-13 mb-4">{{ __('hrms.employees.deactivate_employee_desc') }}</p>
                     <div class="d-flex justify-content-center gap-3">
-                        <button type="button" class="btn btn-light border px-4 fw-bold text-uppercase fs-11" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-danger px-4 fw-bold text-uppercase fs-11" id="confirmStatusBtn">Yes, Inactivate</button>
+                        <button type="button" class="btn btn-light border px-4 fw-bold text-uppercase fs-11" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
+                        <button type="button" class="btn btn-danger px-4 fw-bold text-uppercase fs-11" id="confirmStatusBtn">{{ __('hrms.employees.btn_inactivate') }}</button>
                     </div>
                 </div>
             </div>

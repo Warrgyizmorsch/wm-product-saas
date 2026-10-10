@@ -2,6 +2,7 @@
 
 namespace App\Domains\HRMS\Repositories;
 
+use App\Domains\HRMS\Models\CashAdvance;
 use App\Domains\HRMS\Models\Company;
 use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Employee;
@@ -9,7 +10,9 @@ use App\Domains\HRMS\Models\EmployeeExit;
 use App\Domains\HRMS\Models\EmployeeExitClearance;
 use App\Domains\HRMS\Models\EmployeeExitDocument;
 use App\Domains\HRMS\Models\EmployeeFnfSettlement;
+use App\Domains\HRMS\Models\ExpenseReport;
 use App\Domains\HRMS\Models\ExitClearanceTemplate;
+use App\Domains\HRMS\Models\PayrollHold;
 use App\Domains\HRMS\Services\ExitClearanceService;
 use App\Domains\HRMS\Services\ExitDocumentationService;
 use App\Domains\HRMS\Services\FnFCalculationService;
@@ -70,21 +73,27 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
         }
 
         if ($search) {
-            $exitsQuery->whereHas('employee', function($q) use ($search) {
-                $q->where('full_name', 'like', "%{$search}%")
-                  ->orWhere('employee_id', 'like', "%{$search}%")
-                  ->orWhere('personal_email', 'like', "%{$search}%");
+            $exitsQuery->where(function($masterQ) use ($search) {
+                $masterQ->whereHas('employee', function($q) use ($search) {
+                    $q->where('full_name', 'like', "%{$search}%")
+                      ->orWhere('employee_id', 'like', "%{$search}%")
+                      ->orWhere('personal_email', 'like', "%{$search}%")
+                      ->orWhere('office_email', 'like', "%{$search}%");
+                })
+                ->orWhere('separation_type', 'like', "%{$search}%")
+                ->orWhere('reason_category', 'like', "%{$search}%")
+                ->orWhere('reason_details', 'like', "%{$search}%");
             });
         }
 
         if ($statusFilter) {
-            $exitsQuery->where('status', $statusFilter);
+            $exitsQuery->where('employee_exits.status', $statusFilter);
         }
 
         $departmentId = $inputs['department_id'] ?? null;
         $selectedCompanyId = $inputs['company_id'] ?? null;
         $sortBy = $inputs['sort_by'] ?? 'created_at';
-        $sortOrder = $inputs['sort_order'] ?? 'desc';
+        $sortOrder = in_array(strtolower($inputs['sort_order'] ?? 'desc'), ['asc', 'desc']) ? strtolower($inputs['sort_order'] ?? 'desc') : 'desc';
 
         if ($departmentId) {
             $exitsQuery->whereHas('employee', fn($q) => $q->where('department_id', $departmentId));
@@ -94,11 +103,16 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
             $exitsQuery->whereHas('employee', fn($q) => $q->where('company_id', $selectedCompanyId));
         }
 
-        $validSortColumns = ['created_at', 'resignation_date', 'approved_lwd', 'status'];
-        if (in_array($sortBy, $validSortColumns)) {
-            $exitsQuery->orderBy($sortBy, $sortOrder === 'asc' ? 'asc' : 'desc');
+        if ($sortBy === 'lwd') {
+            $exitsQuery->orderBy(DB::raw('COALESCE(employee_exits.approved_lwd, employee_exits.preferred_lwd, employee_exits.resignation_date)'), $sortOrder);
+        } elseif ($sortBy === 'employee') {
+            $exitsQuery->join('employees', 'employees.id', '=', 'employee_exits.employee_id')
+                ->orderBy('employees.full_name', $sortOrder)
+                ->select('employee_exits.*');
+        } elseif (in_array($sortBy, ['created_at', 'resignation_date', 'approved_lwd', 'status'])) {
+            $exitsQuery->orderBy('employee_exits.' . $sortBy, $sortOrder);
         } else {
-            $exitsQuery->orderBy('created_at', 'desc');
+            $exitsQuery->orderBy('employee_exits.created_at', 'desc');
         }
 
         $exits = $exitsQuery->paginate(15)->appends($inputs);
@@ -372,21 +386,40 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
 
     public function settleFnf(EmployeeFnfSettlement $settlement, array $validated, ?int $userId): bool
     {
-        $settlement->update([
-            'status' => 'paid',
-            'payment_mode' => $validated['payment_mode'],
-            'payment_reference' => $validated['payment_reference'] ?? null,
-            'paid_at' => $validated['paid_at'] ?? now(),
-        ]);
-
         $exit = $settlement->employeeExit;
-        $exit->update(['status' => 'settled']);
 
-        $exit->employee->update([
-            'status' => false,
-            'employee_stage' => 'Relieved',
-            'date_of_exit' => $exit->approved_lwd ?? $exit->preferred_lwd ?? now()->format('Y-m-d'),
-        ]);
+        DB::transaction(function () use ($settlement, $validated, $exit) {
+            $settlement->update([
+                'status' => 'paid',
+                'payment_mode' => $validated['payment_mode'],
+                'payment_reference' => $validated['payment_reference'] ?? null,
+                'paid_at' => $validated['paid_at'] ?? now(),
+            ]);
+
+            $exit->update(['status' => 'settled']);
+
+            $exit->employee->update([
+                'status' => false,
+                'employee_stage' => 'Relieved',
+                'date_of_exit' => $exit->approved_lwd ?? $exit->preferred_lwd ?? now()->format('Y-m-d'),
+            ]);
+
+            // Dependent Module Reconciliations
+            // 1. Mark open cash advances as settled
+            CashAdvance::where('employee_id', $exit->employee_id)
+                ->whereIn('status', ['approved', 'disbursed'])
+                ->update(['status' => 'settled']);
+
+            // 2. Mark approved expense reports as paid/settled
+            ExpenseReport::where('employee_id', $exit->employee_id)
+                ->where('status', 'approved')
+                ->update(['status' => 'paid']);
+
+            // 3. Release any active payroll holds
+            PayrollHold::where('employee_id', $exit->employee_id)
+                ->where('status', 'on_hold')
+                ->update(['status' => 'released']);
+        });
 
         try {
             $exit->loadMissing('employee');

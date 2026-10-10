@@ -52,7 +52,7 @@ class ExpenseCategoryController extends Controller
         $this->policyRepository->storeCategory($validated);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'categories'])
-            ->with('success', 'Expense category created successfully.');
+            ->with('success', __('hrms.expense_master.category_created_success'));
     }
 
     public function update(Request $request, ExpenseCategory $category): RedirectResponse
@@ -80,7 +80,7 @@ class ExpenseCategoryController extends Controller
         $this->policyRepository->updateCategory($category, $validated);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'categories'])
-            ->with('success', 'Expense category updated successfully.');
+            ->with('success', __('hrms.expense_master.category_updated_success'));
     }
 
     public function destroy(ExpenseCategory $category): RedirectResponse
@@ -90,13 +90,13 @@ class ExpenseCategoryController extends Controller
         // Check if category has claims before deleting
         if ($category->claims()->exists()) {
             return redirect()->route('hrms.expense-policy.index', ['tab' => 'categories'])
-                ->with('error', 'Cannot delete category as it contains submitted expense claims.');
+                ->with('error', __('hrms.expense_master.category_cannot_delete_has_claims'));
         }
 
         $this->policyRepository->deleteCategory($category);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'categories'])
-            ->with('success', 'Expense category deleted successfully.');
+            ->with('success', __('hrms.expense_master.category_deleted_success'));
     }
 
     /**
