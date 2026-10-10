@@ -15,6 +15,9 @@ class ProductionOrderIssue extends BaseModel
 {
     use BelongsToCompany, BelongsToBranch;
 
+    public bool $sharedAcrossCompanies = true;
+    public bool $sharedAcrossBranches = true;
+
     protected $table = 'production_order_issues';
 
     protected $fillable = [
@@ -22,6 +25,8 @@ class ProductionOrderIssue extends BaseModel
         'company_id',
         'branch_id',
         'production_order_id',
+        'rework_order_id',
+        'rework_operation_id',
         'reservation_id',
         'product_id',
         'warehouse_id',
@@ -41,6 +46,16 @@ class ProductionOrderIssue extends BaseModel
     public function order(): BelongsTo
     {
         return $this->belongsTo(ProductionOrder::class, 'production_order_id');
+    }
+
+    public function reworkOrder(): BelongsTo
+    {
+        return $this->belongsTo(ProductionReworkOrder::class, 'rework_order_id');
+    }
+
+    public function reworkOperation(): BelongsTo
+    {
+        return $this->belongsTo(ProductionReworkOperation::class, 'rework_operation_id');
     }
 
     public function reservation(): BelongsTo
@@ -77,5 +92,20 @@ class ProductionOrderIssue extends BaseModel
     public function batches(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ProductionOrderIssueBatch::class, 'production_order_issue_id');
+    }
+
+    public function getTotalCostAttribute(): float
+    {
+        if ($this->batches->isNotEmpty()) {
+            $batchCost = (float) $this->batches->sum(function ($b) {
+                return (float) $b->quantity * (float) ($b->stockTransaction?->unit_cost ?? 0.0);
+            });
+            if ($batchCost > 0.0) {
+                return $batchCost;
+            }
+        }
+
+        $unitCost = (float) ($this->product?->unit_cost ?? $this->product?->cost_price ?? 0.0);
+        return (float) $this->quantity_issued * $unitCost;
     }
 }

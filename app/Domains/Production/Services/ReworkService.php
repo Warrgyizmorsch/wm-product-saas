@@ -2,8 +2,11 @@
 
 namespace App\Domains\Production\Services;
 
+use App\Domains\Production\Models\ProductionCostAdjustment;
+use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionReworkOperation;
 use App\Domains\Production\Models\ProductionReworkOrder;
+use App\Domains\Production\Models\WorkCenter;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -20,31 +23,53 @@ class ReworkService
     public function createReworkOrder(int $tenantId, int $ncrId, array $data): ProductionReworkOrder
     {
         return DB::transaction(function () use ($tenantId, $ncrId, $data) {
+            $wcId = $data['work_center_id'] ?? WorkCenter::where('tenant_id', $tenantId)->value('id');
+
+            $ncr = \App\Domains\Production\Models\ProductionNcr::with('operation')->find($ncrId);
+            $defaultMachineId = $data['machine_id'] ?? $ncr?->machine_id ?? $ncr?->operation?->machine_id;
+            if (!$defaultMachineId && $wcId) {
+                $defaultMachineId = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->where('work_center_id', $wcId)->value('id');
+            }
+
+            // Default single direct rework operation
+            $defaultOpName = !empty($data['operation_name'])
+                ? $data['operation_name']
+                : ($ncr?->operation ? "Rework: {$ncr->operation->name}" : 'Rework Execution');
+
+            $operations = $data['operations'] ?? [
+                ['sequence' => 10, 'name' => $defaultOpName, 'work_center_id' => $wcId, 'machine_id' => $defaultMachineId],
+            ];
+
+            $costEstimate = isset($data['cost_estimate']) && $data['cost_estimate'] !== null
+                ? (float) $data['cost_estimate']
+                : $this->calculateDynamicCostEstimate($tenantId, $data, $operations);
+
             $rework = ProductionReworkOrder::create([
                 'tenant_id' => $tenantId,
                 'rework_number' => 'RWK-' . strtoupper(uniqid()),
                 'ncr_id' => $ncrId,
                 'original_production_order_id' => $data['original_production_order_id'],
                 'status' => 'draft',
-                'cost_estimate' => $data['cost_estimate'] ?? 150.00,
+                'cost_estimate' => $costEstimate,
             ]);
 
-            $wcId = $data['work_center_id'] ?? \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->value('id') ?? 1;
-
-            // Add standard default rework operation if operations list empty
-            $operations = $data['operations'] ?? [
-                ['sequence' => 10, 'name' => 'Disassemble and Inspect Defect', 'work_center_id' => $wcId],
-                ['sequence' => 20, 'name' => 'Refabricate Defective Section', 'work_center_id' => $wcId],
-            ];
-
             foreach ($operations as $op) {
+                $opWcId = $op['work_center_id'] ?? $wcId;
+                $opMachineId = $op['machine_id'] ?? $defaultMachineId;
+                if ($opMachineId && $opWcId) {
+                    $machWc = \App\Domains\Production\Models\Machine::where('id', $opMachineId)->value('work_center_id');
+                    if ($machWc && $machWc !== $opWcId) {
+                        $opMachineId = \App\Domains\Production\Models\Machine::where('work_center_id', $opWcId)->value('id');
+                    }
+                }
+
                 ProductionReworkOperation::create([
                     'tenant_id' => $tenantId,
                     'rework_order_id' => $rework->id,
                     'sequence' => $op['sequence'],
                     'name' => $op['name'],
-                    'work_center_id' => $op['work_center_id'],
-                    'machine_id' => $op['machine_id'] ?? null,
+                    'work_center_id' => $opWcId,
+                    'machine_id' => $opMachineId,
                     'status' => 'waiting',
                 ]);
             }
@@ -63,9 +88,49 @@ class ReworkService
     }
 
     /**
+     * Calculate dynamic cost estimate based on planned operations and Work Center / Machine rates.
+     */
+    public function calculateDynamicCostEstimate(int $tenantId, array $data, array $operations): float
+    {
+        $totalEstimate = 0.0;
+        $defaultOpMinutes = 30.0; // standard default estimated duration per planned rework stage
+
+        foreach ($operations as $op) {
+            $wcId = $op['work_center_id'] ?? ($data['work_center_id'] ?? null);
+            $wc = $wcId ? WorkCenter::where('tenant_id', $tenantId)->find($wcId) : null;
+
+            $laborRatePerMinute = $wc ? ((float) $wc->cost_per_hour / 60.0) : 0.0;
+            $overheadRatePerMinute = $wc ? ((float) $wc->overhead_rate / 60.0) : 0.0;
+
+            $machineRatePerMinute = 0.0;
+            if (!empty($op['machine_id'])) {
+                $prodOrderId = $data['original_production_order_id'] ?? null;
+                if ($prodOrderId) {
+                    $orderOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+                        ->where('production_order_id', $prodOrderId)
+                        ->where(function ($q) use ($wcId, $op) {
+                            if ($wcId) {
+                                $q->where('work_center_id', $wcId);
+                            }
+                            $q->orWhere('machine_id', $op['machine_id']);
+                        })
+                        ->with('routingOperation')
+                        ->first();
+                    $machineRatePerMinute = (float) ($orderOp?->routingOperation?->machine_cost_rate ?? 0.0);
+                }
+            }
+
+            $opMinutes = (float) ($op['planned_minutes'] ?? $defaultOpMinutes);
+            $totalEstimate += $opMinutes * ($laborRatePerMinute + $overheadRatePerMinute + $machineRatePerMinute);
+        }
+
+        return round($totalEstimate, 2);
+    }
+
+    /**
      * Start rework operation.
      */
-    public function startOperation(int $reworkOpId, ?int $tenantId = null): void
+    public function startOperation(int $reworkOpId, ?int $tenantId = null, ?int $machineId = null): void
     {
         $op = ProductionReworkOperation::query()
             ->when($tenantId !== null, fn($query) => $query->where('tenant_id', $tenantId))
@@ -79,10 +144,15 @@ class ReworkService
             return;
         }
 
-        $op->update([
+        $updateData = [
             'status' => 'running',
             'actual_start' => Carbon::now(),
-        ]);
+        ];
+        if ($machineId) {
+            $updateData['machine_id'] = $machineId;
+        }
+
+        $op->update($updateData);
 
         $rework = $op->reworkOrder;
         if ($rework->status === 'draft') {
@@ -121,25 +191,43 @@ class ReworkService
             $start = $op->actual_start ?? Carbon::now()->subMinutes(30);
             $end = Carbon::now();
 
-            $actualMinutes = (float) $start->diffInMinutes($end);
-            $hours = $actualMinutes / 60.0;
+            $actualElapsedMinutes = (float) $start->diffInMinutes($end);
+            $runMinutes = isset($data['processing_time_actual']) && (float) $data['processing_time_actual'] > 0
+                ? (float) $data['processing_time_actual']
+                : $actualElapsedMinutes;
+
+            $setupMinutes = isset($data['setup_time_actual']) ? (float) $data['setup_time_actual'] : (float) ($op->setup_time_actual ?? 0.0);
+            $totalMinutes = $setupMinutes + $runMinutes;
+            $hours = $totalMinutes / 60.0;
+
+            $op->loadMissing(['workCenter', 'machine', 'reworkOrder.ncr.operation.routingOperation']);
+
+            $wc = $op->workCenter;
+            $wcLaborRate = $wc ? ((float) $wc->cost_per_hour / 60.0) : 0.0;
+            $wcOverheadRate = $wc ? ((float) $wc->overhead_rate / 60.0) : 0.0;
+
+            // Resolve machine rate dynamically if machine assigned
+            $machineRatePerMinute = 0.0;
+            if ($op->machine_id) {
+                $routingMachineRate = (float) ($op->reworkOrder?->ncr?->operation?->routingOperation?->machine_cost_rate ?? 0.0);
+                $machineRatePerMinute = $routingMachineRate;
+            }
+
+            $laborCost = round($totalMinutes * $wcLaborRate, 2);
+            $machineCost = round($totalMinutes * $machineRatePerMinute, 2);
+            $overheadCost = round($totalMinutes * $wcOverheadRate, 2);
+            $addedNonMaterialCost = round($laborCost + $machineCost + $overheadCost, 2);
 
             $op->update([
                 'status' => 'completed',
                 'actual_end' => $end,
-                'setup_time_actual' => $data['setup_time_actual'] ?? 0.00,
-                'processing_time_actual' => $hours,
+                'setup_time_actual' => $setupMinutes,
+                'processing_time_actual' => $runMinutes / 60.0,
             ]);
-
-            // Calculate cost increment: labor ($35/hr) + machine ($50/hr)
-            $laborRate = 35.00;
-            $machineRate = 50.00;
-
-            $addedCost = ($hours * $laborRate) + ($hours * $machineRate);
 
             $rework = $op->reworkOrder;
             $rework->update([
-                'actual_cost' => $rework->actual_cost + $addedCost,
+                'actual_cost' => $rework->actual_cost + $addedNonMaterialCost,
                 'labor_hours_actual' => $rework->labor_hours_actual + $hours,
                 'machine_hours_actual' => $rework->machine_hours_actual + ($op->machine_id ? $hours : 0.00),
             ]);
@@ -151,6 +239,87 @@ class ReworkService
 
             if (!$incomplete) {
                 $rework->update(['status' => 'completed']);
+
+                // Record non-material Rework Expense in ProductionCostAdjustment on parent production order.
+                // CRITICAL ERP RULE: Material cost is explicitly excluded here to prevent double-counting,
+                // as rework material was already captured via ProductionOrderIssue and StockService outflow.
+                $totalReworkLabor = 0.0;
+                $totalReworkMachine = 0.0;
+                $totalReworkOverhead = 0.0;
+
+                if ($rework->original_production_order_id) {
+                    $parentOrder = ProductionOrder::find($rework->original_production_order_id);
+                    if ($parentOrder) {
+                        $rework->loadMissing(['operations.workCenter', 'ncr.operation.routingOperation']);
+
+                        foreach ($rework->operations as $cOp) {
+                            $cMins = round((float) ($cOp->setup_time_actual ?? 0.0) + ((float) ($cOp->processing_time_actual ?? 0.0) * 60.0), 2);
+                            $cWc = $cOp->workCenter;
+                            $cLaborRate = $cWc ? ((float) $cWc->cost_per_hour / 60.0) : 0.0;
+                            $cOverheadRate = $cWc ? ((float) $cWc->overhead_rate / 60.0) : 0.0;
+                            $cMachineRate = 0.0;
+                            if ($cOp->machine_id) {
+                                $cMachineRate = (float) ($rework->ncr?->operation?->routingOperation?->machine_cost_rate ?? 0.0);
+                            }
+
+                            $totalReworkLabor += $cMins * $cLaborRate;
+                            $totalReworkMachine += $cMins * $cMachineRate;
+                            $totalReworkOverhead += $cMins * $cOverheadRate;
+                        }
+
+                        $totalReworkLabor = round($totalReworkLabor, 2);
+                        $totalReworkMachine = round($totalReworkMachine, 2);
+                        $totalReworkOverhead = round($totalReworkOverhead, 2);
+
+                        if ($totalReworkLabor > 0.0) {
+                            ProductionCostAdjustment::create([
+                                'tenant_id'           => $parentOrder->tenant_id,
+                                'production_order_id' => $parentOrder->id,
+                                'adjustment_date'     => now()->toDateString(),
+                                'cost_component'      => ProductionCostAdjustment::COMPONENT_LABOR,
+                                'category'            => ProductionCostAdjustment::CATEGORY_REWORK_EXPENSE,
+                                'description'         => "Rework Labor Expense for Rework Order {$rework->rework_number}",
+                                'amount'              => $totalReworkLabor,
+                                'status'              => 'recorded',
+                                'notes'               => "Generated upon completion of Rework #{$rework->id}",
+                                'created_by'          => auth()->id() ?? $rework->created_by,
+                                'updated_by'          => auth()->id() ?? $rework->created_by,
+                            ]);
+                        }
+
+                        if ($totalReworkMachine > 0.0) {
+                            ProductionCostAdjustment::create([
+                                'tenant_id'           => $parentOrder->tenant_id,
+                                'production_order_id' => $parentOrder->id,
+                                'adjustment_date'     => now()->toDateString(),
+                                'cost_component'      => ProductionCostAdjustment::COMPONENT_MACHINE,
+                                'category'            => ProductionCostAdjustment::CATEGORY_REWORK_EXPENSE,
+                                'description'         => "Rework Machine Expense for Rework Order {$rework->rework_number}",
+                                'amount'              => $totalReworkMachine,
+                                'status'              => 'recorded',
+                                'notes'               => "Generated upon completion of Rework #{$rework->id}",
+                                'created_by'          => auth()->id() ?? $rework->created_by,
+                                'updated_by'          => auth()->id() ?? $rework->created_by,
+                            ]);
+                        }
+
+                        if ($totalReworkOverhead > 0.0) {
+                            ProductionCostAdjustment::create([
+                                'tenant_id'           => $parentOrder->tenant_id,
+                                'production_order_id' => $parentOrder->id,
+                                'adjustment_date'     => now()->toDateString(),
+                                'cost_component'      => ProductionCostAdjustment::COMPONENT_OVERHEAD,
+                                'category'            => ProductionCostAdjustment::CATEGORY_REWORK_EXPENSE,
+                                'description'         => "Rework Overhead Expense for Rework Order {$rework->rework_number}",
+                                'amount'              => $totalReworkOverhead,
+                                'status'              => 'recorded',
+                                'notes'               => "Generated upon completion of Rework #{$rework->id}",
+                                'created_by'          => auth()->id() ?? $rework->created_by,
+                                'updated_by'          => auth()->id() ?? $rework->created_by,
+                            ]);
+                        }
+                    }
+                }
 
                 // Auto-resolve NCR
                 $ncr = $rework->ncr;
@@ -243,6 +412,12 @@ class ReworkService
                             ->exists();
 
                         $wip->rejected_quantity = max(0.0000, $wip->rejected_quantity - $reworkQty);
+                        if (isset($totalReworkLabor) && ($totalReworkLabor > 0 || $totalReworkMachine > 0 || $totalReworkOverhead > 0)) {
+                            $wip->labor_cost += $totalReworkLabor;
+                            $wip->machine_cost += $totalReworkMachine;
+                            $wip->overhead_cost += $totalReworkOverhead;
+                            $wip->total_value += ($totalReworkLabor + $totalReworkMachine + $totalReworkOverhead);
+                        }
                         $wip->save();
 
                         $batchIdCandidate = $orderRework->production_batch_id ?? $wip->production_batch_id;
@@ -533,6 +708,137 @@ class ReworkService
             }
 
             return $rework;
+        });
+    }
+
+    /**
+     * Request additional raw material from store for a Rework Order.
+     * Generates or appends to a Store Requisition Slip (MR-YYYY-XXXXXX).
+     * Warehouse selection is deferred to the Storekeeper in the Store.
+     */
+    public function requestMaterial(
+        int $reworkId,
+        int $tenantId,
+        int $productId,
+        float $quantity,
+        ?int $reworkOpId = null,
+        ?string $reason = null,
+        ?int $userId = null
+    ): \App\Domains\Production\Models\ProductionRequisitionSlip {
+        if ($quantity <= 0) {
+            throw new \InvalidArgumentException('Requested quantity must be greater than zero.');
+        }
+
+        return DB::transaction(function () use ($reworkId, $tenantId, $productId, $quantity, $reworkOpId, $reason, $userId) {
+            $rework = ProductionReworkOrder::with('originalOrder')->findOrFail($reworkId);
+            $parentOrder = $rework->originalOrder;
+
+            $branchId = $parentOrder?->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            $companyId = $parentOrder?->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+
+            // 1. Find existing pending slip for this rework order, or create new one
+            $slip = \App\Domains\Production\Models\ProductionRequisitionSlip::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('rework_order_id', $reworkId)
+                ->whereIn('status', ['pending', 'partial', 'Pending', 'Partially Issued'])
+                ->latest('id')
+                ->first();
+
+            if (!$slip) {
+                $year = now()->format('Y');
+                $prefix = "MR-{$year}-";
+                $lastSlip = \App\Domains\Production\Models\ProductionRequisitionSlip::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->when($branchId !== null, fn($q) => $q->where('branch_id', $branchId))
+                    ->where('requisition_number', 'like', "{$prefix}%")
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                $nextNum = 1;
+                if ($lastSlip) {
+                    $lastNumStr = str_replace($prefix, '', $lastSlip->requisition_number);
+                    $nextNum = ((int) $lastNumStr) + 1;
+                }
+                $reqNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+                while (\App\Domains\Production\Models\ProductionRequisitionSlip::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->when($branchId !== null, fn($q) => $q->where('branch_id', $branchId))
+                    ->where('requisition_number', $reqNumber)
+                    ->exists()) {
+                    $nextNum++;
+                    $reqNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+                }
+
+                $slipNotes = "Material requisition for Rework Order {$rework->rework_number}";
+                if ($reason) {
+                    $slipNotes .= " — {$reason}";
+                }
+
+                $slip = \App\Domains\Production\Models\ProductionRequisitionSlip::create([
+                    'tenant_id'                 => $tenantId,
+                    'company_id'                => $companyId,
+                    'branch_id'                 => $branchId,
+                    'production_order_id'       => $rework->original_production_order_id,
+                    'maintenance_work_order_id' => null,
+                    'rework_order_id'           => $rework->id,
+                    'source_type'               => \App\Domains\Production\Models\ProductionRequisitionSlip::SOURCE_TYPE_REWORK_ORDER,
+                    'requisition_number'        => $reqNumber,
+                    'status'                    => 'pending',
+                    'requested_by'              => $userId ?? auth()->id(),
+                    'requisition_date'          => now()->toDateString(),
+                    'notes'                     => $slipNotes,
+                ]);
+            }
+
+            $product = \App\Domains\Inventory\Models\Product::findOrFail($productId);
+            $uomId = $product->uom_id ?? 1;
+
+            \App\Domains\Production\Models\ProductionRequisitionSlipItem::create([
+                'tenant_id'                      => $tenantId,
+                'production_requisition_slip_id' => $slip->id,
+                'product_id'                     => $productId,
+                'warehouse_id'                   => null, // Storekeeper determines warehouse upon fulfillment!
+                'rework_operation_id'            => $reworkOpId,
+                'quantity_planned'               => $quantity,
+                'quantity_reserved'              => 0.0,
+                'quantity_issued'                => 0.0,
+                'uom_id'                         => $uomId,
+            ]);
+
+            // Sync reservation on parent order so Material Status reflects it
+            if ($parentOrder) {
+                $res = \App\Domains\Production\Models\ProductionOrderReservation::where('tenant_id', $tenantId)
+                    ->where('production_order_id', $parentOrder->id)
+                    ->where('product_id', $productId)
+                    ->first();
+
+                if (!$res) {
+                    \App\Domains\Production\Models\ProductionOrderReservation::create([
+                        'tenant_id'                     => $tenantId,
+                        'production_order_id'           => $parentOrder->id,
+                        'product_id'                    => $productId,
+                        'uom_id'                        => $uomId,
+                        'quantity_planned'              => 0.0,
+                        'quantity_additional_requested' => $quantity,
+                        'quantity_reserved'             => 0.0,
+                        'quantity_issued'               => 0.0,
+                    ]);
+                } else {
+                    $res->quantity_additional_requested += $quantity;
+                    $res->save();
+                }
+            }
+
+            $this->eventService->writeEvent($tenantId, [
+                'production_order_id' => $rework->original_production_order_id,
+                'event_type'          => 'REWORK_MATERIAL_REQUESTED',
+                'title'               => 'Rework Material Requested from Store',
+                'description'         => "Requested {$quantity} of {$product->name} for Rework #{$rework->rework_number} on MR #{$slip->requisition_number}.",
+                'severity'            => 'info',
+                'event_source'        => 'ReworkService',
+            ]);
+
+            return $slip;
         });
     }
 }

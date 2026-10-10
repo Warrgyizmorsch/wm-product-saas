@@ -330,7 +330,6 @@ class ProductionExecutionService
                 app(ReworkService::class)->createReworkOrder($op->tenant_id, $ncr->id, [
                     'original_production_order_id' => $order->id,
                     'work_center_id' => $op->work_center_id,
-                    'cost_estimate' => 50.00,
                 ]);
 
                 $order->quantity_rejected += $rejected;
