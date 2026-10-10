@@ -68,7 +68,10 @@ class CrmDashboardController extends Controller
             fputcsv($file, ['Won Deals Count', $data['wonCount']]);
             fputcsv($file, ['Win Rate %', $data['winRate'] . '%']);
             fputcsv($file, ['Quotations Value', $data['totalQuotationValue']]);
+            fputcsv($file, ['3rd-Party & Web Leads', $data['thirdPartyLeadsCount']]);
+            fputcsv($file, ['Meta Ads Leads', $data['metaLeadsCount']]);
             fputcsv($file, ['WhatsApp Bot Leads', $data['whatsappLeadsCount']]);
+            fputcsv($file, ['Website & Web-to-Lead', $data['webLeadsCount']]);
             fputcsv($file, []);
             fputcsv($file, ['Sales Funnel Stage', 'Count']);
             foreach ($data['funnelStages'] as $stage => $count) {
@@ -218,17 +221,22 @@ class CrmDashboardController extends Controller
 
         // WhatsApp Bot Leads & Auto-Qualification
         $whatsappLeads = (clone $periodLeadsQuery)
-            ->where('source', 'WhatsApp Bot')
+            ->where(function($q) {
+                $q->whereIn('source', ['WhatsApp Bot', 'WhatsApp', 'whatsapp'])
+                  ->orWhere('utm_source', 'whatsapp');
+            })
             ->get();
         $whatsappLeadsCount = $whatsappLeads->count();
         $whatsappQualifiedCount = $whatsappLeads->whereNotIn('status', ['New', 'Lost'])->count();
         $whatsappQualificationRate = $whatsappLeadsCount > 0 ? round(($whatsappQualifiedCount / $whatsappLeadsCount) * 100, 1) : 0;
+        $whatsappWonCount = $whatsappLeads->where('status', 'Won')->count();
+        $whatsappWonRevenue = $whatsappLeads->where('status', 'Won')->sum('expected_amount');
 
         // Meta (Facebook & Instagram) Leads & Conversion
         $metaLeads = (clone $periodLeadsQuery)
             ->where(function($q) {
-                $q->whereIn('source', ['Meta Ads', 'Facebook / Instagram', 'Meta'])
-                  ->orWhere('utm_source', 'meta');
+                $q->whereIn('source', ['Meta Ads', 'Facebook / Instagram', 'Meta', 'Facebook', 'Instagram'])
+                  ->orWhereIn('utm_source', ['meta', 'facebook', 'instagram']);
             })
             ->get();
         $metaLeadsCount = $metaLeads->count();
@@ -237,6 +245,37 @@ class CrmDashboardController extends Controller
         $metaWonCount = $metaLeads->where('status', 'Won')->count();
         $metaWonRevenue = $metaLeads->where('status', 'Won')->sum('expected_amount');
         $metaWinRate = $metaLeadsCount > 0 ? round(($metaWonCount / $metaLeadsCount) * 100, 1) : 0;
+
+        // Website / Embed Forms / Web-to-Lead Inbound Leads
+        $webLeads = (clone $periodLeadsQuery)
+            ->where(function($q) {
+                $q->whereIn('source', ['Web Form', 'Website', 'Web / Inbound', 'Web-to-Lead', 'Widget', 'Embed Widget', 'Website Form'])
+                  ->orWhereIn('utm_source', ['website', 'web', 'embed']);
+            })
+            ->get();
+        $webLeadsCount = $webLeads->count();
+        $webQualifiedCount = $webLeads->whereNotIn('status', ['New', 'Lost'])->count();
+        $webWonRevenue = $webLeads->where('status', 'Won')->sum('expected_amount');
+
+        // Generic Third-Party & Inbound Ingestion (Meta, WhatsApp, Web, Justdial, IndiaMART, APIs, etc.)
+        $thirdPartyLeads = (clone $periodLeadsQuery)
+            ->where(function($q) {
+                $q->whereIn('source', [
+                    'Meta Ads', 'Facebook / Instagram', 'Meta', 'Facebook', 'Instagram',
+                    'WhatsApp Bot', 'WhatsApp', 'whatsapp',
+                    'Web Form', 'Website', 'Web / Inbound', 'Web-to-Lead', 'Widget', 'Embed Widget', 'Website Form',
+                    'Justdial', 'JustDial', 'IndiaMART', 'Indiamart', 'TradeIndia', 'Tradeindia', 'Google Ads',
+                    'API', 'Webhook', 'Third-Party', 'Third Party', 'Portal'
+                ])
+                ->orWhereNotNull('utm_source');
+            })
+            ->get();
+        $thirdPartyLeadsCount = $thirdPartyLeads->count();
+        $thirdPartyQualifiedCount = $thirdPartyLeads->whereNotIn('status', ['New', 'Lost'])->count();
+        $thirdPartyQualifiedRate = $thirdPartyLeadsCount > 0 ? round(($thirdPartyQualifiedCount / $thirdPartyLeadsCount) * 100, 1) : 0;
+        $thirdPartyWonCount = $thirdPartyLeads->where('status', 'Won')->count();
+        $thirdPartyWonRevenue = $thirdPartyLeads->where('status', 'Won')->sum('expected_amount');
+        $thirdPartyWinRate = $thirdPartyLeadsCount > 0 ? round(($thirdPartyWonCount / $thirdPartyLeadsCount) * 100, 1) : 0;
 
         // 2. Enterprise Multi-Stage Sales Funnel Breakdown
         $allLeads = (clone $periodLeadsQuery)->get();
@@ -579,6 +618,13 @@ class CrmDashboardController extends Controller
             'metaQualifiedRate',
             'metaWonRevenue',
             'metaWinRate',
+            'webLeadsCount',
+            'thirdPartyLeadsCount',
+            'thirdPartyQualifiedCount',
+            'thirdPartyQualifiedRate',
+            'thirdPartyWonCount',
+            'thirdPartyWonRevenue',
+            'thirdPartyWinRate',
             'funnelStages',
             'funnelDetailed',
             'campaignPerformance',

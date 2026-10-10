@@ -647,12 +647,160 @@
         border-color: #1e293b !important;
         color: #94a3b8 !important;
     }
-    html.app-skin-dark .table.odoo-table .odoo-table-input {
+    /* Softphone Floating Widget Light & Dark Mode Styles */
+    .crm-softphone-dock {
+        background: #ffffff !important;
+        border: 1px solid rgba(226, 232, 240, 0.9) !important;
+        color: #1e293b;
+    }
+    .crm-softphone-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        padding: 11px 15px !important;
+    }
+    .crm-softphone-body {
+        background: #ffffff !important;
+    }
+    .crm-header-action-btn {
+        color: #f1f5f9 !important;
+        background: rgba(255, 255, 255, 0.12) !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease;
+    }
+    .crm-header-action-btn:hover {
+        color: #ffffff !important;
+        background: rgba(255, 255, 255, 0.25) !important;
+        border-color: rgba(255, 255, 255, 0.35) !important;
+        transform: scale(1.05);
+    }
+    .crm-header-close-btn {
+        color: #ffffff !important;
+        background: #ef4444 !important;
+        border: 1px solid #dc2626 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35) !important;
+        transition: all 0.2s ease;
+    }
+    .crm-header-close-btn:hover {
+        color: #ffffff !important;
+        background: #dc2626 !important;
+        border-color: #b91c1c !important;
+        box-shadow: 0 4px 10px rgba(239, 68, 68, 0.5) !important;
+        transform: scale(1.05);
+    }
+    .crm-dialer-display {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-color: #e2e8f0 !important;
+    }
+    .crm-dialpad-btn {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-color: #e2e8f0 !important;
+        transition: all 0.15s ease;
+    }
+    .crm-dialpad-btn:hover {
+        background: #f8fafc !important;
+        border-color: #cbd5e1 !important;
+    }
+    .crm-dialer-card {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+    }
+
+    /* Dark Mode Theme Support */
+    [data-bs-theme="dark"] .crm-softphone-dock,
+    html.app-skin-dark .crm-softphone-dock {
+        background: #1e293b !important;
+        border-color: #334155 !important;
         color: #f8fafc !important;
+        box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+    }
+    [data-bs-theme="dark"] .crm-softphone-header,
+    html.app-skin-dark .crm-softphone-header {
+        background: #1e293b !important;
         border-bottom-color: #334155 !important;
     }
-    html.app-skin-dark .table.odoo-table .select2-container--bootstrap-5 .select2-selection__rendered {
+    [data-bs-theme="dark"] .crm-softphone-body,
+    html.app-skin-dark .crm-softphone-body {
+        background: #0f172a !important;
+    }
+    [data-bs-theme="dark"] .crm-header-action-btn,
+    html.app-skin-dark .crm-header-action-btn {
+        color: #cbd5e1 !important;
+        background: #334155 !important;
+    }
+    [data-bs-theme="dark"] .crm-header-action-btn:hover,
+    html.app-skin-dark .crm-header-action-btn:hover {
+        color: #ffffff !important;
+        background: #475569 !important;
+    }
+    [data-bs-theme="dark"] .crm-header-close-btn,
+    html.app-skin-dark .crm-header-close-btn {
+        color: #cbd5e1 !important;
+        background: #334155 !important;
+    }
+    [data-bs-theme="dark"] .crm-header-close-btn:hover,
+    html.app-skin-dark .crm-header-close-btn:hover {
+        color: #f87171 !important;
+        background: rgba(239, 68, 68, 0.25) !important;
+    }
+    [data-bs-theme="dark"] .crm-dialer-display,
+    html.app-skin-dark .crm-dialer-display {
+        background: #1e293b !important;
+        color: #ffffff !important;
+        border-color: #334155 !important;
+    }
+    [data-bs-theme="dark"] .crm-dialpad-btn,
+    html.app-skin-dark .crm-dialpad-btn {
+        background: #1e293b !important;
+        color: #ffffff !important;
+        border-color: #334155 !important;
+    }
+    [data-bs-theme="dark"] .crm-dialpad-btn:hover,
+    html.app-skin-dark .crm-dialpad-btn:hover {
+        background: #334155 !important;
+        border-color: #475569 !important;
+    }
+    [data-bs-theme="dark"] .crm-dialer-card,
+    html.app-skin-dark .crm-dialer-card {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+    }
+    [data-bs-theme="dark"] .crm-softphone-dock .text-dark,
+    html.app-skin-dark .crm-softphone-dock .text-dark {
         color: #f8fafc !important;
+    }
+    [data-bs-theme="dark"] .crm-softphone-dock .text-muted,
+    html.app-skin-dark .crm-softphone-dock .text-muted {
+        color: #94a3b8 !important;
+    }
+    [data-bs-theme="dark"] .crm-softphone-dock textarea,
+    html.app-skin-dark .crm-softphone-dock textarea {
+        background: #1e293b !important;
+        color: #ffffff !important;
+        border-color: #334155 !important;
+    }
+    #btnDialerBackspace {
+        transition: all 0.15s ease;
+        color: #64748b;
+    }
+    #btnDialerBackspace:hover {
+        color: #ef4444 !important;
+        background-color: rgba(239, 68, 68, 0.12) !important;
+    }
+    #btnDialerBackspace:active {
+        transform: scale(0.92);
+    }
+    [data-bs-theme="dark"] #btnDialerBackspace,
+    html.app-skin-dark #btnDialerBackspace {
+        color: #94a3b8 !important;
+    }
+    [data-bs-theme="dark"] #btnDialerBackspace:hover,
+    html.app-skin-dark #btnDialerBackspace:hover {
+        color: #f87171 !important;
+        background-color: rgba(239, 68, 68, 0.22) !important;
     }
 </style>
 @endpush
@@ -776,13 +924,63 @@
                     <i class="feather-arrow-left"></i>
                 </a>
 
-
                 @php
+                    $dealNumbers = [];
+                    if (!empty($deal->contact?->phone)) {
+                        $dealNumbers[] = [
+                            'type' => 'Contact Person',
+                            'label' => ($deal->contact->name ? $deal->contact->name . ': ' : '') . $deal->contact->phone,
+                            'number' => $deal->contact->phone,
+                            'is_primary' => true
+                        ];
+                    }
+                    if (!empty($deal->account?->phone) && ($deal->account->phone !== ($deal->contact?->phone ?? ''))) {
+                        $dealNumbers[] = [
+                            'type' => 'Company Phone',
+                            'label' => ($deal->account->name ? $deal->account->name . ': ' : '') . $deal->account->phone,
+                            'number' => $deal->account->phone,
+                            'is_primary' => empty($dealNumbers)
+                        ];
+                    }
+                    if ($linkedLead) {
+                        if (!empty($linkedLead->phone) && !in_array($linkedLead->phone, array_column($dealNumbers, 'number'))) {
+                            $dealNumbers[] = [
+                                'type' => 'Lead Phone',
+                                'label' => ($linkedLead->contact_person ? $linkedLead->contact_person . ': ' : '') . $linkedLead->phone,
+                                'number' => $linkedLead->phone,
+                                'is_primary' => empty($dealNumbers)
+                            ];
+                        }
+                        if (!empty($linkedLead->company_phone) && !in_array($linkedLead->company_phone, array_column($dealNumbers, 'number'))) {
+                            $dealNumbers[] = [
+                                'type' => 'Lead Company Phone',
+                                'label' => ($linkedLead->company_name ? $linkedLead->company_name . ': ' : '') . $linkedLead->company_phone,
+                                'number' => $linkedLead->company_phone,
+                                'is_primary' => empty($dealNumbers)
+                            ];
+                        }
+                    }
+                    $primaryDealPhone = $dealNumbers[0]['number'] ?? ($deal->contact?->phone ?: ($deal->account?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)));
+
                     $hasAcceptedQuotation = $deal->quotations->contains(fn($q) => in_array($q->status, ['Accepted', 'Converted', 'Won']));
                     $isDealWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
                     $hasCustomer = !empty($deal->account?->customer_id) && $isDealWon;
                     $acceptedQuote = $deal->quotations->firstWhere('status', 'Accepted') ?: ($deal->quotations->firstWhere('status', 'Converted') ?: $activeQuotation);
                 @endphp
+
+                <button type="button" 
+                        class="btn btn-xs btn-success fw-bold py-1 px-2.5 rounded shadow-2xs d-inline-flex align-items-center text-white btn-crm-deal-click-to-call" 
+                        title="Start Call & Gemini AI Assistant"
+                        data-deal-id="{{ $deal->id }}"
+                        data-deal-title="{{ addslashes($deal->title) }}"
+                        data-deal-company="{{ addslashes($deal->account?->name ?: ($linkedLead?->company_name ?: '')) }}"
+                        data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
+                        data-deal-stage="{{ $deal->stage }}"
+                        data-deal-phone="{{ $primaryDealPhone }}"
+                        data-deal-numbers="{{ json_encode($dealNumbers) }}"
+                        style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+                    <i class="feather-phone-call me-1"></i> Call Phone
+                </button>
 
                 <button type="button" class="btn btn-xs btn-primary fw-bold py-1 px-2.5 rounded shadow-2xs d-inline-flex align-items-center text-white btn-open-deal-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas">
                     <i class="feather-calendar me-1"></i> + {{ __('crm.followup') }}
@@ -1346,10 +1544,35 @@
                                                 $accEmail = $deal->account?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email);
                                             @endphp
                                             @if($accPhone)
-                                                <div class="fs-12 text-dark"><i class="feather-phone me-1 text-muted"></i>{{ $accPhone }}</div>
+                                                <div class="fs-12 text-dark d-flex align-items-center gap-1.5 mt-1">
+                                                    <button type="button" 
+                                                            class="btn btn-xs btn-soft-success text-success p-0 rounded-circle d-inline-flex align-items-center justify-content-center btn-crm-deal-click-to-call border border-success-subtle shadow-2xs" 
+                                                            style="width: 22px; height: 22px; min-width: 22px;"
+                                                            title="Click-to-Call Company Phone"
+                                                            data-deal-id="{{ $deal->id }}"
+                                                            data-deal-title="{{ addslashes($deal->title) }}"
+                                                            data-deal-company="{{ addslashes($deal->account?->name ?: ($linkedLead?->company_name ?: '')) }}"
+                                                            data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
+                                                            data-deal-stage="{{ $deal->stage }}"
+                                                            data-deal-phone="{{ $accPhone }}"
+                                                            data-deal-numbers="{{ json_encode($dealNumbers) }}">
+                                                        <i class="feather-phone-call fs-10"></i>
+                                                    </button>
+                                                    <a href="javascript:void(0)" 
+                                                       class="text-dark fw-semibold text-decoration-none btn-crm-deal-click-to-call hover-primary"
+                                                       data-deal-id="{{ $deal->id }}"
+                                                       data-deal-title="{{ addslashes($deal->title) }}"
+                                                       data-deal-company="{{ addslashes($deal->account?->name ?: ($linkedLead?->company_name ?: '')) }}"
+                                                       data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
+                                                       data-deal-stage="{{ $deal->stage }}"
+                                                       data-deal-phone="{{ $accPhone }}"
+                                                       data-deal-numbers="{{ json_encode($dealNumbers) }}">
+                                                        {{ $accPhone }}
+                                                    </a>
+                                                </div>
                                             @endif
                                             @if($accEmail)
-                                                <div class="fs-12 text-primary"><i class="feather-mail me-1 text-muted"></i>{{ $accEmail }}</div>
+                                                <div class="fs-12 text-primary mt-1"><i class="feather-mail me-1 text-muted"></i>{{ $accEmail }}</div>
                                             @endif
                                         </div>
                                     </div>
@@ -1364,10 +1587,35 @@
                                             <div class="fw-bold text-dark fs-14 mb-1">{{ $cName ?: __('crm.no_contact_person') }}</div>
                                             <div class="fs-12 text-muted mb-2">{{ $cTitle ?: '—' }}</div>
                                             @if($cPhone)
-                                                <div class="fs-12 text-dark"><i class="feather-phone me-1 text-muted"></i>{{ $cPhone }}</div>
+                                                <div class="fs-12 text-dark d-flex align-items-center gap-1.5 mt-1">
+                                                    <button type="button" 
+                                                            class="btn btn-xs btn-soft-success text-success p-0 rounded-circle d-inline-flex align-items-center justify-content-center btn-crm-deal-click-to-call border border-success-subtle shadow-2xs" 
+                                                            style="width: 22px; height: 22px; min-width: 22px;"
+                                                            title="Click-to-Call Contact Person"
+                                                            data-deal-id="{{ $deal->id }}"
+                                                            data-deal-title="{{ addslashes($deal->title) }}"
+                                                            data-deal-company="{{ addslashes($deal->account?->name ?: ($linkedLead?->company_name ?: '')) }}"
+                                                            data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
+                                                            data-deal-stage="{{ $deal->stage }}"
+                                                            data-deal-phone="{{ $cPhone }}"
+                                                            data-deal-numbers="{{ json_encode($dealNumbers) }}">
+                                                        <i class="feather-phone-call fs-10"></i>
+                                                    </button>
+                                                    <a href="javascript:void(0)" 
+                                                       class="text-dark fw-semibold text-decoration-none btn-crm-deal-click-to-call hover-primary"
+                                                       data-deal-id="{{ $deal->id }}"
+                                                       data-deal-title="{{ addslashes($deal->title) }}"
+                                                       data-deal-company="{{ addslashes($deal->account?->name ?: ($linkedLead?->company_name ?: '')) }}"
+                                                       data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
+                                                       data-deal-stage="{{ $deal->stage }}"
+                                                       data-deal-phone="{{ $cPhone }}"
+                                                       data-deal-numbers="{{ json_encode($dealNumbers) }}">
+                                                        {{ $cPhone }}
+                                                    </a>
+                                                </div>
                                             @endif
                                             @if($cEmail)
-                                                <div class="fs-12 text-primary"><i class="feather-mail me-1 text-muted"></i>{{ $cEmail }}</div>
+                                                <div class="fs-12 text-primary mt-1"><i class="feather-mail me-1 text-muted"></i>{{ $cEmail }}</div>
                                             @endif
                                         </div>
                                     </div>
@@ -2367,6 +2615,42 @@
                                                                 @if($cleanNotes)
                                                                     <div class="activity-notes">
                                                                         {{ $cleanNotes }}
+                                                                    </div>
+                                                                @endif
+
+                                                                @if(!empty($item->recording_url))
+                                                                    <div class="call-recording-player-box my-3 p-3 rounded-3 border shadow-xs" style="background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%); border-color: #bfdbfe !important;">
+                                                                        <div class="d-flex align-items-center justify-content-between mb-2.5 pb-2 border-bottom border-primary border-opacity-10 flex-wrap gap-2">
+                                                                            <div class="d-flex align-items-center gap-2">
+                                                                                <div class="avatar-text avatar-xs bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-xs" style="width: 28px; height: 28px; font-size: 11px;">
+                                                                                    <i class="feather-phone-call"></i>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <div class="d-flex align-items-center gap-2">
+                                                                                        <span class="fw-bold text-dark fs-12">Call Recording Audio</span>
+                                                                                        <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 px-2 py-0.5 rounded-pill fw-semibold">
+                                                                                            <i class="feather-disc me-1 fs-9"></i>2-Way Audio
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    @if(!empty($item->audio_duration))
+                                                                                        <span class="text-muted fs-11">Duration: <strong class="text-dark">{{ gmdate("i:s", $item->audio_duration) }}</strong></span>
+                                                                                    @endif
+                                                                                </div>
+                                                                            </div>
+                                                                            <div class="d-flex align-items-center gap-1.5">
+                                                                                <a href="{{ asset($item->recording_url) }}" download="deal_call_recording_{{ $item->id }}.mp3" class="btn btn-xs btn-primary px-3 py-1 fs-11 rounded-pill d-inline-flex align-items-center gap-1 shadow-xs" title="Download Audio File">
+                                                                                    <i class="feather-download fs-10"></i> Download MP3
+                                                                                </a>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="px-0.5 pt-0.5">
+                                                                            <audio controls preload="metadata" class="w-100" style="height: 38px; border-radius: 25px; outline: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.04));">
+                                                                                <source src="{{ asset($item->recording_url) }}" type="audio/mpeg">
+                                                                                <source src="{{ asset($item->recording_url) }}" type="audio/mp3">
+                                                                                <source src="{{ asset($item->recording_url) }}" type="audio/webm">
+                                                                                Your browser does not support audio playback.
+                                                                            </audio>
+                                                                        </div>
                                                                     </div>
                                                                 @endif
 
@@ -3705,6 +3989,275 @@
         </div>
     </x-ui.modal>
 
+    <!-- Floating Right-Side CRM Mobile Softphone Dialer Widget for Deals -->
+    <div id="crmFloatingSoftphoneWidget" class="crm-softphone-dock shadow-2xl" style="display: none; position: fixed; bottom: 24px; right: 24px; z-index: 1055; width: 320px; max-width: calc(100vw - 48px); border-radius: 20px; overflow: hidden; background: #ffffff; border: 1px solid rgba(226, 232, 240, 0.9); box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(0,0,0,0.06); transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+        
+        <!-- Header: Modern Sleek Phone Header with Clearly Visible Action Buttons -->
+        <div class="d-flex align-items-center justify-content-between crm-softphone-header" id="softphoneHeaderBar" style="cursor: pointer;">
+            <div class="d-flex align-items-center gap-2.5">
+                <div class="d-flex align-items-center justify-content-center rounded-circle" style="width: 28px; height: 28px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399;">
+                    <i class="feather-phone" style="font-size: 13px;"></i>
+                </div>
+                <span class="text-white fw-bold fs-13" style="letter-spacing: 0.2px;">Phone Dialer</span>
+                <span id="softphoneStatusPill" style="display: none;">Ready</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn p-0 d-flex align-items-center justify-content-center crm-header-action-btn" id="btnMinimizeSoftphone" title="Minimize / Expand" style="width: 30px; height: 30px; text-decoration: none; cursor: pointer;">
+                    <i class="feather-minus" id="iconSoftphoneMinMax" style="font-size: 15px; font-weight: bold;"></i>
+                </button>
+                <button type="button" class="btn p-0 d-flex align-items-center justify-content-center crm-header-close-btn" id="btnCloseSoftphone" title="Close Dialer" style="width: 30px; height: 30px; text-decoration: none; cursor: pointer;">
+                    <i class="feather-x" style="font-size: 16px; font-weight: bold;"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Body Content: Pure White in Light Mode, Dark in Dark Mode -->
+        <div id="softphoneBody" class="p-3 crm-softphone-body" style="background: #ffffff; max-height: 80vh; overflow-y: auto;">
+            
+            <!-- Caller Display Section (Clean Minimalist Centered Mobile Style) -->
+            <div class="text-center mb-3">
+                <div class="avatar-text bg-primary text-white rounded-circle fw-bold mx-auto mb-1.5 shadow-sm d-flex align-items-center justify-content-center" id="dialerContactAvatar" style="width: 48px; height: 48px; font-size: 18px; letter-spacing: -0.5px;">
+                    C
+                </div>
+                <div class="fw-bold text-dark fs-14 text-truncate px-2" id="dialerContactName">Customer</div>
+                <div class="text-muted fs-11 text-truncate px-2" id="dialerContactSub">Direct Call</div>
+            </div>
+
+            <!-- Phone Screen Number Display with Centered Clear/Backspace -->
+            <div class="position-relative mb-3">
+                <input type="text" class="form-control form-control-lg text-center fw-bold fs-18 text-dark bg-white border shadow-2xs rounded-3 crm-dialer-display" id="dialerDisplayNumber" placeholder="Enter number" style="letter-spacing: 1px; font-family: monospace; height: 48px; padding-left: 48px; padding-right: 48px; line-height: 48px;">
+                <button type="button" class="btn p-0 position-absolute" id="btnDialerBackspace" title="Backspace" style="right: 8px; top: 0; bottom: 0; margin: auto 0; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; text-decoration: none; border-radius: 50%; z-index: 5; cursor: pointer;">
+                    <i class="feather-delete" style="font-size: 18px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;"></i>
+                </button>
+            </div>
+
+            <!-- Mobile Round Keypad (3x4) -->
+            <div id="dialerIdlePanel">
+                <div class="p-1 mb-3">
+                    <div class="row g-2 text-center">
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="1"><span class="d-block fw-bold fs-15 lh-1">1</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">&nbsp;</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="2"><span class="d-block fw-bold fs-15 lh-1">2</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">ABC</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="3"><span class="d-block fw-bold fs-15 lh-1">3</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">DEF</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="4"><span class="d-block fw-bold fs-15 lh-1">4</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">GHI</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="5"><span class="d-block fw-bold fs-15 lh-1">5</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">JKL</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="6"><span class="d-block fw-bold fs-15 lh-1">6</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">MNO</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="7"><span class="d-block fw-bold fs-15 lh-1">7</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">PQRS</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="8"><span class="d-block fw-bold fs-15 lh-1">8</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">TUV</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="9"><span class="d-block fw-bold fs-15 lh-1">9</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">WXYZ</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="*"><span class="d-block fw-bold fs-15 lh-1">*</span><span class="fs-8 text-muted d-block mt-0.5">&nbsp;</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="0"><span class="d-block fw-bold fs-15 lh-1">0</span><span class="fs-8 text-muted d-block mt-0.5">+</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="#"><span class="d-block fw-bold fs-15 lh-1">#</span><span class="fs-8 text-muted d-block mt-0.5">&nbsp;</span></button></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active In-Call Panel -->
+            <div id="dialerInCallPanel" style="display: none;">
+                <div class="p-3 bg-white rounded-3 border mb-3 shadow-2xs text-center crm-dialer-card">
+                    <div class="d-flex align-items-center justify-content-center gap-1.5 mb-1.5">
+                        <span class="spinner-grow spinner-grow-sm text-danger" style="width: 8px; height: 8px;" role="status"></span>
+                        <span class="badge bg-soft-danger text-danger fs-10 fw-bold px-2 py-0.5" id="dialerLiveStatusTag">
+                            Calling...
+                        </span>
+                        <span class="badge bg-soft-success text-success fs-11 fw-bold px-2 py-0.5" id="dialerLiveTimer">00:00</span>
+                    </div>
+                    <div class="fw-bold text-dark fs-14" id="inCallTargetDisplay">+91 0000000000</div>
+                    <span class="text-muted fs-10" id="inCallSubtext">Telephony Active</span>
+
+                    <!-- Audio Waveform -->
+                    <div class="d-flex align-items-center justify-content-center gap-1 mt-2.5" style="height: 18px;">
+                        <div class="bg-success rounded-pill audio-wave-bar" style="width: 3px; height: 12px; animation: pulseWave 1s infinite alternate;"></div>
+                        <div class="bg-success rounded-pill audio-wave-bar" style="width: 3px; height: 18px; animation: pulseWave 0.7s infinite alternate 0.2s;"></div>
+                        <div class="bg-success rounded-pill audio-wave-bar" style="width: 3px; height: 10px; animation: pulseWave 0.9s infinite alternate 0.4s;"></div>
+                        <div class="bg-success rounded-pill audio-wave-bar" style="width: 3px; height: 16px; animation: pulseWave 0.6s infinite alternate 0.1s;"></div>
+                        <div class="bg-success rounded-pill audio-wave-bar" style="width: 3px; height: 12px; animation: pulseWave 0.8s infinite alternate 0.3s;"></div>
+                    </div>
+                </div>
+
+                <!-- Call Notes / Transcript Input -->
+                <div class="mb-3">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-bold fs-10 text-muted text-uppercase">Voice Notes:</span>
+                        <span class="text-muted fs-9" id="liveSpeechStatus">Listening...</span>
+                    </div>
+                    <textarea class="form-control fs-11 bg-white" id="dialerCallNotes" rows="2" placeholder="Voice transcript & notes..."></textarea>
+                </div>
+            </div>
+
+            <!-- Dial Button Action Container -->
+            <div>
+                <!-- 1. Start Call -->
+                <div id="dialerStartAction">
+                    <button type="button" class="btn btn-success w-100 py-2.5 fs-13 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm rounded-pill" id="btnStartRealCall" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+                        <i class="feather-phone-call fs-14"></i>
+                        <span>Start Call</span>
+                    </button>
+                </div>
+
+                <!-- 2. Disconnect Call -->
+                <div id="dialerEndAction" style="display: none;">
+                    <button type="button" class="btn btn-danger w-100 py-2.5 fs-13 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm rounded-pill" id="btnDisconnectAndAnalyze" style="background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);">
+                        <i class="feather-phone-off fs-14"></i>
+                        <span id="btnDisconnectText">End Call & AI Summary</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal 2: Gemini AI Deal Call Analysis & Confirmation Popup (Human-in-the-Loop using common component) -->
+    <x-ui.modal id="geminiAiCallReviewModal" size="lg" :centered="true" :static="true" :showFooter="false">
+        <x-slot:title>
+            <div class="d-flex align-items-center gap-2">
+                <div class="avatar-text avatar-sm bg-primary text-white rounded-circle shadow-xs">
+                    <i class="feather-cpu fs-14"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="modal-title fs-14 fw-bold mb-0 text-dark" id="geminiAiCallReviewModalLabel">Gemini AI Deal Call Recording Analysis & Next Steps</h5>
+                        <span class="badge bg-soft-primary text-primary fs-10 fw-bold px-2 py-0.5 rounded-pill shadow-xs">Gemini Flash AI</span>
+                    </div>
+                    <span class="fs-11 text-muted">Audio transcribed & analyzed. Review before confirming activity to Deal.</span>
+                </div>
+            </div>
+        </x-slot:title>
+
+        <!-- Target Deal Quick Header -->
+        <div class="bg-light p-3 rounded-3 border mb-3 shadow-xs d-flex align-items-center justify-content-between">
+            <div>
+                <span class="text-muted fs-10 text-uppercase fw-bold">Target Deal / Account</span>
+                <div class="fw-bold text-dark fs-13" id="aiModalDealName">Deal Title</div>
+                <span class="text-muted fs-11" id="aiModalDialedNumber">+91 0000000000</span>
+            </div>
+            <div class="text-end">
+                <span class="text-muted fs-10 text-uppercase fw-bold d-block">AI Sentiment</span>
+                <span class="badge bg-soft-success text-success border border-success-subtle fs-11 fw-bold" id="aiModalSentimentBadge">Positive / Interested</span>
+            </div>
+        </div>
+
+        <form id="geminiAiDealApprovalForm">
+            <input type="hidden" id="aiModalDealId" value="">
+            <input type="hidden" id="aiModalCallDuration" value="0">
+            <input type="hidden" id="aiModalDialedPhoneVal" value="">
+            <input type="hidden" id="aiModalRecordingUrl" value="">
+
+            <!-- Audio Recording Preview & Playback -->
+            <div id="aiModalAudioPreviewContainer" class="p-3 mb-3 bg-white rounded-3 border shadow-xs" style="display: none; border-color: #bfdbfe !important; background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2.5 pb-2 border-bottom border-primary border-opacity-10 flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="avatar-text avatar-xs bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-xs" style="width: 26px; height: 26px; font-size: 11px;">
+                            <i class="feather-phone-call"></i>
+                        </div>
+                        <div>
+                            <span class="fw-bold text-dark fs-12 d-block">Call Recording Audio</span>
+                            <span class="text-muted fs-10">Play & verify speech before Deal confirmation</span>
+                        </div>
+                    </div>
+                    <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 fw-bold px-2.5 py-1 rounded-pill">
+                        <i class="feather-disc me-1 fs-9"></i>2-Way Audio
+                    </span>
+                </div>
+                <div class="px-0.5 pt-0.5">
+                    <audio id="aiModalAudioPlayer" controls preload="metadata" class="w-100" style="height: 38px; border-radius: 25px; outline: none;">
+                        Your browser does not support audio playback.
+                    </audio>
+                </div>
+            </div>
+
+            <!-- 1. Voice Recording Transcription (Speech-to-Text) -->
+            <div class="mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label fw-bold fs-12 text-dark mb-0">
+                        <i class="feather-volume-2 text-primary me-1"></i> Audio Recording Transcript (What was spoken)
+                    </label>
+                    <span class="badge bg-soft-info text-info fs-10">Gemini Audio Speech-to-Text</span>
+                </div>
+                <textarea class="form-control fs-12 bg-white" id="aiModalTranscript" rows="2" placeholder="Transcribed conversation text..."></textarea>
+            </div>
+
+            <!-- 2. Discussion Summary -->
+            <div class="mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label fw-bold fs-12 text-dark mb-0">
+                        <i class="feather-file-text text-primary me-1"></i> Discussion Summary & Next Milestones
+                    </label>
+                    <span class="text-muted fs-10">Editable</span>
+                </div>
+                <textarea class="form-control fs-12 bg-white" id="aiModalDiscussionSummary" rows="3" required placeholder="Discussion details analyzed by Gemini..."></textarea>
+            </div>
+
+            <!-- 3. Next Follow-up & Activity Details -->
+            <div class="p-3 bg-light rounded-3 border mb-3 shadow-xs">
+                <div class="d-flex align-items-center gap-1.5 mb-2.5 pb-2 border-bottom">
+                    <i class="feather-calendar text-primary fs-13"></i>
+                    <h6 class="fs-12 fw-bold text-dark mb-0">Proposed Next Activity & Schedule</h6>
+                </div>
+
+                <div class="row g-2 mb-2">
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold fs-11 text-muted mb-1">Next Activity Type</label>
+                        <select class="form-select form-select-sm fs-12" id="aiModalNextActivityType">
+                            <option value="Call">📞 Call Back</option>
+                            <option value="Meeting">🤝 Meeting</option>
+                            <option value="Demo">💻 Demo</option>
+                            <option value="WhatsApp">💬 WhatsApp Follow-up</option>
+                            <option value="Email">✉️ Email Follow-up</option>
+                        </select>
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label fw-semibold fs-11 text-muted mb-1">Next Follow-up Date & Time</label>
+                        <input type="datetime-local" class="form-control form-control-sm fs-12" id="aiModalNextFollowupDate">
+                    </div>
+                </div>
+
+                <div class="mb-1">
+                    <label class="form-label fw-semibold fs-11 text-muted mb-1">Next Activity Agenda / Title</label>
+                    <input type="text" class="form-control form-control-sm fs-12" id="aiModalNextActivityTitle" placeholder="e.g. Follow-up call for quotation revision and order closing">
+                </div>
+            </div>
+
+            <!-- 4. Suggested Deal Stage & Sync Notice -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                    <div class="p-2.5 bg-white rounded-3 border shadow-xs h-100">
+                        <label class="form-label fw-semibold fs-11 text-muted mb-1">Suggested Deal Stage</label>
+                        <select class="form-select form-select-sm fs-12" id="aiModalDealStage">
+                            @foreach($dealStatuses as $ds)
+                                <option value="{{ $ds->name }}">{{ $ds->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-2.5 bg-soft-info border border-info-subtle rounded-3 text-dark fs-11 h-100 d-flex align-items-center">
+                        <div>
+                            <div class="fw-bold text-info mb-0.5"><i class="feather-check-circle me-1"></i>Deal Timeline Auto-Sync</div>
+                            <span class="text-muted fs-10">Follow-up recorded to Deal Interactions & Timeline automatically.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Follow-up Confirmation Message Preview -->
+            <div class="mb-2">
+                <label class="form-label fw-semibold fs-11 text-muted mb-1">
+                    <i class="feather-send text-success me-1"></i> Customer Follow-up Message Note
+                </label>
+                <textarea class="form-control fs-11 bg-white" id="aiModalFollowupMessage" rows="2" placeholder="Summary message note for WhatsApp/Email..."></textarea>
+            </div>
+
+            <!-- Footer: Actions -->
+            <div class="d-flex align-items-center justify-content-between pt-3 border-top mt-3">
+                <button type="button" class="btn btn-light border px-3 py-2 fs-12 fw-semibold" data-bs-dismiss="modal">Cancel / Edit Later</button>
+                <button type="button" class="btn btn-primary px-4 py-2 fs-12 fw-bold d-flex align-items-center gap-1.5 shadow-sm" id="btnApproveAndScheduleDeal">
+                    <i class="feather-check-circle fs-13"></i>
+                    <span id="btnApproveDealText">Approve & Save to Deal</span>
+                </button>
+            </div>
+        </form>
+    </x-ui.modal>
+
     <script>
         let defaultQuotationPdfName = 'Quotation.pdf';
         let defaultQuotationPdfUrl = '';
@@ -3928,7 +4481,709 @@
                 }
             });
         });
+
+        // =========================================================================
+        // DEAL CRM LIVE CALLING, WEBRTC & GEMINI AI INTEGRATION
+        // =========================================================================
+        var activeDealCallId = null;
+        var activeDealTitle = '';
+        var activeDealCompany = '';
+        var activeDealCallInterval = null;
+        var activeDealDurationSeconds = 0;
+        var isSoftphoneMinimized = false;
+        var activeTwilioCallSid = null;
+        var activeTwilioPollTimer = null;
+
+        var audioChunks = [];
+        var activeMediaRecorder = null;
+        var activeAudioStream = null;
+
+        var speechRecognition = null;
+        var isSpeechRecording = false;
+
+        // Browser Ringing Sound Generator
+        var ringingAudioCtx = null;
+        var ringingOscillator = null;
+        var ringingGainNode = null;
+        var isRingingPlaying = false;
+        var ringingIntervalId = null;
+
+        function startBrowserRingingTone() {
+            try {
+                if (isRingingPlaying) return;
+                var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) return;
+                ringingAudioCtx = new AudioContextClass();
+                isRingingPlaying = true;
+
+                function playBeepCycle() {
+                    if (!isRingingPlaying || !ringingAudioCtx) return;
+                    try {
+                        var osc1 = ringingAudioCtx.createOscillator();
+                        var osc2 = ringingAudioCtx.createOscillator();
+                        var gain = ringingAudioCtx.createGain();
+
+                        osc1.type = 'sine';
+                        osc1.frequency.setValueAtTime(440, ringingAudioCtx.currentTime);
+                        osc2.type = 'sine';
+                        osc2.frequency.setValueAtTime(480, ringingAudioCtx.currentTime);
+
+                        gain.gain.setValueAtTime(0.04, ringingAudioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ringingAudioCtx.currentTime + 1.8);
+
+                        osc1.connect(gain);
+                        osc2.connect(gain);
+                        gain.connect(ringingAudioCtx.destination);
+
+                        osc1.start();
+                        osc2.start();
+                        osc1.stop(ringingAudioCtx.currentTime + 1.8);
+                        osc2.stop(ringingAudioCtx.currentTime + 1.8);
+                    } catch(e) {}
+                }
+
+                playBeepCycle();
+                ringingIntervalId = setInterval(playBeepCycle, 4000);
+            } catch(e) {
+                console.warn('Ringing sound error:', e);
+            }
+        }
+
+        function stopBrowserRingingTone() {
+            isRingingPlaying = false;
+            if (ringingIntervalId) {
+                clearInterval(ringingIntervalId);
+                ringingIntervalId = null;
+            }
+            if (ringingAudioCtx) {
+                try { ringingAudioCtx.close(); } catch(e) {}
+                ringingAudioCtx = null;
+            }
+        }
+
+        function formatDealCallTimer(totalSeconds) {
+            var m = Math.floor(totalSeconds / 60);
+            var s = totalSeconds % 60;
+            return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+        }
+
+        function toggleSoftphoneMinimize() {
+            isSoftphoneMinimized = !isSoftphoneMinimized;
+            if (isSoftphoneMinimized) {
+                $('#softphoneBody').slideUp(200);
+                $('#iconSoftphoneMinMax').removeClass('feather-minus').addClass('feather-maximize-2');
+                $('#crmFloatingSoftphoneWidget').css({'width': '240px'});
+            } else {
+                $('#softphoneBody').slideDown(200);
+                $('#iconSoftphoneMinMax').removeClass('feather-maximize-2').addClass('feather-minus');
+                $('#crmFloatingSoftphoneWidget').css({'width': '320px'});
+            }
+        }
+
+        $('#btnMinimizeSoftphone').on('click', function(e) {
+            e.stopPropagation();
+            toggleSoftphoneMinimize();
+        });
+
+        $('#softphoneHeaderBar').on('click', function() {
+            if (isSoftphoneMinimized) {
+                toggleSoftphoneMinimize();
+            }
+        });
+
+        $('#btnCloseSoftphone').on('click', function(e) {
+            e.stopPropagation();
+            if ($('#dialerInCallPanel').is(':visible')) {
+                if (confirm('A call is currently in progress. Do you want to disconnect?')) {
+                    $('#btnDisconnectAndAnalyze').trigger('click');
+                } else {
+                    return;
+                }
+            }
+            stopBrowserRingingTone();
+            stopActiveCallMedia();
+            $('#crmFloatingSoftphoneWidget').fadeOut(250);
+        });
+
+        // Click-to-Call Trigger for Deals
+        $(document).on('click', '.btn-crm-deal-click-to-call', function(e) {
+            e.preventDefault();
+            var btn = $(this);
+            activeDealCallId = btn.attr('data-deal-id');
+            activeDealTitle = btn.attr('data-deal-title') || 'Deal';
+            activeDealCompany = btn.attr('data-deal-company') || btn.attr('data-contact-name') || '';
+            var contactName = btn.attr('data-contact-name') || activeDealCompany || activeDealTitle || 'Client';
+            
+            var numbers = [];
+            try {
+                var rawNumbers = btn.attr('data-deal-numbers');
+                if (rawNumbers) {
+                    numbers = JSON.parse(rawNumbers);
+                }
+            } catch(err) {
+                numbers = [];
+            }
+
+            if (!numbers.length && btn.attr('data-deal-phone')) {
+                numbers.push({
+                    type: 'Direct Phone',
+                    label: btn.attr('data-deal-phone'),
+                    number: btn.attr('data-deal-phone'),
+                    is_primary: true
+                });
+            }
+
+            // Populate Clean Calling Info Header (No deal badges/stages)
+            $('#dialerContactName').text(contactName);
+            $('#dialerContactSub').text(activeDealCompany && activeDealCompany !== contactName ? activeDealCompany : 'CRM Outbound Call');
+            $('#dialerContactAvatar').text((contactName.trim().charAt(0) || 'C').toUpperCase());
+
+            // Set Phone Number directly in Screen Display
+            if (numbers.length > 0 && numbers[0].number) {
+                $('#dialerDisplayNumber').val(numbers[0].number);
+            } else {
+                $('#dialerDisplayNumber').val('');
+            }
+
+            // Reset UI to Idle / Ready to Call State
+            $('#dialerIdlePanel').show();
+            $('#dialerInCallPanel').hide();
+            $('#dialerStartAction').show();
+            $('#dialerEndAction').hide();
+            $('#softphoneStatusPill').text('Ready').removeClass('bg-danger bg-warning').addClass('bg-success');
+            $('#dialerLiveTimer').text('00:00');
+            $('#dialerCallNotes').val('');
+            activeDealDurationSeconds = 0;
+            audioChunks = [];
+            activeTwilioCallSid = null;
+
+            if (isSoftphoneMinimized) {
+                toggleSoftphoneMinimize();
+            }
+            $('#crmFloatingSoftphoneWidget').fadeIn(250);
+        });
+
+        // Dialpad Digit Keys Click
+        $(document).on('click', '.dialpad-key', function() {
+            var digit = $(this).attr('data-key');
+            var cur = $('#dialerDisplayNumber').val();
+            $('#dialerDisplayNumber').val(cur + digit);
+        });
+
+        $('#btnDialerBackspace').on('click', function() {
+            var cur = $('#dialerDisplayNumber').val();
+            if (cur.length > 0) {
+                $('#dialerDisplayNumber').val(cur.slice(0, -1));
+            }
+        });
+
+        $('#btnDialerClear').on('click', function() {
+            $('#dialerDisplayNumber').val('').focus();
+        });
+
+        $('#btnToggleDialpadView').on('click', function() {
+            var container = $('#dialpadContainer');
+            var icon = $('#dialpadToggleIcon');
+            if (container.is(':visible')) {
+                container.slideUp(200);
+                icon.removeClass('feather-chevron-up').addClass('feather-chevron-down');
+            } else {
+                container.slideDown(200);
+                icon.removeClass('feather-chevron-down').addClass('feather-chevron-up');
+            }
+        });
+
+        $(document).on('click', '.quick-chip-btn', function() {
+            var text = $(this).attr('data-text');
+            var current = $('#dialerCallNotes').val();
+            $('#dialerCallNotes').val((current ? current.trim() + ' ' : '') + text).focus();
+        });
+
+        // =========================================================================
+        // TWILIO WEBRTC 2-WAY LIVE VOICE DEVICE INITIALIZATION
+        // =========================================================================
+        var twilioDevice = null;
+        var activeTwilioCall = null;
+
+        function setupTwilioVoiceDevice() {
+            if (typeof Twilio === 'undefined' || !Twilio.Device) {
+                console.log('Twilio WebRTC Voice SDK not yet loaded.');
+                return;
+            }
+
+            fetch("{{ route('crm.twilio.voiceToken') }}")
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (res.success && res.token) {
+                        try {
+                            twilioDevice = new Twilio.Device(res.token, {
+                                codecPreferences: ['opus', 'pcmu'],
+                                fakeLocalDTMF: true,
+                                enableRingingState: true
+                            });
+
+                            twilioDevice.on('registered', function() {
+                                console.log('Twilio 2-Way Voice Softphone registered and ready for Deals.');
+                                $('#softphoneStatusPill').text('Ready (2-Way)').addClass('bg-success');
+                            });
+
+                            twilioDevice.on('incoming', function(conn) {
+                                conn.accept();
+                            });
+
+                            twilioDevice.on('error', function(err) {
+                                console.warn('Twilio Device warning:', err);
+                            });
+
+                            twilioDevice.register();
+                        } catch(e) {
+                            console.warn('Twilio Device register error:', e);
+                        }
+                    }
+                })
+                .catch(function(err) {
+                    console.warn('Twilio voice token fetch error:', err);
+                });
+        }
+
+        setTimeout(setupTwilioVoiceDevice, 500);
+
+        function triggerRestOutboundCall(targetNumber) {
+            var csrfToken = $('meta[name="csrf-token"]').attr('content');
+            var initiateUrl = "{{ url('crm/deals') }}/" + activeDealCallId + "/call-ai/initiate-call";
+
+            fetch(initiateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ to_number: targetNumber })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (res.success) {
+                    activeTwilioCallSid = res.call_sid || null;
+                    $('#dialerLiveStatusTag').html('<i class="feather-phone-call me-1"></i> Phone Ringing: ' + (res.to || targetNumber));
+                    $('#inCallSubtext').text('Twilio call connected to ' + (res.to || targetNumber) + '. Waiting for answer...');
+
+                    if (activeTwilioCallSid) {
+                        startTwilioCallStatusPolling(activeDealCallId, activeTwilioCallSid);
+                    }
+                } else {
+                    console.warn('Twilio initiate status:', res.message);
+                    $('#inCallSubtext').text(res.message || 'Call initiated via browser.');
+                }
+            })
+            .catch(function(err) {
+                console.error('Twilio initiate error:', err);
+                $('#inCallSubtext').text('Call in progress on browser.');
+            });
+        }
+
+        // START REAL OUTBOUND CALL
+        $('#btnStartRealCall').on('click', function() {
+            var targetNumber = $('#dialerDisplayNumber').val().trim();
+            if (!targetNumber) {
+                alert('Please enter or select a phone number to call.');
+                $('#dialerDisplayNumber').focus();
+                return;
+            }
+
+            if (!activeDealCallId) {
+                alert('No active deal selected.');
+                return;
+            }
+
+            startBrowserRingingTone();
+
+            $('#dialerIdlePanel').hide();
+            $('#dialerInCallPanel').fadeIn(250);
+            $('#dialerStartAction').hide();
+            $('#dialerEndAction').show();
+            $('#softphoneStatusPill').text('Calling...').removeClass('bg-success').addClass('bg-danger');
+            $('#dialerLiveStatusTag').html('<i class="feather-phone-call me-1"></i> Ringing Mobile...');
+            $('#inCallTargetDisplay').text(targetNumber + ' (' + activeDealTitle + ')');
+            $('#inCallSubtext').text('Connecting 2-way live audio with customer phone...');
+
+            activeDealDurationSeconds = 0;
+            $('#dialerLiveTimer').text('00:00');
+            if (activeDealCallInterval) clearInterval(activeDealCallInterval);
+            activeDealCallInterval = setInterval(function() {
+                activeDealDurationSeconds++;
+                $('#dialerLiveTimer').text(formatDealCallTimer(activeDealDurationSeconds));
+            }, 1000);
+
+            if (twilioDevice && twilioDevice.state === 'registered') {
+                try {
+                    twilioDevice.connect({ params: { To: targetNumber, deal_id: activeDealCallId } })
+                        .then(function(call) {
+                            activeTwilioCall = call;
+                            activeTwilioCallSid = call.parameters.CallSid || null;
+
+                            call.on('ringing', function() {
+                                $('#softphoneStatusPill').text('Ringing...').removeClass('bg-success').addClass('bg-danger');
+                                $('#dialerLiveStatusTag').html('<i class="feather-phone-call me-1"></i> Phone Ringing: ' + targetNumber);
+                                $('#inCallSubtext').text('Ringing mobile phone... Waiting for answer.');
+                            });
+
+                            call.on('accept', function() {
+                                stopBrowserRingingTone();
+                                $('#softphoneStatusPill').text('Connected (2-Way)').removeClass('bg-danger bg-warning').addClass('bg-success');
+                                $('#dialerLiveStatusTag').html('<i class="feather-phone-call me-1 text-success"></i> Two-Way Live Audio Connected');
+                                $('#inCallSubtext').text('Connected! Speak directly into your microphone.');
+                            });
+
+                            call.on('disconnect', function() {
+                                stopBrowserRingingTone();
+                                activeTwilioCall = null;
+                                $('#btnDisconnectAndAnalyze').trigger('click');
+                            });
+
+                            call.on('error', function(err) {
+                                console.warn('Twilio Call error:', err);
+                                triggerRestOutboundCall(targetNumber);
+                            });
+                        })
+                        .catch(function(e) {
+                            console.warn('Twilio Device connect catch:', e);
+                            triggerRestOutboundCall(targetNumber);
+                        });
+                } catch(err) {
+                    console.warn('Twilio WebRTC connect error, falling back to REST call:', err);
+                    triggerRestOutboundCall(targetNumber);
+                }
+            } else {
+                triggerRestOutboundCall(targetNumber);
+            }
+
+            // Start Audio Recording via MediaRecorder
+            audioChunks = [];
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(function(stream) {
+                        activeAudioStream = stream;
+                        var mimeType = 'audio/webm';
+                        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                            mimeType = 'audio/webm;codecs=opus';
+                        }
+                        activeMediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+                        activeMediaRecorder.ondataavailable = function(e) {
+                            if (e.data.size > 0) audioChunks.push(e.data);
+                        };
+                        activeMediaRecorder.start(1000);
+                    })
+                    .catch(function(err) {
+                        console.warn('Microphone stream error:', err);
+                    });
+            }
+
+            // Start Web Speech Recognition
+            var SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognitionClass) {
+                try {
+                    speechFinalTranscript = '';
+                    $('#dialerCallNotes').val('');
+                    if (speechRecognition) {
+                        try { speechRecognition.stop(); } catch(err) {}
+                    }
+                    speechRecognition = new SpeechRecognitionClass();
+                    speechRecognition.continuous = true;
+                    speechRecognition.interimResults = true;
+                    speechRecognition.lang = 'hi-IN';
+
+                    speechRecognition.onresult = function(e) {
+                        var interimTranscript = '';
+                        for (var i = e.resultIndex; i < e.results.length; ++i) {
+                            var chunk = e.results[i][0].transcript;
+                            if (e.results[i].isFinal) {
+                                speechFinalTranscript += chunk + ' ';
+                            } else {
+                                interimTranscript += chunk;
+                            }
+                        }
+                        var fullText = (speechFinalTranscript + ' ' + interimTranscript).trim();
+                        if (fullText) {
+                            $('#dialerCallNotes').val(fullText);
+                            $('#liveSpeechStatus').html('<span class="text-success fw-bold"><i class="feather-mic"></i> Converting speech to text...</span>');
+                        }
+                    };
+
+                    speechRecognition.onerror = function(err) {
+                        console.warn('Speech recognition status:', err.error);
+                    };
+
+                    speechRecognition.onend = function() {
+                        if (isSpeechRecording && speechRecognition) {
+                            try { speechRecognition.start(); } catch(e) {}
+                        }
+                    };
+
+                    speechRecognition.start();
+                    isSpeechRecording = true;
+                    $('#liveSpeechStatus').html('<span class="text-success"><i class="feather-mic"></i> Listening... Speak in Hindi or English</span>');
+                } catch(e) {
+                    console.warn('Speech recognition error:', e);
+                }
+            }
+        });
+
+        function startTwilioCallStatusPolling(dealId, callSid) {
+            if (activeTwilioPollTimer) clearInterval(activeTwilioPollTimer);
+            var pollUrl = "{{ url('crm/deals') }}/" + dealId + "/call-ai/status";
+            var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+            activeTwilioPollTimer = setInterval(function() {
+                if (!activeDealCallId || !callSid) {
+                    clearInterval(activeTwilioPollTimer);
+                    return;
+                }
+
+                fetch(pollUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify({ call_sid: callSid })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (res.success) {
+                        var status = res.status;
+                        if (status === 'in-progress') {
+                            stopBrowserRingingTone();
+                            $('#softphoneStatusPill').text('Connected (Mobile)').removeClass('bg-danger bg-warning').addClass('bg-success');
+                            $('#dialerLiveStatusTag').html('<i class="feather-phone-call me-1 text-success"></i> Customer Answered (Live)');
+                            $('#inCallSubtext').text('Customer picked up the call! Speaking live on telephony...');
+                        } else if (status === 'completed' || status === 'canceled' || status === 'busy' || status === 'no-answer') {
+                            clearInterval(activeTwilioPollTimer);
+                            activeTwilioPollTimer = null;
+                            stopBrowserRingingTone();
+                            $('#btnDisconnectAndAnalyze').trigger('click');
+                        }
+                    }
+                })
+                .catch(function(){});
+            }, 1500);
+        }
+
+        function stopActiveCallMedia() {
+            stopBrowserRingingTone();
+            if (activeTwilioCall) {
+                try {
+                    activeTwilioCall.disconnect();
+                } catch(e) {}
+                activeTwilioCall = null;
+            }
+            if (activeTwilioPollTimer) {
+                clearInterval(activeTwilioPollTimer);
+                activeTwilioPollTimer = null;
+            }
+            if (activeDealCallInterval) {
+                clearInterval(activeDealCallInterval);
+                activeDealCallInterval = null;
+            }
+            if (speechRecognition && isSpeechRecording) {
+                isSpeechRecording = false;
+                try { speechRecognition.stop(); } catch(e) {}
+            }
+            if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
+                try { activeMediaRecorder.stop(); } catch(e) {}
+            }
+            if (activeAudioStream) {
+                try {
+                    activeAudioStream.getTracks().forEach(function(track) { track.stop(); });
+                } catch(e) {}
+                activeAudioStream = null;
+            }
+        }
+
+        // DISCONNECT CALL & ANALYZE WITH GEMINI AI
+        $('#btnDisconnectAndAnalyze').on('click', function() {
+            if (!activeDealCallId) return;
+
+            var currentCallSid = activeTwilioCallSid;
+            var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+            // 1. Forcefully terminate telephony call leg immediately so customer's phone disconnects
+            var terminateUrl = "{{ url('crm/deals') }}/" + activeDealCallId + "/call-ai/terminate-call";
+            fetch(terminateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ call_sid: currentCallSid || '' })
+            }).catch(function(){});
+
+            stopActiveCallMedia();
+            activeTwilioCallSid = null;
+
+            var notes = $('#dialerCallNotes').val().trim();
+            var dialedPhone = $('#dialerDisplayNumber').val().trim();
+
+            var btn = $(this);
+            var origHtml = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Gemini AI Transcribing & Processing...');
+
+            var analyzeUrl = "{{ url('crm/deals') }}/" + activeDealCallId + "/call-ai/analyze";
+
+            var formData = new FormData();
+            formData.append('call_notes', notes);
+            formData.append('duration_seconds', activeDealDurationSeconds || 60);
+            formData.append('dialed_number', dialedPhone);
+            if (currentCallSid) {
+                formData.append('call_sid', currentCallSid);
+            }
+
+            if (audioChunks && audioChunks.length > 0) {
+                var audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                formData.append('audio_file', audioBlob, 'deal_call_recording.webm');
+            }
+
+            fetch(analyzeUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: formData
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                btn.prop('disabled', false).html(origHtml);
+
+                if (res.success) {
+                    $('#crmFloatingSoftphoneWidget').fadeOut(250);
+
+                    // Populate Gemini AI Confirmation Popup
+                    $('#aiModalDealId').val(activeDealCallId);
+                    $('#aiModalCallDuration').val(activeDealDurationSeconds);
+                    $('#aiModalDialedPhoneVal').val(dialedPhone);
+                    $('#aiModalRecordingUrl').val(res.recording_url || '');
+                    $('#aiModalDealName').text(activeDealTitle + (activeDealCompany ? ' (' + activeDealCompany + ')' : ''));
+                    $('#aiModalDialedNumber').text('Dialed: ' + (res.dialed_number || dialedPhone || 'Contact Number'));
+
+                    if (res.recording_url) {
+                        $('#aiModalAudioPreviewContainer').show();
+                        var audioSrc = res.recording_url.startsWith('http') ? res.recording_url : ('/' + res.recording_url.replace(/^\/+/, ''));
+                        $('#aiModalAudioPlayer').attr('src', audioSrc);
+                    } else {
+                        $('#aiModalAudioPreviewContainer').hide();
+                        $('#aiModalAudioPlayer').removeAttr('src');
+                    }
+
+                    var sentiment = res.sentiment || 'Interested';
+                    $('#aiModalSentimentBadge').text(sentiment);
+                    if (sentiment.toLowerCase().indexOf('hot') > -1 || sentiment.toLowerCase().indexOf('positive') > -1) {
+                        $('#aiModalSentimentBadge').attr('class', 'badge bg-soft-success text-success border border-success-subtle fs-11 fw-bold');
+                    } else if (sentiment.toLowerCase().indexOf('cold') > -1 || sentiment.toLowerCase().indexOf('not interested') > -1) {
+                        $('#aiModalSentimentBadge').attr('class', 'badge bg-soft-danger text-danger border border-danger-subtle fs-11 fw-bold');
+                    } else {
+                        $('#aiModalSentimentBadge').attr('class', 'badge bg-soft-warning text-warning border border-warning-subtle fs-11 fw-bold');
+                    }
+
+                    $('#aiModalTranscript').val(res.transcript || '');
+                    $('#aiModalDiscussionSummary').val(res.discussion_summary || res.summary || '');
+                    $('#aiModalNextActivityType').val(res.next_activity_type || 'Call');
+                    $('#aiModalNextFollowupDate').val(res.next_followup_date || '');
+                    $('#aiModalNextActivityTitle').val(res.next_activity_title || (res.summary === 'Not answering' ? 'Retry Call' : 'Follow-up Call'));
+                    $('#aiModalDealStage').val(res.suggested_deal_stage || 'Qualification');
+                    $('#aiModalFollowupMessage').val(res.followup_message_preview || '');
+
+                    setTimeout(function() {
+                        var reviewModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('geminiAiCallReviewModal'));
+                        reviewModal.show();
+                    }, 300);
+
+                } else {
+                    alert(res.message || 'Error processing AI call analysis.');
+                }
+            })
+            .catch(function(err) {
+                btn.prop('disabled', false).html(origHtml);
+                console.error('Call analysis error:', err);
+                alert('An error occurred during Gemini AI processing.');
+            });
+        });
+
+        // APPROVE & SCHEDULE ACTIVITY IN DEAL
+        $('#btnApproveAndScheduleDeal').on('click', function(e) {
+            e.preventDefault();
+            var dealId = $('#aiModalDealId').val();
+            if (!dealId) return;
+
+            var payload = {
+                summary: $('#aiModalDiscussionSummary').val(),
+                transcript: $('#aiModalTranscript').val(),
+                next_activity_type: $('#aiModalNextActivityType').val(),
+                next_action: $('#aiModalNextActivityTitle').val() || $('#aiModalNextActivityType').val(),
+                next_followup_date: $('#aiModalNextFollowupDate').val(),
+                deal_stage: $('#aiModalDealStage').val(),
+                sentiment: $('#aiModalSentimentBadge').text(),
+                followup_message_preview: $('#aiModalFollowupMessage').val(),
+                recording_url: $('#aiModalRecordingUrl').val() || null,
+                duration_seconds: parseInt($('#aiModalCallDuration').val()) || activeDealDurationSeconds
+            };
+
+            var btn = $(this);
+            var origHtml = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Applying to Deal...');
+
+            var csrfToken = $('meta[name="csrf-token"]').attr('content');
+            var confirmUrl = "{{ url('crm/deals') }}/" + dealId + "/call-ai/confirm";
+
+            fetch(confirmUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                btn.prop('disabled', false).html(origHtml);
+
+                if (res.success) {
+                    var reviewModalEl = document.getElementById('geminiAiCallReviewModal');
+                    var reviewModal = bootstrap.Modal.getInstance(reviewModalEl);
+                    if (reviewModal) reviewModal.hide();
+
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Deal Call Saved & Activity Scheduled!',
+                            html: '<p class="fs-12 text-muted mb-2">' + (res.message || 'Call logged & next follow-up scheduled to Deal successfully.') + '</p>' +
+                                  (payload.next_followup_date ? '<div class="badge bg-soft-primary text-primary fs-11 p-2">📅 Next Follow-up: ' + payload.next_followup_date.replace('T', ' ') + '</div>' : ''),
+                            confirmButtonColor: '#4f46e5',
+                            confirmButtonText: 'Great, Done!'
+                        }).then(function() {
+                            window.location.reload();
+                        });
+                    } else {
+                        alert(res.message || 'Deal call and follow-up saved successfully!');
+                        window.location.reload();
+                    }
+                } else {
+                    alert(res.message || 'Error saving deal follow-up.');
+                }
+            })
+            .catch(function(err) {
+                btn.prop('disabled', false).html(origHtml);
+                console.error('Save error:', err);
+                alert('An error occurred while saving the activity.');
+            });
+        });
     </script>
+    <!-- Twilio Voice WebRTC SDK for 2-Way Live Calling -->
+    <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.11.1/dist/twilio.min.js"></script>
+    <script src="{{ asset('assets/vendors/js/sweetalert2.all.min.js') }}"></script>
     @endpush
 
     @push('styles')

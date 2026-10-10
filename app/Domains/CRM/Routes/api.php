@@ -114,6 +114,10 @@ Route::prefix('api/crm')
                 // Deal Activities & Followups
                 Route::get('/{deal}/followups', [DealActivityApiController::class, 'index'])->whereNumber('deal')->name('followups.index');
                 Route::post('/{deal}/followups', [DealActivityApiController::class, 'store'])->whereNumber('deal')->name('followups.store');
+
+                // Deal Documents
+                Route::get('/{deal}/documents', [CrmDealApiController::class, 'documents'])->whereNumber('deal')->name('documents.index');
+                Route::post('/{deal}/documents', [CrmDealApiController::class, 'uploadDocuments'])->whereNumber('deal')->name('documents.upload');
             });
 
         // Standalone followups & documents delete/patch
@@ -171,6 +175,9 @@ Route::prefix('api/crm')
             Route::delete('/{id}', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'destroy'])->name('destroy');
             Route::post('/{id}/approve', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'approve'])->name('approve');
             Route::post('/{id}/reject', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'reject'])->name('reject');
+            Route::post('/{id}/send-email', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'sendEmail'])->name('send-email');
+            Route::post('/{id}/send-whatsapp', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'sendWhatsApp'])->name('send-whatsapp');
+            Route::get('/{id}/download', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'downloadPdf'])->name('download');
         });
 
         // ==========================================

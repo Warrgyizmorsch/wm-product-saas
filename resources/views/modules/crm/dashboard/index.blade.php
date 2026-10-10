@@ -185,7 +185,7 @@
     {{-- Executive KPI Metrics Row --}}
     <div class="row g-3 mb-4">
         {{-- Total Leads --}}
-        <div class="col-xxl-2 col-xl-4 col-md-6">
+        <div class="col-xxl col-xl-4 col-md-6">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -204,7 +204,7 @@
         </div>
 
         {{-- Active Pipeline Value --}}
-        <div class="col-xxl-2 col-xl-4 col-md-6">
+        <div class="col-xxl col-xl-4 col-md-6">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -223,7 +223,7 @@
         </div>
 
         {{-- Won Deals Revenue --}}
-        <div class="col-xxl-2 col-xl-4 col-md-6">
+        <div class="col-xxl col-xl-4 col-md-6">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -242,7 +242,7 @@
         </div>
 
         {{-- Quotations Value --}}
-        <div class="col-xxl-2 col-xl-6 col-md-6">
+        <div class="col-xxl col-xl-6 col-md-6">
             <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -260,39 +260,20 @@
             </div>
         </div>
 
-        {{-- Meta Ads Leads Card --}}
-        <div class="col-xxl-2 col-xl-6 col-md-6">
-            <div class="card stretch stretch-full border-0 shadow-sm h-100 bg-soft-primary">
+        {{-- Third-Party Leads --}}
+        <div class="col-xxl col-xl-6 col-md-6">
+            <div class="card stretch stretch-full border-0 shadow-sm h-100">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="fs-11 fw-bold text-uppercase text-primary">{{ __('crm.dashboard.meta_leads_title') }}</span>
-                        <div class="avatar-text avatar-md bg-primary text-white rounded-3">
-                            <i class="feather-globe fs-16"></i>
+                        <span class="fs-11 fw-bold text-uppercase text-muted">{{ __('crm.dashboard.third_party_leads_title') }}</span>
+                        <div class="avatar-text avatar-md bg-soft-purple text-purple rounded-3">
+                            <i class="feather-share-2 fs-16"></i>
                         </div>
                     </div>
-                    <h3 class="fw-bolder mb-1 text-primary">{{ number_format($metaLeadsCount) }} <span class="fs-12 fw-normal">{{ __('crm.dashboard.leads_label') }}</span></h3>
+                    <h3 class="fw-bolder mb-1 text-dark">{{ number_format($thirdPartyLeadsCount) }}</h3>
                     <div class="d-flex align-items-center justify-content-between mt-2">
-                        <span class="badge bg-primary text-white fs-11 fw-semibold"><i class="feather-award me-1"></i>{{ $metaWinRate }}% {{ __('crm.dashboard.win_label') }}</span>
-                        <span class="fs-11 text-primary fw-bold">{{ $formatCurrency($metaWonRevenue) }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {{-- WhatsApp Bot Integration --}}
-        <div class="col-xxl-2 col-xl-6 col-md-6">
-            <div class="card stretch stretch-full border-0 shadow-sm h-100 bg-soft-success">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="fs-11 fw-bold text-uppercase text-success">{{ __('crm.dashboard.whatsapp_bot_automation') }}</span>
-                        <div class="avatar-text avatar-md bg-success text-white rounded-3">
-                            <i class="feather-message-square fs-16"></i>
-                        </div>
-                    </div>
-                    <h3 class="fw-bolder mb-1 text-success">{{ number_format($whatsappLeadsCount) }} <span class="fs-12 fw-normal">{{ __('crm.dashboard.bot_leads') }}</span></h3>
-                    <div class="d-flex align-items-center justify-content-between mt-2">
-                        <span class="badge bg-success text-white fs-11 fw-semibold"><i class="feather-check-circle me-1"></i>{{ $whatsappQualificationRate }}%</span>
-                        <span class="fs-11 text-success font-bold">{{ __('crm.dashboard.ai_engine_active') }}</span>
+                        <span class="badge bg-soft-purple text-purple fs-11 fw-semibold"><i class="feather-award me-1"></i>{{ $thirdPartyWinRate }}% {{ __('crm.dashboard.win_label') }}</span>
+                        <span class="fs-11 text-muted">{{ $thirdPartyWonCount }} {{ __('crm.dashboard.deals_won') }}</span>
                     </div>
                 </div>
             </div>

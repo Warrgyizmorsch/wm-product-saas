@@ -287,6 +287,28 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded h-100 bg-light-soft d-flex flex-column">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="fw-bold text-dark mb-0">
+                                                <i class="feather-phone-call text-purple me-1"></i>{{ __('Twilio Telephony & AI Call Recording') }}
+                                            </h6>
+                                            <span class="badge bg-soft-purple text-purple">Cloud Calling</span>
+                                        </div>
+                                        <p class="text-muted fs-13 mb-3">
+                                            {{ __('Connect Twilio Account SID, Auth Token & Virtual Phone Number for automated click-to-call, call audio recordings, and AI-powered voice summaries.') }}
+                                        </p>
+                                        <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                                            <span class="fs-12 text-muted">{{ __('Inbound/Outbound & AI Notes') }}</span>
+                                            @if ($canManagePlatformSettings && Route::has('platform.twilioSettings.index'))
+                                                <x-ui.button href="{{ route('platform.twilioSettings.index') }}" variant="secondary" size="sm" icon="feather-external-link">
+                                                    {{ __('Manage Twilio') }}
+                                                </x-ui.button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             @if (Route::has('platform.notification-rules.index') && $canManagePlatformSettings)
