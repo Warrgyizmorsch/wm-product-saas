@@ -43,12 +43,12 @@ class ProductionOrderScrap extends BaseModel
     ];
 
     protected $casts = [
-        'quantity'    => 'float',
-        'length'      => 'float',
-        'width'       => 'float',
-        'thickness'   => 'float',
-        'pieces'      => 'integer',
-        'weight'      => 'float',
+        'quantity' => 'float',
+        'length' => 'float',
+        'width' => 'float',
+        'thickness' => 'float',
+        'pieces' => 'integer',
+        'weight' => 'float',
         'recorded_at' => 'datetime',
     ];
 
@@ -150,6 +150,6 @@ class ProductionOrderScrap extends BaseModel
      */
     public function isStockPosted(): bool
     {
-        return ! is_null($this->stock_transaction_id);
+        return !is_null($this->stock_transaction_id);
     }
 }

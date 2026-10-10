@@ -641,7 +641,6 @@ class MesExecutionService
                     app(\App\Domains\Production\Services\ReworkService::class)->createReworkOrder($order->tenant_id, $ncr->id, [
                         'original_production_order_id' => $order->id,
                         'work_center_id' => $orderOp->work_center_id,
-                        'cost_estimate' => 50.00,
                     ]);
                 }
 

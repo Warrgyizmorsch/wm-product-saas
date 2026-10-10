@@ -115,7 +115,7 @@ Route::prefix('production')
         Route::post('machines/{machine}/link-asset', [MachineController::class, 'linkAsset'])->name('machines.link-asset');
         Route::post('machines/{machine}/unlink-asset', [MachineController::class, 'unlinkAsset'])->name('machines.unlink-asset');
         Route::resource('machines', MachineController::class)->except(['show']);
-        Route::get('machines/{id}', fn ($id) => redirect()->route('production.mes.machines.show', $id))->name('machines.show');
+        Route::get('machines/{id}', fn($id) => redirect()->route('production.mes.machines.show', $id))->name('machines.show');
 
         // ── Plant Maintenance ──────────────────────────────────────────────────
         Route::prefix('maintenance')->as('maintenance.')->group(function (): void {
@@ -335,6 +335,9 @@ Route::prefix('production')
         Route::post('quality/rework/ops/{id}/start', [ReworkController::class, 'startOp'])->name('quality.rework.ops.start');
         Route::post('quality/rework/ops/{id}/complete', [ReworkController::class, 'completeOp'])->name('quality.rework.ops.complete');
         Route::post('quality/rework/{id}/fail', [ReworkController::class, 'fail'])->name('quality.rework.fail');
+        Route::post('quality/rework/{id}/request-material', [ReworkController::class, 'requestMaterial'])->name('quality.rework.request-material');
+        Route::post('quality/rework/{id}/issue-material', [ReworkController::class, 'issueMaterial'])->name('quality.rework.issue-material');
+        Route::get('quality/rework/{id}', [ReworkController::class, 'show'])->name('quality.rework.show');
         Route::resource('quality/rework', ReworkController::class)->only(['index', 'show']);
 
         Route::post('quality/scrap/{id}/approve', [ScrapController::class, 'approve'])->name('quality.scrap.approve');

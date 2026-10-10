@@ -110,6 +110,29 @@
                         <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">Breakdown / Issue</span>
                         <span class="text-dark fs-12">{{ Str::limit($slip->maintenanceWorkOrder?->problem_description ?? '—', 60) }}</span>
                     </div>
+                @elseif($slip->isRework())
+                    <div class="col-md-3">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.source_document') ?? 'Source Document' }}</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-soft-info text-info fw-bold fs-10 text-uppercase">Rework Order</span>
+                            <a href="{{ route('production.rework.show', $slip->rework_order_id) }}" class="fs-14 font-monospace text-primary fw-bold text-decoration-none">
+                                {{ $slip->reworkOrder?->rework_number ?? 'RWK #' . $slip->rework_order_id }}
+                            </a>
+                        </div>
+                        @if($slip->order)
+                            <div class="text-muted fs-11 mt-1">
+                                Parent: <a href="{{ route('production.orders.show', $slip->production_order_id) }}" class="text-primary text-decoration-none font-monospace">{{ $slip->order->order_number }}</a>
+                            </div>
+                        @endif
+                    </div>
+                    <div class="col-md-6">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.target_product_mfg') }}</span>
+                        <strong>{{ $slip->order?->product?->name ?? '—' }} ({{ $slip->order?->product?->sku ?? '—' }})</strong>
+                    </div>
+                    <div class="col-md-3">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.qty_ordered') }}</span>
+                        <strong class="fs-14 font-monospace">{{ (float) ($slip->order?->quantity_ordered ?? 0.0) }}</strong>
+                    </div>
                 @else
                     <div class="col-md-3">
                         <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.production_order') }}</span>

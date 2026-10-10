@@ -14,7 +14,8 @@ class CompleteReworkOperationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'setup_time_actual' => 'nullable|numeric',
+            'setup_time_actual'      => 'nullable|numeric|min:0',
+            'processing_time_actual' => 'nullable|numeric|min:0',
         ];
     }
 }

@@ -2620,9 +2620,9 @@
                                     <tbody>
                                         @forelse($order->issues as $iss)
                                             <tr>
-                                                <td class="text-muted">{{ $iss->issued_at->format('Y-m-d H:i') }}</td>
-                                                <td class="fw-bold text-dark font-monospace fs-12">{{ $iss->product->sku }}</td>
-                                                <td>{{ $iss->product->name }}</td>
+                                                <td class="text-muted">{{ $iss->issued_at?->format('Y-m-d H:i') ?? '—' }}</td>
+                                                <td class="fw-bold text-dark font-monospace fs-12">{{ $iss->product?->sku ?? '—' }}</td>
+                                                <td>{{ $iss->product?->name ?? 'Unknown Item' }}</td>
                                                 <td class="text-muted">{{ $iss->warehouse?->name ?? '—' }}</td>
                                                 <td
                                                     class="text-center fw-bold {{ $iss->quantity_issued < 0 ? 'text-danger' : 'text-success' }}">
@@ -2636,6 +2636,8 @@
                                                             class="badge bg-light text-warning border border-warning">{{ __('production.additional') }}</span>
                                                     @elseif($iss->issue_type === 'return')
                                                         <span class="badge bg-light text-danger border border-danger">{{ __('production.return') }}</span>
+                                                    @elseif($iss->issue_type === 'rework' || $iss->rework_order_id)
+                                                        <span class="badge bg-light text-info border border-info">Rework</span>
                                                     @else
                                                         <span class="badge bg-light text-dark">{{ $iss->issue_type }}</span>
                                                     @endif
@@ -2645,7 +2647,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="7" class="text-center py-5 text-muted">
+                                                <td colspan="8" class="text-center py-5 text-muted">
                                                     <i
                                                         class="feather-info fs-20 d-block mb-2"></i>{{ __('production.no_issues_logged') }}
                                                 </td>
@@ -4666,7 +4668,7 @@
                             <div class="p-2.5 bg-light rounded text-dark fs-13 border">
                                 <strong>Order Number:</strong> {{ $order->order_number }} <br>
                                 <strong>Target Product:</strong> {{ $order->product->name }} ({{ $order->product->sku }}) <br>
-                                <strong>Ordered Quantity:</strong> {{ number_format($order->quantity_planned, 2) }}
+                                <strong>Ordered Quantity:</strong> {{ number_format($order->quantity_ordered ?? $order->quantity_planned ?? 0, 2) }}
                                 {{ $order->product->uom?->code ?? 'units' }}
                             </div>
                         </div>

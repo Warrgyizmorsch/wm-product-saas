@@ -13,6 +13,7 @@ use App\Domains\Production\Models\ProductionLotTrace;
 use App\Domains\Production\Models\ProductionOrderIssue;
 use App\Domains\Production\Models\ProductionOrderIssueBatch;
 use App\Domains\Production\Models\ProductionOrderReservation;
+use App\Domains\Production\Models\ProductionReworkOrder;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -206,6 +207,157 @@ class ProductionMaterialService
                 'severity'            => 'info',
                 'event_source'        => 'ProductionMaterialService',
                 'triggered_by'        => $userId,
+            ]);
+
+            return $issue;
+        });
+    }
+
+    /**
+     * Issue additional materials directly to a Rework Order via canonical stock outflow.
+     *
+     * Flow:
+     *  - Deducts stock via StockService::recordOutflow() with FIFO/Weighted Avg valuation.
+     *  - Creates canonical ProductionOrderIssue with rework_order_id, rework_operation_id, and issue_type='rework'.
+     *  - Records batch consumption allocations & ProductionLotTrace.
+     *  - Triggers PostProductionConsumptionJournal via StockOutflowRecorded event (Dr WIP 1204, Cr Inventory).
+     *  - Adds material cost to parent ProductionOrder WIP sheet.
+     *  - Increments ReworkOrder actual_cost.
+     */
+    public function issueReworkMaterial(
+        int     $reworkOrderId,
+        int     $productId,
+        float   $quantity,
+        ?int    $warehouseId       = null,
+        ?int    $reworkOperationId = null,
+        ?string $remarks           = null,
+        ?int    $userId            = null
+    ): ProductionOrderIssue {
+        if ($quantity <= 0) {
+            throw new InvalidArgumentException('Quantity to issue must be greater than zero.');
+        }
+
+        return DB::transaction(function () use (
+            $reworkOrderId,
+            $productId,
+            $quantity,
+            $warehouseId,
+            $reworkOperationId,
+            $remarks,
+            $userId
+        ) {
+            $rework = ProductionReworkOrder::lockForUpdate()->with('originalOrder')->findOrFail($reworkOrderId);
+
+            if (in_array($rework->status, ['completed', 'failed', 'cancelled'], true)) {
+                throw new InvalidArgumentException("Cannot issue material to a {$rework->status} rework order.");
+            }
+
+            if ($reworkOperationId !== null) {
+                $opExists = \App\Domains\Production\Models\ProductionReworkOperation::where('rework_order_id', $rework->id)
+                    ->where('id', $reworkOperationId)
+                    ->exists();
+                if (! $opExists) {
+                    throw new InvalidArgumentException('Specified rework operation does not belong to this rework order.');
+                }
+            }
+
+            $warehouseId = $warehouseId ?: ($rework->originalOrder?->warehouse_id ?? $this->defaultWarehouseId($rework->tenant_id));
+            if (! $warehouseId) {
+                throw new InvalidArgumentException('A warehouse is required before issuing rework material.');
+            }
+
+            $this->assertWarehouseActive($warehouseId, $rework->tenant_id);
+
+            // Validate product
+            $product = Product::withoutGlobalScopes()
+                ->where('tenant_id', $rework->tenant_id)
+                ->findOrFail($productId);
+
+            // Check lot/batch eligibility if batches exist
+            $hasBatches = InventoryBatch::where('tenant_id', $rework->tenant_id)
+                ->where('product_id', $productId)
+                ->where('warehouse_id', $warehouseId)
+                ->exists();
+
+            if ($hasBatches) {
+                $this->assertBatchEligibleForIssue($rework->tenant_id, $productId, $warehouseId);
+            }
+
+            // Record inventory outflow — StockService computes valuation and fires StockOutflowRecorded
+            $transaction = StockService::recordOutflow(
+                $rework->tenant_id,
+                $productId,
+                $warehouseId,
+                $quantity,
+                'Production Material Issue',
+                $rework->original_production_order_id
+            );
+
+            $allocations = $transaction->consumed_allocations ?? [];
+            $primaryBatchId = !empty($allocations) ? $allocations[0]['batch_id'] : null;
+
+            $issue = ProductionOrderIssue::create([
+                'tenant_id'           => $rework->tenant_id,
+                'company_id'          => $rework->originalOrder?->company_id ?? company_id(),
+                'branch_id'           => $rework->originalOrder?->branch_id ?? branch_id(),
+                'production_order_id' => $rework->original_production_order_id,
+                'reservation_id'      => null,
+                'rework_order_id'     => $rework->id,
+                'rework_operation_id' => $reworkOperationId,
+                'product_id'          => $productId,
+                'warehouse_id'        => $warehouseId,
+                'inventory_batch_id'  => $primaryBatchId,
+                'quantity_issued'     => $quantity,
+                'issue_type'          => 'rework',
+                'issued_by'           => $userId ?? auth()->id(),
+                'issued_at'           => now(),
+                'remarks'             => $remarks,
+            ]);
+
+            foreach ($allocations as $allocation) {
+                ProductionOrderIssueBatch::create([
+                    'tenant_id'                 => $rework->tenant_id,
+                    'production_order_issue_id' => $issue->id,
+                    'inventory_batch_id'        => $allocation['batch_id'],
+                    'quantity'                  => $allocation['quantity_consumed'],
+                    'stock_transaction_id'      => $transaction->id,
+                ]);
+
+                ProductionLotTrace::create([
+                    'tenant_id'   => $rework->tenant_id,
+                    'source_type' => 'lot',
+                    'source_id'   => $allocation['batch_id'],
+                    'target_type' => 'order',
+                    'target_id'   => $rework->original_production_order_id,
+                    'quantity'    => $allocation['quantity_consumed'],
+                    'remarks'     => "Material issued from batch #{$allocation['batch_id']} to rework order #{$rework->rework_number}.",
+                ]);
+            }
+
+            // Valuation: use actual transaction total_value from FIFO/Weighted-Avg
+            $materialCost = (float) $transaction->total_value;
+            if ($materialCost <= 0.0) {
+                $unitCost = (float) ($product->unit_cost ?? $product->cost_price ?? 0.0);
+                $materialCost = $quantity * $unitCost;
+            }
+
+            // Capitalize in WIP on parent production order
+            if ($rework->original_production_order_id) {
+                app(ProductionWipService::class)->addMaterialCost($rework->original_production_order_id, $materialCost);
+            }
+
+            // Increment rework actual cost
+            $rework->actual_cost += $materialCost;
+            $rework->save();
+
+            app(ProductionEventService::class)->writeEvent($rework->tenant_id, [
+                'production_order_id' => $rework->original_production_order_id,
+                'event_type'          => 'Rework Material Issued',
+                'title'               => 'Rework Material Issued',
+                'description'         => "Issued {$quantity} units of {$product->name} for rework order #{$rework->rework_number}.",
+                'severity'            => 'info',
+                'event_source'        => 'ProductionMaterialService',
+                'triggered_by'        => $userId ?? auth()->id(),
             ]);
 
             return $issue;
