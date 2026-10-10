@@ -222,6 +222,15 @@
                         @endcan
                     </div>
                 @endif
+                @if(session('success'))
+                    <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
+                @endif
+                @if(session('error'))
+                    <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
+                @endif
+                @if(session('warning'))
+                    <x-ui.toast :auto="true" type="warning" title="{{ session('warning') }}" />
+                @endif
                 @yield('content')
             </div>
         </div>

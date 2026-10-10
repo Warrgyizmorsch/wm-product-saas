@@ -237,13 +237,13 @@ class MaterialRequestService
                 return $quantity;
             }
 
-            StockService::recordOutflow(
+            $stockTxn = StockService::recordOutflow(
                 $tenantId,
                 $item->product_id,
                 $resolvedWarehouseId,
                 $quantity,
-                'Production Order',
-                $slip->production_order_id
+                $slip->isRework() ? 'ReworkOrder' : 'Production Order',
+                $slip->isRework() ? $slip->rework_order_id : $slip->production_order_id
             );
 
             // Sequentially allocate issue quantity across matching items of this product
@@ -277,19 +277,49 @@ class MaterialRequestService
                     ->first();
             }
 
-            DB::table('production_order_issues')->insert([
+            $companyId = $slip->company_id ?? $slip->order?->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+            $branchId  = $slip->branch_id ?? $slip->order?->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+
+            $issueId = DB::table('production_order_issues')->insertGetId([
                 'tenant_id'           => $tenantId,
+                'company_id'          => $companyId,
+                'branch_id'           => $branchId,
                 'production_order_id' => $slip->production_order_id,
                 'reservation_id'      => $poReservation?->id,
+                'rework_order_id'     => $slip->rework_order_id,
+                'rework_operation_id' => $item->rework_operation_id,
                 'product_id'          => $item->product_id,
                 'warehouse_id'        => $resolvedWarehouseId,
                 'quantity_issued'     => $quantity,
+                'issue_type'          => $slip->isRework() ? 'rework' : 'standard',
                 'issued_at'           => now(),
                 'issued_by'           => auth()->id() ?: 1,
                 'remarks'             => $remarks,
                 'created_at'          => now(),
                 'updated_at'          => now(),
             ]);
+
+            if ($stockTxn) {
+                \App\Domains\Production\Models\ProductionOrderIssueBatch::create([
+                    'tenant_id'                 => $tenantId,
+                    'company_id'                => $companyId,
+                    'branch_id'                 => $branchId,
+                    'production_order_issue_id' => $issueId,
+                    'inventory_batch_id'        => $stockTxn->batch_id,
+                    'quantity'                  => $quantity,
+                    'stock_transaction_id'      => $stockTxn->id,
+                ]);
+            }
+
+            if ($slip->rework_order_id) {
+                $rework = \App\Domains\Production\Models\ProductionReworkOrder::find($slip->rework_order_id);
+                if ($rework) {
+                    $itemCost = (float) ($stockTxn?->total_cost ?? (($stockTxn?->unit_cost ?? 0.0) * $quantity));
+                    $rework->update([
+                        'actual_cost' => (float) $rework->actual_cost + $itemCost,
+                    ]);
+                }
+            }
 
             if ($poReservation) {
                 $poReservation->increment('quantity_issued', $quantity);
