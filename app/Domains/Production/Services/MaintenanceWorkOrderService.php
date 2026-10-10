@@ -162,9 +162,11 @@ class MaintenanceWorkOrderService
 
         $workOrder->assignments()->each(function (ProductionMaintenanceWorkOrderAssignment $assignment) use ($maintStart, $endTime) {
             $assignmentAt = $assignment->assigned_at ? Carbon::parse($assignment->assigned_at) : $maintStart;
-            $referenceStart = $assignmentAt->greaterThan($maintStart) ? $assignmentAt : $maintStart;
             $seconds = max(0, $referenceStart->diffInSeconds($endTime, false));
-            $hours = round($seconds / 3600, 2);
+            $totalMinutes = (int) round($seconds / 60);
+            $h = intdiv($totalMinutes, 60);
+            $m = $totalMinutes % 60;
+            $hours = (float) sprintf('%d.%02d', $h, $m);
 
             if (empty($assignment->worked_hours) || (float) $assignment->worked_hours <= 0.0) {
                 $assignment->update([
@@ -180,12 +182,29 @@ class MaintenanceWorkOrderService
             return;
         }
 
+        $seenInternal = [];
+        $seenExternal = [];
+
         foreach ($assignments as $assignment) {
             if (!is_array($assignment) || $this->isBlankAssignment($assignment)) {
                 continue;
             }
 
             $normalized = $this->normalizeAssignmentInput($assignment);
+
+            // Deduplicate internal technicians within batch
+            if ($normalized['assignment_type'] === ProductionMaintenanceWorkOrderAssignment::TYPE_INTERNAL && !empty($normalized['technician_id'])) {
+                if (in_array($normalized['technician_id'], $seenInternal, true)) {
+                    continue;
+                }
+                $seenInternal[] = $normalized['technician_id'];
+            } elseif ($normalized['assignment_type'] === ProductionMaintenanceWorkOrderAssignment::TYPE_EXTERNAL && !empty($normalized['technician_name'])) {
+                $extKey = strtolower(trim($normalized['technician_name']));
+                if (in_array($extKey, $seenExternal, true)) {
+                    continue;
+                }
+                $seenExternal[] = $extKey;
+            }
 
             $record = ProductionMaintenanceWorkOrderAssignment::create([
                 'tenant_id' => $workOrder->tenant_id,
@@ -203,6 +222,7 @@ class MaintenanceWorkOrderService
             $this->logService->recordAssignmentCreated($workOrder, [
                 'assignment_id' => $record->id,
                 'assignment_type' => $record->assignment_type,
+                'type' => $record->assignment_type,
                 'technician_id' => $record->technician_id,
                 'technician_name' => $record->technician_name,
                 'worked_hours' => $record->worked_hours,
@@ -231,6 +251,28 @@ class MaintenanceWorkOrderService
 
         $normalized = $this->normalizeAssignmentInput($data);
 
+        // Enforce uniqueness for both internal and external technicians
+        if ($normalized['assignment_type'] === ProductionMaintenanceWorkOrderAssignment::TYPE_INTERNAL && !empty($normalized['technician_id'])) {
+            $alreadyAssigned = ProductionMaintenanceWorkOrderAssignment::where('work_order_id', $workOrder->id)
+                ->where('assignment_type', ProductionMaintenanceWorkOrderAssignment::TYPE_INTERNAL)
+                ->where('technician_id', $normalized['technician_id'])
+                ->exists();
+
+            if ($alreadyAssigned) {
+                $techLabel = $normalized['technician_name'] ?: "ID #{$normalized['technician_id']}";
+                throw new InvalidArgumentException("Technician '{$techLabel}' is already assigned to this work order.");
+            }
+        } elseif ($normalized['assignment_type'] === ProductionMaintenanceWorkOrderAssignment::TYPE_EXTERNAL && !empty($normalized['technician_name'])) {
+            $alreadyAssigned = ProductionMaintenanceWorkOrderAssignment::where('work_order_id', $workOrder->id)
+                ->where('assignment_type', ProductionMaintenanceWorkOrderAssignment::TYPE_EXTERNAL)
+                ->whereRaw('LOWER(TRIM(technician_name)) = ?', [strtolower(trim($normalized['technician_name']))])
+                ->exists();
+
+            if ($alreadyAssigned) {
+                throw new InvalidArgumentException("External technician '{$normalized['technician_name']}' is already assigned to this work order.");
+            }
+        }
+
         $assignment = ProductionMaintenanceWorkOrderAssignment::create([
             'tenant_id' => $tenantId,
             'work_order_id' => $workOrder->id,
@@ -247,6 +289,7 @@ class MaintenanceWorkOrderService
         $this->logService->recordAssignmentCreated($workOrder, [
             'assignment_id' => $assignment->id,
             'assignment_type' => $assignment->assignment_type,
+            'type' => $assignment->assignment_type,
             'technician_id' => $assignment->technician_id,
             'technician_name' => $assignment->technician_name,
             'worked_hours' => $assignment->worked_hours,
@@ -444,6 +487,7 @@ class MaintenanceWorkOrderService
                 default                                          => 'Preventive Maintenance',
             };
 
+            $downtimeNewlyStarted = false;
             // Start downtime if not already open
             if (!$wo->downtime_id || !ProductionMachineDowntime::where('tenant_id', $tenantId)->where('id', $wo->downtime_id)->where('status', ProductionMachineDowntime::STATUS_OPEN)->exists()) {
                 $downtime = $this->downtimeService->startDowntime(
@@ -454,6 +498,7 @@ class MaintenanceWorkOrderService
                     $userId
                 );
                 $wo->downtime_id = $downtime->id;
+                $downtimeNewlyStarted = true;
             }
 
             // Ensure machine status is under_maintenance
@@ -466,7 +511,7 @@ class MaintenanceWorkOrderService
             $wo->status       = ProductionMaintenanceWorkOrder::STATUS_IN_PROGRESS;
             $wo->save();
 
-            if ($wo->downtime_id) {
+            if ($downtimeNewlyStarted && $wo->downtime_id) {
                 $this->logService->recordMachineDowntimeStarted($wo, $wo->downtime_id, $userId, [
                     'category' => $category,
                     'machine_name' => $machine->name,
@@ -624,7 +669,21 @@ class MaintenanceWorkOrderService
             $machine = Machine::withoutGlobalScopes()->where('tenant_id', $tenantId)->lockForUpdate()->findOrFail($wo->machine_id);
 
             // Completion timestamp: use captured timestamp if provided, otherwise now()
-            $completionTime = $completedAt ? Carbon::parse($completedAt) : now();
+            if ($completedAt) {
+                $completionTime = Carbon::parse($completedAt);
+                // Ensure timezone is application timezone
+                $completionTime->setTimezone(config('app.timezone', 'Asia/Kolkata'));
+            } else {
+                $completionTime = now();
+            }
+
+            // Guard: completion time must never be earlier than work order start
+            if ($wo->actual_start) {
+                $startDt = Carbon::parse($wo->actual_start);
+                if ($completionTime->lessThan($startDt)) {
+                    $completionTime = now()->greaterThan($startDt) ? now() : $startDt->copy();
+                }
+            }
 
             // 1. Process assignments worked hours & hourly rates if provided
             if (!empty($assignmentsData) && is_array($assignmentsData)) {
@@ -651,7 +710,7 @@ class MaintenanceWorkOrderService
                 $this->syncAssignmentWorkedHoursForCompletion($wo, $completionTime);
             }
 
-            // 2. Compute mechanic costs from assignments: sum of hourly_rate * worked_hours
+            // 2. Compute mechanic costs from assignments: sum of hourly_rate * worked_hours (using hours_to_decimal)
             $assignments = $wo->assignments()->get();
             if ($assignments->isNotEmpty()) {
                 $calcInternalCost = 0.0;
@@ -659,7 +718,7 @@ class MaintenanceWorkOrderService
                 $totalAssignedWorkedHours = 0.0;
 
                 foreach ($assignments as $asn) {
-                    $cost = round((float) $asn->hourly_rate * (float) $asn->worked_hours, 2);
+                    $cost = round((float) $asn->hourly_rate * hours_to_decimal($asn->worked_hours), 2);
                     $totalAssignedWorkedHours += (float) $asn->worked_hours;
                     if ($asn->assignment_type === ProductionMaintenanceWorkOrderAssignment::TYPE_EXTERNAL) {
                         $calcExternalCost += $cost;
@@ -812,41 +871,104 @@ class MaintenanceWorkOrderService
 
             $machine = Machine::withoutGlobalScopes()->where('tenant_id', $tenantId)->lockForUpdate()->findOrFail($wo->machine_id);
 
-            // If machine is under maintenance for this WO, restore to active
-            if ($machine->status === Machine::STATUS_UNDER_MAINTENANCE) {
-                $machine->update([
-                    'status'             => Machine::STATUS_ACTIVE,
-                    'maintenance_status' => 'none',
-                ]);
-                $this->stateService->transitionState($tenantId, $machine->id, 'Idle', $reason ?: 'Work Order Cancelled', $userId);
+            // Determine if this work order was associated with a machine breakdown
+            $downtime = null;
+            if ($wo->downtime_id) {
+                $downtime = ProductionMachineDowntime::where('tenant_id', $tenantId)->find($wo->downtime_id);
+            }
+            if (!$downtime && ($wo->type === ProductionMaintenanceWorkOrder::TYPE_BREAKDOWN || $machine->maintenance_status === 'breakdown')) {
+                $downtime = ProductionMachineDowntime::where('tenant_id', $tenantId)
+                    ->where('machine_id', $wo->machine_id)
+                    ->where('status', ProductionMachineDowntime::STATUS_OPEN)
+                    ->latest('id')
+                    ->first();
+            }
+
+            $isBreakdown = $wo->type === ProductionMaintenanceWorkOrder::TYPE_BREAKDOWN
+                || ($machine->maintenance_status === 'breakdown')
+                || ($machine->current_state === 'Breakdown')
+                || ($downtime && $downtime->category === 'Breakdown');
+
+            $effectiveReason = trim((string) $reason);
+            if ($isBreakdown && $effectiveReason === '') {
+                throw new InvalidArgumentException("A cancellation reason is required for breakdown work orders.");
             }
 
             // Close downtime if open
-            if ($wo->downtime_id) {
-                $downtime = ProductionMachineDowntime::where('tenant_id', $tenantId)->find($wo->downtime_id);
-                if ($downtime && $downtime->status !== ProductionMachineDowntime::STATUS_CLOSED) {
-                    $downtime->update([
-                        'end_time' => now(),
-                        'status'   => ProductionMachineDowntime::STATUS_CLOSED,
-                        'remarks'  => $reason ?: 'Work Order Cancelled',
-                    ]);
+            if ($downtime && $downtime->status !== ProductionMachineDowntime::STATUS_CLOSED) {
+                $endTime = now();
+                $start = $downtime->start_time ? Carbon::parse($downtime->start_time) : $endTime;
+                $durationMinutes = max(0.00, round($start->diffInSeconds($endTime) / 60.0, 2));
+
+                $downtime->update([
+                    'end_time'         => $endTime,
+                    'duration_minutes' => $durationMinutes,
+                    'status'           => ProductionMachineDowntime::STATUS_CLOSED,
+                    'remarks'          => $effectiveReason !== '' ? "Cancelled: {$effectiveReason}" : 'Work Order Cancelled',
+                    'approved_by'      => $userId,
+                ]);
+
+                if (!$wo->downtime_id) {
+                    $wo->downtime_id = $downtime->id;
                 }
             }
 
-            $wo->update([
-                'status'  => ProductionMaintenanceWorkOrder::STATUS_CANCELLED,
-                'work_performed' => $wo->work_performed ? $wo->work_performed . " [Cancelled: {$reason}]" : "Cancelled: {$reason}",
-            ]);
+            // Update work order to cancelled status and persist decision_note / work_performed
+            $wo->status = ProductionMaintenanceWorkOrder::STATUS_CANCELLED;
+            if ($effectiveReason !== '') {
+                $wo->decision_note = $effectiveReason;
+                $wo->work_performed = $wo->work_performed
+                    ? $wo->work_performed . " [Cancelled: {$effectiveReason}]"
+                    : "Cancelled: {$effectiveReason}";
+            } else {
+                $wo->work_performed = $wo->work_performed ?: 'Work Order Cancelled';
+            }
+            $wo->save();
+
+            // If machine was under maintenance, inactive, or broken down for this WO, restore to active
+            if (
+                $machine->status === Machine::STATUS_UNDER_MAINTENANCE
+                || $machine->status === Machine::STATUS_INACTIVE
+                || $machine->maintenance_status === 'breakdown'
+                || $isBreakdown
+            ) {
+                $hasOtherActiveMwo = ProductionMaintenanceWorkOrder::where('tenant_id', $tenantId)
+                    ->where('machine_id', $machine->id)
+                    ->where('id', '!=', $wo->id)
+                    ->whereIn('status', [
+                        ProductionMaintenanceWorkOrder::STATUS_DRAFT,
+                        ProductionMaintenanceWorkOrder::STATUS_SCHEDULED,
+                        ProductionMaintenanceWorkOrder::STATUS_IN_PROGRESS,
+                    ])
+                    ->exists();
+
+                if (!$hasOtherActiveMwo) {
+                    $machine->update([
+                        'status'               => Machine::STATUS_ACTIVE,
+                        'maintenance_status'   => 'none',
+                        'current_state'        => 'Idle',
+                        'current_state_reason' => $effectiveReason !== '' ? "Work Order Cancelled: {$effectiveReason}" : 'Work Order Cancelled',
+                    ]);
+                }
+
+                $this->stateService->transitionState(
+                    $tenantId,
+                    $machine->id,
+                    'Idle',
+                    $effectiveReason !== '' ? "Work Order Cancelled: {$effectiveReason}" : 'Work Order Cancelled',
+                    $userId
+                );
+            }
 
             $this->logService->recordWorkOrderCancelled($wo, $userId, [
-                'reason' => $reason ?: 'Cancelled by user',
+                'reason' => $effectiveReason ?: 'Cancelled by user',
             ]);
 
             $this->eventService->writeEvent($tenantId, [
                 'machine_id'   => $wo->machine_id,
                 'event_type'   => 'Work Order Cancelled',
                 'title'        => 'Maintenance WO Cancelled',
-                'description'  => "Work Order [{$wo->work_order_number}] cancelled. Reason: {$reason}",
+                'description'  => "Work Order [{$wo->work_order_number}] cancelled." . ($effectiveReason !== '' ? " Reason: {$effectiveReason}" : ''),
                 'severity'     => 'warning',
                 'event_source' => 'MaintenanceWorkOrderService',
             ]);
@@ -854,4 +976,118 @@ class MaintenanceWorkOrderService
             return $wo->fresh(['machine', 'technician', 'downtime']);
         });
     }
+
+    /**
+     * Calculate an employee technician's hourly rate derived from their HRMS salary structure,
+     * returned denominated in the active or requested target currency.
+     *
+     * @param User|int|null $user
+     * @param string|null $targetCurrency Optional target currency code (defaults to active_currency())
+     * @return float Hourly rate rounded to 2 decimal places, or 0.00 if unresolvable
+     */
+    public function calculateTechnicianHourlyRate(User|int|null $user, ?string $targetCurrency = null): float
+    {
+        if (empty($user)) {
+            return 0.00;
+        }
+
+        if (is_numeric($user)) {
+            $user = User::find($user);
+        }
+
+        if (!$user instanceof User) {
+            return 0.00;
+        }
+
+        /** @var \App\Domains\HRMS\Models\Employee|null $employee */
+        $employee = $user->relationLoaded('employee') && $user->employee
+            ? $user->employee
+            : (class_exists(\App\Domains\HRMS\Models\Employee::class)
+                ? (\App\Domains\HRMS\Models\Employee::withoutGlobalScopes()->where('user_id', $user->id)->first()
+                    ?: \App\Domains\HRMS\Models\Employee::resolveForUser($user))
+                : null);
+
+        if (!$employee || empty($employee->current_salary) || (float) $employee->current_salary <= 0) {
+            return 0.00;
+        }
+
+        // 1. Resolve salary structure: pay group match preferred, then direct assignment
+        $structure = null;
+        if ($employee->pay_group_id && class_exists(\App\Domains\HRMS\Models\SalaryStructure::class)) {
+            $structure = \App\Domains\HRMS\Models\SalaryStructure::where('pay_group_id', $employee->pay_group_id)
+                ->where('min_ctc', '<=', $employee->current_salary)
+                ->where('max_ctc', '>=', $employee->current_salary)
+                ->where('status', true)
+                ->first();
+        }
+
+        if (!$structure) {
+            $structure = $employee->salaryStructure;
+        }
+
+        if (!$structure || !$structure->relationLoaded('items') && !method_exists($structure, 'items')) {
+            return 0.00;
+        }
+
+        // 2. Identify the BASIC salary component item
+        $items = $structure->items()->with('component')->get();
+        /** @var \App\Domains\HRMS\Models\SalaryStructureItem|null $basicItem */
+        $basicItem = $items->first(function ($item) {
+            return $item->component && (
+                strtolower($item->component->code ?? '') === 'basic' ||
+                ($item->component->type === 'earning' && in_array($item->calculation_type, ['fixed', 'percentage_of_ctc']))
+            );
+        });
+
+        if (!$basicItem || $basicItem->value === null || (float) $basicItem->value <= 0) {
+            return 0.00;
+        }
+
+        // 3. Calculate monthly basic salary based on calculation_type
+        $monthlyBasic = 0.00;
+        if ($basicItem->calculation_type === 'percentage_of_ctc') {
+            // value represents a percentage of annual CTC (e.g. 50.00 = 50%)
+            $annualBasic = ((float) $employee->current_salary * (float) $basicItem->value) / 100.0;
+            $monthlyBasic = $annualBasic / 12.0;
+        } elseif ($basicItem->calculation_type === 'fixed') {
+            // Per HRMS PayrollCalculationService convention, fixed components are stored as annual amounts
+            $monthlyBasic = (float) $basicItem->value / 12.0;
+        } else {
+            // Unknown or unsupported calculation type; do not guess
+            return 0.00;
+        }
+
+        if ($monthlyBasic <= 0) {
+            return 0.00;
+        }
+
+        // 4. Derive hourly rate using configurable standard working-hours basis
+        $workingHours = max(1.0, (float) config('production.maintenance_working_hours_per_month', 208.0));
+        $hourlyRateInEmpCurrency = $monthlyBasic / $workingHours;
+
+        // 5. Currency normalization:
+        // Employee salary is denominated in the company's local payroll currency (default INR)
+        $employeeCurrency = $employee->company?->currency ?? 'INR';
+        $baseCurrency = config('currency.base', 'USD');
+
+        if ($employeeCurrency === $baseCurrency) {
+            $rateInBase = $hourlyRateInEmpCurrency;
+        } else {
+            $empFxRate = (float) (config("currency.currencies.{$employeeCurrency}.rate") ?? 1.0);
+            $rateInBase = $empFxRate > 0 ? ($hourlyRateInEmpCurrency / $empFxRate) : $hourlyRateInEmpCurrency;
+        }
+
+        // 6. Convert to target/active display currency
+        if ($targetCurrency !== null) {
+            $targetFxRate = (float) (config("currency.currencies.{$targetCurrency}.rate") ?? 1.0);
+            $finalRate = $rateInBase * $targetFxRate;
+        } else {
+            $finalRate = function_exists('convert_from_base')
+                ? convert_from_base($rateInBase)
+                : $rateInBase;
+        }
+
+        return round($finalRate, 2);
+    }
 }
+

@@ -332,5 +332,96 @@ if (! function_exists('format_currency')) {
     }
 }
 
+if (! function_exists('hours_to_decimal')) {
+    /**
+     * Convert H.MM format (where .MM is 00-59 minutes) into decimal hours for costing.
+     * E.g. 0.09 (9 mins) -> 0.15, 1.25 (1 hr 25 mins) -> 1.4167, 2.5 (decimal) -> 2.5
+     */
+    function hours_to_decimal($hmm): float
+    {
+        $val = (float) ($hmm ?: 0.0);
+        $str = (string) $val;
+        $dotPos = strpos($str, '.');
+
+        // If 1 decimal digit (e.g. 2.5, 0.5, 1.8), it is standard decimal hours
+        if ($dotPos !== false && strlen(substr($str, $dotPos + 1)) === 1) {
+            return $val;
+        }
+
+        $h = (int) floor($val);
+        $m = (int) round(($val - $h) * 100);
+
+        if ($m >= 60) {
+            return $val;
+        }
+
+        return (float) ($h + ($m / 60.0));
+    }
+}
+
+if (! function_exists('format_hours')) {
+    /**
+     * Format hours such that the decimal part represents actual minutes (00-59),
+     * ensuring it never exceeds .59.
+     *
+     * Example: 0.09 -> "0.09 hrs" (9 minutes)
+     *          1.25 -> "1.25 hrs" (1 hour, 25 minutes)
+     *          1.37 -> "1.37 hrs" (1 hour, 37 minutes)
+     *          2.50 -> "2.30 hrs" (2 hours, 30 minutes)
+     */
+    function format_hours($val, bool $includeSuffix = true): string
+    {
+        if (is_array($val) || $val instanceof \Traversable) {
+            $totalMinutes = 0;
+            foreach ($val as $item) {
+                $hVal = is_object($item) ? ($item->worked_hours ?? 0) : (is_array($item) ? ($item['worked_hours'] ?? 0) : $item);
+                $f = (float) $hVal;
+                $str = (string) $f;
+                $dotPos = strpos($str, '.');
+                if ($dotPos !== false && strlen(substr($str, $dotPos + 1)) === 1) {
+                    $totalMinutes += (int) round($f * 60);
+                } else {
+                    $h = (int) floor($f);
+                    $m = (int) round(($f - $h) * 100);
+                    if ($m >= 60) {
+                        $totalMinutes += (int) round($f * 60);
+                    } else {
+                        $totalMinutes += ($h * 60) + $m;
+                    }
+                }
+            }
+            $hours = intdiv($totalMinutes, 60);
+            $minutes = $totalMinutes % 60;
+            $formatted = sprintf('%d.%02d', $hours, $minutes);
+            return $includeSuffix ? $formatted . ' hrs' : $formatted;
+        }
+
+        $f = (float) ($val ?: 0.0);
+        $str = (string) $f;
+        $dotPos = strpos($str, '.');
+
+        if ($dotPos !== false && strlen(substr($str, $dotPos + 1)) === 1) {
+            $totalMinutes = (int) round($f * 60);
+            $hours = intdiv($totalMinutes, 60);
+            $minutes = $totalMinutes % 60;
+        } else {
+            $h = (int) floor($f);
+            $m = (int) round(($f - $h) * 100);
+            if ($m >= 60) {
+                $totalMinutes = (int) round($f * 60);
+                $hours = intdiv($totalMinutes, 60);
+                $minutes = $totalMinutes % 60;
+            } else {
+                $hours = $h;
+                $minutes = $m;
+            }
+        }
+
+        $formatted = sprintf('%d.%02d', $hours, $minutes);
+
+        return $includeSuffix ? $formatted . ' hrs' : $formatted;
+    }
+}
+
 
 
