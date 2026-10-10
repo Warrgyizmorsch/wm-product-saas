@@ -1248,6 +1248,47 @@
                                     ]
                                 }
                             }
+                        },
+                        {
+                            "name": "17. Upload Lead Documents",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/leads/1/documents",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "leads",
+                                        "1",
+                                        "documents"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "documents[]",
+                                            "type": "file",
+                                            "description": "Select files/documents to upload"
+                                        }
+                                    ]
+                                }
+                            }
                         }
                     ]
                 },
@@ -1963,6 +2004,78 @@
                                         "deals",
                                         "1",
                                         "restore"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "16. List Deal Documents",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/deals/1/documents",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "deals",
+                                        "1",
+                                        "documents"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "17. Upload Deal Documents",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/deals/1/documents",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "deals",
+                                        "1",
+                                        "documents"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "documents[]",
+                                            "type": "file",
+                                            "description": "Select files/documents to upload for this deal"
+                                        }
                                     ]
                                 }
                             }
@@ -2760,6 +2873,117 @@
                                         "crm",
                                         "quotations",
                                         "1"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "7. Send Quotation via Email",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/quotations/1/send-email",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "quotations",
+                                        "1",
+                                        "send-email"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"to_email\": \"client@example.com\",\n    \"subject\": \"Official Commercial Proposal - Quotation #QT-2026-0001\",\n    \"body_html\": \"<p>Dear Valued Client,<br>Please find attached our quotation proposal.</p>\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "8. Send Quotation via WhatsApp",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/quotations/1/send-whatsapp",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "quotations",
+                                        "1",
+                                        "send-whatsapp"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"phone\": \"+919876543210\",\n    \"caption\": \"Hello, please review our official Quotation proposal.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "9. Download Quotation PDF",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/quotations/1/download",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "quotations",
+                                        "1",
+                                        "download"
                                     ]
                                 }
                             }

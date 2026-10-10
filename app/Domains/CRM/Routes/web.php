@@ -89,12 +89,31 @@ Route::prefix('crm')
         Route::post('deals/{deal}/sync-health', [CrmDealController::class, 'syncHealth'])->name('deals.syncHealth');
         Route::post('deals/{deal}/save-health-evaluation', [CrmDealController::class, 'saveHealthEvaluation'])->name('deals.saveHealthEvaluation');
         Route::post('deals/{deal}/generate-draft-reply', [CrmDealController::class, 'generateDraftReply'])->name('deals.generateDraftReply');
+        Route::post('deals/{deal}/call-ai/initiate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'initiateDealOutboundCall'])->name('deals.callAi.initiateCall');
+        Route::post('deals/{deal}/call-ai/terminate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'terminateDealOutboundCall'])->name('deals.callAi.terminateCall');
+        Route::post('deals/{deal}/call-ai/status', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'checkDealCallStatus'])->name('deals.callAi.status');
+        Route::post('deals/{deal}/call-ai/analyze', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'analyzeDealCall'])->name('deals.callAi.analyze');
+        Route::post('deals/{deal}/call-ai/confirm', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'confirmDealCallFollowup'])->name('deals.callAi.confirm');
         Route::get('leads/create', [LeadController::class, 'create'])
             ->name('leads.create');
         Route::get('leads', [LeadController::class, 'index'])
             ->name('leads.index');
         Route::get('leads/kanban', [LeadController::class, 'kanban'])
             ->name('leads.kanban');
+
+        // AI Call Assistant & Click-to-Call Routes
+        Route::get('twilio/voice-token', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'generateVoiceToken'])
+            ->name('twilio.voiceToken');
+        Route::post('leads/{lead}/call-ai/initiate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'initiateOutboundCall'])
+            ->name('leads.callAi.initiateCall');
+        Route::post('leads/{lead}/call-ai/terminate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'terminateOutboundCall'])
+            ->name('leads.callAi.terminateCall');
+        Route::post('leads/{lead}/call-ai/status', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'checkCallStatus'])
+            ->name('leads.callAi.status');
+        Route::post('leads/{lead}/call-ai/analyze', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'analyzeCall'])
+            ->name('leads.callAi.analyze');
+        Route::post('leads/{lead}/call-ai/confirm', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'confirmCallFollowup'])
+            ->name('leads.callAi.confirm');
         Route::get('activities', [LeadActivityController::class, 'index'])
             ->name('activities.index');
         Route::post('google-calendar/schedule-event', [GoogleCalendarController::class, 'scheduleEvent'])
@@ -164,6 +183,16 @@ Route::prefix('crm')
             ->name('followups.update');
         Route::delete('followups/{followup}', [LeadFollowupController::class, 'destroy'])
             ->name('followups.destroy');
+
+        // AI Call Assistant & Twilio Outbound Telephony
+        Route::post('leads/{lead}/call-ai/initiate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'initiateOutboundCall'])
+            ->name('leads.callAi.initiateCall');
+        Route::post('leads/{lead}/call-ai/terminate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'terminateOutboundCall'])
+            ->name('leads.callAi.terminateCall');
+        Route::post('leads/{lead}/call-ai/analyze', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'analyzeCall'])
+            ->name('leads.callAi.analyze');
+        Route::post('leads/{lead}/call-ai/confirm', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'confirmCallFollowup'])
+            ->name('leads.callAi.confirm');
 
         Route::get('customers', [CustomerController::class, 'index'])
             ->name('customers.index');

@@ -10,6 +10,8 @@ use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\DealStatus;
+use App\Domains\CRM\Models\LeadDocument;
+use App\Domains\CRM\Services\LeadService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -1300,6 +1302,128 @@ class LeadApiController extends Controller
             'success' => true,
             'message' => 'Lead restored successfully',
             'data'    => $lead,
+        ]);
+    }
+
+    /**
+     * GET /api/crm/leads/{lead}/documents
+     * List all documents for a lead.
+     */
+    public function documents(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->find($id);
+
+        if (!$lead) {
+            return response()->json([
+                'success' => false,
+                'message' => "Lead with ID {$id} not found.",
+            ], 404);
+        }
+
+        $this->authorize('view', $lead);
+
+        $documents = $lead->leadDocuments->map(function (LeadDocument $doc) {
+            return [
+                'id'         => $doc->id,
+                'file_name'  => $doc->file_name,
+                'file_type'  => $doc->file_type,
+                'size'       => $doc->size,
+                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'created_at' => $doc->created_at?->toIso8601String(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'count'   => $documents->count(),
+            'data'    => $documents,
+        ]);
+    }
+
+    /**
+     * POST /api/crm/leads/{lead}/documents
+     * Upload one or multiple documents for a lead.
+     */
+    public function uploadDocuments(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->find($id);
+
+        if (!$lead) {
+            return response()->json([
+                'success' => false,
+                'message' => "Lead with ID {$id} not found.",
+            ], 404);
+        }
+
+        $this->authorize('update', $lead);
+
+        $validator = Validator::make($request->all(), [
+            'documents'   => 'required',
+            'documents.*' => 'file|max:10240',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $files = $request->file('documents');
+        if (!is_array($files)) {
+            $files = [$files];
+        }
+
+        app(LeadService::class)->uploadDocuments($lead, $files);
+
+        $lead->refresh();
+        $documents = $lead->leadDocuments->map(function (LeadDocument $doc) {
+            return [
+                'id'         => $doc->id,
+                'file_name'  => $doc->file_name,
+                'file_type'  => $doc->file_type,
+                'size'       => $doc->size,
+                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'created_at' => $doc->created_at?->toIso8601String(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Document(s) uploaded successfully.',
+            'count'   => $documents->count(),
+            'data'    => $documents,
+        ], 201);
+    }
+
+    /**
+     * DELETE /api/crm/documents/{document}
+     * Delete a single document.
+     */
+    public function deleteDocument(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $document = LeadDocument::where('tenant_id', $tenantId)->find($id);
+
+        if (!$document) {
+            return response()->json([
+                'success' => false,
+                'message' => "Document with ID {$id} not found.",
+            ], 404);
+        }
+
+        if ($document->lead) {
+            $this->authorize('update', $document->lead);
+        }
+
+        app(LeadService::class)->deleteDocument($document);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Document deleted successfully.',
         ]);
     }
 }

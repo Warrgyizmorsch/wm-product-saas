@@ -21,7 +21,7 @@ class LeadRepository
      */
     public function getPaginatedLeads(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Lead::query()->with(['quotations', 'owner']);
+        $query = Lead::query()->with(['quotations', 'owner', 'followups']);
 
         // Search Keywords
         if (!empty($filters['search'])) {
@@ -111,25 +111,42 @@ class LeadRepository
      */
     public function getLeadDetails(Lead $lead, ?int $activeQuotationId = null): array
     {
-        $lead->load(['followups.taggedUser', 'histories.user', 'leadDocuments']);
+        $lead->load([
+            'followups' => fn($q) => $q->with([
+                'taggedUser:id,name,email',
+                'rescheduledTo:id,rescheduled_from_id,followup_date,status'
+            ]),
+            'histories' => fn($q) => $q->with('user:id,name')->latest('id'),
+            'leadDocuments' => fn($q) => $q->latest('id')
+        ]);
 
         $customer = null;
         if ($lead->email) {
-            $customer = Customer::where('email', $lead->email)->first();
-        }
-        if (!$customer && $lead->phone) {
-            $customer = Customer::where('phone', $lead->phone)->first();
+            $customer = Customer::where('email', $lead->email)->select('id', 'name', 'email', 'phone', 'company_name', 'billing_address', 'shipping_address')->first();
+        } elseif ($lead->phone) {
+            $customer = Customer::where('phone', $lead->phone)->select('id', 'name', 'email', 'phone', 'company_name', 'billing_address', 'shipping_address')->first();
         }
 
         $quotations = Quotation::where('lead_id', $lead->id)->latest()->get();
         if ($activeQuotationId) {
-            $activeQuotation = Quotation::where('lead_id', $lead->id)->find($activeQuotationId);
+            $activeQuotation = Quotation::where('lead_id', $lead->id)->with('items')->find($activeQuotationId);
         } else {
             $activeQuotation = $quotations->where('is_current', true)->first() ?: $quotations->first();
+            $activeQuotation?->loadMissing('items');
         }
 
-        $prevLead = Lead::where('id', '>', $lead->id)->orderBy('id', 'asc')->first();
-        $nextLead = Lead::where('id', '<', $lead->id)->orderBy('id', 'desc')->first();
+        $tenantId = $lead->tenant_id;
+        $prevLead = Lead::where('id', '>', $lead->id)
+            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            ->orderBy('id', 'asc')
+            ->select('id')
+            ->first();
+
+        $nextLead = Lead::where('id', '<', $lead->id)
+            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            ->orderBy('id', 'desc')
+            ->select('id')
+            ->first();
 
         return compact('customer', 'quotations', 'activeQuotation', 'prevLead', 'nextLead');
     }
