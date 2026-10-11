@@ -2,14 +2,18 @@
 
 namespace App\Domains\Production\Services;
 
+use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionMachineDowntime;
 use App\Domains\Production\Models\ProductionMaintenanceWorkOrder;
 use App\Domains\Production\Models\ProductionMaintenanceWorkOrderAssignment;
 use App\Domains\Production\Models\ProductionMaintenanceWorkOrderSpare;
+use App\Domains\Production\Models\ProductionRequisitionSlipItem;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Sales\Services\MaterialRequestService;
 use App\Models\User;
+use App\Domains\Accounting\Services\MaintenanceWorkOrderJournalService;
 use App\Domains\Production\Repositories\MaintenanceRepositoryInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +21,8 @@ use InvalidArgumentException;
 
 class MaintenanceWorkOrderService
 {
+    private readonly MaintenanceWorkOrderJournalService $journalService;
+
     public function __construct(
         private readonly MaintenanceRepositoryInterface $repository,
         private readonly DowntimeService $downtimeService,
@@ -24,8 +30,11 @@ class MaintenanceWorkOrderService
         private readonly PmScheduleService $pmScheduleService,
         private readonly MaintenanceCodeService $codeService,
         private readonly ProductionEventService $eventService,
-        private readonly MaintenanceWorkOrderLogService $logService
-    ) {}
+        private readonly MaintenanceWorkOrderLogService $logService,
+        ?MaintenanceWorkOrderJournalService $journalService = null
+    ) {
+        $this->journalService = $journalService ?? app(MaintenanceWorkOrderJournalService::class);
+    }
 
     private function isBlankAssignment(array $assignment): bool
     {
@@ -162,6 +171,7 @@ class MaintenanceWorkOrderService
 
         $workOrder->assignments()->each(function (ProductionMaintenanceWorkOrderAssignment $assignment) use ($maintStart, $endTime) {
             $assignmentAt = $assignment->assigned_at ? Carbon::parse($assignment->assigned_at) : $maintStart;
+            $referenceStart = $assignmentAt->greaterThan($maintStart) ? $assignmentAt : $maintStart;
             $seconds = max(0, $referenceStart->diffInSeconds($endTime, false));
             $totalMinutes = (int) round($seconds / 60);
             $h = intdiv($totalMinutes, 60);
@@ -826,6 +836,10 @@ class MaintenanceWorkOrderService
                 'completed_by'             => $userId,
             ]);
 
+            // 7.5 Post General Ledger completion journal synchronously within transaction
+            $fallbackExtCost = $assignments->isEmpty() ? (float) ($externalMechanicCost ?? 0.00) : null;
+            $this->journalService->postCompletionJournal($wo, $userId, $fallbackExtCost);
+
             // 8. Record logs & events
             $this->logService->recordWorkOrderCompleted($wo, $userId, [
                 'mechanic_cost'            => $mechanicCost,
@@ -867,6 +881,61 @@ class MaintenanceWorkOrderService
 
             if ($wo->status === ProductionMaintenanceWorkOrder::STATUS_COMPLETED) {
                 throw new InvalidArgumentException("Cannot cancel a completed Work Order.");
+            }
+
+            if ($wo->status === ProductionMaintenanceWorkOrder::STATUS_IN_PROGRESS || !empty($wo->actual_start)) {
+                throw new InvalidArgumentException("Cannot cancel a Work Order that has already started.");
+            }
+
+            // Return all issued spare parts back to inventory via StockService::recordInflow()
+            $spares = ProductionMaintenanceWorkOrderSpare::where('tenant_id', $tenantId)
+                ->where('maintenance_work_order_id', $wo->id)
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($spares as $spare) {
+                $issuedQty = (float) $spare->issued_qty;
+                if ($issuedQty <= 0.0) {
+                    continue; // Skip requested but unissued spares
+                }
+
+                $warehouseId = $spare->warehouse_id
+                    ?: ($spare->stockTransaction?->warehouse_id ?: Warehouse::where('tenant_id', $tenantId)->value('id'));
+
+                if (!$warehouseId) {
+                    throw new InvalidArgumentException("A valid warehouse is required to return issued spare parts.");
+                }
+
+                $unitCost = (float) $spare->unit_cost;
+                if ($unitCost <= 0.0 && $spare->stockTransaction) {
+                    $unitCost = (float) $spare->stockTransaction->unit_cost;
+                }
+                if ($unitCost <= 0.0 && $spare->product) {
+                    $unitCost = (float) ($spare->product->unit_cost ?? $spare->product->cost_price ?? 0.0);
+                }
+
+                $batchNumber = $spare->stockTransaction?->batch?->batch_number;
+
+                StockService::recordInflow(
+                    $tenantId,
+                    (int) $spare->product_id,
+                    (int) $warehouseId,
+                    $issuedQty,
+                    $unitCost,
+                    'MaintenanceWorkOrder',
+                    (int) $wo->id,
+                    $batchNumber
+                );
+
+                if ($spare->production_requisition_slip_item_id) {
+                    $slipItem = ProductionRequisitionSlipItem::find($spare->production_requisition_slip_item_id);
+                    if ($slipItem) {
+                        $slipItem->decrement('quantity_issued', min((float) $slipItem->quantity_issued, $issuedQty));
+                        if ($slipItem->slip) {
+                            app(MaterialRequestService::class)->updateSlipStatus($slipItem->slip);
+                        }
+                    }
+                }
             }
 
             $machine = Machine::withoutGlobalScopes()->where('tenant_id', $tenantId)->lockForUpdate()->findOrFail($wo->machine_id);

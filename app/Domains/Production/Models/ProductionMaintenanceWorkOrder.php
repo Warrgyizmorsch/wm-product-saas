@@ -6,9 +6,11 @@ use App\Core\Database\BaseModel;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
+use App\Domains\Accounting\Models\Journal;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ProductionMaintenanceWorkOrder extends BaseModel
 {
@@ -176,5 +178,11 @@ class ProductionMaintenanceWorkOrder extends BaseModel
     public function completer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'completed_by');
+    }
+
+    public function journal(): HasOne
+    {
+        return $this->hasOne(Journal::class, 'reference_id', 'id')
+            ->where('reference_type', 'maintenance_work_order');
     }
 }
