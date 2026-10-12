@@ -270,10 +270,10 @@ All project actors map to the ERP's global `App\Models\User` filtered through `p
 - **Production Order Bridge & Event-Driven Sync:**
   - Loose coupling via foreign keys `production_orders.project_id`, `production_orders.project_milestone_id`, and `production_orders.project_task_id` (`nullOnDelete()`), with Task backlink `project_tasks.production_order_id`. Standalone production orders remain 100% operational with null project references.
   - Authoritative Manufacturing Ownership: Production module remains the sole source of truth for BOM, routing, work centers, operations, material allocations, QC, and rework.
-  - Automated Completion Sync: `ProductionOrderCompleted` event triggers `SyncProductionTaskCompletionListener`. The linked PM Task automatically transitions to `Completed` **only** if:
-    1. Production's authoritative quantity is satisfied: `quantity_produced >= quantity_ordered` (in Production, units failing QC, scrapped, or under active rework remain uncredited toward `quantity_produced`), AND
-    2. All uncompleted sibling production orders linked to the same task have reached `Completed` status.
-  - If a production order completes with a quantity shortfall (e.g. from scrapped/rejected units) or if sibling orders remain open, the PM task safely remains `In Progress` with a `production.shortfall_warning` activity log.
+  - Automated Completion Sync: `ProductionOrderCompleted` event triggers `SyncProductionTaskCompletionListener`. A Project Task linked to Production Orders is automatically completed **only** if:
+    1. Every Production Order belonging to that Project Task has reached `Completed` status, AND
+    2. The aggregate good production quantity across all linked production orders satisfies the aggregate ordered quantity: `SUM(quantity_produced) >= (SUM(quantity_ordered) - 0.0001)` (in Production, units failing QC, scrapped, or under active rework remain uncredited toward `quantity_produced`).
+  - If a production order completes with an aggregate quantity shortfall (e.g. from scrapped/rejected units across any sibling orders) or if sibling orders remain open, the PM task safely remains `In Progress` with a `production.shortfall_warning` activity log.
 - **Direct Task Procurement Bridge:**
   - Tasks can link directly to Purchase Requisitions via `purchase_requisition_items.project_task_id` (`nullOnDelete()`).
   - Requisition items record task context for direct costing and procurement fulfillment, with project context derived from the parent task.

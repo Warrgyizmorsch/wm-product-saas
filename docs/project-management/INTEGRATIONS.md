@@ -442,10 +442,10 @@ The application has an extensive library of 44 pre-built `<x-ui.*>` Blade compon
 - **Listener:** `App\Domains\Projects\Listeners\SyncProductionTaskCompletionListener` (registered in `AppServiceProvider`)
 - **Canonical Dispatch Location:** Dispatched strictly from `ProductionOrder::booted()` on `wasChanged('status') && status === ProductionOrder::STATUS_COMPLETED`.
 - **Authoritative Quantity & QC Rules:**
-  - PM strictly consumes Production's authoritative quantities: `$isQuantitySatisfied = ($quantityOrdered <= 0) || ($quantityProduced >= ($quantityOrdered - 0.0001))`.
+  - A Project Task linked to Production Orders is automatically completed only when all linked Production Orders are completed and their aggregate good production quantity satisfies the aggregate ordered quantity: $\sum \text{quantity\_produced} \ge (\sum \text{quantity\_ordered} - 0.0001)$.
   - In Production, units failing QC or undergoing active rework remain uncredited toward `quantity_produced`.
-  - If a shortfall occurs (due to scrap, rejection, or unresolved rework), the PM task remains `In Progress`, and an audit warning (`production.shortfall_warning`) is logged.
-  - Checks sibling production orders linked to the same task. The PM task is auto-completed only when all sibling orders are completed and production yields satisfy ordered quantities.
+  - If an aggregate shortfall occurs (due to scrap, rejection, or unresolved rework across any linked order) or if sibling orders remain open, the PM task safely remains `In Progress`, and an audit warning (`production.shortfall_warning`) is logged.
+  - Checks sibling production orders linked to the same task and enforces aggregate yield satisfaction across all linked orders.
   - Task linking endpoints: `POST /projects/{project}/tasks/{task}/link-production-order` and `DELETE .../unlink-production-order` in `TaskController`.
   - Foreign keys: `production_orders.project_id`, `production_orders.project_milestone_id`, `production_orders.project_task_id` (`nullOnDelete()`). Standalone production orders remain 100% operational with null project references.
 

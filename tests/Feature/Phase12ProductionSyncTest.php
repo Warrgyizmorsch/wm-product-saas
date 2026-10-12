@@ -383,4 +383,103 @@ class Phase12ProductionSyncTest extends TestCase
         $betaPo->refresh();
         $this->assertNull($betaPo->project_task_id);
     }
+
+    public function test_sync_listener_keeps_task_in_progress_when_multiple_orders_completed_with_aggregate_shortfall(): void
+    {
+        // Case 4: Multiple orders completed, but aggregate good produced < aggregate ordered
+        $po1 = ProductionOrder::create([
+            'tenant_id' => $this->tenantAlpha->id,
+            'order_number' => 'PO-MULTI-SHORT-1',
+            'product_id' => $this->product->id,
+            'quantity_ordered' => 50,
+            'quantity_produced' => 30, // 20 short due to scrap/rejection
+            'start_date' => now()->format('Y-m-d'),
+            'end_date' => now()->addDays(5)->format('Y-m-d'),
+            'status' => ProductionOrder::STATUS_IN_PROGRESS,
+            'project_id' => $this->project->id,
+            'project_task_id' => $this->task->id,
+        ]);
+
+        $po2 = ProductionOrder::create([
+            'tenant_id' => $this->tenantAlpha->id,
+            'order_number' => 'PO-MULTI-SHORT-2',
+            'product_id' => $this->product->id,
+            'quantity_ordered' => 50,
+            'quantity_produced' => 50, // Fully satisfied for this order
+            'start_date' => now()->format('Y-m-d'),
+            'end_date' => now()->addDays(5)->format('Y-m-d'),
+            'status' => ProductionOrder::STATUS_IN_PROGRESS,
+            'project_id' => $this->project->id,
+            'project_task_id' => $this->task->id,
+        ]);
+
+        // Complete PO1 first (produces shortfall warning)
+        $po1->status = ProductionOrder::STATUS_COMPLETED;
+        $po1->save();
+
+        $this->task->refresh();
+        $this->assertEquals(Task::STATUS_IN_PROGRESS, $this->task->status);
+
+        // Complete PO2 second (even though PO2 has full individual yield and all siblings are completed, aggregate yield is 80/100)
+        $po2->status = ProductionOrder::STATUS_COMPLETED;
+        $po2->save();
+
+        $this->task->refresh();
+        // Task MUST remain in progress because aggregate yield (80) is less than aggregate ordered (100)
+        $this->assertEquals(Task::STATUS_IN_PROGRESS, $this->task->status);
+        $this->assertNull($this->task->completed_at);
+
+        // Warning logged for aggregate shortfall
+        $this->assertDatabaseHas('project_activity_logs', [
+            'tenant_id' => $this->tenantAlpha->id,
+            'project_id' => $this->project->id,
+            'subject_id' => $this->task->id,
+            'event_type' => 'production.shortfall_warning',
+        ]);
+    }
+
+    public function test_sync_listener_completes_task_when_multiple_orders_reach_exact_aggregate_yield(): void
+    {
+        // Case 6: Unequal split (60 + 40 = 100) reaching exact aggregate yield
+        $po1 = ProductionOrder::create([
+            'tenant_id' => $this->tenantAlpha->id,
+            'order_number' => 'PO-SPLIT-60',
+            'product_id' => $this->product->id,
+            'quantity_ordered' => 60,
+            'quantity_produced' => 60,
+            'start_date' => now()->format('Y-m-d'),
+            'end_date' => now()->addDays(5)->format('Y-m-d'),
+            'status' => ProductionOrder::STATUS_IN_PROGRESS,
+            'project_id' => $this->project->id,
+            'project_task_id' => $this->task->id,
+        ]);
+
+        $po2 = ProductionOrder::create([
+            'tenant_id' => $this->tenantAlpha->id,
+            'order_number' => 'PO-SPLIT-40',
+            'product_id' => $this->product->id,
+            'quantity_ordered' => 40,
+            'quantity_produced' => 40,
+            'start_date' => now()->format('Y-m-d'),
+            'end_date' => now()->addDays(5)->format('Y-m-d'),
+            'status' => ProductionOrder::STATUS_IN_PROGRESS,
+            'project_id' => $this->project->id,
+            'project_task_id' => $this->task->id,
+        ]);
+
+        // Complete first order
+        $po1->status = ProductionOrder::STATUS_COMPLETED;
+        $po1->save();
+
+        $this->task->refresh();
+        $this->assertEquals(Task::STATUS_IN_PROGRESS, $this->task->status);
+
+        // Complete second order
+        $po2->status = ProductionOrder::STATUS_COMPLETED;
+        $po2->save();
+
+        $this->task->refresh();
+        $this->assertEquals(Task::STATUS_COMPLETED, $this->task->status);
+        $this->assertNotNull($this->task->completed_at);
+    }
 }

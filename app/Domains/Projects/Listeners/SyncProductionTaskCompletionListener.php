@@ -33,19 +33,22 @@ class SyncProductionTaskCompletionListener
         }
 
         // Constraint 3: Consume Production's authoritative completion/disposition rules
-        $quantityProduced = (float) ($order->quantity_produced ?? 0);
-        $quantityOrdered = (float) ($order->quantity_ordered ?? 0);
-        $isQuantitySatisfied = ($quantityOrdered <= 0) || ($quantityProduced >= ($quantityOrdered - 0.0001));
-
-        // Check if there are other Production Orders for the same task that are not yet completed
-        $uncompletedSiblingsExist = ProductionOrder::query()
+        // Aggregate evaluation across all Production Orders belonging to this Task
+        $allOrders = ProductionOrder::query()
             ->where('tenant_id', $order->tenant_id)
             ->where('project_task_id', $task->id)
-            ->where('id', '!=', $order->id)
-            ->where('status', '!=', ProductionOrder::STATUS_COMPLETED)
-            ->exists();
+            ->get();
 
-        if ($isQuantitySatisfied && ! $uncompletedSiblingsExist) {
+        $allOrdersCompleted = $allOrders->every(
+            fn ($po) => $po->status === ProductionOrder::STATUS_COMPLETED
+        );
+
+        $totalOrdered = (float) $allOrders->sum('quantity_ordered');
+        $totalProduced = (float) $allOrders->sum('quantity_produced');
+
+        $isAggregateYieldSatisfied = ($totalOrdered <= 0) || ($totalProduced >= ($totalOrdered - 0.0001));
+
+        if ($allOrdersCompleted && $isAggregateYieldSatisfied) {
             $task->status = Task::STATUS_COMPLETED;
             $task->completed_at = now();
             $task->save();
@@ -56,6 +59,10 @@ class SyncProductionTaskCompletionListener
             }
 
             // Log activity
+            $summaryQtyText = $allOrders->count() > 1
+                ? "aggregate {$totalProduced}/{$totalOrdered} units across {$allOrders->count()} orders"
+                : "{$totalProduced}/{$totalOrdered} units";
+
             ActivityLog::create([
                 'tenant_id' => $task->tenant_id,
                 'company_id' => $task->company_id,
@@ -65,20 +72,23 @@ class SyncProductionTaskCompletionListener
                 'subject_id' => $task->id,
                 'event_type' => 'production.completed',
                 'title' => 'Task Completed via Production Order',
-                'description' => "Task '{$task->title}' automatically completed following successful completion of Production Order {$order->order_number} ({$quantityProduced}/{$quantityOrdered} units).",
+                'description' => "Task '{$task->title}' automatically completed following successful completion of Production Order {$order->order_number} ({$summaryQtyText}).",
                 'triggered_by' => $order->completed_by ?: ($task->assignee_id ?: $task->project?->owner_id),
                 'metadata' => [
                     'production_order_id' => $order->id,
                     'order_number' => $order->order_number,
-                    'quantity_ordered' => $quantityOrdered,
-                    'quantity_produced' => $quantityProduced,
+                    'quantity_ordered' => $totalOrdered,
+                    'quantity_produced' => $totalProduced,
+                    'orders_count' => $allOrders->count(),
                 ],
             ]);
         } else {
             // Shortfall or uncompleted sibling orders: task remains in progress, log warning note
-            $reason = ! $isQuantitySatisfied
-                ? "quantity shortfall ({$quantityProduced} produced vs {$quantityOrdered} ordered)"
-                : "pending sibling production orders for this task";
+            $reason = ! $allOrdersCompleted
+                ? "pending sibling production orders for this task"
+                : ($allOrders->count() > 1
+                    ? "aggregate quantity shortfall ({$totalProduced} produced vs {$totalOrdered} ordered across {$allOrders->count()} orders)"
+                    : "quantity shortfall ({$totalProduced} produced vs {$totalOrdered} ordered)");
 
             ActivityLog::create([
                 'tenant_id' => $task->tenant_id,
@@ -94,9 +104,13 @@ class SyncProductionTaskCompletionListener
                 'metadata' => [
                     'production_order_id' => $order->id,
                     'order_number' => $order->order_number,
-                    'quantity_ordered' => $quantityOrdered,
-                    'quantity_produced' => $quantityProduced,
-                    'uncompleted_siblings' => $uncompletedSiblingsExist,
+                    'quantity_ordered' => $totalOrdered,
+                    'quantity_produced' => $totalProduced,
+                    'order_quantity_ordered' => (float) ($order->quantity_ordered ?? 0),
+                    'order_quantity_produced' => (float) ($order->quantity_produced ?? 0),
+                    'all_orders_completed' => $allOrdersCompleted,
+                    'uncompleted_siblings' => ! $allOrdersCompleted,
+                    'orders_count' => $allOrders->count(),
                 ],
             ]);
         }
