@@ -428,11 +428,11 @@
                     </div>
                     <div class="card-body p-3 fs-13">
                         <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                            <span class="text-muted">Mechanic Hours:</span>
-                            <strong class="text-dark">{{ format_hours($workOrder->assignments) }}</strong>
+                            <span class="text-muted">Down Time Hours:</span>
+                            <strong class="text-dark">{{ format_hours($workOrder->downtime_hours) }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                            <span class="text-muted">Mechanic Cost:</span>
+                            <span class="text-muted">Mechanic Cost Subtotal:</span>
                             <strong class="text-dark">{{ format_currency($workOrder->mechanic_cost) }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
