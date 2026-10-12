@@ -768,7 +768,8 @@ class MaintenanceWorkOrderService
                         $downtime->id,
                         $userId,
                         $workPerformed ?: ($scrapMachine ? 'Maintenance Completed (Machine Scrapped)' : 'Maintenance Completed'),
-                        $scrapMachine ? 'Decommissioned' : 'Idle'
+                        $scrapMachine ? 'Decommissioned' : 'Idle',
+                        $completionTime
                     );
                 }
             } else {

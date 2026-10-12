@@ -127,7 +127,7 @@ class ProductionMaintenanceWorkOrder extends BaseModel
         $h = intdiv($totalMinutes, 60);
         $m = $totalMinutes % 60;
 
-        return sprintf('%d.%02d', $h, $m);
+        return sprintf('%d.%02d hrs', $h, $m);
     }
 
     public function machine(): BelongsTo
