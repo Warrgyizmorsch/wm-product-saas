@@ -227,11 +227,12 @@ class ProjectService
         ];
     }
 
-    public function getNextProjectCode(?int $tenantId = null): string
+    public function getNextProjectCode(?int $tenantId = null, ?int $branchId = null): string
     {
         $tenantId = $tenantId ?? (tenant_id() ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null) ?? 1);
+        $branchId = $branchId ?? (branch_id() ?? (app()->bound(\App\Core\Branch\BranchContext::class) ? app(\App\Core\Branch\BranchContext::class)->id() : null));
 
-        $latest = $this->projects->latestCode($tenantId);
+        $latest = $this->projects->latestCode($tenantId, $branchId);
 
         $nextSeq = $latest ? intval(str_replace('PRJ-', '', $latest)) + 1 : 1;
 
@@ -240,6 +241,7 @@ class ProjectService
             $exists = Project::withoutGlobalScopes()
                 ->withTrashed()
                 ->where('tenant_id', $tenantId)
+                ->when($branchId !== null, fn ($q) => $q->where('branch_id', $branchId))
                 ->where('project_code', $candidate)
                 ->exists();
             if ($exists) {
@@ -254,8 +256,18 @@ class ProjectService
     {
         return DB::transaction(function () use ($data) {
             $tenantId = $data['tenant_id'] ?? (tenant_id() ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null) ?? 1);
+            $branchId = $data['branch_id'] ?? (branch_id() ?? (app()->bound(\App\Core\Branch\BranchContext::class) ? app(\App\Core\Branch\BranchContext::class)->id() : null));
+            $companyId = $data['company_id'] ?? (company_id() ?? (app()->bound(\App\Core\Company\CompanyContext::class) ? app(\App\Core\Company\CompanyContext::class)->id() : null));
+
             $data['tenant_id'] = $tenantId;
-            $data['project_code'] = $data['project_code'] ?? $this->getNextProjectCode($tenantId);
+            if ($branchId !== null && empty($data['branch_id'])) {
+                $data['branch_id'] = $branchId;
+            }
+            if ($companyId !== null && empty($data['company_id'])) {
+                $data['company_id'] = $companyId;
+            }
+
+            $data['project_code'] = $data['project_code'] ?? $this->getNextProjectCode($tenantId, $data['branch_id'] ?? null);
 
             $project = $this->projects->create($data);
 

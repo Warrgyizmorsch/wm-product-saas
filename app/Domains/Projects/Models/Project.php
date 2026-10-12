@@ -34,6 +34,15 @@ class Project extends BaseModel
             }
         }
 
+        $branchId = branch_id() ?? (request()->hasSession() ? request()->session()->get('branch_id') : null);
+
+        if ($branchId !== null && in_array($field, ['project_code', 'code'])) {
+            $branchMatch = $this->where($field, $value)->where('branch_id', $branchId)->first();
+            if ($branchMatch) {
+                return $branchMatch;
+            }
+        }
+
         return parent::resolveRouteBinding($value, $field);
     }
 

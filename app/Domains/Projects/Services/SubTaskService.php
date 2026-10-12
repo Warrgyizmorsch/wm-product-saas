@@ -39,6 +39,8 @@ class SubTaskService
         return DB::transaction(function () use ($task, $data) {
             $data['task_id'] = $task->id;
             $data['tenant_id'] = $task->tenant_id;
+            $data['company_id'] = $data['company_id'] ?? $task->company_id;
+            $data['branch_id'] = $data['branch_id'] ?? $task->branch_id;
             $data['position'] = $this->nextPosition($task);
 
             if (isset($data['status'])) {

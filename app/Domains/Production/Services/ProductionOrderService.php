@@ -427,7 +427,7 @@ class ProductionOrderService
                 try {
                     $proj = $order->project ?: \App\Domains\Projects\Models\Project::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($order->project_id);
                     if ($proj) {
-                        app(\App\Domains\Projects\Services\ProjectActivityService::class)->record(
+                        app(\App\Domains\Projects\Services\ActivityLogService::class)->record(
                             $proj,
                             'production.created',
                             "Production Order {$order->order_number} created from Project Task",
