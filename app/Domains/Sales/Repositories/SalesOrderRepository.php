@@ -107,30 +107,37 @@ class SalesOrderRepository
                 'status' => 'Confirmed',
             ]);
 
-            $delivery = MaterialRequirement::create([
-                'tenant_id' => $order->tenant_id,
-                'sales_order_id' => $order->id,
-                'requirement_number' => $nextRequirementNumber,
-                'requirement_date' => now(),
-                'status' => 'Pending',
-            ]);
-
-            $defaultWarehouseId = Warehouse::where('tenant_id', $order->tenant_id)
-                ->orderBy('is_default', 'desc')
-                ->first()?->id ?? 1;
-
-            foreach ($order->items as $soItem) {
-                MaterialRequirementItem::create([
+            $delivery = MaterialRequirement::where('sales_order_id', $order->id)->first();
+            if (!$delivery) {
+                $delivery = MaterialRequirement::create([
                     'tenant_id' => $order->tenant_id,
-                    'material_requirement_id' => $delivery->id,
-                    'sales_order_item_id' => $soItem->id,
-                    'product_id' => $soItem->product_id,
-                    'warehouse_id' => $soItem->warehouse_id ?? $defaultWarehouseId,
-                    'quantity' => $soItem->quantity,
-                    'quantity_ordered' => $soItem->quantity,
-                    'quantity_reserved' => 0.0000,
+                    'company_id' => $order->company_id,
+                    'branch_id' => $order->branch_id,
+                    'sales_order_id' => $order->id,
+                    'requirement_number' => $nextRequirementNumber,
+                    'requirement_date' => now(),
                     'status' => 'Pending',
                 ]);
+
+                $defaultWarehouseId = Warehouse::where('tenant_id', $order->tenant_id)
+                    ->orderBy('is_default', 'desc')
+                    ->first()?->id ?? 1;
+
+                foreach ($order->items as $soItem) {
+                    MaterialRequirementItem::create([
+                        'tenant_id' => $order->tenant_id,
+                        'company_id' => $order->company_id,
+                        'branch_id' => $order->branch_id,
+                        'material_requirement_id' => $delivery->id,
+                        'sales_order_item_id' => $soItem->id,
+                        'product_id' => $soItem->product_id,
+                        'warehouse_id' => $soItem->warehouse_id ?? $defaultWarehouseId,
+                        'quantity' => $soItem->quantity,
+                        'quantity_ordered' => $soItem->quantity,
+                        'quantity_reserved' => 0.0000,
+                        'status' => 'Pending',
+                    ]);
+                }
             }
 
             return $delivery;

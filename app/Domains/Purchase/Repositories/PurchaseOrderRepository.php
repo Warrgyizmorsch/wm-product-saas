@@ -94,7 +94,12 @@ class PurchaseOrderRepository
             $lastNumStr = str_replace($prefix, '', $lastPo->purchase_order_number);
             $nextNum = ((int) $lastNumStr) + 1;
         }
-        return $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+        $candidate = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+        while (PurchaseOrder::where('purchase_order_number', $candidate)->exists()) {
+            $nextNum++;
+            $candidate = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+        }
+        return $candidate;
     }
 
     public function create(array $data): PurchaseOrder

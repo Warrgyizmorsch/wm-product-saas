@@ -57,6 +57,9 @@ class DispatchOrderRepository
     public function getPendingDOs(int $limit = 5): Collection
     {
         return MaterialRequirement::with(['salesOrder.customer'])
+            ->whereHas('salesOrder', function ($q) {
+                $q->whereIn('status', ['Confirmed', 'Partially Shipped']);
+            })
             ->whereNotIn('id', DispatchOrder::pluck('material_requirement_id'))
             ->whereNotIn('status', ['Cancelled', 'Delivered'])
             ->latest()
@@ -71,6 +74,9 @@ class DispatchOrderRepository
             'items.product',
             'items.warehouse',
         ])
+        ->whereHas('salesOrder', function ($q) {
+            $q->whereIn('status', ['Confirmed', 'Partially Shipped']);
+        })
         ->whereNotIn('status', ['Cancelled'])
         ->latest()
         ->get();
@@ -80,10 +86,7 @@ class DispatchOrderRepository
     {
         $salesOrdersQuery = \App\Domains\Sales\Models\SalesOrder::query()
             ->where('tenant_id', $tenantId)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhereNotIn('status', ['Cancelled', 'cancelled']);
-            })
+            ->whereIn('status', ['Confirmed', 'Partially Shipped'])
             ->with(['customer', 'items.product.uom', 'items.warehouse'])
             ->latest('order_date');
 
@@ -175,10 +178,7 @@ class DispatchOrderRepository
     public function getPendingSalesOrdersCount(int $tenantId): int
     {
         $allOrders = \App\Domains\Sales\Models\SalesOrder::where('tenant_id', $tenantId)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhereNotIn('status', ['Cancelled', 'cancelled']);
-            })
+            ->whereIn('status', ['Confirmed', 'Partially Shipped'])
             ->with(['items'])
             ->get();
 
@@ -268,6 +268,9 @@ class DispatchOrderRepository
 
             foreach ($itemsData as $item) {
                 DispatchOrderItem::create([
+                    'tenant_id' => $dispatch->tenant_id,
+                    'company_id' => $dispatch->company_id,
+                    'branch_id' => $dispatch->branch_id,
                     'dispatch_order_id' => $dispatch->id,
                     'material_requirement_item_id' => $item['material_requirement_item_id'] ?? null,
                     'invoice_item_id' => $item['invoice_item_id'] ?? null,
@@ -284,9 +287,51 @@ class DispatchOrderRepository
         });
     }
 
-    public function getNextDispatchNumber(): string
+    public function getNextDispatchNumber(?int $tenantId = null, ?int $companyId = null, ?int $branchId = null): string
     {
-        $count = DispatchOrder::whereYear('created_at', now()->year)->count() + 1;
-        return 'DISP-' . now()->format('Y') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $year = now()->format('Y');
+        $prefix = "DISP-{$year}-";
+
+        $tenantId = $tenantId ?? (tenant_id() ?? auth()->user()?->tenant_id ?? 1);
+        $companyId = $companyId ?? (company_id() ?? auth()->user()?->company_id);
+        $branchId = $branchId ?? (branch_id() ?? auth()->user()?->branch_id);
+
+        $query = DispatchOrder::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('dispatch_number', 'like', "{$prefix}%");
+
+        if ($companyId !== null) {
+            $query->where('company_id', $companyId);
+        }
+        if ($branchId !== null) {
+            $query->where('branch_id', $branchId);
+        }
+
+        $latest = $query->orderBy('id', 'desc')->first();
+
+        $nextNum = 1;
+        if ($latest) {
+            $rawNum = $latest->getRawOriginal('dispatch_number') ?? $latest->dispatch_number;
+            $lastNumStr = str_replace($prefix, '', $rawNum);
+            $nextNum = intval($lastNumStr) + 1;
+        }
+
+        do {
+            $candidate = $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+            $nextNum++;
+
+            $checkQuery = DispatchOrder::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('dispatch_number', $candidate);
+
+            if ($companyId !== null) {
+                $checkQuery->where('company_id', $companyId);
+            }
+            if ($branchId !== null) {
+                $checkQuery->where('branch_id', $branchId);
+            }
+        } while ($checkQuery->exists());
+
+        return $candidate;
     }
 }

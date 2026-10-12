@@ -138,29 +138,7 @@
 
 @section('content')
 
-    {{-- Session Alerts --}}
-    @if (session('success'))
-        <x-ui.alert variant="success" :dismissible="true" icon="feather-check-circle" class="shadow-sm mb-4">
-            <strong>{{ __('crm.success') ?: 'Success!' }}</strong> {{ session('success') }}
-        </x-ui.alert>
-    @endif
 
-    @if (session('error'))
-        <x-ui.alert variant="danger" :dismissible="true" icon="feather-alert-triangle" class="shadow-sm mb-4">
-            <strong>{{ __('crm.error') ?: 'Error!' }}</strong> {{ session('error') }}
-        </x-ui.alert>
-    @endif
-
-    @if ($errors->any())
-        <x-ui.alert variant="danger" :dismissible="true" icon="feather-alert-triangle" class="shadow-sm mb-4">
-            <strong>{{ __('crm.fix_following_errors') ?: 'Please fix the following errors:' }}</strong>
-            <ul class="mb-0 mt-1 ps-3">
-                @foreach ($errors->all() as $error)
-                    <li class="fs-12">{{ $error }}</li>
-                @endforeach
-            </ul>
-        </x-ui.alert>
-    @endif
 
     @php
         $doStatusClass = 'warning';
