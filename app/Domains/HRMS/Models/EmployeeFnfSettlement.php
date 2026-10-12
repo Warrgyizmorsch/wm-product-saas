@@ -62,6 +62,11 @@ class EmployeeFnfSettlement extends BaseModel
         return $this->belongsTo(EmployeeExit::class, 'employee_exit_id');
     }
 
+    public function employeeExit(): BelongsTo
+    {
+        return $this->exit();
+    }
+
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'employee_id');

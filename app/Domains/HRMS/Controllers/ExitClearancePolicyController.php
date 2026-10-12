@@ -18,7 +18,7 @@ class ExitClearancePolicyController extends Controller
 
     public function index(Request $request): View
     {
-        $this->authorize('viewAny', \App\Domains\HRMS\Models\ExitClearanceItem::class);
+        $this->authorize('viewAny', ExitClearanceTemplate::class);
 
         $data = $this->policyRepository->getIndexData($request->all());
 
@@ -27,75 +27,81 @@ class ExitClearancePolicyController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', \App\Domains\HRMS\Models\ExitClearanceItem::class);
+        $this->authorize('create', ExitClearanceTemplate::class);
         if (empty($request->input('clearance_category')) && $request->filled('clearance_category_select')) {
             $request->merge(['clearance_category' => $request->input('clearance_category_select')]);
         }
 
         $validated = $request->validate([
-            'company_id'         => 'nullable|exists:companies,id',
-            'clearance_category' => 'required|string|max:100',
-            'category_name'      => 'required|string|max:150',
-            'items'              => 'nullable|array|min:1',
-            'items.*.item_name'  => 'nullable|string|max:255',
-            'items.*.description'=> 'nullable|string|max:1000',
-            'items.*.sort_order' => 'nullable|integer|min:0',
-            'items.*.is_mandatory'=> 'nullable',
-            // Fallback for single item
-            'item_name'          => 'nullable|string|max:255',
-            'description'        => 'nullable|string|max:1000',
-            'is_mandatory'       => 'nullable|boolean',
-            'sort_order'         => 'nullable|integer|min:0',
+            'company_id'                => 'nullable|exists:companies,id',
+            'clearance_category'        => 'nullable|string|max:100',
+            'clearance_category_select' => 'nullable|string|max:100',
+            'category_name'             => 'nullable|string|max:150',
+            'items'                     => 'nullable|array|min:1',
+            'items.*.item_name'         => 'nullable|string|max:255',
+            'items.*.description'       => 'nullable|string|max:1000',
+            'items.*.sort_order'        => 'nullable|integer|min:0',
+            'items.*.is_mandatory'      => 'nullable',
+            'items.*.status'            => 'nullable',
+            // Fallback for single direct item
+            'item_name'                 => 'nullable|string|max:255',
+            'description'               => 'nullable|string|max:1000',
+            'is_mandatory'              => 'nullable',
+            'sort_order'                => 'nullable|integer|min:0',
+            'status'                    => 'nullable',
         ]);
 
-        $companyId = $validated['company_id'] ?: null;
-        $categoryName = trim($validated['category_name']);
-
+        $companyId = !empty($validated['company_id']) ? (int) $validated['company_id'] : null;
         $createdCount = $this->policyRepository->storeTemplate($validated, $request);
 
         if ($createdCount === 0) {
             return redirect()->route('hrms.offboarding-policies.index', ['company_id' => $companyId])
-                ->with('error', 'Please provide at least one valid checklist item name.');
+                ->with('error', __('hrms.offboarding_policies.msg_provide_valid_point'));
         }
 
-        $plural = $createdCount === 1 ? 'checklist point' : 'checklist points';
         return redirect()->route('hrms.offboarding-policies.index', ['company_id' => $companyId])
-            ->with('success', "{$createdCount} clearance {$plural} added under '{$categoryName}'.");
+            ->with('success', __('hrms.offboarding_policies.msg_points_saved', ['count' => $createdCount]));
     }
 
     public function update(Request $request, ExitClearanceTemplate $template): RedirectResponse
     {
-        $this->authorize('update', \App\Domains\HRMS\Models\ExitClearanceItem::class);
+        $this->authorize('update', $template);
+        if (empty($request->input('clearance_category')) && $request->filled('clearance_category_select')) {
+            $request->merge(['clearance_category' => $request->input('clearance_category_select')]);
+        }
+
         $validated = $request->validate([
-            'company_id'         => 'nullable|exists:companies,id',
-            'clearance_category' => 'required|string|max:100',
-            'category_name'      => 'required|string|max:150',
-            'item_name'          => 'required|string|max:255',
-            'description'        => 'nullable|string|max:1000',
-            'is_mandatory'       => 'nullable|boolean',
-            'sort_order'         => 'nullable|integer|min:0',
-            'status'             => 'nullable|boolean',
+            'company_id'                => 'nullable|exists:companies,id',
+            'clearance_category'        => 'nullable|string|max:100',
+            'clearance_category_select' => 'nullable|string|max:100',
+            'category_name'             => 'nullable|string|max:150',
+            'item_name'                 => 'required|string|max:255',
+            'description'               => 'nullable|string|max:1000',
+            'is_mandatory'              => 'nullable',
+            'sort_order'                => 'nullable|integer|min:0',
+            'status'                    => 'nullable',
         ]);
 
         $this->policyRepository->updateTemplate($template, $validated, $request);
 
         return redirect()->route('hrms.offboarding-policies.index', ['company_id' => $template->company_id])
-            ->with('success', "Clearance checklist point '{$template->item_name}' updated successfully.");
+            ->with('success', __('hrms.offboarding_policies.msg_point_updated', ['name' => $template->item_name]));
     }
 
     public function destroy(ExitClearanceTemplate $template): RedirectResponse
     {
-        $this->authorize('delete', \App\Domains\HRMS\Models\ExitClearanceItem::class);
+        $this->authorize('delete', $template);
         $name = $template->item_name;
         $companyId = $template->company_id;
         $this->policyRepository->deleteTemplate($template);
 
         return redirect()->route('hrms.offboarding-policies.index', ['company_id' => $companyId])
-            ->with('success', "Clearance point '{$name}' removed from policy.");
+            ->with('success', __('hrms.offboarding_policies.msg_point_deleted', ['name' => $name]));
     }
 
     public function destroyCategory(Request $request): RedirectResponse
     {
+        $this->authorize('delete', ExitClearanceTemplate::class);
         $categoryKey = (string) $request->input('clearance_category');
         $companyId = $request->input('company_id') ? (int) $request->input('company_id') : null;
 
@@ -105,16 +111,17 @@ class ExitClearancePolicyController extends Controller
         $categoryName = $meta['name'] ?? ucwords(str_replace(['_', '-'], ' ', $categoryKey));
 
         return redirect()->route('hrms.offboarding-policies.index', ['company_id' => $companyId])
-            ->with('success', "Category '{$categoryName}' and its {$count} checklist point(s) were completely deleted.");
+            ->with('success', __('hrms.offboarding_policies.msg_category_deleted', ['name' => $categoryName, 'count' => $count]));
     }
 
     public function reset(Request $request): RedirectResponse
     {
+        $this->authorize('create', ExitClearanceTemplate::class);
         $companyId = $request->input('company_id') ? (int) $request->input('company_id') : null;
 
         $this->policyRepository->resetTemplatesToDefaults($companyId);
 
         return redirect()->route('hrms.offboarding-policies.index', ['company_id' => $companyId])
-            ->with('success', "Clearance policies reset to standard 12 default checklist points.");
+            ->with('success', __('hrms.offboarding_policies.msg_reset_success'));
     }
 }

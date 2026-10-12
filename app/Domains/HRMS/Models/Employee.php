@@ -290,6 +290,11 @@ class Employee extends BaseModel
         return $this->hasMany(EmployeeExitDocument::class, 'employee_id')->orderBy('issue_date', 'desc');
     }
 
+    public function pipPlans(): HasMany
+    {
+        return $this->hasMany(PerformanceImprovementPlan::class, 'employee_id')->latest('created_at');
+    }
+
     public function getFirstNameAttribute(): string
     {
         return (string) str($this->full_name)->before(' ');

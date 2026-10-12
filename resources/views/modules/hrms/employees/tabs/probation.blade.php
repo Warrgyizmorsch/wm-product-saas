@@ -4,7 +4,7 @@
     $today = \Carbon\Carbon::today();
 
     $totalDays = ($doj && $probationEnd) ? max(1, $doj->diffInDays($probationEnd)) : 90;
-    $daysPassed = $doj ? max(0, min($totalDays, $doj->diffInDays($today))) : 0;
+    $daysPassed = ($doj && $today->greaterThanOrEqualTo($doj)) ? max(0, min($totalDays, $doj->diffInDays($today))) : 0;
     $probationProgress = (int) round(($daysPassed / $totalDays) * 100);
 
     $isOverdue = ($employee->employee_stage === 'Probation' && $probationEnd && $today->greaterThan($probationEnd));
@@ -53,7 +53,7 @@
                     </x-ui.badge>
                 @else
                     <x-ui.badge soft :variant="$stageVariant" class="fs-12 px-3 py-1.5 fw-semibold">
-                        {{ $employee->employee_stage }}
+                        {{ $employee->employee_stage ? __($employee->employee_stage) : __('hrms.common.not_set') }}
                     </x-ui.badge>
                 @endif
             </div>
@@ -70,7 +70,7 @@
                         </span>
                         <div>
                             <x-ui.badge soft :variant="$stageVariant" class="fs-12 fw-semibold px-2.5 py-1">
-                                {{ $employee->employee_stage ?: __('hrms.common.not_set') }}
+                                {{ $employee->employee_stage ? __($employee->employee_stage) : __('hrms.common.not_set') }}
                             </x-ui.badge>
                         </div>
                     </div>
@@ -134,9 +134,9 @@
                             </span>
                             {{ __('hrms.employees.probation_timeline_progress') }}
                         </span>
-                        <span class="badge bg-soft-primary text-primary px-3 py-1.5 rounded-pill fs-12 fw-bold">
+                        <x-ui.badge soft variant="primary" class="px-3 py-1.5 rounded-pill fs-12 fw-bold">
                             {{ __('hrms.employees.probation_progress_text', ['progress' => $probationProgress, 'passed' => $daysPassed, 'total' => $totalDays]) }}
-                        </span>
+                        </x-ui.badge>
                     </div>
                     <div class="progress my-3" style="height: 10px; border-radius: 999px; background-color: #e2e8f0; overflow: hidden;">
                         <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(100, $probationProgress) }}%; border-radius: 999px; transition: width 0.6s ease;" aria-valuenow="{{ $probationProgress }}" aria-valuemin="0" aria-valuemax="100"></div>
@@ -160,7 +160,7 @@
                     <i class="feather-list text-primary me-1.5"></i> {{ __('hrms.employees.eval_review_history') }}
                 </h6>
                 <x-ui.badge soft variant="secondary" class="fs-11">
-                    {{ __('hrms.employees.records_logged', ['count' => $employee->probationEvaluations->count()]) }}
+                    {{ __('hrms.employees.records_logged', ['count' => $employee->probationEvaluations ? $employee->probationEvaluations->count() : 0]) }}
                 </x-ui.badge>
             </div>
 
@@ -178,7 +178,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($employee->probationEvaluations as $eval)
+                        @forelse($employee->probationEvaluations ?? [] as $eval)
                             @php
                                 $recVariant = match($eval->recommendation) {
                                     'confirm'   => 'success',
@@ -194,29 +194,29 @@
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="avatar-text avatar-xs bg-soft-primary text-primary rounded-circle fw-bold" style="width: 24px; height: 24px; font-size: 10px;">
-                                            {{ strtoupper(substr($eval->reviewer->name ?? 'HR', 0, 1)) }}
+                                            {{ strtoupper(substr($eval->reviewer?->name ?? 'HR', 0, 1)) }}
                                         </div>
-                                        <span>{{ $eval->reviewer->name ?? __('hrms.employees.hr_admin') }}</span>
+                                        <span>{{ $eval->reviewer?->name ?? __('hrms.employees.hr_admin') }}</span>
                                     </div>
                                 </td>
                                 <td class="text-center">
                                     <x-ui.badge soft variant="warning" class="fs-11">
-                                        ★ {{ $eval->performance_rating }}/5
+                                        ★ {{ $eval->performance_rating ?? '-' }}/5
                                     </x-ui.badge>
                                 </td>
                                 <td class="text-center">
                                     <x-ui.badge soft variant="info" class="fs-11">
-                                        ★ {{ $eval->attendance_rating }}/5
+                                        ★ {{ $eval->attendance_rating ?? '-' }}/5
                                     </x-ui.badge>
                                 </td>
                                 <td class="text-center">
                                     <x-ui.badge soft variant="primary" class="fs-11">
-                                        ★ {{ $eval->culture_rating }}/5
+                                        ★ {{ $eval->culture_rating ?? '-' }}/5
                                     </x-ui.badge>
                                 </td>
                                 <td class="text-center">
                                     <x-ui.badge soft :variant="$recVariant" class="text-uppercase fs-11">
-                                        {{ $eval->recommendation }}
+                                        {{ $eval->recommendation ? __(ucfirst((string) $eval->recommendation)) : __('hrms.common.na') }}
                                     </x-ui.badge>
                                 </td>
                                 <td class="pe-3 text-muted fs-12" style="white-space: normal !important; word-wrap: break-word !important; word-break: break-word !important;">
@@ -261,7 +261,7 @@
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
                             <label class="form-label fw-bold fs-12 text-uppercase text-muted mb-1">1. {{ __('hrms.employees.performance_execution') }}</label>
-                            <x-ui.odoo-form-ui type="select" name="performance_rating" :required="true">
+                            <x-ui.odoo-form-ui type="select" name="performance_rating" :required="true" :searchable="false">
                                 <option value="5">{{ __('hrms.employees.perf_5') }}</option>
                                 <option value="4" selected>{{ __('hrms.employees.perf_4') }}</option>
                                 <option value="3">{{ __('hrms.employees.perf_3') }}</option>
@@ -271,7 +271,7 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold fs-12 text-uppercase text-muted mb-1">2. {{ __('hrms.employees.attendance_punctuality') }}</label>
-                            <x-ui.odoo-form-ui type="select" name="attendance_rating" :required="true">
+                            <x-ui.odoo-form-ui type="select" name="attendance_rating" :required="true" :searchable="false">
                                 <option value="5">{{ __('hrms.employees.att_5') }}</option>
                                 <option value="4" selected>{{ __('hrms.employees.att_4') }}</option>
                                 <option value="3">{{ __('hrms.employees.att_3') }}</option>
@@ -281,7 +281,7 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold fs-12 text-uppercase text-muted mb-1">3. {{ __('hrms.employees.culture_fit_teamwork') }}</label>
-                            <x-ui.odoo-form-ui type="select" name="culture_rating" :required="true">
+                            <x-ui.odoo-form-ui type="select" name="culture_rating" :required="true" :searchable="false">
                                 <option value="5">{{ __('hrms.employees.cult_5') }}</option>
                                 <option value="4" selected>{{ __('hrms.employees.cult_4') }}</option>
                                 <option value="3">{{ __('hrms.employees.cult_3') }}</option>
@@ -317,7 +317,7 @@
                         <!-- Profile Extension Box -->
                         <div id="prof_extension_box" class="mt-3 p-3 bg-white rounded-3 border border-warning border-opacity-25 d-none">
                             <label class="form-label fw-bold fs-12 text-dark mb-1">{{ __('hrms.employees.extension_duration') }}</label>
-                            <x-ui.odoo-form-ui type="select" name="extension_days">
+                            <x-ui.odoo-form-ui type="select" name="extension_days" :searchable="false">
                                 <option value="30">{{ __('hrms.employees.days_1_month') }}</option>
                                 <option value="60">{{ __('hrms.employees.days_2_months') }}</option>
                                 <option value="90">{{ __('hrms.employees.days_3_months') }}</option>
@@ -353,7 +353,7 @@
                                 </div>
 
                                 <div class="col-md-6" id="prof_term_notice_days_box">
-                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.notice_duration') }}" name="termination_notice_days">
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.notice_duration') }}" name="termination_notice_days" :searchable="false">
                                         <option value="7">{{ __('hrms.employees.notice_7_days') }}</option>
                                         <option value="15" selected>{{ __('hrms.employees.notice_15_days') }}</option>
                                         <option value="30">{{ __('hrms.employees.notice_30_days') }}</option>
@@ -361,7 +361,7 @@
                                 </div>
 
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.primary_reason_category') }}" name="termination_reason_category">
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.primary_reason_category') }}" name="termination_reason_category" :searchable="false">
                                         <option value="Performance / Skill Gap">{{ __('hrms.employees.reason_perf_skill') }}</option>
                                         <option value="Cultural / Team Misalignment">{{ __('hrms.employees.reason_cultural_misalignment') }}</option>
                                         <option value="Attendance & Discipline">{{ __('hrms.employees.reason_attendance_discipline') }}</option>
@@ -413,5 +413,19 @@
             }
         }
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const modalEl = document.getElementById('profileEvaluateModal');
+        if (modalEl) {
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                const form = modalEl.querySelector('form');
+                if (form) {
+                    form.reset();
+                    handleProfileRecChange('confirm');
+                    toggleProfTerminationNotice(true);
+                }
+            });
+        }
+    });
 </script>
 @endif

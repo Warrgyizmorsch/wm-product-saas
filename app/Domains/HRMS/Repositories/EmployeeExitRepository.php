@@ -66,10 +66,7 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
         ]);
 
         if ($activeTab === 'documents') {
-            $exitsQuery->where(function($q) {
-                $q->where('status', 'settled')
-                  ->orWhereHas('fnfSettlement', fn($fq) => $fq->where('status', 'paid'));
-            });
+            $exitsQuery->where('employee_exits.status', '!=', 'rejected');
         }
 
         if ($search) {
@@ -215,11 +212,32 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
                 NotificationService::sendToEmployee(
                     $employee,
                     'Offboarding Clearance Initiated',
-                    "Your exit and offboarding clearance workflow has been initiated.",
+                    "Your exit and offboarding clearance workflow has been initiated (Effective LWD: {$exit->approved_lwd}).",
                     route('hrms.exits.index'),
                     'hrms',
                     'exit_initiated',
                     'feather-user-x'
+                );
+
+                $employee->loadMissing('reportingManager');
+                if ($employee->reportingManager) {
+                    NotificationService::sendToEmployee(
+                        $employee->reportingManager,
+                        'Offboarding Clearance Initiated — ' . $employee->full_name,
+                        "Offboarding clearance items have been activated for {$employee->full_name} (LWD: {$exit->approved_lwd}).",
+                        route('hrms.exits.index'),
+                        'hrms',
+                        'exit_initiated_manager',
+                        'feather-clipboard'
+                    );
+                }
+
+                NotificationService::sendToHrAdmins(
+                    'Offboarding Initiated: ' . $employee->full_name,
+                    "Offboarding clearance workflow initiated for {$employee->full_name} (LWD: {$exit->approved_lwd}).",
+                    route('hrms.exits.index'),
+                    'exit_initiated_hr',
+                    'feather-clipboard'
                 );
             }
         } catch (\Throwable $e) {
@@ -290,7 +308,7 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
         $exit->employee->update(['employee_stage' => 'Notice Period']);
 
         try {
-            $exit->loadMissing('employee');
+            $exit->loadMissing(['employee.reportingManager']);
             if ($exit->employee) {
                 NotificationService::sendToEmployee(
                     $exit->employee,
@@ -301,10 +319,22 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
                     'resignation_hr_approved',
                     'feather-check-circle'
                 );
+
+                if ($exit->employee->reportingManager) {
+                    NotificationService::sendToEmployee(
+                        $exit->employee->reportingManager,
+                        'Clearance Tasks Active — ' . $exit->employee->full_name,
+                        "Clearance checklist has been activated for {$exit->employee->full_name} (LWD: {$exit->approved_lwd}). Please review and sign off handover/KT items.",
+                        route('hrms.exits.index'),
+                        'hrms',
+                        'clearance_manager_alert',
+                        'feather-clipboard'
+                    );
+                }
             }
 
             NotificationService::sendToHrAdmins(
-                'Exit Clearance In-Progress',
+                'Exit Clearance In-Progress: ' . ($exit->employee?->full_name ?? 'Employee'),
                 "Departmental clearances active for {$exit->employee?->full_name} (Approved LWD: {$exit->approved_lwd}).",
                 route('hrms.exits.index'),
                 'clearance_in_progress',
@@ -354,11 +384,13 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
             'cleared_at' => $validated['status'] === 'cleared' ? now() : null,
         ]);
 
-        $exit = $item->employeeExit;
-        $this->clearanceService->checkAllClearancesCompleted($exit);
+        $exit = $item->exit ?? $item->employeeExit;
+        if ($exit) {
+            $this->clearanceService->checkAllClearancesCompleted($exit);
 
-        $computedFnF = $this->fnfService->calculateFnF($exit);
-        $this->fnfService->saveSettlement($exit, $computedFnF);
+            $computedFnF = $this->fnfService->calculateFnF($exit);
+            $this->fnfService->saveSettlement($exit, $computedFnF);
+        }
 
         return true;
     }
@@ -386,7 +418,7 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
 
     public function settleFnf(EmployeeFnfSettlement $settlement, array $validated, ?int $userId): bool
     {
-        $exit = $settlement->employeeExit;
+        $exit = $settlement->exit ?? $settlement->employeeExit;
 
         DB::transaction(function () use ($settlement, $validated, $exit) {
             $settlement->update([

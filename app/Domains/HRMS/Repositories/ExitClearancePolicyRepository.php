@@ -51,14 +51,14 @@ class ExitClearancePolicyRepository implements ExitClearancePolicyRepositoryInte
             }
 
             if ($selectedStatus !== null && $selectedStatus !== '') {
-                $expectedStatus = (bool) $selectedStatus;
+                $expectedStatus = in_array((string)$selectedStatus, ['1', 'true', 'active'], true);
                 if ($status !== $expectedStatus) {
                     return false;
                 }
             }
 
             if ($selectedMandatory !== null && $selectedMandatory !== '') {
-                $expectedMandatory = (bool) $selectedMandatory;
+                $expectedMandatory = in_array((string)$selectedMandatory, ['1', 'true', 'mandatory'], true);
                 if ($isMandatory !== $expectedMandatory) {
                     return false;
                 }
@@ -84,38 +84,106 @@ class ExitClearancePolicyRepository implements ExitClearancePolicyRepositoryInte
             ];
         });
 
-        $availableCategories = $allTemplates->mapWithKeys(function ($item) {
+        $defaultCategories = [
+            'it_assets'          => __('hrms.offboarding_policies.dept_it_assets'),
+            'facilities_admin'   => __('hrms.offboarding_policies.dept_facilities_admin'),
+            'finance_payroll'    => __('hrms.offboarding_policies.dept_finance_payroll'),
+            'hr_operations'      => __('hrms.offboarding_policies.dept_hr_operations'),
+            'reporting_manager'  => __('hrms.offboarding_policies.dept_reporting_manager'),
+            'legal_compliance'   => __('hrms.offboarding_policies.dept_legal_compliance'),
+            'other'              => __('hrms.offboarding_policies.dept_other'),
+        ];
+
+        $templateCategories = $allTemplates->mapWithKeys(function ($item) {
             $key = is_object($item) ? $item->clearance_category : ($item['clearance_category'] ?? '');
             $name = is_object($item) ? ($item->category_name ?? $key) : ($item['category_name'] ?? $key);
             $meta = ExitClearanceTemplate::getCategoryMetadata($key, $name);
             return [$key => $meta['name'] ?? $meta['title'] ?? $name];
         })->filter();
 
+        $availableCategories = $templateCategories->merge($defaultCategories);
+
+        $sortBy = $inputs['sort_by'] ?? 'order';
+        $sortOrder = in_array(strtolower($inputs['sort_order'] ?? 'asc'), ['asc', 'desc']) ? strtolower($inputs['sort_order'] ?? 'asc') : 'asc';
+
+        // Apply sorting on the filtered templates collection
+        if ($sortBy === 'name') {
+            $filteredTemplates = $sortOrder === 'asc' 
+                ? $filteredTemplates->sortBy(fn($t) => strtolower(is_object($t) ? $t->item_name : ($t['item_name'] ?? '')))
+                : $filteredTemplates->sortByDesc(fn($t) => strtolower(is_object($t) ? $t->item_name : ($t['item_name'] ?? '')));
+        } elseif ($sortBy === 'category') {
+            $filteredTemplates = $sortOrder === 'asc'
+                ? $filteredTemplates->sortBy(fn($t) => strtolower(is_object($t) ? $t->clearance_category : ($t['clearance_category'] ?? '')))
+                : $filteredTemplates->sortByDesc(fn($t) => strtolower(is_object($t) ? $t->clearance_category : ($t['clearance_category'] ?? '')));
+        } elseif ($sortBy === 'mandatory') {
+            $filteredTemplates = $sortOrder === 'asc'
+                ? $filteredTemplates->sortBy(fn($t) => (bool)(is_object($t) ? $t->is_mandatory : ($t['is_mandatory'] ?? true)))
+                : $filteredTemplates->sortByDesc(fn($t) => (bool)(is_object($t) ? $t->is_mandatory : ($t['is_mandatory'] ?? true)));
+        } else {
+            // Default: sort order
+            $filteredTemplates = $sortOrder === 'asc'
+                ? $filteredTemplates->sortBy(fn($t) => (int)(is_object($t) ? $t->sort_order : ($t['sort_order'] ?? 0)))
+                : $filteredTemplates->sortByDesc(fn($t) => (int)(is_object($t) ? $t->sort_order : ($t['sort_order'] ?? 0)));
+        }
+
+        $hasActiveFilters = !empty($search) || !empty($selectedCategory) || $selectedStatus !== null || $selectedMandatory !== null || !empty($selectedCompanyId);
+
+        $totalPointsCount = $allTemplates->count();
+        $mandatoryPointsCount = $allTemplates->filter(fn($t) => (bool)(is_object($t) ? $t->is_mandatory : ($t['is_mandatory'] ?? true)))->count();
+        $activePointsCount = $allTemplates->filter(fn($t) => (bool)(is_object($t) ? $t->status : ($t['status'] ?? true)))->count();
+        $authoritiesCount = $availableCategories->count();
+
+        // Paginate filtered templates (10 items per page by default)
+        $currentPage = (int) ($inputs['page'] ?? request()->get('page', 1));
+        $perPage = 10;
+        $totalResults = $filteredTemplates->count();
+        $paginatedItems = $filteredTemplates->forPage($currentPage, $perPage)->values();
+
+        $paginatedTemplates = new \Illuminate\Pagination\LengthAwarePaginator(
+            $paginatedItems,
+            $totalResults,
+            $perPage,
+            $currentPage,
+            [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ]
+        );
+
         return [
-            'companies'           => $companies,
-            'selectedCompanyId'   => $selectedCompanyId,
-            'selectedCategory'    => $selectedCategory,
-            'selectedStatus'      => $selectedStatus,
-            'selectedMandatory'   => $selectedMandatory,
-            'search'              => $search,
-            'clearanceCategories' => $clearanceCategories,
-            'clearanceTemplates'  => $filteredTemplates,
-            'allTemplatesCount'   => $allTemplates->count(),
-            'availableCategories' => $availableCategories,
+            'companies'            => $companies,
+            'selectedCompanyId'    => $selectedCompanyId,
+            'selectedCategory'     => $selectedCategory,
+            'selectedStatus'       => $selectedStatus,
+            'selectedMandatory'    => $selectedMandatory,
+            'search'               => $search,
+            'sortBy'               => $sortBy,
+            'sortOrder'            => $sortOrder,
+            'hasActiveFilters'     => $hasActiveFilters,
+            'clearanceCategories'  => $clearanceCategories,
+            'clearanceTemplates'   => $paginatedTemplates,
+            'allTemplatesCount'    => $totalPointsCount,
+            'totalPointsCount'     => $totalPointsCount,
+            'mandatoryPointsCount' => $mandatoryPointsCount,
+            'activePointsCount'    => $activePointsCount,
+            'authoritiesCount'     => $authoritiesCount,
+            'availableCategories'  => $availableCategories,
         ];
     }
 
     public function storeTemplate(array $validated, Request $request): int
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $categoryKey = Str::slug($validated['clearance_category'], '_');
-        $categoryName = trim($validated['category_name']);
-        $companyId = $validated['company_id'] ?: null;
+        $rawCat = $validated['clearance_category'] ?? ($validated['clearance_category_select'] ?? 'hr_operations');
+        $categoryKey = Str::slug($rawCat, '_');
+        $meta = ExitClearanceTemplate::getCategoryMetadata($categoryKey);
+        $categoryName = !empty($validated['category_name']) ? trim($validated['category_name']) : $meta['name'];
+        $companyId = !empty($validated['company_id']) ? (int)$validated['company_id'] : null;
 
         if ($tenantId) {
             $tenantHasTemplates = ExitClearanceTemplate::where('tenant_id', $tenantId)->exists();
             if (!$tenantHasTemplates) {
-                $this->clearanceService->resetTemplatesToDefaults($tenantId, null);
+                $this->clearanceService->resetTemplatesToDefaults($tenantId, $companyId);
             }
         }
 
@@ -130,6 +198,10 @@ class ExitClearancePolicyRepository implements ExitClearancePolicyRepositoryInte
                     }
 
                     $isMandatory = isset($itemData['is_mandatory']) && ($itemData['is_mandatory'] == '1' || $itemData['is_mandatory'] === true || $itemData['is_mandatory'] === 'on');
+                    $sortOrder = isset($itemData['sort_order']) && $itemData['sort_order'] !== '' 
+                        ? (int) $itemData['sort_order'] 
+                        : (((int) ExitClearanceTemplate::where('tenant_id', $tenantId)->max('sort_order')) + 1);
+                    $status = isset($itemData['status']) ? ($itemData['status'] == '1' || $itemData['status'] === true || $itemData['status'] === 'on' || $itemData['status'] === 'active') : true;
 
                     ExitClearanceTemplate::create([
                         'tenant_id'          => $tenantId,
@@ -139,23 +211,29 @@ class ExitClearancePolicyRepository implements ExitClearancePolicyRepositoryInte
                         'item_name'          => $itemName,
                         'description'        => !empty($itemData['description']) ? trim($itemData['description']) : null,
                         'is_mandatory'       => $isMandatory,
-                        'sort_order'         => isset($itemData['sort_order']) && $itemData['sort_order'] !== '' ? (int) $itemData['sort_order'] : 0,
-                        'status'             => true,
+                        'sort_order'         => $sortOrder,
+                        'status'             => $status,
                     ]);
 
                     $createdCount++;
                 }
             } elseif (!empty($validated['item_name'])) {
+                $isMandatory = isset($validated['is_mandatory']) && ($validated['is_mandatory'] == '1' || $validated['is_mandatory'] === true || $validated['is_mandatory'] === 'on');
+                $sortOrder = isset($validated['sort_order']) && $validated['sort_order'] !== '' 
+                    ? (int) $validated['sort_order'] 
+                    : (((int) ExitClearanceTemplate::where('tenant_id', $tenantId)->max('sort_order')) + 1);
+                $status = isset($validated['status']) ? ($validated['status'] == '1' || $validated['status'] === true || $validated['status'] === 'on' || $validated['status'] === 'active') : true;
+
                 ExitClearanceTemplate::create([
                     'tenant_id'          => $tenantId,
                     'company_id'         => $companyId,
                     'clearance_category' => $categoryKey,
                     'category_name'      => $categoryName,
                     'item_name'          => trim($validated['item_name']),
-                    'description'        => $validated['description'] ?? null,
-                    'is_mandatory'       => $request->boolean('is_mandatory', true),
-                    'sort_order'         => $validated['sort_order'] ?? 0,
-                    'status'             => true,
+                    'description'        => !empty($validated['description']) ? trim($validated['description']) : null,
+                    'is_mandatory'       => $isMandatory,
+                    'sort_order'         => $sortOrder,
+                    'status'             => $status,
                 ]);
 
                 $createdCount++;
@@ -167,18 +245,30 @@ class ExitClearancePolicyRepository implements ExitClearancePolicyRepositoryInte
 
     public function updateTemplate(ExitClearanceTemplate $template, array $validated, Request $request): bool
     {
-        $categoryKey = Str::slug($validated['clearance_category'], '_');
+        $rawCat = $validated['clearance_category'] ?? ($validated['clearance_category_select'] ?? $template->clearance_category);
+        $categoryKey = Str::slug($rawCat, '_');
+        $meta = ExitClearanceTemplate::getCategoryMetadata($categoryKey);
+        $categoryName = !empty($validated['category_name']) ? trim($validated['category_name']) : $meta['name'];
+        $companyId = !empty($validated['company_id']) ? (int)$validated['company_id'] : null;
 
-        return DB::transaction(function () use ($template, $validated, $categoryKey, $request) {
+        return DB::transaction(function () use ($template, $validated, $companyId, $categoryKey, $categoryName, $request) {
+            $isMandatory = isset($validated['is_mandatory']) && ($validated['is_mandatory'] == '1' || $validated['is_mandatory'] === true || $validated['is_mandatory'] === 'on');
+            $status = isset($validated['status']) 
+                ? ($validated['status'] == '1' || $validated['status'] === true || $validated['status'] === 'on' || $validated['status'] === 'active') 
+                : ($template->status ?? true);
+            $sortOrder = isset($validated['sort_order']) && $validated['sort_order'] !== '' 
+                ? (int)$validated['sort_order'] 
+                : ($template->sort_order ?? 0);
+
             return $template->update([
-                'company_id'         => $validated['company_id'] ?: null,
+                'company_id'         => $companyId,
                 'clearance_category' => $categoryKey,
-                'category_name'      => trim($validated['category_name']),
+                'category_name'      => $categoryName,
                 'item_name'          => trim($validated['item_name']),
                 'description'        => $validated['description'] ?? null,
-                'is_mandatory'       => $request->boolean('is_mandatory'),
-                'sort_order'         => $validated['sort_order'] ?? 0,
-                'status'             => $request->boolean('status', true),
+                'is_mandatory'       => $isMandatory,
+                'sort_order'         => $sortOrder,
+                'status'             => $status,
             ]);
         });
     }
