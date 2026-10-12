@@ -316,4 +316,26 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
     {
         return $salaryComponent->delete();
     }
+
+    public function storePayGroup(array $validated): PayGroup
+    {
+        return PayGroup::create($validated);
+    }
+
+    public function updatePayGroup(PayGroup $payGroup, array $validated): bool
+    {
+        return $payGroup->update($validated);
+    }
+
+    public function destroyPayGroup(PayGroup $payGroup): bool
+    {
+        return $payGroup->delete();
+    }
+
+    public function updatePayGroupRules(PayGroup $payGroup, array $rules): bool
+    {
+        return $payGroup->update([
+            'payroll_rules' => $rules,
+        ]);
+    }
 }

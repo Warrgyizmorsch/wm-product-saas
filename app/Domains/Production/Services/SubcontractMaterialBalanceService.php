@@ -212,6 +212,8 @@ class SubcontractMaterialBalanceService
 
                             $wip = \App\Domains\Production\Models\ProductionWip::create([
                                 'tenant_id' => $tenantId,
+                                'company_id' => $challan->productionOrder?->company_id ?? $challan->company_id ?? company_id(),
+                                'branch_id' => $challan->productionOrder?->branch_id ?? $challan->branch_id ?? branch_id(),
                                 'production_order_id' => $challan->production_order_id,
                                 'production_batch_id' => $batch?->id,
                                 'product_id' => $item->product_id ?: $challan->productionOrder?->product_id,
@@ -361,6 +363,8 @@ class SubcontractMaterialBalanceService
 
                             $wip = \App\Domains\Production\Models\ProductionWip::create([
                                 'tenant_id' => $tenantId,
+                                'company_id' => $order?->company_id ?? $challan->company_id ?? company_id(),
+                                'branch_id' => $order?->branch_id ?? $challan->branch_id ?? branch_id(),
                                 'production_order_id' => $challan->production_order_id,
                                 'production_batch_id' => $batch?->id,
                                 'product_id' => $firstItem?->product_id ?: $order?->product_id,

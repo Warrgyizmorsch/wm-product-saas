@@ -1,5 +1,5 @@
 <!-- 1. ASSET ITEMS TAB -->
-<div class="tab-pane fade show active" id="items-pane" role="tabpanel" aria-labelledby="items-tab">
+<div class="tab-pane fade {{ request('tab', 'items-pane') === 'items-pane' ? 'show active' : '' }}" id="items-pane" role="tabpanel" aria-labelledby="items-pane-tab">
     <div>
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
             <div>
@@ -8,6 +8,7 @@
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <!-- Items Search & Filter Form -->
                 <form method="GET" action="{{ route('hrms.assets.index') }}" class="d-flex align-items-center gap-2 m-0">
+                    <input type="hidden" name="tab" value="items-pane">
                     @foreach(['registry_search', 'registry_category_id', 'registry_status', 'registry_condition', 'category_search', 'category_company_id', 'request_search', 'request_category_id', 'request_company_id', 'request_status'] as $param)
                         @if(request()->filled($param))
                             <input type="hidden" name="{{ $param }}" value="{{ request($param) }}">
@@ -55,16 +56,16 @@
                             </div>
 
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('hrms.assets.index', request()->except(['item_search', 'item_company_id', 'item_category_id'])) }}" class="btn btn-sm btn-light border">{{ __('hrms.common.reset') }}</a>
+                                <a href="{{ route('hrms.assets.index', array_merge(request()->except(['item_search', 'item_company_id', 'item_category_id']), ['tab' => 'items-pane'])) }}" class="btn btn-sm btn-light border">{{ __('hrms.common.reset') }}</a>
                                 <button type="submit" class="btn btn-sm btn-primary">{{ __('hrms.common.apply') }}</button>
                             </div>
                         </x-ui.filter>
 
-                    @if(request()->anyFilled(['item_search', 'item_company_id', 'item_category_id']))
-                        <a href="{{ route('hrms.assets.index', request()->except(['item_search', 'item_company_id', 'item_category_id'])) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="Clear Filters">
-                            <i class="feather-x"></i>
-                        </a>
-                    @endif
+                        @if(request()->anyFilled(['item_search', 'item_company_id', 'item_category_id']))
+                            <a href="{{ route('hrms.assets.index', array_merge(request()->except(['item_search', 'item_company_id', 'item_category_id']), ['tab' => 'items-pane'])) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="{{ __('hrms.common.reset') }}">
+                                <i class="feather-x"></i>
+                            </a>
+                        @endif
                     </div>
                 </form>
             </div>
@@ -102,7 +103,7 @@
                                 </td>
                                 <td class="py-3 text-end px-4">
                                     <div class="d-flex justify-content-end align-items-center gap-2">
-                                        <button class="btn btn-sm btn-icon btn-light toggle-assets-btn" type="button" data-item-id="{{ $itemObj->id }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;" title="Toggle Serialized Assets">
+                                        <button class="btn btn-sm btn-icon btn-light toggle-assets-btn" type="button" data-item-id="{{ $itemObj->id }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;" title="{{ __('hrms.assets.serialized_units_registry') }}">
                                             <i class="feather-chevron-right toggle-icon"></i>
                                         </button>
                                         <x-ui.action-dropdown>
@@ -296,7 +297,7 @@
                                                                  </td>
                                                                  <td class="py-2 text-end px-3">
                                                                      <div class="d-flex justify-content-end gap-1 align-items-center">
-                                                                         <button type="button" class="btn btn-xs btn-icon btn-light text-primary show-history-btn" title="View Allocation History" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})" data-allocations="{{ base64_encode($asset->allocations()->with('employee')->get()->toJson()) }}">
+                                                                         <button type="button" class="btn btn-xs btn-icon btn-light text-primary show-history-btn" title="{{ __('hrms.assets.allocation_history') }}" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})" data-allocations="{{ base64_encode($asset->allocations()->with('employee')->get()->toJson()) }}">
                                                                              <i class="feather-clock" style="font-size: 11px;"></i>
                                                                          </button>
                                                                          <form action="{{ route('hrms.assets.destroy', $asset->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.assets.confirm_delete_asset') }}', { title: '{{ __('hrms.assets.delete_asset_title') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
@@ -356,7 +357,7 @@
 </div>{{-- /#items-pane --}}
 
 <!-- MODAL: ADD ASSET -->
-<div class="modal fade" id="addAssetModal" aria-labelledby="addAssetModalLabel" aria-hidden="true">
+<div class="modal fade" id="addAssetModal" tabindex="-1" aria-labelledby="addAssetModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -370,24 +371,24 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="Asset Category" name="asset_category_id" :required="true" select2-selector="default">
-                                <option value="">Select Category</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.tbl_category') }}" name="asset_category_id" id="add_asset_category_id" :required="true" select2-selector="default">
+                                <option value="">{{ __('hrms.assets.select_category') }}</option>
                                 @foreach($categories as $category)
                                     <option value="{{ $category->id }}" {{ old('asset_category_id') == $category->id ? 'selected' : '' }}>{{ $category->name }} ({{ $category->company->company_name ?? 'All' }})</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="Item Name" name="name" placeholder="e.g. Laptop, Mobile Phone, Office Desk" :required="true" value="{{ old('name') }}" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.lbl_item_name') }}" name="name" placeholder="{{ __('hrms.assets.placeholder_item_name') }}" :required="true" value="{{ old('name') }}" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="Item Description" name="description" placeholder="Brief details about this item..." value="{{ old('description') }}" />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.lbl_item_description') }}" name="description" placeholder="{{ __('hrms.assets.placeholder_item_desc') }}" value="{{ old('description') }}" />
                         </div>
                         <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.brand_vendor') }}" name="brand" placeholder="e.g. Apple" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.brand_vendor') }}" name="brand" placeholder="{{ __('hrms.assets.placeholder_brand') }}" />
                         </div>
                         <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.model_number') }}" name="model_number" placeholder="e.g. A2442" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.model_number') }}" name="model_number" placeholder="{{ __('hrms.assets.placeholder_model') }}" />
                         </div>
                         <div class="col-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_date') }}" name="purchase_date" inputType="date" />
@@ -396,53 +397,53 @@
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_cost') }}" name="purchase_cost" inputType="number" step="0.01" placeholder="0.00" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.internal_notes') }}" name="notes" placeholder="Condition details, license specifications, configurations..." />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.internal_notes') }}" name="notes" placeholder="{{ __('hrms.assets.placeholder_notes') }}" />
                         </div>
                         
                         <div class="col-12 border-top pt-3 mt-3">
-                            <h6 class="fw-bold text-dark mb-3">Serialized Units Registry</h6>
+                            <h6 class="fw-bold text-dark mb-3">{{ __('hrms.assets.serialized_units_registry') }}</h6>
                             
                             <!-- Code generator panel -->
                             <div class="bg-light p-3 rounded mb-3 border d-flex align-items-center justify-content-between gap-3 flex-wrap">
                                 <div class="d-flex align-items-center gap-2">
-                                    <label class="form-label mb-0 fs-12 fw-bold text-muted">Generate Sequential Codes:</label>
-                                    <input type="text" id="gen_prefix" class="form-control form-control-sm" placeholder="Prefix (e.g. AST-)" style="width: 200px; height: 32px;">
-                                    <input type="number" id="gen_count" class="form-control form-control-sm" placeholder="Count" min="1" max="50" style="width: 100px; height: 32px;">
-                                    <button type="button" class="btn btn-sm btn-primary fw-bold text-uppercase" id="btn-generate-units" style="height: 32px;">Generate</button>
+                                    <label class="form-label mb-0 fs-12 fw-bold text-muted">{{ __('hrms.assets.generate_sequential_codes') }}</label>
+                                    <input type="text" id="gen_prefix" class="form-control form-control-sm" placeholder="{{ __('hrms.assets.placeholder_prefix') }}" style="width: 200px; height: 32px;">
+                                    <input type="number" id="gen_count" class="form-control form-control-sm" placeholder="{{ __('hrms.assets.placeholder_count') }}" min="1" max="50" style="width: 100px; height: 32px;">
+                                    <button type="button" class="btn btn-sm btn-primary fw-bold text-uppercase" id="btn-generate-units" style="height: 32px;">{{ __('hrms.assets.btn_generate') }}</button>
                                 </div>
-                                <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" id="btn-add-unit-row" style="height: 32px;"><i class="feather-plus me-1"></i>Add Row</button>
+                                <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" id="btn-add-unit-row" style="height: 32px;"><i class="feather-plus me-1"></i>{{ __('hrms.assets.btn_add_row') }}</button>
                             </div>
 
                             <div class="table-responsive border rounded bg-white" style="max-height: 250px;">
                                 <table class="table table-sm table-hover align-middle mb-0 text-center" id="bulk-units-table">
                                     <thead class="table-light text-uppercase fs-11" style="position: sticky; top: 0; z-index: 2;">
                                         <tr>
-                                            <th class="py-2.5 px-3 text-start">Asset Code (Unique ID) *</th>
-                                            <th class="py-2.5">Serial Number *</th>
-                                            <th class="py-2.5">Condition *</th>
-                                            <th class="py-2.5 text-end px-3">Action</th>
+                                            <th class="py-2.5 px-3 text-start">{{ __('hrms.assets.asset_code_unique') }}</th>
+                                            <th class="py-2.5">{{ __('hrms.assets.tbl_serial_number') }} *</th>
+                                            <th class="py-2.5">{{ __('hrms.assets.tbl_condition') }} *</th>
+                                            <th class="py-2.5 text-end px-3">{{ __('hrms.assets.actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody id="bulk-units-tbody">
                                         <tr>
                                             <td class="py-2 px-3 text-start">
-                                                <input type="text" name="units[0][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required>
+                                                <input type="text" name="units[0][asset_code]" class="form-control form-control-sm text-center fs-12 fw-semibold" placeholder="{{ __('hrms.assets.placeholder_asset_code') }}" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
                                             </td>
                                             <td class="py-2">
-                                                <input type="text" name="units[0][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN-XXXX" required>
+                                                <input type="text" name="units[0][serial_number]" class="form-control form-control-sm text-center fs-12" placeholder="{{ __('hrms.assets.placeholder_serial_number') }}" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
                                             </td>
-                                            <td class="py-2" style="min-width: 120px;">
-                                                <select name="units[0][condition]" class="odoo-table-select" required>
-                                                    <option value="good">Good</option>
-                                                    <option value="new">New</option>
-                                                    <option value="fair">Fair</option>
-                                                    <option value="damaged">Damaged</option>
-                                                    <option value="scrapped">Scrapped</option>
+                                            <td class="py-2" style="min-width: 140px;">
+                                                <select name="units[0][condition]" class="form-select form-select-sm fs-12 unit-condition-select" data-select2-selector="status" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
+                                                    <option value="good" data-bg="bg-success" selected>{{ __('hrms.assets.cond_good') }}</option>
+                                                    <option value="new" data-bg="bg-primary">{{ __('hrms.assets.cond_new') }}</option>
+                                                    <option value="fair" data-bg="bg-warning">{{ __('hrms.assets.cond_fair') }}</option>
+                                                    <option value="damaged" data-bg="bg-danger">{{ __('hrms.assets.cond_damaged') }}</option>
+                                                    <option value="scrapped" data-bg="bg-secondary">{{ __('hrms.assets.cond_scrapped') }}</option>
                                                 </select>
                                             </td>
                                             <td class="py-2 text-end px-3">
                                                 <div class="d-flex justify-content-end gap-1">
-                                                    <button type="button" class="btn btn-sm btn-soft-danger btn-remove-unit-row" disabled><i class="feather-trash-2"></i></button>
+                                                    <button type="button" class="btn btn-sm btn-icon btn-soft-danger btn-remove-unit-row" style="width: 32px; height: 32px; border-radius: 6px;" disabled><i class="feather-trash-2"></i></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -462,7 +463,7 @@
 </div>
 
 <!-- MODAL: EDIT ASSET -->
-<div class="modal fade" id="editAssetModal" aria-labelledby="editAssetModalLabel" aria-hidden="true">
+<div class="modal fade" id="editAssetModal" tabindex="-1" aria-labelledby="editAssetModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -479,7 +480,7 @@
                             <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.asset_item') }}" name="asset_item_id" id="edit_asset_item_id" :required="true" select2-selector="default">
                                 <option value="">{{ __('hrms.assets.select_item') }}</option>
                                 @foreach($items as $itm)
-                                    <option value="{{ $itm->id }}">{{ $itm->name }} (Category: {{ $itm->category->name ?? 'N/A' }})</option>
+                                    <option value="{{ $itm->id }}">{{ $itm->name }} ({{ __('hrms.assets.tbl_category') }}: {{ $itm->category->name ?? __('hrms.common.na') }})</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
@@ -490,10 +491,10 @@
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.asset_name_label') }}" name="name" id="edit_name" :required="true" />
                         </div>
                         <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.brand_vendor') }}" name="brand" id="edit_brand" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.brand_vendor') }}" name="brand" id="edit_brand" placeholder="{{ __('hrms.assets.placeholder_brand') }}" />
                         </div>
                         <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.model_number') }}" name="model_number" id="edit_model_number" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.model_number') }}" name="model_number" id="edit_model_number" placeholder="{{ __('hrms.assets.placeholder_model') }}" />
                         </div>
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.serial_number') }}" name="serial_number" id="edit_serial_number" :required="true" />
@@ -505,16 +506,16 @@
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_cost') }}" name="purchase_cost" id="edit_purchase_cost" inputType="number" step="0.01" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.condition') }}" name="condition" id="edit_condition" :required="true" select2-selector="default">
-                                <option value="good">{{ __('hrms.assets.cond_good') }}</option>
-                                <option value="new">{{ __('hrms.assets.cond_new') }}</option>
-                                <option value="fair">{{ __('hrms.assets.cond_fair') }}</option>
-                                <option value="damaged">{{ __('hrms.assets.cond_damaged') }}</option>
-                                <option value="scrapped">{{ __('hrms.assets.cond_scrapped') }}</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.condition') }}" name="condition" id="edit_condition" :required="true" select2-selector="status">
+                                <option value="good" data-bg="bg-success">{{ __('hrms.assets.cond_good') }}</option>
+                                <option value="new" data-bg="bg-primary">{{ __('hrms.assets.cond_new') }}</option>
+                                <option value="fair" data-bg="bg-warning">{{ __('hrms.assets.cond_fair') }}</option>
+                                <option value="damaged" data-bg="bg-danger">{{ __('hrms.assets.cond_damaged') }}</option>
+                                <option value="scrapped" data-bg="bg-secondary">{{ __('hrms.assets.cond_scrapped') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.internal_notes') }}" name="notes" id="edit_notes" />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.internal_notes') }}" name="notes" id="edit_notes" placeholder="{{ __('hrms.assets.placeholder_notes') }}" />
                         </div>
                     </div>
                 </div>
@@ -528,7 +529,7 @@
 </div>
 
 <!-- MODAL: IMPORT ASSETS -->
-<div class="modal fade" id="importAssetModal" tabindex="-1" aria-labelledby="importAssetModalLabel" aria-hidden="true">
+<div class="modal fade" id="importAssetModal" tabindex="-1" aria-labelledby="importAssetModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header">
@@ -559,13 +560,13 @@
                              <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="asset_import_file">
                                  <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
                                  <span class="file-text text-muted" id="asset_import_file_text">{{ __('hrms.assets.select_excel_file') }}</span>
-                                 <input type="file" name="file" id="asset_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('asset_import_file_text').innerText = this.files[0]?.name || '{{ __('hrms.assets.select_excel_file') }}'">
+                                 <input type="file" name="file" id="asset_import_file" class="d-none" required accept=".xlsx,.xls,.csv" onchange="document.getElementById('asset_import_file_text').innerText = this.files[0]?.name || '{{ __('hrms.assets.select_excel_file') }}'">
                              </label>
                          </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.import') }}</button>
+                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.common.import') }}</button>
                     <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.discard') }}</button>
                 </div>
             </form>
@@ -574,7 +575,7 @@
 </div>
 
 <!-- MODAL: ALLOCATE ASSET -->
-<div class="modal fade" id="allocateAssetModal" aria-labelledby="allocateAssetModalLabel" aria-hidden="true">
+<div class="modal fade" id="allocateAssetModal" tabindex="-1" aria-labelledby="allocateAssetModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -632,7 +633,7 @@
                                 <div id="request_assets_checklist" class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
                                     <!-- Checklist populated via JS -->
                                 </div>
-                                <small class="text-muted mt-1 d-block">Select physical units to fulfill the request (maximum <span id="max_selectable_count" class="fw-bold text-primary">0</span> unit(s)).</small>
+                                <small class="text-muted mt-1 d-block">{{ __('hrms.assets.select_up_to_units', ['qty' => '']) }} <span id="max_selectable_count" class="fw-bold text-primary">0</span></small>
                             </div>
                         </div>
 
@@ -654,7 +655,7 @@
 </div>
 
 <!-- MODAL: ADD ASSET ITEM -->
-<div class="modal fade" id="addAssetItemModal" tabindex="-1" aria-labelledby="addAssetItemModalLabel" aria-hidden="true">
+<div class="modal fade" id="addAssetItemModal" tabindex="-1" aria-labelledby="addAssetItemModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -676,10 +677,10 @@
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.lbl_item_name') }}" name="name" placeholder="e.g. Laptop, Mobile Phone, Office Desk" :required="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.lbl_item_name') }}" name="name" placeholder="{{ __('hrms.assets.placeholder_item_name') }}" :required="true" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" placeholder="Brief details about this item..." />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" placeholder="{{ __('hrms.assets.placeholder_item_desc') }}" />
                         </div>
                     </div>
                 </div>
@@ -693,7 +694,7 @@
 </div>
 
 <!-- MODAL: EDIT ASSET ITEM -->
-<div class="modal fade" id="editAssetItemModal" aria-labelledby="editAssetItemModalLabel" aria-hidden="true">
+<div class="modal fade" id="editAssetItemModal" tabindex="-1" aria-labelledby="editAssetItemModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -716,16 +717,16 @@
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.lbl_item_name') }}" name="name" id="edit_item_name" placeholder="e.g. Laptop, Mobile Phone, Office Desk" :required="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.lbl_item_name') }}" name="name" id="edit_item_name" placeholder="{{ __('hrms.assets.placeholder_item_name') }}" :required="true" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.lbl_item_description') }}" name="description" id="edit_item_description" placeholder="Brief details about this item..." />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.lbl_item_description') }}" name="description" id="edit_item_description" placeholder="{{ __('hrms.assets.placeholder_item_desc') }}" />
                         </div>
                         <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.brand_vendor') }}" name="brand" id="edit_item_brand" placeholder="e.g. Apple" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.brand_vendor') }}" name="brand" id="edit_item_brand" placeholder="{{ __('hrms.assets.placeholder_brand') }}" />
                         </div>
                         <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.model_number') }}" name="model_number" id="edit_item_model_number" placeholder="e.g. A2442" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.model_number') }}" name="model_number" id="edit_item_model_number" placeholder="{{ __('hrms.assets.placeholder_model') }}" />
                         </div>
                         <div class="col-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_date') }}" name="purchase_date" id="edit_item_purchase_date" inputType="date" />
@@ -734,7 +735,7 @@
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_cost') }}" name="purchase_cost" id="edit_item_purchase_cost" inputType="number" step="0.01" placeholder="0.00" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.internal_notes') }}" name="notes" id="edit_item_notes" placeholder="Condition details, license specifications, configurations..." />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.internal_notes') }}" name="notes" id="edit_item_notes" placeholder="{{ __('hrms.assets.placeholder_notes') }}" />
                         </div>
 
                         <div class="col-12 border-top pt-3 mt-3">
@@ -744,8 +745,8 @@
                             <div class="bg-light p-3 rounded mb-3 border d-flex align-items-center justify-content-between gap-3 flex-wrap">
                                 <div class="d-flex align-items-center gap-2">
                                     <label class="form-label mb-0 fs-12 fw-bold text-muted">{{ __('hrms.assets.generate_sequential_codes') }}</label>
-                                    <input type="text" id="edit_item_gen_prefix" class="form-control form-control-sm" placeholder="Prefix (e.g. AST-)" style="width: 200px; height: 32px;">
-                                    <input type="number" id="edit_item_gen_count" class="form-control form-control-sm" placeholder="Count" min="1" max="50" style="width: 100px; height: 32px;">
+                                    <input type="text" id="edit_item_gen_prefix" class="form-control form-control-sm" placeholder="{{ __('hrms.assets.placeholder_prefix') }}" style="width: 200px; height: 32px;">
+                                    <input type="number" id="edit_item_gen_count" class="form-control form-control-sm" placeholder="{{ __('hrms.assets.placeholder_count') }}" min="1" max="50" style="width: 100px; height: 32px;">
                                     <button type="button" class="btn btn-sm btn-primary fw-bold text-uppercase" id="edit-item-btn-generate-units" style="height: 32px;">{{ __('hrms.assets.btn_generate') }}</button>
                                 </div>
                                 <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" id="edit-item-btn-add-unit-row" style="height: 32px;"><i class="feather-plus me-1"></i>{{ __('hrms.assets.btn_add_row') }}</button>
@@ -779,7 +780,7 @@
 </div>
 
 <!-- MODAL: RETURN ASSET -->
-<div class="modal fade" id="returnAssetModal" aria-labelledby="returnAssetModalLabel" aria-hidden="true">
+<div class="modal fade" id="returnAssetModal" tabindex="-1" aria-labelledby="returnAssetModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -802,26 +803,26 @@
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <label class="info-label mb-2 fw-bold text-dark d-block">Select Serialized Assets to Return</label>
+                            <label class="info-label mb-2 fw-bold text-dark d-block">{{ __('hrms.assets.select_serialized_to_return') }}</label>
                             <div id="return_assets_checklist" class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
-                                <span class="text-muted fs-12">Please select an employee first.</span>
+                                <span class="text-muted fs-12">{{ __('hrms.assets.select_employee_first') }}</span>
                             </div>
-                            <small class="text-muted mt-1 d-block">Select the specific physical units being returned.</small>
+                            <small class="text-muted mt-1 d-block">{{ __('hrms.assets.select_physical_units_returned') }}</small>
                         </div>
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.return_date') }}" name="returned_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.return_condition') }}" name="return_condition" :required="true" select2-selector="default">
-                                <option value="good">{{ __('hrms.assets.cond_good') }}</option>
-                                <option value="new">{{ __('hrms.assets.cond_new') }}</option>
-                                <option value="fair">{{ __('hrms.assets.cond_fair') }}</option>
-                                <option value="damaged">{{ __('hrms.assets.cond_damaged') }} ({{ __('hrms.assets.needs_maintenance') }})</option>
-                                <option value="scrapped">{{ __('hrms.assets.cond_scrapped') }}</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.return_condition') }}" name="return_condition" :required="true" select2-selector="status">
+                                <option value="good" data-bg="bg-success">{{ __('hrms.assets.cond_good') }}</option>
+                                <option value="new" data-bg="bg-primary">{{ __('hrms.assets.cond_new') }}</option>
+                                <option value="fair" data-bg="bg-warning">{{ __('hrms.assets.cond_fair') }}</option>
+                                <option value="damaged" data-bg="bg-danger">{{ __('hrms.assets.cond_damaged') }} ({{ __('hrms.assets.needs_maintenance') }})</option>
+                                <option value="scrapped" data-bg="bg-secondary">{{ __('hrms.assets.cond_scrapped') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.return_notes') }}" name="return_notes" placeholder="Condition details, damage details, return notes..." />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.return_notes') }}" name="return_notes" placeholder="{{ __('hrms.assets.placeholder_return_notes') }}" />
                         </div>
                     </div>
                 </div>
@@ -835,7 +836,7 @@
 </div>
 
 <!-- MODAL: ASSET HISTORY LOG -->
-<div class="modal fade" id="assetHistoryModal" tabindex="-1" aria-labelledby="assetHistoryModalLabel" aria-hidden="true">
+<div class="modal fade" id="assetHistoryModal" tabindex="-1" aria-labelledby="assetHistoryModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -871,7 +872,7 @@
 </div>
 
 <!-- MODAL: ITEM ALLOCATION HISTORY LOG -->
-<div class="modal fade" id="itemHistoryModal" tabindex="-1" aria-labelledby="itemHistoryModalLabel" aria-hidden="true">
+<div class="modal fade" id="itemHistoryModal" tabindex="-1" aria-labelledby="itemHistoryModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header border-bottom py-3">
@@ -906,7 +907,7 @@
                 </div>
             </div>
             <div class="modal-footer py-2">
-                <button type="button" class="btn btn-light-brand px-4" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-light-brand px-4" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
             </div>
         </div>
     </div>

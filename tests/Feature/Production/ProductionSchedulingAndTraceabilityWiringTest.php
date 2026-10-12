@@ -259,5 +259,53 @@ class ProductionSchedulingAndTraceabilityWiringTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('BAT-2026-000200');
         $response->assertSee('Export CSV');
+        $response->assertSee(__('production.total_operations'));
+    }
+
+    /** @test */
+    public function traceability_kpi_card_renders_canonical_total_operations_label_across_locales()
+    {
+        $product = \App\Domains\Inventory\Models\Product::create([
+            'tenant_id' => $this->tenantId,
+            'name'      => 'Locale Test Product',
+            'sku'       => 'SKU-LOC-01',
+            'type'      => 'manufactured',
+        ]);
+
+        $order = ProductionOrder::create([
+            'tenant_id'         => $this->tenantId,
+            'order_number'      => 'ORD-LOC-001',
+            'product_id'        => $product->id,
+            'quantity_ordered'  => 5,
+            'quantity_produced' => 0,
+            'status'            => ProductionOrder::STATUS_DRAFT,
+            'start_date'        => now()->toDateString(),
+            'end_date'          => now()->addDays(5)->toDateString(),
+        ]);
+
+        $batch = ProductionBatch::create([
+            'tenant_id'           => $this->tenantId,
+            'batch_number'        => 'BAT-LOC-001',
+            'production_order_id' => $order->id,
+            'product_id'          => $product->id,
+            'planned_quantity'    => 5.0,
+            'actual_quantity'     => 0.0,
+            'status'              => 'planned',
+        ]);
+
+        foreach (['en', 'hi', 'bg'] as $locale) {
+            app()->setLocale($locale);
+            $expectedLabel = __('production.total_operations');
+
+            $response = $this->withHeader('X-Tenant', 'test-tenant')
+                ->get(route('production.mes.traceability.search', [
+                    'type' => 'batch',
+                    'code' => 'BAT-LOC-001',
+                ]));
+
+            $response->assertStatus(200);
+            $response->assertSee($expectedLabel);
+        }
     }
 }
+

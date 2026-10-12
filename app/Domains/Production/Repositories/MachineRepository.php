@@ -105,10 +105,16 @@ class MachineRepository implements MachineRepositoryInterface
     public function getDashboardMachines(int $tenantId): Collection
     {
         $machines = Machine::where('tenant_id', $tenantId)
-            ->whereIn('status', [Machine::STATUS_ACTIVE, Machine::STATUS_UNDER_MAINTENANCE])
-            ->with(['workCenter', 'maintenanceWorkOrders' => function ($q) {
-                $q->whereIn('status', ['draft', 'scheduled', 'in_progress'])->orderByDesc('created_at');
-            }])
+            ->whereNotIn('status', ['sold'])
+            ->with([
+                'workCenter',
+                'maintenanceWorkOrders' => function ($q) {
+                    $q->whereIn('status', ['draft', 'scheduled', 'in_progress'])->orderByDesc('created_at');
+                },
+                'downtimes' => function ($q) {
+                    $q->where('status', 'open')->orderByDesc('id');
+                },
+            ])
             ->orderBy('name')
             ->get();
 
@@ -124,6 +130,7 @@ class MachineRepository implements MachineRepositoryInterface
         $machines->each(function ($machine) use ($runningOps) {
             $machine->currentOp = $runningOps->get($machine->id);
             $machine->activeMaintenanceWo = $machine->maintenanceWorkOrders->first();
+            $machine->activeDowntime = $machine->downtimes->first();
         });
 
         return $machines;
@@ -131,7 +138,7 @@ class MachineRepository implements MachineRepositoryInterface
 
     public function getMachineDashboardDetails(int $machineId): array
     {
-        $machine = Machine::with('workCenter')->findOrFail($machineId);
+        $machine = Machine::with(['workCenter', 'asset'])->findOrFail($machineId);
 
         $currentOp = \App\Domains\Production\Models\ProductionScheduleOperation::with(['schedule.order.product', 'orderOperation', 'workCenter'])
             ->where('machine_id', $machine->id)

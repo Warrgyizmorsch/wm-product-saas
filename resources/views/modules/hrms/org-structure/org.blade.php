@@ -5,27 +5,30 @@
 @section('breadcrumb', 'HRMS / ' . __('hrms.org.title'))
 
 @section('page-actions')
-    <div id="add-btn-legal-entities" class="org-add-btn-wrapper">
+    @php
+        $activeTab = request('tab', 'legal-entities');
+    @endphp
+    <div id="add-btn-legal-entities" class="org-add-btn-wrapper {{ ($activeTab === 'legal-entities' || empty($activeTab)) ? '' : 'd-none' }}">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addCompanyModal">
             {{ __('hrms.org.add_legal_entity') }}
         </x-ui.button>
     </div>
-    <div id="add-btn-business-units" class="org-add-btn-wrapper d-none">
+    <div id="add-btn-business-units" class="org-add-btn-wrapper {{ $activeTab === 'business-units' ? '' : 'd-none' }}">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addBuModal">
             {{ __('hrms.org.add_business_unit') }}
         </x-ui.button>
     </div>
-    <div id="add-btn-branches" class="org-add-btn-wrapper d-none">
+    <div id="add-btn-branches" class="org-add-btn-wrapper {{ $activeTab === 'branches' ? '' : 'd-none' }}">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addBranchModal">
             {{ __('hrms.org.add_branch') }}
         </x-ui.button>
     </div>
-    <div id="add-btn-departments" class="org-add-btn-wrapper d-none">
+    <div id="add-btn-departments" class="org-add-btn-wrapper {{ $activeTab === 'departments' ? '' : 'd-none' }}">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addDeptModal">
             {{ __('hrms.org.add_department') }}
         </x-ui.button>
     </div>
-    <div id="add-btn-designations" class="org-add-btn-wrapper d-none">
+    <div id="add-btn-designations" class="org-add-btn-wrapper {{ $activeTab === 'designations' ? '' : 'd-none' }}">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addDesigModal">
             {{ __('hrms.org.add_designation') }}
         </x-ui.button>
@@ -44,95 +47,6 @@
 
 @section('content')
     <style>
-        /* Modern layouts for connected settings sidebar */
-        @media (min-width: 992px) {
-            /* Override container paddings to allow flush layout next to main sidebar */
-            .nxl-content {
-                padding: 0 !important;
-            }
-            .page-header {
-                padding: 24px 24px 16px 24px !important;
-                margin-bottom: 0 !important;
-                border-bottom: 1px solid #e5e7eb;
-                background-color: #fff;
-            }
-            .main-content {
-                padding: 0 !important;
-            }
-            .settings-container {
-                display: flex;
-                min-height: calc(100vh - 120px);
-                background-color: #f8fafc;
-            }
-            .settings-sidebar-col {
-                width: 280px;
-                min-width: 280px;
-                background-color: #fff;
-                border-right: 1px solid #e5e7eb;
-                display: flex;
-                flex-direction: column;
-            }
-            .settings-content-col {
-                flex-grow: 1;
-                padding: 24px 30px;
-                background-color: #f8fafc;
-                min-width: 0;
-            }
-        }
-
-        @media (max-width: 991.98px) {
-            .settings-sidebar-col {
-                width: 100%;
-                background-color: #fff;
-                border-bottom: 1px solid #e5e7eb;
-                margin-bottom: 20px;
-                padding: 10px;
-            }
-            .settings-content-col {
-                width: 100%;
-                padding: 0 15px;
-            }
-        }
-
-        /* Settings Subsidebar Items */
-        #settingsSubSidebar .nav-link {
-            background-color: transparent;
-            transition: all 0.2s ease-in-out;
-            border-radius: 6px !important;
-            font-size: 14px;
-            font-weight: 500;
-            color: #475569 !important;
-            padding: 12px 16px !important;
-            border: 0 !important;
-        }
-        #settingsSubSidebar .nav-link:hover {
-            background-color: #f1f5f9;
-            color: var(--bs-primary) !important;
-        }
-        #settingsSubSidebar .nav-link.active {
-            background-color: var(--bs-primary) !important;
-            color: #fff !important;
-            font-weight: 600;
-        }
-
-        /* Underlined Horizontal Tabs */
-        #orgTabs .nav-link {
-            border: none !important;
-            background-color: transparent !important;
-            color: #64748b;
-            font-weight: 500;
-            padding: 12px 20px;
-            border-bottom: 2px solid transparent !important;
-            transition: all 0.2s ease-in-out;
-        }
-        #orgTabs .nav-link:hover {
-            color: var(--bs-primary);
-        }
-        #orgTabs .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom: 2px solid var(--bs-primary) !important;
-        }
-
         /* Colors and theme attributes */
         .bg-soft-purple { background-color: rgba(139, 92, 246, 0.08) !important; }
         .text-purple { color: #8b5cf6 !important; }
@@ -152,83 +66,65 @@
         }
     </style>
 
-    <div class="settings-container">
-        <!-- Right Content Column -->
-        <div class="settings-content-col erp-single-panel bg-white flex-grow-1 p-4 shadow-sm rounded border-0 text-dark">
-            <div class="tab-content" id="settingsSubSidebarContent">
-                <!-- Org Structure Pane -->
-                <div class="tab-pane fade show active" id="org-structure-pane" role="tabpanel" aria-labelledby="org-structure-menu">
-                    <div class="row">
-                        <!-- Horizontal Navigation directly above table content -->
-                        <div class="col-12 mb-3">
-                            <ul class="nav gap-2 border-bottom pb-2" id="orgTabs" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="legal-entities-tab" data-bs-toggle="tab" data-bs-target="#legal-entities" type="button" role="tab" aria-controls="legal-entities" aria-selected="true">
-                                        <i class="feather-home me-2"></i>{{ __('hrms.org.legal_entities') }}
-                                    </button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="business-units-tab" data-bs-toggle="tab" data-bs-target="#business-units" type="button" role="tab" aria-controls="business-units" aria-selected="false">
-                                        <i class="feather-briefcase me-2"></i>{{ __('hrms.org.business_units') }}
-                                    </button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="branches-tab" data-bs-toggle="tab" data-bs-target="#branches" type="button" role="tab" aria-controls="branches" aria-selected="false">
-                                        <i class="feather-map-pin me-2"></i>{{ __('hrms.org.branches') }}
-                                    </button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="departments-tab" data-bs-toggle="tab" data-bs-target="#departments" type="button" role="tab" aria-controls="departments" aria-selected="false">
-                                        <i class="feather-users me-2"></i>{{ __('hrms.org.departments') }}
-                                    </button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="designations-tab" data-bs-toggle="tab" data-bs-target="#designations" type="button" role="tab" aria-controls="designations" aria-selected="false">
-                                        <i class="feather-award me-2"></i>{{ __('hrms.org.designations') }}
-                                    </button>
-                                </li>
-                            </ul>
-                        </div>
+    @php
+        $activeTab = request('tab', 'legal-entities');
+        $orgTabs = [
+            [
+                'id' => 'legal-entities',
+                'label' => __('hrms.org.legal_entities'),
+                'active' => ($activeTab === 'legal-entities' || empty($activeTab)),
+                'icon' => 'feather-home',
+            ],
+            [
+                'id' => 'business-units',
+                'label' => __('hrms.org.business_units'),
+                'active' => ($activeTab === 'business-units'),
+                'icon' => 'feather-briefcase',
+            ],
+            [
+                'id' => 'branches',
+                'label' => __('hrms.org.branches'),
+                'active' => ($activeTab === 'branches'),
+                'icon' => 'feather-map-pin',
+            ],
+            [
+                'id' => 'departments',
+                'label' => __('hrms.org.departments'),
+                'active' => ($activeTab === 'departments'),
+                'icon' => 'feather-users',
+            ],
+            [
+                'id' => 'designations',
+                'label' => __('hrms.org.designations'),
+                'active' => ($activeTab === 'designations'),
+                'icon' => 'feather-award',
+            ],
+        ];
+    @endphp
 
-                        <!-- Tabs Content -->
-                        <div class="col-12">
-                            <div class="tab-content" id="orgTabsContent">
-                                <div class="tab-pane fade show active" id="legal-entities" role="tabpanel" aria-labelledby="legal-entities-tab">
-                                    @include('modules.hrms.org-structure.tabs.legal-entities')
-                                </div>
-                                <div class="tab-pane fade" id="business-units" role="tabpanel" aria-labelledby="business-units-tab">
-                                    @include('modules.hrms.org-structure.tabs.business-units')
-                                </div>
-                                <div class="tab-pane fade" id="branches" role="tabpanel" aria-labelledby="branches-tab">
-                                    @include('modules.hrms.org-structure.tabs.branches')
-                                </div>
-                                <div class="tab-pane fade" id="departments" role="tabpanel" aria-labelledby="departments-tab">
-                                    @include('modules.hrms.org-structure.tabs.departments')
-                                </div>
-                                <div class="tab-pane fade" id="designations" role="tabpanel" aria-labelledby="designations-tab">
-                                    @include('modules.hrms.org-structure.tabs.designations')
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+    <div class="row">
+        <!-- Horizontal Navigation using Common UI Horizontal Tabs Component -->
+        <div class="col-12 mb-3">
+            <x-ui.horizontal-tabs id="orgTabs" :tabs="$orgTabs" :syncUrl="true" />
+        </div>
+
+        <!-- Tabs Content -->
+        <div class="col-12">
+            <div class="tab-content pt-2" id="orgTabsContent">
+                <div class="tab-pane fade {{ ($activeTab === 'legal-entities' || empty($activeTab)) ? 'show active' : '' }}" id="legal-entities" role="tabpanel" aria-labelledby="legal-entities-tab">
+                    @include('modules.hrms.org-structure.tabs.legal-entities')
                 </div>
-
-                <!-- Salary Structure Pane -->
-                <div class="tab-pane fade" id="salary-structure-pane" role="tabpanel" aria-labelledby="salary-structure-menu">
-                    @include('modules.hrms.salary-structure.tabs.salary-components')
+                <div class="tab-pane fade {{ $activeTab === 'business-units' ? 'show active' : '' }}" id="business-units" role="tabpanel" aria-labelledby="business-units-tab">
+                    @include('modules.hrms.org-structure.tabs.business-units')
                 </div>
-
-                <!-- Leave Structure Pane -->
-                <div class="tab-pane fade" id="leave-structure-pane" role="tabpanel" aria-labelledby="leave-structure-menu">
-                    <div class="card stretch stretch-full mb-0">
-                        <div class="card-body py-5 text-center">
-                            <div class="avatar-text avatar-xl bg-soft-warning text-warning mx-auto mb-4" style="width: 60px; height: 60px; min-width: 60px; min-height: 60px;">
-                                <i class="feather-calendar fs-24"></i>
-                            </div>
-                            <h4 class="fw-bold mb-2">{{ __('hrms.org.leave_structure_settings') }}</h4>
-                            <p class="text-muted mb-0">{{ __('hrms.org.leave_structure_desc') }}</p>
-                        </div>
-                    </div>
+                <div class="tab-pane fade {{ $activeTab === 'branches' ? 'show active' : '' }}" id="branches" role="tabpanel" aria-labelledby="branches-tab">
+                    @include('modules.hrms.org-structure.tabs.branches')
+                </div>
+                <div class="tab-pane fade {{ $activeTab === 'departments' ? 'show active' : '' }}" id="departments" role="tabpanel" aria-labelledby="departments-tab">
+                    @include('modules.hrms.org-structure.tabs.departments')
+                </div>
+                <div class="tab-pane fade {{ $activeTab === 'designations' ? 'show active' : '' }}" id="designations" role="tabpanel" aria-labelledby="designations-tab">
+                    @include('modules.hrms.org-structure.tabs.designations')
                 </div>
             </div>
         </div>
@@ -245,23 +141,11 @@
             });
 
             // Toggle Add buttons in header on tab change
-            $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-                const targetTabId = e.target.getAttribute('aria-controls');
+            $(document).on('shown.bs.tab', '#orgTabs button, #orgTabs a', function (e) {
+                const targetTabId = (e.target.getAttribute('aria-controls') || e.target.getAttribute('data-bs-target') || '').replace('#', '');
                 $('.org-add-btn-wrapper').addClass('d-none');
                 $('#add-btn-' + targetTabId).removeClass('d-none');
             });
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const tabParam = urlParams.get('tab');
-            const companyFormMode = @json(old('form_mode'));
-            if (tabParam) {
-                setTimeout(function() {
-                    const tabButton = document.getElementById(tabParam + '-tab');
-                    if (tabButton) {
-                        tabButton.click();
-                    }
-                }, 100);
-            }
 
             // AJAX Quick Search, Sort, Filter, and Pagination for Organization Structure
             let searchTimeout = null;
@@ -520,22 +404,30 @@
             }
             initFilterSelects();
 
-            if (companyFormMode === 'add_company') {
-                setTimeout(function() {
-                    const modalElement = document.getElementById('addCompanyModal');
-                    if (modalElement) {
-                        bootstrap.Modal.getOrCreateInstance(modalElement).show();
-                    }
-                }, 150);
-            }
-
-            if (companyFormMode === 'edit_company') {
-                setTimeout(function() {
-                    const modalElement = document.getElementById('editCompanyModal');
-                    if (modalElement) {
-                        bootstrap.Modal.getOrCreateInstance(modalElement).show();
-                    }
-                }, 150);
+            // Handle auto-opening modals on validation redirection
+            const formMode = @json(old('form_mode', ''));
+            if (formMode) {
+                const modalMap = {
+                    'add_company': 'addCompanyModal',
+                    'edit_company': 'editCompanyModal',
+                    'add_bu': 'addBuModal',
+                    'edit_bu': 'editBuModal',
+                    'add_branch': 'addBranchModal',
+                    'edit_branch': 'editBranchModal',
+                    'add_dept': 'addDeptModal',
+                    'edit_dept': 'editDeptModal',
+                    'add_desig': 'addDesigModal',
+                    'edit_desig': 'editDesigModal'
+                };
+                const targetModalId = modalMap[formMode];
+                if (targetModalId) {
+                    setTimeout(function() {
+                        const modalElement = document.getElementById(targetModalId);
+                        if (modalElement) {
+                            bootstrap.Modal.getOrCreateInstance(modalElement).show();
+                        }
+                    }, 150);
+                }
             }
 
             // Generic modal Select2 initializer inside HRMS boundaries

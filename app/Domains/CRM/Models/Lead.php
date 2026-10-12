@@ -35,6 +35,25 @@ class Lead extends Model
             }
         });
 
+        static::saving(function ($lead) {
+            // Auto-detect and normalize lead_type (b2b vs b2c) across all ingestion sources
+            if (!empty($lead->lead_type)) {
+                $normalized = strtolower(trim((string)$lead->lead_type));
+                $lead->lead_type = ($normalized === 'b2c' || str_contains($normalized, 'individual') || str_contains($normalized, 'consumer')) ? 'b2c' : 'b2b';
+            } else {
+                $hasGstin = !empty(trim((string)$lead->gstin));
+                $companyName = trim((string)$lead->company_name);
+                $contactPerson = trim((string)$lead->contact_person);
+
+                $hasDistinctCompany = !empty($companyName) && 
+                    strcasecmp($companyName, 'Individual Customer') !== 0 && 
+                    strcasecmp($companyName, 'Walk-in Visitor') !== 0 &&
+                    ($companyName !== $contactPerson || $hasGstin);
+
+                $lead->lead_type = ($hasGstin || $hasDistinctCompany) ? 'b2b' : 'b2c';
+            }
+        });
+
         static::updating(function ($lead) {
             if ($lead->isDirty('status') && strtolower($lead->status) === 'won' && !$lead->crm_account_id) {
                 throw new \InvalidArgumentException('Cannot mark as Won. Account & Deal conversion required first!');
@@ -85,6 +104,7 @@ class Lead extends Model
         'is_customer',
         'documents',
         'additional_contacts',
+        'custom_fields',
     ];
 
     protected $casts = [
@@ -97,7 +117,24 @@ class Lead extends Model
         'product_items' => 'array',
         'documents' => 'array',
         'additional_contacts' => 'array',
+        'custom_fields' => 'array',
     ];
+
+    /**
+     * Get formatted key-value pairs for dynamic custom fields.
+     */
+    public function getCustomFieldsFormattedAttribute(): array
+    {
+        if (empty($this->custom_fields) || !is_array($this->custom_fields)) {
+            return [];
+        }
+        $result = [];
+        foreach ($this->custom_fields as $key => $value) {
+            $label = ucwords(str_replace('_', ' ', $key));
+            $result[$label] = is_array($value) ? implode(', ', $value) : $value;
+        }
+        return $result;
+    }
 
     /**
      * Get all interested products models.

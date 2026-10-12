@@ -4,7 +4,7 @@ namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\Accounting\Concerns\LogsAccountingActivity;
-use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\RecordsBranch;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Budget extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch, LogsAccountingActivity;
+    use HasFactory, BelongsToCompany, RecordsBranch, LogsAccountingActivity;
 
     public const STATUS_DRAFT = 'draft';
     public const STATUS_APPROVED = 'approved';

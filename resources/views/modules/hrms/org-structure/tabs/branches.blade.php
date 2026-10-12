@@ -47,40 +47,40 @@
                             
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.org.tbl_company') }}</label>
-                                <x-ui.odoo-form-ui type="select" name="br_company_id" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                                <select name="br_company_id" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
                                     <option value="">{{ __('hrms.common.all_companies') }}</option>
                                     @foreach($companiesList as $company)
                                         <option value="{{ $company->id }}" @selected((string) $filters['br_company_id'] === (string) $company->id)>
                                             {{ $company->company_name }}
                                         </option>
                                     @endforeach
-                                </x-ui.odoo-form-ui>
+                                </select>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.org.tbl_bu') }}</label>
-                                <x-ui.odoo-form-ui type="select" name="br_business_unit_id" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                                <select name="br_business_unit_id" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
                                     <option value="">{{ __('hrms.employees.lbl_all_bu') ?? __('hrms.org.empty_bu') }}</option>
                                     @foreach($businessUnitsList as $unit)
                                         <option value="{{ $unit->id }}" @selected((string) $filters['br_business_unit_id'] === (string) $unit->id)>
                                             {{ $unit->name }}
                                         </option>
                                     @endforeach
-                                </x-ui.odoo-form-ui>
+                                </select>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.org.tbl_status') }}</label>
-                                <x-ui.odoo-form-ui type="select" name="br_status" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                                <select name="br_status" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
                                     <option value="">{{ __('hrms.common.all_statuses') }}</option>
                                     <option value="1" @selected($filters['br_status'] === '1')>{{ __('hrms.employees.frm_status_active') }}</option>
                                     <option value="0" @selected($filters['br_status'] === '0')>{{ __('hrms.employees.frm_status_inactive') }}</option>
-                                </x-ui.odoo-form-ui>
+                                </select>
                             </div>
                             
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('hrms.org.index', ['tab' => 'branches']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">{{ __('hrms.common.reset') }}</a>
-                                <button type="submit" class="btn btn-sm btn-primary text-uppercase fw-bold py-2 px-3 text-white" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em;">{{ __('hrms.common.apply') }}</button>
+                                <x-ui.button href="{{ route('hrms.org.index', ['tab' => 'branches']) }}" variant="light" size="sm" class="text-uppercase fw-bold py-2 px-3">{{ __('hrms.common.reset') }}</x-ui.button>
+                                <x-ui.button type="submit" variant="primary" size="sm" class="text-uppercase fw-bold py-2 px-3">{{ __('hrms.common.apply') }}</x-ui.button>
                             </div>
                         </form>
                     </x-ui.filter>
@@ -133,7 +133,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end align-items-center">
-                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-branch" data-bs-toggle="modal" data-bs-target="#viewBranchModal" data-branch="{{ base64_encode($br->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;">
+                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-branch" data-bs-toggle="modal" data-bs-target="#viewBranchModal" data-branch="{{ base64_encode($br->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
                                             <i class="feather feather-eye"></i>
                                         </a>
                                         <x-ui.action-dropdown>
@@ -147,7 +147,7 @@
                                                      <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.common.delete') }}
                                                  </button>
                                              </li>
-                                        </x-ui.action-dropdown>
+                                         </x-ui.action-dropdown>
                                     </div>
                                 </form>
                             </td>
@@ -186,223 +186,216 @@
 
 <script>
     (function() {
-        function init() {
-            function getInitials(name, fallback) {
-                const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
+        function getInitials(name, fallback) {
+            const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
 
-                if (words.length >= 2) {
-                    return (words[0][0] + words[1][0]).toUpperCase();
-                }
-
-                return (words[0] || fallback || '').substring(0, 2).toUpperCase();
+            if (words.length >= 2) {
+                return (words[0][0] + words[1][0]).toUpperCase();
             }
 
-            // View Action Trigger
-            document.querySelectorAll('.btn-view-branch').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    let branch = JSON.parse(atob(this.dataset.branch));
-                    
-                    let nameEl = document.getElementById('modal_view_branch_name');
-                    if (nameEl) nameEl.innerText = branch.name;
-                    
-                    let buEl = document.getElementById('modal_view_branch_bu');
-                    if (buEl) buEl.innerText = (branch.business_unit && branch.business_unit.name) ? branch.business_unit.name : ((branch.company && branch.company.company_name) ? branch.company.company_name : 'N/A');
-                    
-                    let codeEl = document.getElementById('modal_view_branch_code');
-                    if (codeEl) codeEl.innerText = branch.code;
-                    
-                    let managerEl = document.getElementById('modal_view_branch_manager');
-                    if (managerEl) managerEl.innerText = (branch.manager) ? (branch.manager.first_name + ' ' + branch.manager.last_name) : 'N/A';
-                    
-                    let phoneEl = document.getElementById('modal_view_branch_phone');
-                    if (phoneEl) phoneEl.innerText = branch.phone || 'N/A';
-                    
-                    let emailEl = document.getElementById('modal_view_branch_email');
-                    if (emailEl) emailEl.innerText = branch.email || 'N/A';
-                    
-                    let countryEl = document.getElementById('modal_view_branch_country');
-                    if (countryEl) countryEl.innerText = branch.country || 'N/A';
-                    
-                    let stateEl = document.getElementById('modal_view_branch_state');
-                    if (stateEl) stateEl.innerText = branch.state || 'N/A';
-                    
-                    let cityEl = document.getElementById('modal_view_branch_city');
-                    if (cityEl) cityEl.innerText = branch.city || 'N/A';
-                    
-                    let zipEl = document.getElementById('modal_view_branch_zip');
-                    if (zipEl) zipEl.innerText = branch.postal_code || 'N/A';
-                    
-                    let addressEl = document.getElementById('modal_view_branch_address');
-                    if (addressEl) addressEl.innerText = branch.address || 'N/A';
-                    
-                    let avatarEl = document.getElementById('modal_view_branch_avatar');
-                    if (avatarEl) {
-                        avatarEl.innerText = getInitials(branch.name, 'BR');
-                    }
-                    
-                    let statusEl = document.getElementById('modal_view_branch_status');
-                    if (statusEl) {
-                        if (branch.status === true || branch.status === 1 || branch.status === '1') {
-                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success fw-bold fs-13">{{ __('hrms.employees.frm_status_active') }}</span>';
-                        } else {
-                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger fw-bold fs-13">{{ __('hrms.employees.frm_status_inactive') }}</span>';
-                        }
-                    }
-                });
-            });
+            return (words[0] || fallback || '').substring(0, 2).toUpperCase();
+        }
 
-            // Edit Action Trigger
-            document.querySelectorAll('.btn-edit-branch').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    let branch = JSON.parse(atob(this.dataset.branch));
-                    
-                    let nameEl = document.getElementById('edit_branch_name');
-                    if (nameEl) nameEl.value = branch.name || '';
-                    
-                    let codeEl = document.getElementById('edit_branch_code');
-                    if (codeEl) codeEl.value = branch.code || '';
-                    
-                    let buEl = document.getElementById('edit_branch_bu_id');
-                    if (buEl) {
-                        buEl.value = branch.business_unit_id || '';
-                        $(buEl).trigger('change');
-                    }
-                    
-                    let companyEl = document.getElementById('edit_branch_company_id');
-                    if (companyEl) {
-                        companyEl.value = branch.company_id || '';
-                        $(companyEl).trigger('change');
-                    }
-                    
-                    let managerEl = document.getElementById('edit_branch_manager_id');
-                    if (managerEl) {
-                        $(managerEl).val(branch.manager_employee_id || '');
-                        if ($(managerEl).hasClass('select2-hidden-accessible')) {
-                            $(managerEl).trigger('change.select2');
-                        }
-                    }
-                    
-                    let phoneEl = document.getElementById('edit_branch_phone');
-                    if (phoneEl) phoneEl.value = branch.phone || '';
-                    
-                    let emailEl = document.getElementById('edit_branch_email');
-                    if (emailEl) emailEl.value = branch.email || '';
-                    
-                    let countryEl = document.getElementById('edit_branch_country');
-                    if (countryEl) {
-                        countryEl.value = branch.country || '';
-                        $(countryEl).trigger('change');
-                    }
-                    
-                    let stateEl = document.getElementById('edit_branch_state');
-                    if (stateEl) {
-                        stateEl.value = branch.state || '';
-                        $(stateEl).trigger('change');
-                    }
-                    
-                    let cityEl = document.getElementById('edit_branch_city');
-                    if (cityEl) {
-                        cityEl.value = branch.city || '';
-                        $(cityEl).trigger('change');
-                    }
-                    
-                    let postalEl = document.getElementById('edit_branch_postal_code');
-                    if (postalEl) postalEl.value = branch.postal_code || '';
-                    
-                    let addressEl = document.getElementById('edit_branch_address');
-                    if (addressEl) addressEl.value = branch.address || '';
-                    
-                    let statusSelect = document.getElementById('edit_branch_status');
-                    if (statusSelect) {
-                        statusSelect.value = (branch.status === true || branch.status === 1 || branch.status === '1') ? '1' : '0';
-                        $(statusSelect).trigger('change');
-                    }
-                    
-                    let form = document.getElementById('branch_edit_form');
-                    if (form) {
-                        form.action = '/hrms/org/branch/update/' + branch.id;
-                    }
-
-                    // Perform initial toggle for edit modal values
-                    toggleBranchParentRequirements('edit_branch_company_id', 'edit_branch_bu_id');
-                });
-            });
-
-            function toggleBranchParentRequirements(companySelectId, buSelectId) {
-                let companySelect = document.getElementById(companySelectId);
-                let buSelect = document.getElementById(buSelectId);
-                if (!companySelect || !buSelect) return;
-
-                let companyVal = companySelect.value;
-                let buVal = buSelect.value;
-
-                let companyLabel = companySelect.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
-                let buLabel = buSelect.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
-
-                if (companyVal) {
-                    buSelect.removeAttribute('required');
-                    if (buLabel) {
-                        buLabel.style.removeProperty('color');
-                        let asterisk = buLabel.querySelector('.text-danger');
-                        if (asterisk) asterisk.remove();
-                    }
-                    companySelect.removeAttribute('required');
-                    if (companyLabel) {
-                        companyLabel.style.removeProperty('color');
-                        let asterisk = companyLabel.querySelector('.text-danger');
-                        if (asterisk) asterisk.remove();
-                    }
-                } else if (buVal) {
-                    companySelect.removeAttribute('required');
-                    if (companyLabel) {
-                        companyLabel.style.removeProperty('color');
-                        let asterisk = companyLabel.querySelector('.text-danger');
-                        if (asterisk) asterisk.remove();
-                    }
-                    buSelect.removeAttribute('required');
-                    if (buLabel) {
-                        buLabel.style.removeProperty('color');
-                        let asterisk = buLabel.querySelector('.text-danger');
-                        if (asterisk) asterisk.remove();
-                    }
+        // Delegated View Action Trigger
+        $(document).on('click', '.btn-view-branch', function() {
+            let branch = JSON.parse(atob(this.dataset.branch));
+            
+            let nameEl = document.getElementById('modal_view_branch_name');
+            if (nameEl) nameEl.innerText = branch.name;
+            
+            let buEl = document.getElementById('modal_view_branch_bu');
+            if (buEl) buEl.innerText = (branch.business_unit && branch.business_unit.name) ? branch.business_unit.name : ((branch.company && branch.company.company_name) ? branch.company.company_name : 'N/A');
+            
+            let codeEl = document.getElementById('modal_view_branch_code');
+            if (codeEl) codeEl.innerText = branch.code;
+            
+            let managerEl = document.getElementById('modal_view_branch_manager');
+            if (managerEl) managerEl.innerText = (branch.manager) ? (branch.manager.first_name + ' ' + branch.manager.last_name) : 'N/A';
+            
+            let phoneEl = document.getElementById('modal_view_branch_phone');
+            if (phoneEl) phoneEl.innerText = branch.phone || 'N/A';
+            
+            let emailEl = document.getElementById('modal_view_branch_email');
+            if (emailEl) emailEl.innerText = branch.email || 'N/A';
+            
+            let countryEl = document.getElementById('modal_view_branch_country');
+            if (countryEl) countryEl.innerText = branch.country || 'N/A';
+            
+            let stateEl = document.getElementById('modal_view_branch_state');
+            if (stateEl) stateEl.innerText = branch.state || 'N/A';
+            
+            let cityEl = document.getElementById('modal_view_branch_city');
+            if (cityEl) cityEl.innerText = branch.city || 'N/A';
+            
+            let zipEl = document.getElementById('modal_view_branch_zip');
+            if (zipEl) zipEl.innerText = branch.postal_code || 'N/A';
+            
+            let addressEl = document.getElementById('modal_view_branch_address');
+            if (addressEl) addressEl.innerText = branch.address || 'N/A';
+            
+            let avatarEl = document.getElementById('modal_view_branch_avatar');
+            if (avatarEl) {
+                avatarEl.innerText = getInitials(branch.name, 'BR');
+            }
+            
+            let statusEl = document.getElementById('modal_view_branch_status');
+            if (statusEl) {
+                if (branch.status === true || branch.status === 1 || branch.status === '1') {
+                    statusEl.innerHTML = '<span class="badge bg-soft-success text-success fw-bold fs-13">{{ __("hrms.employees.frm_status_active") }}</span>';
                 } else {
-                    // Default to requiring business unit if both are empty
-                    buSelect.setAttribute('required', 'required');
-                    if (buLabel) {
-                        buLabel.style.color = '#dc3545';
-                        if (!buLabel.querySelector('.text-danger')) {
-                            buLabel.innerHTML += ' <span class="text-danger">*</span>';
-                        }
-                    }
-                    companySelect.removeAttribute('required');
-                    if (companyLabel) {
-                        companyLabel.style.removeProperty('color');
-                        let asterisk = companyLabel.querySelector('.text-danger');
-                        if (asterisk) asterisk.remove();
-                    }
+                    statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger fw-bold fs-13">{{ __("hrms.employees.frm_status_inactive") }}</span>';
                 }
             }
+        });
 
-            $(document).on('change change.select2', '#add_branch_company_id, #add_branch_business_unit_id', function() {
-                toggleBranchParentRequirements('add_branch_company_id', 'add_branch_business_unit_id');
-            });
-            $(document).on('change change.select2', '#edit_branch_company_id, #edit_branch_bu_id', function() {
-                toggleBranchParentRequirements('edit_branch_company_id', 'edit_branch_bu_id');
-            });
+        // Delegated Edit Action Trigger
+        $(document).on('click', '.btn-edit-branch', function() {
+            let branch = JSON.parse(atob(this.dataset.branch));
+            
+            let nameEl = document.getElementById('edit_branch_name');
+            if (nameEl) nameEl.value = branch.name || '';
+            
+            let codeEl = document.getElementById('edit_branch_code');
+            if (codeEl) codeEl.value = branch.code || '';
+            
+            let buEl = document.getElementById('edit_branch_bu_id');
+            if (buEl) {
+                buEl.value = branch.business_unit_id || '';
+                $(buEl).trigger('change');
+            }
+            
+            let companyEl = document.getElementById('edit_branch_company_id');
+            if (companyEl) {
+                companyEl.value = branch.company_id || '';
+                $(companyEl).trigger('change');
+            }
+            
+            let managerEl = document.getElementById('edit_branch_manager_id');
+            if (managerEl) {
+                $(managerEl).val(branch.manager_employee_id || '');
+                if ($(managerEl).hasClass('select2-hidden-accessible')) {
+                    $(managerEl).trigger('change.select2');
+                }
+            }
+            
+            let phoneEl = document.getElementById('edit_branch_phone');
+            if (phoneEl) phoneEl.value = branch.phone || '';
+            
+            let emailEl = document.getElementById('edit_branch_email');
+            if (emailEl) emailEl.value = branch.email || '';
+            
+            let countryEl = document.getElementById('edit_branch_country');
+            if (countryEl) {
+                countryEl.value = branch.country || '';
+                $(countryEl).trigger('change');
+            }
+            
+            let stateEl = document.getElementById('edit_branch_state');
+            if (stateEl) {
+                stateEl.value = branch.state || '';
+                $(stateEl).trigger('change');
+            }
+            
+            let cityEl = document.getElementById('edit_branch_city');
+            if (cityEl) {
+                cityEl.value = branch.city || '';
+                $(cityEl).trigger('change');
+            }
+            
+            let postalEl = document.getElementById('edit_branch_postal_code');
+            if (postalEl) postalEl.value = branch.postal_code || '';
+            
+            let addressEl = document.getElementById('edit_branch_address');
+            if (addressEl) addressEl.value = branch.address || '';
+            
+            let statusSelect = document.getElementById('edit_branch_status');
+            if (statusSelect) {
+                statusSelect.value = (branch.status === true || branch.status === 1 || branch.status === '1') ? '1' : '0';
+                $(statusSelect).trigger('change');
+            }
+            
+            let form = document.getElementById('branch_edit_form');
+            if (form) {
+                form.action = '/hrms/org/branch/update/' + branch.id;
+            }
 
-            $('#addBranchModal').on('shown.bs.modal', function() {
-                toggleBranchParentRequirements('add_branch_company_id', 'add_branch_business_unit_id');
-            });
-            $('#editBranchModal').on('shown.bs.modal', function() {
-                toggleBranchParentRequirements('edit_branch_company_id', 'edit_branch_bu_id');
-            });
+            let branchIdInput = document.getElementById('edit_branch_id');
+            if (branchIdInput) {
+                branchIdInput.value = branch.id || '';
+            }
+
+            // Perform initial toggle for edit modal values
+            toggleBranchParentRequirements('edit_branch_company_id', 'edit_branch_bu_id');
+        });
+
+        function toggleBranchParentRequirements(companySelectId, buSelectId) {
+            let companySelect = document.getElementById(companySelectId);
+            let buSelect = document.getElementById(buSelectId);
+            if (!companySelect || !buSelect) return;
+
+            let companyVal = companySelect.value;
+            let buVal = buSelect.value;
+
+            let companyLabel = companySelect.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
+            let buLabel = buSelect.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
+
+            if (companyVal) {
+                buSelect.removeAttribute('required');
+                if (buLabel) {
+                    buLabel.style.removeProperty('color');
+                    let asterisk = buLabel.querySelector('.text-danger');
+                    if (asterisk) asterisk.remove();
+                }
+                companySelect.removeAttribute('required');
+                if (companyLabel) {
+                    companyLabel.style.removeProperty('color');
+                    let asterisk = companyLabel.querySelector('.text-danger');
+                    if (asterisk) asterisk.remove();
+                }
+            } else if (buVal) {
+                companySelect.removeAttribute('required');
+                if (companyLabel) {
+                    companyLabel.style.removeProperty('color');
+                    let asterisk = companyLabel.querySelector('.text-danger');
+                    if (asterisk) asterisk.remove();
+                }
+                buSelect.removeAttribute('required');
+                if (buLabel) {
+                    buLabel.style.removeProperty('color');
+                    let asterisk = buLabel.querySelector('.text-danger');
+                    if (asterisk) asterisk.remove();
+                }
+            } else {
+                // Default to requiring business unit if both are empty
+                buSelect.setAttribute('required', 'required');
+                if (buLabel) {
+                    buLabel.style.color = '#dc3545';
+                    if (!buLabel.querySelector('.text-danger')) {
+                        buLabel.innerHTML += ' <span class="text-danger">*</span>';
+                    }
+                }
+                companySelect.removeAttribute('required');
+                if (companyLabel) {
+                    companyLabel.style.removeProperty('color');
+                    let asterisk = companyLabel.querySelector('.text-danger');
+                    if (asterisk) asterisk.remove();
+                }
+            }
         }
 
-        if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", init);
-        } else {
-            init();
-        }
+        $(document).on('change change.select2', '#add_branch_company_id, #add_branch_business_unit_id', function() {
+            toggleBranchParentRequirements('add_branch_company_id', 'add_branch_business_unit_id');
+        });
+        $(document).on('change change.select2', '#edit_branch_company_id, #edit_branch_bu_id', function() {
+            toggleBranchParentRequirements('edit_branch_company_id', 'edit_branch_bu_id');
+        });
+
+        $('#addBranchModal').on('shown.bs.modal', function() {
+            toggleBranchParentRequirements('add_branch_company_id', 'add_branch_business_unit_id');
+        });
+        $('#editBranchModal').on('shown.bs.modal', function() {
+            toggleBranchParentRequirements('edit_branch_company_id', 'edit_branch_bu_id');
+        });
     })();
 </script>
 
@@ -456,7 +449,7 @@
                 </div>
             </div>
             <div class="modal-footer bg-light py-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                <x-ui.button variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
             </div>
         </div>
     </div>
@@ -472,12 +465,13 @@
             </div>
             <form action="{{ route('hrms.branch.store') }}" method="POST">
                 @csrf
+                <input type="hidden" name="form_mode" value="add_branch">
                 <div class="modal-body p-4">
                     @include('modules.hrms.org-structure.branch-form-fields', ['mode' => 'add'])
                 </div>
                 <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_branch') }}</button>
+                    <x-ui.button variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">{{ __('hrms.org.save_branch') }}</x-ui.button>
                 </div>
             </form>
         </div>
@@ -492,14 +486,16 @@
                 <h5 class="modal-title fw-bold" id="editBranchModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.common.edit') }} {{ __('hrms.org.branches') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="branch_edit_form" method="POST">
+            <form id="branch_edit_form" method="POST" action="{{ old('form_mode') === 'edit_branch' && old('edit_branch_id') ? route('hrms.branch.update', ['branch' => old('edit_branch_id')]) : '' }}">
                 @csrf
+                <input type="hidden" name="form_mode" value="edit_branch">
+                <input type="hidden" name="edit_branch_id" id="edit_branch_id" value="{{ old('edit_branch_id') }}">
                 <div class="modal-body p-4">
                     @include('modules.hrms.org-structure.branch-form-fields', ['mode' => 'edit'])
                 </div>
                 <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_branch') }}</button>
+                    <x-ui.button variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">{{ __('hrms.org.update_branch') }}</x-ui.button>
                 </div>
             </form>
         </div>

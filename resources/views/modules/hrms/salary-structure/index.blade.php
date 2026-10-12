@@ -463,8 +463,8 @@
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                        <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_pay_group') }}</button>
+                        <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.org.save_pay_group') }}</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -479,8 +479,9 @@
                     <h5 class="modal-title fw-bold" id="editPayGroupModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.org.edit_pay_group') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="editPayGroupForm" method="POST">
+                <form id="editPayGroupForm" method="POST" action="{{ old('edit_pg_id') ? route('hrms.salary-structure.pay-group.update', ['payGroup' => old('edit_pg_id')]) : '' }}">
                     @csrf
+                    <input type="hidden" name="edit_pg_id" id="edit_pg_id" value="{{ old('edit_pg_id') }}">
                     <div class="modal-body p-4">
                         <div class="row g-3">
                             <div class="col-12">
@@ -506,8 +507,8 @@
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                        <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_pay_group') }}</button>
+                        <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.org.update_pay_group') }}</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -516,15 +517,31 @@
 
     @push('scripts')
     <script>
+        function safeBase64Decode(str) {
+            if (!str) return null;
+            try {
+                return JSON.parse(decodeURIComponent(escape(atob(str))));
+            } catch(e) {
+                try {
+                    return JSON.parse(atob(str));
+                } catch(e2) {
+                    console.error('Base64 decode error:', e2);
+                    return null;
+                }
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", function() {
             // Edit Pay Group Trigger
             $(document).on('click', '.edit-pay-group-btn', function() {
                 let dataStr = $(this).attr('data-pay-group');
                 if (!dataStr) return;
 
-                let pg = JSON.parse(atob(dataStr));
+                let pg = safeBase64Decode(dataStr);
+                if (!pg) return;
                 
                 $('#editPayGroupForm').attr('action', `/hrms/salary-structure/pay-group/update/${pg.id}`);
+                $('#edit_pg_id').val(pg.id);
                 $('#edit_pg_name').val(pg.name);
                 $('#edit_pg_company_id').val(pg.company_id || '');
                 $('#edit_pg_description').val(pg.description || '');
@@ -532,6 +549,7 @@
                 let statusVal = (pg.status === true || pg.status === 1 || pg.status === '1') ? '1' : '0';
                 $('#edit_pg_status').val(statusVal);
 
+                $('#editPayGroupModal select').trigger('change');
                 $('#editPayGroupModal').modal('show');
             });
 

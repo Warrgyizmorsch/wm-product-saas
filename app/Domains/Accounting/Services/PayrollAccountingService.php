@@ -35,10 +35,7 @@ class PayrollAccountingService
         $tenantId = $run->tenant_id ?? current_tenant_id() ?? require_tenant_id();
 
         // Check if journal already posted for this payroll run to prevent duplicate entries
-        $existingJournal = Journal::where('tenant_id', $tenantId)
-            ->where('reference_type', 'PayrollRun')
-            ->where('reference_id', $run->id)
-            ->first();
+        $existingJournal = $this->journalService->activePosting((int) $tenantId, 'PayrollRun', $run->id);
 
         if ($existingJournal) {
             return $existingJournal;
@@ -251,7 +248,7 @@ class PayrollAccountingService
             'posted_by'             => auth()->id(),
         ];
 
-        return $this->journalService->post($lines, $meta);
+        return $this->journalService->postOnce($lines, $meta);
     }
 
     /**
@@ -264,10 +261,8 @@ class PayrollAccountingService
         // somehow unresolvable.
         $tenantId = $run->tenant_id ?? current_tenant_id() ?? require_tenant_id();
 
-        $existingJournal = Journal::where('tenant_id', $tenantId)
-            ->where('reference_type', 'PayrollRunPayout')
-            ->where('reference_id', $run->id)
-            ->first();
+        // Standing posting only: once reversed, the document can post again.
+        $existingJournal = $this->journalService->activePosting((int) $tenantId, 'PayrollRunPayout', $run->id);
 
         if ($existingJournal) {
             return $existingJournal;
@@ -350,7 +345,7 @@ class PayrollAccountingService
             'posted_by'             => auth()->id(),
         ];
 
-        return $this->journalService->post($lines, $meta);
+        return $this->journalService->postOnce($lines, $meta);
     }
 
     /**

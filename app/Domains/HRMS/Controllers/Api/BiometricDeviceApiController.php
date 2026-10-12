@@ -98,7 +98,7 @@ class BiometricDeviceApiController extends Controller
         $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
         $query = BiometricDevice::query()
             ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
-            ->with(['company:id,company_name', 'businessUnit:id,unit_name', 'branch:id,name'])
+            ->with(['company:id,company_name', 'businessUnit:id,name', 'branch:id,name'])
             ->orderBy('name');
 
         if ($request->filled('status')) {
@@ -169,7 +169,7 @@ class BiometricDeviceApiController extends Controller
             'company_id'       => 'required|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
             'branch_id'        => 'nullable|exists:branches,id',
-            'ip_address'       => 'nullable|ip',
+            'ip_address'       => 'nullable|string|max:255',
             'port'             => 'required|integer|min:1|max:65535',
             'status'           => 'nullable|boolean',
         ]);
@@ -179,7 +179,7 @@ class BiometricDeviceApiController extends Controller
 
         $device = $this->repository->storeDevice($validated);
 
-        return $this->sendSuccess($device->fresh(['company:id,company_name', 'branch:id,name']), 'Biometric device registered successfully.', 201);
+        return $this->sendSuccess($device->fresh(['company:id,company_name', 'businessUnit:id,name', 'branch:id,name']), 'Biometric device registered successfully.', 201);
     }
 
     /**
@@ -192,7 +192,7 @@ class BiometricDeviceApiController extends Controller
         }
 
         $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
-        $device = BiometricDevice::with(['company:id,company_name', 'businessUnit:id,unit_name', 'branch:id,name'])
+        $device = BiometricDevice::with(['company:id,company_name', 'businessUnit:id,name', 'branch:id,name'])
             ->where('tenant_id', $tenantId)
             ->find($id);
 
@@ -234,7 +234,7 @@ class BiometricDeviceApiController extends Controller
             'company_id'       => 'required|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
             'branch_id'        => 'nullable|exists:branches,id',
-            'ip_address'       => 'nullable|ip',
+            'ip_address'       => 'nullable|string|max:255',
             'port'             => 'required|integer|min:1|max:65535',
             'status'           => 'nullable|boolean',
         ]);
@@ -243,7 +243,7 @@ class BiometricDeviceApiController extends Controller
 
         $this->repository->updateDevice($device, $validated);
 
-        return $this->sendSuccess($device->fresh(['company:id,company_name', 'branch:id,name']), 'Biometric device updated successfully.');
+        return $this->sendSuccess($device->fresh(['company:id,company_name', 'businessUnit:id,name', 'branch:id,name']), 'Biometric device updated successfully.');
     }
 
     /**
@@ -320,5 +320,63 @@ class BiometricDeviceApiController extends Controller
             'punch_time'   => $punchTime->toIso8601String(),
             'punch_type'   => $validated['punch_type'],
         ], 'Mock biometric punch logged and processed successfully.');
+    }
+
+    /**
+     * POST /api/hrms/biometric-devices/{id}/test-connection
+     */
+    public function testConnection(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to test biometric connection.', 403);
+        }
+
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+        $device = BiometricDevice::where('tenant_id', $tenantId)->find($id);
+
+        if (!$device) {
+            return $this->sendError("Biometric device with ID '{$id}' not found.", 404);
+        }
+
+        $ip = trim((string)$device->ip_address);
+        $port = (int)($device->port ?: 4370);
+
+        if (empty($ip)) {
+            $lastPing = $device->last_ping_at ? $device->last_ping_at->diffForHumans() : 'Never';
+            return $this->sendSuccess([
+                'connected' => !empty($device->last_ping_at),
+                'mode'      => 'adms_push',
+                'last_ping' => $device->last_ping_at?->toIso8601String(),
+            ], "Device operates in Cloud ADMS Push Mode. Last heartbeat from terminal: {$lastPing}.");
+        }
+
+        $errno = 0;
+        $errstr = '';
+        $socket = @fsockopen($ip, $port, $errno, $errstr, 2.0);
+
+        if ($socket) {
+            fclose($socket);
+            $device->update(['last_ping_at' => now()]);
+
+            return $this->sendSuccess([
+                'connected' => true,
+                'mode'      => 'direct_tcp',
+                'ip'        => $ip,
+                'port'      => $port,
+                'last_ping' => now()->toIso8601String(),
+            ], "Device at {$ip}:{$port} is online and connected successfully!");
+        }
+
+        return $this->sendError("Unable to reach {$ip}:{$port} directly (" . ($errstr ?: 'Connection timed out') . "). If behind NAT, configure Cloud ADMS Push Mode.", 200, [
+            'connected' => false,
+            'mode'      => 'direct_tcp',
+            'ip'        => $ip,
+            'port'      => $port,
+            'last_ping' => $device->last_ping_at?->toIso8601String(),
+        ]);
     }
 }

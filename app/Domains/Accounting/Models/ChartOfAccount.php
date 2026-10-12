@@ -4,7 +4,7 @@ namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\Accounting\Concerns\LogsAccountingActivity;
-use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\RecordsBranch;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ChartOfAccount extends BaseModel
 {
-    use HasFactory, SoftDeletes, BelongsToCompany, BelongsToBranch, LogsAccountingActivity;
+    use HasFactory, SoftDeletes, BelongsToCompany, RecordsBranch, LogsAccountingActivity;
 
     public const TYPE_ASSET = 'asset';
     public const TYPE_LIABILITY = 'liability';

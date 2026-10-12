@@ -38,7 +38,7 @@ class LeaveStructureController extends Controller
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $newPlan = $this->leaveStructureRepository->storePlan([
-            'company_id' => $request->company_id ?: (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+            'company_id' => $request->filled('company_id') ? $request->company_id : null,
             'name' => $request->name,
             'effective_from' => $request->effective_from,
             'description' => $request->description,
@@ -63,7 +63,7 @@ class LeaveStructureController extends Controller
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->leaveStructureRepository->updatePlan($leavePlan, [
-            'company_id' => $request->company_id ?: $leavePlan->company_id ?: (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+            'company_id' => $request->filled('company_id') ? $request->company_id : null,
             'name' => $request->name,
             'effective_from' => $request->effective_from,
             'description' => $request->description,
@@ -93,6 +93,7 @@ class LeaveStructureController extends Controller
             'color' => 'nullable|string|max:20',
             'type' => 'required|in:paid,unpaid',
             'quota' => 'required|numeric|min:0',
+            'description' => 'nullable|string',
             'status' => 'required',
         ]);
 
@@ -105,6 +106,7 @@ class LeaveStructureController extends Controller
             'color' => $request->color ?: '#3b82f6',
             'type' => $request->type,
             'quota' => $request->quota,
+            'description' => $request->description,
             'status' => $status,
         ]);
 
@@ -121,6 +123,7 @@ class LeaveStructureController extends Controller
             'color' => 'nullable|string|max:20',
             'type' => 'required|in:paid,unpaid',
             'quota' => 'required|numeric|min:0',
+            'description' => 'nullable|string',
             'status' => 'required',
         ]);
 
@@ -129,9 +132,10 @@ class LeaveStructureController extends Controller
         $this->leaveStructureRepository->updateType($leaveType, [
             'name' => $request->name,
             'code' => $request->code,
-            'color' => $request->color ?: '#3b82f6',
+            'color' => $request->color ?: ($leaveType->color ?: '#3b82f6'),
             'type' => $request->type,
             'quota' => $request->quota,
+            'description' => $request->description,
             'status' => $status,
         ]);
 
@@ -154,14 +158,24 @@ class LeaveStructureController extends Controller
 
     public function updateRules(\Illuminate\Http\Request $request, LeaveType $leaveType)
     {
+        $this->authorize('update', LeavePlan::class);
+
         $validated = $request->validate([
             'rules' => 'required|array',
         ]);
 
-        $leaveType->update(['rules' => $validated['rules']]);
+        $this->leaveStructureRepository->updateRules($leaveType, $validated['rules']);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => __('hrms.leave.rules_saved'),
+                'data' => $leaveType->fresh(['plan']),
+            ]);
+        }
 
         return redirect()->route('hrms.leave-structure.index', ['plan_id' => $leaveType->leave_plan_id])
-            ->with('success', 'Leave policy rules updated successfully.');
+            ->with('success', __('hrms.leave.rules_saved'));
     }
 
     public function renewPlanBalances(\Illuminate\Http\Request $request)
@@ -228,7 +242,7 @@ class LeaveStructureController extends Controller
                             'leave_type_id'  => $ltype->id,
                             'requested_days' => $autoEncashDays,
                             'status'         => 'approved',
-                            'reason'         => 'Year-end renewal automatic encashment',
+                            'reason'         => __('hrms.leave.yearend_auto_encashment_reason'),
                             'approved_by'    => auth()->id(),
                             'approved_at'    => now(),
                         ]);
@@ -246,9 +260,9 @@ class LeaveStructureController extends Controller
             ]);
 
             return redirect()->route('hrms.leave-structure.index', ['plan_id' => $leavePlan->id])
-                ->with('success', 'Leave plan balances renewed successfully for all assigned employees.');
+                ->with('success', __('hrms.leave.renew_success'));
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Failed to renew leave plan balances: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.leave.renew_error', ['message' => $e->getMessage()]));
         }
     }
 
@@ -294,25 +308,27 @@ class LeaveStructureController extends Controller
 
             if (!empty($pendingEmployees)) {
                 return redirect()->back()->with('error',
-                    'Cannot transition leave plans. The following employee(s) have pending leave or encashment requests: '
-                    . implode(', ', $pendingEmployees));
+                    __('hrms.leave.transition_pending_error', ['employees' => implode(', ', $pendingEmployees)]));
             }
 
-            $count = 0;
-            foreach ($employeeIds as $empId) {
-                $employee = \App\Domains\HRMS\Models\Employee::find($empId);
-                if ($employee && (int)$employee->leave_plan_id !== (int)$newPlanId) {
-                    $oldPlanId = $employee->leave_plan_id;
-                    $employee->update(['leave_plan_id' => $newPlanId]);
-                    $employee->migrateToLeavePlan($oldPlanId, $newPlanId, $action, $unusedAction);
-                    $count++;
+            $count = \Illuminate\Support\Facades\DB::transaction(function () use ($employeeIds, $newPlanId, $action, $unusedAction) {
+                $processedCount = 0;
+                foreach ($employeeIds as $empId) {
+                    $employee = \App\Domains\HRMS\Models\Employee::find($empId);
+                    if ($employee && (int)$employee->leave_plan_id !== (int)$newPlanId) {
+                        $oldPlanId = $employee->leave_plan_id;
+                        $employee->update(['leave_plan_id' => $newPlanId]);
+                        $employee->migrateToLeavePlan($oldPlanId, $newPlanId, $action, $unusedAction);
+                        $processedCount++;
+                    }
                 }
-            }
+                return $processedCount;
+            });
 
             return redirect()->route('hrms.leave-structure.index')
-                ->with('success', "Successfully transitioned {$count} employee(s) to the new leave plan.");
+                ->with('success', __('hrms.leave.transition_success', ['count' => $count]));
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Leave plan transition failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.leave.transition_error', ['message' => $e->getMessage()]));
         }
     }
 }

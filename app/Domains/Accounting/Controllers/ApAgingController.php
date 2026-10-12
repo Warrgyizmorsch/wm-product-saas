@@ -32,7 +32,7 @@ class ApAgingController extends Controller
 
         $asOf = $request->filled('as_of') ? Carbon::parse($request->string('as_of')) : Carbon::today();
 
-        $bills = VendorBill::with('vendor')
+        $bills = VendorBill::withoutGlobalScope('branch')->with('vendor')
             ->whereIn('status', self::OPEN_STATUSES)
             ->where('due_amount', '>', 0)
             ->orderBy('due_date')

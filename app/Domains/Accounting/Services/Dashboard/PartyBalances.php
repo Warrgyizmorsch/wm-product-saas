@@ -26,7 +26,7 @@ class PartyBalances
 
     public function receivables(Carbon $today, int $horizonDays = 30): array
     {
-        $invoices = Invoice::query()
+        $invoices = Invoice::withoutGlobalScope('branch')
             ->with('customer')
             ->whereIn('status', self::OPEN_INVOICE_STATUSES)
             ->where('balance_due', '>', 0)
@@ -41,7 +41,7 @@ class PartyBalances
 
     public function payables(Carbon $today, int $horizonDays = 30): array
     {
-        $bills = VendorBill::query()
+        $bills = VendorBill::withoutGlobalScope('branch')
             ->with('vendor')
             ->whereIn('status', self::OPEN_BILL_STATUSES)
             ->where('due_amount', '>', 0)
@@ -65,12 +65,12 @@ class PartyBalances
         $range = [$from->copy()->startOfDay(), $to->copy()->endOfDay()];
 
         return [
-            'invoiced' => round((float) Invoice::query()
+            'invoiced' => round((float) Invoice::withoutGlobalScope('branch')
                 ->whereNotIn('status', ['Draft', 'Cancelled'])
                 ->whereBetween('invoice_date', $range)
                 ->sum('total_amount'), 2),
             // vendor_bills stores its total in grand_total (there is no total_amount column).
-            'billed' => round((float) VendorBill::query()
+            'billed' => round((float) VendorBill::withoutGlobalScope('branch')
                 ->whereNotIn('status', ['Draft', 'Cancelled'])
                 ->whereBetween('bill_date', $range)
                 ->sum('grand_total'), 2),

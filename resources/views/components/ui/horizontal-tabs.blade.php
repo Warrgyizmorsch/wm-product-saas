@@ -8,9 +8,10 @@
 @once
     @push('styles')
         <style>
-            .erp-horizontal-tabs {
-                border-bottom: 2px solid #e2e8f0;
-                gap: 8px;
+            .erp-horizontal-tabs,
+            ul.nav.nav-tabs.erp-horizontal-tabs {
+                border-bottom: 1px solid #e2e8f0 !important;
+                gap: 8px !important;
                 overflow-x: auto;
                 overflow-y: visible;
                 flex-wrap: nowrap;
@@ -18,8 +19,9 @@
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: none; /* Firefox */
                 -ms-overflow-style: none; /* IE and Edge */
-                padding-bottom: 4px;
-                padding-top: 8px;
+                padding-bottom: 8px !important;
+                padding-top: 4px;
+                margin-bottom: 1.5rem !important;
             }
             .erp-horizontal-tabs::-webkit-scrollbar {
                 display: none; /* Chrome, Safari, Opera */
@@ -27,55 +29,83 @@
                 height: 0;
             }
             .erp-horizontal-tabs .nav-item {
-                margin-bottom: 0;
+                margin-bottom: 0 !important;
                 flex-shrink: 0;
                 position: relative;
             }
-            .erp-horizontal-tabs .nav-link {
-                border: 1px solid transparent !important;
-                background: transparent !important;
+            .erp-horizontal-tabs .nav-link,
+            ul.nav.nav-tabs.erp-horizontal-tabs .nav-link {
+                border: 1px solid #e2e8f0 !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+                background-color: #ffffff !important;
                 color: #64748b !important;
-                font-size: 13px;
-                font-weight: 600;
-                padding: 6px 14px;
-                transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-                display: flex;
-                align-items: center;
+                font-size: 13px !important;
+                font-weight: 600 !important;
+                padding: 8px 16px !important;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                display: inline-flex !important;
+                align-items: center !important;
                 border-radius: 6px !important;
-                white-space: nowrap;
-                flex-shrink: 0;
+                white-space: nowrap !important;
+                flex-shrink: 0 !important;
                 position: relative !important;
                 overflow: visible !important;
+                margin-bottom: 0 !important;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
             }
-            .erp-horizontal-tabs .nav-link .btn-badge-count {
-                top: -8px;
-                right: -6px;
-                font-size: 10px;
-                min-width: 19px;
-                height: 19px;
-                padding: 0 4px;
-                border: 2px solid #ffffff;
+            .erp-horizontal-tabs .nav-link .erp-tab-badge {
+                font-size: 11px !important;
+                font-weight: 700 !important;
+                padding: 2px 7px !important;
+                border-radius: 9999px !important;
+                margin-left: 8px !important;
+                background-color: #f1f5f9 !important;
+                color: #475569 !important;
+                border: 1px solid #e2e8f0 !important;
+                transition: all 0.2s ease !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                line-height: 1 !important;
             }
-            .erp-horizontal-tabs .nav-link i {
-                font-size: 14px;
+            .erp-horizontal-tabs .nav-link:hover .erp-tab-badge {
+                background-color: color-mix(in srgb, var(--bs-primary) 15%, transparent) !important;
+                color: var(--bs-primary) !important;
+                border-color: color-mix(in srgb, var(--bs-primary) 30%, transparent) !important;
+            }
+            .erp-horizontal-tabs .nav-link.active .erp-tab-badge {
+                background-color: #ffffff !important;
+                color: var(--bs-primary) !important;
+                border-color: #ffffff !important;
+                font-weight: 800 !important;
+            }
+            .erp-horizontal-tabs .nav-link i,
+            ul.nav.nav-tabs.erp-horizontal-tabs .nav-link i {
+                font-size: 14px !important;
+                margin-right: 8px !important;
+                color: inherit !important;
                 transition: transform 0.2s ease, color 0.2s ease;
             }
-            .erp-horizontal-tabs .nav-link:hover {
+            .erp-horizontal-tabs .nav-link:hover,
+            ul.nav.nav-tabs.erp-horizontal-tabs .nav-link:hover {
                 color: var(--bs-primary) !important;
                 background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent) !important;
-                border-color: color-mix(in srgb, var(--bs-primary) 15%, transparent) !important;
+                border-color: color-mix(in srgb, var(--bs-primary) 20%, transparent) !important;
             }
             .erp-horizontal-tabs .nav-link:hover i {
                 transform: translateY(-1px);
             }
-            .erp-horizontal-tabs .nav-link.active {
+            .erp-horizontal-tabs .nav-link.active,
+            ul.nav.nav-tabs.erp-horizontal-tabs .nav-link.active {
                 background-color: var(--bs-primary) !important;
                 color: #ffffff !important;
-                font-weight: 700;
+                font-weight: 700 !important;
                 border-color: var(--bs-primary) !important;
-                box-shadow: 0 2px 6px color-mix(in srgb, var(--bs-primary) 30%, transparent);
+                border-bottom: 1px solid var(--bs-primary) !important;
+                box-shadow: 0 2px 6px color-mix(in srgb, var(--bs-primary) 35%, transparent) !important;
             }
-            .erp-horizontal-tabs .nav-link.active i {
+            .erp-horizontal-tabs .nav-link.active i,
+            ul.nav.nav-tabs.erp-horizontal-tabs .nav-link.active i {
                 color: #ffffff !important;
             }
             .erp-horizontal-tabs .erp-tab-header-badge {
@@ -90,21 +120,28 @@
             }
 
             /* Dark Mode Support for Horizontal Tabs */
-            html.app-skin-dark .erp-horizontal-tabs {
-                border-bottom: 2px solid #1e293b !important;
+            html.app-skin-dark .erp-horizontal-tabs,
+            html.app-skin-dark ul.nav.nav-tabs.erp-horizontal-tabs {
+                border-bottom: 1px solid #1e293b !important;
             }
-            html.app-skin-dark .erp-horizontal-tabs .nav-link {
+            html.app-skin-dark .erp-horizontal-tabs .nav-link,
+            html.app-skin-dark ul.nav.nav-tabs.erp-horizontal-tabs .nav-link {
+                background-color: #162038 !important;
+                border-color: #283c50 !important;
                 color: #94a3b8 !important;
             }
-            html.app-skin-dark .erp-horizontal-tabs .nav-link:hover {
+            html.app-skin-dark .erp-horizontal-tabs .nav-link:hover,
+            html.app-skin-dark ul.nav.nav-tabs.erp-horizontal-tabs .nav-link:hover {
                 color: #ffffff !important;
                 background-color: rgba(255, 255, 255, 0.08) !important;
                 border-color: rgba(255, 255, 255, 0.15) !important;
             }
-            html.app-skin-dark .erp-horizontal-tabs .nav-link.active {
+            html.app-skin-dark .erp-horizontal-tabs .nav-link.active,
+            html.app-skin-dark ul.nav.nav-tabs.erp-horizontal-tabs .nav-link.active {
                 background-color: var(--bs-primary) !important;
                 color: #ffffff !important;
                 border-color: var(--bs-primary) !important;
+                border-bottom-color: var(--bs-primary) !important;
                 box-shadow: 0 2px 10px color-mix(in srgb, var(--bs-primary) 40%, transparent) !important;
             }
             html.app-skin-dark .erp-horizontal-tabs .erp-tab-header-badge {
@@ -112,8 +149,15 @@
                 color: #cbd5e1 !important;
                 border-color: #283c50 !important;
             }
-            html.app-skin-dark .erp-horizontal-tabs .nav-link .btn-badge-count {
-                border-color: #0f172a !important;
+            html.app-skin-dark .erp-horizontal-tabs .nav-link .erp-tab-badge {
+                background-color: #1e293b !important;
+                color: #94a3b8 !important;
+                border-color: #334155 !important;
+            }
+            html.app-skin-dark .erp-horizontal-tabs .nav-link.active .erp-tab-badge {
+                background-color: #ffffff !important;
+                color: var(--bs-primary) !important;
+                border-color: #ffffff !important;
             }
         </style>
     @endpush
@@ -130,21 +174,21 @@
             </li>
         @elseif(!empty($tab['url']) || !empty($tab['href']))
             <li class="nav-item" role="presentation">
-                <a class="nav-link btn-badge-container {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
+                <a class="nav-link {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
                    id="{{ ($tab['id'] ?? 'tab-'.\Illuminate\Support\Str::slug($tab['label'] ?? 'item')) }}-tab"
                    href="{{ $tab['url'] ?? $tab['href'] }}">
                     @if(!empty($tab['icon']))
                         <i class="{{ $tab['icon'] }} me-2"></i>
                     @endif
                     {{ $tab['label'] }}
-                    @if(isset($tab['badge']) && (int)$tab['badge'] > 0)
-                        <span class="btn-badge-count {{ $tab['badgeClass'] ?? '' }}">{{ $tab['badge'] }}</span>
+                    @if(isset($tab['badge']) && $tab['badge'] !== null && $tab['badge'] !== '')
+                        <span class="erp-tab-badge {{ $tab['badgeClass'] ?? '' }}">{{ $tab['badge'] }}</span>
                     @endif
                 </a>
             </li>
         @else
             <li class="nav-item" role="presentation">
-                <button class="nav-link btn-badge-container {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
+                <button class="nav-link {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
                         id="{{ $tab['id'] }}-tab" 
                         data-bs-toggle="tab" 
                         data-bs-target="#{{ $tab['id'] }}" 
@@ -156,8 +200,8 @@
                         <i class="{{ $tab['icon'] }} me-2"></i>
                     @endif
                     {{ $tab['label'] }}
-                    @if(isset($tab['badge']) && (int)$tab['badge'] > 0)
-                        <span class="btn-badge-count {{ $tab['badgeClass'] ?? '' }}">{{ $tab['badge'] }}</span>
+                    @if(isset($tab['badge']) && $tab['badge'] !== null && $tab['badge'] !== '')
+                        <span class="erp-tab-badge {{ $tab['badgeClass'] ?? '' }}">{{ $tab['badge'] }}</span>
                     @endif
                 </button>
             </li>

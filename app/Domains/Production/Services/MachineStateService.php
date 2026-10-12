@@ -57,7 +57,10 @@ class MachineStateService
                 'current_state_reason' => $reason,
             ];
 
-            if (in_array($newState, ['Idle', 'Running', 'Setup']) && $machine->status === Machine::STATUS_UNDER_MAINTENANCE) {
+            if (
+                in_array($newState, ['Idle', 'Running', 'Setup']) &&
+                ($machine->status === Machine::STATUS_UNDER_MAINTENANCE || $machine->status === Machine::STATUS_INACTIVE || $machine->maintenance_status === 'breakdown')
+            ) {
                 $hasActiveMwo = \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::where('tenant_id', $tenantId)
                     ->where('machine_id', $machineId)
                     ->whereIn('status', [

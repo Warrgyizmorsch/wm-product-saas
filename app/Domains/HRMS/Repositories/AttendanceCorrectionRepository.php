@@ -222,10 +222,9 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
                 $correction->update(['attendance_id' => $attendance->id]);
             }
 
-            EmployeePenalty::where('tenant_id', $correction->tenant_id)
-                ->where('employee_id', $correction->employee_id)
+            EmployeePenalty::where('employee_id', $correction->employee_id)
                 ->whereDate('date', $dateStr)
-                ->where('status', 'active')
+                ->whereIn('status', ['pending', 'active'])
                 ->delete();
 
             DB::commit();

@@ -256,6 +256,7 @@ Route::prefix('hrms')
             Route::get('/', [BiometricDeviceController::class, 'index'])->name('biometric-devices.index');
             Route::post('/', [BiometricDeviceController::class, 'store'])->name('biometric-devices.store');
             Route::post('/simulate-punch', [BiometricDeviceController::class, 'simulatePunch'])->name('biometric-devices.simulate-punch');
+            Route::post('/{biometricDevice}/test-connection', [BiometricDeviceController::class, 'testConnection'])->name('biometric-devices.test-connection');
             Route::put('/{biometricDevice}', [BiometricDeviceController::class, 'update'])->name('biometric-devices.update');
             Route::delete('/{biometricDevice}', [BiometricDeviceController::class, 'destroy'])->name('biometric-devices.destroy');
         });
@@ -473,6 +474,7 @@ Route::prefix('hrms')
             Route::post('/clearance/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearance.update');
             Route::post('/clearances/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearances.update');
             Route::post('/{exit}/clearances/{department}/batch-update', [EmployeeExitController::class, 'updateDepartmentClearances'])->name('exits.clearances.batch-update');
+            Route::post('/{exit}/clearances/batch-update-all', [EmployeeExitController::class, 'updateAllExitClearances'])->name('exits.clearances.batch-update-all');
             Route::post('/{exit}/clearances/adhoc', [EmployeeExitController::class, 'storeAdhocExitClearance'])->name('exits.clearances.adhoc.store');
             Route::delete('/clearances/{clearance}/adhoc', [EmployeeExitController::class, 'destroyExitClearance'])->name('exits.clearances.adhoc.destroy');
             Route::post('/templates', [EmployeeExitController::class, 'storeClearanceTemplate'])->name('exits.templates.store');

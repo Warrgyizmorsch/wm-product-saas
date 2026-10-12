@@ -123,6 +123,19 @@ Route::prefix('platform')
         Route::post('gst-settings/{id}/test', [\App\Domains\Platform\Controllers\GstSettingController::class, 'testConnection'])->name('gstSettings.test');
         Route::delete('gst-settings/{id}', [\App\Domains\Platform\Controllers\GstSettingController::class, 'destroy'])->name('gstSettings.destroy');
 
+        // Meta (Facebook & Instagram) Marketing & Lead Setup Routes
+        Route::get('meta-settings', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'index'])->name('metaSettings.index');
+        Route::post('meta-settings/store', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'store'])->name('metaSettings.store');
+        Route::post('meta-settings/test-token', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'testToken'])->name('metaSettings.testToken');
+        Route::post('meta-settings/simulate-test-lead', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'simulateTestLead'])->name('metaSettings.simulateTestLead');
+        Route::delete('meta-settings/{id}', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'destroy'])->name('metaSettings.destroy');
+
+        // Twilio Cloud Telephony & Call Recording Routes
+        Route::get('twilio-settings', [\App\Domains\Platform\Controllers\TwilioSettingController::class, 'index'])->name('twilioSettings.index');
+        Route::post('twilio-settings/store', [\App\Domains\Platform\Controllers\TwilioSettingController::class, 'store'])->name('twilioSettings.store');
+        Route::post('twilio-settings/test-connection', [\App\Domains\Platform\Controllers\TwilioSettingController::class, 'testConnection'])->name('twilioSettings.testConnection');
+        Route::post('twilio-settings/simulate-call', [\App\Domains\Platform\Controllers\TwilioSettingController::class, 'simulateCallLog'])->name('twilioSettings.simulateCallLog');
+
         // Notification Rules Master (Absolute ERP Style)
         Route::post('notification-rules/{notificationRule}/toggle-status', [\App\Domains\Platform\Controllers\NotificationRuleController::class, 'toggleStatus'])
             ->name('notification-rules.toggle-status');

@@ -63,9 +63,20 @@ class PmScheduleService
     {
         return DB::transaction(function () use ($id, $tenantId, $data) {
             $schedule = $this->repository->findPmSchedule($id, $tenantId);
+
             if (!$schedule) {
                 throw new InvalidArgumentException("PM Schedule #{$id} not found.");
             }
+
+            $baseDate = !empty($data['last_completed_date'])
+                ? Carbon::parse($data['last_completed_date'])
+                : Carbon::today();
+
+            $data['next_due_date'] = $this->computeNextDueDate(
+                $baseDate,
+                $data['frequency_type'] ?? ProductionPmSchedule::FREQ_DAYS,
+                (int) ($data['frequency_value'] ?? 30)
+            )->toDateString();
 
             return $this->repository->updatePmSchedule($id, $tenantId, $data);
         });
@@ -117,10 +128,14 @@ class PmScheduleService
                 }
 
                 // Generate unique WO number
-                $woNumber = $this->codeService->generateWorkOrderNumber($tenantId);
+                $branchId = $schedule->machine?->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+                $companyId = $schedule->machine?->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+                $woNumber = $this->codeService->generateWorkOrderNumber($tenantId, $branchId);
 
                 $workOrder = $this->repository->createWorkOrder([
                     'tenant_id'           => $tenantId,
+                    'company_id'          => $companyId,
+                    'branch_id'           => $branchId,
                     'work_order_number'   => $woNumber,
                     'machine_id'          => $schedule->machine_id,
                     'pm_schedule_id'      => $schedule->id,

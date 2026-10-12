@@ -46,16 +46,28 @@ graph TD
 
 ## 3. Rework Lifecycle (`ProductionReworkOrder`)
 
-- **Definition:** Defective units that can be brought into conformance via additional labor (e.g. re-machining a shaft, repainting a scratch, re-soldering a PCB joint).
+- **Definition:** Defective units that can be brought into conformance via additional labor and/or additional raw materials (e.g. re-machining a shaft, replacing a burnt gasket, re-soldering a PCB joint).
 - **Trigger:** Inspector or operator issues a `rework` disposition.
 - **Workflow:**
   1. Auto-creates a `ProductionNcr` logging defect severity.
   2. Creates a `ProductionReworkOrder` linked to the parent order and batch.
-  3. Creates sequential `ProductionReworkOperation` steps assigned to a repair Work Center.
-  4. The operator starts and completes the repair steps on the MES console:
+  3. Dynamic Cost Estimate is derived automatically from the planned repair stages and Work Center labor/overhead rates (`calculateDynamicCostEstimate`), avoiding arbitrary fallbacks.
+  4. Creates sequential `ProductionReworkOperation` steps assigned to a repair Work Center.
+  5. **Material Consumption Flow:** If repair requires additional parts or materials:
+     - Operator/Storekeeper issues material via Web UI modal or API (`POST /production/quality/rework/{id}/issue-material`).
+     - Handled by `ProductionMaterialService::issueReworkMaterial()`.
+     - Stock is deducted via canonical `StockService::recordOutflow()` with FIFO or Weighted Average valuation.
+     - Persisted in `production_order_issues` with `rework_order_id`, `rework_operation_id`, and `issue_type = 'rework'`.
+     - Triggers canonical `PostProductionConsumptionJournal` (Debit WIP 1204, Credit Inventory).
+     - Material cost is capitalized to parent order WIP sheet and added to `$rework->actual_cost`.
+  6. The operator executes and completes the repair steps on the MES console:
      - `POST /production/quality/rework/ops/{id}/start`
      - `POST /production/quality/rework/ops/{id}/complete`
-  5. Upon completion, the repaired units are re-inspected. If passed, they rejoin the good WIP flow without double-counting initial production counts!
+     - Duration is calculated from elapsed minutes or explicit input (`setup_time_actual`, `processing_time_actual`).
+     - Cost rates are dynamically resolved from the Work Center (`cost_per_hour`, `overhead_rate`) and Routing machine rate without hardcoded numbers.
+  7. Upon completion of all rework operations:
+     - Repaired units are re-inspected or restored to good WIP without double-counting initial production counts.
+     - **No Double-Counting Integration:** A `ProductionCostAdjustment` is generated on the parent `ProductionOrder` under category `CATEGORY_REWORK_EXPENSE` containing **only** additional Labor, Machine, and Overhead expenses. Material cost is strictly excluded from the adjustment because it was already recognized at the moment of issue.
 
 ---
 
@@ -65,16 +77,19 @@ If units undergoing rework cannot be salvaged:
 - **Action:** Inspector triggers `POST /production/quality/rework/{id}/fail`.
 - **System Actions:**
   1. Closes the rework order as `failed`.
-  2. Creates a `ProductionWipTransaction` with `transaction_type = 'rework_failed_scrapped'`.
-  3. Emits high-priority notification to the Production Manager.
-  4. Converts the remaining quantity to final operational scrap.
+  2. Cancels any non-completed rework operations.
+  3. Creates a `ProductionWipTransaction` with `transaction_type = 'rework_failed_scrapped'`.
+  4. Creates a `ProductionScrapDisposal` record with status `pending_approval`.
+  5. Emits high-priority event to the Production Manager.
+  6. Converts the remaining quantity to final operational scrap.
 
 ---
 
 ## 5. Financial & Cost Summary Impact
 
-| Defect State | WIP Balance Effect | Order Cost Sheet Effect | Inventory Effect |
+| Defect State | WIP Balance Effect | Order Cost Sheet Effect | Inventory & Accounting Effect |
 |---|---|---|---|
 | **Operational Scrap** | Decrements available quantity on current WIP card | Absorbed as manufacturing shrinkage; increases per-unit cost of remaining good units | Raw material stock ledger deducted if applicable |
-| **Rework Loop** | Holds quantity in `rework` status; prevents downstream transfer | Incurs additional direct labor and machine overhead costs on the rework work center | No inventory movement until final FG sign-off |
-| **Failed Rework** | Deducted permanently from WIP balance | Rework labor and machine costs remain charged to the order as unrecovered defect expenses | Final write-off to scrap expense account |
+| **Rework Material Issue** | Increments `material_cost` and `total_value` on parent order WIP | Adds to Rework Order `material_cost` and `actual_cost` | `StockService::recordOutflow` deducts inventory; `PostProductionConsumptionJournal` posts Dr WIP (1204), Cr Inventory |
+| **Rework Operation Completion** | Increments `labor_cost`, `machine_cost`, `overhead_cost` on parent order WIP | Incurs actual labor & overhead based on configured Work Center rates; creates `ProductionCostAdjustment` (`CATEGORY_REWORK_EXPENSE`) excluding material | Capitalized into WIP; reflected in Final Costing Summary without double-counting |
+| **Failed Rework** | Deducted permanently from WIP balance | Rework labor, machine, and material costs remain charged to the order as unrecovered defect expenses | Final write-off to scrap disposal workflow |

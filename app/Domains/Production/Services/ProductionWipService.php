@@ -71,6 +71,8 @@ class ProductionWipService
 
             $wip = ProductionWip::create([
                 'tenant_id' => $order->tenant_id,
+                'company_id' => $order->company_id ?? company_id(),
+                'branch_id' => $order->branch_id ?? branch_id(),
                 'production_order_id' => $order->id,
                 'production_batch_id' => $validBatchId,
                 'product_id' => $batch ? $batch->product_id : $order->product_id,
@@ -176,6 +178,8 @@ class ProductionWipService
 
             $wip = ProductionWip::create([
                 'tenant_id' => $order->tenant_id,
+                'company_id' => $order->company_id ?? company_id(),
+                'branch_id' => $order->branch_id ?? branch_id(),
                 'production_order_id' => $order->id,
                 'production_batch_id' => null,
                 'product_id' => $order->product_id,

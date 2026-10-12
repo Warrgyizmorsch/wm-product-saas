@@ -16,4 +16,6 @@ interface LeaveRequestRepositoryInterface
     public function getPolicyRules(int $employeeId, int $leaveTypeId): array;
 
     public function cancelLeaveRequest(LeaveRequest $leaveRequest): void;
+
+    public function export(array $filters = []): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
 }

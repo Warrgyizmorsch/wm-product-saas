@@ -35,6 +35,7 @@ class LeaveBalance extends BaseModel
 
     public function getRemainingAttribute(): float
     {
-        return max(0.0, floatval($this->allocated) - floatval($this->used) - floatval($this->encashed ?? 0.0));
+        return round(floatval($this->allocated) - floatval($this->used) - floatval($this->encashed ?? 0.0), 2);
     }
 }
+

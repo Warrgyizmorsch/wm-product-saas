@@ -53,7 +53,7 @@ class QuotationApiController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $quotation = Quotation::with(['lead', 'crmAccount', 'crmContact', 'deal', 'items.product'])->find($id);
+        $quotation = Quotation::with(['lead', 'crmAccount', 'deal', 'items.product'])->find($id);
 
         if (!$quotation) {
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
@@ -244,5 +244,113 @@ class QuotationApiController extends Controller
             'success' => true,
             'message' => "Quotation #{$id} deleted successfully.",
         ]);
+    }
+
+    /**
+     * POST /api/crm/quotations/{id}/send-email
+     */
+    public function sendEmail(Request $request, int $id): JsonResponse
+    {
+        $quotation = Quotation::find($id);
+        if (!$quotation) {
+            return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'to_email'   => 'required|email',
+            'subject'    => 'required|string|max:255',
+            'body_html'  => 'required|string',
+            'account_id' => 'nullable|exists:email_configurations,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            /** @var \App\Services\EmailService $emailService */
+            $emailService = app(\App\Services\EmailService::class);
+            $emailService->sendQuotationEmail($quotation, $request->all());
+
+            return response()->json([
+                'success' => true,
+                'message' => "Quotation {$quotation->quotation_number} sent successfully to {$request->input('to_email')} with PDF attached!",
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send Quotation Email: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * POST /api/crm/quotations/{id}/send-whatsapp
+     */
+    public function sendWhatsApp(Request $request, int $id): JsonResponse
+    {
+        $quotation = Quotation::find($id);
+        if (!$quotation) {
+            return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'phone'      => 'required|string',
+            'caption'    => 'nullable|string',
+            'custom_pdf' => 'nullable|file|mimes:pdf|max:10240',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $phone = $request->input('phone');
+        if (!empty($phone)) {
+            $quotation->update(['phone' => $phone]);
+        }
+
+        try {
+            /** @var \App\Services\WhatsAppService $waService */
+            $waService = app(\App\Services\WhatsAppService::class);
+            $result = $waService->sendQuotation(
+                quotation: $quotation,
+                mobile: $phone,
+                customCaption: $request->input('caption'),
+                customPdfFile: $request->file('custom_pdf')
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => "Quotation {$quotation->quotation_number} sent via WhatsApp to {$phone}!",
+                'data'    => $result,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send WhatsApp quotation: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * GET /api/crm/quotations/{id}/download
+     */
+    public function downloadPdf(int $id)
+    {
+        $quotation = Quotation::find($id);
+        if (!$quotation) {
+            return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
+        return $pdf->download("Quotation_{$quotation->quotation_number}.pdf");
     }
 }

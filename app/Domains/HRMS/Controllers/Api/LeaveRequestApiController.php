@@ -7,13 +7,17 @@ use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\LeaveType;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\LeaveBalance;
-use App\Domains\HRMS\Models\LeaveEncashment;
+use App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 
 class LeaveRequestApiController extends Controller
 {
+    public function __construct(
+        protected LeaveRequestRepositoryInterface $leaveRequestRepository
+    ) {}
+
     /**
      * Helper for standardized success JSON response.
      */
@@ -269,6 +273,7 @@ class LeaveRequestApiController extends Controller
         }
 
         $rules     = $leaveType->rules ?? [];
+        $sandwichRule = !empty($rules['application']['sandwich_rule']);
         $startDate = Carbon::parse($validated['start_date']);
         $endDate   = Carbon::parse($validated['end_date']);
         $startType = $validated['start_date_type'];
@@ -279,7 +284,7 @@ class LeaveRequestApiController extends Controller
             $isHoliday = \App\Domains\HRMS\Models\HolidayCalendar::isHolidayForEmployee($employee, $date);
             $isActiveWorkDay = !is_null($employee->resolveShiftForDate($date));
 
-            if (!$isHoliday && $isActiveWorkDay) {
+            if ($sandwichRule) {
                 if ($startDate->isSameDay($endDate)) {
                     $duration += ($startType === 'full_day') ? 1.0 : 0.5;
                 } elseif ($date->isSameDay($startDate)) {
@@ -288,6 +293,18 @@ class LeaveRequestApiController extends Controller
                     $duration += ($endType === 'full_day') ? 1.0 : 0.5;
                 } else {
                     $duration += 1.0;
+                }
+            } else {
+                if (!$isHoliday && $isActiveWorkDay) {
+                    if ($startDate->isSameDay($endDate)) {
+                        $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                    } elseif ($date->isSameDay($startDate)) {
+                        $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                    } elseif ($date->isSameDay($endDate)) {
+                        $duration += ($endType === 'full_day') ? 1.0 : 0.5;
+                    } else {
+                        $duration += 1.0;
+                    }
                 }
             }
         }
@@ -312,18 +329,23 @@ class LeaveRequestApiController extends Controller
 
         // Probation Restriction
         $probationRules = $rules['probation'] ?? [];
-        if (!empty($probationRules['probation_rule'])) {
-            $probRule = $probationRules['probation_rule'];
-            $doj = $employee->date_of_joining;
-            if ($probRule === 'disallow' && $employee->employee_stage === 'Probation') {
-                return $this->sendError(__('hrms.leave.app.probation_restricted'), 422);
+        $probRule = $probationRules['rule'] ?? ($probationRules['probation_rule'] ?? 'allow');
+        $doj = $employee->date_of_joining;
+        if ($probRule === 'disallow' && ($employee->employee_stage === 'Probation' || $employee->employment_status === 'probation')) {
+            return $this->sendError(__('hrms.leave.app.probation_restricted'), 422);
+        }
+        if ($probRule === 'allow_after_months') {
+            $requiredMonths = intval($probationRules['months'] ?? ($probationRules['probation_months'] ?? 3));
+            if ($doj && Carbon::parse($doj)->addMonths($requiredMonths)->isFuture()) {
+                return $this->sendError(__('hrms.leave.app.probation_months_restricted', ['months' => $requiredMonths]), 422);
             }
-            if ($probRule === 'allow_after_months') {
-                $requiredMonths = intval($probationRules['probation_months'] ?? 3);
-                if ($doj && Carbon::parse($doj)->addMonths($requiredMonths)->isFuture()) {
-                    return $this->sendError(__('hrms.leave.app.probation_months_restricted', ['months' => $requiredMonths]), 422);
-                }
-            }
+        }
+
+        // Notice Period Restriction
+        $noticeRules = $rules['notice'] ?? [];
+        $noticeRule = $noticeRules['rule'] ?? ($noticeRules['notice_rule'] ?? 'allow');
+        if ($noticeRule === 'disallow' && ($employee->employee_stage === 'Notice Period' || $employee->employment_status === 'notice')) {
+            return $this->sendError(__('hrms.leave.app.notice_restricted'), 422);
         }
 
         // Apply in Advance Rule
@@ -353,7 +375,7 @@ class LeaveRequestApiController extends Controller
             }
         }
 
-        // Leave Balance Availability
+        // Leave Balance Availability Check (respecting Negative Leave balance policy)
         $isPaid = strtolower($leaveType->type) === 'paid';
         $isLimited = empty($rules['accrual']['quota_type']) || $rules['accrual']['quota_type'] !== 'unlimited';
 
@@ -362,8 +384,23 @@ class LeaveRequestApiController extends Controller
                 ->where('leave_type_id', $leaveType->id)
                 ->first();
             $remaining = $balance ? floatval($balance->remaining) : 0.0;
-            if ($duration > $remaining) {
-                return $this->sendError(__('hrms.leave.app.insufficient_balance', ['remaining' => $remaining, 'duration' => $duration]), 422);
+            $allowNegative = !empty($rules['accrual']['allow_negative']);
+            $maxNegative = floatval($rules['accrual']['max_negative'] ?? 0.0);
+
+            if ($allowNegative) {
+                $maxAllowedDuration = $remaining + $maxNegative;
+                if ($duration > $maxAllowedDuration) {
+                    return $this->sendError(__('hrms.leave.app.insufficient_balance_negative', [
+                        'remaining'    => $remaining,
+                        'max_negative' => $maxNegative,
+                        'allowed'      => max(0.0, $maxAllowedDuration),
+                        'duration'     => $duration
+                    ]), 422);
+                }
+            } else {
+                if ($duration > $remaining) {
+                    return $this->sendError(__('hrms.leave.app.insufficient_balance', ['remaining' => $remaining, 'duration' => $duration]), 422);
+                }
             }
         }
 
@@ -457,6 +494,22 @@ class LeaveRequestApiController extends Controller
             }
         }
 
+        // Trigger Global Notification
+        try {
+            $startFormatted = \Carbon\Carbon::parse($leaveRequest->start_date)->format('d M Y');
+            $endFormatted = \Carbon\Carbon::parse($leaveRequest->end_date)->format('d M Y');
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.approved', [
+                'employee_name' => $leaveRequest->employee?->full_name ?? 'Employee',
+                'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
+                'from_date'     => $startFormatted,
+                'to_date'       => $endFormatted,
+                'days'          => (string) ($leaveRequest->duration ?? 1),
+                'approved_by'   => auth()->user()?->name ?? 'Manager',
+            ], $leaveRequest);
+        } catch (\Throwable $e) {
+            // Silence any notification trigger errors
+        }
+
         return $this->sendSuccess($leaveRequest, __('hrms.leave.app.approved_successfully'));
     }
 
@@ -488,6 +541,22 @@ class LeaveRequestApiController extends Controller
             'current_level'    => 'rejected',
             'rejection_reason' => $validated['rejection_reason']
         ]);
+
+        // Trigger Global Notification
+        try {
+            $startFormatted = \Carbon\Carbon::parse($leaveRequest->start_date)->format('d M Y');
+            $endFormatted = \Carbon\Carbon::parse($leaveRequest->end_date)->format('d M Y');
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.rejected', [
+                'employee_name'    => $leaveRequest->employee?->full_name ?? 'Employee',
+                'leave_type'       => $leaveRequest->leaveType?->name ?? 'Leave',
+                'from_date'        => $startFormatted,
+                'to_date'          => $endFormatted,
+                'rejection_reason' => $validated['rejection_reason'],
+                'rejected_by'      => auth()->user()?->name ?? 'Manager',
+            ], $leaveRequest);
+        } catch (\Throwable $e) {
+            // Silence any notification trigger errors
+        }
 
         return $this->sendSuccess($leaveRequest, __('hrms.leave.app.rejected_successfully'));
     }
@@ -617,6 +686,7 @@ class LeaveRequestApiController extends Controller
 
         $validated = $request->validate([
             'employee_id'     => 'required|exists:employees,id',
+            'leave_type_id'   => 'nullable|exists:leave_types,id',
             'start_date'      => 'required|date',
             'end_date'        => 'required|date|after_or_equal:start_date',
             'start_date_type' => 'required|string|in:full_day,first_half,second_half',
@@ -628,25 +698,33 @@ class LeaveRequestApiController extends Controller
             return $this->sendError(__('hrms.leave.app.emp_not_found'), 404);
         }
 
+        $leaveType = !empty($validated['leave_type_id']) ? LeaveType::find($validated['leave_type_id']) : null;
+        $sandwichRule = $leaveType && !empty($leaveType->rules['application']['sandwich_rule']);
+
         $startDate = Carbon::parse($validated['start_date']);
         $endDate   = Carbon::parse($validated['end_date']);
         $startType = $validated['start_date_type'];
         $endType   = $validated['end_date_type'];
 
-        $duration = 0.0;
-        $holidays = [];
-        $restDays = [];
+        $duration     = 0.0;
+        $holidays     = [];
+        $restDays     = [];
+        $sandwichDays = [];
 
         for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
             $dateStr = $date->toDateString();
             $isHoliday = \App\Domains\HRMS\Models\HolidayCalendar::isHolidayForEmployee($employee, $date);
             $isActiveWorkDay = !is_null($employee->resolveShiftForDate($date));
+            $isNonWorkDay = $isHoliday || !$isActiveWorkDay;
 
-            if ($isHoliday) {
-                $holidays[] = $dateStr;
-            } elseif (!$isActiveWorkDay) {
-                $restDays[] = $dateStr;
-            } else {
+            if ($sandwichRule) {
+                if ($isHoliday) {
+                    $holidays[] = $dateStr;
+                }
+                if (!$isActiveWorkDay) {
+                    $restDays[] = $dateStr;
+                }
+
                 if ($startDate->isSameDay($endDate)) {
                     $duration += ($startType === 'full_day') ? 1.0 : 0.5;
                 } elseif ($date->isSameDay($startDate)) {
@@ -655,14 +733,35 @@ class LeaveRequestApiController extends Controller
                     $duration += ($endType === 'full_day') ? 1.0 : 0.5;
                 } else {
                     $duration += 1.0;
+                    if ($isNonWorkDay) {
+                        $sandwichDays[] = $dateStr;
+                    }
+                }
+            } else {
+                if ($isHoliday) {
+                    $holidays[] = $dateStr;
+                } elseif (!$isActiveWorkDay) {
+                    $restDays[] = $dateStr;
+                } else {
+                    if ($startDate->isSameDay($endDate)) {
+                        $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                    } elseif ($date->isSameDay($startDate)) {
+                        $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                    } elseif ($date->isSameDay($endDate)) {
+                        $duration += ($endType === 'full_day') ? 1.0 : 0.5;
+                    } else {
+                        $duration += 1.0;
+                    }
                 }
             }
         }
 
         return $this->sendSuccess([
-            'duration'  => $duration,
-            'holidays'  => $holidays,
-            'rest_days' => $restDays,
+            'duration'      => $duration,
+            'holidays'      => $holidays,
+            'rest_days'     => $restDays,
+            'sandwich_rule' => $sandwichRule,
+            'sandwich_days' => $sandwichDays,
         ], 'Leave duration calculated successfully');
     }
 
@@ -843,6 +942,14 @@ class LeaveRequestApiController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Export Leave Applications to Excel (.xlsx).
+     */
+    public function export(Request $request): mixed
+    {
+        return $this->leaveRequestRepository->export($request->all());
     }
 }
 

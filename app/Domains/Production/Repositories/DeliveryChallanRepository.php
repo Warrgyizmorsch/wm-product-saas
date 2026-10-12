@@ -107,6 +107,8 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
                             $order = \App\Domains\Production\Models\ProductionOrder::find($orderId);
                             $wip = \App\Domains\Production\Models\ProductionWip::create([
                                 'tenant_id' => $tenantId,
+                                'company_id' => $order?->company_id ?? company_id(),
+                                'branch_id' => $order?->branch_id ?? branch_id(),
                                 'production_order_id' => $orderId,
                                 'production_batch_id' => $batchId,
                                 'product_id' => $item['product_id'] ?? $order?->product_id,

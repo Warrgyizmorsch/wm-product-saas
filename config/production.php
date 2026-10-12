@@ -75,4 +75,14 @@ return [
         'decommissioned'    => 'Decommissioned',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Maintenance Hourly Rate Working Hours Basis
+    |--------------------------------------------------------------------------
+    | Standard monthly working hours basis used to derive an employee mechanic's
+    | hourly wage from their monthly basic salary.
+    | Default: 208 hours (26 working days * 8 hours/day).
+    */
+    'maintenance_working_hours_per_month' => (float) env('PRODUCTION_MAINTENANCE_WORKING_HOURS_PER_MONTH', 208.0),
+
 ];

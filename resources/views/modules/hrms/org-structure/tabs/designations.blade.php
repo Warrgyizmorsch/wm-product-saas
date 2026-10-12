@@ -66,8 +66,8 @@
                             </div>
                             
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('hrms.org.index', ['tab' => 'designations']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">{{ __('hrms.common.reset') }}</a>
-                                <button type="submit" class="btn btn-sm btn-primary text-uppercase fw-bold py-2 px-3 text-white" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em;">{{ __('hrms.common.apply') }}</button>
+                                <x-ui.button href="{{ route('hrms.org.index', ['tab' => 'designations']) }}" variant="light" size="sm" class="text-uppercase fw-bold py-2 px-3">{{ __('hrms.common.reset') }}</x-ui.button>
+                                <x-ui.button type="submit" variant="primary" size="sm" class="text-uppercase fw-bold py-2 px-3">{{ __('hrms.common.apply') }}</x-ui.button>
                             </div>
                         </form>
                     </x-ui.filter>
@@ -106,7 +106,7 @@
                                     @csrf
                                     @method('DELETE')
                                      <div class="hstack gap-2 justify-content-end align-items-center">
-                                         <a href="javascript:void(0)" class="action-dropdown-btn btn-view-desig" data-bs-toggle="modal" data-bs-target="#viewDesigModal" data-desig="{{ base64_encode($ds->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;">
+                                         <a href="javascript:void(0)" class="action-dropdown-btn btn-view-desig" data-bs-toggle="modal" data-bs-target="#viewDesigModal" data-desig="{{ base64_encode($ds->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
                                              <i class="feather feather-eye"></i>
                                          </a>
                                          <x-ui.action-dropdown>
@@ -121,7 +121,7 @@
                                                  </button>
                                              </li>
                                          </x-ui.action-dropdown>
-                                    </div>
+                                     </div>
                                 </form>
                             </td>
                         </tr>
@@ -159,89 +159,82 @@
 
 <script>
     (function() {
-        function init() {
-            function getInitials(name, fallback) {
-                const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
+        function getInitials(name, fallback) {
+            const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
 
-                if (words.length >= 2) {
-                    return (words[0][0] + words[1][0]).toUpperCase();
-                }
-
-                return (words[0] || fallback || '').substring(0, 2).toUpperCase();
+            if (words.length >= 2) {
+                return (words[0][0] + words[1][0]).toUpperCase();
             }
 
-            // View Action Trigger
-            document.querySelectorAll('.btn-view-desig').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    let desig = JSON.parse(atob(this.dataset.desig));
-                    
-                    let nameEl = document.getElementById('modal_view_desig_name');
-                    if (nameEl) nameEl.innerText = desig.name;
-                    
-                    let deptEl = document.getElementById('modal_view_desig_dept');
-                    if (deptEl) deptEl.innerText = (desig.department && desig.department.name) ? desig.department.name : 'N/A';
-                    
-                    let levelEl = document.getElementById('modal_view_desig_level');
-                    if (levelEl) levelEl.innerText = desig.level || 'N/A';
-                    
-                    let descEl = document.getElementById('modal_view_desig_desc');
-                    if (descEl) descEl.innerText = desig.description || '{{ __("hrms.employees.lbl_no_description") }}';
-                    
-                    let avatarEl = document.getElementById('modal_view_desig_avatar');
-                    if (avatarEl) {
-                        avatarEl.innerText = getInitials(desig.name, 'DS');
-                    }
-                    
-                    let statusEl = document.getElementById('modal_view_desig_status');
-                    if (statusEl) {
-                        if (desig.status === true || desig.status === 1 || desig.status === '1') {
-                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success">{{ __("hrms.employees.frm_status_active") }}</span>';
-                        } else {
-                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">{{ __("hrms.employees.frm_status_inactive") }}</span>';
-                        }
-                    }
-                });
-            });
-
-            // Edit Action Trigger
-            document.querySelectorAll('.btn-edit-desig').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    let desig = JSON.parse(atob(this.dataset.desig));
-                    
-                    let nameEl = document.getElementById('edit_desig_name');
-                    if (nameEl) nameEl.value = desig.name || '';
-                    
-                    let levelEl = document.getElementById('edit_desig_level');
-                    if (levelEl) levelEl.value = desig.level || '';
-                    
-                    let deptEl = document.getElementById('edit_desig_dept_id');
-                    if (deptEl) {
-                        deptEl.value = desig.department_id || '';
-                        $(deptEl).trigger('change');
-                    }
-                    
-                    let descEl = document.getElementById('edit_desig_description');
-                    if (descEl) descEl.value = desig.description || '';
-                    
-                    let statusSelect = document.getElementById('edit_desig_status');
-                    if (statusSelect) {
-                        statusSelect.value = (desig.status === true || desig.status === 1 || desig.status === '1') ? '1' : '0';
-                        $(statusSelect).trigger('change');
-                    }
-                    
-                    let form = document.getElementById('desig_edit_form');
-                    if (form) {
-                        form.action = '/hrms/org/designation/update/' + desig.id;
-                    }
-                });
-            });
+            return (words[0] || fallback || '').substring(0, 2).toUpperCase();
         }
 
-        if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", init);
-        } else {
-            init();
-        }
+        // Delegated View Action Trigger
+        $(document).on('click', '.btn-view-desig', function() {
+            let desig = JSON.parse(atob(this.dataset.desig));
+            
+            let nameEl = document.getElementById('modal_view_desig_name');
+            if (nameEl) nameEl.innerText = desig.name;
+            
+            let deptEl = document.getElementById('modal_view_desig_dept');
+            if (deptEl) deptEl.innerText = (desig.department && desig.department.name) ? desig.department.name : 'N/A';
+            
+            let levelEl = document.getElementById('modal_view_desig_level');
+            if (levelEl) levelEl.innerText = desig.level || 'N/A';
+            
+            let descEl = document.getElementById('modal_view_desig_desc');
+            if (descEl) descEl.innerText = desig.description || '{{ __("hrms.employees.lbl_no_description") }}';
+            
+            let avatarEl = document.getElementById('modal_view_desig_avatar');
+            if (avatarEl) {
+                avatarEl.innerText = getInitials(desig.name, 'DS');
+            }
+            
+            let statusEl = document.getElementById('modal_view_desig_status');
+            if (statusEl) {
+                if (desig.status === true || desig.status === 1 || desig.status === '1') {
+                    statusEl.innerHTML = '<span class="badge bg-soft-success text-success">{{ __("hrms.employees.frm_status_active") }}</span>';
+                } else {
+                    statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">{{ __("hrms.employees.frm_status_inactive") }}</span>';
+                }
+            }
+        });
+
+        // Delegated Edit Action Trigger
+        $(document).on('click', '.btn-edit-desig', function() {
+            let desig = JSON.parse(atob(this.dataset.desig));
+            
+            let nameEl = document.getElementById('edit_desig_name');
+            if (nameEl) nameEl.value = desig.name || '';
+            
+            let levelEl = document.getElementById('edit_desig_level');
+            if (levelEl) levelEl.value = desig.level || '';
+            
+            let deptEl = document.getElementById('edit_desig_dept_id');
+            if (deptEl) {
+                deptEl.value = desig.department_id || '';
+                $(deptEl).trigger('change');
+            }
+            
+            let descEl = document.getElementById('edit_desig_description');
+            if (descEl) descEl.value = desig.description || '';
+            
+            let statusSelect = document.getElementById('edit_desig_status');
+            if (statusSelect) {
+                statusSelect.value = (desig.status === true || desig.status === 1 || desig.status === '1') ? '1' : '0';
+                $(statusSelect).trigger('change');
+            }
+            
+            let form = document.getElementById('desig_edit_form');
+            if (form) {
+                form.action = '/hrms/org/designation/update/' + desig.id;
+            }
+
+            let desigIdInput = document.getElementById('edit_desig_id');
+            if (desigIdInput) {
+                desigIdInput.value = desig.id || '';
+            }
+        });
     })();
 </script>
 
@@ -280,7 +273,7 @@
                 </div>
             </div>
             <div class="modal-footer bg-light py-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                <x-ui.button variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
             </div>
         </div>
     </div>
@@ -296,12 +289,13 @@
             </div>
             <form action="{{ route('hrms.designation.store') }}" method="POST">
                 @csrf
+                <input type="hidden" name="form_mode" value="add_desig">
                 <div class="modal-body p-4">
                     @include('modules.hrms.org-structure.designation-form-fields', ['mode' => 'add'])
                 </div>
                 <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_designation') }}</button>
+                    <x-ui.button variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">{{ __('hrms.org.save_designation') }}</x-ui.button>
                 </div>
             </form>
         </div>
@@ -316,14 +310,16 @@
                 <h5 class="modal-title fw-bold" id="editDesigModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.common.edit') }} {{ __('hrms.org.designations') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="desig_edit_form" method="POST">
+            <form id="desig_edit_form" method="POST" action="{{ old('form_mode') === 'edit_desig' && old('edit_desig_id') ? route('hrms.designation.update', ['designation' => old('edit_desig_id')]) : '' }}">
                 @csrf
+                <input type="hidden" name="form_mode" value="edit_desig">
+                <input type="hidden" name="edit_desig_id" id="edit_desig_id" value="{{ old('edit_desig_id') }}">
                 <div class="modal-body p-4">
                     @include('modules.hrms.org-structure.designation-form-fields', ['mode' => 'edit'])
                 </div>
                 <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_designation') }}</button>
+                    <x-ui.button variant="secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">{{ __('hrms.org.update_designation') }}</x-ui.button>
                 </div>
             </form>
         </div>

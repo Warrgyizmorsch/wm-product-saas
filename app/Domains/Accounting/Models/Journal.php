@@ -3,7 +3,7 @@
 namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
-use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\RecordsBranch;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Journal extends BaseModel
 {
-    use HasFactory, SoftDeletes, BelongsToCompany, BelongsToBranch;
+    use HasFactory, SoftDeletes, BelongsToCompany, RecordsBranch;
 
     public const STATUS_DRAFT = 'draft';
     public const STATUS_POSTED = 'posted';
@@ -35,6 +35,10 @@ class Journal extends BaseModel
     public const SOURCE_PRODUCTION = 'production';
     public const SOURCE_PAYROLL = 'payroll';
     public const SOURCE_FIXED_ASSETS = 'fixed_assets';
+    // Year-end closing entry: moves the year's income/expense balances into
+    // Reserves & Surplus. It's in the ledger (Balance Sheet, GL) but kept out
+    // of P&L-style reports, or the closed year's profit would read as zero.
+    public const SOURCE_YEAR_END_CLOSE = 'year_end_close';
 
     // What kind of accounting document this journal represents — orthogonal to
     // `source` (which module triggered it). Null means a plain manual journal.
@@ -61,6 +65,7 @@ class Journal extends BaseModel
         'exchange_rate',
         'reference_type',
         'reference_id',
+        'idempotency_key',
         'memo',
         'status',
         'reversed_journal_id',

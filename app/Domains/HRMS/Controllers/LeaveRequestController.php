@@ -54,7 +54,16 @@ class LeaveRequestController extends Controller
 
         $employee = Employee::findOrFail($validated['employee_id']);
 
-        // Calculate duration server-side from dates + session types, excluding holidays & rest days
+        $leaveType = \App\Domains\HRMS\Models\LeaveType::with('plan')->findOrFail($validated['leave_type_id']);
+        if ($leaveType->plan && !$leaveType->plan->status) {
+            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.plan_inactive'));
+        }
+
+        $rules        = $leaveType->rules ?? [];
+        $appRules     = $rules['application'] ?? [];
+        $sandwichRule = !empty($appRules['sandwich_rule']);
+
+        // Calculate duration server-side from dates + session types, respecting Sandwich Rule policy
         $startDate = Carbon::parse($validated['start_date']);
         $endDate   = Carbon::parse($validated['end_date']);
         $startType = $validated['start_date_type'] ?? 'full_day';
@@ -65,7 +74,7 @@ class LeaveRequestController extends Controller
             $isHoliday = \App\Domains\HRMS\Models\HolidayCalendar::isHolidayForEmployee($employee, $date);
             $isActiveWorkDay = !is_null($employee->resolveShiftForDate($date));
 
-            if (!$isHoliday && $isActiveWorkDay) {
+            if ($sandwichRule) {
                 if ($startDate->isSameDay($endDate)) {
                     $duration += ($startType === 'full_day') ? 1.0 : 0.5;
                 } elseif ($date->isSameDay($startDate)) {
@@ -74,6 +83,18 @@ class LeaveRequestController extends Controller
                     $duration += ($endType === 'full_day') ? 1.0 : 0.5;
                 } else {
                     $duration += 1.0;
+                }
+            } else {
+                if (!$isHoliday && $isActiveWorkDay) {
+                    if ($startDate->isSameDay($endDate)) {
+                        $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                    } elseif ($date->isSameDay($startDate)) {
+                        $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                    } elseif ($date->isSameDay($endDate)) {
+                        $duration += ($endType === 'full_day') ? 1.0 : 0.5;
+                    } else {
+                        $duration += 1.0;
+                    }
                 }
             }
         }
@@ -95,6 +116,83 @@ class LeaveRequestController extends Controller
 
         if ($conflict) {
             return redirect()->back()->withInput()->with('error', $conflict);
+        }
+
+        // Probation Restriction
+        $probationRules = $rules['probation'] ?? [];
+        $probRule = $probationRules['rule'] ?? ($probationRules['probation_rule'] ?? 'allow');
+        $doj = $employee->date_of_joining;
+        if ($probRule === 'disallow' && ($employee->employee_stage === 'Probation' || $employee->employment_status === 'probation')) {
+            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.probation_restricted'));
+        }
+        if ($probRule === 'allow_after_months') {
+            $requiredMonths = intval($probationRules['months'] ?? ($probationRules['probation_months'] ?? 3));
+            if ($doj && Carbon::parse($doj)->addMonths($requiredMonths)->isFuture()) {
+                return redirect()->back()->withInput()->with('error', __('hrms.leave.app.probation_months_restricted', ['months' => $requiredMonths]));
+            }
+        }
+
+        // Notice Period Restriction
+        $noticeRules = $rules['notice'] ?? [];
+        $noticeRule = $noticeRules['rule'] ?? ($noticeRules['notice_rule'] ?? 'allow');
+        if ($noticeRule === 'disallow' && ($employee->employee_stage === 'Notice Period' || $employee->employment_status === 'notice')) {
+            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.notice_restricted'));
+        }
+
+        // Apply in Advance Rule
+        if (!empty($appRules['apply_in_advance'])) {
+            $advanceDays = intval($appRules['advance_days'] ?? 3);
+            $minAllowedDate = Carbon::today()->addDays($advanceDays);
+            if ($startDate->lt($minAllowedDate)) {
+                return redirect()->back()->withInput()->with('error', __('hrms.leave.app.advance_restricted', ['days' => $advanceDays, 'date' => $minAllowedDate->format('Y-m-d')]));
+            }
+        }
+
+        // Duration Limits
+        $minDuration = floatval($appRules['min_duration'] ?? 0.5);
+        $maxDuration = floatval($appRules['max_duration'] ?? 365);
+        if ($minDuration > 0 && $duration < $minDuration) {
+            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.min_duration_restricted', ['min' => $minDuration]));
+        }
+        if ($maxDuration > 0 && $duration > $maxDuration) {
+            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.max_duration_restricted', ['max' => $maxDuration]));
+        }
+
+        // Attachment Requirement
+        if (!empty($appRules['require_attachment'])) {
+            $attachmentDays = intval($appRules['attachment_days'] ?? 3);
+            if ($duration >= $attachmentDays && !$request->hasFile('attachment')) {
+                return redirect()->back()->withInput()->with('error', __('hrms.leave.app.attachment_required', ['days' => $attachmentDays]));
+            }
+        }
+
+        // Leave Balance Availability Check (respecting Negative Leave balance policy)
+        $isPaid = strtolower($leaveType->type) === 'paid';
+        $isLimited = empty($rules['accrual']['quota_type']) || $rules['accrual']['quota_type'] !== 'unlimited';
+
+        if ($isPaid && $isLimited) {
+            $balance = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $employee->id)
+                ->where('leave_type_id', $leaveType->id)
+                ->first();
+            $remaining = $balance ? floatval($balance->remaining) : 0.0;
+            $allowNegative = !empty($rules['accrual']['allow_negative']);
+            $maxNegative = floatval($rules['accrual']['max_negative'] ?? 0.0);
+
+            if ($allowNegative) {
+                $maxAllowedDuration = $remaining + $maxNegative;
+                if ($duration > $maxAllowedDuration) {
+                    return redirect()->back()->withInput()->with('error', __('hrms.leave.app.insufficient_balance_negative', [
+                        'remaining'    => $remaining,
+                        'max_negative' => $maxNegative,
+                        'allowed'      => max(0.0, $maxAllowedDuration),
+                        'duration'     => $duration
+                    ]));
+                }
+            } else {
+                if ($duration > $remaining) {
+                    return redirect()->back()->withInput()->with('error', __('hrms.leave.app.insufficient_balance', ['remaining' => $remaining, 'duration' => $duration]));
+                }
+            }
         }
 
         $validated['company_id'] = $employee->company_id;
@@ -318,82 +416,50 @@ class LeaveRequestController extends Controller
     // Export Leave Applications to Excel
     // ─────────────────────────────────────────────────────────────────────────
 
-    public function export(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function export(Request $request): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
-        $user = auth()->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
-        $employee = Employee::resolveForUser($user);
-
-        $query = LeaveRequest::with(['employee', 'leaveType'])->orderBy('created_at', 'desc');
-
-        // Non-admin: scope to own records only
-        if (!$isHrAdmin) {
-            $query->where('employee_id', $employee ? $employee->id : 0);
-        }
-
-        $rows = $query->get();
-
-        $headers = [
-            'Employee Name',
-            'Employee ID',
-            'Leave Type',
-            'Start Date',
-            'End Date',
-            'Duration (Days)',
-            'Status',
-            'Applied On',
-            'Reason',
-        ];
-
-        $data = $rows->map(function ($req) {
-            return [
-                $req->employee->full_name ?? '—',
-                $req->employee->employee_id ?? '—',
-                $req->leaveType->name ?? '—',
-                $req->start_date ? $req->start_date->format('d M Y') : '—',
-                $req->end_date   ? $req->end_date->format('d M Y')   : '—',
-                floatval($req->duration),
-                ucfirst($req->status),
-                $req->created_at ? $req->created_at->format('d M Y') : '—',
-                $req->reason ?? '',
-            ];
-        })->toArray();
-
-        $filename = 'leave_applications_' . now()->format('Y-m-d') . '.xlsx';
-
-        return XlsxHelper::export($headers, $data, $filename);
+        return $this->leaveRequestRepository->export($request->all());
     }
 
     public function calculateDuration(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'employee_id'     => 'required|exists:employees,id',
+            'leave_type_id'   => 'nullable|integer',
             'start_date'      => 'required|date',
             'end_date'        => 'required|date|after_or_equal:start_date',
             'start_date_type' => 'required|string|in:full_day,first_half,second_half',
             'end_date_type'   => 'required|string|in:full_day,first_half,second_half',
         ]);
 
-        $employee = Employee::findOrFail($validated['employee_id']);
+        $employee  = Employee::findOrFail($validated['employee_id']);
         $startDate = Carbon::parse($validated['start_date']);
         $endDate   = Carbon::parse($validated['end_date']);
         $startType = $validated['start_date_type'];
         $endType   = $validated['end_date_type'];
 
-        $duration = 0.0;
-        $holidays = [];
-        $restDays = [];
+        $leaveType = !empty($validated['leave_type_id']) ? \App\Domains\HRMS\Models\LeaveType::find($validated['leave_type_id']) : null;
+        $sandwichRule = $leaveType && !empty($leaveType->rules['application']['sandwich_rule']);
+
+        $duration     = 0.0;
+        $holidays     = [];
+        $restDays     = [];
+        $sandwichDays = [];
 
         for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
             $dateStr = $date->toDateString();
             $isHoliday = \App\Domains\HRMS\Models\HolidayCalendar::isHolidayForEmployee($employee, $date);
             $isActiveWorkDay = !is_null($employee->resolveShiftForDate($date));
+            $isNonWorkDay = $isHoliday || !$isActiveWorkDay;
 
-            if ($isHoliday) {
-                $holidays[] = $dateStr;
-            } elseif (!$isActiveWorkDay) {
-                $restDays[] = $dateStr;
-            } else {
+            if ($sandwichRule) {
+                if ($isHoliday) {
+                    $holidays[] = $dateStr;
+                }
+                if (!$isActiveWorkDay) {
+                    $restDays[] = $dateStr;
+                }
+
                 if ($startDate->isSameDay($endDate)) {
                     $duration += ($startType === 'full_day') ? 1.0 : 0.5;
                 } elseif ($date->isSameDay($startDate)) {
@@ -402,15 +468,36 @@ class LeaveRequestController extends Controller
                     $duration += ($endType === 'full_day') ? 1.0 : 0.5;
                 } else {
                     $duration += 1.0;
+                    if ($isNonWorkDay) {
+                        $sandwichDays[] = $dateStr;
+                    }
+                }
+            } else {
+                if ($isHoliday) {
+                    $holidays[] = $dateStr;
+                } elseif (!$isActiveWorkDay) {
+                    $restDays[] = $dateStr;
+                } else {
+                    if ($startDate->isSameDay($endDate)) {
+                        $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                    } elseif ($date->isSameDay($startDate)) {
+                        $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                    } elseif ($date->isSameDay($endDate)) {
+                        $duration += ($endType === 'full_day') ? 1.0 : 0.5;
+                    } else {
+                        $duration += 1.0;
+                    }
                 }
             }
         }
 
         return response()->json([
-            'success'   => true,
-            'duration'  => $duration,
-            'holidays'  => $holidays,
-            'rest_days' => $restDays,
+            'success'       => true,
+            'duration'      => $duration,
+            'holidays'      => $holidays,
+            'rest_days'     => $restDays,
+            'sandwich_rule' => $sandwichRule,
+            'sandwich_days' => $sandwichDays,
         ]);
     }
 

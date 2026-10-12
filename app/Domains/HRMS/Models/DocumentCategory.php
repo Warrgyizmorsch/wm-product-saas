@@ -31,4 +31,12 @@ class DocumentCategory extends BaseModel
     {
         return $this->hasMany(DocumentMaster::class, 'document_category_id');
     }
+
+    /**
+     * Get the document templates belonging to this category.
+     */
+    public function templates(): HasMany
+    {
+        return $this->hasMany(DocumentTemplate::class, 'document_category_id');
+    }
 }

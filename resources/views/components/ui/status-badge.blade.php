@@ -48,7 +48,7 @@
 
     $normalized = strtolower(str_replace(' ', '_', $status));
     $config = $statusMap[$normalized] ?? ['bg' => 'bg-soft-secondary', 'text' => 'text-secondary', 'dot' => 'bg-secondary', 'default_label' => ucfirst($status)];
-    $displayLabel = $label ?? $config['default_label'];
+    $displayLabel = $label ?? (__('hrms.common.' . $normalized) !== 'hrms.common.' . $normalized ? __('hrms.common.' . $normalized) : $config['default_label']);
 
     $sizeClass = match($size) {
         'sm' => 'erp-badge--sm',

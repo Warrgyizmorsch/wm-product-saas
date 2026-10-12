@@ -10,10 +10,10 @@ class DocumentMasterRepository implements DocumentMasterRepositoryInterface
     public function getIndexData(array $inputs): array
     {
         // 1. Categories list (dropdowns and modals)
-        $allCategories = DocumentCategory::query()->orderBy('name', 'asc')->get();
+        $allCategories = DocumentCategory::query()->with('company')->orderBy('name', 'asc')->get();
 
         // 2. Filtered Categories query (for Category List Tab)
-        $categoriesQuery = DocumentCategory::query();
+        $categoriesQuery = DocumentCategory::query()->withCount('documentMasters')->with('company');
 
         if (!empty($inputs['category_search'])) {
             $search = $inputs['category_search'];

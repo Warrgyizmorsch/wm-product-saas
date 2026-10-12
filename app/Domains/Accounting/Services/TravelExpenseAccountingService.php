@@ -21,10 +21,8 @@ class TravelExpenseAccountingService
     {
         $tenantId = $cashAdvance->tenant_id ?? current_tenant_id() ?? require_tenant_id();
 
-        $existingJournal = Journal::where('tenant_id', $tenantId)
-            ->where('reference_type', 'CashAdvance')
-            ->where('reference_id', $cashAdvance->id)
-            ->first();
+        // Standing posting only: once reversed, the document can post again.
+        $existingJournal = $this->journalService->activePosting((int) $tenantId, 'CashAdvance', $cashAdvance->id);
 
         if ($existingJournal) {
             return $existingJournal;
@@ -74,7 +72,7 @@ class TravelExpenseAccountingService
         ];
 
         try {
-            return $this->journalService->post($lines, [
+            return $this->journalService->postOnce($lines, [
                 'tenant_id'      => $tenantId,
                 'journal_date'   => now()->format('Y-m-d'),
                 'source'         => 'expense',
@@ -98,10 +96,8 @@ class TravelExpenseAccountingService
     {
         $tenantId = $expenseReport->tenant_id ?? current_tenant_id() ?? require_tenant_id();
 
-        $existingJournal = Journal::where('tenant_id', $tenantId)
-            ->where('reference_type', 'ExpenseReport')
-            ->where('reference_id', $expenseReport->id)
-            ->first();
+        // Standing posting only: once reversed, the document can post again.
+        $existingJournal = $this->journalService->activePosting((int) $tenantId, 'ExpenseReport', $expenseReport->id);
 
         if ($existingJournal) {
             return $existingJournal;
@@ -189,7 +185,7 @@ class TravelExpenseAccountingService
         }
 
         try {
-            return $this->journalService->post($lines, [
+            return $this->journalService->postOnce($lines, [
                 'tenant_id'      => $tenantId,
                 'journal_date'   => now()->format('Y-m-d'),
                 'source'         => 'expense',

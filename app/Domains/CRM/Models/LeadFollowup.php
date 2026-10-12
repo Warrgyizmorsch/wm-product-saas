@@ -32,6 +32,8 @@ class LeadFollowup extends Model
         'tagged_user_ids',
         'rescheduled_from_id',
         'original_followup_date',
+        'recording_url',
+        'audio_duration',
     ];
 
     protected $casts = [

@@ -567,6 +567,7 @@ class EmployeeApiController extends Controller
         ]);
 
         $validated['employee_id'] = $employee->id;
+        $validated['tenant_id']   = $employee->tenant_id ?? (auth()->user()?->tenant_id ?? 1);
         $validated['status']      = 'pending';
 
         $penalty = EmployeePenalty::create($validated);

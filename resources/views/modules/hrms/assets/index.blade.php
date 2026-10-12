@@ -5,19 +5,34 @@
 @section('breadcrumb', 'HRMS / ' . __('hrms.sidebar.asset_management'))
 
 @section('page-actions')
-    <div id="hdr-btn-add-item" class="d-none d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <!-- Universal Import/Export Dropdown (Consistent across tabs) -->
         <x-ui.import-export-dropdown 
             type="asset" 
             :exportRoute="route('hrms.assets.export')" 
             :downloadTemplateRoute="route('hrms.assets.import.template')" 
             importModalTarget="#importAssetModal" 
         />
-        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addAssetModal" class="fw-bold text-uppercase">
+        
+        <!-- Tab-specific Add Action Buttons -->
+        <x-ui.button 
+            id="hdr-btn-add-item" 
+            variant="primary" 
+            icon="feather-plus" 
+            data-bs-toggle="modal" 
+            data-bs-target="#addAssetModal" 
+            class="fw-bold text-uppercase {{ request('tab') === 'categories-pane' ? 'd-none' : '' }}"
+        >
             {{ __('hrms.assets.add_item') }}
         </x-ui.button>
-    </div>
-    <div id="hdr-btn-add-category" class="d-none d-flex align-items-center gap-2">
-        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addCategoryModal" class="fw-bold text-uppercase">
+        <x-ui.button 
+            id="hdr-btn-add-category" 
+            variant="primary" 
+            icon="feather-plus" 
+            data-bs-toggle="modal" 
+            data-bs-target="#addCategoryModal" 
+            class="fw-bold text-uppercase {{ request('tab') === 'categories-pane' ? '' : 'd-none' }}"
+        >
             {{ __('hrms.assets.add_category') }}
         </x-ui.button>
     </div>
@@ -91,24 +106,6 @@
             }
         }
 
-        /* Tabs styling */
-        #assetModuleTabs .nav-link {
-            border: none !important;
-            background-color: transparent !important;
-            color: #64748b;
-            font-weight: 600;
-            padding: 12px 20px;
-            border-bottom: 2px solid transparent !important;
-            transition: all 0.2s ease-in-out;
-        }
-        #assetModuleTabs .nav-link:hover {
-            color: var(--bs-primary);
-        }
-        #assetModuleTabs .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom: 2px solid var(--bs-primary) !important;
-        }
-
         .badge-available {
             background-color: rgba(16, 185, 129, 0.08) !important;
             color: #10b981 !important;
@@ -155,6 +152,147 @@
         .table-responsive {
             overflow-x: auto !important;
         }
+
+        /* Common UI Elements: Modal & Form Styles */
+        .modal .modal-content {
+            border: 0 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+            overflow: hidden !important;
+            background-color: #ffffff !important;
+        }
+        .modal .modal-header {
+            border-bottom: 1px solid #e2e8f0 !important;
+            padding: 14px 20px !important;
+            background-color: #ffffff !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+        }
+        .modal .modal-header .modal-title {
+            font-size: 15px !important;
+            font-weight: 700 !important;
+            color: #1e293b !important;
+            margin: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+        .modal .modal-body {
+            padding: 20px !important;
+        }
+        .modal .modal-footer {
+            border-top: 1px solid #e2e8f0 !important;
+            padding: 12px 20px !important;
+            background-color: #f8fafc !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-end !important;
+            gap: 8px !important;
+        }
+        .modal .modal-footer .btn {
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            padding: 8px 18px !important;
+            border-radius: 6px !important;
+        }
+
+        /* Modal Select2 Styling to match Common UI system */
+        .modal .select2-container--bootstrap-5 {
+            width: 100% !important;
+        }
+        .modal .select2-container--bootstrap-5 .select2-selection {
+            min-height: 38px !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px !important;
+            background-color: #ffffff !important;
+            padding: 6px 12px !important;
+            font-size: 13px !important;
+            color: #1e293b !important;
+            display: flex !important;
+            align-items: center !important;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        .modal .select2-container--bootstrap-5.select2-container--focus .select2-selection,
+        .modal .select2-container--bootstrap-5.select2-container--open .select2-selection {
+            border-color: var(--bs-primary) !important;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--bs-primary) 15%, transparent) !important;
+        }
+        .modal .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            padding-left: 0 !important;
+            font-size: 13px !important;
+            color: #1e293b !important;
+            line-height: normal !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+        .modal .select2-container--bootstrap-5 .select2-dropdown {
+            border-color: #cbd5e1 !important;
+            border-radius: 6px !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+            z-index: 9999 !important;
+            overflow: hidden !important;
+            background-color: #ffffff !important;
+        }
+        .modal .select2-container--bootstrap-5 .select2-results__option {
+            font-size: 13px !important;
+            padding: 8px 12px !important;
+            color: #1e293b !important;
+        }
+        .modal .select2-container--bootstrap-5 .select2-results__option--highlighted {
+            background-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+        }
+
+        /* Serialized Units Table Inputs & Condition Selects */
+        .modal table .form-control-sm {
+            height: 32px !important;
+            font-size: 12px !important;
+            border-radius: 6px !important;
+            border: 1px solid #cbd5e1 !important;
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            transition: all 0.15s ease-in-out;
+        }
+        .modal table .form-control-sm:focus {
+            border-color: var(--bs-primary) !important;
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--bs-primary) 15%, transparent) !important;
+            background-color: #ffffff !important;
+        }
+        .modal table .select2-container--bootstrap-5 {
+            width: 100% !important;
+            min-width: 130px !important;
+        }
+        .modal table .select2-container--bootstrap-5 .select2-selection {
+            min-height: 32px !important;
+            height: 32px !important;
+            padding: 2px 8px !important;
+            font-size: 12px !important;
+            border-radius: 6px !important;
+            border: 1px solid #cbd5e1 !important;
+            background-color: #ffffff !important;
+        }
+        .modal table .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            font-size: 12px !important;
+            line-height: normal !important;
+        }
+        .modal table .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered .hstack {
+            font-size: 12px !important;
+        }
+        .modal .select2-results__option .hstack {
+            font-size: 12px !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+        .wd-7, .modal .wd-7, .select2-dropdown .wd-7 {
+            width: 8px !important;
+            min-width: 8px !important;
+        }
+        .ht-7, .modal .ht-7, .select2-dropdown .ht-7 {
+            height: 8px !important;
+            min-height: 8px !important;
+        }
     </style>
 @endpush
 
@@ -169,26 +307,32 @@
         <div class="settings-content-col erp-single-panel bg-white flex-grow-1 p-4 shadow-sm rounded border-0 text-dark">
 
             <!-- Tabs Navigation -->
-            <ul class="nav nav-tabs border-bottom mb-4" id="assetModuleTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="items-tab" data-bs-toggle="tab" data-bs-target="#items-pane" type="button" role="tab" aria-controls="items-pane" aria-selected="true">
-                        <i class="feather-box me-2"></i>{{ __('hrms.assets.tab_items') }}
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories-pane" type="button" role="tab" aria-controls="categories-pane" aria-selected="false">
-                        <i class="feather-sliders me-2"></i>{{ __('hrms.assets.tab_categories') }}
-                    </button>
-                </li>
-            </ul>
+            <x-ui.horizontal-tabs 
+                id="assetModuleTabs" 
+                :syncUrl="true"
+                syncParam="tab"
+                :tabs="[
+                    [
+                        'id' => 'items-pane',
+                        'label' => __('hrms.assets.tab_items'),
+                        'icon' => 'feather-box',
+                        'active' => request('tab', 'items-pane') === 'items-pane',
+                    ],
+                    [
+                        'id' => 'categories-pane',
+                        'label' => __('hrms.assets.tab_categories'),
+                        'icon' => 'feather-sliders',
+                        'active' => request('tab') === 'categories-pane',
+                    ]
+                ]" 
+            />
 
             <div class="tab-content" id="assetModuleTabsContent">
-                @include('modules.hrms.assets.tabs.categories')
                 @include('modules.hrms.assets.tabs.items')
+                @include('modules.hrms.assets.tabs.categories')
             </div>
         </div>
     </div>
-</div>
 @endsection
 
 @push('scripts')
@@ -219,15 +363,168 @@
             requestedAssetNotAvail: "{{ __('hrms.assets.requested_asset_not_avail') }}",
             autoMatched: "{{ __('hrms.assets.auto_matched') }}",
             noAvailAssetsInCat: "{{ __('hrms.assets.no_avail_assets_in_cat', ['category' => ':category']) }}",
-            selectEmployee: "{{ __('hrms.assets.select_employee') }}"
+            selectEmployee: "{{ __('hrms.assets.select_employee') }}",
+            condGood: "{{ __('hrms.assets.cond_good') }}",
+            condNew: "{{ __('hrms.assets.cond_new') }}",
+            condFair: "{{ __('hrms.assets.cond_fair') }}",
+            condDamaged: "{{ __('hrms.assets.cond_damaged') }}",
+            condScrapped: "{{ __('hrms.assets.cond_scrapped') }}",
+            alertMinOneUnit: "{{ __('hrms.assets.alert_min_one_unit') }}",
+            alertEnterCodePrefix: "{{ __('hrms.assets.alert_enter_code_prefix') }}",
+            alertEnterCountRange: "{{ __('hrms.assets.alert_enter_count_range') }}",
+            alertEnterValidCount: "{{ __('hrms.assets.alert_enter_valid_count') }}",
+            alertSelectEmployeeFirst: "{{ __('hrms.assets.alert_select_employee_first') }}",
+            alertNoActiveAllocations: "{{ __('hrms.assets.alert_no_active_allocations') }}",
+            alertSelectUnitToReturn: "{{ __('hrms.assets.alert_select_unit_to_return') }}",
+            alertSelectUnitToFulfill: "{{ __('hrms.assets.alert_select_unit_to_fulfill') }}",
+            alertMaxUnitsExceeded: "{{ __('hrms.assets.alert_max_units_exceeded', ['qty' => ':qty']) }}",
+            assetCodeRequired: "{{ __('hrms.assets.asset_code_required') }}",
+            serialNumberRequired: "{{ __('hrms.assets.serial_number_required') }}",
+            noAllocationLogs: "{{ __('hrms.assets.no_allocation_logs') }}",
+            inPossession: "{{ __('hrms.assets.in_possession') }}",
+            noAllocationHistoryUnits: "{{ __('hrms.assets.no_allocation_history_units') }}",
+            unit: "{{ __('hrms.assets.unit') }}",
+            units: "{{ __('hrms.assets.units') }}",
+            events: "{{ __('hrms.assets.events') }}",
+            noAvailableUnitsItem: "{{ __('hrms.assets.no_available_units_item') }}",
+            noAvailableUnitsFoundFor: "{{ __('hrms.assets.no_available_units_found_for', ['item' => ':item']) }}",
+            selectUpToUnits: "{{ __('hrms.assets.select_up_to_units', ['qty' => ':qty']) }}",
+            noSerial: "{{ __('hrms.assets.no_serial') }}",
+            req: "{{ __('hrms.assets.req') }}",
+            rem: "{{ __('hrms.assets.rem') }}",
+            allocatingQty: "{{ __('hrms.assets.allocating_qty') }}",
+            noSerializedUnitsLinked: "{{ __('hrms.assets.no_serialized_units_linked') }}",
+            noSpecificReasonProvided: "{{ __('hrms.assets.no_specific_reason_provided') }}",
+            fullDescription: "{{ __('hrms.assets.full_description') }}",
+            description: "{{ __('hrms.assets.description') }}",
+            confirmDirectAllocate: "{{ __('hrms.assets.confirm_direct_allocate', ['asset' => ':asset', 'employee' => ':employee']) }}",
+            confirmTitleAllocate: "{{ __('hrms.assets.confirm_allocation') }}",
+            btnAllocate: "{{ __('hrms.assets.btn_allocate') }}",
+            statusPending: "{{ __('hrms.assets.status_pending') }}",
+            statusPartiallyAllocated: "{{ __('hrms.assets.status_partially_allocated') }}",
+            statusAllocated: "{{ __('hrms.assets.status_allocated') }}",
+            statusRejected: "{{ __('hrms.assets.status_rejected') }}"
         };
 
         $(document).ready(function() {
+            function syncHeaderAddButton() {
+                var isCategory = $('#categories-pane-tab').hasClass('active') || 
+                                 $('#categories-pane').hasClass('active') ||
+                                 $('#assetModuleTabs button[data-bs-target="#categories-pane"]').hasClass('active') ||
+                                 $('#assetModuleTabs button.active').attr('data-bs-target') === '#categories-pane';
+
+                if (isCategory) {
+                    $('#hdr-btn-add-item').addClass('d-none');
+                    $('#hdr-btn-add-category').removeClass('d-none');
+                } else {
+                    $('#hdr-btn-add-item').removeClass('d-none');
+                    $('#hdr-btn-add-category').addClass('d-none');
+                }
+            }
+
+            // Initial sync on load
+            syncHeaderAddButton();
+            setTimeout(syncHeaderAddButton, 50);
+
+            // Tab switching sync for header action buttons
+            $(document).on('shown.bs.tab', '#assetModuleTabs button, [data-bs-toggle="tab"]', function() {
+                syncHeaderAddButton();
+            });
+            $(document).on('click', '#assetModuleTabs button', function() {
+                setTimeout(syncHeaderAddButton, 30);
+            });
+            window.addEventListener('popstate', function() {
+                setTimeout(syncHeaderAddButton, 30);
+            });
+
+            // Ensure bgformat and userformat are globally available for Common UI status Select2 dropdowns
+            if (typeof window.bgformat !== 'function') {
+                window.bgformat = function(state) {
+                    if (!state.id) return (state && state.text) ? state.text : '';
+                    var el = state.element;
+                    var bgClass = $(el).data('bg') || 'bg-primary';
+                    return $('<span class="hstack gap-2 align-items-center"><span class="wd-7 ht-7 rounded-circle ' + bgClass + '" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0;"></span><span>' + (state.text || '') + '</span></span>');
+                };
+            }
+
+            if (typeof window.userformat !== 'function') {
+                window.userformat = function(user) {
+                    if (!user || !user.id) return (user && user.text) ? user.text : '';
+                    var el = user.element;
+                    var avatar = $(el).data('avatar');
+                    if (!avatar) {
+                        var u = $(el).data('user');
+                        avatar = u ? ('/assets/images/avatar/' + u + '.png') : '/assets/images/avatar/default.png';
+                    }
+                    return $('<span class="hstack gap-2 align-items-center"><img src="' + avatar + '" class="avatar-image avatar-sm object-fit-cover rounded-circle flex-shrink-0" style="width:22px;height:22px;border-radius:50%;" onerror="this.onerror=null;this.src=\'/assets/images/avatar/default.png\';" /><span>' + (user.text || '') + '</span></span>');
+                };
+            }
+
+            // Helper to generate Common UI status select markup for condition fields
+            function getConditionSelectMarkup(name, selectedCondition = 'good') {
+                return `<select name="${name}" class="form-select form-select-sm fs-12 unit-condition-select" data-select2-selector="status" required>
+                    <option value="good" data-bg="bg-success" ${selectedCondition === 'good' ? 'selected' : ''}>${langAssets.condGood || 'Good'}</option>
+                    <option value="new" data-bg="bg-primary" ${selectedCondition === 'new' ? 'selected' : ''}>${langAssets.condNew || 'New'}</option>
+                    <option value="fair" data-bg="bg-warning" ${selectedCondition === 'fair' ? 'selected' : ''}>${langAssets.condFair || 'Fair'}</option>
+                    <option value="damaged" data-bg="bg-danger" ${selectedCondition === 'damaged' ? 'selected' : ''}>${langAssets.condDamaged || 'Damaged'}</option>
+                    <option value="scrapped" data-bg="bg-secondary" ${selectedCondition === 'scrapped' ? 'selected' : ''}>${langAssets.condScrapped || 'Scrapped'}</option>
+                </select>`;
+            }
+
+            // Dedicated Select2 Initializer with modal parent binding & status dot formatting
+            function initSelect2Element($select, parent) {
+                if (!$select || !$select.length) return;
+                
+                var $modal = $select.closest('.modal');
+                if (!parent) {
+                    var modalContent = $modal.find('.modal-content');
+                    parent = modalContent.length ? modalContent : ($modal.length ? $modal : $(document.body));
+                }
+
+                if ($select.hasClass('select2-hidden-accessible')) {
+                    $select.select2('destroy');
+                }
+
+                var placeholder = $select.attr('placeholder') || $select.find('option[value=""]').first().text() || "Select Option";
+                var selectorType = $select.attr('data-select2-selector') || $select.attr('select2-selector') || ($select.hasClass('unit-condition-select') ? 'status' : 'default');
+                var fieldName = $select.attr('name') || '';
+
+                var options = {
+                    theme: 'bootstrap-5',
+                    dropdownParent: parent,
+                    width: '100%',
+                    placeholder: placeholder,
+                    allowClear: !$select.prop('required')
+                };
+
+                if (selectorType === 'status' || $select.hasClass('unit-condition-select') || fieldName === 'condition' || fieldName === 'return_condition' || fieldName.indexOf('[condition]') !== -1) {
+                    options.templateResult = bgformat;
+                    options.templateSelection = bgformat;
+                    options.minimumResultsForSearch = Infinity;
+                } else if (selectorType === 'user' && typeof userformat === 'function') {
+                    options.templateResult = userformat;
+                    options.templateSelection = userformat;
+                }
+
+                $select.select2(options);
+            }
+
+            function initModalSelects(modal) {
+                var $modal = $(modal);
+                var modalContent = $modal.find('.modal-content');
+                var parent = modalContent.length ? modalContent : $modal;
+
+                $modal.find('select').each(function() {
+                    initSelect2Element($(this), parent);
+                });
+            }
+
             // Append modals to body root to prevent Bootstrap backdrop overlay issues inside settings flex container
             $('#addAssetModal').appendTo('body');
 
             $('#addAssetModal').on('show.bs.modal', function() {
                 var modal = $(this);
+                var modalContent = modal.find('.modal-content');
                 // Clear inputs
                 modal.find('input[name="name"]').val('');
                 modal.find('textarea[name="description"]').val('');
@@ -249,28 +546,24 @@
                 let rowHtml = `
                     <tr>
                         <td class="py-2 px-3 text-start">
-                            <input type="text" name="units[0][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required>
+                            <input type="text" name="units[0][asset_code]" class="form-control form-control-sm text-center fs-12 fw-semibold" placeholder="e.g. AST-001" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
                         </td>
                         <td class="py-2">
-                            <input type="text" name="units[0][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN-XXXX">
+                            <input type="text" name="units[0][serial_number]" class="form-control form-control-sm text-center fs-12" placeholder="e.g. SN-XXXX" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
                         </td>
-                        <td class="py-2" style="min-width: 120px;">
-                            <select name="units[0][condition]" class="odoo-table-select" required>
-                                <option value="good">Good</option>
-                                <option value="new">New</option>
-                                <option value="fair">Fair</option>
-                                <option value="damaged">Damaged</option>
-                                <option value="scrapped">Scrapped</option>
-                            </select>
+                        <td class="py-2" style="min-width: 140px;">
+                            ${getConditionSelectMarkup('units[0][condition]', 'good')}
                         </td>
                         <td class="py-2 text-end px-3">
                             <div class="d-flex justify-content-end gap-1">
-                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-unit-row" disabled><i class="feather-trash-2"></i></button>
+                                <button type="button" class="btn btn-sm btn-icon btn-soft-danger btn-remove-unit-row" style="width: 32px; height: 32px; border-radius: 6px;" disabled><i class="feather-trash-2"></i></button>
                             </div>
                         </td>
                     </tr>
                 `;
-                tbody.append(rowHtml);
+                let $row = $(rowHtml);
+                tbody.append($row);
+                initSelect2Element($row.find('select'), modalContent);
                 toggleRemoveButtons();
             });
             $('#editAssetModal').appendTo('body');
@@ -336,6 +629,7 @@
                 var encodedUnits = button.data('units');
 
                 var modal = $(this);
+                var modalContent = modal.find('.modal-content');
                 modal.find('form').attr('action', '/hrms/assets/item/update/' + id);
 
                 modal.find('#edit_item_category_id').val(categoryId).trigger('change');
@@ -357,25 +651,21 @@
                             var rowHtml = `<tr>
                                 <td class="py-2 px-3 text-start">
                                     <input type="hidden" name="units[${index}][id]" value="${unit.id}">
-                                    <input type="text" name="units[${index}][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required value="${unit.asset_code}">
+                                    <input type="text" name="units[${index}][asset_code]" class="form-control form-control-sm text-center fs-12 fw-semibold" placeholder="e.g. AST-001" required value="${unit.asset_code}" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;">
                                 </td>
                                 <td class="py-2">
-                                    <input type="text" name="units[${index}][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN123456" value="${unit.serial_number || ''}" required>
+                                    <input type="text" name="units[${index}][serial_number]" class="form-control form-control-sm text-center fs-12" placeholder="e.g. SN123456" value="${unit.serial_number || ''}" required style="border-radius: 6px; height: 32px; border-color: #cbd5e1;">
                                 </td>
-                                <td class="py-2" style="min-width: 120px;">
-                                    <select name="units[${index}][condition]" class="odoo-table-select" required>
-                                        <option value="good" ${unit.condition === 'good' ? 'selected' : ''}>Good</option>
-                                        <option value="new" ${unit.condition === 'new' ? 'selected' : ''}>New</option>
-                                        <option value="fair" ${unit.condition === 'fair' ? 'selected' : ''}>Fair</option>
-                                        <option value="damaged" ${unit.condition === 'damaged' ? 'selected' : ''}>Damaged</option>
-                                        <option value="scrapped" ${unit.condition === 'scrapped' ? 'selected' : ''}>Scrapped</option>
-                                    </select>
+                                <td class="py-2" style="min-width: 140px;">
+                                    ${getConditionSelectMarkup(`units[${index}][condition]`, unit.condition || 'good')}
                                 </td>
                                 <td class="py-2 text-end px-3">
-                                    <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row"><i class="feather-trash-2"></i></button>
+                                    <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row" style="width: 32px; height: 32px; border-radius: 6px;"><i class="feather-trash-2"></i></button>
                                 </td>
                             </tr>`;
-                            tbody.append(rowHtml);
+                            var $row = $(rowHtml);
+                            tbody.append($row);
+                            initSelect2Element($row.find('select'), modalContent);
                         });
                     }
                 }
@@ -383,41 +673,30 @@
                 if (tbody.children().length === 0) {
                     var rowHtml = `<tr>
                         <td class="py-2 px-3 text-start">
-                            <input type="text" name="units[0][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required>
+                            <input type="text" name="units[0][asset_code]" class="form-control form-control-sm text-center fs-12 fw-semibold" placeholder="e.g. AST-001" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
                         </td>
                         <td class="py-2">
-                            <input type="text" name="units[0][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN123456" required>
+                            <input type="text" name="units[0][serial_number]" class="form-control form-control-sm text-center fs-12" placeholder="e.g. SN123456" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
                         </td>
-                        <td class="py-2" style="min-width: 120px;">
-                            <select name="units[0][condition]" class="odoo-table-select" required>
-                                <option value="good">Good</option>
-                                <option value="new">New</option>
-                                <option value="fair">Fair</option>
-                                <option value="damaged">Damaged</option>
-                                <option value="scrapped">Scrapped</option>
-                            </select>
+                        <td class="py-2" style="min-width: 140px;">
+                            ${getConditionSelectMarkup('units[0][condition]', 'good')}
                         </td>
                         <td class="py-2 text-end px-3">
-                            <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row"><i class="feather-trash-2"></i></button>
+                            <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row" style="width: 32px; height: 32px; border-radius: 6px;"><i class="feather-trash-2"></i></button>
                         </td>
                     </tr>`;
-                    tbody.append(rowHtml);
+                    var $row = $(rowHtml);
+                    tbody.append($row);
+                    initSelect2Element($row.find('select'), modalContent);
                 }
             });
 
-            // Automatically initialize select2 inside modals with dropdownParent set to the modal to fix focus/closing bugs
+            $(document).on('show.bs.modal', '.modal', function() {
+                initModalSelects(this);
+            });
+
             $(document).on('shown.bs.modal', '.modal', function() {
-                var modal = $(this);
-                modal.find('select[select2-selector="default"]').each(function() {
-                    if ($(this).hasClass('select2-hidden-accessible')) {
-                        $(this).select2('destroy');
-                    }
-                    $(this).select2({
-                        dropdownParent: modal,
-                        placeholder: $(this).attr('placeholder') || "Select Option",
-                        allowClear: true
-                    });
-                });
+                initModalSelects(this);
             });
 
             // Add unit row in Edit Modal
@@ -426,25 +705,22 @@
                 var index = tbody.children().length;
                 var rowHtml = `<tr>
                     <td class="py-2 px-3 text-start">
-                        <input type="text" name="units[${index}][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required>
+                        <input type="text" name="units[${index}][asset_code]" class="form-control form-control-sm text-center fs-12 fw-semibold" placeholder="e.g. AST-001" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
                     </td>
                     <td class="py-2">
-                        <input type="text" name="units[${index}][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN123456" required>
+                        <input type="text" name="units[${index}][serial_number]" class="form-control form-control-sm text-center fs-12" placeholder="e.g. SN123456" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
                     </td>
-                    <td class="py-2" style="min-width: 120px;">
-                        <select name="units[${index}][condition]" class="odoo-table-select" required>
-                            <option value="good">Good</option>
-                            <option value="new">New</option>
-                            <option value="fair">Fair</option>
-                            <option value="damaged">Damaged</option>
-                            <option value="scrapped">Scrapped</option>
-                        </select>
+                    <td class="py-2" style="min-width: 140px;">
+                        ${getConditionSelectMarkup(`units[${index}][condition]`, 'good')}
                     </td>
                     <td class="py-2 text-end px-3">
-                        <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row"><i class="feather-trash-2"></i></button>
+                        <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row" style="width: 32px; height: 32px; border-radius: 6px;"><i class="feather-trash-2"></i></button>
                     </td>
                 </tr>`;
-                tbody.append(rowHtml);
+                var $row = $(rowHtml);
+                tbody.append($row);
+                var modalContent = $('#editAssetItemModal').find('.modal-content');
+                initSelect2Element($row.find('select'), modalContent);
             });
 
             // Remove unit row in Edit Modal
@@ -453,14 +729,14 @@
                 if (tbody.children().length > 1) {
                     $(this).closest('tr').remove();
                     tbody.children().each(function(index, row) {
-                        $(row).find('input[name*="units["]').each(function() {
+                        $(row).find('input[name*="units["], select[name*="units["]').each(function() {
                             var name = $(this).attr('name');
                             var updatedName = name.replace(/units\[\d+\]/, 'units[' + index + ']');
                             $(this).attr('name', updatedName);
                         });
                     });
                 } else {
-                    alert('At least one physical asset unit must be registered.');
+                    alert(langAssets.alertMinOneUnit);
                 }
             });
 
@@ -469,11 +745,11 @@
                 var prefix = $('#edit_item_gen_prefix').val().trim();
                 var count = parseInt($('#edit_item_gen_count').val());
                 if (!prefix) {
-                    alert('Please enter a code prefix.');
+                    alert(langAssets.alertEnterCodePrefix);
                     return;
                 }
                 if (isNaN(count) || count < 1 || count > 50) {
-                    alert('Please enter a count between 1 and 50.');
+                    alert(langAssets.alertEnterCountRange);
                     return;
                 }
 
@@ -484,31 +760,28 @@
 
                 var startIndex = tbody.children().length;
                 var currentNumber = startIndex + 1;
+                var modalContent = $('#editAssetItemModal').find('.modal-content');
 
                 for (var i = 0; i < count; i++) {
                     var finalIndex = startIndex + i;
                     var code = prefix + String(currentNumber).padStart(3, '0');
                     var rowHtml = `<tr>
                         <td class="py-2 px-3 text-start">
-                            <input type="text" name="units[${finalIndex}][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required value="${code}">
+                            <input type="text" name="units[${finalIndex}][asset_code]" class="form-control form-control-sm text-center fs-12 fw-semibold" placeholder="e.g. AST-001" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required value="${code}">
                         </td>
                         <td class="py-2">
-                            <input type="text" name="units[${finalIndex}][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN123456" required>
+                            <input type="text" name="units[${finalIndex}][serial_number]" class="form-control form-control-sm text-center fs-12" placeholder="e.g. SN123456" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
                         </td>
-                        <td class="py-2" style="min-width: 120px;">
-                            <select name="units[${finalIndex}][condition]" class="odoo-table-select" required>
-                                <option value="good">Good</option>
-                                <option value="new">New</option>
-                                <option value="fair">Fair</option>
-                                <option value="damaged">Damaged</option>
-                                <option value="scrapped">Scrapped</option>
-                            </select>
+                        <td class="py-2" style="min-width: 140px;">
+                            ${getConditionSelectMarkup(`units[${finalIndex}][condition]`, 'good')}
                         </td>
                         <td class="py-2 text-end px-3">
-                            <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row"><i class="feather-trash-2"></i></button>
+                            <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row" style="width: 32px; height: 32px; border-radius: 6px;"><i class="feather-trash-2"></i></button>
                         </td>
                     </tr>`;
-                    tbody.append(rowHtml);
+                    var $row = $(rowHtml);
+                    tbody.append($row);
+                    initSelect2Element($row.find('select'), modalContent);
                     currentNumber++;
                 }
             });
@@ -557,28 +830,25 @@
                 let rowHtml = `
                     <tr>
                         <td class="py-2 px-3 text-start">
-                            <input type="text" name="units[${unitRowIndex}][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" value="${code}" required>
+                            <input type="text" name="units[${unitRowIndex}][asset_code]" class="form-control form-control-sm text-center fs-12 fw-semibold" placeholder="e.g. AST-001" value="${code}" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
                         </td>
                         <td class="py-2">
-                            <input type="text" name="units[${unitRowIndex}][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN-XXXX" value="${serial}" required>
+                            <input type="text" name="units[${unitRowIndex}][serial_number]" class="form-control form-control-sm text-center fs-12" placeholder="e.g. SN-XXXX" value="${serial}" style="border-radius: 6px; height: 32px; border-color: #cbd5e1;" required>
                         </td>
-                        <td class="py-2" style="min-width: 120px;">
-                            <select name="units[${unitRowIndex}][condition]" class="odoo-table-select" required>
-                                <option value="good" ${condition === 'good' ? 'selected' : ''}>Good</option>
-                                <option value="new" ${condition === 'new' ? 'selected' : ''}>New</option>
-                                <option value="fair" ${condition === 'fair' ? 'selected' : ''}>Fair</option>
-                                <option value="damaged" ${condition === 'damaged' ? 'selected' : ''}>Damaged</option>
-                                <option value="scrapped" ${condition === 'scrapped' ? 'selected' : ''}>Scrapped</option>
-                            </select>
+                        <td class="py-2" style="min-width: 140px;">
+                            ${getConditionSelectMarkup(`units[${unitRowIndex}][condition]`, condition)}
                         </td>
                         <td class="py-2 text-end px-3">
                             <div class="d-flex justify-content-end gap-1">
-                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-unit-row"><i class="feather-trash-2"></i></button>
+                                <button type="button" class="btn btn-sm btn-icon btn-soft-danger btn-remove-unit-row" style="width: 32px; height: 32px; border-radius: 6px;"><i class="feather-trash-2"></i></button>
                             </div>
                         </td>
                     </tr>
                 `;
-                tbody.append(rowHtml);
+                let $row = $(rowHtml);
+                tbody.append($row);
+                let modalContent = $('#addAssetModal').find('.modal-content');
+                initSelect2Element($row.find('select'), modalContent);
                 unitRowIndex++;
                 toggleRemoveButtons();
             }
@@ -603,11 +873,11 @@
                 let count = parseInt($('#gen_count').val());
 
                 if (!prefix) {
-                    alert('Please enter a code prefix.');
+                    alert(langAssets.alertEnterCodePrefix);
                     return;
                 }
                 if (isNaN(count) || count < 1) {
-                    alert('Please enter a valid count of 1 or more.');
+                    alert(langAssets.alertEnterValidCount);
                     return;
                 }
 
@@ -661,14 +931,14 @@
                 });
 
                 var checklistDiv = modal.find('#return_assets_checklist');
-                checklistDiv.html('<span class="text-muted fs-12">Please select an employee first.</span>');
+                checklistDiv.html('<span class="text-muted fs-12">' + (langAssets.alertSelectEmployeeFirst || 'Please select an employee first.') + '</span>');
 
                 employeeSelect.off('change').on('change', function() {
                     var employeeId = $(this).val();
                     checklistDiv.empty();
 
                     if (!employeeId) {
-                        checklistDiv.html('<span class="text-muted fs-12">Please select an employee first.</span>');
+                        checklistDiv.html('<span class="text-muted fs-12">' + (langAssets.alertSelectEmployeeFirst || 'Please select an employee first.') + '</span>');
                         return;
                     }
 
@@ -677,7 +947,7 @@
                     });
 
                     if (empAssets.length === 0) {
-                        checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No active allocations found.</span>');
+                        checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>' + (langAssets.alertNoActiveAllocations || 'No active allocations found.') + '</span>');
                     } else {
                         empAssets.forEach(function(asset) {
                             var checkboxId = 'return_asset_check_' + asset.id;
@@ -698,7 +968,7 @@
                     var checkedCount = modal.find('.return-allocated-asset-checkbox:checked').length;
                     if (checkedCount === 0) {
                         e.preventDefault();
-                        alert('Please select at least one physical asset/serial number to return.');
+                        alert(langAssets.alertSelectUnitToReturn);
                     }
                 });
 
@@ -729,7 +999,7 @@
                 
                 var html = '';
                 if (allocations.length === 0) {
-                    html = '<tr><td colspan="6" class="text-center py-4 text-muted fs-12">No allocation logs found for this asset.</td></tr>';
+                    html = '<tr><td colspan="6" class="text-center py-4 text-muted fs-12">' + (langAssets.noAllocationLogs || 'No allocation logs found for this asset.') + '</td></tr>';
                 } else {
                     allocations.forEach(function(log) {
                         var empName = log.employee ? (log.employee.full_name || log.employee.display_name) : 'Unknown';
@@ -750,7 +1020,7 @@
                             return '<span class="badge ' + cls + ' text-capitalize px-2 py-1 fs-11 rounded-pill">' + cond + '</span>';
                         }
 
-                        var returnCondBadge = log.returned_at ? getCondBadge(returnCond) : '<span class="text-muted fs-11">In Possession</span>';
+                        var returnCondBadge = log.returned_at ? getCondBadge(returnCond) : '<span class="text-muted fs-11">' + (langAssets.inPossession || 'In Possession') + '</span>';
                         
                         html += '<tr>' +
                             '<td class="text-start" style="padding-left: 20px;"><strong>' + empName + '</strong><span class="text-muted fs-11">' + empCode + '</span></td>' +
@@ -783,11 +1053,11 @@
                 }
 
                 $('#item_history_name_display').text(itemName);
-                $('#item_history_total_count').text((allocations ? allocations.length : 0) + ' Events');
+                $('#item_history_total_count').text((allocations ? allocations.length : 0) + ' ' + (langAssets.events || 'Events'));
                 
                 var html = '';
                 if (!allocations || allocations.length === 0) {
-                    html = '<tr><td colspan="6" class="text-center py-4 text-muted fs-12">No allocation history recorded for units under this item.</td></tr>';
+                    html = '<tr><td colspan="6" class="text-center py-4 text-muted fs-12">' + (langAssets.noAllocationHistoryUnits || 'No allocation history recorded for units under this item.') + '</td></tr>';
                 } else {
                     allocations.forEach(function(event, index) {
                         var empName = event.employee ? event.employee.display_name : 'Unknown';
@@ -805,7 +1075,7 @@
                         html += '<tr>' +
                             '<td class="text-start px-3" style="min-width: 130px;">' +
                                 '<button type="button" class="btn btn-sm btn-soft-primary fw-bold py-1 px-2.5 fs-11 toggle-item-units-btn d-inline-flex align-items-center" data-target="#item-units-box-' + index + '">' +
-                                    '<i class="feather-box me-1.5"></i>' + event.qty + ' Unit' + (event.qty > 1 ? 's' : '') +
+                                    '<i class="feather-box me-1.5"></i>' + event.qty + ' ' + (event.qty > 1 ? (langAssets.units || 'Units') : (langAssets.unit || 'Unit')) +
                                     '<i class="feather-chevron-down ms-1.5 toggle-icon fs-12"></i>' +
                                 '</button>' +
                                 '<div id="item-units-box-' + index + '" class="d-none mt-2 p-2 bg-light border rounded shadow-sm" style="max-width: 260px;">' +
@@ -859,7 +1129,7 @@
                 var requestId = btn.data('request-id');
                 var empName = btn.data('employee-name');
                 var assetName = btn.data('asset-name');
-                var confirmTemplate = btn.data('confirm-template');
+                var confirmTemplate = btn.data('confirm-template') || langAssets.confirmDirectAllocate;
 
                 var confirmMsg = confirmTemplate
                     .replace(':asset', assetName)
@@ -879,7 +1149,7 @@
 
                     $('body').append(form);
                     form.submit();
-                }, { title: 'Allocate Asset Confirmation', variant: 'success', confirmButtonText: 'Allocate' });
+                }, { title: langAssets.confirmTitleAllocate || 'Allocate Asset Confirmation', variant: 'success', confirmButtonText: langAssets.btnAllocate || 'Allocate' });
             });
 
             // Client-side validation: ensure Serial Number & Asset Code show inline error messages below fields
@@ -893,7 +1163,7 @@
                         invalid = true;
                         $(this).addClass('is-invalid');
                         if (parent.find('.invalid-feedback').length === 0) {
-                            $(this).after('<div class="invalid-feedback fs-11 text-start mt-1">Asset code is required.</div>');
+                            $(this).after('<div class="invalid-feedback fs-11 text-start mt-1">' + (langAssets.assetCodeRequired || 'Asset code is required.') + '</div>');
                         }
                     } else {
                         $(this).removeClass('is-invalid');
@@ -907,7 +1177,7 @@
                         invalid = true;
                         $(this).addClass('is-invalid');
                         if (parent.find('.invalid-feedback').length === 0) {
-                            $(this).after('<div class="invalid-feedback fs-11 text-start mt-1">Serial number is required.</div>');
+                            $(this).after('<div class="invalid-feedback fs-11 text-start mt-1">' + (langAssets.serialNumberRequired || 'Serial number is required.') + '</div>');
                         }
                     } else {
                         $(this).removeClass('is-invalid');
@@ -937,12 +1207,12 @@
                     var checkedCount = $('.request-allocated-asset-checkbox:checked').length;
                     if (checkedCount === 0) {
                         e.preventDefault();
-                        alert('Please select at least one physical asset/serial number to fulfill this request.');
+                        alert(langAssets.alertSelectUnitToFulfill);
                         return false;
                     }
                     if (checkedCount > remainingQty) {
                         e.preventDefault();
-                        alert('You cannot select more physical units than remaining needed (' + remainingQty + ').');
+                        alert(langAssets.alertMaxUnitsExceeded.replace(':qty', remainingQty));
                         return false;
                     }
                 }
@@ -989,7 +1259,7 @@
                     });
 
                     if (filteredAssets.length === 0) {
-                        checklistDiv.html('<div class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No available units in inventory for this item.</div>');
+                        checklistDiv.html('<div class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>' + (langAssets.noAvailableUnitsItem || 'No available units in inventory for this item.') + '</div>');
                     } else {
                         filteredAssets.forEach(function(asset) {
                             var checkboxId = 'allocate_asset_checkbox_' + asset.id;
@@ -1054,14 +1324,6 @@
                     form.attr('action', '/hrms/assets/item/' + itemId + '/allocate');
                 }
             });
-
-            // Tab Persistence
-            var activeTab = localStorage.getItem('activeAssetTab') || 'registry-tab';
-            var tabEl = document.querySelector('#' + activeTab);
-            if (tabEl) {
-                var tab = new bootstrap.Tab(tabEl);
-                tab.show();
-            }
 
             // Handle search form submission via AJAX (covers Enter key and clicking Apply in filter)
             $(document).on('submit', 'form[action*="assets"][method="GET"], form[action*="assets"][method="get"]', function(e) {
@@ -1272,37 +1534,6 @@
                 }
             });
 
-            // Toggle Add buttons in header based on active tab
-            function updateHeaderActions() {
-                var activeTabId = localStorage.getItem('activeAssetTab') || 'items-tab';
-                if (activeTabId === 'registry-tab') {
-                    activeTabId = 'items-tab';
-                    localStorage.setItem('activeAssetTab', 'items-tab');
-                }
-                
-                if (activeTabId === 'categories-tab') {
-                    $('#hdr-btn-log-asset').addClass('d-none');
-                    $('#hdr-btn-add-category').removeClass('d-none');
-                    $('#hdr-btn-add-item').addClass('d-none');
-                } else if (activeTabId === 'items-tab') {
-                    $('#hdr-btn-log-asset').addClass('d-none');
-                    $('#hdr-btn-add-category').addClass('d-none');
-                    $('#hdr-btn-add-item').removeClass('d-none');
-                } else {
-                    $('#hdr-btn-log-asset').addClass('d-none');
-                    $('#hdr-btn-add-category').addClass('d-none');
-                    $('#hdr-btn-add-item').addClass('d-none');
-                }
-            }
-
-            // On page load
-            setTimeout(updateHeaderActions, 50);
-
-            // On tab change
-            $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-                localStorage.setItem('activeAssetTab', e.target.id);
-                updateHeaderActions();
-            });
             // Checkbox multi-select logic
             const $selectAll = $('#selectAllRequests');
             const $bulkToolbar = $('#bulkActionsToolbar');
@@ -1382,20 +1613,20 @@
 
                     if (matchedAssets.length > 0) {
                         assetSelectionHtml += `<div class="bg-light p-2 rounded border" style="max-height: 150px; overflow-y: auto;">`;
-                        assetSelectionHtml += `<div class="fs-11 text-muted mb-1">Select up to <strong>${remainingQty}</strong> unit(s):</div>`;
+                        assetSelectionHtml += `<div class="fs-11 text-muted mb-1">${(langAssets.selectUpToUnits || 'Select up to :qty unit(s):').replace(':qty', '<strong>' + remainingQty + '</strong>')}</div>`;
                         matchedAssets.forEach(function(asset) {
                             assetSelectionHtml += `
                                 <div class="form-check py-1">
                                     <input type="checkbox" name="allocations[${reqId}][]" value="${asset.id}" class="form-check-input bulk-unit-checkbox" data-req-id="${reqId}" data-rem-qty="${remainingQty}">
                                     <label class="form-check-label fs-12 fw-semibold text-dark">
-                                        ${asset.asset_code} <span class="text-muted fs-11">(${asset.serial_number || 'No Serial'})</span>
+                                        ${asset.asset_code} <span class="text-muted fs-11">(${asset.serial_number || langAssets.noSerial || 'No Serial'})</span>
                                     </label>
                                 </div>
                             `;
                         });
                         assetSelectionHtml += `</div>`;
                     } else {
-                        assetSelectionHtml = `<span class="text-danger fw-bold fs-12"><i class="feather-alert-triangle me-1"></i>No available units found for ${itemName}.</span>`;
+                        assetSelectionHtml = `<span class="text-danger fw-bold fs-12"><i class="feather-alert-triangle me-1"></i>${(langAssets.noAvailableUnitsFoundFor || 'No available units found for :item.').replace(':item', itemName)}</span>`;
                     }
 
                     const rowHtml = `
@@ -1407,11 +1638,11 @@
                                 <div class="fw-bold text-dark fs-12">${itemName}</div>
                                 <span class="badge bg-light text-secondary border px-2 py-0.5 fs-11">${catName}</span>
                                 <div class="fs-11 text-muted mt-1">
-                                    Req: <strong class="text-dark">${requestedQty}</strong> | Rem: <strong class="text-danger">${remainingQty}</strong>
+                                    ${langAssets.req || 'Req'}: <strong class="text-dark">${requestedQty}</strong> | ${langAssets.rem || 'Rem'}: <strong class="text-danger">${remainingQty}</strong>
                                 </div>
                                 <div class="mt-2 pt-1 border-top d-flex align-items-center justify-content-between">
-                                    <span class="fs-11 fw-bold text-muted text-uppercase">Allocating Qty:</span>
-                                    <span class="badge bg-soft-success text-success border border-success border-opacity-25 px-2 py-1 fs-11" id="bulk_alloc_badge_${reqId}">0 / ${remainingQty} unit(s)</span>
+                                    <span class="fs-11 fw-bold text-muted text-uppercase">${langAssets.allocatingQty || 'Allocating Qty'}:</span>
+                                    <span class="badge bg-soft-success text-success border border-success border-opacity-25 px-2 py-1 fs-11" id="bulk_alloc_badge_${reqId}">0 / ${remainingQty} ${langAssets.units || 'unit(s)'}</span>
                                 </div>
                             </td>
                             <td class="text-start">
@@ -1436,14 +1667,14 @@
                 if (checkedCount > remQty) {
                     $(this).prop('checked', false);
                     checkedCount = remQty;
-                    alert(`You can select at most ${remQty} unit(s) for this request.`);
+                    alert((langAssets.alertMaxUnitsExceeded || 'You can select at most :qty unit(s) for this request.').replace(':qty', remQty));
                 }
 
                 const badge = $(`#bulk_alloc_badge_${reqId}`);
                 if (checkedCount > 0) {
-                    badge.removeClass('bg-soft-secondary text-secondary border-secondary').addClass('bg-soft-success text-success border-success').text(`${checkedCount} / ${remQty} unit(s)`);
+                    badge.removeClass('bg-soft-secondary text-secondary border-secondary').addClass('bg-soft-success text-success border-success').text(`${checkedCount} / ${remQty} ${(langAssets.units || 'unit(s)')}`);
                 } else {
-                    badge.removeClass('bg-soft-success text-success border-success').addClass('bg-soft-secondary text-secondary border-secondary').text(`0 / ${remQty} unit(s)`);
+                    badge.removeClass('bg-soft-success text-success border-success').addClass('bg-soft-secondary text-secondary border-secondary').text(`0 / ${remQty} ${(langAssets.units || 'unit(s)')}`);
                 }
             });
 
@@ -1472,9 +1703,9 @@
                 const container = $(this).closest('.desc-expandable-container');
                 const readMoreBtn = container.find('.btn-read-more-dynamic');
                 if (!readMoreBtn.hasClass('d-none')) {
-                    const title = readMoreBtn.data('title') || 'Description';
+                    const title = readMoreBtn.data('title') || (langAssets.description || 'Description');
                     const desc = readMoreBtn.data('desc') || '';
-                    $('#desc_modal_title').text(title + ' - Full Description');
+                    $('#desc_modal_title').text(title + ' - ' + (langAssets.fullDescription || 'Full Description'));
                     $('#desc_modal_content').text(desc);
                     $('#viewDescriptionModal').appendTo('body').modal('show');
                 }
@@ -1498,13 +1729,13 @@
 
                 let badgeHtml = '';
                 if (status === 'pending') {
-                    badgeHtml = '<span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11">Pending</span>';
+                    badgeHtml = '<span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11">' + (langAssets.statusPending || 'Pending') + '</span>';
                 } else if (status === 'partially_allocated' || status === 'partial') {
-                    badgeHtml = '<span class="badge bg-soft-info text-info px-2.5 py-1 rounded-pill fs-11">Partially Allocated</span>';
+                    badgeHtml = '<span class="badge bg-soft-info text-info px-2.5 py-1 rounded-pill fs-11">' + (langAssets.statusPartiallyAllocated || 'Partially Allocated') + '</span>';
                 } else if (status === 'allocated') {
-                    badgeHtml = '<span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11">Allocated</span>';
+                    badgeHtml = '<span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11">' + (langAssets.statusAllocated || 'Allocated') + '</span>';
                 } else if (status === 'rejected') {
-                    badgeHtml = '<span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded-pill fs-11">Rejected</span>';
+                    badgeHtml = '<span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded-pill fs-11">' + (langAssets.statusRejected || 'Rejected') + '</span>';
                 } else {
                     badgeHtml = `<span class="badge bg-light text-secondary px-2.5 py-1 rounded-pill fs-11">${btn.data('status')}</span>`;
                 }
@@ -1553,7 +1784,7 @@
                             `;
                         });
                     } else {
-                        unitsHtml = `<span class="fs-12 text-muted fst-italic">No serialized units linked.</span>`;
+                        unitsHtml = '<span class="fs-12 text-muted fst-italic">' + (langAssets.noSerializedUnitsLinked || 'No serialized units linked.') + '</span>';
                     }
                     $('#req_detail_allocated_units_list').html(unitsHtml);
 
@@ -1561,7 +1792,7 @@
                     actionSection.removeClass('d-none');
                     rejectBox.removeClass('d-none');
                     $('#req_detail_reject_date').text(actionDate);
-                    $('#req_detail_reject_notes').text(adminNotes && adminNotes.trim() !== '' ? adminNotes : 'No specific reason provided.');
+                    $('#req_detail_reject_notes').text(adminNotes && adminNotes.trim() !== '' ? adminNotes : (langAssets.noSpecificReasonProvided || 'No specific reason provided.'));
                 }
 
                 $('#viewRequestDetailsModal').appendTo('body').modal('show');

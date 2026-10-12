@@ -279,6 +279,11 @@ class TableManufacturingE2EValidationTest extends TestCase
             'type' => 'breakdown',
             'priority' => 'high',
             'problem_description' => 'Blade Jam & Motor Overheat',
+            'assignments' => [[
+                'assignment_type' => 'internal',
+                'technician_id' => $this->user->id,
+                'technician_name' => $this->user->name,
+            ]],
         ]);
         $maintService->startWorkOrder($workOrder->id, $this->tenant->id, $this->user->id);
         $machineCut->refresh();

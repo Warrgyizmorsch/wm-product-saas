@@ -137,7 +137,7 @@
                                             <input type="number" name="quantity" class="form-control form-control-sm" value="1" min="1" step="any">
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label text-muted fw-semibold fs-12">Rework Cost Est. ($)</label>
+                                            <label class="form-label text-muted fw-semibold fs-12">Rework Cost Est. ({{ active_currency_symbol() }})</label>
                                             <input type="number" name="cost_estimate" class="form-control form-control-sm" value="150" min="0" step="any">
                                         </div>
                                     </div>

@@ -45,7 +45,7 @@ class PostProductionConsumptionJournal
         // over its lifetime, each needing its own journal, so the production
         // order id alone can't be the idempotency key (it would block every
         // issue after the first).
-        if ($this->journals->findByReference('stock_transaction', $transaction->id)->isNotEmpty()) {
+        if ($this->journals->activePosting((int) $transaction->tenant_id, 'stock_transaction', $transaction->id) !== null) {
             return;
         }
 
@@ -70,7 +70,7 @@ class PostProductionConsumptionJournal
                 return;
             }
 
-            $this->journals->post([
+            $this->journals->postOnce([
                 [
                     'chart_of_account_id' => $wip->id,
                     'debit' => (float) $transaction->total_value,

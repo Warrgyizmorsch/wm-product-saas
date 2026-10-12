@@ -494,6 +494,47 @@ class LeadController extends Controller
         ));
     }
 
+    /**
+     * Fetch past activities paginated via AJAX for lazy loading infinite scroll.
+     */
+    public function getPastActivities(Lead $lead, Request $request)
+    {
+        $this->authorize('view', $lead);
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, min(50, (int) $request->input('per_page', 5)));
+        $todayStart = now()->startOfDay();
+
+        $query = $lead->followups()
+            ->where('status', '!=', 'Pending')
+            ->where('updated_at', '<', $todayStart)
+            ->whereDoesntHave('rescheduledTo')
+            ->with(['taggedUser:id,name,email', 'rescheduledTo:id,rescheduled_from_id,followup_date,status'])
+            ->orderByDesc('updated_at');
+
+        $total = $query->count();
+        $items = $query->skip(($page - 1) * $perPage)->take($perPage)->get();
+        $users = User::orderBy('name')->get();
+
+        $html = '';
+        foreach ($items as $item) {
+            $html .= view('modules.crm.leads.partials.activity-card-item', [
+                'item' => $item,
+                'category' => 'history',
+                'lead' => $lead,
+                'users' => $users,
+            ])->render();
+        }
+
+        return response()->json([
+            'html' => $html,
+            'count' => $items->count(),
+            'has_more' => ($page * $perPage) < $total,
+            'remaining' => max(0, $total - ($page * $perPage)),
+            'total' => $total,
+            'page' => $page,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $this->authorize('create', Lead::class);

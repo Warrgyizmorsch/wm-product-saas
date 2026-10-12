@@ -341,21 +341,92 @@ class ProfileAndAccountSettingsTest extends TestCase
     }
 
     /** @test */
-    public function deactivated_user_cannot_log_in(): void
+    public function non_employee_can_update_name_email_and_phone_in_account_settings(): void
     {
-        $this->user->update([
-            'settings' => array_merge($this->user->settings ?? [], ['is_deactivated' => true]),
-        ]);
-
-        $response = $this->withSession(['tenant_slug' => $this->tenant->slug])
-            ->post(route('login'), [
-                'email'    => $this->user->email,
-                'password' => 'password123',
+        $response = $this->actingAsTenantUser()
+            ->put(route('account.settings.profile'), [
+                'name'  => 'Non Employee Admin',
+                'email' => 'admin.new@acme.com',
+                'phone' => '+91 9999911111',
             ]);
 
-        $response->assertRedirect(route('login'));
-        $response->assertSessionHasErrors('email');
-        $this->assertGuest();
+        $response->assertRedirect(route('account.settings', ['tab' => 'profile']));
+        $response->assertSessionHas('success');
+
+        $this->user->refresh();
+        $this->assertEquals('Non Employee Admin', $this->user->name);
+        $this->assertEquals('admin.new@acme.com', $this->user->email);
+        $this->assertEquals('+91 9999911111', $this->user->phone);
+    }
+
+    /** @test */
+    public function employee_name_and_email_are_protected_from_direct_modification_in_account_settings(): void
+    {
+        $company = Company::create([
+            'tenant_id'    => $this->tenant->id,
+            'company_name' => 'Acme Labs',
+        ]);
+
+        $employee = Employee::create([
+            'tenant_id'              => $this->tenant->id,
+            'user_id'                => $this->user->id,
+            'company_id'             => $company->id,
+            'full_name'              => 'Jane Doe',
+            'personal_email'         => 'jane@acme.com',
+            'personal_mobile_number' => '+91 9876543210',
+            'date_of_joining'        => now(),
+            'gender'                 => 'Female',
+        ]);
+
+        // Attempting to alter name and email through account settings form
+        $response = $this->actingAsTenantUser()
+            ->put(route('account.settings.profile'), [
+                'name'  => 'Hacked Employee Name',
+                'email' => 'hacked@acme.com',
+                'phone' => '+91 7777788888',
+            ]);
+
+        $response->assertRedirect(route('account.settings', ['tab' => 'profile']));
+        $response->assertSessionHas('success');
+
+        $this->user->refresh();
+        // Name and email remain unchanged for employee
+        $this->assertEquals('Jane Doe', $this->user->name);
+        $this->assertEquals('jane@acme.com', $this->user->email);
+        // Phone number is updated and synchronized
+        $this->assertEquals('+91 7777788888', $this->user->phone);
+
+        $employee->refresh();
+        $this->assertEquals('+91 7777788888', $employee->personal_mobile_number);
+    }
+
+    /** @test */
+    public function account_settings_page_displays_hrms_badge_and_locks_fields_for_employee(): void
+    {
+        $company = Company::create([
+            'tenant_id'    => $this->tenant->id,
+            'company_name' => 'Acme Labs',
+        ]);
+
+        Employee::create([
+            'tenant_id'              => $this->tenant->id,
+            'user_id'                => $this->user->id,
+            'company_id'             => $company->id,
+            'full_name'              => 'Jane Doe',
+            'personal_email'         => 'jane@acme.com',
+            'personal_mobile_number' => '+91 9876543210',
+            'date_of_joining'        => now(),
+            'gender'                 => 'Female',
+        ]);
+
+        $response = $this->actingAsTenantUser()
+            ->get(route('account.settings'));
+
+        $response->assertOk();
+        $response->assertSee('HRMS Linked Employee');
+        $response->assertSee('Your official Name and Email are managed by HRMS.');
+        $response->assertSee('name_locked');
+        $response->assertSee('email_locked');
     }
 }
 

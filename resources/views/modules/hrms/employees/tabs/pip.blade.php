@@ -1,84 +1,90 @@
 <!-- PIP TAB -->
 <div class="tab-pane fade {{ $activeTabName === 'pip' ? 'show active' : '' }}" id="pip-pane" role="tabpanel" aria-labelledby="pip-tab">
-    <div class="card border-0 shadow-sm rounded-3 mt-3">
-        <div class="card-header bg-white border-bottom p-3 d-flex justify-content-between align-items-center">
+    <div class="card-custom mb-4">
+        <div class="card-custom-header d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div>
-                <h6 class="fw-bold text-dark mb-0"><i class="feather-trending-up text-primary me-1.5"></i> Performance Improvement Plans (PIP)</h6>
-                <small class="text-muted fs-12">Performance improvement history, objectives, and evaluation milestones for this employee.</small>
+                <h5 class="card-custom-title mb-0">
+                    <i class="feather-trending-up text-primary me-2"></i> {{ __('hrms.pip.title') }}
+                </h5>
+                <span class="text-muted fs-12">{{ __('hrms.pip.employee_tab_desc') }}</span>
             </div>
             @php
                 $authUser = auth()->user();
                 $canInitiatePip = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
             @endphp
             @if($canInitiatePip)
-                <a href="{{ route('hrms.pip.index') }}" class="btn btn-sm btn-primary fw-bold px-3 py-1.5">
-                    <i class="feather-plus me-1"></i> Initiate PIP
-                </a>
+                <div>
+                    <x-ui.button variant="primary" size="sm" icon="feather-plus" href="{{ route('hrms.pip.index') }}" class="fw-semibold">
+                        {{ __('hrms.pip.initiate_pip') }}
+                    </x-ui.button>
+                </div>
             @endif
         </div>
         <div class="card-body p-0">
             @php
-                $employeePips = \App\Domains\HRMS\Models\PerformanceImprovementPlan::where('employee_id', $employee->id)
-                    ->with(['category', 'objectives', 'checkins'])
-                    ->latest()
-                    ->get();
+                $employeePips = $pipPlans ?? ($employee->pipPlans ?? collect());
             @endphp
 
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0 fs-13">
-                    <thead class="bg-light">
+                <table class="table table-hover align-middle mb-0 fs-13 text-dark" style="width: 100%;">
+                    <thead class="table-light fs-11 text-uppercase tracking-wider">
                         <tr>
-                            <th class="ps-3 py-3 text-muted text-uppercase fs-11">PIP #</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Category / Reason</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Duration</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Objectives</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Check-ins</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Status</th>
-                            <th class="pe-3 py-3 text-end text-muted text-uppercase fs-11">Action</th>
+                            <th class="ps-3 py-3" style="width: 15%;">{{ __('hrms.pip.pip_number') }}</th>
+                            <th class="py-3" style="width: 18%;">{{ __('hrms.pip.category_reason') }}</th>
+                            <th class="py-3" style="width: 18%;">{{ __('hrms.common.duration') }}</th>
+                            <th class="py-3 text-center" style="width: 14%;">{{ __('hrms.pip.objectives') }}</th>
+                            <th class="py-3 text-center" style="width: 12%;">{{ __('hrms.pip.checkins') }}</th>
+                            <th class="py-3 text-center" style="width: 13%;">{{ __('hrms.common.status') }}</th>
+                            <th class="pe-3 py-3 text-end" style="width: 10%;">{{ __('hrms.common.action') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($employeePips as $pPlan)
+                            @php
+                                $badgeVariant = match($pPlan->status) {
+                                    'active'            => 'success',
+                                    'under_review'      => 'warning',
+                                    'completed_success' => 'info',
+                                    'extended'          => 'primary',
+                                    'role_reassigned'   => 'secondary',
+                                    'failed_terminated' => 'danger',
+                                    default             => 'light'
+                                };
+                                $objectivesCount = $pPlan->objectives ? $pPlan->objectives->count() : 0;
+                                $achievedCount = $pPlan->objectives ? $pPlan->objectives->where('status', 'achieved')->count() : 0;
+                                $checkinsCount = $pPlan->checkins ? $pPlan->checkins->count() : 0;
+                            @endphp
                             <tr>
-                                <td class="ps-3 fw-bold text-primary">
+                                <td class="ps-3">
                                     <a href="{{ route('hrms.pip.show', $pPlan->id) }}" class="text-decoration-none text-primary fw-bold">
                                         {{ $pPlan->pip_number }}
                                     </a>
                                 </td>
                                 <td>
-                                    <span class="badge bg-light text-dark border px-2 py-1">
-                                        {{ $pPlan->category?->name ?? $pPlan->reason_category ?? 'Performance' }}
-                                    </span>
+                                    <x-ui.badge soft variant="light" class="border px-2 py-1 text-dark">
+                                        {{ $pPlan->category?->name ?? ($pPlan->reason_category ? __($pPlan->reason_category) : __('hrms.employees.tbl_performance')) }}
+                                    </x-ui.badge>
                                 </td>
                                 <td>
-                                    <div class="fw-semibold text-dark fs-12">{{ $pPlan->start_date->format('d M') }} - {{ $pPlan->end_date->format('d M, Y') }}</div>
-                                    <small class="text-muted fs-11">{{ $pPlan->duration_days }} Days</small>
+                                    <div class="fw-semibold text-dark fs-12">
+                                        {{ $pPlan->start_date ? $pPlan->start_date->format('d M') : __('hrms.common.na') }} - {{ $pPlan->end_date ? $pPlan->end_date->format('d M, Y') : __('hrms.common.na') }}
+                                    </div>
+                                    <small class="text-muted fs-11">{{ $pPlan->duration_days ?? 0 }} {{ __('hrms.wfh.days_count') }}</small>
                                 </td>
-                                <td>
-                                    <span class="badge bg-info-subtle text-info px-2 py-1 fs-11">
-                                        {{ $pPlan->objectives->where('status', 'achieved')->count() }} / {{ $pPlan->objectives->count() }} Achieved
-                                    </span>
+                                <td class="text-center">
+                                    <x-ui.badge soft variant="info" class="fs-11 px-2 py-1">
+                                        {{ $achievedCount }} / {{ $objectivesCount }} {{ __('hrms.pip.achieved') }}
+                                    </x-ui.badge>
                                 </td>
-                                <td>
-                                    <span class="badge bg-secondary-subtle text-secondary px-2 py-1 fs-11">
-                                        {{ $pPlan->checkins->count() }} Check-ins
-                                    </span>
+                                <td class="text-center">
+                                    <x-ui.badge soft variant="secondary" class="fs-11 px-2 py-1">
+                                        {{ $checkinsCount }} {{ __('hrms.pip.checkins') }}
+                                    </x-ui.badge>
                                 </td>
-                                <td>
-                                    @php
-                                        $badgeClass = match($pPlan->status) {
-                                            'active' => 'bg-success-subtle text-success border border-success-subtle',
-                                            'under_review' => 'bg-warning-subtle text-warning border border-warning-subtle',
-                                            'completed_success' => 'bg-info-subtle text-info border border-info-subtle',
-                                            'extended' => 'bg-primary-subtle text-primary border border-primary-subtle',
-                                            'role_reassigned' => 'bg-purple-subtle text-purple border border-purple-subtle',
-                                            'failed_terminated' => 'bg-danger-subtle text-danger border border-danger-subtle',
-                                            default => 'bg-light text-dark border'
-                                        };
-                                    @endphp
-                                    <span class="badge {{ $badgeClass }} px-2.5 py-1 rounded-pill fs-11 fw-bold">
-                                        {{ str_replace('_', ' ', ucfirst($pPlan->status)) }}
-                                    </span>
+                                <td class="text-center">
+                                    <x-ui.badge soft :variant="$badgeVariant" class="px-2.5 py-1 text-uppercase fs-11 fw-bold">
+                                        {{ __(ucwords(str_replace('_', ' ', (string) $pPlan->status))) }}
+                                    </x-ui.badge>
                                 </td>
                                 <td class="pe-3 text-end">
                                     <x-ui.action-dropdown viewUrl="{{ route('hrms.pip.show', $pPlan->id) }}" align="end" />
@@ -86,9 +92,11 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center py-4 text-muted">
-                                    <i class="feather-trending-up fs-24 d-block mb-1 text-secondary"></i>
-                                    No PIP records found for this employee.
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center">
+                                        <i class="feather-trending-up fs-18"></i>
+                                    </div>
+                                    <h6 class="fw-bold mb-1 text-dark fs-13">{{ __('hrms.pip.no_records_for_employee') }}</h6>
                                 </td>
                             </tr>
                         @endforelse
@@ -98,3 +106,4 @@
         </div>
     </div>
 </div>
+

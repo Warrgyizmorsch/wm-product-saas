@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 class DocumentTemplateService
 {
     /**
-     * Import raw content from an uploaded template file (.html, .txt, .docx).
+     * Import raw content from an uploaded template file (.html, .htm, .txt, .docx).
      */
     public function importTemplateFromFile($uploadedFile): string
     {
@@ -24,96 +24,404 @@ class DocumentTemplateService
         $extension = strtolower($uploadedFile->getClientOriginalExtension());
 
         if (in_array($extension, ['html', 'htm', 'txt'])) {
-            return file_get_contents($uploadedFile->getRealPath());
+            return file_get_contents($uploadedFile->getRealPath()) ?: '';
         }
 
         if ($extension === 'docx') {
-            try {
-                $zip = new \ZipArchive();
-                if ($zip->open($uploadedFile->getRealPath()) === true) {
-                    if (($index = $zip->locateName('word/document.xml')) !== false) {
-                        $data = $zip->getFromIndex($index);
-                        $zip->close();
-                        $xml = strip_tags($data, '<w:p><w:r><w:t>');
-                        $text = preg_replace('/<w:p[^>]*>/', "<p>", $xml);
-                        $text = preg_replace('/<\/w:p>/', "</p>", $text);
-                        $text = strip_tags($text, '<p>');
-                        return $text;
-                    }
-                    $zip->close();
-                }
-            } catch (\Exception $e) {
-                Log::warning("DOCX Template Import fallback: " . $e->getMessage());
-            }
+            return $this->parseDocxToHtml($uploadedFile->getRealPath());
         }
 
         return file_get_contents($uploadedFile->getRealPath()) ?: '';
     }
 
     /**
-     * Render complete template HTML for an employee by substituting dynamic tags.
+     * Parse complete DOCX (Word OpenXML) into clean HTML preserving formatting, tables, styles, alignment & images.
      */
-    public function renderTemplate(DocumentTemplate $template, Employee $employee, ?string $refNumber = null, array $extraData = []): string
+    public function parseDocxToHtml(string $filePath): string
     {
-        $employee->loadMissing(['company', 'department', 'designation', 'branch', 'reportingManager']);
-        
-        $company = $employee->company ?: Company::first();
-        $refNo = $refNumber ?: ('DOC/' . ($company?->code ?? 'ORG') . '/' . date('Y') . '/' . str_pad((string)$employee->id, 4, '0', STR_PAD_LEFT));
-
-        // Resolve HR Signature Data
-        $hrName = $extraData['hr_name'] ?? auth()->user()?->name ?? 'Authorized HR Signatory';
-        $hrDesignation = $extraData['hr_designation'] ?? 'HR Manager';
-        $issueDateStr = !empty($extraData['issue_date']) ? Carbon::parse($extraData['issue_date'])->format('d M, Y') : Carbon::today()->format('d M, Y');
-        $hrSigUrl = $extraData['hr_signature_url'] ?? $extraData['hr_signature_data'] ?? null;
-
-        if ($hrSigUrl) {
-            $hrSigHtml = '<div style="display:inline-block; text-align:left; margin:5px 0;">' .
-                         '<img src="' . $hrSigUrl . '" style="max-height:55px; max-width:200px; object-fit:contain; display:block;" alt="HR Signature" />' .
-                         '</div>';
-        } else {
-            $hrSigHtml = '<div style="display:inline-block; border-bottom:1.5px solid #0f172a; width:180px; height:35px; text-align:center; color:#94a3b8; font-size:11px; line-height:45px;">[ Signature Line ]</div>';
+        if (!file_exists($filePath) || !class_exists('ZipArchive')) {
+            return '';
         }
 
-        // 1. Build Single Value Dictionary
-        $dictionary = [
-            '{{employee_name}}'      => e($employee->full_name ?? ''),
-            '{{employee_id}}'        => e($employee->employee_id ?? ''),
-            '{{email}}'              => e($employee->personal_email ?? $employee->office_email ?? 'N/A'),
-            '{{phone}}'              => e($employee->personal_mobile_number ?? $employee->home_phone ?? 'N/A'),
-            '{{dob}}'                => $employee->date_of_birth ? Carbon::parse($employee->date_of_birth)->format('d M, Y') : 'N/A',
-            '{{gender}}'             => e(ucfirst($employee->gender ?? 'N/A')),
-            '{{marital_status}}'     => e(ucfirst($employee->marital_status ?? 'N/A')),
-            '{{designation}}'        => e($employee->designation?->name ?? 'N/A'),
-            '{{department}}'         => e($employee->department?->name ?? 'N/A'),
-            '{{branch}}'             => e($employee->branch?->name ?? 'N/A'),
-            '{{reporting_manager}}'  => e($employee->reportingManager?->full_name ?? 'N/A'),
-            '{{joining_date}}'       => $employee->date_of_joining ? Carbon::parse($employee->date_of_joining)->format('d M, Y') : 'N/A',
-            '{{last_working_day}}'   => (isset($employee->relieving_date) && $employee->relieving_date) ? Carbon::parse($employee->relieving_date)->format('d M, Y') : Carbon::today()->format('d M, Y'),
-            '{{employment_status}}'  => e(ucfirst(str_replace('_', ' ', $employee->employee_stage ?? $employee->employment_type ?? 'active'))),
-            
-            '{{company_name}}'       => e($company?->company_name ?? 'Company Name'),
-            '{{company_logo}}'       => $company?->logo ? asset('storage/' . $company->logo) : '',
-            '{{company_address}}'    => e($company?->address ?? 'Headquarters'),
-            '{{company_email}}'      => e($company?->email ?? 'info@company.com'),
-            '{{company_phone}}'      => e($company?->phone ?? 'N/A'),
-            
-            '{{current_date}}'       => Carbon::today()->format('d M, Y'),
-            '{{issue_date}}'         => $issueDateStr,
-            '{{reference_number}}'   => e($refNo),
+        $zip = new \ZipArchive();
+        if ($zip->open($filePath) !== true) {
+            return '';
+        }
 
-            '{{hr_signature}}'       => $hrSigHtml,
-            '{{hr_name}}'            => e($hrName),
-            '{{hr_designation}}'     => e($hrDesignation),
-            '{{signature_date}}'     => $issueDateStr,
-        ];
+        // 1. Read Relationships to extract image / media links
+        $mediaMap = [];
+        if (($relsIndex = $zip->locateName('word/_rels/document.xml.rels')) !== false) {
+            $relsXml = $zip->getFromIndex($relsIndex);
+            if ($relsXml) {
+                try {
+                    $relsDom = new \DOMDocument();
+                    @$relsDom->loadXML($relsXml);
+                    foreach ($relsDom->getElementsByTagName('Relationship') as $rel) {
+                        $id = $rel->getAttribute('Id');
+                        $target = $rel->getAttribute('Target');
+                        $type = $rel->getAttribute('Type');
+                        if (str_contains($type, '/image') || preg_match('/\.(png|jpg|jpeg|gif|webp|svg)$/i', $target)) {
+                            $targetPath = str_starts_with($target, 'media/') ? ('word/' . $target) : (str_starts_with($target, 'word/') ? $target : ('word/' . ltrim($target, '/')));
+                            if (($imgIndex = $zip->locateName($targetPath)) !== false) {
+                                $imgData = $zip->getFromIndex($imgIndex);
+                                $ext = pathinfo($target, PATHINFO_EXTENSION) ?: 'png';
+                                $mime = match (strtolower($ext)) {
+                                    'jpg', 'jpeg' => 'image/jpeg',
+                                    'png' => 'image/png',
+                                    'gif' => 'image/gif',
+                                    'webp' => 'image/webp',
+                                    'svg' => 'image/svg+xml',
+                                    default => 'image/png'
+                                };
+                                $mediaMap[$id] = 'data:' . $mime . ';base64,' . base64_encode($imgData);
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("DOCX rels parsing error: " . $e->getMessage());
+                }
+            }
+        }
 
-        // 2. Render Relational Tables
-        $dictionary['{{education_table}}'] = $this->renderEducationTable($employee);
-        $dictionary['{{experience_table}}'] = $this->renderExperienceTable($employee);
-        $dictionary['{{skills_list}}'] = $this->renderSkillsList($employee);
-        $dictionary['{{certifications_list}}'] = $this->renderCertificationsList($employee);
+        // 2. Read Main Document XML
+        $docIndex = $zip->locateName('word/document.xml');
+        if ($docIndex === false) {
+            $zip->close();
+            return '';
+        }
 
-        // 3. Assemble Header, Body, and Footer
+        $documentXml = $zip->getFromIndex($docIndex);
+        $zip->close();
+
+        if (empty($documentXml)) {
+            return '';
+        }
+
+        try {
+            $dom = new \DOMDocument('1.0', 'UTF-8');
+            $dom->preserveWhiteSpace = true;
+            @$dom->loadXML($documentXml);
+
+            $xpath = new \DOMXPath($dom);
+            $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+            $xpath->registerNamespace('r', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+            $xpath->registerNamespace('a', 'http://schemas.openxmlformats.org/drawingml/2006/main');
+            $xpath->registerNamespace('wp', 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing');
+            $xpath->registerNamespace('v', 'urn:schemas-microsoft-com:vml');
+
+            $bodyNodes = $xpath->query('//w:body/*');
+            if (!$bodyNodes || $bodyNodes->length === 0) {
+                return '';
+            }
+
+            $html = '';
+            foreach ($bodyNodes as $node) {
+                $html .= $this->convertDocxNodeToHtml($node, $xpath, $mediaMap);
+            }
+
+            return trim($html);
+        } catch (\Throwable $e) {
+            Log::warning("DOCX to HTML parsing error: " . $e->getMessage());
+            // Fallback
+            $xml = strip_tags($documentXml, '<w:p><w:r><w:t>');
+            $text = preg_replace('/<w:p[^>]*>/', "<p>", $xml);
+            $text = preg_replace('/<\/w:p>/', "</p>", $text);
+            return strip_tags($text, '<p>');
+        }
+    }
+
+    /**
+     * Convert an individual OpenXML node (w:p, w:tbl, etc.) to semantic HTML.
+     */
+    protected function convertDocxNodeToHtml(\DOMNode $node, \DOMXPath $xpath, array $mediaMap): string
+    {
+        $nodeName = $node->localName ?? $node->nodeName;
+
+        if ($nodeName === 'p') {
+            return $this->convertDocxParagraphToHtml($node, $xpath, $mediaMap);
+        }
+
+        if ($nodeName === 'tbl') {
+            return $this->convertDocxTableToHtml($node, $xpath, $mediaMap);
+        }
+
+        return '';
+    }
+
+    /**
+     * Convert a Word paragraph (w:p) to HTML (<p>, <h1>, <h2>, etc.) with exact styles.
+     */
+    protected function convertDocxParagraphToHtml(\DOMNode $pNode, \DOMXPath $xpath, array $mediaMap): string
+    {
+        $tag = 'p';
+        $classes = [];
+        $styles = [];
+
+        // Check paragraph properties (w:pPr)
+        $pPr = $xpath->query('w:pPr', $pNode)->item(0);
+        if ($pPr) {
+            // Heading style
+            $pStyle = $xpath->query('w:pStyle/@w:val', $pPr)->item(0);
+            if ($pStyle) {
+                $styleVal = strtolower($pStyle->nodeValue);
+                if (str_contains($styleVal, 'heading1') || str_contains($styleVal, 'title')) {
+                    $tag = 'h1';
+                } elseif (str_contains($styleVal, 'heading2') || str_contains($styleVal, 'subtitle')) {
+                    $tag = 'h2';
+                } elseif (str_contains($styleVal, 'heading3')) {
+                    $tag = 'h3';
+                } elseif (str_contains($styleVal, 'heading4')) {
+                    $tag = 'h4';
+                }
+            }
+
+            // Alignment (support both Quill class and CSS text-align for preview/PDF)
+            $jc = $xpath->query('w:jc/@w:val', $pPr)->item(0);
+            if ($jc) {
+                $align = match (strtolower($jc->nodeValue)) {
+                    'center' => 'center',
+                    'right' => 'right',
+                    'both', 'distribute', 'justify' => 'justify',
+                    default => 'left'
+                };
+                if ($align !== 'left') {
+                    $classes[] = 'ql-align-' . $align;
+                    $styles[] = "text-align: {$align};";
+                }
+            }
+        }
+
+        // Parse child runs, linebreaks, hyperlinks, images
+        $innerHtml = '';
+        foreach ($pNode->childNodes as $child) {
+            $childName = $child->localName ?? $child->nodeName;
+
+            if ($childName === 'r') {
+                $innerHtml .= $this->convertDocxRunToHtml($child, $xpath, $mediaMap);
+            } elseif ($childName === 'hyperlink') {
+                $linkText = '';
+                foreach ($child->childNodes as $hyperChild) {
+                    if (($hyperChild->localName ?? $hyperChild->nodeName) === 'r') {
+                        $linkText .= $this->convertDocxRunToHtml($hyperChild, $xpath, $mediaMap);
+                    }
+                }
+                $innerHtml .= "<a href=\"#\" target=\"_blank\">{$linkText}</a>";
+            }
+        }
+
+        // If paragraph is empty or only whitespace, return a single break paragraph for Quill parity
+        if (trim(strip_tags($innerHtml, '<img><br>')) === '' && !str_contains($innerHtml, '<img') && !str_contains($innerHtml, '<br>')) {
+            return "<p><br></p>\n";
+        }
+
+        $classAttr = !empty($classes) ? (' class="' . implode(' ', $classes) . '"') : '';
+        $styleAttr = !empty($styles) ? (' style="' . implode(' ', $styles) . '"') : '';
+        return "<{$tag}{$classAttr}{$styleAttr}>{$innerHtml}</{$tag}>\n";
+    }
+
+    /**
+     * Convert a Word text run (w:r) to HTML formatting (bold, italic, underline, color, size, font, text, br, images).
+     */
+    protected function convertDocxRunToHtml(\DOMNode $rNode, \DOMXPath $xpath, array $mediaMap): string
+    {
+        $isBold = false;
+        $isItalic = false;
+        $isUnderline = false;
+        $isStrike = false;
+        $isSup = false;
+        $isSub = false;
+        $spanStyles = [];
+
+        $rPr = $xpath->query('w:rPr', $rNode)->item(0);
+        if ($rPr) {
+            if ($xpath->query('w:b[not(@w:val) or @w:val="1" or @w:val="true"]', $rPr)->length > 0) {
+                $isBold = true;
+            }
+            if ($xpath->query('w:i[not(@w:val) or @w:val="1" or @w:val="true"]', $rPr)->length > 0) {
+                $isItalic = true;
+            }
+            if ($xpath->query('w:u[not(@w:val="none")]', $rPr)->length > 0) {
+                $isUnderline = true;
+            }
+            if ($xpath->query('w:strike[not(@w:val) or @w:val="1" or @w:val="true"]', $rPr)->length > 0) {
+                $isStrike = true;
+            }
+
+            // Subscript / Superscript
+            $vertAlign = $xpath->query('w:vertAlign/@w:val', $rPr)->item(0);
+            if ($vertAlign) {
+                if ($vertAlign->nodeValue === 'superscript') {
+                    $isSup = true;
+                } elseif ($vertAlign->nodeValue === 'subscript') {
+                    $isSub = true;
+                }
+            }
+
+            // Font Color
+            $color = $xpath->query('w:color/@w:val', $rPr)->item(0);
+            if ($color && $color->nodeValue && $color->nodeValue !== 'auto') {
+                $spanStyles[] = 'color: #' . ltrim($color->nodeValue, '#') . ';';
+            }
+
+            // Highlight / Background color
+            $highlight = $xpath->query('w:highlight/@w:val', $rPr)->item(0);
+            if ($highlight && $highlight->nodeValue && $highlight->nodeValue !== 'none') {
+                $spanStyles[] = 'background-color: ' . htmlspecialchars($highlight->nodeValue) . ';';
+            }
+
+            // Font Family
+            $font = $xpath->query('w:rFonts/@w:ascii', $rPr)->item(0);
+            if ($font && $font->nodeValue && !in_array(strtolower($font->nodeValue), ['calibri', 'arial'])) {
+                $spanStyles[] = 'font-family: ' . htmlspecialchars($font->nodeValue) . ', sans-serif;';
+            }
+
+            // Font Size (stored in half-points: 24 = 12pt)
+            $sz = $xpath->query('w:sz/@w:val', $rPr)->item(0);
+            if ($sz && is_numeric($sz->nodeValue)) {
+                $pt = ((int)$sz->nodeValue) / 2;
+                if ($pt >= 8 && $pt <= 48) {
+                    $spanStyles[] = "font-size: {$pt}pt;";
+                }
+            }
+        }
+
+        $text = '';
+        foreach ($rNode->childNodes as $child) {
+            $childName = $child->localName ?? $child->nodeName;
+
+            if ($childName === 't') {
+                $escaped = htmlspecialchars($child->nodeValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                // Preserve consecutive spaces without breaking normal word wrap
+                $text .= preg_replace('/ {2}/', '&nbsp; ', $escaped);
+            } elseif ($childName === 'br' || $childName === 'cr') {
+                $text .= '<br>';
+            } elseif ($childName === 'tab') {
+                $text .= '&nbsp;&nbsp;&nbsp;&nbsp;';
+            } elseif ($childName === 'noBreakHyphen') {
+                $text .= '&#8209;';
+            } elseif ($childName === 'drawing' || $childName === 'pict') {
+                // DrawingML or VML Embedded Image
+                $blip = $xpath->query('.//a:blip/@r:embed', $child)->item(0);
+                if (!$blip) {
+                    $blip = $xpath->query('.//v:imagedata/@r:id', $child)->item(0);
+                }
+                if ($blip && isset($mediaMap[$blip->nodeValue])) {
+                    $imgSrc = $mediaMap[$blip->nodeValue];
+                    $text .= '<img src="' . $imgSrc . '" style="max-width:100%; height:auto; margin:4px 0;" alt="Embedded Image" />';
+                }
+            }
+        }
+
+        if ($text === '') {
+            return '';
+        }
+
+        if (!empty($spanStyles)) {
+            $text = '<span style="' . implode(' ', $spanStyles) . '">' . $text . '</span>';
+        }
+        if ($isSub) {
+            $text = '<sub>' . $text . '</sub>';
+        }
+        if ($isSup) {
+            $text = '<sup>' . $text . '</sup>';
+        }
+        if ($isStrike) {
+            $text = '<s>' . $text . '</s>';
+        }
+        if ($isUnderline) {
+            $text = '<u>' . $text . '</u>';
+        }
+        if ($isItalic) {
+            $text = '<em>' . $text . '</em>';
+        }
+        if ($isBold) {
+            $text = '<strong>' . $text . '</strong>';
+        }
+
+        return $text;
+    }
+
+    /**
+     * Convert a Word table (w:tbl) to HTML table preserving borders, shading and cell padding.
+     */
+    protected function convertDocxTableToHtml(\DOMNode $tblNode, \DOMXPath $xpath, array $mediaMap): string
+    {
+        $rows = $xpath->query('w:tr', $tblNode);
+        if ($rows->length === 0) {
+            return '';
+        }
+
+        $html = '<table style="width:100%; border-collapse:collapse; margin:12px 0; border:1px solid #cbd5e1;">' . "\n";
+        $isFirstRow = true;
+
+        foreach ($rows as $tr) {
+            $html .= '  <tr>' . "\n";
+            $cells = $xpath->query('w:tc', $tr);
+
+            foreach ($cells as $tc) {
+                $cellTag = $isFirstRow ? 'th' : 'td';
+                $cellStyles = ['border: 1px solid #cbd5e1;', 'padding: 6px 10px;', 'vertical-align: top;'];
+                
+                // Cell background shading
+                $tcPr = $xpath->query('w:tcPr', $tc)->item(0);
+                if ($tcPr) {
+                    $shd = $xpath->query('w:shd/@w:fill', $tcPr)->item(0);
+                    if ($shd && $shd->nodeValue && $shd->nodeValue !== 'auto') {
+                        $cellStyles[] = 'background-color: #' . ltrim($shd->nodeValue, '#') . ';';
+                    } elseif ($isFirstRow) {
+                        $cellStyles[] = 'background-color: #f8fafc;';
+                    }
+
+                    $vAlign = $xpath->query('w:vAlign/@w:val', $tcPr)->item(0);
+                    if ($vAlign && $vAlign->nodeValue) {
+                        $cellStyles[] = 'vertical-align: ' . match($vAlign->nodeValue) {
+                            'center' => 'middle',
+                            'bottom' => 'bottom',
+                            default => 'top'
+                        } . ';';
+                    }
+                } elseif ($isFirstRow) {
+                    $cellStyles[] = 'background-color: #f8fafc;';
+                }
+
+                if ($isFirstRow) {
+                    $cellStyles[] = 'font-weight: 600;';
+                }
+
+                $cellContent = '';
+                $pNodes = $xpath->query('w:p', $tc);
+                foreach ($pNodes as $p) {
+                    $cellContent .= $this->convertDocxParagraphToHtml($p, $xpath, $mediaMap);
+                }
+
+                $styleAttr = ' style="' . implode(' ', $cellStyles) . '"';
+                $html .= "    <{$cellTag}{$styleAttr}>" . trim($cellContent) . "</{$cellTag}>\n";
+            }
+
+            $html .= '  </tr>' . "\n";
+            $isFirstRow = false;
+        }
+
+        $html .= '</table>' . "\n";
+        return $html;
+    }
+
+    /**
+     * Render complete template HTML for an employee by substituting dynamic tags.
+     * When $employee is null, placeholders are preserved for clean template live preview.
+     */
+    public function renderTemplate(DocumentTemplate $template, ?Employee $employee = null, ?string $refNumber = null, array $extraData = []): string
+    {
+        $company = null;
+
+        if ($employee) {
+            $employee->loadMissing(['company', 'department', 'designation', 'branch', 'reportingManager']);
+            $company = $employee->company ?: Company::first();
+        } else {
+            $company = Company::first();
+        }
+
+        // 1. Assemble Header, Body, and Footer
         $header = $template->header_content ?? '';
         $body = $template->body_content ?? '';
         $footer = $template->footer_content ?? '';
@@ -127,15 +435,184 @@ class DocumentTemplateService
             $fullHtml .= '<footer class="doc-footer mt-4 pt-3 border-top">' . $footer . '</footer>';
         }
 
-        // Apply substitution
-        foreach ($dictionary as $tag => $val) {
-            $fullHtml = str_replace($tag, $val, $fullHtml);
+        if ($employee) {
+            $refNo = $refNumber ?: ('DOC/' . ($company?->code ?? 'ORG') . '/' . date('Y') . '/' . str_pad((string)$employee->id, 4, '0', STR_PAD_LEFT));
+
+            // Resolve HR Signature Data
+            $hrName = $extraData['hr_name'] ?? auth()->user()?->name ?? 'Authorized HR Signatory';
+            $hrDesignation = $extraData['hr_designation'] ?? 'HR Manager';
+            $issueDateStr = !empty($extraData['issue_date']) ? Carbon::parse($extraData['issue_date'])->format('d M, Y') : Carbon::today()->format('d M, Y');
+            $hrSigUrl = $extraData['hr_signature_url'] ?? $extraData['hr_signature_data'] ?? null;
+
+            if ($hrSigUrl) {
+                $hrSigHtml = '<div style="display:inline-block; text-align:left; margin:5px 0;">' .
+                             '<img src="' . $hrSigUrl . '" style="max-height:55px; max-width:200px; object-fit:contain; display:block;" alt="HR Signature" />' .
+                             '</div>';
+            } else {
+                $hrSigHtml = '<div style="display:inline-block; border-bottom:1.5px solid #0f172a; width:180px; height:35px; text-align:center; color:#94a3b8; font-size:11px; line-height:45px;">[ Signature Line ]</div>';
+            }
+
+            // Salary and Compensation Calculations
+            $salary = (float)($employee->current_salary ?? 0);
+            $annualCtc = $salary > 0 ? ('₹' . number_format($salary, 2)) : 'N/A';
+            $monthlyGross = $salary > 0 ? ('₹' . number_format($salary / 12, 2)) : 'N/A';
+            $basicSalary = $salary > 0 ? ('₹' . number_format(($salary / 12) * 0.5, 2)) : 'N/A';
+            $salaryInWords = $salary > 0 ? ($this->numberToWords($salary) . ' Only') : 'N/A';
+
+            // Tenure & Conduct calculations
+            $doj = $employee->date_of_joining ? Carbon::parse($employee->date_of_joining) : Carbon::today();
+            $lwd = (isset($employee->relieving_date) && $employee->relieving_date) ? Carbon::parse($employee->relieving_date) : Carbon::today();
+            $diff = $doj->diff($lwd);
+            $tenureString = trim(($diff->y ? $diff->y . ' year' . ($diff->y > 1 ? 's ' : ' ') : '') . ($diff->m ? $diff->m . ' month' . ($diff->m > 1 ? 's' : '') : ''));
+            if (empty($tenureString)) {
+                $tenureString = $diff->days . ' days';
+            }
+
+            // Build Employee Substitution Dictionary
+            $dictionary = [
+                '{{employee_name}}'         => e($employee->full_name ?? ''),
+                '{{employee_id}}'           => e($employee->employee_id ?? ''),
+                '{{email}}'                 => e($employee->personal_email ?? $employee->office_email ?? 'N/A'),
+                '{{phone}}'                 => e($employee->personal_mobile_number ?? $employee->home_phone ?? 'N/A'),
+                '{{dob}}'                   => $employee->date_of_birth ? Carbon::parse($employee->date_of_birth)->format('d M, Y') : 'N/A',
+                '{{gender}}'                => e(ucfirst($employee->gender ?? 'N/A')),
+                '{{marital_status}}'        => e(ucfirst($employee->marital_status ?? 'N/A')),
+                '{{blood_group}}'           => e($employee->blood_group ?? 'N/A'),
+                '{{current_address}}'       => e($employee->present_address ?? 'N/A'),
+                '{{permanent_address}}'     => e($employee->permanent_address ?? 'N/A'),
+                '{{emergency_contact_name}}' => e($employee->emergency_contact_name ?? 'N/A'),
+                '{{emergency_contact_phone}}'=> e($employee->emergency_contact_number ?? 'N/A'),
+
+                '{{designation}}'           => e($employee->designation?->name ?? $employee->job_title ?? 'N/A'),
+                '{{department}}'            => e($employee->department?->name ?? 'N/A'),
+                '{{branch}}'                => e($employee->branch?->name ?? 'N/A'),
+                '{{reporting_manager}}'     => e($employee->reportingManager?->full_name ?? 'N/A'),
+                '{{joining_date}}'          => $employee->date_of_joining ? Carbon::parse($employee->date_of_joining)->format('d M, Y') : 'N/A',
+                '{{date_of_joining}}'       => $employee->date_of_joining ? Carbon::parse($employee->date_of_joining)->format('d M, Y') : 'N/A',
+                '{{probation_end_date}}'    => $employee->probation_end_date ? Carbon::parse($employee->probation_end_date)->format('d M, Y') : 'N/A',
+                '{{confirmation_date}}'     => $employee->confirmation_date ? Carbon::parse($employee->confirmation_date)->format('d M, Y') : 'N/A',
+                '{{last_working_day}}'      => (isset($employee->relieving_date) && $employee->relieving_date) ? Carbon::parse($employee->relieving_date)->format('d M, Y') : Carbon::today()->format('d M, Y'),
+                '{{relieving_date}}'        => (isset($employee->relieving_date) && $employee->relieving_date) ? Carbon::parse($employee->relieving_date)->format('d M, Y') : Carbon::today()->format('d M, Y'),
+                '{{resignation_date}}'      => (isset($employee->resignation_date) && $employee->resignation_date) ? Carbon::parse($employee->resignation_date)->format('d M, Y') : 'N/A',
+                '{{employment_status}}'     => e(ucfirst(str_replace('_', ' ', $employee->employee_stage ?? $employee->employment_type ?? 'active'))),
+                '{{separation_type}}'       => e(ucfirst(str_replace('_', ' ', $employee->separation_type ?? 'Resignation'))),
+                '{{tenure_string}}'         => e($tenureString),
+                '{{conduct_statement}}'     => 'During their tenure, we found their character, dedication, and professional conduct to be exemplary.',
+                '{{clearance_status}}'      => 'All company assets, dues, files, and accounts have been fully cleared across IT, Finance, HR, Admin, and Operations departments.',
+                
+                // Salary & Compensation
+                '{{annual_ctc}}'            => $annualCtc,
+                '{{ctc}}'                   => $annualCtc,
+                '{{monthly_gross_salary}}'  => $monthlyGross,
+                '{{basic_salary}}'          => $basicSalary,
+                '{{salary_in_words}}'       => $salaryInWords,
+                '{{gross_earnings}}'        => $monthlyGross,
+                '{{total_deductions}}'      => $salary > 0 ? ('₹' . number_format(($salary / 12) * 0.1, 2)) : 'N/A',
+                '{{net_pay}}'               => $salary > 0 ? ('₹' . number_format(($salary / 12) * 0.9, 2)) : 'N/A',
+                '{{net_pay_in_words}}'      => $salary > 0 ? ($this->numberToWords(($salary / 12) * 0.9) . ' Only') : 'N/A',
+                '{{payslip_month}}'         => Carbon::today()->format('F Y'),
+                '{{pay_period}}'            => Carbon::today()->format('F Y'),
+                '{{working_days}}'          => '30',
+                '{{paid_days}}'             => '30',
+                '{{lop_days}}'              => '0',
+                '{{salary_mode}}'           => 'Bank Transfer',
+                '{{fnf_net_payable}}'       => $annualCtc,
+                '{{fnf_net_payable_words}}' => $salaryInWords,
+
+                // Banking & Statutory
+                '{{bank_name}}'             => e($employee->bank_name ?? 'N/A'),
+                '{{bank_account_number}}'   => e($employee->account_number ?? $employee->bank_account_number ?? 'N/A'),
+                '{{ifsc_code}}'             => e($employee->ifsc_code ?? $employee->bank_ifsc ?? 'N/A'),
+                '{{pan_number}}'            => e($employee->pan_card_number ?? $employee->pan_number ?? 'N/A'),
+                '{{aadhaar_number}}'        => e($employee->aadhaar_card_number ?? 'N/A'),
+                '{{uan_number}}'            => e($employee->uan_number ?? 'N/A'),
+                '{{pf_number}}'             => e($employee->pf_number ?? $employee->uan_number ?? 'N/A'),
+
+                '{{company_name}}'          => e($company?->company_name ?? 'Company Name'),
+                '{{company_logo}}'          => $company?->logo ? asset('storage/' . $company->logo) : '',
+                '{{company_address}}'       => e($company?->address ?? 'Headquarters'),
+                '{{company_email}}'         => e($company?->email ?? 'info@company.com'),
+                '{{company_phone}}'         => e($company?->phone ?? 'N/A'),
+                '{{company_website}}'       => e($company?->website ?? 'N/A'),
+                
+                '{{current_date}}'          => Carbon::today()->format('d M, Y'),
+                '{{issue_date}}'            => $issueDateStr,
+                '{{reference_number}}'      => e($refNo),
+
+                '{{hr_signature}}'          => $hrSigHtml,
+                '{{hr_name}}'               => e($hrName),
+                '{{hr_designation}}'        => e($hrDesignation),
+                '{{signature_date}}'        => $issueDateStr,
+                '{{employee_signature}}'    => '<div style="display:inline-block; border-bottom:1.5px solid #0f172a; width:180px; height:35px; text-align:center; color:#94a3b8; font-size:11px; line-height:45px;">[ Employee Signature ]</div>',
+            ];
+
+            // Render Relational Tables & Complex Blocks
+            $dictionary['{{education_table}}'] = $this->renderEducationTable($employee);
+            $dictionary['{{experience_table}}'] = $this->renderExperienceTable($employee);
+            $dictionary['{{skills_list}}'] = $this->renderSkillsList($employee);
+            $dictionary['{{certifications_list}}'] = $this->renderCertificationsList($employee);
+            
+            // Standard compensation breakdown table
+            $monthlyBasic = ($salary / 12) * 0.5;
+            $monthlyHra = ($salary / 12) * 0.3;
+            $monthlySpecial = ($salary / 12) * 0.2;
+            $monthlyGrossVal = $salary / 12;
+            $dictionary['{{salary_breakdown_table}}'] = '<table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #cbd5e1; font-size:12px; margin:10px 0;">' .
+                '<thead style="background-color:#f8fafc; font-weight:bold;"><tr><th style="text-align:left; padding:6px 8px;">Salary Component</th><th style="text-align:right; width:120px; padding:6px 8px;">Monthly (₹)</th><th style="text-align:right; width:120px; padding:6px 8px;">Annual (₹)</th></tr></thead>' .
+                '<tbody>' .
+                '<tr><td style="padding:5px 8px;">Basic Salary (50%)</td><td style="text-align:right; padding:5px 8px;">₹' . number_format($monthlyBasic, 2) . '</td><td style="text-align:right; padding:5px 8px;">₹' . number_format($monthlyBasic * 12, 2) . '</td></tr>' .
+                '<tr><td style="padding:5px 8px;">House Rent Allowance (HRA 30%)</td><td style="text-align:right; padding:5px 8px;">₹' . number_format($monthlyHra, 2) . '</td><td style="text-align:right; padding:5px 8px;">₹' . number_format($monthlyHra * 12, 2) . '</td></tr>' .
+                '<tr><td style="padding:5px 8px;">Special Allowance (20%)</td><td style="text-align:right; padding:5px 8px;">₹' . number_format($monthlySpecial, 2) . '</td><td style="text-align:right; padding:5px 8px;">₹' . number_format($monthlySpecial * 12, 2) . '</td></tr>' .
+                '<tr style="font-weight:bold; background-color:#f8fafc;"><td style="padding:6px 8px;">Total Cost to Company (CTC)</td><td style="text-align:right; padding:6px 8px;">₹' . number_format($monthlyGrossVal, 2) . '</td><td style="text-align:right; padding:6px 8px;">₹' . number_format($salary, 2) . '</td></tr>' .
+                '</tbody></table>';
+
+            $dictionary['{{earnings_table}}'] = $dictionary['{{salary_breakdown_table}}'];
+            $dictionary['{{deductions_table}}'] = '<p class="text-muted fs-12">Standard Statutory Deductions as per IT & PF Rules.</p>';
+            $dictionary['{{fnf_settlement_table}}'] = '<p class="text-muted fs-12">Full & Final settlement clearances completed.</p>';
+
+            // Apply substitutions
+            foreach ($dictionary as $tag => $val) {
+                $fullHtml = str_replace($tag, $val, $fullHtml);
+            }
+        } else {
+            // Preview mode with NO employee selected:
+            // Keep all employee placeholders intact (e.g. {{employee_name}}, {{designation}}, {{annual_ctc}}, etc.)
+            // Resolve company details if available
+            if ($company) {
+                $companyDict = [
+                    '{{company_name}}'    => e($company->company_name),
+                    '{{company_logo}}'    => $company->logo ? asset('storage/' . $company->logo) : '',
+                    '{{company_address}}' => e($company->address ?? ''),
+                    '{{company_email}}'   => e($company->email ?? ''),
+                    '{{company_phone}}'   => e($company->phone ?? ''),
+                    '{{company_website}}' => e($company->website ?? ''),
+                ];
+                foreach ($companyDict as $tag => $val) {
+                    if ($val !== '') {
+                        $fullHtml = str_replace($tag, $val, $fullHtml);
+                    }
+                }
+            }
         }
 
         // Wrap with CSS styling container
         $customCss = $template->css_styles ?? '';
         $wrapper = '<div class="generated-doc-container" style="font-family: Arial, Helvetica, sans-serif; color: #1e293b; line-height: 1.5; padding: 30px; background: #ffffff;">';
-        $wrapper .= '<style>.generated-doc-container p { margin-top: 0; margin-bottom: 0.35em; line-height: 1.5; } .generated-doc-container { line-height: 1.5; font-family: Arial, Helvetica, sans-serif; color: #1e293b; }</style>';
+        $wrapper .= '<style>
+            .generated-doc-container { line-height: 1.5; font-family: Arial, Helvetica, sans-serif; color: #1e293b; font-size: 14px; }
+            .generated-doc-container p { margin-top: 0; margin-bottom: 0.35em; line-height: 1.5; }
+            .generated-doc-container h1, .generated-doc-container h2, .generated-doc-container h3, .generated-doc-container h4 { margin-top: 0.6em; margin-bottom: 0.3em; font-weight: bold; }
+            .generated-doc-container table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+            .generated-doc-container th, .generated-doc-container td { border: 1px solid #cbd5e1; padding: 6px 10px; vertical-align: top; }
+            .generated-doc-container th { background-color: #f8fafc; font-weight: bold; }
+            .generated-doc-container td p, .generated-doc-container th p { margin-bottom: 0 !important; }
+            .generated-doc-container .ql-align-center { text-align: center; }
+            .generated-doc-container .ql-align-right { text-align: right; }
+            .generated-doc-container .ql-align-justify { text-align: justify; }
+            .generated-doc-container ul, .generated-doc-container ol { margin-top: 0; margin-bottom: 0.5em; padding-left: 24px; }
+            .generated-doc-container li { margin-bottom: 0.2em; }
+            .generated-doc-container img { max-width: 100%; height: auto; }
+        </style>';
         if ($customCss) {
             $wrapper .= '<style>' . $customCss . '</style>';
         }
@@ -160,8 +637,20 @@ class DocumentTemplateService
                 <title>{$safeTitle}</title>
                 <style>
                     @page { size: A4; margin: 15mm; }
-                    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #1e293b; }
+                    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #1e293b; font-size: 11pt; line-height: 1.5; }
+                    p { margin-top: 0; margin-bottom: 0.35em; line-height: 1.5; }
+                    h1, h2, h3, h4 { margin-top: 0.5em; margin-bottom: 0.3em; font-weight: bold; }
+                    .ql-align-center { text-align: center; }
+                    .ql-align-right { text-align: right; }
+                    .ql-align-justify { text-align: justify; }
+                    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10.5pt; }
+                    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; }
+                    th { background-color: #f8fafc; font-weight: bold; }
+                    td p, th p { margin-bottom: 0 !important; }
+                    ul, ol { margin-top: 0; margin-bottom: 0.5em; padding-left: 20px; }
+                    li { margin-bottom: 0.2em; }
                     .generated-doc-container { padding: 0 !important; }
+                    img { max-width: 100%; height: auto; }
                 </style>
             </head>
             <body>

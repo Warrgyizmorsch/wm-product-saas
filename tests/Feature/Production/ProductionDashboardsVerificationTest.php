@@ -114,4 +114,51 @@ class ProductionDashboardsVerificationTest extends TestCase
         $detailResponse->assertStatus(200);
         $detailResponse->assertSee('Main Assembly Center');
     }
+
+    /** @test */
+    public function machine_dashboard_displays_breakdown_and_maintenance_status_correctly()
+    {
+        $breakdownMachine = Machine::create([
+            'tenant_id' => $this->tenantId,
+            'work_center_id' => $this->workCenter->id,
+            'name' => 'Breakdown Grinder',
+            'code' => 'MCH-BD-01',
+            'status' => Machine::STATUS_INACTIVE,
+            'maintenance_status' => 'breakdown',
+            'current_state' => 'Breakdown',
+            'current_state_reason' => 'Motor failure and smoke',
+        ]);
+
+        $wo = \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::create([
+            'tenant_id' => $this->tenantId,
+            'work_order_number' => 'MWO-TEST-001',
+            'machine_id' => $breakdownMachine->id,
+            'type' => \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::TYPE_BREAKDOWN,
+            'priority' => 'critical',
+            'problem_description' => 'Motor failure and smoke',
+            'status' => \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::STATUS_DRAFT,
+        ]);
+
+        $maintMachine = Machine::create([
+            'tenant_id' => $this->tenantId,
+            'work_center_id' => $this->workCenter->id,
+            'name' => 'Preventive Maintenance Lathe',
+            'code' => 'MCH-PM-01',
+            'status' => Machine::STATUS_UNDER_MAINTENANCE,
+            'maintenance_status' => 'in_progress',
+            'current_state' => 'Maintenance',
+        ]);
+
+        $response = $this->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('production.mes.machines.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Breakdown Grinder');
+        $response->assertSee('Breakdown');
+        $response->assertSee('Breakdown Event');
+        $response->assertSee('MWO-TEST-001');
+        $response->assertSee('Preventive Maintenance Lathe');
+        $response->assertSee('Under Maintenance');
+    }
 }
+

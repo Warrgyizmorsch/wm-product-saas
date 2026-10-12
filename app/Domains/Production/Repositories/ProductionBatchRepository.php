@@ -42,7 +42,7 @@ class ProductionBatchRepository implements ProductionBatchRepositoryInterface
 
     public function findBatchByNumber(string $batchNumber): ?ProductionBatch
     {
-        return ProductionBatch::where('batch_no', $batchNumber)->first();
+        return ProductionBatch::where('batch_number', $batchNumber)->first();
     }
 
     public function getBatchesForOperation(int $operationId): Collection

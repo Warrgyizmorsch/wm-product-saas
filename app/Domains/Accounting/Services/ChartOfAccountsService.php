@@ -110,9 +110,7 @@ class ChartOfAccountsService
     public function syncOpeningBalance(ChartOfAccount $account): void
     {
         try {
-            $existing = $this->journals->findByReference('chart_of_account_opening_balance', $account->id)
-                ->whereNotIn('status', [\App\Domains\Accounting\Models\Journal::STATUS_REVERSED])
-                ->first();
+            $existing = $this->journals->activePosting((int) $account->tenant_id, 'chart_of_account_opening_balance', $account->id);
 
             $balance = round((float) $account->opening_balance, 2);
 
@@ -138,7 +136,7 @@ class ChartOfAccountsService
 
             $isDebitOpening = $account->opening_balance_type === ChartOfAccount::BALANCE_DEBIT;
 
-            $this->journals->post([
+            $this->journals->postOnce([
                 [
                     'chart_of_account_id' => $account->id,
                     'debit' => $isDebitOpening ? $balance : 0,

@@ -2,7 +2,7 @@
 
 @section('title', __('hrms.holiday.title') . ' | SaaS ERP')
 @section('page-title', __('hrms.holiday.title'))
-@section('breadcrumb', 'HRMS / ' . __('hrms.holiday.title'))
+@section('breadcrumb', __('hrms.holiday.breadcrumb'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
@@ -16,33 +16,12 @@
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
-        .badge-scope-global {
-            background-color: rgba(99, 102, 241, 0.08) !important;
-            color: #6366f1 !important;
-            font-weight: 600;
-            padding: 4px 8px;
-            border-radius: 4px;
+        /* ── Table Responsive Dropdown Visibility Fix ── */
+        .table-responsive {
+            position: relative;
         }
-        .badge-scope-company {
-            background-color: rgba(139, 92, 246, 0.08) !important;
-            color: #8b5cf6 !important;
-            font-weight: 600;
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-        .badge-scope-bu {
-            background-color: rgba(20, 184, 166, 0.08) !important;
-            color: #14b8a6 !important;
-            font-weight: 600;
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-        .badge-scope-branch {
-            background-color: rgba(245, 158, 11, 0.08) !important;
-            color: #f59e0b !important;
-            font-weight: 600;
-            padding: 4px 8px;
-            border-radius: 4px;
+        .table-responsive:has(.dropdown-menu.show) {
+            overflow: visible !important;
         }
 
         /* Modern layout container for connected settings sidebar */
@@ -100,7 +79,6 @@
 
 @push('scripts')
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
-    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
 @endpush
 
 @section('content')
@@ -108,22 +86,20 @@
         <div class="settings-content-col erp-single-panel bg-white flex-grow-1 p-4 shadow-sm rounded border-0 text-dark holidays-pane-wrapper" id="holidays-pane">
             
             @if(session('success'))
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="feather-check-circle me-2"></i> {{ session('success') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                <x-ui.alert variant="success" :dismissible="true" icon="feather-check-circle" class="mb-3">
+                    {{ session('success') }}
+                </x-ui.alert>
             @endif
 
             @if($errors->any())
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="feather-alert-triangle me-2"></i> <strong>Validation Errors:</strong>
-                    <ul class="mb-0 mt-1">
+                <x-ui.alert variant="danger" :dismissible="true" icon="feather-alert-triangle" class="mb-3">
+                    <strong>{{ __('hrms.common.validation_errors') }}</strong>
+                    <ul class="mb-0 mt-1 ps-3">
                         @foreach ($errors->all() as $error)
                             <li>{{ $error }}</li>
                         @endforeach
                     </ul>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                </x-ui.alert>
             @endif
 
             <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
@@ -135,25 +111,38 @@
                     <form method="GET" action="{{ route('hrms.holidays.index') }}" class="d-flex align-items-center gap-2 m-0" id="holidayFilterForm">
                         <input type="hidden" name="sort" id="holiday_sort" value="{{ $filters['sort'] ?? 'date_asc' }}">
 
-                        <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
+                        <div class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 220px; max-width: 280px; height: 38px;">
                             <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
                             <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.holiday.search_placeholder') }}" value="{{ $filters['search'] ?? '' }}" style="box-shadow: none; height: 32px;">
                         </div>
 
                         <div class="d-flex gap-2">
-                            <x-ui.sort-dropdown label="Sort">
-                                <a class="dropdown-item py-2 {{ ($filters['sort'] ?? 'date_asc') == 'date_asc' ? 'active' : '' }}" href="#" onclick="changeSort('holiday', 'date_asc', this); event.preventDefault();">Date (Ascending)</a>
-                                <a class="dropdown-item py-2 {{ ($filters['sort'] ?? '') == 'date_desc' ? 'active' : '' }}" href="#" onclick="changeSort('holiday', 'date_desc', this); event.preventDefault();">Date (Descending)</a>
-                                <a class="dropdown-item py-2 {{ ($filters['sort'] ?? '') == 'name_asc' ? 'active' : '' }}" href="#" onclick="changeSort('holiday', 'name_asc', this); event.preventDefault();">Name (A-Z)</a>
-                                <a class="dropdown-item py-2 {{ ($filters['sort'] ?? '') == 'name_desc' ? 'active' : '' }}" href="#" onclick="changeSort('holiday', 'name_desc', this); event.preventDefault();">Name (Z-A)</a>
+                            <x-ui.sort-dropdown :label="__('hrms.common.sort')">
+                                <a class="dropdown-item py-2 d-flex justify-content-between align-items-center {{ ($filters['sort'] ?? 'date_asc') == 'date_asc' ? 'active' : '' }}" href="#" onclick="changeSort('holiday', 'date_asc', this); event.preventDefault();">
+                                    <span>{{ __('hrms.holiday.sort_date_asc') }}</span>
+                                    @if(($filters['sort'] ?? 'date_asc') == 'date_asc') <i class="feather-check ms-2"></i> @endif
+                                </a>
+                                <a class="dropdown-item py-2 d-flex justify-content-between align-items-center {{ ($filters['sort'] ?? '') == 'date_desc' ? 'active' : '' }}" href="#" onclick="changeSort('holiday', 'date_desc', this); event.preventDefault();">
+                                    <span>{{ __('hrms.holiday.sort_date_desc') }}</span>
+                                    @if(($filters['sort'] ?? '') == 'date_desc') <i class="feather-check ms-2"></i> @endif
+                                </a>
+                                <div class="dropdown-divider my-1"></div>
+                                <a class="dropdown-item py-2 d-flex justify-content-between align-items-center {{ ($filters['sort'] ?? '') == 'name_asc' ? 'active' : '' }}" href="#" onclick="changeSort('holiday', 'name_asc', this); event.preventDefault();">
+                                    <span>{{ __('hrms.common.sort_name_asc') }}</span>
+                                    @if(($filters['sort'] ?? '') == 'name_asc') <i class="feather-check ms-2"></i> @endif
+                                </a>
+                                <a class="dropdown-item py-2 d-flex justify-content-between align-items-center {{ ($filters['sort'] ?? '') == 'name_desc' ? 'active' : '' }}" href="#" onclick="changeSort('holiday', 'name_desc', this); event.preventDefault();">
+                                    <span>{{ __('hrms.common.sort_name_desc') }}</span>
+                                    @if(($filters['sort'] ?? '') == 'name_desc') <i class="feather-check ms-2"></i> @endif
+                                </a>
                             </x-ui.sort-dropdown>
 
-                            <x-ui.filter label="Filter" offset="0, 5" :reset-url="route('hrms.holidays.index')">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5" :reset-url="route('hrms.holidays.index')" :submit-label="__('hrms.common.apply')" :reset-label="__('hrms.common.reset')">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                                 
                                 <div class="mb-3" style="min-width: 260px;">
                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.holiday.scope_company') }}</label>
-                                    <select name="company_id" id="filter_company_id" class="form-select font-size-13">
+                                    <select name="company_id" id="filter_company_id" class="form-select form-select-sm font-size-13">
                                         <option value="">{{ __('hrms.holiday.all_companies') }}</option>
                                         @foreach($companies as $company)
                                             <option value="{{ $company->id }}" @selected((string)($filters['company_id'] ?? '') === (string)$company->id)>{{ $company->company_name }}</option>
@@ -163,7 +152,7 @@
 
                                 <div class="mb-3">
                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.holiday.scope_bu') }}</label>
-                                    <select name="business_unit_id" id="filter_business_unit_id" class="form-select font-size-13">
+                                    <select name="business_unit_id" id="filter_business_unit_id" class="form-select form-select-sm font-size-13">
                                         <option value="">{{ __('hrms.holiday.all_business_units') }}</option>
                                         @foreach($businessUnits as $bu)
                                             <option value="{{ $bu->id }}" data-company-id="{{ $bu->company_id }}" @selected((string)($filters['business_unit_id'] ?? '') === (string)$bu->id)>{{ $bu->name }}</option>
@@ -173,7 +162,7 @@
 
                                 <div class="mb-3">
                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.holiday.scope_branch') }}</label>
-                                    <select name="branch_id" id="filter_branch_id" class="form-select font-size-13">
+                                    <select name="branch_id" id="filter_branch_id" class="form-select form-select-sm font-size-13">
                                         <option value="">{{ __('hrms.holiday.all_branches') }}</option>
                                         @foreach($branches as $branch)
                                             <option value="{{ $branch->id }}" data-company-id="{{ $branch->company_id }}" data-business-unit-id="{{ $branch->business_unit_id }}" @selected((string)($filters['branch_id'] ?? '') === (string)$branch->id)>{{ $branch->name }}</option>
@@ -183,7 +172,7 @@
 
                                 <div class="mb-3">
                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.holiday.select_year') }}</label>
-                                    <select name="year" class="form-select font-size-13">
+                                    <select name="year" id="filter_year" class="form-select form-select-sm font-size-13">
                                         <option value="">{{ __('hrms.holiday.all_years') }}</option>
                                         @foreach($availableYears as $year)
                                             <option value="{{ $year }}" @selected((string)($filters['year'] ?? '') === (string)$year)>{{ $year }}</option>
@@ -193,8 +182,8 @@
 
                                 <div class="mb-3">
                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.holiday.status') }}</label>
-                                    <select name="status" class="form-select font-size-13">
-                                        <option value="">All Statuses</option>
+                                    <select name="status" id="filter_status" class="form-select form-select-sm font-size-13">
+                                        <option value="">{{ __('hrms.common.all_statuses') }}</option>
                                         <option value="1" @selected((string)($filters['status'] ?? '') === '1')>{{ __('hrms.holiday.active') }}</option>
                                         <option value="0" @selected((string)($filters['status'] ?? '') === '0')>{{ __('hrms.holiday.inactive') }}</option>
                                     </select>
@@ -205,93 +194,133 @@
                 </div>
             </div>
 
+            {{-- Active filter badges --}}
+            @php
+                $statusFilter = $filters['status'] ?? '';
+                $hasActiveFilters = !empty($filters['search']) || !empty($filters['company_id']) || !empty($filters['business_unit_id']) || !empty($filters['branch_id']) || !empty($filters['year']) || ($statusFilter !== '' && $statusFilter !== null);
+            @endphp
+            @if($hasActiveFilters)
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+                    <span class="fs-12 text-muted fw-semibold"><i class="feather-filter me-1"></i>{{ __('hrms.common.active_filters') }}</span>
+                    @if(!empty($filters['search']))
+                        <x-ui.badge variant="primary" soft class="d-inline-flex align-items-center gap-1">
+                            <i class="feather-search fs-11"></i> "{{ $filters['search'] }}"
+                        </x-ui.badge>
+                    @endif
+                    @if(!empty($filters['company_id']) && ($selComp = $companies->firstWhere('id', $filters['company_id'])))
+                        <x-ui.badge variant="primary" soft class="d-inline-flex align-items-center gap-1">
+                            <i class="feather-briefcase fs-11"></i> {{ $selComp->company_name }}
+                        </x-ui.badge>
+                    @endif
+                    @if(!empty($filters['business_unit_id']) && ($selBU = $businessUnits->firstWhere('id', $filters['business_unit_id'])))
+                        <x-ui.badge variant="info" soft class="d-inline-flex align-items-center gap-1">
+                            <i class="feather-grid fs-11"></i> {{ $selBU->name }}
+                        </x-ui.badge>
+                    @endif
+                    @if(!empty($filters['branch_id']) && ($selBranch = $branches->firstWhere('id', $filters['branch_id'])))
+                        <x-ui.badge variant="warning" soft class="d-inline-flex align-items-center gap-1">
+                            <i class="feather-git-commit fs-11"></i> {{ $selBranch->name }}
+                        </x-ui.badge>
+                    @endif
+                    @if(!empty($filters['year']))
+                        <x-ui.badge variant="secondary" soft class="d-inline-flex align-items-center gap-1">
+                            <i class="feather-calendar fs-11"></i> {{ $filters['year'] }}
+                        </x-ui.badge>
+                    @endif
+                    @if($statusFilter !== '' && $statusFilter !== null)
+                        <x-ui.badge variant="{{ (string)$statusFilter === '1' ? 'success' : 'danger' }}" soft class="d-inline-flex align-items-center gap-1">
+                            {{ (string)$statusFilter === '1' ? __('hrms.holiday.active') : __('hrms.holiday.inactive') }}
+                        </x-ui.badge>
+                    @endif
+                    <a href="{{ route('hrms.holidays.index') }}" class="text-danger fs-12 text-decoration-none fw-semibold ms-1">
+                        <i class="feather-x fs-11"></i> {{ __('hrms.common.clear_all') }}
+                    </a>
+                </div>
+            @endif
+
             <!-- Table content -->
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0 text-center" style="table-layout: fixed; width: 100%;">
                     <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
                         <tr>
-                            <th class="text-start px-4" style="width: 8%;">#</th>
-                            <th style="width: 17%;">{{ __('hrms.holiday.holiday_date') }}</th>
-                            <th style="width: 25%;">{{ __('hrms.holiday.holiday_name') }}</th>
-                            <th style="width: 20%;">{{ __('hrms.holiday.scope') }}</th>
+                            <th class="text-start px-3" style="width: 6%;">#</th>
+                            <th style="width: 16%;">{{ __('hrms.holiday.holiday_date') }}</th>
+                            <th style="width: 24%;">{{ __('hrms.holiday.holiday_name') }}</th>
+                            <th style="width: 18%;">{{ __('hrms.holiday.scope') }}</th>
                             <th style="width: 20%;">{{ __('hrms.org.description') }}</th>
-                            <th style="width: 10%;">{{ __('hrms.holiday.status') }}</th>
-                            <th class="text-end px-4" style="width: 10%;">{{ __('hrms.org.tbl_actions') }}</th>
+                            <th style="width: 8%;">{{ __('hrms.holiday.status') }}</th>
+                            <th class="text-end px-3" style="width: 8%;">{{ __('hrms.org.tbl_actions') }}</th>
                         </tr>
                     </thead>
                     <tbody id="holidaysTableBody">
                         @forelse($holidays as $holiday)
                             <tr>
-                                <td class="text-start px-4 font-weight-semibold text-secondary">{{ $loop->iteration + ($holidays->currentPage() - 1) * $holidays->perPage() }}</td>
+                                <td class="text-start px-3 font-weight-semibold text-secondary">{{ $loop->iteration + ($holidays->currentPage() - 1) * $holidays->perPage() }}</td>
                                 <td>
                                     <div class="fw-bold text-dark fs-13">
                                         <i class="feather-calendar me-1.5 text-primary"></i>
-                                        {{ $holiday->holiday_date->format('Y-m-d') }}
+                                        {{ $holiday->holiday_date ? $holiday->holiday_date->format('Y-m-d') : '-' }}
                                     </div>
                                 </td>
                                 <td>
                                     <span class="fs-13 fw-semibold text-dark">{{ $holiday->name }}</span>
                                 </td>
                                 <td>
-                                    @if($holiday->branch_id)
-                                        <span class="badge-scope-branch">
-                                            <i class="feather-git-commit me-1"></i>
+                                    @if($holiday->branch_id && $holiday->branch)
+                                        <x-ui.badge variant="warning" soft class="d-inline-flex align-items-center gap-1">
+                                            <i class="feather-git-commit fs-10"></i>
                                             {{ $holiday->branch->name }}
-                                        </span>
-                                    @elseif($holiday->business_unit_id)
-                                        <span class="badge-scope-bu">
-                                            <i class="feather-grid me-1"></i>
+                                        </x-ui.badge>
+                                    @elseif($holiday->business_unit_id && $holiday->businessUnit)
+                                        <x-ui.badge variant="info" soft class="d-inline-flex align-items-center gap-1">
+                                            <i class="feather-grid fs-10"></i>
                                             {{ $holiday->businessUnit->name }}
-                                        </span>
-                                    @elseif($holiday->company_id)
-                                        <span class="badge-scope-company">
-                                            <i class="feather-briefcase me-1"></i>
+                                        </x-ui.badge>
+                                    @elseif($holiday->company_id && $holiday->company)
+                                        <x-ui.badge variant="primary" soft class="d-inline-flex align-items-center gap-1">
+                                            <i class="feather-briefcase fs-10"></i>
                                             {{ $holiday->company->company_name }}
-                                        </span>
+                                        </x-ui.badge>
                                     @else
-                                        <span class="badge-scope-global">
-                                            <i class="feather-globe me-1"></i>
-                                            Global
-                                        </span>
+                                        <x-ui.badge variant="secondary" soft class="d-inline-flex align-items-center gap-1">
+                                            <i class="feather-globe fs-10"></i>
+                                            {{ __('hrms.holiday.scope_global_short') }}
+                                        </x-ui.badge>
                                     @endif
                                 </td>
                                 <td class="text-secondary small text-truncate" title="{{ $holiday->description }}">
                                     {{ $holiday->description ?: '-' }}
                                 </td>
                                 <td>
-                                    @if($holiday->status)
-                                        <x-ui.badge variant="success" soft>{{ __('hrms.holiday.active') }}</x-ui.badge>
-                                    @else
-                                        <x-ui.badge variant="danger" soft>{{ __('hrms.holiday.inactive') }}</x-ui.badge>
-                                    @endif
+                                    <x-ui.status-badge :status="$holiday->status ? 'active' : 'inactive'" />
                                 </td>
-                                <td class="pe-4 text-end">
-                                    <form action="{{ route('hrms.holidays.destroy', $holiday->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.holiday.confirm_delete') }}', { title: 'Delete Holiday', variant: 'danger', confirmButtonText: 'Delete' });" class="d-inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <x-ui.action-dropdown>
-                                            <li>
-                                                <a class="dropdown-item" href="javascript:void(0)" 
-                                                   data-bs-toggle="modal" 
-                                                   data-bs-target="#editHolidayModal"
-                                                   data-id="{{ $holiday->id }}"
-                                                   data-name="{{ $holiday->name }}"
-                                                   data-date="{{ $holiday->holiday_date->format('Y-m-d') }}"
-                                                   data-description="{{ $holiday->description }}"
-                                                   data-company-id="{{ $holiday->company_id }}"
-                                                   data-business-unit-id="{{ $holiday->business_unit_id }}"
-                                                   data-branch-id="{{ $holiday->branch_id }}"
-                                                   data-status="{{ $holiday->status ? '1' : '0' }}">
-                                                    <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.common.edit') ?? 'Edit' }}
-                                                </a>
-                                            </li>
-                                            <li>
+                                <td class="pe-3 text-end">
+                                    <x-ui.action-dropdown>
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0)" 
+                                               data-bs-toggle="modal" 
+                                               data-bs-target="#editHolidayModal"
+                                               data-id="{{ $holiday->id }}"
+                                               data-name="{{ $holiday->name }}"
+                                               data-date="{{ $holiday->holiday_date ? $holiday->holiday_date->format('Y-m-d') : '' }}"
+                                               data-description="{{ $holiday->description }}"
+                                               data-company-id="{{ $holiday->company_id }}"
+                                               data-business-unit-id="{{ $holiday->business_unit_id }}"
+                                               data-branch-id="{{ $holiday->branch_id }}"
+                                               data-status="{{ $holiday->status ? '1' : '0' }}">
+                                                <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.common.edit') }}
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <form action="{{ route('hrms.holidays.destroy', $holiday->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.holiday.confirm_delete') }}', { title: '{{ __('hrms.holiday.delete_holiday') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });" class="m-0 p-0">
+                                                @csrf
+                                                @method('DELETE')
                                                 <button type="submit" class="dropdown-item text-danger">
-                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.common.delete') ?? 'Delete' }}
+                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.common.delete') }}
                                                 </button>
-                                            </li>
-                                        </x-ui.action-dropdown>
-                                    </form>
+                                            </form>
+                                        </li>
+                                    </x-ui.action-dropdown>
                                 </td>
                             </tr>
                         @empty
@@ -306,61 +335,39 @@
                 </table>
             </div>
 
-            <div id="holidaysPaginationWrapper" class="d-flex justify-content-end mt-3">
-                @if($holidays->hasPages())
-                    {{ $holidays->links() }}
-                @endif
+            <div id="holidaysPaginationWrapper">
+                <x-ui.pagination :paginator="$holidays" />
             </div>
         </div>
     </div>
 
     <!-- ADD HOLIDAY MODAL -->
-    <div class="modal fade" id="addHolidayModal" tabindex="-1" aria-labelledby="addHolidayModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content" style="border-radius: 8px;">
-                <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold" id="addHolidayModalLabel">
-                        <i class="feather-plus me-2 text-primary"></i>{{ __('hrms.holiday.add_holiday') }}
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form action="{{ route('hrms.holidays.store') }}" method="POST" id="addHolidayForm">
-                    @csrf
-                    <div class="modal-body">
-                        @include('modules.hrms.holiday-calendar.holiday-form-fields', ['mode' => 'create'])
-                    </div>
-                    <div class="modal-footer bg-light border-top-0">
-                        <button type="button" class="btn btn-light fw-bold" data-bs-dismiss="modal" style="border-radius: 6px;">{{ __('hrms.wfh.close') }}</button>
-                        <button type="submit" class="btn btn-primary fw-bold text-uppercase" style="border-radius: 6px;">{{ __('hrms.common.save') ?? 'Save' }}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+    <x-ui.modal
+        id="addHolidayModal"
+        title='<i class="feather-plus me-2 text-primary"></i>{{ __("hrms.holiday.add_holiday") }}'
+        size="lg"
+        :centered="true"
+        formAction="{{ route('hrms.holidays.store') }}"
+        formMethod="POST"
+        submitText="{{ __('hrms.common.save') }}"
+        closeText="{{ __('hrms.common.close') }}"
+    >
+        @include('modules.hrms.holiday-calendar.holiday-form-fields', ['mode' => 'create'])
+    </x-ui.modal>
 
     <!-- EDIT HOLIDAY MODAL -->
-    <div class="modal fade" id="editHolidayModal" tabindex="-1" aria-labelledby="editHolidayModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content" style="border-radius: 8px;">
-                <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold" id="editHolidayModalLabel">
-                        <i class="feather-edit me-2 text-primary"></i>{{ __('hrms.holiday.edit_holiday') }}
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form method="POST" id="editHolidayForm">
-                    @csrf
-                    <div class="modal-body">
-                        @include('modules.hrms.holiday-calendar.holiday-form-fields', ['mode' => 'edit'])
-                    </div>
-                    <div class="modal-footer bg-light border-top-0">
-                        <button type="button" class="btn btn-light fw-bold" data-bs-dismiss="modal" style="border-radius: 6px;">{{ __('hrms.wfh.close') }}</button>
-                        <button type="submit" class="btn btn-primary fw-bold text-uppercase" style="border-radius: 6px;">{{ __('hrms.common.save') ?? 'Save' }}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+    <x-ui.modal
+        id="editHolidayModal"
+        title='<i class="feather-edit me-2 text-primary"></i>{{ __("hrms.holiday.edit_holiday") }}'
+        size="lg"
+        :centered="true"
+        formAction="#"
+        formMethod="PUT"
+        submitText="{{ __('hrms.common.save') }}"
+        closeText="{{ __('hrms.common.close') }}"
+    >
+        @include('modules.hrms.holiday-calendar.holiday-form-fields', ['mode' => 'edit'])
+    </x-ui.modal>
 
     @push('scripts')
         <script>
@@ -386,7 +393,7 @@
                 })
                 .then(function (response) {
                     if (!response.ok) {
-                        throw new Error('Unable to refresh list.');
+                        throw new Error('{{ __('hrms.common.unable_refresh') }}');
                     }
                     return response.text();
                 })
@@ -434,9 +441,16 @@
                     if (menu) {
                         menu.querySelectorAll('.dropdown-item').forEach(function(el) {
                             el.classList.remove('active');
+                            const icon = el.querySelector('.feather-check');
+                            if (icon) icon.remove();
                         });
                     }
                     element.classList.add('active');
+                    if (!element.querySelector('.feather-check')) {
+                        const checkIcon = document.createElement('i');
+                        checkIcon.className = 'feather-check ms-2';
+                        element.appendChild(checkIcon);
+                    }
                 }
 
                 if (input) {
@@ -549,29 +563,18 @@
 
                 const initialBU = buSelect.val();
                 if (initialBU || initialComp) {
-                    const originalBranches = branchSelect.data('original-options');
-                    const currentBranchVal = branchSelect.val();
-                    branchSelect.empty();
-                    originalBranches.each(function() {
-                        const option = $(this);
-                        let matchesComp = !initialComp || String(option.data('company-id')) === String(initialComp);
-                        let matchesBU = !initialBU || String(option.data('business-unit-id')) === String(initialBU);
-                        if (!option.val() || (matchesComp && matchesBU)) {
-                            branchSelect.append(option.clone());
-                        }
-                    });
-                    branchSelect.val(currentBranchVal);
+                    filterBranches();
                 }
             }
 
-            function setupModalCascadingDropdowns(prefix) {
+            function setupModalCascadingHandlers(prefix) {
                 const companySelect = $('#' + prefix + '_company_id');
-                const buSelect = $('#' + (prefix === 'add_holiday' ? 'add_holiday_business_unit_id' : 'edit_holiday_bu_id'));
+                const buSelect = $('#' + prefix + '_business_unit_id');
                 const branchSelect = $('#' + prefix + '_branch_id');
 
                 if (!companySelect.length) return;
 
-                // Cache original options
+                // Cache original options once
                 if (!buSelect.data('original-options')) {
                     buSelect.data('original-options', buSelect.find('option').clone());
                 }
@@ -579,7 +582,7 @@
                     branchSelect.data('original-options', branchSelect.find('option').clone());
                 }
 
-                companySelect.on('change', function() {
+                companySelect.off('change.modalCascade').on('change.modalCascade', function() {
                     const companyId = $(this).val();
                     const originalBUs = buSelect.data('original-options');
                     const currentBUVal = buSelect.val();
@@ -600,10 +603,10 @@
                     }
                     buSelect.trigger('change.select2');
                     
-                    filterBranches();
+                    filterModalBranches();
                 });
 
-                buSelect.on('change', function() {
+                buSelect.off('change.modalCascade').on('change.modalCascade', function() {
                     const buVal = $(this).val();
                     const selectedOption = buSelect.find(`option[value="${buVal}"]`);
                     const companyId = selectedOption.data('company-id');
@@ -612,10 +615,10 @@
                         companySelect.val(companyId).trigger('change.select2');
                     }
                     
-                    filterBranches();
+                    filterModalBranches();
                 });
 
-                branchSelect.on('change', function() {
+                branchSelect.off('change.modalCascade').on('change.modalCascade', function() {
                     const branchVal = $(this).val();
                     const selectedOption = branchSelect.find(`option[value="${branchVal}"]`);
                     const companyId = selectedOption.data('company-id');
@@ -631,7 +634,7 @@
                     }
                 });
 
-                function filterBranches() {
+                function filterModalBranches() {
                     const companyId = companySelect.val();
                     const buId = buSelect.val();
                     
@@ -661,11 +664,53 @@
                 }
             }
 
-            $(document).ready(function() {
-                // Append modals to body to fix backdrop/z-index issues
-                $('#addHolidayModal').appendTo('body');
-                $('#editHolidayModal').appendTo('body');
+            function populateModalFields(prefix, companyId, buId, branchId) {
+                const companySelect = $('#' + prefix + '_company_id');
+                const buSelect = $('#' + prefix + '_business_unit_id');
+                const branchSelect = $('#' + prefix + '_branch_id');
 
+                if (!buSelect.data('original-options')) {
+                    buSelect.data('original-options', buSelect.find('option').clone());
+                }
+                if (!branchSelect.data('original-options')) {
+                    branchSelect.data('original-options', branchSelect.find('option').clone());
+                }
+
+                // Filter BU options
+                const originalBUs = buSelect.data('original-options');
+                buSelect.empty();
+                originalBUs.each(function() {
+                    const option = $(this);
+                    const optionCompId = option.data('company-id');
+                    if (!option.val() || !companyId || String(optionCompId) === String(companyId)) {
+                        buSelect.append(option.clone());
+                    }
+                });
+                buSelect.val(buId ? String(buId) : '');
+
+                // Filter Branch options
+                const originalBranches = branchSelect.data('original-options');
+                branchSelect.empty();
+                originalBranches.each(function() {
+                    const option = $(this);
+                    const optionCompId = option.data('company-id');
+                    const optionBuId = option.data('business-unit-id');
+                    let matchesCompany = !companyId || String(optionCompId) === String(companyId);
+                    let matchesBU = !buId || String(optionBuId) === String(buId);
+                    if (!option.val() || (matchesCompany && matchesBU)) {
+                        branchSelect.append(option.clone());
+                    }
+                });
+                branchSelect.val(branchId ? String(branchId) : '');
+
+                companySelect.val(companyId ? String(companyId) : '');
+
+                companySelect.trigger('change.select2');
+                buSelect.trigger('change.select2');
+                branchSelect.trigger('change.select2');
+            }
+
+            $(document).ready(function() {
                 setupFilterCascading();
 
                 // Select2 modals initializer
@@ -684,46 +729,48 @@
                         });
                     });
 
-                    // Set up cascading select options inside active modals
+                    // Set up cascading handlers
                     if (modal.attr('id') === 'addHolidayModal') {
-                        setupModalCascadingDropdowns('add_holiday');
+                        setupModalCascadingHandlers('add_holiday');
                     } else if (modal.attr('id') === 'editHolidayModal') {
-                        setupModalCascadingDropdowns('edit_holiday');
+                        setupModalCascadingHandlers('edit_holiday');
                     }
+                });
+
+                // Reset Add Modal on open
+                $('#addHolidayModal').on('show.bs.modal', function() {
+                    var form = $('#addHolidayModal').find('form')[0];
+                    if (form) {
+                        form.reset();
+                    }
+                    populateModalFields('add_holiday', '', '', '');
+                    $('#add_holiday_status').val('1').trigger('change.select2');
                 });
 
                 // Populate Edit Modal
                 $('#editHolidayModal').on('show.bs.modal', function(event) {
                     var button = $(event.relatedTarget);
+                    if (!button.length) return;
+
                     var holidayId = button.data('id');
                     var name = button.data('name');
                     var date = button.data('date');
                     var description = button.data('description');
-                    var companyId = button.data('company-id');
-                    var buId = button.data('business-unit-id');
-                    var branchId = button.data('branch-id');
+                    var companyId = button.data('company-id') || '';
+                    var buId = button.data('business-unit-id') || '';
+                    var branchId = button.data('branch-id') || '';
                     var status = button.data('status');
 
                     var modal = $(this);
-                    modal.find('form').attr('action', '/hrms/holidays/update/' + holidayId);
+                    var updateUrl = "{{ route('hrms.holidays.update', ':id') }}".replace(':id', holidayId);
+                    modal.find('form').attr('action', updateUrl);
                     
                     modal.find('#edit_holiday_name').val(name);
                     modal.find('#edit_holiday_holiday_date').val(date);
                     modal.find('#edit_holiday_description').val(description);
-                    
-                    modal.find('#edit_holiday_company_id').val(companyId).trigger('change');
-                    
-                    // We must wait for cascading bu Select to load before populating the selected BU
-                    setTimeout(function() {
-                        modal.find('#edit_holiday_bu_id').val(buId).trigger('change');
-                        
-                        // We must wait for cascading branch select to load before populating branch
-                        setTimeout(function() {
-                            modal.find('#edit_holiday_branch_id').val(branchId).trigger('change');
-                        }, 100);
-                    }, 100);
+                    modal.find('#edit_holiday_status').val(String(status)).trigger('change.select2');
 
-                    modal.find('#edit_holiday_status').val(status).trigger('change');
+                    populateModalFields('edit_holiday', companyId, buId, branchId);
                 });
 
                 // Debounced quick search to avoid needing to press Enter
@@ -778,3 +825,5 @@
         </script>
     @endpush
 @endsection
+
+

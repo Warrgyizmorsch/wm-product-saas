@@ -196,23 +196,32 @@ class EmployeeController extends Controller
 
         $userIdInput = $request->input('user_id');
         if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
-            if ($request->filled('office_email')) {
-                $existingUser = \App\Models\User::where('email', $request->office_email)->first();
+            $userEmail = $request->input('office_email') ?: $request->input('personal_email');
+            if (!empty($userEmail)) {
+                $existingUser = \App\Models\User::where('email', $userEmail)->first();
                 if ($existingUser) {
                     $request->merge(['user_id' => $existingUser->id]);
+                    if (!$request->filled('office_email')) {
+                        $request->merge(['office_email' => $existingUser->email]);
+                    }
                 } else {
                     $newUser = \App\Models\User::create([
-                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id'),
+                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id') ?? 1,
                         'company_id'    => $request->input('company_id'),
                         'branch_id'     => $request->input('branch_id'),
                         'department_id' => $request->input('department_id'),
                         'role_id'       => $request->input('role_id'),
                         'name'          => $request->input('full_name'),
-                        'email'         => $request->input('office_email'),
+                        'email'         => $userEmail,
                         'password'      => \Illuminate\Support\Facades\Hash::make('12345678'),
                     ]);
                     $request->merge(['user_id' => $newUser->id]);
+                    if (!$request->filled('office_email')) {
+                        $request->merge(['office_email' => $userEmail]);
+                    }
                 }
+            } else {
+                $request->merge(['user_id' => null]);
             }
         } elseif ($request->filled('user_id')) {
             $targetUser = \App\Models\User::find($request->user_id);
@@ -552,7 +561,7 @@ class EmployeeController extends Controller
                     ->ignore($employeeId),
             ],
             'user_id' => [
-                'required',
+                'nullable',
                 Rule::unique('employees', 'user_id')
                     ->where('tenant_id', $tenantId)
                     ->whereNull('deleted_at')

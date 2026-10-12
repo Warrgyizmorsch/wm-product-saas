@@ -14,4 +14,6 @@ interface WfhRequestRepositoryInterface
     public function updateStatus(WfhRequest $wfhRequest, array $validated, Request $request): bool;
 
     public function cancelWfhRequest(WfhRequest $wfhRequest): void;
+
+    public function export(array $filters = []): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
 }

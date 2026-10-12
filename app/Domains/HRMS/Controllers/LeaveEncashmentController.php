@@ -62,38 +62,6 @@ class LeaveEncashmentController extends Controller
 
     public function exportEncashments(Request $request)
     {
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $encashments = $this->leaveEncashmentRepository->getExportData($request->all(), $request->user(), $tenantId);
-
-        $headers = [
-            'ID',
-            'Employee Code',
-            'Employee Name',
-            'Department',
-            'Leave Type',
-            'Requested Days',
-            'Status',
-            'Reason',
-            'Rejection Reason',
-            'Applied Date',
-        ];
-
-        $rows = [];
-        foreach ($encashments as $encash) {
-            $rows[] = [
-                $encash->id,
-                $encash->employee->employee_id ?? 'N/A',
-                $encash->employee->full_name ?? 'N/A',
-                $encash->employee->department->name ?? 'N/A',
-                $encash->leaveType->name ?? 'N/A',
-                $encash->requested_days,
-                ucfirst($encash->status),
-                $encash->reason ?? '',
-                $encash->rejection_reason ?? '',
-                $encash->created_at ? $encash->created_at->format('Y-m-d H:i') : '',
-            ];
-        }
-
-        return XlsxHelper::download('leave_encashments_' . date('Ymd_His') . '.xlsx', 'Leave Encashments', $headers, $rows);
+        return $this->leaveEncashmentRepository->export($request->all());
     }
 }

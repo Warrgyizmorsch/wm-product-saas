@@ -26,7 +26,7 @@ class Gstr1Controller extends Controller
 
         [$from, $to] = GstReportPeriod::resolve($request);
 
-        $invoices = Invoice::with('customer')
+        $invoices = Invoice::withoutGlobalScope('branch')->with('customer')
             ->whereBetween('invoice_date', [$from, $to])
             ->where('status', '!=', 'Cancelled')
             ->get();
@@ -34,7 +34,7 @@ class Gstr1Controller extends Controller
         $b2b = $invoices->filter(fn ($invoice) => !empty($invoice->customer?->gstin))->values();
         $b2c = $invoices->filter(fn ($invoice) => empty($invoice->customer?->gstin))->values();
 
-        $returns = SalesReturn::with(['customer', 'invoice'])
+        $returns = SalesReturn::withoutGlobalScope('branch')->with(['customer', 'invoice'])
             ->whereBetween('return_date', [$from, $to])
             ->where('status', 'Completed')
             ->get()

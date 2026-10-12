@@ -536,6 +536,14 @@ class LeadImportMapperService
                         $currentCount++;
                         $leadPayload['lead_number'] = 'LD-' . $year . '-' . str_pad((string)$currentCount, 4, '0', STR_PAD_LEFT);
                         $createdLead = Lead::create($leadPayload);
+
+                        if (empty($createdLead->lead_owner_id)) {
+                            try {
+                                app(\App\Domains\CRM\Services\LeadAssignmentService::class)->assignLeadOwner($createdLead, 'api_import', $leadPayload);
+                            } catch (\Throwable $e) {
+                                // Silent fallback
+                            }
+                        }
                         
                         // Register in memory map
                         if ($cleanPhoneDigits && strlen($cleanPhoneDigits) >= 7) {

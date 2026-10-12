@@ -194,13 +194,19 @@ class MesController extends Controller
     }
 
 
-    public function start(Request $request, int $op)
+    public function start(Request $request, mixed $op)
     {
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
+        if ($op === 'downtime') {
+            return app(DowntimeController::class)->start($request);
+        }
+
+        $operationId = (int) $op;
+
         try {
             $machineId = $request->input('machine_id') ? (int) $request->input('machine_id') : null;
-            $this->mesService->startOperation($op, $machineId, auth()->id());
+            $this->mesService->startOperation($operationId, $machineId, auth()->id());
             return redirect()->back()->with('success', 'Operation started successfully.');
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -425,6 +431,8 @@ class MesController extends Controller
             DB::transaction(function () use ($tenantId, $orderOp, $qty, $reason, $batchId, $productId, $userId, $isOutputProduct, $scrapType, $scrapWarehouseId, $storageLocation, $measurementType, $request) {
                 ProductionOrderScrap::create([
                     'tenant_id' => $tenantId,
+                    'company_id' => $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
+                    'branch_id' => $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
                     'production_order_id' => $orderOp->production_order_id,
                     'production_order_operation_id' => $orderOp->id,
                     'production_batch_id' => $batchId,
@@ -495,7 +503,8 @@ class MesController extends Controller
             $reworkLoc = $request->input('rework_location');
             $isVendorRework = ($dispType === 'rework') && ($reworkLoc === 'vendor_rework' || ($orderOp->is_external && $reworkLoc !== 'internal_repair'));
 
-            DB::transaction(function () use ($tenantId, $orderOp, $dispType, $qty, $reason, $batchId, $userId, $request, $isVendorRework) {
+            $createdRework = null;
+            DB::transaction(function () use ($tenantId, $orderOp, $dispType, $qty, $reason, $batchId, $userId, $request, $isVendorRework, &$createdRework) {
                 $ncr = ProductionNcr::where('tenant_id', $tenantId)
                     ->where('production_order_operation_id', $orderOp->id)
                     ->where('status', 'open')
@@ -519,7 +528,7 @@ class MesController extends Controller
                 }
 
                 if ($dispType === 'rework') {
-                    app(\App\Domains\Production\Services\ReworkService::class)->createReworkOrder($tenantId, $ncr->id, [
+                    $createdRework = app(\App\Domains\Production\Services\ReworkService::class)->createReworkOrder($tenantId, $ncr->id, [
                         'original_production_order_id' => $orderOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'batch_id' => $batchId,
@@ -529,11 +538,13 @@ class MesController extends Controller
                         'machine_id' => $request->input('machine_id') ?? $orderOp->machine_id,
                         'instructions' => $request->input('instructions') ?? "Rework for {$qty} rejected units.",
                         'assigned_to' => $request->input('assigned_to') ?? $userId,
-                        'cost_estimate' => (float) ($request->input('cost_estimate') ?? 150.00),
+                        'cost_estimate' => $request->filled('cost_estimate') ? convert_to_base((float) $request->input('cost_estimate')) : null,
                     ]);
 
                     \App\Domains\Production\Models\ProductionOrderRework::create([
                         'tenant_id' => $tenantId,
+                        'company_id' => $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
+                        'branch_id' => $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
                         'production_order_id' => $orderOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'production_batch_id' => $batchId,
@@ -560,6 +571,8 @@ class MesController extends Controller
                 } else { // scrap
                     ProductionOrderScrap::create([
                         'tenant_id' => $tenantId,
+                        'company_id' => $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
+                        'branch_id' => $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
                         'production_order_id' => $orderOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'production_batch_id' => $batchId,
@@ -582,11 +595,22 @@ class MesController extends Controller
                 }
             });
 
+            $reworkNum = $createdRework?->rework_number;
             $msg = ($dispType === 'rework')
                 ? ($isVendorRework
                     ? "Subcontract Rework Gate Pass created. {$qty} rejected unit(s) ready for dispatch back to vendor."
-                    : "Rework recorded for {$qty} units. Ready for Re-QC upon completion.")
+                    : ($reworkNum
+                        ? "Rework Order {$reworkNum} created successfully for {$qty} unit(s) and queued in Quality & Rework."
+                        : "Rework Order created successfully for {$qty} unit(s) and queued in Quality & Rework."))
                 : "Scrap recorded successfully for {$qty} units.";
+
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $msg,
+                    'rework_number' => $reworkNum,
+                ]);
+            }
 
             return redirect()->back()->with('success', $msg);
         } catch (InvalidArgumentException $e) {

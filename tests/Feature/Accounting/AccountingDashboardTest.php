@@ -250,8 +250,41 @@ class AccountingDashboardTest extends TestCase
         $period = $this->dashboard(['preset' => 'last_month'])->assertOk()->viewData('period');
 
         $this->assertTrue($period->from->equalTo(now()->subMonthNoOverflow()->startOfMonth()));
-        $this->assertSame($period->days(), (int) round(abs($period->previousFrom->diffInDays($period->previousTo->copy()->startOfDay()))) + 1);
-        $this->assertTrue($period->previousTo->copy()->addDay()->startOfDay()->equalTo($period->from));
+        // The whole month before, however many days it has.
+        $this->assertTrue($period->previousFrom->equalTo(now()->subMonthsNoOverflow(2)->startOfMonth()));
+        $this->assertTrue($period->previousTo->equalTo(now()->subMonthsNoOverflow(2)->endOfMonth()));
+    }
+
+    public function test_comparisons_line_up_like_for_like(): void
+    {
+        $today = Carbon::parse('2026-10-10');
+        $fyStart = Carbon::parse('2026-04-01');
+        $range = fn (string $preset) => \App\Domains\Accounting\Support\DashboardPeriod::resolve(['preset' => $preset], $today, $fyStart);
+        $dates = fn ($p) => [$p->from->toDateString(), $p->to->toDateString(), $p->previousFrom->toDateString(), $p->previousTo->toDateString()];
+
+        // MTD: same days of last month, not the last 10 days of September.
+        $this->assertSame(['2026-10-01', '2026-10-10', '2026-09-01', '2026-09-10'], $dates($range('this_month')));
+        // QTD: same days into the previous quarter.
+        $this->assertSame(['2026-10-01', '2026-10-10', '2026-07-01', '2026-07-10'], $dates($range('this_quarter')));
+        // YTD: the same span of last fiscal year.
+        $this->assertSame(['2026-04-01', '2026-10-10', '2025-04-01', '2025-10-10'], $dates($range('fiscal_year')));
+        // Custom: the equal-length window just before.
+        $custom = \App\Domains\Accounting\Support\DashboardPeriod::resolve(['preset' => 'custom', 'from' => '2026-10-05', 'to' => '2026-10-09'], $today, $fyStart);
+        $this->assertSame(['2026-10-05', '2026-10-09', '2026-09-30', '2026-10-04'], $dates($custom));
+
+        // MTD on 31 Mar compares with all of February, clipped to its last day.
+        $march = \App\Domains\Accounting\Support\DashboardPeriod::resolve(['preset' => 'this_month'], Carbon::parse('2027-03-31'), $fyStart);
+        $this->assertSame(['2027-02-01', '2027-02-28'], [$march->previousFrom->toDateString(), $march->previousTo->toDateString()]);
+    }
+
+    public function test_the_period_is_one_row_of_pills_with_a_custom_range(): void
+    {
+        $html = $this->dashboard(['preset' => 'fiscal_year'])->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('<select name="preset"', $html);
+        $this->assertStringContainsString('name="preset" id="preset" value="fiscal_year"', $html);
+        $this->assertStringContainsString('id="custom-period-toggle"', $html);
+        $this->assertSame(1, substr_count($html, '>YTD</a>'));
     }
 
     public function test_cost_center_filter_limits_income_and_expense_but_not_cash(): void

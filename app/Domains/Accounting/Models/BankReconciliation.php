@@ -4,7 +4,7 @@ namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\Accounting\Concerns\LogsAccountingActivity;
-use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\RecordsBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BankReconciliation extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch, LogsAccountingActivity;
+    use HasFactory, BelongsToCompany, RecordsBranch, LogsAccountingActivity;
 
     public const STATUS_IN_PROGRESS = 'in_progress';
     public const STATUS_COMPLETED = 'completed';

@@ -11,6 +11,8 @@ class Warehouse extends BaseModel
 {
     use HasFactory, BelongsToCompany, BelongsToBranch;
 
+    public bool $sharedAcrossCompanies = true;
+
     protected $table = 'warehouses';
 
     public const TYPE_STANDARD = 'standard';

@@ -5,6 +5,8 @@ namespace App\Domains\Production\Models;
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Sales\Models\MaterialRequirementItem;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\Loggable;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProductionOrder extends BaseModel
 {
-    use HasFactory, Loggable, SoftDeletes;
+    use HasFactory, Loggable, SoftDeletes, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'production_orders';
 
@@ -101,6 +103,8 @@ class ProductionOrder extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'order_number',
         'production_plan_id',
         'product_id',

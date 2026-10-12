@@ -115,7 +115,16 @@ class ProductionQualityRepository implements ProductionQualityRepositoryInterfac
 
     public function findReworkOrder(int $id): ?ProductionReworkOrder
     {
-        return ProductionReworkOrder::with(['originalOrder.product', 'ncr', 'operations.workCenter', 'operations.machine'])->find($id);
+        return ProductionReworkOrder::with([
+            'originalOrder.product',
+            'ncr',
+            'operations.workCenter',
+            'operations.machine',
+            'issues.product',
+            'issues.warehouse',
+            'issues.batches.stockTransaction',
+            'issues.user',
+        ])->find($id);
     }
 
     public function findScrapDisposal(int $id): ?ProductionScrapDisposal

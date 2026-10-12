@@ -21,4 +21,10 @@ interface AttendanceRepositoryInterface
     public function getAllAttendanceLogs(array $filters);
 
     public function trackLocation(int $employeeId, float $latitude, float $longitude): array;
+
+    public function export(array $filters = []): mixed;
+
+    public function downloadTemplate(): mixed;
+
+    public function import(\Illuminate\Http\UploadedFile $file): array;
 }

@@ -67,7 +67,7 @@ class CrmDealController extends Controller
             }
         }
 
-        $query = CrmDeal::with(['account', 'contact', 'owner', 'quotations', 'lead'])
+        $query = CrmDeal::with(['account', 'contact', 'owner', 'quotations', 'lead', 'followups'])
             ->where('tenant_id', $tenantId);
 
         if ($search) {

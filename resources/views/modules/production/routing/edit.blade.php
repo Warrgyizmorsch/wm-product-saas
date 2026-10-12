@@ -81,12 +81,12 @@
 
                         <x-ui.odoo-form-ui type="radio" :label="__('production.sequence_control')">
                             <div class="form-check me-3">
-                                <input class="form-check-input" type="radio" name="auto_sequence_radio_edit" id="auto_seq_edit_auto" :value="true" x-model="autoSequence">
-                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_edit_auto">{{ __('production.auto_manage_sequence') }}</label>
+                                <input class="form-check-input" type="radio" name="auto_sequence_radio" id="auto_seq_auto" :value="true" x-model="autoSequence">
+                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_auto">{{ __('production.auto_manage_sequence') }}</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="auto_sequence_radio_edit" id="auto_seq_edit_manual" :value="false" x-model="autoSequence">
-                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_edit_manual">Manual Sequence</label>
+                                <input class="form-check-input" type="radio" name="auto_sequence_radio" id="auto_seq_manual" :value="false" x-model="autoSequence">
+                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_manual">Manual Sequence</label>
                             </div>
                         </x-ui.odoo-form-ui>
                     </div>
@@ -369,7 +369,7 @@
             function routingForm() {
                 return {
                     operations: [],
-                    autoSequence: {{ $routing->auto_sequence ? 'true' : 'false' }},
+                    autoSequence: true,
                     uidCounter: 1,
 
                     init() {
@@ -385,7 +385,7 @@
                                 setup_time_minutes: "{{ number_format($op->setup_time_minutes, 2, '.', '') }}",
                                 processing_time_minutes: "{{ number_format($op->processing_time_minutes, 2, '.', '') }}",
                                 wait_time_minutes: "{{ number_format($op->wait_time_minutes ?? 0, 2, '.', '') }}",
-                                labor_cost_rate: "{{ number_format($op->labor_cost_rate ?? 0, 4, '.', '') }}",
+                                labor_cost_rate: "{{ number_format(convert_from_base($op->labor_cost_rate ?? 0), 4, '.', '') }}",
                                 description: "{{ addslashes($op->description ?? '') }}",
                                 instructions: @js($op->instructions ?? ''),
                                 showSop: {{ !empty($op->instructions) ? 'true' : 'false' }},
@@ -396,7 +396,7 @@
                                 material_supply_type: "{{ $op->material_supply_type ?? 'company_supplied' }}",
                                 subcontract_input_type: "{{ $op->subcontract_input_type ?? 'bom_raw_materials' }}",
                                 subcontract_lead_time_days: {{ (int) ($op->subcontract_lead_time_days ?? 0) }},
-                                subcontract_cost_per_unit: "{{ number_format($op->subcontract_cost_per_unit ?? 0, 2, '.', '') }}",
+                                subcontract_cost_per_unit: "{{ number_format(convert_from_base($op->subcontract_cost_per_unit ?? 0), 2, '.', '') }}",
                                 subcontract_service_product_id: "{{ $op->subcontract_service_product_id ?? '' }}",
                                 dispatch_buffer_days: {{ (int) ($op->dispatch_buffer_days ?? 0) }},
                                 return_buffer_days: {{ (int) ($op->return_buffer_days ?? 0) }},

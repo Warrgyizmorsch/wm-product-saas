@@ -30,7 +30,7 @@ class PostPurchaseReturnJournal
     {
         $return = $event->purchaseReturn;
 
-        if ($this->journals->findByReference('purchase_return', $return->id)->isNotEmpty()) {
+        if ($this->journals->activePosting((int) ($return->tenant_id ?: tenant_id()), 'purchase_return', $return->id) !== null) {
             return;
         }
 
@@ -210,7 +210,7 @@ class PostPurchaseReturnJournal
             }
 
             // Post General Ledger Journal Entry
-            $debitNoteJournal = $this->journals->post($lines, [
+            $debitNoteJournal = $this->journals->postOnce($lines, [
                 'tenant_id'             => $tenantId,
                 'journal_date'          => $return->return_date ?: now(),
                 'source'                => Journal::SOURCE_PURCHASE,

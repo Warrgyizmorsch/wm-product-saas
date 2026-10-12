@@ -66,6 +66,14 @@ class AccountSettingsController extends Controller
             || $this->accessService->allows($user, 'platform.tenants.manage')
             || in_array($user->role, ['admin', 'super_admin', 'tenant_owner'], true);
 
+        // Resolve linked HRMS employee if present
+        $employee = null;
+        if (class_exists(\App\Domains\HRMS\Models\Employee::class)) {
+            $employee = $user->relationLoaded('employee')
+                ? $user->employee
+                : \App\Domains\HRMS\Models\Employee::resolveForUser($user);
+        }
+
         // Notification preferences stored in user settings JSON
         $notificationPrefs = $user->settings['notifications'] ?? [
             'in_app'   => true,
@@ -75,6 +83,7 @@ class AccountSettingsController extends Controller
 
         return view('account.settings', compact(
             'user',
+            'employee',
             'tenant',
             'maxUsers',
             'currentUserCount',
@@ -98,11 +107,24 @@ class AccountSettingsController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $validated = $request->validate([
-            'name'   => ['required', 'string', 'max:255'],
-            'email'  => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'phone'  => ['nullable', 'string', 'max:30'],
-        ]);
+        $employee = class_exists(\App\Domains\HRMS\Models\Employee::class)
+            ? \App\Domains\HRMS\Models\Employee::resolveForUser($user)
+            : null;
+
+        if ($employee) {
+            // Employees: Name and Email are official HR records and must be requested via HRMS Profile Edit.
+            $validated = $request->validate([
+                'phone' => ['nullable', 'string', 'max:30'],
+            ]);
+            $validated['name'] = $user->name;
+            $validated['email'] = $user->email;
+        } else {
+            $validated = $request->validate([
+                'name'   => ['required', 'string', 'max:255'],
+                'email'  => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+                'phone'  => ['nullable', 'string', 'max:30'],
+            ]);
+        }
 
         $this->accountService->updateProfile($user, $validated);
 

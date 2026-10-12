@@ -18,6 +18,8 @@ class ProductionMaintenanceWorkOrderSpare extends BaseModel
     protected $fillable = [
         'tenant_id',
         'maintenance_work_order_id',
+        'production_requisition_slip_id',
+        'production_requisition_slip_item_id',
         'product_id',
         'warehouse_id',
         'requested_qty',
@@ -37,6 +39,16 @@ class ProductionMaintenanceWorkOrderSpare extends BaseModel
     public function workOrder(): BelongsTo
     {
         return $this->belongsTo(ProductionMaintenanceWorkOrder::class, 'maintenance_work_order_id');
+    }
+
+    public function requisitionSlip(): BelongsTo
+    {
+        return $this->belongsTo(ProductionRequisitionSlip::class, 'production_requisition_slip_id');
+    }
+
+    public function requisitionSlipItem(): BelongsTo
+    {
+        return $this->belongsTo(ProductionRequisitionSlipItem::class, 'production_requisition_slip_item_id');
     }
 
     public function product(): BelongsTo

@@ -1,23 +1,23 @@
 @extends('layouts.duralux')
 
-@section('title', 'Document Master | SaaS ERP')
-@section('page-title', 'Document Master')
-@section('breadcrumb', 'HRMS / Document Master')
+@section('title', __('hrms.document_master.meta_title'))
+@section('page-title', __('hrms.document_master.title'))
+@section('breadcrumb', __('hrms.document_master.breadcrumb'))
 
 @section('page-actions')
     <div id="hdr-btn-add-document" class="d-none d-flex align-items-center gap-2">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addDocumentModal" class="fw-bold text-uppercase">
-            Add Document Master
+            {{ __('hrms.document_master.add_document') }}
         </x-ui.button>
     </div>
     <div id="hdr-btn-add-category" class="d-none d-flex align-items-center gap-2">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addCategoryModal" class="fw-bold text-uppercase">
-            Add Category
+            {{ __('hrms.document_master.add_category') }}
         </x-ui.button>
     </div>
     <div id="hdr-btn-add-template" class="d-none d-flex align-items-center gap-2">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addTemplateModal" class="fw-bold text-uppercase">
-            Add Document Template
+            {{ __('hrms.document_master.add_template') }}
         </x-ui.button>
     </div>
 @endsection
@@ -25,6 +25,7 @@
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/quill.min.css') }}">
     <style>
         .tab-pane.is-loading {
             opacity: 0.6;
@@ -89,71 +90,6 @@
             }
         }
 
-        /* Tabs styling */
-        #docMasterTabs .nav-link {
-            border: none !important;
-            background-color: transparent !important;
-            color: #64748b;
-            font-weight: 600;
-            padding: 12px 20px;
-            border-bottom: 2px solid transparent !important;
-            transition: all 0.2s ease-in-out;
-        }
-        #docMasterTabs .nav-link:hover {
-            color: var(--bs-primary);
-        }
-        #docMasterTabs .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom: 2px solid var(--bs-primary) !important;
-        }
-
-        /* Access badge styling */
-        .badge-access-yes {
-            background-color: rgba(16, 185, 129, 0.08) !important;
-            color: #10b981 !important;
-            font-weight: 600;
-            font-size: 10px;
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-        .badge-access-no {
-            background-color: rgba(239, 68, 68, 0.08) !important;
-            color: #ef4444 !important;
-            font-weight: 600;
-            font-size: 10px;
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-
-        /* Upload Responsibility Badge */
-        .badge-resp-employee {
-            background-color: rgba(13, 110, 253, 0.08) !important;
-            color: var(--bs-primary) !important;
-            font-weight: 600;
-        }
-        .badge-resp-hr {
-            background-color: rgba(245, 158, 11, 0.08) !important;
-            color: #f59e0b !important;
-            font-weight: 600;
-        }
-        .badge-resp-both {
-            background-color: rgba(139, 92, 246, 0.08) !important;
-            color: #8b5cf6 !important;
-            font-weight: 600;
-        }
-
-        /* Status Badge */
-        .badge-status-active {
-            background-color: rgba(16, 185, 129, 0.08) !important;
-            color: #10b981 !important;
-            font-weight: 600;
-        }
-        .badge-status-inactive {
-            background-color: rgba(100, 116, 139, 0.08) !important;
-            color: #64748b !important;
-            font-weight: 600;
-        }
-
         /* Expiry configurations layout */
         .expiry-config-section {
             background-color: #f8fafc;
@@ -178,60 +114,65 @@
 @push('scripts')
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/quill.min.js') }}"></script>
 @endpush
 
 @section('content')
     @php
         $activeTab = request()->query('active_tab', 'documents');
+        $docMasterTabs = [
+            [
+                'id' => 'documents-pane',
+                'label' => __('hrms.document_master.tabs_documents'),
+                'active' => $activeTab === 'documents',
+                'icon' => 'feather-file-text',
+                'badge' => $documents->total(),
+            ],
+            [
+                'id' => 'categories-pane',
+                'label' => __('hrms.document_master.tabs_categories'),
+                'active' => $activeTab === 'categories',
+                'icon' => 'feather-sliders',
+                'badge' => $categories->total(),
+            ],
+            [
+                'id' => 'templates-pane',
+                'label' => __('hrms.document_master.tabs_templates'),
+                'active' => $activeTab === 'templates',
+                'icon' => 'feather-layout',
+                'badge' => $templates->total(),
+            ],
+        ];
     @endphp
 
     <div class="settings-container">
         <div class="settings-content-col erp-single-panel bg-white flex-grow-1 p-4 shadow-sm rounded border-0 text-dark">
             
             @if(session('success'))
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="feather-check-circle me-2"></i> {{ session('success') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                <x-ui.alert variant="success" icon="feather-check-circle" dismissible class="mb-3">
+                    {{ session('success') }}
+                </x-ui.alert>
             @endif
 
             @if(session('error'))
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="feather-alert-triangle me-2"></i> {{ session('error') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible class="mb-3">
+                    {{ session('error') }}
+                </x-ui.alert>
             @endif
 
             @if($errors->any())
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="feather-alert-triangle me-2"></i> <strong>Validation Errors:</strong>
+                <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible class="mb-3">
+                    <strong>{{ __('hrms.document_master.validation_errors') }}</strong>
                     <ul class="mb-0 mt-1">
                         @foreach ($errors->all() as $error)
                             <li>{{ $error }}</li>
                         @endforeach
                     </ul>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                </x-ui.alert>
             @endif
 
-            <!-- Tabs Navigation -->
-            <ul class="nav nav-tabs border-bottom mb-4" id="docMasterTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeTab === 'documents' ? 'active' : '' }}" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents-pane" type="button" role="tab" aria-controls="documents-pane" aria-selected="{{ $activeTab === 'documents' ? 'true' : 'false' }}">
-                        <i class="feather-file-text me-2"></i>Document Masters
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeTab === 'categories' ? 'active' : '' }}" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories-pane" type="button" role="tab" aria-controls="categories-pane" aria-selected="{{ $activeTab === 'categories' ? 'true' : 'false' }}">
-                        <i class="feather-sliders me-2"></i>Document Categories
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeTab === 'templates' ? 'active' : '' }}" id="templates-tab" data-bs-toggle="tab" data-bs-target="#templates-pane" type="button" role="tab" aria-controls="templates-pane" aria-selected="{{ $activeTab === 'templates' ? 'true' : 'false' }}">
-                        <i class="feather-layout me-2"></i>Document Templates
-                    </button>
-                </li>
-            </ul>
+            <!-- Common Horizontal Tabs Navigation -->
+            <x-ui.horizontal-tabs id="docMasterTabs" :tabs="$docMasterTabs" />
 
             <div class="tab-content" id="docMasterTabsContent">
                 @include('modules.hrms.document-master.tabs.documents')
@@ -269,12 +210,12 @@
             $('#previewTemplateModal').appendTo('body');
 
             // Handle bootstrap tab switch shown event
-            $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-                var targetId = $(e.target).attr('id');
+            $(document).on('shown.bs.tab', 'button[data-bs-toggle="tab"]', function (e) {
+                var targetId = $(e.target).attr('id') || '';
                 var tabName = 'documents';
-                if (targetId === 'categories-tab') {
+                if (targetId.indexOf('categories') !== -1) {
                     tabName = 'categories';
-                } else if (targetId === 'templates-tab') {
+                } else if (targetId.indexOf('templates') !== -1) {
                     tabName = 'templates';
                 }
                 
@@ -300,7 +241,7 @@
                     $(this).select2({
                         theme: "bootstrap-5",
                         dropdownParent: modal.find('.modal-content'),
-                        placeholder: $(this).attr('placeholder') || "Select Option",
+                        placeholder: $(this).attr('placeholder') || "{{ __('hrms.document_master.select_option') }}",
                         allowClear: false
                     });
                 });
@@ -320,6 +261,38 @@
                 }
             });
 
+            // Helper to dynamically toggle Portal Access editable checkbox vs automatic note based on Upload Responsibility
+            function updatePortalAccessVisibility($modal, responsibility, employeeCanView) {
+                var $editable = $modal.find('.portal-access-editable');
+                var $auto = $modal.find('.portal-access-auto');
+                var $checkbox = $modal.find('.employee-can-view-checkbox');
+
+                if (responsibility === 'hr') {
+                    $auto.hide();
+                    $editable.show();
+                    if (employeeCanView !== undefined) {
+                        $checkbox.prop('checked', employeeCanView);
+                    }
+                } else {
+                    $editable.hide();
+                    $auto.show();
+                    $checkbox.prop('checked', true);
+                }
+            }
+
+            // Listen to Upload Responsibility dropdown changes
+            $(document).on('change', 'select[name="upload_responsibility"]', function() {
+                var val = $(this).val();
+                var $modal = $(this).closest('.modal');
+                updatePortalAccessVisibility($modal, val);
+            });
+
+            // On Add Document modal open, initialize portal access section
+            $('#addDocumentModal').on('show.bs.modal', function() {
+                var val = $(this).find('select[name="upload_responsibility"]').val() || 'employee';
+                updatePortalAccessVisibility($(this), val, true);
+            });
+
             // Handle Category Edit Bindings
             $('#editCategoryModal').on('show.bs.modal', function(event) {
                 var button = $(event.relatedTarget);
@@ -329,7 +302,7 @@
                 var description = button.data('description');
 
                 var modal = $(this);
-                modal.find('form').attr('action', '/hrms/documents-master/categories/' + categoryId);
+                modal.find('form').attr('action', '{{ url("hrms/documents-master/categories") }}/' + categoryId);
                 modal.find('#edit_category_company_id').val(companyId).trigger('change');
                 modal.find('#edit_category_name').val(name);
                 modal.find('#edit_category_description').val(description);
@@ -347,17 +320,17 @@
                 var isRequired = button.data('is-required') == 1;
                 var uploadResponsibility = button.data('upload-responsibility');
                 var approvalRequired = button.data('approval-required') == 1;
+                var requiresSignature = button.data('requires-signature') == 1;
                 
                 var expiryApplicable = button.data('expiry-applicable') == 1;
                 var reminderDays = button.data('reminder-days');
                 
                 var employeeCanView = button.data('employee-can-view') == 1;
-                var employeeCanDownload = button.data('employee-can-download') == 1;
                 
                 var status = button.data('status');
 
                 var modal = $(this);
-                modal.find('form').attr('action', '/hrms/documents-master/documents/' + docId);
+                modal.find('form').attr('action', '{{ url("hrms/documents-master/documents") }}/' + docId);
                 
                 modal.find('#edit_doc_category_id').val(categoryId).trigger('change');
                 modal.find('#edit_doc_name').val(name);
@@ -366,7 +339,10 @@
                 
                 modal.find('#edit_doc_is_required').prop('checked', isRequired);
                 modal.find('#edit_doc_upload_responsibility').val(uploadResponsibility).trigger('change');
+                updatePortalAccessVisibility(modal, uploadResponsibility, employeeCanView);
+
                 modal.find('#edit_doc_approval_required').prop('checked', approvalRequired);
+                modal.find('#edit_doc_requires_signature').prop('checked', requiresSignature);
                 
                 modal.find('#edit_doc_expiry_applicable').prop('checked', expiryApplicable);
                 var reminderGroup = modal.find('.reminder-days-group');
@@ -379,7 +355,6 @@
                 }
                 
                 modal.find('#edit_doc_employee_can_view').prop('checked', employeeCanView);
-                modal.find('#edit_doc_employee_can_download').prop('checked', employeeCanDownload);
                 
                 modal.find('#edit_doc_status').val(status).trigger('change');
             });
@@ -402,6 +377,10 @@
                 'documents': {
                     tbody: 'documentsTableBody',
                     pagination: 'documentsPaginationWrapper'
+                },
+                'templates': {
+                    tbody: 'templatesTableBody',
+                    pagination: 'templatesPaginationWrapper'
                 }
             }[tabId];
 
@@ -485,7 +464,7 @@
         $(document).ready(function() {
             // Debounced quick search to avoid needing to press Enter
             var searchTimeout = null;
-            $(document).on('input', 'input[name="category_search"], input[name="doc_search"]', function () {
+            $(document).on('input', 'input[name="category_search"], input[name="doc_search"], input[name="template_search"]', function () {
                 const input = this;
                 const form = input.closest('form');
                 if (!form) return;
@@ -498,7 +477,7 @@
                     url.searchParams.set(key, val);
                 }
 
-                const pageParam = tabId === 'categories' ? 'category_page' : 'doc_page';
+                const pageParam = tabId === 'categories' ? 'category_page' : (tabId === 'templates' ? 'template_page' : 'doc_page');
                 url.searchParams.delete(pageParam);
 
                 clearTimeout(searchTimeout);
@@ -522,7 +501,7 @@
                     url.searchParams.set(key, val);
                 }
 
-                const pageParam = tabId === 'categories' ? 'category_page' : 'doc_page';
+                const pageParam = tabId === 'categories' ? 'category_page' : (tabId === 'templates' ? 'template_page' : 'doc_page');
                 url.searchParams.delete(pageParam);
 
                 refreshDocumentMasterList(url, tabId);
@@ -540,7 +519,7 @@
                 const urlObj = new URL(href, window.location.origin);
                 const tabId = urlObj.searchParams.get('active_tab');
 
-                if (tabId !== 'categories' && tabId !== 'documents') return;
+                if (tabId !== 'categories' && tabId !== 'documents' && tabId !== 'templates') return;
 
                 event.preventDefault();
                 refreshDocumentMasterList(urlObj, tabId);

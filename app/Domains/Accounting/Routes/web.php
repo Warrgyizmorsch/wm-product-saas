@@ -70,6 +70,7 @@ Route::prefix('accounting')
         Route::get('fiscal-years', [FiscalYearController::class, 'index'])->name('fiscal-years.index');
         Route::post('fiscal-years', [FiscalYearController::class, 'store'])->name('fiscal-years.store');
         Route::post('fiscal-years/{fiscalYear}/close', [FiscalYearController::class, 'close'])->name('fiscal-years.close');
+        Route::post('fiscal-years/{fiscalYear}/reopen', [FiscalYearController::class, 'reopen'])->name('fiscal-years.reopen');
 
         Route::post('periods/{period}/close', [AccountingPeriodController::class, 'close'])->name('periods.close');
         Route::post('periods/{period}/lock', [AccountingPeriodController::class, 'lock'])->name('periods.lock');

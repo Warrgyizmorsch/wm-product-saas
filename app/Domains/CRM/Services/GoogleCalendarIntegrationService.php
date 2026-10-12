@@ -21,19 +21,36 @@ class GoogleCalendarIntegrationService
     /**
      * Exchange a one-time auth_code for a persistent bearer/session token
      */
-    public function exchangeAuthCode(string $authCode): ?string
+    public function exchangeAuthCode(string $authCode, ?int $userId = null): ?string
     {
         try {
+            $resolvedUserId = $userId ?? auth()->id() ?? 1;
             $response = Http::timeout(10)->post($this->baseUrl . '/auth/token', [
                 'auth_code' => trim($authCode),
+                'user_id'   => $resolvedUserId,
             ]);
 
             if ($response->successful()) {
                 $data = $response->json();
                 $token = $data['token'] ?? $data['access_token'] ?? $data['session_token'] ?? (is_string($data) ? $data : null);
+                $googleUserId = $data['user_id'] ?? $data['google_user_id'] ?? $resolvedUserId;
+
                 if ($token) {
-                    session(['google_token' => $token]);
-                    session(['google_calendar_connected' => true]);
+                    session([
+                        'google_token' => $token,
+                        'google_user_id' => $googleUserId,
+                        'google_calendar_connected' => true,
+                    ]);
+
+                    if (auth()->check()) {
+                        $user = auth()->user();
+                        $settings = is_array($user->settings) ? $user->settings : (json_decode($user->settings ?? '{}', true) ?: []);
+                        $settings['google_token'] = $token;
+                        $settings['google_user_id'] = $googleUserId;
+                        $user->settings = $settings;
+                        $user->saveQuietly();
+                    }
+
                     return $token;
                 }
             } else {
@@ -47,14 +64,21 @@ class GoogleCalendarIntegrationService
     }
 
     /**
-     * Resolve user_id and token from params, request, or session
+     * Resolve user_id and token from params, request, session, or user settings
      */
     public function resolveCredentials(?int $userId = null, ?string $token = null): array
     {
+        $userSettings = [];
+        if (auth()->check()) {
+            $user = auth()->user();
+            $userSettings = is_array($user->settings) ? $user->settings : (json_decode($user->settings ?? '{}', true) ?: []);
+        }
+
         $resolvedUserId = $userId 
             ?? (request()?->filled('google_user_id') ? (int) request('google_user_id') : null)
             ?? (request()?->filled('user_id') ? (int) request('user_id') : null)
             ?? (session('google_user_id') ? (int) session('google_user_id') : null)
+            ?? ($userSettings['google_user_id'] ?? null)
             ?? auth()->id() 
             ?? 1;
 
@@ -64,17 +88,18 @@ class GoogleCalendarIntegrationService
             ?? request()?->input('access_token') 
             ?? session('google_token') 
             ?? session('google_access_token') 
+            ?? ($userSettings['google_token'] ?? null)
             ?? null;
 
         // If no token yet but auth_code is available, exchange it now
         if (empty($resolvedToken)) {
             $authCode = request()?->input('auth_code') ?? request()?->input('code') ?? session('google_auth_code');
             if (!empty($authCode)) {
-                $resolvedToken = $this->exchangeAuthCode($authCode);
+                $resolvedToken = $this->exchangeAuthCode($authCode, (int)$resolvedUserId);
             }
         }
 
-        return [$resolvedUserId, $resolvedToken];
+        return [(int)$resolvedUserId, $resolvedToken];
     }
 
     /**

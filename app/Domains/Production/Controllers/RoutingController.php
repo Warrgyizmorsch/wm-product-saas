@@ -62,8 +62,23 @@ class RoutingController extends Controller
         Gate::authorize('create', Routing::class);
 
         try {
-        $tenantId = require_tenant_id();
-            $dto      = RoutingDTO::fromArray($request->validated());
+            $tenantId = require_tenant_id();
+            $data = $request->validated();
+            if (!empty($data['operations']) && is_array($data['operations'])) {
+                foreach ($data['operations'] as &$op) {
+                    if (isset($op['labor_cost_rate'])) {
+                        $op['labor_cost_rate'] = convert_to_base((float) $op['labor_cost_rate']);
+                    }
+                    if (isset($op['machine_cost_rate'])) {
+                        $op['machine_cost_rate'] = convert_to_base((float) $op['machine_cost_rate']);
+                    }
+                    if (isset($op['subcontract_cost_per_unit'])) {
+                        $op['subcontract_cost_per_unit'] = convert_to_base((float) $op['subcontract_cost_per_unit']);
+                    }
+                }
+                unset($op);
+            }
+            $dto      = RoutingDTO::fromArray($data);
             $routing  = $this->routingService->create($dto, $tenantId, auth()->id() ?: 1);
 
             return redirect()
@@ -123,7 +138,22 @@ class RoutingController extends Controller
         Gate::authorize('update', $routing);
 
         try {
-            $dto     = RoutingDTO::fromArray($request->validated());
+            $data = $request->validated();
+            if (!empty($data['operations']) && is_array($data['operations'])) {
+                foreach ($data['operations'] as &$op) {
+                    if (isset($op['labor_cost_rate'])) {
+                        $op['labor_cost_rate'] = convert_to_base((float) $op['labor_cost_rate']);
+                    }
+                    if (isset($op['machine_cost_rate'])) {
+                        $op['machine_cost_rate'] = convert_to_base((float) $op['machine_cost_rate']);
+                    }
+                    if (isset($op['subcontract_cost_per_unit'])) {
+                        $op['subcontract_cost_per_unit'] = convert_to_base((float) $op['subcontract_cost_per_unit']);
+                    }
+                }
+                unset($op);
+            }
+            $dto     = RoutingDTO::fromArray($data);
             $routing = $this->routingService->update($id, $dto);
 
             return redirect()

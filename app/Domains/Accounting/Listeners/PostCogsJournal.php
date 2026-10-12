@@ -34,7 +34,7 @@ class PostCogsJournal
             return;
         }
 
-        if ($this->journals->findByReference('delivery_order', $transaction->reference_id)->isNotEmpty()) {
+        if ($this->journals->activePosting((int) $transaction->tenant_id, 'delivery_order', $transaction->reference_id) !== null) {
             return;
         }
 
@@ -54,7 +54,7 @@ class PostCogsJournal
                 return;
             }
 
-            $this->journals->post([
+            $this->journals->postOnce([
                 [
                     'chart_of_account_id' => $cogs->id,
                     'debit' => (float) $transaction->total_value,

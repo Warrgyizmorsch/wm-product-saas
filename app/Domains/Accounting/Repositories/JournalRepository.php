@@ -118,6 +118,23 @@ class JournalRepository implements JournalRepositoryInterface
             ->get();
     }
 
+    public function activeForReference(int $tenantId, string $referenceType, int $referenceId): ?Journal
+    {
+        // A reversal journal carries its original's reference too; it isn't a
+        // posting of the document, so it's skipped along with reversed originals.
+        return Journal::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
+            ->where('reference_type', $referenceType)
+            ->where('reference_id', $referenceId)
+            ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_PENDING_APPROVAL])
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')
+                ->from('journals as originals')
+                ->whereColumn('originals.reversed_journal_id', 'journals.id'))
+            ->orderBy('id')
+            ->first();
+    }
+
     /**
      * Must be called inside the same DB transaction that will insert the journal,
      * so the count-based sequence and the unique (tenant_id, journal_number)
@@ -154,6 +171,7 @@ class JournalRepository implements JournalRepositoryInterface
                 'branch_id' => $journal->branch_id,
                 'chart_of_account_id' => $line['chart_of_account_id'],
                 'cost_center_id' => $line['cost_center_id'] ?? null,
+                'project_id' => $line['project_id'] ?? null,
                 'party_type' => $line['party_type'] ?? null,
                 'party_id' => $line['party_id'] ?? null,
                 'debit' => $line['debit'] ?? 0,
@@ -165,13 +183,16 @@ class JournalRepository implements JournalRepositoryInterface
         return $journal->load(['entries.account']);
     }
 
-    public function trialBalance(int $periodId, ?int $costCenterId = null): Collection
+    public function trialBalance(int $periodId, ?int $costCenterId = null, ?int $projectId = null): Collection
     {
         return JournalEntry::query()
             ->select('chart_of_account_id')
             ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
-            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('accounting_period_id', $periodId))
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->where('accounting_period_id', $periodId)
+                ->where('source', '!=', Journal::SOURCE_YEAR_END_CLOSE))
             ->when($costCenterId, fn ($q) => $q->where('cost_center_id', $costCenterId))
+            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
             ->groupBy('chart_of_account_id')
             ->with('account')
             ->get();
@@ -231,7 +252,7 @@ class JournalRepository implements JournalRepositoryInterface
             ->values();
     }
 
-    public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection
+    public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate, bool $excludeYearEndClose = false): Collection
     {
         return JournalEntry::query()
             ->select('chart_of_account_id')
@@ -239,7 +260,8 @@ class JournalRepository implements JournalRepositoryInterface
             ->whereHas('journal', fn ($q) => $q
                 ->where('tenant_id', $tenantId)
                 ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
-                ->where('journal_date', '<=', $asOfDate))
+                ->where('journal_date', '<=', $asOfDate)
+                ->when($excludeYearEndClose, fn ($q) => $q->where('source', '!=', Journal::SOURCE_YEAR_END_CLOSE)))
             ->groupBy('chart_of_account_id')
             ->with('account')
             ->get();
@@ -253,6 +275,7 @@ class JournalRepository implements JournalRepositoryInterface
             ->whereHas('journal', fn ($q) => $q
                 ->where('tenant_id', $tenantId)
                 ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->where('source', '!=', Journal::SOURCE_YEAR_END_CLOSE)
                 ->whereBetween('journal_date', [$from, $to]))
             ->when($costCenterId, fn ($q) => $q->where('cost_center_id', $costCenterId))
             ->groupBy('chart_of_account_id')
@@ -280,6 +303,7 @@ class JournalRepository implements JournalRepositoryInterface
             ->where('journals.tenant_id', $tenantId)
             ->whereIn('journals.status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
             ->whereNull('journals.deleted_at')
+            ->where('journals.source', '!=', Journal::SOURCE_YEAR_END_CLOSE)
             ->whereBetween('journals.journal_date', [$from, $to])
             ->when($costCenterId, fn ($q) => $q->where('journal_entries.cost_center_id', $costCenterId))
             ->select('journal_entries.chart_of_account_id', 'journals.journal_date')

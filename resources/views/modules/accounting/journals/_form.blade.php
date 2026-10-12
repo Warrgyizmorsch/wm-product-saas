@@ -90,12 +90,13 @@
                 <x-ui.odoo-form-ui type="table" id="itemsTable">
                     <thead>
                         <tr>
-                            <th style="width: 24%;">Account</th>
-                            <th style="width: 15%;">Cost Center</th>
-                            <th style="width: 17%;">Description</th>
-                            <th class="text-end" style="width: 14%;">Debit</th>
-                            <th class="text-end" style="width: 14%;">Credit</th>
-                            <th class="text-center" style="width: 16%;">Actions</th>
+                            <th style="width: 22%;">Account</th>
+                            <th style="width: 13%;">Cost Center</th>
+                            <th style="width: 13%;">Project</th>
+                            <th style="width: 16%;">Description</th>
+                            <th class="text-end" style="width: 12%;">Debit</th>
+                            <th class="text-end" style="width: 12%;">Credit</th>
+                            <th class="text-center" style="width: 12%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -140,9 +141,11 @@
                 @php
                     $mappedAccounts = $accounts->map(fn ($a) => ['id' => $a->id, 'code' => $a->code, 'name' => $a->name]);
                     $mappedCostCenters = $costCenters->map(fn ($c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name]);
+                    $mappedProjects = ($projects ?? collect())->map(fn ($p) => ['id' => $p->id, 'code' => $p->project_code, 'name' => $p->name]);
                 @endphp
                 const accountsList = @json($mappedAccounts);
                 const costCentersList = @json($mappedCostCenters);
+                const projectsList = @json($mappedProjects);
 
                 function escapeHtml(string) {
                     return String(string).replace(/[&<>"']/g, function (s) {
@@ -168,6 +171,16 @@
                     return opts;
                 }
 
+                function buildProjectOptions(selectedId = '') {
+                    let opts = '<option value="">—</option>';
+                    projectsList.forEach(function(p) {
+                        const sel = (p.id == selectedId) ? ' selected' : '';
+                        const label = p.code ? `${escapeHtml(p.code)} - ${escapeHtml(p.name)}` : escapeHtml(p.name);
+                        opts += `<option value="${p.id}"${sel}>${label}</option>`;
+                    });
+                    return opts;
+                }
+
                 function getRowHtml(index, values) {
                     values = values || {};
 
@@ -181,6 +194,11 @@
                             <td>
                                 <select name="items[${index}][cost_center_id]" class="form-select odoo-table-select odoo-select2 cost-center-select">
                                     ${buildCostCenterOptions(values.costCenterId)}
+                                </select>
+                            </td>
+                            <td>
+                                <select name="items[${index}][project_id]" class="form-select odoo-table-select odoo-select2 project-select">
+                                    ${buildProjectOptions(values.projectId)}
                                 </select>
                             </td>
                             <td>
@@ -218,6 +236,7 @@
                     if (typeof $.fn.select2 === 'function') {
                         newRow.find('.account-select').select2({ theme: "bootstrap-5", width: "100%", dropdownParent: newRow.closest('.offcanvas, body') });
                         newRow.find('.cost-center-select').select2({ theme: "bootstrap-5", width: "100%", dropdownParent: newRow.closest('.offcanvas, body') });
+                        newRow.find('.project-select').select2({ theme: "bootstrap-5", width: "100%", dropdownParent: newRow.closest('.offcanvas, body') });
                     }
 
                     rowIndex++;
@@ -236,6 +255,7 @@
                     const newRow = addRow({
                         accountId: $row.find('.account-select').val(),
                         costCenterId: $row.find('.cost-center-select').val(),
+                        projectId: $row.find('.project-select').val(),
                         description: $row.find('.description-input').val(),
                         debit: $row.find('.debit-input').val(),
                         credit: $row.find('.credit-input').val(),

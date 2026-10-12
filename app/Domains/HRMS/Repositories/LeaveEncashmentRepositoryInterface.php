@@ -17,4 +17,6 @@ interface LeaveEncashmentRepositoryInterface
     public function delete(LeaveEncashment $leaveEncashment): bool;
 
     public function getExportData(array $inputs, ?User $user, int $tenantId): array;
+
+    public function export(array $filters = []): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse;
 }

@@ -663,6 +663,22 @@ class SopApiController extends Controller
         }
     }
 
+    /**
+     * GET /api/hrms/sop/documents/{id}/export-audit
+     * Export compliance audit report as CSV.
+     */
+    public function exportAudit(int $id): mixed
+    {
+        [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
+
+        if (!$isHrOrAdmin) {
+            return $this->sendError('Unauthorized. Only HR/Admins can export audit logs.', 403);
+        }
+
+        return $this->sopRepository->exportAudit($id, $tenantId);
+    }
+
+
     // =========================================================================
     // 4. EMPLOYEE SIGN-OFF & "MY SOPS" APIS
     // =========================================================================
@@ -1061,4 +1077,6 @@ class SopApiController extends Controller
             return $this->sendError($e->getMessage(), 500);
         }
     }
+
 }
+

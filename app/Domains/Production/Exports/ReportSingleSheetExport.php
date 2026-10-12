@@ -39,7 +39,7 @@ class ReportSingleSheetExport extends ReportSheetExport
                 'Production Orders',
             ],
             'material-consumption' => [
-                ['Order Number', 'Finished Good', 'Consuming Operation', 'Work Center', 'Material', 'SKU', 'UOM', 'Planned Qty', 'Issued Qty', 'Consumed Qty', 'Floor Stock WIP', 'Consumption %', 'Unit Cost', 'Planned Cost', 'Consumed Cost', 'Issued Cost', 'Variance Cost'],
+                ['Order Number', 'Finished Good', 'Consuming Operation', 'Work Center', 'Material', 'SKU', 'UOM', 'Planned Qty', 'Issued Qty', 'Consumed Qty', 'Floor Stock WIP', 'Consumption %', 'Unit Cost (' . active_currency() . ')', 'Planned Cost (' . active_currency() . ')', 'Consumed Cost (' . active_currency() . ')', 'Issued Cost (' . active_currency() . ')', 'Variance Cost (' . active_currency() . ')'],
                 collect($reportData['data'])->map(fn($r) => [
                     $r['order_number'], $r['finished_good'], $r['operation_name'] ?? 'Intake', $r['work_center'] ?? '', $r['material_name'], $r['material_sku'], $r['uom'],
                     $r['planned_qty'], $r['issued_qty'], $r['consumed_qty'] ?? 0, $r['floor_balance'] ?? 0, ($r['consumption_pct'] ?? 0) . '%',
@@ -50,7 +50,7 @@ class ReportSingleSheetExport extends ReportSheetExport
                 'Material Consumption',
             ],
             'cost-variance' => [
-                ['Order Number', 'Product', 'SKU', 'Status', 'Planned Cost', 'Actual Material', 'Actual Labor', 'Actual Machine', 'Actual Overhead', 'Adjustments', 'Actual Total', 'Variance Amount', 'Variance %'],
+                ['Order Number', 'Product', 'SKU', 'Status', 'Planned Cost (' . active_currency() . ')', 'Actual Material (' . active_currency() . ')', 'Actual Labor (' . active_currency() . ')', 'Actual Machine (' . active_currency() . ')', 'Actual Overhead (' . active_currency() . ')', 'Adjustments (' . active_currency() . ')', 'Actual Total (' . active_currency() . ')', 'Variance Amount (' . active_currency() . ')', 'Variance %'],
                 collect($reportData['data'])->map(fn($r) => [
                     $r['order_number'], $r['product_name'], $r['product_sku'], ucfirst($r['status']),
                     number_format($r['planned_cost'], 2, '.', ''), number_format($r['actual_material_cost'], 2, '.', ''),

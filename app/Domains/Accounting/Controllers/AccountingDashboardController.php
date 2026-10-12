@@ -69,6 +69,7 @@ class AccountingDashboardController extends Controller
             'initial' => $this->layouts->preload($state['layout'], $user, $tenantId, $widgetQuery),
             'widgetQuery' => (object) $widgetQuery,
             'presets' => DashboardPeriod::PRESETS,
+            'fiscalYearStart' => $this->dashboard->fiscalYearStart(Carbon::today()),
             'views' => self::VIEWS,
             'activeView' => $activeView,
             'costCenters' => CostCenter::query()->active()->orderBy('code')->get(['id', 'code', 'name']),

@@ -21,4 +21,12 @@ interface SalaryStructureRepositoryInterface
     public function updateComponent(SalaryComponent $salaryComponent, array $validated): bool;
 
     public function destroyComponent(SalaryComponent $salaryComponent): bool;
+
+    public function storePayGroup(array $validated): \App\Domains\HRMS\Models\PayGroup;
+
+    public function updatePayGroup(\App\Domains\HRMS\Models\PayGroup $payGroup, array $validated): bool;
+
+    public function destroyPayGroup(\App\Domains\HRMS\Models\PayGroup $payGroup): bool;
+
+    public function updatePayGroupRules(\App\Domains\HRMS\Models\PayGroup $payGroup, array $rules): bool;
 }

@@ -13,6 +13,8 @@ class ProductionOrderIssueBatch extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'production_order_issue_id',
         'inventory_batch_id',
         'quantity',

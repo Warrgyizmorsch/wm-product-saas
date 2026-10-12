@@ -13,6 +13,8 @@ class Product extends BaseModel
 {
     use HasFactory, BelongsToCompany, BelongsToBranch;
 
+    public bool $sharedAcrossCompanies = true;
+
     protected $table = 'products';
 
     public const MODEL_PURE_MANUFACTURING = 'pure_manufacturing';

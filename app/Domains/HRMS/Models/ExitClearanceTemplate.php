@@ -28,104 +28,48 @@ class ExitClearanceTemplate extends BaseModel
     ];
 
     /**
-     * Standard default checklist template definition.
+     * Standard default checklist template definition (5 Core Global Checkpoints).
      */
     public const DEFAULT_TEMPLATES = [
         [
             'clearance_category' => 'it_assets',
             'category_name' => 'IT & Systems',
-            'item_name' => 'Hardware Asset Recovery (Laptop/Accessories)',
-            'description' => 'Collect laptop, chargers, monitors, peripherals, and perform physical inspection.',
+            'item_name' => 'System & Email Access Deactivation',
+            'description' => 'Revoke access to corporate email, SSO accounts, internal applications, and company networks.',
             'is_mandatory' => true,
             'sort_order' => 1,
         ],
         [
-            'clearance_category' => 'it_assets',
-            'category_name' => 'IT & Systems',
-            'item_name' => 'Email, Slack & ERP System Logins Deactivation',
-            'description' => 'Revoke email accounts, SaaS accesses, internal ERP, and Slack/Teams workspaces.',
+            'clearance_category' => 'facilities_admin',
+            'category_name' => 'Facilities & Admin',
+            'item_name' => 'Building Access Badge & Office Keys Handover',
+            'description' => 'Collect office access card, building ID badge, cabin/drawer keys, and parking tags.',
             'is_mandatory' => true,
             'sort_order' => 2,
         ],
         [
-            'clearance_category' => 'it_assets',
-            'category_name' => 'IT & Systems',
-            'item_name' => 'Cloud Data Backup & File Handover',
-            'description' => 'Transfer Google Drive / OneDrive data and ensure code/documentation repository ownership transfer.',
-            'is_mandatory' => false,
+            'clearance_category' => 'finance_payroll',
+            'category_name' => 'Finance & Payroll',
+            'item_name' => 'Expense Claims & Financial Dues Clearance',
+            'description' => 'Settle pending expense claims, travel advances, company loans, and finalize payroll deductions.',
+            'is_mandatory' => true,
             'sort_order' => 3,
         ],
         [
-            'clearance_category' => 'facilities_admin',
-            'category_name' => 'Facilities & Admin',
-            'item_name' => 'Company Physical ID Card & Access Badge Handover',
-            'description' => 'Collect building biometric card, office entry badge, and visitor tags.',
+            'clearance_category' => 'hr_operations',
+            'category_name' => 'HR & Operations',
+            'item_name' => 'Exit Formalities & Benefits De-enrollment',
+            'description' => 'Complete exit interview, statutory documentation, and de-enroll from company insurance & benefits.',
             'is_mandatory' => true,
             'sort_order' => 4,
         ],
         [
-            'clearance_category' => 'facilities_admin',
-            'category_name' => 'Facilities & Admin',
-            'item_name' => 'Office Keys, Drawer Keys & Parking Tag Handover',
-            'description' => 'Return workstation locker keys, cabin keys, and vehicle parking stickers.',
+            'clearance_category' => 'reporting_manager',
+            'category_name' => 'Reporting Manager',
+            'item_name' => 'Knowledge Transfer & Project Handover',
+            'description' => 'Verify complete handover of ongoing tasks, project files, client contacts, and team responsibilities.',
             'is_mandatory' => true,
             'sort_order' => 5,
-        ],
-        [
-            'clearance_category' => 'finance_payroll',
-            'category_name' => 'Finance & Payroll',
-            'item_name' => 'Reconcile Open Cash Advances & Loan Accounts',
-            'description' => 'Check ledger for any outstanding travel advances, salary advances, or company loans.',
-            'is_mandatory' => true,
-            'sort_order' => 6,
-        ],
-        [
-            'clearance_category' => 'finance_payroll',
-            'category_name' => 'Finance & Payroll',
-            'item_name' => 'Verify Pending Travel & Expense Reimbursements',
-            'description' => 'Approve or reject all pending expense claims before calculating final settlement.',
-            'is_mandatory' => true,
-            'sort_order' => 7,
-        ],
-        [
-            'clearance_category' => 'finance_payroll',
-            'category_name' => 'Finance & Payroll',
-            'item_name' => 'Notice Period Shortfall / Buyout Verification',
-            'description' => 'Verify if unserved notice days should be recovered or waived.',
-            'is_mandatory' => true,
-            'sort_order' => 8,
-        ],
-        [
-            'clearance_category' => 'hr_operations',
-            'category_name' => 'HR & Operations',
-            'item_name' => 'Exit Interview & Feedback Questionnaire Completed',
-            'description' => 'Conduct formal exit interview discussion and record feedback notes.',
-            'is_mandatory' => false,
-            'sort_order' => 9,
-        ],
-        [
-            'clearance_category' => 'hr_operations',
-            'category_name' => 'HR & Operations',
-            'item_name' => 'PF, Gratuity & Pension Settlement Verification',
-            'description' => 'Verify provident fund transfer documentation, gratuity eligibility, and statutory dues.',
-            'is_mandatory' => true,
-            'sort_order' => 10,
-        ],
-        [
-            'clearance_category' => 'reporting_manager',
-            'category_name' => 'Reporting Manager',
-            'item_name' => 'Knowledge Transfer (KT) & Task Handover Sign-off',
-            'description' => 'Verify comprehensive handover of ongoing projects, documents, and key tasks to team members.',
-            'is_mandatory' => true,
-            'sort_order' => 11,
-        ],
-        [
-            'clearance_category' => 'reporting_manager',
-            'category_name' => 'Reporting Manager',
-            'item_name' => 'Client Contacts, Repo & Credentials Handover',
-            'description' => 'Handover client contact details, master passwords, project accounts, and repo permissions.',
-            'is_mandatory' => true,
-            'sort_order' => 12,
         ],
     ];
 
@@ -149,77 +93,111 @@ class ExitClearanceTemplate extends BaseModel
     public static function getCategoryMetadata(string $categoryKey, ?string $categoryName = null): array
     {
         $categoryKey = self::normalizeCategoryKey($categoryKey);
+
+        $standardCategoryKeys = [
+            'it_assets', 'facilities_admin', 'finance_payroll', 'hr_operations',
+            'reporting_manager', 'legal_compliance', 'other',
+        ];
+        $knownEnglishDefaults = [
+            'it & systems', 'it assets', 'it assets & equipment', 'it', 'systems',
+            'facilities & admin', 'facilities & assets', 'facilities', 'admin',
+            'finance & payroll', 'finance', 'payroll', 'accounts',
+            'hr & operations', 'hr operations', 'hr', 'human resources',
+            'reporting manager', 'manager', 'line manager',
+            'legal & compliance', 'legal', 'compliance',
+            'other', 'other / miscellaneous', 'miscellaneous', 'general',
+        ];
+
+        $categoryNameLower = strtolower(trim((string) $categoryName));
+        $isStandardKey = in_array($categoryKey, $standardCategoryKeys, true);
+        $shouldUseLocalized = $isStandardKey && ($categoryNameLower === '' || in_array($categoryNameLower, $knownEnglishDefaults, true));
+        $transKey = 'hrms.offboarding_policies.dept_' . $categoryKey;
+        $localizedDeptName = \Illuminate\Support\Facades\Lang::has($transKey) ? __($transKey) : null;
+        $resolvedName = ($shouldUseLocalized && $localizedDeptName) ? $localizedDeptName : ($categoryName ?: ($localizedDeptName ?: ucwords(str_replace(['_', '-'], ' ', $categoryKey))));
+
         $map = [
             'it_assets' => [
-                'name' => $categoryName ?: 'IT & Systems',
+                'name' => $resolvedName,
                 'icon' => 'feather-monitor',
                 'color' => 'primary',
                 'bg' => 'soft-primary',
             ],
             'it' => [
-                'name' => $categoryName ?: 'IT & Systems',
+                'name' => $resolvedName,
                 'icon' => 'feather-monitor',
                 'color' => 'primary',
                 'bg' => 'soft-primary',
             ],
             'facilities_admin' => [
-                'name' => $categoryName ?: 'Facilities & Admin',
+                'name' => $resolvedName,
                 'icon' => 'feather-briefcase',
                 'color' => 'warning',
                 'bg' => 'soft-warning',
             ],
             'admin' => [
-                'name' => $categoryName ?: 'Facilities & Admin',
+                'name' => $resolvedName,
                 'icon' => 'feather-briefcase',
                 'color' => 'warning',
                 'bg' => 'soft-warning',
             ],
             'finance_payroll' => [
-                'name' => $categoryName ?: 'Finance & Payroll',
+                'name' => $resolvedName,
                 'icon' => 'feather-dollar-sign',
                 'color' => 'success',
                 'bg' => 'soft-success',
             ],
             'finance' => [
-                'name' => $categoryName ?: 'Finance & Payroll',
+                'name' => $resolvedName,
                 'icon' => 'feather-dollar-sign',
                 'color' => 'success',
                 'bg' => 'soft-success',
             ],
             'hr_operations' => [
-                'name' => $categoryName ?: 'HR & Operations',
+                'name' => $resolvedName,
                 'icon' => 'feather-users',
                 'color' => 'info',
                 'bg' => 'soft-info',
             ],
             'hr' => [
-                'name' => $categoryName ?: 'HR & Operations',
+                'name' => $resolvedName,
                 'icon' => 'feather-users',
                 'color' => 'info',
                 'bg' => 'soft-info',
             ],
             'reporting_manager' => [
-                'name' => $categoryName ?: 'Reporting Manager',
+                'name' => $resolvedName,
                 'icon' => 'feather-user-check',
-                'color' => 'purple',
-                'bg' => 'soft-purple',
+                'color' => 'indigo',
+                'bg' => 'soft-indigo',
             ],
             'manager' => [
-                'name' => $categoryName ?: 'Reporting Manager',
+                'name' => $resolvedName,
                 'icon' => 'feather-user-check',
-                'color' => 'purple',
-                'bg' => 'soft-purple',
+                'color' => 'indigo',
+                'bg' => 'soft-indigo',
             ],
             'legal_compliance' => [
-                'name' => $categoryName ?: 'Legal & Compliance',
+                'name' => $resolvedName,
                 'icon' => 'feather-shield',
                 'color' => 'danger',
                 'bg' => 'soft-danger',
             ],
+            'other' => [
+                'name' => $resolvedName,
+                'icon' => 'feather-more-horizontal',
+                'color' => 'secondary',
+                'bg' => 'soft-secondary',
+            ],
+            'miscellaneous' => [
+                'name' => $resolvedName,
+                'icon' => 'feather-more-horizontal',
+                'color' => 'secondary',
+                'bg' => 'soft-secondary',
+            ],
         ];
 
         $entry = $map[$categoryKey] ?? [
-            'name' => $categoryName ?: ucwords(str_replace(['_', '-'], ' ', $categoryKey)),
+            'name' => $resolvedName,
             'icon' => 'feather-check-circle',
             'color' => 'secondary',
             'bg' => 'soft-secondary',

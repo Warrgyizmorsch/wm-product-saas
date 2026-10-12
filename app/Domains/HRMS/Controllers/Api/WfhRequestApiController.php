@@ -4,13 +4,17 @@ namespace App\Domains\HRMS\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Domains\HRMS\Models\Employee;
-use App\Domains\HRMS\Models\WfhRequest;
+use App\Domains\HRMS\Repositories\WfhRequestRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 
 class WfhRequestApiController extends Controller
 {
+    public function __construct(
+        protected WfhRequestRepositoryInterface $wfhRequestRepository
+    ) {}
+
     private function sendSuccess(mixed $data = null, string $message = 'Operation successful', int $statusCode = 200): JsonResponse
     {
         return response()->json([
@@ -509,5 +513,13 @@ class WfhRequestApiController extends Controller
         ]);
 
         return $this->sendSuccess($wfhRequest, 'Cancellation request denied. Application remains approved.');
+    }
+
+    /**
+     * Export WFH requests to Excel (.xlsx).
+     */
+    public function export(Request $request): mixed
+    {
+        return $this->wfhRequestRepository->export($request->all());
     }
 }

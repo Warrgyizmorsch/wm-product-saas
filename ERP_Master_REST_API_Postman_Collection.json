@@ -893,12 +893,51 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"lead_owner_id\": 1\n}"
+                                    "raw": "{\n    \"lead_owner_id\": 1,\n    \"note\": \"Transferred lead ownership for technical follow-up.\"\n}"
                                 }
                             }
                         },
                         {
-                            "name": "11. Quick Requirement Update",
+                            "name": "11. Bulk Reassign Leads Owner",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/leads/bulk-assign",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "leads",
+                                        "bulk-assign"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"lead_ids\": [1, 2, 3],\n    \"lead_owner_id\": 1,\n    \"note\": \"Reassigned Q4 target leads to account executive.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "12. Quick Requirement Update",
                             "request": {
                                 "method": "PATCH",
                                 "header": [
@@ -1209,6 +1248,47 @@
                                     ]
                                 }
                             }
+                        },
+                        {
+                            "name": "17. Upload Lead Documents",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/leads/1/documents",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "leads",
+                                        "1",
+                                        "documents"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "documents[]",
+                                            "type": "file",
+                                            "description": "Select files/documents to upload"
+                                        }
+                                    ]
+                                }
+                            }
                         }
                     ]
                 },
@@ -1466,7 +1546,86 @@
                             }
                         },
                         {
-                            "name": "8. Update Deal Requirement",
+                            "name": "8. Deal Owner Update",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/deals/1/owner",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "deals",
+                                        "1",
+                                        "owner"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"deal_owner_id\": 1,\n    \"note\": \"Transferred deal ownership for negotiation phase.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "9. Bulk Reassign Deals Owner",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/deals/bulk-assign",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "deals",
+                                        "bulk-assign"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"deal_ids\": [1, 2],\n    \"deal_owner_id\": 1,\n    \"note\": \"Bulk assigned pipeline deals to sales manager.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "10. Update Deal Requirement",
                             "request": {
                                 "method": "PATCH",
                                 "header": [
@@ -1848,6 +2007,78 @@
                                     ]
                                 }
                             }
+                        },
+                        {
+                            "name": "16. List Deal Documents",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/deals/1/documents",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "deals",
+                                        "1",
+                                        "documents"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "17. Upload Deal Documents",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/deals/1/documents",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "deals",
+                                        "1",
+                                        "documents"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "documents[]",
+                                            "type": "file",
+                                            "description": "Select files/documents to upload for this deal"
+                                        }
+                                    ]
+                                }
+                            }
                         }
                     ]
                 },
@@ -2031,7 +2262,86 @@
                             }
                         },
                         {
-                            "name": "6. Add Contact Person to Account",
+                            "name": "6. Account Owner Update",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/accounts/1/owner",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "accounts",
+                                        "1",
+                                        "owner"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"account_owner_id\": 1,\n    \"note\": \"Assigned dedicated Account Manager.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "7. Bulk Reassign Accounts Owner",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/accounts/bulk-assign",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "accounts",
+                                        "bulk-assign"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"account_ids\": [1, 2],\n    \"account_owner_id\": 1,\n    \"note\": \"Bulk assigned corporate accounts to Key Accounts Team.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "8. Add Contact Person to Account",
                             "request": {
                                 "method": "POST",
                                 "header": [
@@ -2563,6 +2873,117 @@
                                         "crm",
                                         "quotations",
                                         "1"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "7. Send Quotation via Email",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/quotations/1/send-email",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "quotations",
+                                        "1",
+                                        "send-email"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"to_email\": \"client@example.com\",\n    \"subject\": \"Official Commercial Proposal - Quotation #QT-2026-0001\",\n    \"body_html\": \"<p>Dear Valued Client,<br>Please find attached our quotation proposal.</p>\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "8. Send Quotation via WhatsApp",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/quotations/1/send-whatsapp",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "quotations",
+                                        "1",
+                                        "send-whatsapp"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"phone\": \"+919876543210\",\n    \"caption\": \"Hello, please review our official Quotation proposal.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "9. Download Quotation PDF",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/quotations/1/download",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "quotations",
+                                        "1",
+                                        "download"
                                     ]
                                 }
                             }

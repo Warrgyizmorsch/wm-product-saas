@@ -142,6 +142,8 @@ class SubcontractReceiptOrchestrator
                     if (!$wip) {
                         ProductionWip::create([
                             'tenant_id' => $op->tenant_id,
+                            'company_id' => $op->company_id ?? $op->order?->company_id ?? company_id(),
+                            'branch_id' => $op->branch_id ?? $op->order?->branch_id ?? branch_id(),
                             'production_order_id' => $op->production_order_id,
                             'production_batch_id' => $batchId,
                             'product_id' => $op->order?->product_id,
@@ -241,6 +243,8 @@ class SubcontractReceiptOrchestrator
                 if (!$wip) {
                     ProductionWip::create([
                         'tenant_id' => $op->tenant_id,
+                        'company_id' => $op->company_id ?? $op->order?->company_id ?? company_id(),
+                        'branch_id' => $op->branch_id ?? $op->order?->branch_id ?? branch_id(),
                         'production_order_id' => $op->production_order_id,
                         'production_batch_id' => $batchId,
                         'product_id' => $op->order?->product_id,

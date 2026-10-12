@@ -230,30 +230,7 @@ class ProbationApiController extends Controller
             );
 
             if ($exit->clearances()->count() === 0) {
-                $standardChecklist = [
-                    ['department' => 'it', 'item_name' => 'Hardware Asset Recovery (Laptop/Accessories)'],
-                    ['department' => 'it', 'item_name' => 'Email, Slack & ERP System Logins Deactivation'],
-                    ['department' => 'it', 'item_name' => 'Cloud Data Backup & File Handover'],
-                    ['department' => 'admin', 'item_name' => 'Company Physical ID Card & Access Badge Handover'],
-                    ['department' => 'admin', 'item_name' => 'Office Keys, Drawer Keys & Parking Tag Handover'],
-                    ['department' => 'finance', 'item_name' => 'Reconcile Open Cash Advances & Loan Accounts'],
-                    ['department' => 'finance', 'item_name' => 'Verify Pending Travel & Expense Reimbursements'],
-                    ['department' => 'finance', 'item_name' => 'Notice Period Shortfall / Buyout Verification'],
-                    ['department' => 'hr', 'item_name' => 'Exit Interview & Feedback Questionnaire Completed'],
-                    ['department' => 'hr', 'item_name' => 'PF, Gratuity & Pension Settlement Verification'],
-                    ['department' => 'manager', 'item_name' => 'Knowledge Transfer (KT) & Task Handover Sign-off'],
-                    ['department' => 'manager', 'item_name' => 'Client Contacts, Repo & Credentials Handover'],
-                ];
-
-                foreach ($standardChecklist as $item) {
-                    EmployeeExitClearance::create([
-                        'tenant_id'        => $tenantId,
-                        'employee_exit_id' => $exit->id,
-                        'department'       => $item['department'],
-                        'item_name'        => $item['item_name'],
-                        'status'           => 'pending',
-                    ]);
-                }
+                app(\App\Domains\HRMS\Services\ExitClearanceService::class)->generateClearancesForExit($exit, $tenantId);
             }
 
             $fnfService = app(FnFCalculationService::class);

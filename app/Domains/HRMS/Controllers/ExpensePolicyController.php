@@ -59,8 +59,8 @@ class ExpensePolicyController extends Controller
             'branch_id'                   => 'nullable|exists:branches,id',
             'status'                      => 'nullable|boolean',
             'approval_type'               => 'required|string|in:1_level,2_level,conditional_threshold',
-            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin',
-            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head',
+            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin,finance_manager',
+            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head,reporting_manager',
             'amount_threshold_for_2_level'=> 'nullable|numeric|min:0',
         ]);
 
@@ -69,8 +69,8 @@ class ExpensePolicyController extends Controller
 
         $this->policyRepository->storePolicy($validated);
 
-        return redirect()->route('hrms.expense-policy.index')
-            ->with('success', 'Expense policy created successfully.');
+        return redirect()->route('hrms.expense-policy.index', ['tab' => 'policies'])
+            ->with('success', __('hrms.expense_master.policy_created_success'));
     }
 
     /**
@@ -89,8 +89,8 @@ class ExpensePolicyController extends Controller
             'branch_id'                   => 'nullable|exists:branches,id',
             'status'                      => 'nullable|boolean',
             'approval_type'               => 'required|string|in:1_level,2_level,conditional_threshold',
-            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin',
-            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head',
+            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin,finance_manager',
+            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head,reporting_manager',
             'amount_threshold_for_2_level'=> 'nullable|numeric|min:0',
         ]);
 
@@ -98,8 +98,8 @@ class ExpensePolicyController extends Controller
 
         $this->policyRepository->updatePolicy($policy, $validated);
 
-        return redirect()->route('hrms.expense-policy.index')
-            ->with('success', 'Expense policy updated successfully.');
+        return redirect()->route('hrms.expense-policy.index', ['tab' => 'policies'])
+            ->with('success', __('hrms.expense_master.policy_updated_success'));
     }
 
     /**
@@ -110,8 +110,8 @@ class ExpensePolicyController extends Controller
         $this->authorize('delete', $policy);
         $this->policyRepository->deletePolicy($policy);
 
-        return redirect()->route('hrms.expense-policy.index')
-            ->with('success', 'Expense policy deleted successfully.');
+        return redirect()->route('hrms.expense-policy.index', ['tab' => 'policies'])
+            ->with('success', __('hrms.expense_master.policy_deleted_success'));
     }
 
     /**
@@ -135,7 +135,7 @@ class ExpensePolicyController extends Controller
         $this->policyRepository->storeRule($policy, $validated);
 
         return redirect()->route('hrms.expense-policy.rules', $policy)
-            ->with('success', 'Category limit added/updated successfully.');
+            ->with('success', __('hrms.expense_master.limit_saved_success'));
     }
 
     /**
@@ -156,7 +156,7 @@ class ExpensePolicyController extends Controller
         $this->policyRepository->deleteRule($rule);
 
         return redirect()->route('hrms.expense-policy.rules', $policy)
-            ->with('success', 'Category rule removed.');
+            ->with('success', __('hrms.expense_master.limit_removed_success'));
     }
 
     public function storeWorkflow(Request $request): RedirectResponse
@@ -174,8 +174,8 @@ class ExpensePolicyController extends Controller
             'business_unit_id'            => 'nullable|exists:business_units,id',
             'branch_id'                   => 'nullable|exists:branches,id',
             'approval_type'               => 'required|string|in:1_level,2_level,conditional_threshold',
-            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin',
-            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head',
+            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin,finance_manager',
+            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head,reporting_manager',
             'amount_threshold_for_2_level'=> 'nullable|numeric|min:0',
             'is_default'                  => 'nullable|boolean',
             'status'                      => 'nullable|boolean',
@@ -188,7 +188,7 @@ class ExpensePolicyController extends Controller
         $this->policyRepository->storeWorkflow($validated);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'workflows'])
-            ->with('success', 'Approval workflow created successfully.');
+            ->with('success', __('hrms.expense_master.workflow_created_success'));
     }
 
     public function updateWorkflow(Request $request, ExpenseApprovalWorkflow $workflow): RedirectResponse
@@ -206,8 +206,8 @@ class ExpensePolicyController extends Controller
             'business_unit_id'            => 'nullable|exists:business_units,id',
             'branch_id'                   => 'nullable|exists:branches,id',
             'approval_type'               => 'required|string|in:1_level,2_level,conditional_threshold',
-            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin',
-            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head',
+            'first_approver'              => 'required|string|in:reporting_manager,department_head,hr_admin,finance_manager',
+            'second_approver'             => 'required|string|in:finance_manager,hr_admin,department_head,reporting_manager',
             'amount_threshold_for_2_level'=> 'nullable|numeric|min:0',
             'is_default'                  => 'nullable|boolean',
             'status'                      => 'nullable|boolean',
@@ -219,7 +219,7 @@ class ExpensePolicyController extends Controller
         $this->policyRepository->updateWorkflow($workflow, $validated);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'workflows'])
-            ->with('success', 'Approval workflow updated successfully.');
+            ->with('success', __('hrms.expense_master.workflow_updated_success'));
     }
 
     public function destroyWorkflow(ExpenseApprovalWorkflow $workflow): RedirectResponse
@@ -229,6 +229,6 @@ class ExpensePolicyController extends Controller
         $this->policyRepository->deleteWorkflow($workflow);
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'workflows'])
-            ->with('success', 'Approval workflow deleted successfully.');
+            ->with('success', __('hrms.expense_master.workflow_deleted_success'));
     }
 }

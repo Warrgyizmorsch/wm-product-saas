@@ -17,6 +17,7 @@ class ProductionRequisitionSlipItem extends BaseModel
         'production_requisition_slip_id',
         'product_id',
         'warehouse_id',
+        'rework_operation_id',
         'quantity_planned',
         'quantity_reserved',
         'quantity_issued',
@@ -42,6 +43,11 @@ class ProductionRequisitionSlipItem extends BaseModel
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id');
+    }
+
+    public function reworkOperation(): BelongsTo
+    {
+        return $this->belongsTo(ProductionReworkOperation::class, 'rework_operation_id');
     }
 
     public function uom(): BelongsTo

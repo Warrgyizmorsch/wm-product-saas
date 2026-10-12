@@ -112,11 +112,17 @@
         $accrualRate = $ltRules['accrual']['rate'] ?? 'Immediate (Full Year)';
         $prorated = isset($ltRules['accrual']['prorated']) ? ($ltRules['accrual']['prorated'] ? 'Yes' : 'No') : 'Yes';
         $maxAcc = $ltRules['accrual']['max_accumulation'] ?? ($ltAlloc > 0 ? ($ltAlloc * 2) . ' Days' : '30 Days');
+        $negativeBalance = !empty($ltRules['accrual']['allow_negative']) 
+            ? 'Allowed (Max ' . ($ltRules['accrual']['max_negative'] ?? 5) . ' Days)' 
+            : 'Not Allowed';
 
         // Application & Duration Limits
         $minDur = $ltRules['application']['min_duration'] ?? '1 Day(s)';
         $maxDur = $ltRules['application']['max_duration'] ?? ($ltAlloc > 0 ? "{$ltAlloc} Day(s)" : '10 Day(s)');
         $advNotice = $ltRules['application']['advance_notice'] ?? 'None';
+        $sandwichRule = !empty($ltRules['application']['sandwich_rule']) 
+            ? 'Active (Holidays/Offs Counted)' 
+            : 'Inactive';
         $medicalAtt = isset($ltRules['attachment']['require_attachment']) 
             ? ($ltRules['attachment']['require_attachment'] ? 'Required' : 'Not Required')
             : ($ltRules['application']['attachment'] ?? 'Not Required');
@@ -183,6 +189,10 @@
                                             <span class="text-muted">Max Accumulation Limit:</span>
                                             <span class="fw-bold text-dark">{{ $maxAcc }}</span>
                                         </div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="text-muted">Negative Balance:</span>
+                                            <span class="fw-bold {{ !empty($ltRules['accrual']['allow_negative']) ? 'text-primary' : 'text-dark' }}">{{ $negativeBalance }}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -207,6 +217,10 @@
                                         <div class="d-flex justify-content-between align-items-center">
                                             <span class="text-muted">Advance Notice Required:</span>
                                             <span class="fw-bold text-dark">{{ $advNotice }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="text-muted">Sandwich Rule:</span>
+                                            <span class="fw-bold {{ !empty($ltRules['application']['sandwich_rule']) ? 'text-warning' : 'text-dark' }}">{{ $sandwichRule }}</span>
                                         </div>
                                         <div class="d-flex justify-content-between align-items-center">
                                             <span class="text-muted">Medical Attachment:</span>

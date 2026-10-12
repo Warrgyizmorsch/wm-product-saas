@@ -22,7 +22,10 @@ class LotTraceabilityController extends Controller
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         Gate::authorize('viewAny', ProductionOrder::class);
-        return view('modules.production.mes.operator.traceability');
+        $tenantId = require_tenant_id();
+        $available = $this->getAvailableEntities($tenantId);
+
+        return view('modules.production.mes.operator.traceability', $available);
     }
 
     public function search(SearchLotTraceabilityRequest $request)
@@ -38,13 +41,13 @@ class LotTraceabilityController extends Controller
         $id        = null;
 
         if ($type === 'batch') {
-            $batch = ProductionBatch::where('tenant_id', $tenantId)->where('batch_number', $code)->first();
+            $batch = ProductionBatch::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('batch_number', $code)->first();
             if ($batch) $id = $batch->id;
         } elseif ($type === 'order') {
-            $order = ProductionOrder::where('tenant_id', $tenantId)->where('order_number', $code)->first();
+            $order = ProductionOrder::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('order_number', $code)->first();
             if ($order) $id = $order->id;
         } elseif ($type === 'serial') {
-            $serial = ProductionSerialNumber::where('tenant_id', $tenantId)->where('serial_number', $code)->first();
+            $serial = ProductionSerialNumber::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('serial_number', $code)->first();
             if ($serial) $id = $serial->id;
         } elseif ($type === 'lot') {
             // Search by inventory batch number (raw material lot)
@@ -66,13 +69,48 @@ class LotTraceabilityController extends Controller
             default    => $this->traceService->buildGenealogy($tenantId, $type, $id),
         };
 
-        return view('modules.production.mes.operator.traceability', [
+        $available = $this->getAvailableEntities($tenantId);
+
+        return view('modules.production.mes.operator.traceability', array_merge($available, [
             'nodes'             => $genealogy['nodes'],
             'edges'             => $genealogy['edges'],
             'searchedType'      => $type,
             'searchedCode'      => $code,
             'searchedDirection' => $direction,
-        ]);
+        ]));
+    }
+
+    private function getAvailableEntities(int $tenantId): array
+    {
+        $orders = ProductionOrder::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->with('product:id,name,sku')
+            ->latest('id')
+            ->take(100)
+            ->get(['id', 'order_number', 'status', 'product_id', 'quantity_ordered', 'created_at']);
+
+        $batches = ProductionBatch::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->with('product:id,name,sku')
+            ->latest('id')
+            ->take(100)
+            ->get(['id', 'batch_number', 'status', 'product_id', 'planned_quantity', 'actual_quantity', 'created_at']);
+
+        $serials = ProductionSerialNumber::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->with('product:id,name,sku')
+            ->latest('id')
+            ->take(100)
+            ->get(['id', 'serial_number', 'status', 'product_id', 'created_at']);
+
+        $lots = InventoryBatch::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->with('product:id,name,sku')
+            ->latest('id')
+            ->take(100)
+            ->get(['id', 'batch_number', 'product_id', 'quantity', 'created_at']);
+
+        return compact('orders', 'batches', 'serials', 'lots');
     }
 
     /**

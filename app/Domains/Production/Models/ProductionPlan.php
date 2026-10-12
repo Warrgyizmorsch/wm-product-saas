@@ -6,6 +6,8 @@ use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\SalesOrderItem;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\Loggable;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,7 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProductionPlan extends BaseModel
 {
-    use HasFactory, Loggable, SoftDeletes;
+    use HasFactory, Loggable, SoftDeletes, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'production_plans';
 
@@ -48,6 +50,8 @@ class ProductionPlan extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'plan_number',
         'name',
         'product_id',

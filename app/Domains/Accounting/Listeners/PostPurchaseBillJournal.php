@@ -27,7 +27,7 @@ class PostPurchaseBillJournal
     {
         $bill = $event->bill;
 
-        if ($this->journals->findByReference('vendor_bill', $bill->id)->isNotEmpty()) {
+        if ($this->journals->activePosting((int) $bill->tenant_id, 'vendor_bill', $bill->id) !== null) {
             return;
         }
 
@@ -365,7 +365,7 @@ class PostPurchaseBillJournal
             }
 
             // Post General Ledger Journal Entry
-            $this->journals->post($lines, [
+            $this->journals->postOnce($lines, [
                 'tenant_id'      => $tenantId,
                 'journal_date'   => $bill->bill_date,
                 'source'         => Journal::SOURCE_PURCHASE,

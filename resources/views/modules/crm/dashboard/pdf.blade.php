@@ -64,9 +64,9 @@
                 <td class="num">{{ $totalQuotationsCount }} Quotations ({{ $pendingQuotationsCount }} Pending)</td>
             </tr>
             <tr>
-                <td>WhatsApp Bot Leads</td>
-                <td class="num">{{ number_format($whatsappLeadsCount) }}</td>
-                <td class="num">{{ $whatsappQualificationRate }}% Auto-Qualified</td>
+                <td>Third-Party Leads</td>
+                <td class="num">{{ number_format($thirdPartyLeadsCount) }}</td>
+                <td class="num">Win Rate: {{ $thirdPartyWinRate }}% ({{ $thirdPartyWonCount }} Won)</td>
             </tr>
         </tbody>
     </table>

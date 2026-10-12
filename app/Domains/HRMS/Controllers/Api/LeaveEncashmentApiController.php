@@ -5,14 +5,17 @@ namespace App\Domains\HRMS\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\LeaveType;
-use App\Domains\HRMS\Models\LeaveBalance;
-use App\Domains\HRMS\Models\LeaveEncashment;
+use App\Domains\HRMS\Repositories\LeaveEncashmentRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 
 class LeaveEncashmentApiController extends Controller
 {
+    public function __construct(
+        protected LeaveEncashmentRepositoryInterface $leaveEncashmentRepository
+    ) {}
+
     /**
      * Helper for standardized success JSON response.
      */
@@ -509,5 +512,13 @@ class LeaveEncashmentApiController extends Controller
             'end' => $periodEnd,
             'is_valid_month' => $isValidMonth,
         ];
+    }
+
+    /**
+     * Export Leave Encashment Requests to Excel (.xlsx).
+     */
+    public function export(Request $request): mixed
+    {
+        return $this->leaveEncashmentRepository->export($request->all());
     }
 }

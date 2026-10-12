@@ -4,9 +4,12 @@ namespace App\Domains\Sales\Services;
 
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Services\StockService;
+use App\Domains\Production\Models\ProductionMaintenanceWorkOrder;
+use App\Domains\Production\Models\ProductionMaintenanceWorkOrderSpare;
 use App\Domains\Production\Models\ProductionOrderReservation;
 use App\Domains\Production\Models\ProductionRequisitionSlip;
 use App\Domains\Production\Models\ProductionRequisitionSlipItem;
+use App\Domains\Production\Services\MaintenanceWorkOrderLogService;
 use App\Domains\Purchase\Models\PurchaseRequisition;
 use App\Domains\Purchase\Models\PurchaseRequisitionItem;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +40,38 @@ class MaterialRequestService
 
             if ($qtyToReserve <= 0) {
                 throw new InvalidArgumentException('No available stock in the selected warehouse to reserve.');
+            }
+
+            if ($slip->isMaintenance()) {
+                StockService::reserveStock(
+                    $tenantId,
+                    $item->product_id,
+                    $warehouseId,
+                    $qtyToReserve,
+                    'MaintenanceWorkOrder',
+                    $slip->maintenance_work_order_id,
+                    $item->id
+                );
+
+                // Sequentially allocate reserve across matching items of this product
+                $remRes = $qtyToReserve;
+                foreach ($sameProductItems as $pItem) {
+                    if ($remRes <= 0) break;
+
+                    $pRemToRes = max(0.0, (float)$pItem->quantity_planned - ((float)$pItem->quantity_issued + (float)$pItem->quantity_reserved));
+                    if ($pRemToRes > 0) {
+                        $alloc = min($remRes, $pRemToRes);
+                        $pItem->warehouse_id = $warehouseId;
+                        $pItem->quantity_reserved += $alloc;
+                        $pItem->save();
+
+                        $remRes -= $alloc;
+                    }
+                }
+
+                $this->updateSlipStatus($slip);
+
+                return $qtyToReserve;
             }
 
             StockService::reserveStock(
@@ -118,13 +153,97 @@ class MaterialRequestService
                 throw new InvalidArgumentException("Cannot issue {$quantity} units. Only {$maxAllowed} units are available.");
             }
 
-            StockService::recordOutflow(
+            if ($slip->isMaintenance()) {
+                $stockTxn = StockService::recordOutflow(
+                    $tenantId,
+                    $item->product_id,
+                    $resolvedWarehouseId,
+                    $quantity,
+                    'MaintenanceWorkOrder',
+                    $slip->maintenance_work_order_id
+                );
+
+                // Sequentially allocate issue quantity across matching items of this product
+                $remIssue = $quantity;
+                foreach ($sameProductItems as $pItem) {
+                    if ($remIssue <= 0) break;
+
+                    $pRemaining = max(0.0, (float)$pItem->quantity_planned - (float)$pItem->quantity_issued);
+                    if ($pRemaining > 0) {
+                        $alloc = min($remIssue, $pRemaining);
+
+                        $qtyFromRes = min($alloc, (float)$pItem->quantity_reserved);
+                        $pItem->quantity_reserved -= $qtyFromRes;
+                        $pItem->quantity_issued += $alloc;
+                        $pItem->save();
+
+                        $remIssue -= $alloc;
+                    }
+                }
+
+                // Sync to ProductionMaintenanceWorkOrderSpare
+                $spare = ProductionMaintenanceWorkOrderSpare::where('tenant_id', $tenantId)
+                    ->where('production_requisition_slip_item_id', $item->id)
+                    ->first();
+
+                if (!$spare) {
+                    $spare = ProductionMaintenanceWorkOrderSpare::where('tenant_id', $tenantId)
+                        ->where('maintenance_work_order_id', $slip->maintenance_work_order_id)
+                        ->where('product_id', $item->product_id)
+                        ->first();
+                }
+
+                $unitCost  = (float) $stockTxn->unit_cost;
+                $totalCost = (float) ($stockTxn->total_cost ?? $stockTxn->total_value);
+
+                if ($spare) {
+                    $newIssuedQty = (float) $spare->issued_qty + $quantity;
+                    $newTotalCost = (float) $spare->total_cost + $totalCost;
+                    $newUnitCost  = $newIssuedQty > 0 ? round($newTotalCost / $newIssuedQty, 2) : $unitCost;
+
+                    $spare->update([
+                        'warehouse_id'         => $resolvedWarehouseId,
+                        'issued_qty'           => $newIssuedQty,
+                        'unit_cost'            => $newUnitCost,
+                        'total_cost'           => $newTotalCost,
+                        'stock_transaction_id' => $stockTxn->id,
+                    ]);
+                }
+
+                // Recalculate Maintenance Work Order costs
+                $wo = ProductionMaintenanceWorkOrder::find($slip->maintenance_work_order_id);
+                if ($wo) {
+                    $sumSparesCost = (float) ProductionMaintenanceWorkOrderSpare::where('tenant_id', $tenantId)
+                        ->where('maintenance_work_order_id', $wo->id)
+                        ->sum('total_cost');
+
+                    $wo->update([
+                        'spare_parts_cost' => $sumSparesCost,
+                        'total_cost'       => round((float) $wo->mechanic_cost + $sumSparesCost + (float)($wo->additional_cost ?? 0.0), 2),
+                    ]);
+
+                    app(MaintenanceWorkOrderLogService::class)->recordSpareIssued(
+                        $wo,
+                        $item->product_id,
+                        $resolvedWarehouseId,
+                        $quantity,
+                        $totalCost,
+                        auth()->id() ?: 1
+                    );
+                }
+
+                $this->updateSlipStatus($slip);
+
+                return $quantity;
+            }
+
+            $stockTxn = StockService::recordOutflow(
                 $tenantId,
                 $item->product_id,
                 $resolvedWarehouseId,
                 $quantity,
-                'Production Order',
-                $slip->production_order_id
+                $slip->isRework() ? 'ReworkOrder' : 'Production Order',
+                $slip->isRework() ? $slip->rework_order_id : $slip->production_order_id
             );
 
             // Sequentially allocate issue quantity across matching items of this product
@@ -158,19 +277,49 @@ class MaterialRequestService
                     ->first();
             }
 
-            DB::table('production_order_issues')->insert([
+            $companyId = $slip->company_id ?? $slip->order?->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+            $branchId  = $slip->branch_id ?? $slip->order?->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+
+            $issueId = DB::table('production_order_issues')->insertGetId([
                 'tenant_id'           => $tenantId,
+                'company_id'          => $companyId,
+                'branch_id'           => $branchId,
                 'production_order_id' => $slip->production_order_id,
                 'reservation_id'      => $poReservation?->id,
+                'rework_order_id'     => $slip->rework_order_id,
+                'rework_operation_id' => $item->rework_operation_id,
                 'product_id'          => $item->product_id,
                 'warehouse_id'        => $resolvedWarehouseId,
                 'quantity_issued'     => $quantity,
+                'issue_type'          => $slip->isRework() ? 'rework' : 'standard',
                 'issued_at'           => now(),
                 'issued_by'           => auth()->id() ?: 1,
                 'remarks'             => $remarks,
                 'created_at'          => now(),
                 'updated_at'          => now(),
             ]);
+
+            if ($stockTxn) {
+                \App\Domains\Production\Models\ProductionOrderIssueBatch::create([
+                    'tenant_id'                 => $tenantId,
+                    'company_id'                => $companyId,
+                    'branch_id'                 => $branchId,
+                    'production_order_issue_id' => $issueId,
+                    'inventory_batch_id'        => $stockTxn->batch_id,
+                    'quantity'                  => $quantity,
+                    'stock_transaction_id'      => $stockTxn->id,
+                ]);
+            }
+
+            if ($slip->rework_order_id) {
+                $rework = \App\Domains\Production\Models\ProductionReworkOrder::find($slip->rework_order_id);
+                if ($rework) {
+                    $itemCost = (float) ($stockTxn?->total_cost ?? (($stockTxn?->unit_cost ?? 0.0) * $quantity));
+                    $rework->update([
+                        'actual_cost' => (float) $rework->actual_cost + $itemCost,
+                    ]);
+                }
+            }
 
             if ($poReservation) {
                 $poReservation->increment('quantity_issued', $quantity);

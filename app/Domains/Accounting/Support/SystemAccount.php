@@ -25,6 +25,8 @@ final class SystemAccount
     public const INVENTORY = 'inventory';
     public const WORK_IN_PROGRESS = 'work_in_progress';
     public const SUSPENSE = 'suspense_account';
+    // Where the year-end close moves each year's profit or loss.
+    public const RESERVES_AND_SURPLUS = 'reserves_and_surplus';
 
     // Advances
     public const LOANS_AND_ADVANCES = 'loans_and_advances';

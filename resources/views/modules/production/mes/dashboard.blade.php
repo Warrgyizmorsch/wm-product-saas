@@ -1558,7 +1558,7 @@
                                             </x-ui.odoo-form-ui>
                                         </div>
                                         <div class="col-md-6">
-                                            <x-ui.odoo-form-ui type="input" label="Estimated Repair Cost ($)" name="cost_estimate"
+                                            <x-ui.odoo-form-ui type="input" :label="'Estimated Repair Cost (' . active_currency_symbol() . ')'" name="cost_estimate"
                                                 inputType="number" step="0.01" value="50.00" />
                                         </div>
 

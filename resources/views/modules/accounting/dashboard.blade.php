@@ -43,32 +43,35 @@
         // Ledger amounts carry no symbol, like every Accounting screen — the layout
         // shows "Amounts in <company currency>" once per page.
         $mixedCurrencies = $currencyNote && str_starts_with($currencyNote, 'Warning');
-        // Quick period switch (ui-reference segmented control), keeping the other filters.
+        // The one period control: a pill per preset (keeping the other filters), plus Custom.
         $quickPresets = ['this_month' => 'MTD', 'last_month' => 'Last Month', 'this_quarter' => 'QTD', 'fiscal_year' => 'YTD'];
         $presetUrl = fn (string $preset) => route('accounting.dashboard', array_diff_key($query, array_flip(['preset', 'from', 'to'])) + ['preset' => $preset]);
+        $presetRange = fn (string $preset) => \App\Domains\Accounting\Support\DashboardPeriod::resolve(['preset' => $preset], $today, $fiscalYearStart)->label();
+        $isCustom = $period->preset === 'custom';
     @endphp
 
     {{-- Filters: they apply to every block on the page. --}}
     <x-ui.filter-panel formId="dashboard-period-form" :resetUrl="route('accounting.dashboard')" submitLabel="Filter Ledger">
         <input type="hidden" name="view" value="{{ $activeView }}">
-        <div class="col-sm-6 col-lg-auto">
-            <label class="form-label" for="preset">Accounting Period</label>
-            <div class="ax-select-chip">
-                <i class="feather-calendar"></i>
-                <select name="preset" id="preset" class="form-select">
-                    @foreach ($presets as $value => $label)
-                        <option value="{{ $value }}" @selected($period->preset === $value)>{{ $label }}{{ $period->preset === $value && $value !== 'custom' ? ' ('.$period->label().')' : '' }}</option>
-                    @endforeach
-                </select>
+        <div class="col-auto">
+            <label class="form-label d-block">Accounting Period</label>
+            {{-- Pills switch straight away; Custom opens the date fields, applied with Filter Ledger. --}}
+            <input type="hidden" name="preset" id="preset" value="{{ $period->preset }}">
+            <div class="ax-segmented" role="group" aria-label="Accounting period">
+                @foreach ($quickPresets as $key => $label)
+                    <a href="{{ $presetUrl($key) }}" title="{{ $presets[$key] }}: {{ $presetRange($key) }}"
+                       @class(['active' => $period->preset === $key]) @if ($period->preset === $key) aria-current="true" @endif>{{ $label }}</a>
+                @endforeach
+                <button type="button" id="custom-period-toggle" @class(['active' => $isCustom]) aria-expanded="{{ $isCustom ? 'true' : 'false' }}">Custom</button>
             </div>
         </div>
-        <div class="col-sm-3 col-lg-auto custom-range {{ $period->preset === 'custom' ? '' : 'd-none' }}">
+        <div class="col-sm-3 col-lg-auto custom-range {{ $isCustom ? '' : 'd-none' }}">
             <label class="form-label" for="from">From</label>
-            <input type="date" name="from" id="from" class="form-control" value="{{ $period->from->toDateString() }}">
+            <input type="date" name="from" id="from" class="form-control" value="{{ $period->from->toDateString() }}" @disabled(! $isCustom)>
         </div>
-        <div class="col-sm-3 col-lg-auto custom-range {{ $period->preset === 'custom' ? '' : 'd-none' }}">
+        <div class="col-sm-3 col-lg-auto custom-range {{ $isCustom ? '' : 'd-none' }}">
             <label class="form-label" for="to">To</label>
-            <input type="date" name="to" id="to" class="form-control" value="{{ $period->to->toDateString() }}">
+            <input type="date" name="to" id="to" class="form-control" value="{{ $period->to->toDateString() }}" @disabled(! $isCustom)>
         </div>
         @if ($companyCount > 1)
             <div class="col-sm-6 col-lg-auto">
@@ -96,17 +99,14 @@
                 </div>
             </div>
         @endif
-        <div class="col-auto">
-            <x-ui.segmented :options="$quickPresets" :active="$period->preset" :href="$presetUrl" />
-        </div>
 
         <x-slot:meta>
             <span class="d-inline-flex flex-wrap align-items-center gap-2">
                 <span class="ax-ref ax-tone-brand">{{ $period->preset === 'custom' ? 'CUSTOM' : 'LIVE' }}</span>
                 <span class="text-subtle">·</span>
-                <span>Current snapshot: <strong class="text-dark fw-medium">{{ $period->label() }} ({{ $period->days() }} {{ \Illuminate\Support\Str::plural('day', $period->days()) }})</strong></span>
+                <span>Current snapshot: <strong class="text-dark fw-medium">{{ $period->presetLabel() }} · {{ $period->label() }} ({{ $period->days() }} {{ \Illuminate\Support\Str::plural('day', $period->days()) }})</strong></span>
                 <span class="ax-footer-sep">|</span>
-                <span>Comparative: <span class="fw-medium">{{ $period->previousLabel() }}</span></span>
+                <span>Compared with: <span class="fw-medium">{{ $period->previousLabel() }}</span></span>
             </span>
             <span class="d-inline-flex align-items-center gap-2">
                 <span class="ax-overline" style="font-size: 11px;">Ledger:</span>
@@ -145,13 +145,23 @@
             // The widgets read the page's own filters.
             window.dashboardBaseQuery = () => @json($widgetQuery);
 
-            const presetSelect = document.getElementById('preset');
-            if (presetSelect) {
-                presetSelect.addEventListener('change', function () {
-                    const isCustom = this.value === 'custom';
-                    document.querySelectorAll('#dashboard-period-form .custom-range').forEach((el) => el.classList.toggle('d-none', !isCustom));
-                    if (!isCustom) {
-                        this.form.submit();
+            // Custom: show the date fields and send preset=custom with them;
+            // closing it again goes back to the preset the page is showing.
+            const customToggle = document.getElementById('custom-period-toggle');
+            const presetInput = document.getElementById('preset');
+            const shownPreset = presetInput ? presetInput.value : 'this_month';
+            if (customToggle && presetInput) {
+                customToggle.addEventListener('click', function () {
+                    const open = this.getAttribute('aria-expanded') !== 'true';
+                    this.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    this.classList.toggle('active', open);
+                    presetInput.value = open ? 'custom' : (shownPreset === 'custom' ? 'this_month' : shownPreset);
+                    document.querySelectorAll('#dashboard-period-form .custom-range').forEach((el) => {
+                        el.classList.toggle('d-none', !open);
+                        el.querySelectorAll('input').forEach((input) => { input.disabled = !open; });
+                    });
+                    if (open) {
+                        document.getElementById('from')?.focus();
                     }
                 });
             }

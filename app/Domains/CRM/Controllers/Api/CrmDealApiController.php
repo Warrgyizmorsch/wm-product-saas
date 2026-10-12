@@ -802,6 +802,134 @@ class CrmDealApiController extends Controller
     }
 
     /**
+     * PATCH /api/crm/deals/{deal}/owner
+     */
+    public function updateOwner(Request $request, CrmDeal $deal): JsonResponse
+    {
+        $this->authorize('update', $deal);
+
+        $validator = Validator::make($request->all(), [
+            'deal_owner_id' => 'nullable|integer|exists:users,id',
+            'owner_id'      => 'nullable|integer|exists:users,id',
+            'note'          => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $ownerId = $request->input('deal_owner_id', $request->input('owner_id'));
+        $deal->update(['owner_id' => $ownerId]);
+
+        // Sync linked Lead owner if lead exists
+        $linkedLead = Lead::where('crm_deal_id', $deal->id)
+            ->orWhere(function ($q) use ($deal) {
+                if ($deal->lead_id) {
+                    $q->where('id', $deal->lead_id);
+                }
+            })
+            ->first();
+
+        if ($linkedLead) {
+            $linkedLead->update(['lead_owner_id' => $ownerId]);
+            if ($request->filled('note')) {
+                \App\Domains\CRM\Models\LeadHistory::logEvent(
+                    $linkedLead,
+                    'note',
+                    null,
+                    $request->input('note'),
+                    "Deal Assignment Note: {$request->input('note')}"
+                );
+            }
+        }
+
+        $targetUser = $ownerId ? User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+
+        return response()->json([
+            'success'       => true,
+            'message'       => "Deal owner successfully updated to {$ownerName}.",
+            'deal_id'       => $deal->id,
+            'owner_id'      => $ownerId,
+            'owner_name'    => $ownerName,
+            'data'          => $deal->load('owner'),
+        ]);
+    }
+
+    /**
+     * POST /api/crm/deals/bulk-assign
+     */
+    public function bulkAssign(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', CrmDeal::class);
+        [$tenantId] = $this->resolveTenantContext();
+
+        $validator = Validator::make($request->all(), [
+            'deal_ids'      => 'required|array|min:1',
+            'deal_ids.*'    => 'required|integer|exists:crm_deals,id',
+            'deal_owner_id' => 'nullable|integer|exists:users,id',
+            'owner_id'      => 'nullable|integer|exists:users,id',
+            'note'          => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $ownerId = $request->input('deal_owner_id', $request->input('owner_id'));
+        $targetUser = $ownerId ? User::find($ownerId) : null;
+        $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
+        $note = $request->input('note');
+
+        $deals = CrmDeal::where('tenant_id', $tenantId)
+            ->whereIn('id', $request->input('deal_ids'))
+            ->get();
+
+        $updatedCount = 0;
+        foreach ($deals as $deal) {
+            $deal->update(['owner_id' => $ownerId]);
+
+            $linkedLead = Lead::where('crm_deal_id', $deal->id)
+                ->orWhere(function ($q) use ($deal) {
+                    if ($deal->lead_id) {
+                        $q->where('id', $deal->lead_id);
+                    }
+                })
+                ->first();
+
+            if ($linkedLead) {
+                $linkedLead->update(['lead_owner_id' => $ownerId]);
+                if (!empty($note)) {
+                    \App\Domains\CRM\Models\LeadHistory::logEvent(
+                        $linkedLead,
+                        'note',
+                        null,
+                        $note,
+                        "Bulk Deal Assignment Note: {$note}"
+                    );
+                }
+            }
+            $updatedCount++;
+        }
+
+        return response()->json([
+            'success'       => true,
+            'message'       => "Successfully assigned {$updatedCount} deal(s) to {$ownerName}.",
+            'updated_count' => $updatedCount,
+            'owner_id'      => $ownerId,
+            'owner_name'    => $ownerName,
+        ]);
+    }
+
+    /**
      * GET /api/crm/deals/export
      */
     public function export(Request $request)
@@ -813,5 +941,119 @@ class CrmDealApiController extends Controller
             new \App\Exports\DealExport($tenantId, $request->all()),
             'deals_export_' . date('Y-m-d_His') . '.xlsx'
         );
+    }
+
+    /**
+     * GET /api/crm/deals/{deal}/documents
+     * List all documents attached to deal / linked lead.
+     */
+    public function documents(CrmDeal $deal): JsonResponse
+    {
+        $this->authorize('view', $deal);
+
+        $linkedLead = Lead::where('crm_deal_id', $deal->id)
+            ->orWhere(function ($q) use ($deal) {
+                if ($deal->lead_id) {
+                    $q->where('id', $deal->lead_id);
+                } elseif ($deal->crm_account_id) {
+                    $q->where('crm_account_id', $deal->crm_account_id);
+                }
+            })
+            ->with('leadDocuments')
+            ->first();
+
+        $documents = $linkedLead ? $linkedLead->leadDocuments->map(function ($doc) {
+            return [
+                'id'         => $doc->id,
+                'file_name'  => $doc->file_name,
+                'file_type'  => $doc->file_type,
+                'size'       => $doc->size,
+                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'created_at' => $doc->created_at?->toIso8601String(),
+            ];
+        }) : collect();
+
+        return response()->json([
+            'success' => true,
+            'count'   => $documents->count(),
+            'data'    => $documents,
+        ]);
+    }
+
+    /**
+     * POST /api/crm/deals/{deal}/documents
+     * Upload documents for a deal.
+     */
+    public function uploadDocuments(Request $request, CrmDeal $deal): JsonResponse
+    {
+        $this->authorize('update', $deal);
+
+        $validator = Validator::make($request->all(), [
+            'documents'   => 'required',
+            'documents.*' => 'file|max:10240',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
+
+        $linkedLead = Lead::where('crm_deal_id', $deal->id)
+            ->orWhere(function ($q) use ($deal) {
+                if ($deal->lead_id) {
+                    $q->where('id', $deal->lead_id);
+                } elseif ($deal->crm_account_id) {
+                    $q->where('crm_account_id', $deal->crm_account_id);
+                }
+            })
+            ->first();
+
+        if (!$linkedLead) {
+            $linkedLead = Lead::create([
+                'tenant_id'      => $tenantId,
+                'company_id'     => $companyId,
+                'branch_id'      => $branchId,
+                'company_name'   => $deal->account ? $deal->account->name : $deal->title,
+                'contact_person' => $deal->contact ? $deal->contact->name : 'N/A',
+                'phone'          => $deal->contact?->phone ?: $deal->account?->phone,
+                'email'          => $deal->contact?->email ?: $deal->account?->email,
+                'requirement'    => $deal->title,
+                'crm_account_id' => $deal->crm_account_id,
+                'crm_contact_id' => $deal->crm_contact_id,
+                'crm_deal_id'    => $deal->id,
+                'status'         => 'Qualified',
+            ]);
+        }
+
+        $files = $request->file('documents');
+        if (!is_array($files)) {
+            $files = [$files];
+        }
+
+        app(\App\Domains\CRM\Services\LeadService::class)->uploadDocuments($linkedLead, $files);
+
+        $linkedLead->refresh();
+        $documents = $linkedLead->leadDocuments->map(function ($doc) {
+            return [
+                'id'         => $doc->id,
+                'file_name'  => $doc->file_name,
+                'file_type'  => $doc->file_type,
+                'size'       => $doc->size,
+                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'created_at' => $doc->created_at?->toIso8601String(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Deal document(s) uploaded successfully.',
+            'count'   => $documents->count(),
+            'data'    => $documents,
+        ], 201);
     }
 }

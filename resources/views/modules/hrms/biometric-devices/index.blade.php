@@ -1,18 +1,20 @@
 @extends('layouts.duralux')
 
-@section('title', 'Biometric Device Master | SaaS ERP')
-@section('page-title', 'Biometric Device Master')
-@section('breadcrumb', 'HRMS / Biometric Device Master')
+@section('title', __('hrms.biometric.title') . ' | SaaS ERP')
+@section('page-title', __('hrms.biometric.title'))
+@section('breadcrumb', __('hrms.biometric.breadcrumb'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addDeviceModal" class="fw-bold text-uppercase">
-            Add Biometric Device
+            {{ __('hrms.biometric.add_device') }}
         </x-ui.button>
     </div>
 @endsection
 
 @push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
         @media (min-width: 992px) {
             .nxl-content {
@@ -38,6 +40,13 @@
                 background-color: #f8fafc;
                 min-width: 0;
             }
+            .biometric-devices-table {
+                table-layout: fixed !important;
+                width: 100% !important;
+            }
+            .biometric-table-responsive {
+                overflow-x: hidden !important;
+            }
         }
 
         @media (max-width: 991.98px) {
@@ -45,22 +54,35 @@
                 width: 100%;
                 padding: 0 15px;
             }
+            .biometric-table-responsive {
+                overflow-x: auto;
+            }
         }
 
-        .nav-tabs .nav-link {
-            border: none !important;
-            border-bottom: 2px solid transparent !important;
-            background: transparent !important;
-            color: #64748b !important;
-            padding: 12px 16px !important;
+        .biometric-devices-table th {
+            vertical-align: middle;
         }
 
-        .nav-tabs .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom: 2px solid var(--bs-primary) !important;
-            font-weight: 600 !important;
+        .biometric-devices-table td {
+            vertical-align: top !important;
+            white-space: normal !important;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            padding-top: 14px !important;
+            padding-bottom: 14px !important;
+        }
+
+        .adms-banner {
+            background: linear-gradient(135deg, #f8fafc 0%, #eef2f6 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
         }
     </style>
+@endpush
+
+@push('scripts')
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
 @endpush
 
 @section('content')
@@ -75,141 +97,253 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show mb-4 border-0 shadow-sm" role="alert" style="background-color: #ffebee; color: #c62828;">
+            <div class="d-flex align-items-center">
+                <i class="feather-alert-circle me-2 fs-18"></i>
+                <div>{{ session('error') }}</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show mb-4 border-0 shadow-sm" role="alert" style="background-color: #ffebee; color: #c62828;">
+            <ul class="mb-0 ps-3">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if(isset($hasBiometricRule) && !$hasBiometricRule)
+        <div class="alert alert-warning alert-dismissible fade show mb-4 border-0 shadow-sm" role="alert" style="background-color: #fff8e1; color: #5d4037;">
+            <div class="d-flex align-items-center">
+                <i class="feather-alert-triangle me-2 fs-18 text-warning"></i>
+                <div>
+                    <strong>{{ __('hrms.biometric.rule_notice_title') }}</strong> 
+                    {!! __('hrms.biometric.rule_notice_desc', ['link' => '<a href="'.route('hrms.penalization-policy.index').'" class="fw-bold text-dark text-decoration-underline">'.__('hrms.biometric.attendance_rules').'</a>']) !!}
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <div class="settings-container">
         <div class="settings-content-col erp-single-panel bg-white flex-grow-1 p-4 shadow-sm rounded border-0 text-dark biometric-pane-wrapper">
             
-            <!-- Main Tabs Header and Search / Filters -->
-            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-3 border-bottom gap-3">
-                <div>
-                    <ul class="nav nav-tabs border-0" id="biometricTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active fw-semibold border-0 {{ request('tab', 'devices') === 'devices' ? 'active' : '' }}" id="devices-tab" data-bs-toggle="tab" data-bs-target="#devices-pane" type="button" role="tab" aria-controls="devices-pane" aria-selected="true">
-                                <i class="feather-cpu me-2"></i>Devices List
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link fw-semibold border-0 {{ request('tab') === 'simulator' ? 'active' : '' }}" id="simulator-tab" data-bs-toggle="tab" data-bs-target="#simulator-pane" type="button" role="tab" aria-controls="simulator-pane" aria-selected="false">
-                                <i class="feather-play-circle me-2"></i>Biometric Simulator
-                            </button>
-                        </li>
-                    </ul>
+            <!-- Cloud ADMS & Server Webhook Info Header Banner -->
+            <div class="adms-banner p-3 mb-4 rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-3 shadow-none border" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle flex-shrink-0" style="width: 42px; height: 42px; display: inline-flex; align-items: center; justify-content: center;">
+                        <i class="feather-radio fs-18"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-dark fs-13">{{ __('hrms.biometric.adms_banner_title') }}</div>
+                        <div class="text-muted fs-12">{{ __('hrms.biometric.adms_banner_desc') }}</div>
+                    </div>
                 </div>
-
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <form method="GET" action="{{ route('hrms.biometric-devices.index') }}" class="d-flex align-items-center gap-2 m-0" id="biometricFilterForm">
-                        <input type="hidden" name="tab" value="devices">
-                        <input type="hidden" name="sort" id="biometric_sort" value="{{ $sort ?? 'name_asc' }}">
-
-                        <!-- Search -->
-                        <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
-                            <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                            <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search devices..." value="{{ $search ?? '' }}" style="box-shadow: none; height: 32px;">
-                        </div>
-
-                        <div class="d-flex gap-2">
-                            <!-- Sort Dropdown Component -->
-                            <x-ui.sort-dropdown label="Sort">
-                                <a class="dropdown-item py-2 {{ ($sort ?? 'name_asc') == 'name_asc' ? 'active' : '' }}" href="#" onclick="changeSort('biometric', 'name_asc', this); event.preventDefault();">Name (A-Z)</a>
-                                <a class="dropdown-item py-2 {{ ($sort ?? '') == 'name_desc' ? 'active' : '' }}" href="#" onclick="changeSort('biometric', 'name_desc', this); event.preventDefault();">Name (Z-A)</a>
-                                <a class="dropdown-item py-2 {{ ($sort ?? '') == 'serial_asc' ? 'active' : '' }}" href="#" onclick="changeSort('biometric', 'serial_asc', this); event.preventDefault();">Serial (Ascending)</a>
-                                <a class="dropdown-item py-2 {{ ($sort ?? '') == 'serial_desc' ? 'active' : '' }}" href="#" onclick="changeSort('biometric', 'serial_desc', this); event.preventDefault();">Serial (Descending)</a>
-                            </x-ui.sort-dropdown>
-
-                            <!-- Filter Dropdown Component -->
-                            <x-ui.filter label="Filter" offset="0, 5" :reset-url="route('hrms.biometric-devices.index', ['tab' => 'devices'])">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
-                                
-                                <div class="mb-3" style="min-width: 260px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Company</label>
-                                    <x-ui.odoo-form-ui type="select" name="company_id">
-                                        <option value="">All Companies</option>
-                                        @foreach($companies as $company)
-                                            <option value="{{ $company->id }}" @selected((string)$selectedCompanyId === (string)$company->id)>{{ $company->company_name }}</option>
-                                        @endforeach
-                                    </x-ui.odoo-form-ui>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Business Unit</label>
-                                    <x-ui.odoo-form-ui type="select" name="business_unit_id">
-                                        <option value="">All Business Units</option>
-                                        @foreach($businessUnits as $bu)
-                                            <option value="{{ $bu->id }}" @selected((string)$selectedBusinessUnitId === (string)$bu->id)>{{ $bu->name }}</option>
-                                        @endforeach
-                                    </x-ui.odoo-form-ui>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Branch</label>
-                                    <x-ui.odoo-form-ui type="select" name="branch_id">
-                                        <option value="">All Branches</option>
-                                        @foreach($branches as $branch)
-                                            <option value="{{ $branch->id }}" @selected((string)$selectedBranchId === (string)$branch->id)>{{ $branch->name }}</option>
-                                        @endforeach
-                                    </x-ui.odoo-form-ui>
-                                </div>
-                            </x-ui.filter>
-                        </div>
-                    </form>
+                <div class="d-flex align-items-center flex-grow-1 justify-content-lg-end" style="min-width: 380px;">
+                    <div class="input-group input-group-sm" style="max-width: 560px; width: 100%;">
+                        <span class="input-group-text bg-white text-muted border-end-0 fs-12 px-2.5">
+                            <i class="feather-link-2"></i>
+                        </span>
+                        <input type="text" class="form-control bg-white fs-12 fw-monospace border-start-0 border-end-0 text-dark px-2" id="admsWebhookUrl" value="{{ url('api/hrms/biometric/webhook') }}" readonly style="cursor: text;" onclick="this.select()" title="{{ __('hrms.biometric.copy_url') }}">
+                        <button class="btn btn-sm btn-primary fw-semibold px-3 d-inline-flex align-items-center flex-shrink-0" type="button" onclick="copyAdmsWebhookUrl(this)">
+                            <i class="feather-copy me-1.5 fs-12"></i>{{ __('hrms.biometric.copy_url') }}
+                        </button>
+                    </div>
                 </div>
+            </div>
+
+            @php
+                $biometricTabs = [
+                    [
+                        'id' => 'devices-pane',
+                        'label' => __('hrms.biometric.devices_list'),
+                        'icon' => 'feather-cpu',
+                        'active' => (request('tab', 'devices') === 'devices' || request('tab') === 'devices-pane')
+                    ],
+                    [
+                        'id' => 'simulator-pane',
+                        'label' => __('hrms.biometric.simulator'),
+                        'icon' => 'feather-play-circle',
+                        'active' => (request('tab') === 'simulator' || request('tab') === 'simulator-pane')
+                    ]
+                ];
+            @endphp
+
+            <!-- Navigation Tabs Bar with Common UI Component -->
+            <div class="mb-4">
+                <x-ui.horizontal-tabs id="biometricTabs" :tabs="$biometricTabs" />
             </div>
 
             <div class="tab-content" id="biometricTabsContent">
                 <!-- Tab 1: Devices List -->
-                <div class="tab-pane fade show active {{ request('tab', 'devices') === 'devices' ? 'show active' : '' }}" id="devices-pane" role="tabpanel" aria-labelledby="devices-tab">
+                <div class="tab-pane fade {{ (request('tab', 'devices') === 'devices' || request('tab') === 'devices-pane') ? 'show active' : '' }}" id="devices-pane" role="tabpanel" aria-labelledby="devices-pane-tab">
+
+                    <!-- Devices Toolbar: Title + Search, Sort, Filter -->
+                    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0 d-flex align-items-center">
+                                <i class="feather-cpu me-2 text-primary"></i> {{ __('hrms.biometric.registered_devices') }}
+                                <span class="badge bg-light text-dark border ms-2 fs-11 fw-semibold">{{ $devices->total() }}</span>
+                            </h5>
+                            <p class="text-muted fs-12 mb-0">{{ __('hrms.biometric.registered_devices_desc') }}</p>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
+                            <form method="GET" action="{{ route('hrms.biometric-devices.index') }}" class="d-flex align-items-center gap-2 m-0" id="biometricFilterForm">
+                                <input type="hidden" name="tab" value="devices">
+                                <input type="hidden" name="sort" id="biometric_sort" value="{{ $sort ?? 'name_asc' }}">
+
+                                <!-- Clean Single-Border Search Input (No double box nesting) -->
+                                <div class="position-relative" style="min-width: 240px; max-width: 280px;">
+                                    <input type="text" name="search" id="biometricSearchInput" 
+                                           class="form-control form-control-sm ps-4 pe-4 fs-12 bg-white text-dark" 
+                                           placeholder="{{ __('hrms.biometric.search_placeholder') }}" 
+                                           value="{{ $search ?? '' }}" 
+                                           autocomplete="off" 
+                                           style="height: 38px; border: 1px solid #d1d5db; border-radius: 6px; padding-left: 34px !important;">
+                                    <i class="feather-search text-muted position-absolute" style="left: 11px; top: 50%; transform: translateY(-50%); font-size: 13px; pointer-events: none;"></i>
+                                    @if(!empty($search))
+                                        <a href="{{ route('hrms.biometric-devices.index', ['tab' => 'devices']) }}" class="position-absolute text-muted" style="right: 10px; top: 50%; transform: translateY(-50%); font-size: 12px;" title="{{ __('hrms.biometric.clear_search') }}">
+                                            <i class="feather-x"></i>
+                                        </a>
+                                    @endif
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <!-- Sort Dropdown Component -->
+                                    <x-ui.sort-dropdown :label="__('hrms.biometric.sort')">
+                                        <a class="dropdown-item py-2 {{ ($sort ?? 'name_asc') == 'name_asc' ? 'active' : '' }}" href="#" onclick="changeSort('biometric', 'name_asc', this); event.preventDefault();">{{ __('hrms.biometric.sort_name_asc') }}</a>
+                                        <a class="dropdown-item py-2 {{ ($sort ?? '') == 'name_desc' ? 'active' : '' }}" href="#" onclick="changeSort('biometric', 'name_desc', this); event.preventDefault();">{{ __('hrms.biometric.sort_name_desc') }}</a>
+                                        <a class="dropdown-item py-2 {{ ($sort ?? '') == 'serial_asc' ? 'active' : '' }}" href="#" onclick="changeSort('biometric', 'serial_asc', this); event.preventDefault();">{{ __('hrms.biometric.sort_serial_asc') }}</a>
+                                        <a class="dropdown-item py-2 {{ ($sort ?? '') == 'serial_desc' ? 'active' : '' }}" href="#" onclick="changeSort('biometric', 'serial_desc', this); event.preventDefault();">{{ __('hrms.biometric.sort_serial_desc') }}</a>
+                                    </x-ui.sort-dropdown>
+
+                                    <!-- Filter Dropdown Component -->
+                                    <x-ui.filter :label="__('hrms.biometric.filter')" offset="0, 5" :reset-url="route('hrms.biometric-devices.index', ['tab' => 'devices'])">
+                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.biometric.filter_options') }}</h6>
+                                        
+                                        <div class="mb-3" style="min-width: 260px;">
+                                            <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.company')" name="company_id" id="filter_company_id">
+                                                <option value="">{{ __('hrms.biometric.all_companies') }}</option>
+                                                @foreach($companies as $company)
+                                                    <option value="{{ $company->id }}" @selected((string)$selectedCompanyId === (string)$company->id)>{{ $company->company_name }}</option>
+                                                @endforeach
+                                            </x-ui.modal-form-ui>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.business_unit')" name="business_unit_id" id="filter_business_unit_id">
+                                                <option value="">{{ __('hrms.biometric.all_business_units') }}</option>
+                                                @foreach($businessUnits as $bu)
+                                                    <option value="{{ $bu->id }}" @selected((string)$selectedBusinessUnitId === (string)$bu->id)>{{ $bu->name }}</option>
+                                                @endforeach
+                                            </x-ui.modal-form-ui>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.branch')" name="branch_id" id="filter_branch_id">
+                                                <option value="">{{ __('hrms.biometric.all_branches') }}</option>
+                                                @foreach($branches as $branch)
+                                                    <option value="{{ $branch->id }}" @selected((string)$selectedBranchId === (string)$branch->id)>{{ $branch->name }}</option>
+                                                @endforeach
+                                            </x-ui.modal-form-ui>
+                                        </div>
+                                    </x-ui.filter>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
 
                     <!-- Device Table -->
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                    <div class="table-responsive biometric-table-responsive">
+                        <table class="table table-hover align-middle mb-0 biometric-devices-table" style="font-size: 13px;">
+                            <colgroup>
+                                <col style="width: 26%;">
+                                <col style="width: 14%;">
+                                <col style="width: 28%;">
+                                <col style="width: 14%;">
+                                <col style="width: 12%;">
+                                <col style="width: 6%;">
+                            </colgroup>
                             <thead class="table-light text-uppercase fs-11 text-muted" style="letter-spacing: .5px;">
                                 <tr>
-                                    <th class="ps-4 py-3" style="width: 25%;">Device Info</th>
-                                    <th style="width: 15%;">Serial Number</th>
-                                    <th style="width: 25%;">Org Level Scoping</th>
-                                    <th style="width: 15%;">Network Info</th>
-                                    <th style="width: 10%;">Status</th>
-                                    <th class="pe-4 text-end" style="width: 10%;">Action</th>
+                                    <th class="ps-4 py-3">{{ __('hrms.biometric.device_info') }}</th>
+                                    <th>{{ __('hrms.biometric.serial_number') }}</th>
+                                    <th>{{ __('hrms.biometric.org_scope') }}</th>
+                                    <th>{{ __('hrms.biometric.network_port') }}</th>
+                                    <th>{{ __('hrms.biometric.connection_state') }}</th>
+                                    <th class="pe-4 text-end">{{ __('hrms.biometric.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="biometricTableBody">
                                 @forelse($devices as $dev)
                                     <tr>
                                         <td class="ps-4 py-3">
-                                            <div class="d-flex align-items-center gap-2">
-                                                <div class="avatar-text avatar-md bg-soft-primary text-primary fw-bold rounded-circle flex-shrink-0" style="width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center;">
-                                                    <i class="feather-cpu fs-16"></i>
+                                            <div class="d-flex align-items-start gap-2.5">
+                                                <div class="avatar-text avatar-md bg-soft-primary text-primary fw-bold rounded-circle flex-shrink-0 mt-0.5" style="width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;">
+                                                    <i class="feather-cpu fs-15"></i>
                                                 </div>
                                                 <div>
-                                                    <div class="fw-bold text-dark">{{ $dev->name }}</div>
-                                                    <div class="text-muted fs-11">Registered: {{ $dev->created_at ? $dev->created_at->format('d M Y') : '—' }}</div>
+                                                    <div class="fw-bold text-dark lh-sm mb-1">{{ $dev->name }}</div>
+                                                    <div class="text-muted fs-11">{{ __('hrms.biometric.registered_on', ['date' => $dev->created_at ? $dev->created_at->format('d M Y') : '—']) }}</div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td>
-                                            <code class="px-2 py-1 bg-light rounded text-secondary fw-semibold">{{ $dev->device_serial }}</code>
+                                            <code class="px-2 py-1 bg-light rounded text-secondary fw-semibold text-break d-inline-block">{{ $dev->device_serial }}</code>
                                         </td>
                                         <td>
                                             <div class="fs-12">
-                                                <div class="fw-semibold text-dark">{{ $dev->company->company_name ?? '—' }}</div>
-                                                <div class="text-muted fs-11">
-                                                    BU: {{ $dev->businessUnit->name ?? 'Global' }} | 
-                                                    Branch: {{ $dev->branch->name ?? 'Global' }}
+                                                <div class="fw-bold text-dark mb-1">{{ $dev->company->company_name ?? '—' }}</div>
+                                                <div class="text-muted fs-11 lh-sm mb-1">
+                                                    <span class="text-secondary fw-semibold">BU:</span> {{ $dev->businessUnit->name ?? __('hrms.biometric.global') }}
+                                                </div>
+                                                <div class="text-muted fs-11 lh-sm">
+                                                    <span class="text-secondary fw-semibold">Branch:</span> {{ $dev->branch->name ?? __('hrms.biometric.global') }}
                                                 </div>
                                             </div>
                                         </td>
                                         <td>
                                             <div class="fs-12">
-                                                <div><i class="feather-wifi me-1 text-muted"></i>{{ $dev->ip_address ?? 'Cloud ADMS' }}</div>
-                                                <div class="text-muted fs-11">Port: {{ $dev->port ?? '4370' }}</div>
+                                                <div class="fw-semibold text-dark mb-1">
+                                                    <i class="feather-wifi me-1 text-primary"></i>{{ $dev->ip_address ?: __('hrms.biometric.cloud_adms') }}
+                                                </div>
+                                                <div class="text-muted fs-11">{{ __('hrms.biometric.port_prefix', ['port' => $dev->port ?? '4370']) }}</div>
                                             </div>
                                         </td>
                                         <td>
-                                            <x-ui.badge :variant="$dev->status ? 'success' : 'danger'" soft>
-                                                {{ $dev->status ? 'Active' : 'Inactive' }}
-                                            </x-ui.badge>
+                                            <div class="d-flex flex-column gap-1 align-items-start">
+                                                @if($dev->last_ping_at && $dev->last_ping_at->gt(now()->subMinutes(15)))
+                                                    <x-ui.badge variant="success" :soft="true" class="d-inline-flex align-items-center" style="padding: 3px 8px; font-size: 11px;">
+                                                        <i class="feather-check-circle me-1"></i>{{ __('hrms.biometric.status_online') }}
+                                                    </x-ui.badge>
+                                                    <span class="text-muted fs-11">{{ __('hrms.biometric.ping_prefix', ['time' => $dev->last_ping_at->diffForHumans()]) }}</span>
+                                                @elseif($dev->last_ping_at)
+                                                    <x-ui.badge variant="warning" :soft="true" class="d-inline-flex align-items-center" style="padding: 3px 8px; font-size: 11px;">
+                                                        <i class="feather-clock me-1"></i>{{ __('hrms.biometric.status_idle') }}
+                                                    </x-ui.badge>
+                                                    <span class="text-muted fs-11">{{ __('hrms.biometric.last_prefix', ['time' => $dev->last_ping_at->diffForHumans()]) }}</span>
+                                                @else
+                                                    <x-ui.badge variant="secondary" :soft="true" class="d-inline-flex align-items-center" style="padding: 3px 8px; font-size: 11px;">
+                                                        <i class="feather-cloud me-1"></i>{{ __('hrms.biometric.status_standby') }}
+                                                    </x-ui.badge>
+                                                    <span class="text-muted fs-11">{{ __('hrms.biometric.awaiting_sync') }}</span>
+                                                @endif
+                                            </div>
                                         </td>
                                         <td class="pe-4 text-end">
                                             <x-ui.action-dropdown>
+                                                <li>
+                                                    <a class="dropdown-item py-2" href="#" onclick="testDeviceConnection({{ $dev->id }}, this); event.preventDefault();">
+                                                        <i class="feather-activity me-2 text-primary"></i>{{ __('hrms.biometric.test_connection') }}
+                                                    </a>
+                                                </li>
                                                 <li>
                                                     <a class="dropdown-item py-2" href="#" 
                                                         data-bs-toggle="modal" data-bs-target="#editDeviceModal" 
@@ -223,7 +357,7 @@
                                                         data-port="{{ $dev->port }}"
                                                         data-status="{{ $dev->status ? '1' : '0' }}"
                                                         onclick="populateEditModal(this); event.preventDefault();">
-                                                        <i class="feather-edit me-2 text-muted"></i>Edit Device
+                                                        <i class="feather-edit me-2 text-muted"></i>{{ __('hrms.biometric.edit_device') }}
                                                     </a>
                                                 </li>
                                                 <li>
@@ -234,7 +368,7 @@
                                                         @csrf
                                                         @method('DELETE')
                                                         <a class="dropdown-item py-2 text-danger fw-semibold" href="#" onclick="confirmDelete(this); event.preventDefault();">
-                                                            <i class="feather-trash-2 me-2"></i>Delete Device
+                                                            <i class="feather-trash-2 me-2"></i>{{ __('hrms.biometric.delete_device') }}
                                                         </a>
                                                     </form>
                                                 </li>
@@ -245,7 +379,7 @@
                                     <tr>
                                         <td colspan="6" class="text-center py-5 text-muted">
                                             <i class="feather-alert-circle fs-30 mb-2 d-block text-secondary"></i>
-                                            <div>No biometric devices registered. Register a virtual device to start testing!</div>
+                                            <div>{{ __('hrms.biometric.empty_devices_hint') }}</div>
                                         </td>
                                     </tr>
                                 @endforelse
@@ -268,20 +402,20 @@
                     <div class="row m-0 border-top">
                         <!-- Instructions Side Panel -->
                         <div class="col-lg-4 p-4 bg-light border-end">
-                            <h5 class="fw-bold text-dark fs-14 mb-3"><i class="feather-info me-2 text-primary"></i>Biometric Punch Simulator</h5>
+                            <h5 class="fw-bold text-dark fs-14 mb-3"><i class="feather-info me-2 text-primary"></i>{{ __('hrms.biometric.simulator_title') }}</h5>
                             <p class="text-muted fs-12 leading-relaxed">
-                                This panel emulates a physical biometric device pushing logs to the cloud application. It allows you to test:
+                                {{ __('hrms.biometric.simulator_intro') }}
                             </p>
                             <ul class="ps-3 fs-12 text-muted leading-relaxed mb-4">
-                                <li class="mb-2"><strong>Check-In Logs</strong> (Creates attendance entry)</li>
-                                <li class="mb-2"><strong>Check-Out Logs</strong> (Closes attendance, calculates hours)</li>
-                                <li class="mb-2"><strong>Roster Off-Days</strong> (Sunday defaults to rest days)</li>
-                                <li class="mb-2"><strong>Shift Penalties</strong> (Checks grace periods)</li>
+                                <li class="mb-2">{{ __('hrms.biometric.sim_check_in') }}</li>
+                                <li class="mb-2">{{ __('hrms.biometric.sim_check_out') }}</li>
+                                <li class="mb-2">{{ __('hrms.biometric.sim_grace_period') }}</li>
+                                <li class="mb-2">{{ __('hrms.biometric.sim_roster_int') }}</li>
                             </ul>
                             
                             <div class="alert bg-soft-primary text-primary border-0 fs-12 mb-0" style="padding: 12px;">
-                                <i class="feather-alert-triangle me-1"></i>
-                                <strong>System Note:</strong> Triggering a mock punch dispatches a background job that processes the database asynchronously.
+                                <i class="feather-zap me-1"></i>
+                                <strong>{{ __('hrms.biometric.sim_instant_title') }}</strong> {{ __('hrms.biometric.sim_instant_desc') }}
                             </div>
                         </div>
 
@@ -292,50 +426,44 @@
                                 <div class="row g-3">
                                     <!-- Device Select -->
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted fs-11 text-uppercase">Target Virtual Device</label>
-                                        <select name="biometric_device_id" class="form-select border shadow-sm">
-                                            <option value="">Virtual Simulator Port</option>
-                                            @foreach($devices as $dev)
+                                        <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.target_virtual_device')" name="biometric_device_id" id="sim_biometric_device_id">
+                                            <option value="">{{ __('hrms.biometric.virtual_simulator_port') }}</option>
+                                            @foreach(($allDevices ?? $devices) as $dev)
                                                 <option value="{{ $dev->id }}">{{ $dev->name }} ({{ $dev->device_serial }})</option>
                                             @endforeach
-                                        </select>
+                                        </x-ui.modal-form-ui>
                                     </div>
 
                                     <!-- Employee Select -->
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted fs-11 text-uppercase">Select Employee <span class="text-danger">*</span></label>
-                                        <select name="employee_id" class="form-select border shadow-sm" required>
-                                            <option value="">-- Choose Employee --</option>
+                                        <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.select_employee')" name="employee_id" id="sim_employee_id" required>
+                                            <option value="">{{ __('hrms.biometric.choose_employee') }}</option>
                                             @foreach($allEmployeesForSim as $emp)
                                                 <option value="{{ $emp->id }}">
                                                     {{ $emp->full_name }} ({{ $emp->employee_id ?? 'No ID' }}) 
                                                 </option>
                                             @endforeach
-                                        </select>
-                                        <div class="invalid-feedback">Employee is required.</div>
+                                        </x-ui.modal-form-ui>
                                     </div>
 
                                     <!-- Punch Type -->
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted fs-11 text-uppercase">Punch Event Type <span class="text-danger">*</span></label>
-                                        <select name="punch_type" class="form-select border shadow-sm" required>
-                                            <option value="auto">Auto-Resolve (Sequence Mode)</option>
-                                            <option value="in">Check-In</option>
-                                            <option value="out">Check-Out</option>
-                                        </select>
+                                        <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.punch_event_type')" name="punch_type" id="sim_punch_type" required>
+                                            <option value="auto">{{ __('hrms.biometric.auto_resolve') }}</option>
+                                            <option value="in">{{ __('hrms.biometric.check_in') }}</option>
+                                            <option value="out">{{ __('hrms.biometric.check_out') }}</option>
+                                        </x-ui.modal-form-ui>
                                     </div>
 
                                     <!-- Timestamp -->
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold text-muted fs-11 text-uppercase">Punch Time & Date <span class="text-danger">*</span></label>
-                                        <input type="datetime-local" name="punch_time" class="form-control border shadow-sm" value="{{ now()->format('Y-m-d\TH:i') }}" required>
-                                        <div class="invalid-feedback">Punch time is required.</div>
+                                        <x-ui.modal-form-ui type="input" inputType="datetime-local" :label="__('hrms.biometric.punch_time')" name="punch_time" id="sim_punch_time" value="{{ now()->format('Y-m-d\TH:i') }}" required />
                                     </div>
 
                                     <div class="col-12 mt-4 text-end">
-                                        <button type="submit" class="btn btn-primary d-flex align-items-center gap-2 ms-auto shadow-sm">
-                                            <i class="feather-zap fs-14"></i> Trigger Test Punch
-                                        </button>
+                                        <x-ui.button variant="primary" icon="feather-zap" type="submit" class="shadow-sm">
+                                            {{ __('hrms.biometric.trigger_test_punch') }}
+                                        </x-ui.button>
                                     </div>
                                 </div>
                             </form>
@@ -353,82 +481,123 @@
 <!-- Add Device Modal -->
 <x-ui.modal 
     id="addDeviceModal" 
-    title='<i class="feather-cpu me-1 text-primary"></i>Register Biometric Device' 
-    submitText="Save Device"
+    :title="'<i class=\'feather-cpu me-2 text-primary\'></i>' . __('hrms.biometric.register_modal_title')" 
+    :submit-text="__('hrms.biometric.save_device')"
     formAction="{{ route('hrms.biometric-devices.store') }}" 
-    formMethod="POST">
+    formMethod="POST"
+    centered>
     
-    <x-ui.odoo-form-ui type="input" label="Device Name" name="name" placeholder="Office Main Gate" required />
-    <x-ui.odoo-form-ui type="input" label="Device Serial" name="device_serial" placeholder="ZK9500-1049382" required />
-    
-    <x-ui.odoo-form-ui type="select" label="Company" name="company_id" required>
-        <option value="">-- Select Company --</option>
-        @foreach($companies as $company)
-            <option value="{{ $company->id }}">{{ $company->company_name }}</option>
-        @endforeach
-    </x-ui.odoo-form-ui>
-    
-    <x-ui.odoo-form-ui type="select" label="Business Unit" name="business_unit_id">
-        <option value="">Global / All Units</option>
-        @foreach($businessUnits as $bu)
-            <option value="{{ $bu->id }}">{{ $bu->name }}</option>
-        @endforeach
-    </x-ui.odoo-form-ui>
-    
-    <x-ui.odoo-form-ui type="select" label="Branch" name="branch_id">
-        <option value="">Global / All Branches</option>
-        @foreach($branches as $branch)
-            <option value="{{ $branch->id }}">{{ $branch->name }}</option>
-        @endforeach
-    </x-ui.odoo-form-ui>
-    
-    <x-ui.odoo-form-ui type="input" label="IP Address" name="ip_address" placeholder="192.168.1.201" />
-    <x-ui.odoo-form-ui type="input" label="Port" name="port" type="number" value="4370" required />
-    
-    <x-ui.odoo-form-ui type="select" label="Status" name="status" id="addDeviceStatus" required>
-        <option value="1" selected>Active</option>
-        <option value="0">Inactive</option>
-    </x-ui.odoo-form-ui>
+    <div class="row g-3">
+        <div class="col-md-6">
+            <x-ui.modal-form-ui type="input" :label="__('hrms.biometric.device_name')" name="name" id="add_name" :placeholder="__('hrms.biometric.device_name_placeholder')" required />
+        </div>
+        <div class="col-md-6">
+            <x-ui.modal-form-ui type="input" :label="__('hrms.biometric.device_serial')" name="device_serial" id="add_device_serial" :placeholder="__('hrms.biometric.device_serial_placeholder')" required />
+        </div>
+
+        <div class="col-md-12">
+            <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.company_entity')" name="company_id" id="add_company_id" required>
+                <option value="">{{ __('hrms.biometric.select_company') }}</option>
+                @foreach($companies as $company)
+                    <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                @endforeach
+            </x-ui.modal-form-ui>
+        </div>
+
+        <div class="col-md-6">
+            <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.business_unit_opt')" name="business_unit_id" id="add_business_unit_id">
+                <option value="">{{ __('hrms.biometric.global_all_units') }}</option>
+                @foreach($businessUnits as $bu)
+                    <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                @endforeach
+            </x-ui.modal-form-ui>
+        </div>
+
+        <div class="col-md-6">
+            <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.branch_opt')" name="branch_id" id="add_branch_id">
+                <option value="">{{ __('hrms.biometric.global_all_branches') }}</option>
+                @foreach($branches as $branch)
+                    <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                @endforeach
+            </x-ui.modal-form-ui>
+        </div>
+
+        <div class="col-md-8">
+            <x-ui.modal-form-ui type="input" :label="__('hrms.biometric.ip_address')" name="ip_address" id="add_ip_address" :placeholder="__('hrms.biometric.ip_address_placeholder')" :helper-text="__('hrms.biometric.ip_helper_text')" />
+        </div>
+
+        <div class="col-md-4">
+            <x-ui.modal-form-ui type="input" inputType="number" :label="__('hrms.biometric.port')" name="port" id="add_port" value="4370" required min="1" max="65535" />
+        </div>
+
+        <div class="col-md-12">
+            <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.device_status')" name="status" id="add_status" required>
+                <option value="1" selected>{{ __('hrms.biometric.status_active_ready') }}</option>
+                <option value="0">{{ __('hrms.biometric.status_inactive_disabled') }}</option>
+            </x-ui.modal-form-ui>
+        </div>
+    </div>
 </x-ui.modal>
 
 <!-- Edit Device Modal -->
 <x-ui.modal 
     id="editDeviceModal" 
-    title='<i class="feather-cpu me-1 text-primary"></i>Edit Biometric Device' 
-    submitText="Save Changes"
+    :title="'<i class=\'feather-cpu me-2 text-primary\'></i>' . __('hrms.biometric.edit_modal_title')" 
+    :submit-text="__('hrms.biometric.save_changes')"
     formAction="placeholder" 
-    formMethod="PUT">
+    formMethod="PUT"
+    centered>
     
-    <x-ui.odoo-form-ui type="input" label="Device Name" name="name" id="edit_name" required />
-    <x-ui.odoo-form-ui type="input" label="Device Serial" name="device_serial" id="edit_serial" required />
-    
-    <x-ui.odoo-form-ui type="select" label="Company" name="company_id" id="edit_company_id" required>
-        @foreach($companies as $company)
-            <option value="{{ $company->id }}">{{ $company->company_name }}</option>
-        @endforeach
-    </x-ui.odoo-form-ui>
-    
-    <x-ui.odoo-form-ui type="select" label="Business Unit" name="business_unit_id" id="edit_business_unit_id">
-        <option value="">Global / All Units</option>
-        @foreach($businessUnits as $bu)
-            <option value="{{ $bu->id }}">{{ $bu->name }}</option>
-        @endforeach
-    </x-ui.odoo-form-ui>
-    
-    <x-ui.odoo-form-ui type="select" label="Branch" name="branch_id" id="edit_branch_id">
-        <option value="">Global / All Branches</option>
-        @foreach($branches as $branch)
-            <option value="{{ $branch->id }}">{{ $branch->name }}</option>
-        @endforeach
-    </x-ui.odoo-form-ui>
-    
-    <x-ui.odoo-form-ui type="input" label="IP Address" name="ip_address" id="edit_ip_address" />
-    <x-ui.odoo-form-ui type="input" label="Port" name="port" id="edit_port" type="number" required />
-    
-    <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_status" required>
-        <option value="1">Active</option>
-        <option value="0">Inactive</option>
-    </x-ui.odoo-form-ui>
+    <div class="row g-3">
+        <div class="col-md-6">
+            <x-ui.modal-form-ui type="input" :label="__('hrms.biometric.device_name')" name="name" id="edit_name" required />
+        </div>
+        <div class="col-md-6">
+            <x-ui.modal-form-ui type="input" :label="__('hrms.biometric.device_serial')" name="device_serial" id="edit_serial" required />
+        </div>
+
+        <div class="col-md-12">
+            <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.company_entity')" name="company_id" id="edit_company_id" required>
+                <option value="">{{ __('hrms.biometric.select_company') }}</option>
+                @foreach($companies as $company)
+                    <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                @endforeach
+            </x-ui.modal-form-ui>
+        </div>
+
+        <div class="col-md-6">
+            <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.business_unit_opt')" name="business_unit_id" id="edit_business_unit_id">
+                <option value="">{{ __('hrms.biometric.global_all_units') }}</option>
+                @foreach($businessUnits as $bu)
+                    <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                @endforeach
+            </x-ui.modal-form-ui>
+        </div>
+
+        <div class="col-md-6">
+            <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.branch_opt')" name="branch_id" id="edit_branch_id">
+                <option value="">{{ __('hrms.biometric.global_all_branches') }}</option>
+                @foreach($branches as $branch)
+                    <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                @endforeach
+            </x-ui.modal-form-ui>
+        </div>
+
+        <div class="col-md-8">
+            <x-ui.modal-form-ui type="input" :label="__('hrms.biometric.ip_address')" name="ip_address" id="edit_ip_address" :placeholder="__('hrms.biometric.ip_address_placeholder')" :helper-text="__('hrms.biometric.ip_helper_text')" />
+        </div>
+
+        <div class="col-md-4">
+            <x-ui.modal-form-ui type="input" inputType="number" :label="__('hrms.biometric.port')" name="port" id="edit_port" required min="1" max="65535" />
+        </div>
+
+        <div class="col-md-12">
+            <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.device_status')" name="status" id="edit_status" required>
+                <option value="1">{{ __('hrms.biometric.status_active_ready') }}</option>
+                <option value="0">{{ __('hrms.biometric.status_inactive_disabled') }}</option>
+            </x-ui.modal-form-ui>
+        </div>
+    </div>
 </x-ui.modal>
 
 <script>
@@ -448,81 +617,146 @@
             })
     })()
 
+    // Ensure Select2 is initialized inside Bootstrap modals
+    $(document).on('shown.bs.modal', '#addDeviceModal, #editDeviceModal', function () {
+        var modal = $(this);
+        modal.find('.form-ui-select2').each(function () {
+            var $select = $(this);
+            if (!$select.hasClass('select2-hidden-accessible')) {
+                $select.select2({
+                    theme: "bootstrap-5",
+                    width: "100%",
+                    dropdownParent: modal
+                });
+            }
+        });
+    });
+
+    // Reset Add modal on open
+    $('#addDeviceModal').on('show.bs.modal', function () {
+        var form = $(this).find('form')[0];
+        if (form) {
+            form.reset();
+            form.classList.remove('was-validated');
+            $('#add_company_id').val('').trigger('change');
+            $('#add_business_unit_id').val('').trigger('change');
+            $('#add_branch_id').val('').trigger('change');
+            $('#add_status').val('1').trigger('change');
+        }
+    });
+
     // Populate dynamic edit modal values
     function populateEditModal(button) {
         var id = button.getAttribute('data-id');
-        var name = button.getAttribute('data-name');
-        var serial = button.getAttribute('data-serial');
-        var company = button.getAttribute('data-company');
+        var name = button.getAttribute('data-name') || '';
+        var serial = button.getAttribute('data-serial') || '';
+        var company = button.getAttribute('data-company') || '';
         var bu = button.getAttribute('data-bu') || '';
         var branch = button.getAttribute('data-branch') || '';
         var ip = button.getAttribute('data-ip') || '';
-        var port = button.getAttribute('data-port');
-        var status = button.getAttribute('data-status');
+        var port = button.getAttribute('data-port') || '4370';
+        var status = button.getAttribute('data-status') || '1';
 
-        document.getElementById('edit_name').value = name;
-        document.getElementById('edit_serial').value = serial;
-        
-        var companySelect = document.getElementById('edit_company_id');
-        if (companySelect) {
-            companySelect.value = company;
-            if (window.jQuery && $(companySelect).data('select2')) {
-                $(companySelect).trigger('change');
-            }
-        }
-        
-        var buSelect = document.getElementById('edit_business_unit_id');
-        if (buSelect) {
-            buSelect.value = bu;
-            if (window.jQuery && $(buSelect).data('select2')) {
-                $(buSelect).trigger('change');
-            }
-        }
-        
-        var branchSelect = document.getElementById('edit_branch_id');
-        if (branchSelect) {
-            branchSelect.value = branch;
-            if (window.jQuery && $(branchSelect).data('select2')) {
-                $(branchSelect).trigger('change');
-            }
-        }
-
-        document.getElementById('edit_ip_address').value = ip;
-        document.getElementById('edit_port').value = port;
-        
-        var statusSelect = document.getElementById('edit_status');
-        if (statusSelect) {
-            statusSelect.value = status;
-            if (window.jQuery && $(statusSelect).data('select2')) {
-                $(statusSelect).trigger('change');
-            }
-        }
+        $('#edit_name').val(name);
+        $('#edit_serial').val(serial);
+        $('#edit_company_id').val(company).trigger('change');
+        $('#edit_business_unit_id').val(bu).trigger('change');
+        $('#edit_branch_id').val(branch).trigger('change');
+        $('#edit_ip_address').val(ip);
+        $('#edit_port').val(port);
+        $('#edit_status').val(status).trigger('change');
 
         var form = document.querySelector('#editDeviceModal form');
         if (form) {
-            var baseAction = "{{ route('hrms.biometric-devices.update', ':id') }}";
-            form.action = baseAction.replace(':id', id);
+            var baseAction = "{{ route('hrms.biometric-devices.update', 99999999) }}";
+            form.action = baseAction.replace('99999999', id);
         }
     }
 
-    // Swel delete confirmation wrapper
+    // Ping / Test Device Connection
+    function testDeviceConnection(deviceId, button) {
+        var originalHtml = button.innerHTML;
+        button.innerHTML = '<i class="feather-loader me-2 fa-spin"></i>{{ __('hrms.biometric.testing') }}';
+        button.disabled = true;
+
+        var token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+
+        fetch('{{ url("hrms/biometric-devices") }}/' + deviceId + '/test-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: data.connected ? '{{ __('hrms.biometric.device_connected') }}' : '{{ __('hrms.biometric.connection_status') }}',
+                    text: data.message || (data.connected ? '{{ __('hrms.biometric.device_responded') }}' : '{{ __('hrms.biometric.unable_to_connect') }}'),
+                    icon: data.connected ? 'success' : 'info',
+                    confirmButtonText: 'OK',
+                    confirmButtonColor: '#3085d6'
+                });
+            } else {
+                alert(data.message || (data.connected ? '{{ __('hrms.biometric.device_connected') }}' : '{{ __('hrms.biometric.unable_to_connect') }}'));
+            }
+        })
+        .catch(function (err) {
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: '{{ __('hrms.biometric.conn_check_error') }}',
+                    text: '{{ __('hrms.biometric.conn_check_error_desc') }}',
+                    icon: 'error'
+                });
+            } else {
+                alert('{{ __('hrms.biometric.conn_check_error_desc') }}');
+            }
+        });
+    }
+
+    // Copy Cloud ADMS Webhook URL
+    function copyAdmsWebhookUrl(button) {
+        var copyText = document.getElementById("admsWebhookUrl");
+        if (copyText) {
+            copyText.select();
+            copyText.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(copyText.value);
+            
+            var originalText = button.innerHTML;
+            button.innerHTML = '<i class="feather-check me-1 text-success"></i>{{ __('hrms.biometric.copied') }}';
+            setTimeout(function () {
+                button.innerHTML = originalText;
+            }, 2000);
+        }
+    }
+
+    // SweetAlert delete confirmation wrapper
     function confirmDelete(button) {
         if (typeof Swal !== 'undefined') {
             Swal.fire({
-                title: 'Are you sure?',
-                text: "You are about to delete this biometric device registration.",
+                title: '{{ __('hrms.biometric.confirm_delete_title') }}',
+                text: "{{ __('hrms.biometric.confirm_delete_text') }}",
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#3085d6',
                 cancelButtonColor: '#d33',
-                confirmButtonText: 'Yes, delete it!'
+                confirmButtonText: '{{ __('hrms.biometric.yes_delete') }}',
+                cancelButtonText: '{{ __('hrms.biometric.cancel') }}'
             }).then((result) => {
                 if (result.isConfirmed) {
                     button.closest('form').submit();
                 }
             });
         } else {
-            if (confirm("Are you sure you want to delete this biometric device?")) {
+            if (confirm("{{ __('hrms.biometric.confirm_delete_text') }}")) {
                 button.closest('form').submit();
             }
         }
@@ -618,27 +852,8 @@
         });
     }
 
-    // Toggle search/filter form visibility based on active tab
     document.addEventListener('DOMContentLoaded', function () {
-        var devicesTab = document.getElementById('devices-tab');
-        var simulatorTab = document.getElementById('simulator-tab');
-        var filterForm = document.getElementById('biometricFilterForm');
-
-        function toggleControls() {
-            if (devicesTab && devicesTab.classList.contains('active')) {
-                if (filterForm) filterForm.style.setProperty('display', 'flex', 'important');
-            } else {
-                if (filterForm) filterForm.style.setProperty('display', 'none', 'important');
-            }
-        }
-
-        if (devicesTab && simulatorTab && filterForm) {
-            devicesTab.addEventListener('shown.bs.tab', toggleControls);
-            simulatorTab.addEventListener('shown.bs.tab', toggleControls);
-            toggleControls();
-        }
-
-        // Debounced quick search to avoid needing to press Enter
+        // Debounced quick search
         var searchTimeout = null;
         $(document).on('input', '#biometricFilterForm input[name="search"]', function () {
             const input = this;
