@@ -322,6 +322,25 @@ Inspect the existing **Production BOM module** (`resources/views/modules/product
 
 ---
 
+### 3.14 Commercial & Manufacturing Integration UI (Phase 12 — Completed)
+- **Sales Order to Project Actions (`sales/orders/show.blade.php`):**
+  - "Create Project" action CTA button in the Sales Order actions toolbar.
+  - Converts order into linked delivery project with auto-created Milestones mapped to order items.
+  - Bidirectional navigation badge linking directly to `projects.show`.
+- **Project Identity Accordion (`projects/show.blade.php`):**
+  - Displays linked Sales Order pill (`so_number`) and customer reference when origin is a commercial order.
+- **Milestone Item Association (`projects/milestones/_form.blade.php`, `projects/milestones/workspace.blade.php`):**
+  - Odoo-form select for `sales_order_item_id` displaying item line description, quantity, and unit price.
+  - Shows linked sales order item badge in milestone header.
+- **Manufacturing & Procurement Task Card (`projects/tasks/workspace/_manufacturing-procurement.blade.php`):**
+  - Rendered in the Task Workspace meta rail.
+  - Displays linked Production Orders table: Order Number, Product, Progress bar (Produced vs. Ordered units), Status badge, and Unlink action.
+  - Includes inline link form with searchable select filtered to tenant/company production orders.
+  - Displays linked Purchase Requisitions table showing PR number, item description, quantity, and status.
+- **Status:** **FULLY IMPLEMENTED (PHASE 12).**
+
+---
+
 ## 4. Collaborator Invariant Enforced in UI
 
 All user selectors in the UI strictly enforce project membership:

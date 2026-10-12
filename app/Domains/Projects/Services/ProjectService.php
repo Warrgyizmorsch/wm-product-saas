@@ -227,19 +227,35 @@ class ProjectService
         ];
     }
 
-    public function getNextProjectCode(): string
+    public function getNextProjectCode(?int $tenantId = null): string
     {
-        $latest = $this->projects->latestCode();
+        $tenantId = $tenantId ?? (tenant_id() ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null) ?? 1);
+
+        $latest = $this->projects->latestCode($tenantId);
 
         $nextSeq = $latest ? intval(str_replace('PRJ-', '', $latest)) + 1 : 1;
 
-        return 'PRJ-' . str_pad((string) $nextSeq, 4, '0', STR_PAD_LEFT);
+        do {
+            $candidate = 'PRJ-' . str_pad((string) $nextSeq, 4, '0', STR_PAD_LEFT);
+            $exists = Project::withoutGlobalScopes()
+                ->withTrashed()
+                ->where('tenant_id', $tenantId)
+                ->where('project_code', $candidate)
+                ->exists();
+            if ($exists) {
+                $nextSeq++;
+            }
+        } while ($exists);
+
+        return $candidate;
     }
 
     public function create(array $data): Project
     {
         return DB::transaction(function () use ($data) {
-            $data['project_code'] = $this->getNextProjectCode();
+            $tenantId = $data['tenant_id'] ?? (tenant_id() ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null) ?? 1);
+            $data['tenant_id'] = $tenantId;
+            $data['project_code'] = $data['project_code'] ?? $this->getNextProjectCode($tenantId);
 
             $project = $this->projects->create($data);
 

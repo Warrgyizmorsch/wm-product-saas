@@ -5,6 +5,7 @@ namespace App\Domains\Sales\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
@@ -55,6 +56,11 @@ class SalesOrderItem extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id');
+    }
+
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Projects\Models\Milestone::class, 'sales_order_item_id');
     }
 
     protected static function booted(): void

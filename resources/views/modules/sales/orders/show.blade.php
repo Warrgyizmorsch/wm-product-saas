@@ -35,6 +35,16 @@
                 </button>
             </form>
         @elseif (in_array($order->status, ['Confirmed', 'Partially Shipped', 'Shipped']))
+            @if ($order->projects && $order->projects->isNotEmpty())
+                <x-ui.button variant="outline-info" size="sm" :href="route('projects.show', $order->projects->first()->project_code)" class="fw-bold px-3 d-print-none" icon="feather-folder">
+                    {{ __('projects.view_project') }} ({{ $order->projects->first()->project_code }})
+                </x-ui.button>
+            @elseif ($order->status === 'Confirmed' && auth()->user()->can('create', \App\Domains\Projects\Models\Project::class))
+                <x-ui.button variant="outline-primary" size="sm" class="fw-bold px-3 d-print-none" data-bs-toggle="modal" data-bs-target="#convertToProjectModal" icon="feather-folder-plus">
+                    {{ __('projects.convert_to_project') }}
+                </x-ui.button>
+            @endif
+
             @if ($hasUnbilledQty && $invoicingPolicy !== 'dispatch_order')
                 <a href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id, 'mode' => 'sales_order']) }}" class="btn btn-sm btn-primary fw-bold px-3 d-print-none">
                     <i class="feather-file-text me-1.5"></i>{{ __('crm.create_invoice') }}
@@ -810,6 +820,43 @@
             </div>
         </div>
     </div>
+
+    @if ($order->status === 'Confirmed' && auth()->user()->can('create', \App\Domains\Projects\Models\Project::class))
+    <x-ui.modal 
+        id="convertToProjectModal" 
+        :title="'<i class=\'feather-folder-plus me-2 text-primary\'></i>' . __('projects.convert_to_project')" 
+        :centered="true" 
+        size="lg" 
+        :formAction="route('sales.orders.convert-to-project', $order->id)" 
+        formMethod="POST">
+        
+        <p class="text-muted fs-13 mb-3">
+            {{ __('projects.convert_so_to_project_desc', ['order' => $order->sales_order_number]) ?: "Convert this Sales Order into a Project. Delivery milestones will be created for each order line item automatically." }}
+        </p>
+
+        <div class="row g-3">
+            <div class="col-12">
+                <x-ui.odoo-form-ui type="input" name="project_name" :label="__('projects.project_name')" :value="'Delivery: ' . $order->sales_order_number" :required="true" />
+            </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" inputType="date" name="start_date" :label="__('projects.start_date')" :value="$order->order_date ? $order->order_date->format('Y-m-d') : date('Y-m-d')" />
+            </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" inputType="date" name="end_date" :label="__('projects.end_date')" :value="$order->shipment_date ? $order->shipment_date->format('Y-m-d') : date('Y-m-d', strtotime('+30 days'))" />
+            </div>
+            <div class="col-12">
+                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" name="budget_amount" :label="__('projects.budget_amount')" :value="$order->total_amount" />
+            </div>
+        </div>
+
+        <x-slot:footer>
+            <x-ui.button variant="light" size="sm" data-bs-dismiss="modal">{{ __('crm.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold" icon="feather-check-circle">
+                {{ __('projects.create_project') }}
+            </x-ui.button>
+        </x-slot:footer>
+    </x-ui.modal>
+    @endif
 @endsection
 
 @push('styles')

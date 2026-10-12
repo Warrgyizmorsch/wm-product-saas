@@ -592,9 +592,11 @@
                     $('.odoo-select2').each(function() {
                         var select = $(this);
                         if (!select.hasClass('select2-hidden-accessible')) {
+                            var parentContainer = select.closest('.modal-content, .modal, .offcanvas-body, .offcanvas');
                             select.select2({
                                 theme: "bootstrap-5",
-                                width: "100%"
+                                width: "100%",
+                                dropdownParent: parentContainer.length ? parentContainer : $(document.body)
                             });
                         }
                     });
@@ -912,8 +914,8 @@
             });
 
             // Re-initialize for modals/drawers when shown
-            $(document).on('show.bs.modal show.bs.offcanvas', function () {
-                setTimeout(initOdooComponents, 150);
+            $(document).on('show.bs.modal show.bs.offcanvas shown.bs.modal shown.bs.offcanvas', function () {
+                setTimeout(initOdooComponents, 100);
             });
         </script>
     @endpush

@@ -359,8 +359,14 @@ The application has an extensive library of 44 pre-built `<x-ui.*>` Blade compon
 | **Core** | `User` | Core Domain | Assignee, Owner, Manager, Reviewer reference |
 | **Core / Access** | `Role`, `Permission` | Access Domain | Authorization evaluation via `AccessService` |
 | **CRM** | `Customer` | CRM Domain | Project Client reference (`customer_id`) |
+| **CRM** | `Deal`, `Contact` | CRM Domain | Opportunity and primary client contact references (`crm_deal_id`, `client_contact_id`) |
+| **Sales** | `SalesOrder`, `SalesOrderItem` | Sales Domain | Originating commercial order (`projects.sales_order_id`, `project_milestones.sales_order_item_id`) |
 | **Sales** | `Invoice`, `InvoiceItem` | Sales Domain | Target invoice created from project billing calculation |
+| **Production** | `ProductionOrder` | Production Domain | Manufacturing order (`production_orders.project_task_id`); Production remains 100% authoritative for BOM, routing, QC, and execution |
+| **Purchase** | `PurchaseRequisitionItem` | Purchase Domain | Direct material sourcing item linked to task (`purchase_requisition_items.project_task_id`) |
+| **Accounting** | `CostCenter` | Accounting Domain | Financial cost center reference (`projects.cost_center_id`) |
 | **Accounting** | `Journal`, `JournalItem` | Accounting Domain | Auto-posted from Sales Invoices (never direct from PM) |
+| **Platform** | `NotificationEventCatalog` | Platform Domain | Central system event catalog (19 registered PM lifecycle events) |
 | **Storage** | Physical Files on Disk | Laravel Filesystem | Tenant-isolated project attachment paths |
 | **Notifications** | `notifications` | Laravel Framework | Delivery channel for project domain events |
 | **Projects** | `Project` | Project Management | Root project entity |
@@ -383,6 +389,10 @@ The application has an extensive library of 44 pre-built `<x-ui.*>` Blade compon
 |---|---|---|---|
 | `App\Models\User` | Resources, Owners, Assignees | **REUSE** | Single authentication and identity source; tenant-isolated. |
 | `App\Domains\CRM\Models\Customer` | Project Client | **REUSE** | Canonical client entity across CRM and Sales; avoids duplicate `clients` table. |
+| `App\Domains\Sales\Models\SalesOrder` | Order to Project Conversion | **REUSE / BRIDGE** | `SalesOrderProjectBridgeService` bridges confirmed orders to delivery projects without duplicating order data. |
+| `App\Domains\Production\Models\ProductionOrder` | Manufacturing Operations | **REUSE / EVENT SYNC** | Event-driven status synchronization (`ProductionOrderCompleted`); PM strictly consumes Production quantity without duplicating manufacturing logic. |
+| `App\Domains\Purchase\Models\PurchaseRequisition` | Material Sourcing | **REUSE / LINK** | Reuses standard procurement requisition engine via `source_type = 'project'` and line-level `project_task_id`. |
+| `NotificationEventCatalog` | Platform Event Catalog | **REUSE / REGISTER** | Registers all 19 PM events in the central ERP notification catalog. |
 | `App\Domains\Sales\Models\Invoice` | Project Invoicing | **REUSE** | Commercial invoice engine with GST, tax, and PDF generation. |
 | `InvoicePosted` / `PostInvoiceJournal` | GL Auto-Posting | **REUSE** | Accounting postings are triggered via standard invoice events. |
 | `ActivityLogService` | Audit Trail | **REUSE** | Polymorphic logging already handles all project sub-entities. |
@@ -412,3 +422,91 @@ The application has an extensive library of 44 pre-built `<x-ui.*>` Blade compon
 4. **Third-Party Gantt Dependency Bloat:**
    - *Risk:* Pulling in heavy, conflicting NPM packages like DHTMLX.
    - *Safeguard:* Reusing the existing native HTML5 Timeline architecture proven in the Production module.
+
+---
+
+## 17. Cross-Module Commercial & Manufacturing Integrations (Phase 12 — Completed & Verified)
+
+### 17.1 Sales Order ↔ Delivery Project Bridge
+- **Service:** `App\Domains\Sales\Services\SalesOrderProjectBridgeService`
+- **Controller Action:** `SalesOrderController::convertToProject` (`POST /sales/orders/{order}/convert-to-project`)
+- **Cardinality & Business Rules:**
+  - `SalesOrder` 1 : N `Project` (An order can create a dedicated delivery project, and multiple projects can reference one order).
+  - `SalesOrderItem` 1 : N `Milestone` (Non-unique `project_milestones.sales_order_item_id` allows phased deliverable splits for a single line item).
+  - Draft sales orders cannot convert; only `Confirmed` sales orders may convert.
+  - Generates a default `Fulfillment & Delivery` Task List with tasks for each deliverable milestone.
+  - Foreign key: `projects.sales_order_id` -> `sales_orders(id)` (`nullOnDelete()`).
+
+### 17.2 Production Order ↔ PM Task Linking & Authoritative Completion Sync
+- **Event:** `App\Domains\Production\Events\ProductionOrderCompleted`
+- **Listener:** `App\Domains\Projects\Listeners\SyncProductionTaskCompletionListener` (registered in `AppServiceProvider`)
+- **Canonical Dispatch Location:** Dispatched strictly from `ProductionOrder::booted()` on `wasChanged('status') && status === ProductionOrder::STATUS_COMPLETED`.
+- **Authoritative Quantity & QC Rules:**
+  - PM strictly consumes Production's authoritative quantities: `$isQuantitySatisfied = ($quantityOrdered <= 0) || ($quantityProduced >= ($quantityOrdered - 0.0001))`.
+  - In Production, units failing QC or undergoing active rework remain uncredited toward `quantity_produced`.
+  - If a shortfall occurs (due to scrap, rejection, or unresolved rework), the PM task remains `In Progress`, and an audit warning (`production.shortfall_warning`) is logged.
+  - Checks sibling production orders linked to the same task. The PM task is auto-completed only when all sibling orders are completed and production yields satisfy ordered quantities.
+  - Task linking endpoints: `POST /projects/{project}/tasks/{task}/link-production-order` and `DELETE .../unlink-production-order` in `TaskController`.
+  - Foreign keys: `production_orders.project_id`, `production_orders.project_milestone_id`, `production_orders.project_task_id` (`nullOnDelete()`). Standalone production orders remain 100% operational with null project references.
+
+### 17.3 Purchase Requisition ↔ Task Procurement Linking
+- **Service Integration:** `PurchaseRequisitionService` accepts `source_type = 'project'` and sets `source_id = project_id`.
+- **Line Item Linkage:** `purchase_requisition_items.project_task_id` -> `project_tasks(id)` (`nullOnDelete()`).
+- **Endpoints:** `POST /projects/{project}/tasks/{task}/link-purchase-requisition` and `DELETE .../unlink-purchase-requisition` in `TaskController`.
+
+### 17.4 Platform Notification Event Catalog Registration
+- All 19 canonical project lifecycle event keys are registered in `NotificationEventCatalog::getEvents()` under the `'projects'` module:
+  `projects.project.created`, `projects.project.status_changed`, `projects.project.completed`, `projects.milestone.created`, `projects.milestone.completed`, `projects.task.created`, `projects.task.assigned`, `projects.task.completed`, `projects.issue.logged`, `projects.issue.resolved`, `projects.issue.retested`, `projects.timesheet.submitted`, `projects.timesheet.approved`, `projects.timesheet.rejected`, `projects.review.requested`, `projects.review.signed_off`, `projects.change_request.created`, `projects.change_request.approved`, and `projects.project.closed`.
+
+### 17.5 Cross-Module Permissions & Tenant Isolation
+- Linking actions check tenant-scoped permissions via `AccessService`:
+  - Production linking requires `production.orders.view`, `production.view`, `tenant_owner`, or `super_admin`.
+  - Purchase linking requires `purchase.requisitions.view`, `purchase.view`, `tenant_owner`, or `super_admin`.
+- All queries strictly enforce `tenant_id` match via explicit rule existence constraints and `require_tenant_id()`.
+
+### 17.6 Pre-Existing Baseline Sales Regression Debt
+- Two pre-existing failures in `tests/Feature/SalesOrderTest.php` (`sales_order_can_be_stored` and `supplier_method_routing_rules`) stem from commit `d797f0e4` ("new material requirment changes") prior to Phase 12, where material requirements were converted to redirect aliases and shipping calculation logic was altered. These are recognized as legacy baseline debt outside Phase 12 scope.
+
+---
+
+## 18. Project ↔ Production Integration Deepening (Phase 13 — Completed & Verified)
+
+### 18.1 Company & Branch Boundary Enforcement
+- **Cross-Domain Validation:** Enforced in both `TaskController::linkProductionOrder` and `StoreProductionOrderRequest`.
+- **Validation Rules:**
+  - Tasks and Production Orders must belong to the same `tenant_id`.
+  - When company or branch boundaries are defined, they must match: cross-company and cross-branch associations are strictly rejected with HTTP 422 `ValidationException` (`projects.company_mismatch_error` / `projects.branch_mismatch_error`).
+  - Standalone production orders without company/branch constraints remain fully operational.
+
+### 18.2 Project-Aware Production Order Creation
+- **UX Flow:** Project Task Workspace -> "Create Production Order" button -> `/production/orders/create?project_id=X&project_task_id=Y`.
+- **Context Banner & Form State:** `resources/views/modules/production/orders/create.blade.php` detects project/task context, renders an informative link banner, and populates hidden inputs (`project_id`, `project_milestone_id`, `project_task_id`).
+- **Persistence:** Handled directly by `ProductionOrderService::createDirect` and `create`, persisting the foreign keys without altering database schemas (the columns already existed).
+- **Audit:** Records a project activity log entry (`production.created`) upon successful creation.
+
+### 18.3 Production → Project/Task Reverse Navigation
+- **Order Details (`show.blade.php`):**
+  - Page header action: Displays `<x-ui.button>` linking directly to `projects.show` (`route('projects.show', $order->project->project_code)`).
+  - Identity/KPI Grid: Renders "Project Context" row with clickable badges for Project, Milestone, and Task back to Project Management.
+- **Order Index (`index.blade.php`):**
+  - Renders project and task badges under the order number for linked orders. Standalone orders retain a clean, uncluttered layout.
+- **Repository Optimization:** `ProductionOrderRepository::findWithDetails` and `paginateWithFilters` eager load `project`, `projectMilestone`, and `projectTask` to prevent N+1 query overhead.
+
+### 18.4 Project-Level Manufacturing Summary
+- **Live Aggregation:** Calculated on-demand in `ProjectController::show` by aggregating live production orders linked to the project (`project_id` or `projectTask.project_id`).
+- **Data Payload:** Exposes `total_orders`, `completed_orders`, `in_progress_orders`, `pending_orders`, `ordered_quantity`, `produced_quantity`, `overall_progress`, and order collection.
+- **UI Component:** `resources/views/modules/projects/_manufacturing-summary.blade.php` displays metric cards, progress bars, and linked order rows on the Project Overview Summary tab.
+- **Zero Schema Duplication:** No manufacturing status or quantity values are duplicated into `projects` table columns.
+
+### 18.5 Production Actual Cost in Project Financial Reporting
+- **Authoritative Sourcing:** Production remains the sole costing engine. Project financial services consume actual costs dynamically via `ProductionCostVarianceService::getCostAnalysis()` and `ProductionCostAdjustmentService::getFinalCostingSummary()`.
+- **Cost Formula:**
+  $$\text{Project Actual Cost} = \text{Timesheet Cost} + \sum \text{Authoritative Production Actual Cost}$$
+- **Reports Updated:**
+  - `ProjectReportService::getBudgetCostReportData()`: Sums timesheet cost and authoritative production actual cost for each project. Exposes `timesheet_cost`, `production_cost`, and combined `actual_cost`.
+  - `ProjectDashboardService::getPortfolioKpis()`: Sums authoritative production costs across portfolio projects into `total_incurred_cost`.
+  - `resources/views/modules/projects/reports/budget-cost.blade.php`: Displays manufacturing cost pills under the actual cost column.
+- **Double-Counting Prevention:** Timesheet logs represent project team hours (`project_time_logs`). Production labor represents shop floor machine/work-center operations (`production_order_operations`). Distinct domain separation ensures zero double-counting.
+- **Zero Persistent Columns:** No `projects.actual_production_cost` column is introduced; no direct accounting journals are posted by Project Management.
+
+

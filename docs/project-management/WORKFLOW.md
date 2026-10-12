@@ -205,6 +205,38 @@ flowchart TD
 - **Result:** Project is marked read-only. No further tasks, timesheets, or expenses can be logged.
 - **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 8).**
 
+### Stage 17: Sales Order Conversion & Multi-Milestone Sourcing
+- **Actor:** Sales Manager / Project Manager
+- **Trigger:** Sales Order reaches `Confirmed` status.
+- **Action:** User clicks "Convert to Delivery Project" modal on Sales Order show page.
+- **Result:** Invokes `SalesOrderProjectBridgeService`, creating the Delivery Project, auto-generating a `Fulfillment & Delivery` task list, creating milestones for each SO item with allocated billing amounts, and structuring fulfillment tasks. One SO item can be split across multiple phased milestones.
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 12).**
+
+### Stage 18: Manufacturing Execution & Yield Synchronization
+- **Actor:** Production Supervisor / Project Manager
+- **Trigger:** Production Order linked to a PM Task transitions to `Completed`.
+- **Action:** Canonical event `ProductionOrderCompleted` triggers `SyncProductionTaskCompletionListener`.
+- **Result:** Evaluates authoritative Production yield (`quantity_produced >= quantity_ordered`) and sibling orders under the task. If units fail QC, are scrapped, or are in unresolved rework, the task remains `In Progress` with a warning note. If output is satisfied and all siblings complete, the PM task auto-completes.
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 12).**
+
+### Stage 19: Direct Procurement Sourcing
+- **Actor:** Procurement Officer / Project Manager
+- **Trigger:** Material required for a PM task.
+- **Action:** User creates a Purchase Requisition with `source_type = 'project'` or links PR line items to a task via Task Workspace.
+- **Result:** Establishes cross-module procurement tracking on the task without duplicating purchase order or vendor logic.
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 12).**
+
+### Stage 20: Project-Aware Manufacturing Lifecycle & Reverse Cost Integration
+- **Actor:** Production Supervisor / Project Manager / Financial Controller
+- **Trigger:** Production Order creation from Project Task or Project financial review.
+- **Action:** 
+  1. Creation: User clicks "Create Production Order" in Task Workspace, which opens the standard Production Order creation form pre-seeded with project and task context (`/production/orders/create?project_id=X&project_task_id=Y`).
+  2. Boundary Validation: Validates strict matching of `tenant_id`, `company_id`, and `branch_id`.
+  3. Reverse Navigation: Production Order index and show views display linked Project and Task with direct navigation links.
+  4. Manufacturing Summary: Project Overview dynamically displays aggregate production metrics (total orders, completed, in progress, pending, ordered/produced quantities, and overall progress).
+  5. Financial Aggregation: Authoritative Production costs (`material_cost`, `labor_cost`, `machine_cost`, `overhead_cost`, `subcontracting_cost`, `adjustments`) dynamically flow into Project Budget vs Actual reports and Portfolio KPIs without persisting redundant cost columns on projects.
+- **Status:** **CURRENTLY IMPLEMENTED & VERIFIED (PHASE 13).**
+
 ---
 
 ## 3. Workflow Comparison: Implemented vs Target
@@ -227,3 +259,8 @@ flowchart TD
 | **14. Change Requests** | Implemented (Impact + Budget) | Impact analysis + Budget adjust | None (Completed in Phase 5) |
 | **15. Billing Integration** | Implemented (Sales Invoices) | Sales Invoice generation + Currency | None (Completed in Phase 7) |
 | **16. Project Closure** | Implemented (5 Strict Gates) | 5 Strict Validation Gates | None (Completed in Phase 8) |
+| **17. Sales Order Conversion** | Implemented (Bridge Service) | 1 SO to Project, 1 SO item to N Milestones | None (Completed in Phase 12) |
+| **18. Manufacturing Sync** | Implemented (Event-Driven Yield) | Authoritative QC/Yield sync via listener | None (Completed in Phase 12) |
+| **19. Material Sourcing** | Implemented (PR Task Linkage) | Sourcing via Purchase Requisition items | None (Completed in Phase 12) |
+| **20. Manufacturing Cost & Navigation** | Implemented (Phase 13 Integration) | Bidirectional Nav, Company Isolation, Cost Flow | None (Completed in Phase 13) |
+

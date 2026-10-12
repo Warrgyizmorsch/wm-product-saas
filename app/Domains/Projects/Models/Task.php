@@ -141,5 +141,15 @@ class Task extends BaseModel
     {
         return $this->morphMany(ProjectDocument::class, 'attachable');
     }
+
+    public function productionOrders(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Production\Models\ProductionOrder::class, 'project_task_id');
+    }
+
+    public function purchaseRequisitionItems(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Purchase\Models\PurchaseRequisitionItem::class, 'project_task_id');
+    }
 }
 

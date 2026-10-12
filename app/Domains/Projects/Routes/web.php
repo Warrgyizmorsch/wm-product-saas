@@ -121,6 +121,10 @@ Route::prefix('projects')
                 Route::delete('{task}', [TaskController::class, 'destroy'])->name('destroy');
                 Route::patch('{task}/status', [TaskController::class, 'updateStatus'])->name('update-status');
                 Route::patch('{task}/assign', [TaskController::class, 'assign'])->name('assign');
+                Route::post('{task}/link-production-order', [TaskController::class, 'linkProductionOrder'])->name('link-production-order');
+                Route::delete('{task}/production-orders/{productionOrder}', [TaskController::class, 'unlinkProductionOrder'])->name('unlink-production-order');
+                Route::post('{task}/link-purchase-requisition', [TaskController::class, 'linkPurchaseRequisition'])->name('link-purchase-requisition');
+                Route::delete('{task}/purchase-requisitions/{requisitionItem}', [TaskController::class, 'unlinkPurchaseRequisition'])->name('unlink-purchase-requisition');
 
                 Route::prefix('{task}/subtasks')
                     ->as('subtasks.')

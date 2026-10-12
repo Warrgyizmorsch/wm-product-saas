@@ -156,6 +156,14 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
+        @if($order->project)
+            <x-ui.button href="{{ route('projects.show', $order->project->project_code) }}"
+                icon="feather-folder me-1" variant="outline-primary" target="_blank"
+                title="{{ __('production.view_project') ?: 'View Project' }}">
+                <span class="d-none d-sm-inline">{{ __('projects.project') ?: 'Project' }}:</span> {{ $order->project->project_code }}
+            </x-ui.button>
+        @endif
+
         {{-- Print Order Label Button --}}
         <x-ui.button href="{{ route('production.labels.orders.print', $order->id) }}" target="_blank"
             icon="feather-printer me-1" variant="outline-secondary">
@@ -431,6 +439,32 @@
                         @endif
                     </div>
                 </div>
+                @if($order->project)
+                    <div class="row erp-form-row mb-2">
+                        <div class="col-md-4">
+                            <span class="fw-semibold text-muted fs-13">{{ __('projects.project_context') ?: 'Project Context' }}:</span>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="d-flex flex-wrap align-items-center gap-1.5">
+                                <a href="{{ route('projects.show', $order->project->project_code) }}"
+                                    class="badge bg-soft-primary text-primary border border-primary-subtle text-decoration-none" target="_blank">
+                                    <i class="feather-folder me-1"></i>{{ $order->project->project_code }} — {{ $order->project->name }}
+                                </a>
+                                @if($order->projectMilestone)
+                                    <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle">
+                                        <i class="feather-flag me-1"></i>{{ $order->projectMilestone->name }}
+                                    </span>
+                                @endif
+                                @if($order->projectTask)
+                                    <a href="{{ route('projects.tasks.show', [$order->project, $order->projectTask]) }}"
+                                        class="badge bg-soft-info text-info border border-info-subtle text-decoration-none" target="_blank">
+                                        <i class="feather-check-square me-1"></i>{{ $order->projectTask->task_code }} — {{ $order->projectTask->title }}
+                                    </a>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
             <div class="col-md-6">
                 <div class="row erp-form-row mb-2">

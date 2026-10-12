@@ -30,11 +30,15 @@ The module connects client deliverables to day-to-day operational execution (mil
 Project (Root Entity)
   ├── Project Members / Resources (Rated team members & allocation)
   ├── Milestones (Major phase boundaries with target delivery dates)
-  │     └── Task Lists (Groupings / board columns within milestone or project)
-  │           └── Tasks (Core unit of work with assignee, dates, priority, status)
-  │                 ├── Sub Tasks (Itemized checklist / atomic child tasks)
-  │                 ├── Task Dependencies (Predecessor / successor constraints)
-  │                 └── Time Logs (Logged hours submitted by resources)
+  │     ├── Task Lists (Groupings / board columns within milestone or project)
+  │     │     └── Tasks (Core unit of work with assignee, dates, priority, status)
+  │     │           ├── Sub Tasks (Itemized checklist / atomic child tasks)
+  │     │           ├── Task Dependencies (Predecessor / successor constraints)
+  │     │           ├── Time Logs (Logged hours submitted by resources)
+  │     │           ├── Production Order Bridge (Links to canonical Production Orders)
+  │     │           └── Purchase Requisition Item Bridge (Links direct PR procurement items)
+  │     └── Commercial Sales Order Item Link (1:N line delivery breakdown)
+  ├── Commercial Sales Order Bridge (1:N project decomposition from SO)
   ├── Issues / Defects (Bugs linked to project and optional task)
   ├── Documents (Project-level and task-level attachments)
   ├── Project Reviews / UAT (Client acceptance sign-offs)
@@ -257,6 +261,24 @@ All project actors map to the ERP's global `App\Models\User` filtered through `p
 ### 8.8 Dynamic Tenant Currency & Approval UX Standards (Implemented & Verified)
 - **Dynamic Tenant Currency:** Every monetary amount across the PM module (budgets, member rates, actual cost, time log billables, change requests, invoices, dashboard KPIs, and tabular reports/exports) resolves through the ERP's shared `format_currency($amount)` and `active_currency_symbol()`. Hardcoded symbols (`$`, `₹`, `USD`) are strictly prohibited.
 - **Production-Consistent Approval UX:** When an entity enters a pending approval state (UAT Review sign-off, Change Request review, Timesheet approval), prominent localized notice banners (`alert alert-warning border-warning bg-soft-warning` / `alert alert-info border-info bg-soft-info`) are rendered with clear role-gated sign-off action buttons matching Production BOM/Routing conventions.
+
+### 8.9 Cross-Module Commercial & Manufacturing Integrations (Implemented & Verified in Phase 12)
+- **Sales Order to Project Conversion:**
+  - Automated conversion (`SalesOrderProjectBridgeService`) decomposing confirmed Sales Orders into delivery projects, creating Milestones from individual Sales Order Items, generating default project tasks, and maintaining bidirectional commercial navigation.
+  - Multi-Project & Milestone Cardinality: A single Sales Order can spawn multiple projects (e.g. per phase/department), and a single Sales Order Item can be linked to multiple milestones across projects without unique constraint collisions.
+  - Tenant, company, and customer isolation strictly enforced; client ID automatically maps to `projects.customer_id`.
+- **Production Order Bridge & Event-Driven Sync:**
+  - Loose coupling via foreign keys `production_orders.project_id`, `production_orders.project_milestone_id`, and `production_orders.project_task_id` (`nullOnDelete()`), with Task backlink `project_tasks.production_order_id`. Standalone production orders remain 100% operational with null project references.
+  - Authoritative Manufacturing Ownership: Production module remains the sole source of truth for BOM, routing, work centers, operations, material allocations, QC, and rework.
+  - Automated Completion Sync: `ProductionOrderCompleted` event triggers `SyncProductionTaskCompletionListener`. The linked PM Task automatically transitions to `Completed` **only** if:
+    1. Production's authoritative quantity is satisfied: `quantity_produced >= quantity_ordered` (in Production, units failing QC, scrapped, or under active rework remain uncredited toward `quantity_produced`), AND
+    2. All uncompleted sibling production orders linked to the same task have reached `Completed` status.
+  - If a production order completes with a quantity shortfall (e.g. from scrapped/rejected units) or if sibling orders remain open, the PM task safely remains `In Progress` with a `production.shortfall_warning` activity log.
+- **Direct Task Procurement Bridge:**
+  - Tasks can link directly to Purchase Requisitions via `purchase_requisition_items.project_task_id` (`nullOnDelete()`).
+  - Requisition items record task context for direct costing and procurement fulfillment, with project context derived from the parent task.
+- **Unified Event Notification Catalog:**
+  - PM domain events integrated into the centralized `App\Domains\Platform\Services\NotificationEventCatalog` under the `'projects'` module with all 19 canonical keys: `projects.project.created`, `projects.project.status_changed`, `projects.project.completed`, `projects.milestone.created`, `projects.milestone.completed`, `projects.task.created`, `projects.task.assigned`, `projects.task.completed`, `projects.issue.logged`, `projects.issue.resolved`, `projects.issue.retested`, `projects.timesheet.submitted`, `projects.timesheet.approved`, `projects.timesheet.rejected`, `projects.review.requested`, `projects.review.signed_off`, `projects.change_request.created`, `projects.change_request.approved`, and `projects.project.closed`.
 
 ---
 

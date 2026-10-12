@@ -129,4 +129,8 @@ class SalesOrder extends BaseModel
         return $this->hasMany(PurchaseRequisition::class, 'sales_order_id');
     }
 
+    public function projects(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Projects\Models\Project::class, 'sales_order_id');
+    }
 }

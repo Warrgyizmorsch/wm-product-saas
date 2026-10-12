@@ -37,6 +37,8 @@ After reviewing these files, inspect the current codebase to verify that files a
   - Do NOT create parallel models, tables, or services for functionality that exists in the ERP.
   - Specifically: **Do NOT build a parallel `project_invoices` system.** Project billing MUST interface with `App\Domains\Sales\Models\Invoice` and its accounting pipeline.
   - **Do NOT build a custom file upload table** if `App\Domains\Core\Services\FileStorageService` or standard Laravel storage handles documents.
+  - **Manufacturing Ownership Invariant:** Production is the authoritative owner of Production Orders, BOM, routings, operations, work centers, QC, scrap, and rework. Project Management tasks merely link to production orders and consume completion events via `SyncProductionTaskCompletionListener`. PM must never duplicate manufacturing business logic.
+  - **Commercial Decomposition Rules:** A single Sales Order may generate multiple Projects. A single Sales Order Item may link to multiple Milestones across projects (no tenant-wide unique constraint on `sales_order_item_id`).
 - **Tenant Isolation Invariant:**
   - Every project table MUST have `tenant_id`, `company_id`, and `branch_id`.
   - Every Eloquent model MUST include `BelongsToTenant`, `BelongsToCompany`, and `BelongsToBranch`.
@@ -124,7 +126,8 @@ flowchart LR
 ## 6. Testing Rules
 
 - **Zero Regression Tolerance:**
-  - The Project Management suite currently passes 230 tests with 3,117 assertions. A pull request or agent run that breaks any of these tests is invalid.
+  - The Project Management suite currently passes 246 tests with 3,157 assertions across all Project and Phase 12 integration suites. A pull request or agent run that breaks any of these tests is invalid.
+  - Note on Pre-Existing Sales Failures: Two failing tests in `tests/Feature/SalesOrderTest.php` (`test_sales_order_can_be_stored` and `test_supplier_method_routing_rules_enforce_purchase_requisition_and_production_order_creation`) stem from commit `d797f0e4` ("new material requirment changes") prior to Phase 12 and are documented legacy baseline debt outside the PM module. Phase 12 introduced zero regressions.
 - **Dynamic Tenant Currency Convention:**
   - Never hardcode currency symbols (`$`, `₹`, `USD`). Always use `format_currency($amount)` for amounts and `active_currency_symbol()` for column headers/labels, matching the Production module.
 - **Approval UX Standard:**
