@@ -268,6 +268,9 @@ class DispatchOrderRepository
 
             foreach ($itemsData as $item) {
                 DispatchOrderItem::create([
+                    'tenant_id' => $dispatch->tenant_id,
+                    'company_id' => $dispatch->company_id,
+                    'branch_id' => $dispatch->branch_id,
                     'dispatch_order_id' => $dispatch->id,
                     'material_requirement_item_id' => $item['material_requirement_item_id'] ?? null,
                     'invoice_item_id' => $item['invoice_item_id'] ?? null,
@@ -284,9 +287,51 @@ class DispatchOrderRepository
         });
     }
 
-    public function getNextDispatchNumber(): string
+    public function getNextDispatchNumber(?int $tenantId = null, ?int $companyId = null, ?int $branchId = null): string
     {
-        $count = DispatchOrder::whereYear('created_at', now()->year)->count() + 1;
-        return 'DISP-' . now()->format('Y') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $year = now()->format('Y');
+        $prefix = "DISP-{$year}-";
+
+        $tenantId = $tenantId ?? (tenant_id() ?? auth()->user()?->tenant_id ?? 1);
+        $companyId = $companyId ?? (company_id() ?? auth()->user()?->company_id);
+        $branchId = $branchId ?? (branch_id() ?? auth()->user()?->branch_id);
+
+        $query = DispatchOrder::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('dispatch_number', 'like', "{$prefix}%");
+
+        if ($companyId !== null) {
+            $query->where('company_id', $companyId);
+        }
+        if ($branchId !== null) {
+            $query->where('branch_id', $branchId);
+        }
+
+        $latest = $query->orderBy('id', 'desc')->first();
+
+        $nextNum = 1;
+        if ($latest) {
+            $rawNum = $latest->getRawOriginal('dispatch_number') ?? $latest->dispatch_number;
+            $lastNumStr = str_replace($prefix, '', $rawNum);
+            $nextNum = intval($lastNumStr) + 1;
+        }
+
+        do {
+            $candidate = $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+            $nextNum++;
+
+            $checkQuery = DispatchOrder::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('dispatch_number', $candidate);
+
+            if ($companyId !== null) {
+                $checkQuery->where('company_id', $companyId);
+            }
+            if ($branchId !== null) {
+                $checkQuery->where('branch_id', $branchId);
+            }
+        } while ($checkQuery->exists());
+
+        return $candidate;
     }
 }

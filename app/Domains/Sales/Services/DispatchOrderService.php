@@ -197,21 +197,46 @@ class DispatchOrderService
             }
         }
 
+        $branchId = $validated['branch_id'] ?? $req?->branch_id ?? $req?->salesOrder?->branch_id ?? branch_id() ?? auth()->user()?->branch_id;
+        $companyId = $validated['company_id'] ?? $req?->company_id ?? $req?->salesOrder?->company_id ?? company_id() ?? auth()->user()?->company_id;
+
         // 2. Generate dispatch number
-        $dispatchNumber = $this->dispatchRepo->getNextDispatchNumber();
+        $dispatchNumber = $this->dispatchRepo->getNextDispatchNumber($tenantId, $companyId, $branchId);
 
         // 3. Generate Gate Pass Number
         $year = date('Y');
-        $lastGp = DispatchOrder::where('tenant_id', $tenantId)
-            ->whereNotNull('gate_pass_number')
-            ->orderBy('id', 'desc')
-            ->value('gate_pass_number');
+        $lastGpQuery = DispatchOrder::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('gate_pass_number');
+        if ($companyId !== null) {
+            $lastGpQuery->where('company_id', $companyId);
+        }
+        if ($branchId !== null) {
+            $lastGpQuery->where('branch_id', $branchId);
+        }
+        $lastGp = $lastGpQuery->orderBy('id', 'desc')->value('gate_pass_number');
         $gpSeq = $lastGp ? ((int) preg_replace('/[^0-9]/', '', substr($lastGp, -4))) + 1 : 1;
-        $gatePassNumber = 'GP-' . $year . '-' . str_pad($gpSeq, 4, '0', STR_PAD_LEFT);
+
+        do {
+            $gatePassNumber = 'GP-' . $year . '-' . str_pad($gpSeq, 4, '0', STR_PAD_LEFT);
+            $gpSeq++;
+
+            $checkGpQuery = DispatchOrder::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('gate_pass_number', $gatePassNumber);
+            if ($companyId !== null) {
+                $checkGpQuery->where('company_id', $companyId);
+            }
+            if ($branchId !== null) {
+                $checkGpQuery->where('branch_id', $branchId);
+            }
+        } while ($checkGpQuery->exists());
 
         // 4. Prepare data & save via repository inside transaction
         $dispatchData = [
             'tenant_id' => $tenantId,
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
             'customer_id' => $validated['customer_id'] ?? ($req?->salesOrder?->customer_id),
             'transporter_id' => $validated['transporter_id'] ?? null,
             'material_requirement_id' => $finalMrId,
