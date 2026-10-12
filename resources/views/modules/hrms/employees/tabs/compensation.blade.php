@@ -9,13 +9,13 @@
                         <small class="text-muted d-block mt-1">{{ __('hrms.employees.lbl_computed_salary_desc') }}</small>
                     </div>
                     @if(isset($salaryStructure) && $salaryStructure)
-                        <span class="badge bg-soft-primary text-primary px-3 py-2 rounded-pill fs-12">
+                        <x-ui.badge soft variant="primary" class="px-3 py-1.5 rounded-pill fs-12">
                             {{ $salaryStructure->name }}
-                        </span>
+                        </x-ui.badge>
                     @else
-                        <span class="badge bg-soft-warning text-warning px-3 py-2 rounded-pill fs-12">
+                        <x-ui.badge soft variant="warning" class="px-3 py-1.5 rounded-pill fs-12">
                             {{ __('hrms.employees.lbl_no_slab') }}
-                        </span>
+                        </x-ui.badge>
                     @endif
                 </div>
                 <div class="card-body p-0">
@@ -55,13 +55,13 @@
                                             $amt = $compData['amount'];
                                             $calcTypeLabel = match($item->calculation_type) {
                                                 'fixed'                => __('hrms.employees.lbl_calc_fixed'),
-                                                'percentage_of_ctc'    => $item->value . '% of CTC',
-                                                'percentage_of_basic'  => $item->value . '% of Basic',
+                                                'percentage_of_ctc'    => $item->value . '% ' . __('hrms.employees.lbl_of_ctc'),
+                                                'percentage_of_basic'  => $item->value . '% ' . __('hrms.employees.lbl_of_basic'),
                                                 'balancing'            => __('hrms.employees.lbl_calc_balancing'),
                                                 default => $item->calculation_type
                                             };
                                             
-                                            if ($item->component->type === 'earning') {
+                                            if (($item->component?->type ?? 'earning') === 'earning') {
                                                 $totalEarningsMonthly += $amt / 12;
                                             } else {
                                                 $totalDeductionsMonthly += $amt / 12;
@@ -69,14 +69,18 @@
                                         @endphp
                                         <tr>
                                             <td>
-                                                <div class="fw-bold text-dark">{{ $item->component->name }}</div>
-                                                <code class="fs-12">{{ $item->component->code }}</code>
+                                                <div class="fw-bold text-dark">{{ $item->component?->name ?? __('hrms.employees.tbl_component') }}</div>
+                                                <code class="fs-12">{{ $item->component?->code ?? __('hrms.common.na') }}</code>
                                             </td>
                                             <td>
-                                                @if($item->component->type === 'earning')
-                                                    <span class="badge bg-soft-success text-success">{{ __('hrms.employees.lbl_type_earning') }}</span>
+                                                @if(($item->component?->type ?? 'earning') === 'earning')
+                                                    <x-ui.badge soft variant="success" class="fs-11">
+                                                        {{ __('hrms.employees.lbl_type_earning') }}
+                                                    </x-ui.badge>
                                                 @else
-                                                    <span class="badge bg-soft-danger text-danger">{{ __('hrms.employees.lbl_type_deduction') }}</span>
+                                                    <x-ui.badge soft variant="danger" class="fs-11">
+                                                        {{ __('hrms.employees.lbl_type_deduction') }}
+                                                    </x-ui.badge>
                                                 @endif
                                             </td>
                                             <td class="text-muted fs-13">{{ $calcTypeLabel }}</td>
@@ -138,9 +142,9 @@
                         $canManageCompensation = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
                     @endphp
                     @if($canManageCompensation)
-                        <button type="button" class="btn btn-xs btn-soft-primary fw-bold py-1 px-2.5 rounded-pill fs-11" data-bs-toggle="modal" data-bs-target="#addAdhocModal">
-                            <i class="feather-plus me-1"></i> {{ __('hrms.common.add') }}
-                        </button>
+                        <x-ui.button type="button" variant="light" size="sm" icon="feather-plus" class="rounded-pill fs-11 fw-bold text-primary" data-bs-toggle="modal" data-bs-target="#addAdhocModal">
+                            {{ __('hrms.common.add') }}
+                        </x-ui.button>
                     @endif
                 </div>
                 <div class="card-body p-0">
@@ -162,9 +166,18 @@
                                 <tbody>
                                     @php
                                         $months = [
-                                            '01' => 'Jan', '02' => 'Feb', '03' => 'Mar', '04' => 'Apr',
-                                            '05' => 'May', '06' => 'Jun', '07' => 'Jul', '08' => 'Aug',
-                                            '09' => 'Sep', '10' => 'Oct', '11' => 'Nov', '12' => 'Dec'
+                                            '01' => __('hrms.months.january') ?? 'Jan',
+                                            '02' => __('hrms.months.february') ?? 'Feb',
+                                            '03' => __('hrms.months.march') ?? 'Mar',
+                                            '04' => __('hrms.months.april') ?? 'Apr',
+                                            '05' => __('hrms.months.may') ?? 'May',
+                                            '06' => __('hrms.months.june') ?? 'Jun',
+                                            '07' => __('hrms.months.july') ?? 'Jul',
+                                            '08' => __('hrms.months.august') ?? 'Aug',
+                                            '09' => __('hrms.months.september') ?? 'Sep',
+                                            '10' => __('hrms.months.october') ?? 'Oct',
+                                            '11' => __('hrms.months.november') ?? 'Nov',
+                                            '12' => __('hrms.months.december') ?? 'Dec'
                                         ];
                                     @endphp
                                     @foreach($adhocComponents as $adhoc)
@@ -174,7 +187,7 @@
                                         @endphp
                                         <tr>
                                             <td class="py-2 px-3">
-                                                <div class="fw-bold text-dark">{{ $adhoc->component?->name ?? 'Unknown' }}</div>
+                                                <div class="fw-bold text-dark">{{ $adhoc->component?->name ?? __('hrms.common.unknown') }}</div>
                                                 @if($adhoc->remarks)
                                                     <small class="text-muted d-block text-truncate" style="max-width: 140px;" title="{{ $adhoc->remarks }}">{{ $adhoc->remarks }}</small>
                                                 @endif

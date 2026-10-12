@@ -74,6 +74,10 @@ class EmployeeExitController extends Controller
 
         $exit = $this->exitRepository->storeExit($validated, auth()->id(), $tenantId);
 
+        if ($validated['initiated_by'] === 'employee' || !auth()->user()->can('viewAny', EmployeeExit::class)) {
+            return redirect()->back()->with('success', "Resignation request submitted successfully.");
+        }
+
         return redirect()->route('hrms.exits.index')
             ->with('success', "Exit case created for {$exit->employee->full_name}.");
     }
@@ -85,6 +89,8 @@ class EmployeeExitController extends Controller
 
     public function approve(Request $request, EmployeeExit $exit): RedirectResponse
     {
+        $this->authorize('approve', $exit);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -178,6 +184,11 @@ class EmployeeExitController extends Controller
         $this->exitRepository->recalculateFnf($exit);
 
         return redirect()->back()->with('success', "Clearances for department updated successfully.");
+    }
+
+    public function updateAllExitClearances(Request $request, EmployeeExit $exit): RedirectResponse
+    {
+        return $this->updateDepartmentClearances($request, $exit, 'all');
     }
 
     public function storeAdhocExitClearance(Request $request, EmployeeExit $exit): RedirectResponse
@@ -343,6 +354,10 @@ class EmployeeExitController extends Controller
     public function viewDocument(EmployeeExitDocument $document): View
     {
         $exit = $document->employeeExit;
+        if ($exit) {
+            $this->authorize('view', $exit);
+        }
+
         $employee = $document->employee ?? $exit?->employee;
         $company = $employee?->company ?: \App\Domains\HRMS\Models\Company::first();
 
@@ -368,6 +383,8 @@ class EmployeeExitController extends Controller
 
     public function viewRelievingLetter(EmployeeExit $exit): View
     {
+        $this->authorize('view', $exit);
+
         $document = $this->docService->generateRelievingLetter($exit);
         $doc = $document;
         $employee = $exit->employee;
@@ -378,6 +395,8 @@ class EmployeeExitController extends Controller
 
     public function viewExperienceCertificate(EmployeeExit $exit): View
     {
+        $this->authorize('view', $exit);
+
         $document = $this->docService->generateExperienceCertificate($exit);
         $doc = $document;
         $employee = $exit->employee;
@@ -388,6 +407,8 @@ class EmployeeExitController extends Controller
 
     public function viewNocCertificate(EmployeeExit $exit): View
     {
+        $this->authorize('view', $exit);
+
         $document = $this->docService->generateNocCertificate($exit);
         $doc = $document;
         $employee = $exit->employee;
@@ -398,6 +419,8 @@ class EmployeeExitController extends Controller
 
     public function viewFnFStatement(EmployeeExit $exit): View
     {
+        $this->authorize('view', $exit);
+
         $employee = $exit->employee;
         $company = $employee?->company ?: \App\Domains\HRMS\Models\Company::first();
         $fnf = $exit->fnfSettlement ?: $this->fnfService->saveSettlement($exit, $this->fnfService->calculateFnF($exit));

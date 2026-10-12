@@ -502,50 +502,6 @@
             font-size: 15px;
         }
 
-        .tab-nav-custom {
-            border-bottom: 2px solid #e2e8f0;
-            gap: 8px;
-            margin-bottom: 24px;
-            flex-wrap: nowrap !important;
-            overflow-x: auto !important;
-            overflow-y: hidden !important;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE/Edge */
-        }
-
-        .tab-nav-custom::-webkit-scrollbar {
-            display: none; /* Chrome/Safari */
-        }
-
-        .tab-nav-custom .nav-item {
-            flex-shrink: 0;
-        }
-
-        .tab-nav-custom .nav-link {
-            border: none !important;
-            border-bottom: 3px solid transparent !important;
-            background: transparent !important;
-            color: #64748b !important;
-            font-size: 14px;
-            font-weight: 600;
-            padding: 12px 16px;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .tab-nav-custom .nav-link:hover {
-            color: var(--bs-primary) !important;
-            border-bottom-color: #cbd5e1 !important;
-        }
-
-        .tab-nav-custom .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom-color: var(--bs-primary) !important;
-            font-weight: 700;
-        }
 
         .leave-rules-summary {
             display: flex;
@@ -978,9 +934,9 @@
                     <div class="d-flex flex-column flex-md-row align-items-center gap-2 mb-1">
                         <h3 class="fw-bold text-dark mb-0">{{ $employee->display_name }}</h3>
                         @if($employee->status)
-                            <x-ui.badge variant="success" soft>Active</x-ui.badge>
+                            <x-ui.badge variant="success" soft>{{ __('hrms.common.active') }}</x-ui.badge>
                         @else
-                            <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
+                            <x-ui.badge variant="danger" soft>{{ __('hrms.common.inactive') }}</x-ui.badge>
                         @endif
                     </div>
                     <p class="text-muted fs-14 mb-2">{{ $employee->job_title ?: __('hrms.employees.frm_job_title') }} &bull; {{ $employee->department?->name ?? __('hrms.employees.tbl_department') }}</p>
@@ -1025,43 +981,18 @@
         @endif
 
         @php
-            $rawTab = request('tab', request('active_tab', session('active_tab')));
-            $activeTabName = $rawTab ? str_replace(['#', '-pane'], '', $rawTab) : 'overview';
+            $employeeTabs = [
+                ['id' => 'overview-pane', 'label' => __('hrms.employees.tab_overview'), 'active' => ($activeTabName === 'overview'), 'icon' => 'feather-user'],
+                ['id' => 'compensation-pane', 'label' => __('hrms.employees.tab_compensation'), 'active' => ($activeTabName === 'compensation'), 'icon' => 'feather-dollar-sign'],
+                ['id' => 'documents-pane', 'label' => __('hrms.employees.tab_documents'), 'active' => ($activeTabName === 'documents'), 'icon' => 'feather-file-text'],
+                ['id' => 'probation-pane', 'label' => __('hrms.employees.tab_probation'), 'active' => ($activeTabName === 'probation'), 'icon' => 'feather-award'],
+                ['id' => 'exit-clearance-pane', 'label' => __('hrms.employees.tab_exit_noc'), 'active' => ($activeTabName === 'exit-clearance'), 'icon' => 'feather-log-out'],
+                ['id' => 'pip-pane', 'label' => __('hrms.employees.tab_pip'), 'active' => ($activeTabName === 'pip'), 'icon' => 'feather-trending-up'],
+            ];
         @endphp
 
         <!-- Navigation Tabs -->
-        <ul class="nav nav-tabs tab-nav-custom" id="profileTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'overview' ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="{{ $activeTabName === 'overview' ? 'true' : 'false' }}">
-                    <i class="feather-user"></i> {{ __('hrms.employees.tab_overview') }}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'compensation' ? 'active' : '' }}" id="compensation-tab" data-bs-toggle="tab" data-bs-target="#compensation-pane" type="button" role="tab" aria-controls="compensation-pane" aria-selected="{{ $activeTabName === 'compensation' ? 'true' : 'false' }}">
-                    <i class="feather-dollar-sign"></i> {{ __('hrms.employees.tab_compensation') }}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'documents' ? 'active' : '' }}" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents-pane" type="button" role="tab" aria-controls="documents-pane" aria-selected="{{ $activeTabName === 'documents' ? 'true' : 'false' }}">
-                    <i class="feather-file-text"></i> {{ __('hrms.employees.tab_documents') }}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'probation' ? 'active' : '' }}" id="probation-tab" data-bs-toggle="tab" data-bs-target="#probation-pane" type="button" role="tab" aria-controls="probation-pane" aria-selected="{{ $activeTabName === 'probation' ? 'true' : 'false' }}">
-                    <i class="feather-award"></i> Probation
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'exit-clearance' ? 'active' : '' }}" id="exit-clearance-tab" data-bs-toggle="tab" data-bs-target="#exit-clearance-pane" type="button" role="tab" aria-controls="exit-clearance-pane" aria-selected="{{ $activeTabName === 'exit-clearance' ? 'true' : 'false' }}">
-                    <i class="feather-log-out"></i> Exit & NOC
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'pip' ? 'active' : '' }}" id="pip-tab" data-bs-toggle="tab" data-bs-target="#pip-pane" type="button" role="tab" aria-controls="pip-pane" aria-selected="{{ $activeTabName === 'pip' ? 'true' : 'false' }}">
-                    <i class="feather-trending-up"></i> PIP Plans
-                </button>
-            </li>
-        </ul>
+        <x-ui.horizontal-tabs id="profileTabs" :tabs="$employeeTabs" :syncUrl="true" />
 
         <!-- Tab Content -->
         <div class="tab-content" id="profileTabsContent">
@@ -1128,8 +1059,8 @@
                 $('#profileEvaluateModal').appendTo('body');
                 $('#profileExitModal').appendTo('body');
 
-                // Initialize select2 inside edit modal with dropdownParent to fix Bootstrap focus/typing issue
-                $('#editEmployeeModal select').each(function() {
+                // Initialize select2 inside edit and upload modals with dropdownParent to fix Bootstrap focus/typing issue
+                $('#editEmployeeModal select, #uploadDocumentModal select, #addAdhocModal select').each(function() {
                     var $select = $(this);
                     if ($select.hasClass('select2-hidden-accessible')) {
                         $select.select2('destroy');
@@ -1145,9 +1076,10 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const activeTab = urlParams.get('tab');
                 if (activeTab) {
-                    const tabEl = document.querySelector(`#${activeTab}-tab`);
-                    if (tabEl) {
-                        const tab = new bootstrap.Tab(tabEl);
+                    const cleanTab = activeTab.replace(/(-pane|tab-)/g, '');
+                    const tabEl = document.querySelector(`#${cleanTab}-pane-tab`) || document.querySelector(`#${cleanTab}-tab`) || document.querySelector(`#tab-${cleanTab}-tab`);
+                    if (tabEl && window.bootstrap) {
+                        const tab = bootstrap.Tab.getOrCreateInstance(tabEl);
                         tab.show();
                     }
                 }

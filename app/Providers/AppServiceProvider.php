@@ -1050,6 +1050,11 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\ExitClearanceTemplate::class,
+            \App\Domains\HRMS\Policies\ExitClearancePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\SalaryStructure::class,
             \App\Domains\HRMS\Policies\SalaryStructurePolicy::class
         );

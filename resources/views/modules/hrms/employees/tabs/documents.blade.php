@@ -139,14 +139,17 @@
                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="status">
                                         <option value="">{{ __('hrms.common.all_statuses') }}</option>
-                                        <option value="uploaded">{{ __('hrms.employees.lbl_uploaded') }}</option>
+                                        <option value="approved">{{ __('hrms.employees.status_approved') }}</option>
+                                        <option value="uploaded">{{ __('hrms.employees.lbl_pending_verification') }}</option>
                                         <option value="requested">{{ __('hrms.employees.lbl_pending_upload') }}</option>
+                                        <option value="pending_signature">{{ __('hrms.employees.lbl_pending_signature') }}</option>
+                                        <option value="rejected">{{ __('hrms.employees.status_rejected') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.lbl_expiry_req') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="has_expiry">
-                                        <option value="">{{ __('hrms.employees.tbl_actions') }} - {{ __('hrms.common.filter') }}</option>
+                                        <option value="">{{ __('hrms.common.all') ?? 'All' }}</option>
                                         <option value="1">{{ __('hrms.employees.lbl_has_expiry') }}</option>
                                         <option value="0">{{ __('hrms.employees.lbl_no_expiry') }}</option>
                                     </x-ui.odoo-form-ui>
@@ -211,7 +214,7 @@
                                     @endphp
                                     <tr class="document-row" 
                                         data-title="{{ strtolower($doc->name) }}" 
-                                        data-search="{{ strtolower($doc->name) }}" 
+                                        data-search="{{ strtolower($doc->name) }} {{ strtolower($doc->description ?? '') }} {{ strtolower($doc->requestedBy?->name ?? '') }} {{ strtolower($doc->file_name ?? '') }}" 
                                         data-status="{{ $rowStatus }}" 
                                         data-has-expiry="{{ $rowHasExpiry }}"
                                         data-expiry="{{ $doc->expiry_date ? $doc->expiry_date->timestamp : 9999999999 }}"
@@ -220,7 +223,7 @@
                                             <div class="d-flex align-items-center gap-1.5 flex-wrap mb-1">
                                                 <span class="fw-bold text-dark fs-14" style="word-break: break-word; white-space: normal; line-height: 1.4;" title="{{ $doc->name }}">{{ $doc->name }}</span>
                                                 @if($doc->documentMaster && !$doc->documentMaster->employee_can_view)
-                                                    <span class="badge bg-soft-secondary text-secondary border px-1.5 py-0.5 fs-10" title="Internal / Hidden from Employee Portal"><i class="feather-lock me-0.5"></i> {{ __('hrms.employees.lbl_hr_only') }}</span>
+                                                    <x-ui.badge soft variant="secondary" class="border px-1.5 py-0.5 fs-10" title="Internal / Hidden from Employee Portal"><i class="feather-lock me-0.5"></i> {{ __('hrms.employees.lbl_hr_only') }}</x-ui.badge>
                                                 @endif
                                             </div>
                                             @if($doc->description)
@@ -234,39 +237,39 @@
                                         </td>
                                         <td>
                                             <div>
-                                                <span class="badge bg-light text-dark px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 border">
+                                                <x-ui.badge soft variant="light" class="text-dark px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 border">
                                                     <i class="feather-user fs-11"></i>
                                                     {{ $doc->requestedBy?->name ?? 'System' }}
-                                                </span>
+                                                </x-ui.badge>
                                             </div>
                                             <div class="mt-1.5">
                                                 @if($doc->expiry_date)
                                                     @if($isExpired)
-                                                        <span class="badge bg-soft-danger text-danger px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
+                                                        <x-ui.badge soft variant="danger" class="px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
                                                             <i class="feather-alert-triangle fs-11"></i>
                                                             {{ __('hrms.employees.lbl_expired') }} ({{ $doc->expiry_date->format('d M Y') }})
-                                                        </span>
+                                                        </x-ui.badge>
                                                     @elseif($isExpiringSoon)
-                                                        <span class="badge px-2 py-1 fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.1) !important; color: #ff9800 !important; border: 1px solid rgba(255, 152, 0, 0.2);">
+                                                        <x-ui.badge soft variant="warning" class="px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
                                                             <i class="feather-clock fs-11"></i>
                                                             {{ __('hrms.employees.lbl_near_expiry') ?? 'Near Expiry' }} ({{ $doc->expiry_date->format('d M Y') }})
-                                                        </span>
+                                                        </x-ui.badge>
                                                     @else
-                                                        <span class="badge bg-soft-secondary text-dark px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 border">
+                                                        <x-ui.badge soft variant="secondary" class="text-dark px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 border">
                                                             <i class="feather-clock fs-11"></i>
                                                             {{ __('hrms.employees.lbl_expiry') ?? 'Expiry' }} ({{ $doc->expiry_date->format('d M Y') }})
-                                                        </span>
+                                                        </x-ui.badge>
                                                     @endif
                                                 @elseif($doc->has_expiry)
-                                                    <span class="badge px-2 py-1 fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.1) !important; color: #ff9800 !important; border: 1px solid rgba(255, 152, 0, 0.2);">
+                                                    <x-ui.badge soft variant="warning" class="px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
                                                         <i class="feather-alert-circle fs-11"></i>
                                                         {{ __('hrms.employees.lbl_expiry_required') }}
-                                                    </span>
+                                                    </x-ui.badge>
                                                 @else
-                                                    <span class="badge bg-soft-success text-success px-2 py-1 fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(40, 167, 69, 0.08) !important; color: #28a745 !important; border: 1px solid rgba(40, 167, 69, 0.15);">
+                                                    <x-ui.badge soft variant="success" class="px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
                                                         <i class="feather-check-circle fs-11"></i>
                                                         {{ __('hrms.employees.lbl_no_expiry') }}
-                                                    </span>
+                                                    </x-ui.badge>
                                                 @endif
                                             </div>
                                         </td>
@@ -391,14 +394,14 @@
                                         </td>
                                         <td>
                                             @if(!$doc->file_path || $isExpired)
-                                                <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.08) !important; color: #ff9800 !important; border: 1px solid rgba(255, 193, 7, 0.15); font-weight: 500;">
+                                                <x-ui.badge soft variant="warning" class="px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1">
                                                     <i class="feather-clock fs-11"></i>
                                                     {{ __('hrms.employees.lbl_pending_upload') }}
-                                                </span>
+                                                </x-ui.badge>
                                             @elseif($doc->status === 'pending_signature')
-                                                <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.1) !important; color: #d97706 !important; border: 1px solid rgba(245, 158, 11, 0.2); font-weight: 600;">
+                                                <x-ui.badge soft variant="warning" class="px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1">
                                                     <i class="feather-edit-3 fs-11"></i> {{ __('hrms.employees.lbl_pending_signature') }}
-                                                </span>
+                                                </x-ui.badge>
                                             @else
                                                 @php
                                                     $authUser = auth()->user();
@@ -462,9 +465,9 @@
                                                 @endif
                                                 @if($doc->is_signed)
                                                     <div class="mt-0.5">
-                                                        <span class="badge bg-soft-success text-success px-1.5 py-0.5 rounded fs-9" title="Digitally Signed on {{ $doc->signed_at?->format('d M Y, H:i') }}">
+                                                        <x-ui.badge soft variant="success" class="px-1.5 py-0.5 rounded fs-9" title="Digitally Signed on {{ $doc->signed_at?->format('d M Y, H:i') }}">
                                                             <i class="feather-check-circle fs-9 me-0.5"></i> {{ __('hrms.employees.lbl_digitally_signed') }}
-                                                        </span>
+                                                        </x-ui.badge>
                                                     </div>
                                                 @endif
                                             </td>
@@ -817,8 +820,8 @@
         $('#sig_file_input').val('');
         $('#sig_upload_preview_box').html(
             '<i class="feather-upload-cloud text-primary mb-1" style="font-size: 24px;"></i>' +
-            '<span class="fw-bold text-dark fs-12 file-name-label">Click to browse or drop signature image here</span>' +
-            '<small class="text-muted fs-10 mt-0.5">Supports PNG, JPG, JPEG, WEBP image formats</small>'
+            '<span class="fw-bold text-dark fs-12 file-name-label">{{ __('hrms.employees.lbl_click_to_browse_signature') }}</span>' +
+            '<small class="text-muted fs-10 mt-0.5">{{ __('hrms.employees.lbl_supports_formats') }}</small>'
         );
         switchSigMode('draw');
 
@@ -840,11 +843,11 @@
             }
         } else {
             previewContainer.html(
-                '<div class="d-flex align-items-center justify-content-center h-100 text-muted fs-13"><i class="feather-file me-1"></i> Preview not available</div>'
+                '<div class="d-flex align-items-center justify-content-center h-100 text-muted fs-13"><i class="feather-file me-1"></i> {{ __('hrms.employees.lbl_preview_not_available') }}</div>'
             );
         }
 
-        var modal = new bootstrap.Modal(document.getElementById('signDocumentCanvasModal'));
+        var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('signDocumentCanvasModal'));
         modal.show();
     }
 
@@ -852,13 +855,13 @@
         var dataUrl = null;
         if (currentSigMode === 'upload') {
             if (!uploadedSigDataUrl) {
-                alert('Please select a signature image file to upload.');
+                alert('{{ __('hrms.employees.msg_select_sig_file') }}');
                 return;
             }
             dataUrl = uploadedSigDataUrl;
         } else {
             if (!hasSigned) {
-                alert('Please draw your signature inside the box before confirming.');
+                alert('{{ __('hrms.employees.msg_draw_sig_required') }}');
                 return;
             }
             dataUrl = canvas.toDataURL('image/png');

@@ -116,7 +116,7 @@
 
                 {{-- User menu --}}
                 <div class="dropdown nxl-h-item ax-user">
-                    <a href="javascript:void(0);" class="ax-avatar" data-bs-toggle="dropdown" role="button" data-bs-auto-close="outside" aria-label="{{ __('Account') }}">
+                    <a href="javascript:void(0);" class="ax-avatar" data-bs-toggle="dropdown" role="button" data-bs-auto-close="outside" aria-label="{{ __('ui.account') }}">
                         <img src="{{ $headerAvatarUrl }}" alt="" class="user-avtar object-fit-cover"
                             onerror="this.onerror=null; this.src='/assets/images/avatar/default.png';">
                         <span class="ax-avatar-status"></span>
@@ -132,23 +132,23 @@
                             <span class="badge bg-soft-success ms-auto">{{ $shell['plan'] }}</span>
                         </a>
                         <div class="dropdown-divider"></div>
-                        <a href="{{ route('profile.show') }}" class="dropdown-item"><i class="feather-user"></i><span>My Profile</span></a>
+                        <a href="{{ route('profile.show') }}" class="dropdown-item"><i class="feather-user"></i><span>{{ __('ui.my_profile') }}</span></a>
                         <a href="{{ route('account.settings') }}" class="dropdown-item"><i class="feather-settings"></i><span>{{ __('ui.account_settings') }}</span></a>
                         @if (\Illuminate\Support\Facades\Route::has('access.roles.index'))
                             <a href="{{ route('access.roles.index') }}" class="dropdown-item"><i class="feather-shield"></i><span>{{ __('ui.roles_permissions') }}</span></a>
                         @endif
 
                         <div class="dropdown-divider"></div>
-                        <h6 class="dropdown-header">{{ __('Preferences') }}</h6>
+                        <h6 class="dropdown-header">{{ __('ui.preferences') }}</h6>
                         <div class="ax-pref-row">
-                            <span><i class="feather-moon"></i>{{ __('Theme') }}</span>
+                            <span><i class="feather-moon"></i>{{ __('ui.theme') }}</span>
                             <span class="ax-segmented">
-                                <button type="button" class="light-button" id="header-light-mode-btn">{{ __('Light') }}</button>
-                                <button type="button" class="dark-button" id="header-dark-mode-btn">{{ __('Dark') }}</button>
+                                <button type="button" class="light-button" id="header-light-mode-btn">{{ __('ui.light') }}</button>
+                                <button type="button" class="dark-button" id="header-dark-mode-btn">{{ __('ui.dark') }}</button>
                             </span>
                         </div>
                         <div class="ax-pref-row">
-                            <span><i class="feather-aperture"></i>{{ __('Brand colour') }}</span>
+                            <span><i class="feather-aperture"></i>{{ __('ui.brand_color') }}</span>
                             <label for="primaryColorPicker" class="header-color-picker-label" title="Choose Primary Color">
                                 <span id="primaryColorPreview" class="header-color-preview-circle"></span>
                                 <input type="color" id="primaryColorPicker" class="header-color-picker-input" value="#4f46e5" title="Choose Primary Color">
@@ -166,7 +166,7 @@
                                 </span>
                             </div>
                         @endif
-                        <a href="javascript:void(0);" class="dropdown-item" onclick="$('body').fullScreenHelper('toggle');"><i class="feather-maximize"></i><span>{{ __('Full screen') }}</span></a>
+                        <a href="javascript:void(0);" class="dropdown-item" onclick="$('body').fullScreenHelper('toggle');"><i class="feather-maximize"></i><span>{{ __('ui.full_screen') }}</span></a>
 
                         <div class="dropdown-divider"></div>
                         <form method="POST" action="{{ route('logout') }}">

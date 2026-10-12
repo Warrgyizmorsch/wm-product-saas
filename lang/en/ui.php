@@ -2,7 +2,9 @@
 
 return [
     'access_control' => 'Access Control',
+    'account' => 'Account',
     'account_settings' => 'Account Settings',
+    'full_screen' => 'Full screen',
     'accounting' => 'Accounting',
     'accounting_core' => 'Accounting Core',
     'add_language' => 'Add Language',
@@ -110,4 +112,10 @@ return [
     'workspace' => 'Workspace',
     'optional' => 'Optional',
     'view' => 'View',
+    'my_profile' => 'My Profile',
+    'preferences' => 'Preferences',
+    'theme' => 'Theme',
+    'light' => 'Light',
+    'dark' => 'Dark',
+    'brand_color' => 'Brand colour',
 ];

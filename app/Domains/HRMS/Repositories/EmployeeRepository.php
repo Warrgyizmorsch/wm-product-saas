@@ -106,6 +106,10 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             'assetRequests.requestedAsset',
             'assetRequests.allocatedAsset',
             'assetRequests.allocatedAssets',
+            'probationEvaluations.reviewer',
+            'activeExit.clearances',
+            'activeExit.documents',
+            'activeExit.fnfSettlement',
         ]);
 
         $availableAssets = \App\Domains\HRMS\Models\Asset::query()
