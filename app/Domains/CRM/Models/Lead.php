@@ -35,6 +35,25 @@ class Lead extends Model
             }
         });
 
+        static::saving(function ($lead) {
+            // Auto-detect and normalize lead_type (b2b vs b2c) across all ingestion sources
+            if (!empty($lead->lead_type)) {
+                $normalized = strtolower(trim((string)$lead->lead_type));
+                $lead->lead_type = ($normalized === 'b2c' || str_contains($normalized, 'individual') || str_contains($normalized, 'consumer')) ? 'b2c' : 'b2b';
+            } else {
+                $hasGstin = !empty(trim((string)$lead->gstin));
+                $companyName = trim((string)$lead->company_name);
+                $contactPerson = trim((string)$lead->contact_person);
+
+                $hasDistinctCompany = !empty($companyName) && 
+                    strcasecmp($companyName, 'Individual Customer') !== 0 && 
+                    strcasecmp($companyName, 'Walk-in Visitor') !== 0 &&
+                    ($companyName !== $contactPerson || $hasGstin);
+
+                $lead->lead_type = ($hasGstin || $hasDistinctCompany) ? 'b2b' : 'b2c';
+            }
+        });
+
         static::updating(function ($lead) {
             if ($lead->isDirty('status') && strtolower($lead->status) === 'won' && !$lead->crm_account_id) {
                 throw new \InvalidArgumentException('Cannot mark as Won. Account & Deal conversion required first!');

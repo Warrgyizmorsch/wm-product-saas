@@ -178,14 +178,17 @@ class TwilioSettingController extends Controller
                 ->first();
 
             if (!$lead) {
+                $callerCompany = trim((string)$request->input('company_name', ''));
+                $callerName = trim((string)$request->input('caller_name', ''));
                 $lead = new Lead();
                 $lead->tenant_id = $tenantId;
                 $lead->company_id = $companyId;
                 $lead->branch_id = $branchId;
                 $lead->lead_owner_id = $twilioConfig?->default_lead_owner_id ?: auth()->id();
-                $lead->contact_person = $request->input('caller_name');
+                $lead->contact_person = $callerName ?: 'Twilio Caller';
                 $lead->phone = $phone;
-                $lead->company_name = $request->input('caller_name');
+                $lead->company_name = !empty($callerCompany) ? $callerCompany : null;
+                $lead->lead_type = !empty($callerCompany) ? 'b2b' : 'b2c';
                 $lead->source = $twilioConfig?->default_source ?: 'Twilio Call';
                 $lead->priority = $twilioConfig?->default_priority ?: 'Medium';
                 $lead->status = 'Contacted';

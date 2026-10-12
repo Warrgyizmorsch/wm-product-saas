@@ -111,14 +111,34 @@ class LeadRepository
      */
     public function getLeadDetails(Lead $lead, ?int $activeQuotationId = null): array
     {
+        $todayStart = now()->startOfDay();
+
         $lead->load([
-            'followups' => fn($q) => $q->with([
+            'followups' => fn($q) => $q->where(function($fq) use ($todayStart) {
+                $fq->where('status', 'Pending')
+                   ->orWhere('updated_at', '>=', $todayStart);
+            })->with([
                 'taggedUser:id,name,email',
                 'rescheduledTo:id,rescheduled_from_id,followup_date,status'
             ]),
             'histories' => fn($q) => $q->with('user:id,name')->latest('id'),
             'leadDocuments' => fn($q) => $q->latest('id')
         ]);
+
+        $pastActivitiesQuery = $lead->followups()
+            ->where('status', '!=', 'Pending')
+            ->where('updated_at', '<', $todayStart)
+            ->whereDoesntHave('rescheduledTo');
+
+        $pastActivitiesCount = (clone $pastActivitiesQuery)->count();
+        $pastDoneActivities = $pastActivitiesQuery
+            ->with([
+                'taggedUser:id,name,email',
+                'rescheduledTo:id,rescheduled_from_id,followup_date,status'
+            ])
+            ->orderByDesc('updated_at')
+            ->take(5)
+            ->get();
 
         $customer = null;
         if ($lead->email) {
@@ -148,7 +168,7 @@ class LeadRepository
             ->select('id')
             ->first();
 
-        return compact('customer', 'quotations', 'activeQuotation', 'prevLead', 'nextLead');
+        return compact('customer', 'quotations', 'activeQuotation', 'prevLead', 'nextLead', 'pastActivitiesCount', 'pastDoneActivities');
     }
 
     /**

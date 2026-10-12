@@ -146,6 +146,8 @@ Route::prefix('crm')
             ->name('leads.processConvert');
         Route::patch('leads/{lead}/qualify', [LeadController::class, 'qualify'])
             ->name('leads.qualify');
+        Route::get('leads/{lead}/past-activities', [LeadController::class, 'getPastActivities'])
+            ->name('leads.pastActivities');
         Route::get('leads/{lead}', [LeadController::class, 'show'])
             ->name('leads.show');
         Route::post('leads', [LeadController::class, 'store'])

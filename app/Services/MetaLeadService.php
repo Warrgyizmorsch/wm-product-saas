@@ -179,6 +179,7 @@ class MetaLeadService
         $finalRequirement = implode(" | ", $requirementParts);
 
         // Create CRM Lead record
+        $metaCompanyName = trim((string)($extracted['company_name'] ?? ''));
         $lead = new Lead();
         $lead->tenant_id = $tenantId;
         $lead->company_id = $companyId;
@@ -189,7 +190,8 @@ class MetaLeadService
         $lead->company_phone = $extracted['phone_number'];
         $lead->email = $extracted['email'];
         $lead->company_email = $extracted['email'];
-        $lead->company_name = $extracted['company_name'] ?: $lead->contact_person;
+        $lead->company_name = $metaCompanyName ?: null;
+        $lead->lead_type = !empty($metaCompanyName) ? 'b2b' : 'b2c';
         $lead->city = $extracted['city'];
         $lead->state = $extracted['state'];
         $lead->country = $extracted['country'] ?: 'India';

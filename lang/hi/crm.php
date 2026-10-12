@@ -1978,5 +1978,8 @@ return array (
   'update_activity_mark_not_connected' => 'गतिविधि अपडेट: नॉट कनेक्टेड के रूप में चिह्नित करें',
   'update_activity_cancel' => 'गतिविधि अपडेट: गतिविधि रद्द करें',
   'reschedule_activity' => 'गतिविधि पुनर्निर्धारित करें',
+  'activity' => 'गतिविधि',
+  'note' => 'नोट',
+  'filter' => 'फ़िल्टर',
 );
 
