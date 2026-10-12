@@ -358,9 +358,15 @@ class MaterialRequestService
                 $nextNum = ((int) $lastNumStr) + 1;
             }
             $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            while (PurchaseRequisition::where('requisition_number', $requisitionNumber)->exists()) {
+                $nextNum++;
+                $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            }
 
             $pr = PurchaseRequisition::create([
                 'tenant_id'          => $tenantId,
+                'company_id'         => company_id() ?? auth()->user()?->company_id,
+                'branch_id'          => branch_id() ?? auth()->user()?->branch_id,
                 'requisition_number' => $requisitionNumber,
                 'requisition_date'   => now()->toDateString(),
                 'status'             => 'Draft',
@@ -439,10 +445,16 @@ class MaterialRequestService
                 : 1;
 
             $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            while (PurchaseRequisition::where('requisition_number', $requisitionNumber)->exists()) {
+                $nextNum++;
+                $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            }
 
             // Create ONE PR
             $pr = PurchaseRequisition::create([
                 'tenant_id'          => $tenantId,
+                'company_id'         => company_id() ?? auth()->user()?->company_id,
+                'branch_id'          => branch_id() ?? auth()->user()?->branch_id,
                 'requisition_number' => $requisitionNumber,
                 'requisition_date'   => now()->toDateString(),
                 'status'             => 'Draft',

@@ -57,6 +57,9 @@ class DispatchOrderRepository
     public function getPendingDOs(int $limit = 5): Collection
     {
         return MaterialRequirement::with(['salesOrder.customer'])
+            ->whereHas('salesOrder', function ($q) {
+                $q->whereIn('status', ['Confirmed', 'Partially Shipped']);
+            })
             ->whereNotIn('id', DispatchOrder::pluck('material_requirement_id'))
             ->whereNotIn('status', ['Cancelled', 'Delivered'])
             ->latest()
@@ -71,6 +74,9 @@ class DispatchOrderRepository
             'items.product',
             'items.warehouse',
         ])
+        ->whereHas('salesOrder', function ($q) {
+            $q->whereIn('status', ['Confirmed', 'Partially Shipped']);
+        })
         ->whereNotIn('status', ['Cancelled'])
         ->latest()
         ->get();
@@ -80,10 +86,7 @@ class DispatchOrderRepository
     {
         $salesOrdersQuery = \App\Domains\Sales\Models\SalesOrder::query()
             ->where('tenant_id', $tenantId)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhereNotIn('status', ['Cancelled', 'cancelled']);
-            })
+            ->whereIn('status', ['Confirmed', 'Partially Shipped'])
             ->with(['customer', 'items.product.uom', 'items.warehouse'])
             ->latest('order_date');
 
@@ -175,10 +178,7 @@ class DispatchOrderRepository
     public function getPendingSalesOrdersCount(int $tenantId): int
     {
         $allOrders = \App\Domains\Sales\Models\SalesOrder::where('tenant_id', $tenantId)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhereNotIn('status', ['Cancelled', 'cancelled']);
-            })
+            ->whereIn('status', ['Confirmed', 'Partially Shipped'])
             ->with(['items'])
             ->get();
 

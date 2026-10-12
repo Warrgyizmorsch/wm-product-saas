@@ -17,6 +17,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
 
@@ -165,6 +166,10 @@ class InvoiceController extends Controller
         $latest = Invoice::latest('id')->first();
         $nextSeq = $latest ? intval(str_replace('INV-', '', $latest->invoice_number)) + 1 : 1;
         $nextInvoiceNumber = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        while (Invoice::where('invoice_number', $nextInvoiceNumber)->exists()) {
+            $nextSeq++;
+            $nextInvoiceNumber = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        }
 
         $advanceAllocations = 0;
         if ($salesOrder) {
@@ -293,11 +298,33 @@ class InvoiceController extends Controller
     {
         $this->authorize('create', Invoice::class);
 
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $companyId = company_id() ?? auth()->user()?->company_id;
+        $branchId = branch_id() ?? auth()->user()?->branch_id;
+        if ($request->filled('sales_order_id')) {
+            $so = SalesOrder::find($request->input('sales_order_id'));
+            if ($so) {
+                $tenantId = $so->tenant_id ?? $tenantId;
+                $companyId = $so->company_id ?? $companyId;
+                $branchId = $so->branch_id ?? $branchId;
+            }
+        }
+
+        $invoiceNumberRule = Rule::unique('invoices', 'invoice_number')->where(function ($query) use ($tenantId, $companyId, $branchId) {
+            $query->where('tenant_id', $tenantId);
+            if ($companyId !== null) {
+                $query->where('company_id', $companyId);
+            }
+            if ($branchId !== null) {
+                $query->where('branch_id', $branchId);
+            }
+        });
+
         $validated = $request->validate([
             'sales_order_id'          => ['nullable', 'exists:sales_orders,id'],
             'customer_id'             => ['nullable', 'exists:customers,id'],
             'material_requirement_id' => ['nullable', 'exists:material_requirements,id'],
-            'invoice_number'          => ['required', 'string', 'max:255', 'unique:invoices,invoice_number'],
+            'invoice_number'          => ['required', 'string', 'max:255', $invoiceNumberRule],
             'invoice_date'            => ['required', 'date'],
             'due_date'                => ['required', 'date', 'after_or_equal:invoice_date'],
             'payment_terms'           => ['nullable', 'string', 'max:255'],
@@ -353,7 +380,9 @@ class InvoiceController extends Controller
             return redirect()->back()->withInput()->with('error', 'Customer selection is required.');
         }
 
-        $tenantId = $salesOrder?->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $salesOrder?->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id ?? 1);
+        $branchId = branch_id() ?? $salesOrder?->branch_id ?? auth()->user()?->branch_id;
+        $companyId = company_id() ?? $salesOrder?->company_id ?? auth()->user()?->company_id;
 
         $taxType      = $request->input('tax_type', 'item_wise_tax');
         $discountType = $request->input('discount_type', 'without_discount');
@@ -362,7 +391,7 @@ class InvoiceController extends Controller
         $freightTerms  = $validated['freight_terms'] ?? $salesOrder?->freight_terms ?? 'To Pay';
         $freightAmount = floatval($validated['freight_amount'] ?? 0);
 
-        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $taxType, $discountType, $gstType, $freightTerms, $freightAmount, $request) {
+        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $branchId, $companyId, $taxType, $discountType, $gstType, $freightTerms, $freightAmount, $request) {
             $subtotal = 0;
             $taxAmount = 0;
             $discountAmount = 0;
@@ -435,6 +464,8 @@ class InvoiceController extends Controller
 
             $invoice = Invoice::create([
                 'tenant_id'               => $tenantId,
+                'company_id'              => $companyId,
+                'branch_id'               => $branchId,
                 'sales_order_id'          => $salesOrder?->id,
                 'customer_id'             => $customerId,
                 'material_requirement_id' => $validated['material_requirement_id'] ?? null,

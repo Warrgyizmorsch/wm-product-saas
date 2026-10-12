@@ -150,6 +150,13 @@ class DispatchOrderService
         $finalMrId = $req?->id ?? $mrId;
         $tenantId = require_tenant_id();
 
+        if ($finalSalesOrderId) {
+            $so = \App\Domains\Sales\Models\SalesOrder::find($finalSalesOrderId);
+            if ($so && !in_array($so->status, ['Confirmed', 'Partially Shipped'])) {
+                throw new Exception("Sales Order {$so->sales_order_number} must be Confirmed before creating a Dispatch Order.");
+            }
+        }
+
         // 1. Remaining ordered qty & Stock availability validation
         foreach ($validated['items'] as $item) {
             $mrItemId = $item['material_requirement_item_id'] ?? null;

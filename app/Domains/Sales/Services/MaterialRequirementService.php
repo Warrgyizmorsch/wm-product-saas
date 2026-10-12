@@ -34,7 +34,12 @@ class MaterialRequirementService
             $nextNum = intval($lastNumStr) + 1;
         }
 
-        return $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        do {
+            $candidate = $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+            $nextNum++;
+        } while (MaterialRequirement::where('requirement_number', $candidate)->exists());
+
+        return $candidate;
     }
 
     public function create(array $data, array $items): MaterialRequirement
@@ -105,6 +110,9 @@ class MaterialRequirementService
         $tenantId = require_tenant_id();
 
         return DB::transaction(function () use ($item, $qtyToRequest, $warehouseId, $notes, $expectedDate, $tenantId) {
+            $companyId = company_id() ?? auth()->user()?->company_id;
+            $branchId = branch_id() ?? auth()->user()?->branch_id;
+
             $year = now()->format('Y');
             $prefix = "PR-{$year}-";
             $lastPr = PurchaseRequisition::where('tenant_id', $tenantId)
@@ -117,9 +125,15 @@ class MaterialRequirementService
                 $nextNum = ((int) $lastNumStr) + 1;
             }
             $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            while (PurchaseRequisition::where('requisition_number', $requisitionNumber)->exists()) {
+                $nextNum++;
+                $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            }
 
             $pr = PurchaseRequisition::create([
                 'tenant_id' => $tenantId,
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
                 'requisition_number' => $requisitionNumber,
                 'requisition_date' => now()->toDateString(),
                 'expected_date' => $expectedDate ? date('Y-m-d', strtotime($expectedDate)) : null,
