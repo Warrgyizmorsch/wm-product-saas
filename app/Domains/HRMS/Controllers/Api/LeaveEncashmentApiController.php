@@ -57,8 +57,15 @@ class LeaveEncashmentApiController extends Controller
 
         return (bool) (
             $user->hasHrPermission('hr.settings.manage') ||
-            $user->hasHrPermission('hrms.leave_requests.approve')
+            $user->hasHrPermission('hrms.leave_requests.approve') ||
+            $user->hasHrPermission('hrms.leave_encashments.approve')
         );
+    }
+
+    private function canViewAll(): bool
+    {
+        $user = auth()->user();
+        return $this->isHrAdmin() || ($user && $user->hasHrPermission('hrms.leave_encashments.view'));
     }
 
     /**
@@ -111,9 +118,9 @@ class LeaveEncashmentApiController extends Controller
         }
 
         $employee = $this->getAuthenticatedEmployee();
-        $isHrAdmin = $this->isHrAdmin();
-
+        $isHrAdmin = $this->canViewAll();
         $query = LeaveEncashment::query();
+        if (auth()->user()?->tenant_id) $query->where('tenant_id', auth()->user()->tenant_id);
         if (!$isHrAdmin) {
             $query->where('employee_id', $employee?->id ?? 0);
         }
@@ -137,9 +144,11 @@ class LeaveEncashmentApiController extends Controller
         }
 
         $employee = $this->getAuthenticatedEmployee();
-        $isHrAdmin = $this->isHrAdmin();
+        $isHrAdmin = $this->canViewAll();
+        $canManage = $this->isHrAdmin();
 
         $query = LeaveEncashment::query()->with(['employee', 'leaveType', 'approver']);
+        if (auth()->user()?->tenant_id) $query->where('tenant_id', auth()->user()->tenant_id);
 
         if (!$isHrAdmin) {
             $query->where('employee_id', $employee?->id ?? 0);
@@ -165,13 +174,13 @@ class LeaveEncashmentApiController extends Controller
 
         $encashments = $query->orderBy('created_at', 'desc')->paginate($request->integer('per_page', 10));
 
-        $encashments->getCollection()->transform(function ($enc) use ($employee, $isHrAdmin) {
+        $encashments->getCollection()->transform(function ($enc) use ($employee, $canManage, $isHrAdmin) {
             $isOwner = $employee && (int)$enc->employee_id === (int)$employee->id;
             $isPending = $enc->status === 'pending';
             $enc->capabilities = [
                 'can_view'    => true,
-                'can_approve' => $isHrAdmin && $isPending,
-                'can_reject'  => $isHrAdmin && $isPending,
+                'can_approve' => $canManage && $isPending,
+                'can_reject'  => $canManage && $isPending,
                 'can_cancel'  => ($isOwner || $isHrAdmin) && $isPending,
             ];
             return $enc;
@@ -193,7 +202,8 @@ class LeaveEncashmentApiController extends Controller
         $employee = $this->getAuthenticatedEmployee();
         $isHrAdmin = $this->isHrAdmin();
 
-        $encashment = LeaveEncashment::with(['employee', 'leaveType', 'approver'])->find($id);
+        $encashment = LeaveEncashment::with(['employee', 'leaveType', 'approver'])
+            ->where('tenant_id', auth()->user()->tenant_id)->find($id);
 
         if (!$encashment) {
             return $this->sendError("Leave encashment request with ID '{$id}' not found.", 404);
@@ -226,88 +236,31 @@ class LeaveEncashmentApiController extends Controller
         }
 
         $validated = $request->validate([
-            'employee_id'    => 'required|exists:employees,id',
+            'employee_id'    => 'nullable|integer|exists:employees,id',
             'leave_type_id'  => 'required|exists:leave_types,id',
             'requested_days' => 'required|numeric|min:0.5',
             'reason'         => 'nullable|string|max:1000',
         ]);
 
+        if ($this->isHrAdmin() && empty($validated['employee_id'])) {
+            return $this->sendError('employee_id is required for HR administrators.', 422);
+        }
+
         $employee = $this->getAuthenticatedEmployee();
-        $isHrAdmin = $this->isHrAdmin();
-
-        if (!$isHrAdmin) {
-            if (!$employee) {
-                return $this->sendError(__('hrms.leave.encashment_app.emp_not_found'), 404);
-            }
+        if (!$this->isHrAdmin() && $employee && !empty($validated['employee_id']) && (int) $validated['employee_id'] !== (int) $employee->id) {
+            return $this->sendError('You can only submit a leave encashment request for your own employee profile.', 403);
+        }
+        if (!$this->isHrAdmin() && !$employee) {
+            return $this->sendError('Employee profile not found for the authenticated user.', 404);
+        }
+        if (!$this->isHrAdmin()) {
             $validated['employee_id'] = $employee->id;
-        } else {
-            $employee = Employee::find($validated['employee_id']);
         }
 
-        if (!$employee) {
-            return $this->sendError(__('hrms.leave.encashment_app.emp_not_found'), 404);
-        }
-
-        $leaveType = LeaveType::find($validated['leave_type_id']);
-        if (!$leaveType) {
-            return $this->sendError(__('hrms.leave.encashment_app.type_not_found'), 404);
-        }
-
-        $rules       = $leaveType->rules ?? [];
-        $encashRules = $rules['encashment'] ?? [];
-
-        $isEnabled = !empty($encashRules['enabled']) && ($encashRules['enabled'] === true || $encashRules['enabled'] === '1' || $encashRules['enabled'] === 'true');
-
-        if (!$isEnabled) {
-            return $this->sendError(__('hrms.leave.encashment_app.not_enabled', ['name' => $leaveType->name]), 422);
-        }
-
-        $frequency = $encashRules['frequency'] ?? 'anytime';
-        $periods = $this->getCyclePeriods($employee, Carbon::now(), $frequency);
-
-        if (!$periods['is_valid_month']) {
-            $freqLabel = ucfirst(str_replace('_', ' ', $frequency));
-            return $this->sendError(__('hrms.leave.encashment_app.invalid_month', ['name' => $leaveType->name, 'frequency' => $freqLabel]), 422);
-        }
-
-        if (!$this->isWithinFrequencyLimits($employee->id, $leaveType->id, $periods['start'], $periods['end'], $frequency)) {
-            $freqLabel = ucfirst(str_replace('_', ' ', $frequency));
-            return $this->sendError("You have already submitted an encashment request in the current {$freqLabel} period.", 422);
-        }
-
-        $maxPerRequest = floatval($encashRules['max_days_per_request'] ?? 999.0);
-        $requestedDays = round(floatval($validated['requested_days']) * 2) / 2;
-
-        if ($requestedDays > $maxPerRequest) {
-            return $this->sendError(__('hrms.leave.encashment_app.max_days_exceeded', ['name' => $leaveType->name, 'max' => $maxPerRequest]), 422);
-        }
-
-        $balance = LeaveBalance::where('employee_id', $employee->id)
-            ->where('leave_type_id', $leaveType->id)
-            ->first();
-
-        $remaining        = $balance ? floatval($balance->remaining) : 0.0;
-        $minBalanceToKeep = floatval($encashRules['min_balance_to_keep'] ?? 0.0);
-
-        if (($remaining - $requestedDays) < $minBalanceToKeep) {
-            return $this->sendError(__('hrms.leave.encashment_app.min_balance_required', ['min' => $minBalanceToKeep, 'remaining' => $remaining]), 422);
-        }
-
-        if ($requestedDays > $remaining) {
-            return $this->sendError(__('hrms.leave.encashment_app.insufficient_balance', ['remaining' => $remaining]), 422);
-        }
-
-        $encashment = LeaveEncashment::create([
-            'tenant_id'      => $employee->tenant_id,
-            'company_id'     => $employee->company_id,
-            'employee_id'    => $employee->id,
-            'leave_type_id'  => $leaveType->id,
-            'requested_days' => $requestedDays,
-            'status'         => 'pending',
-            'reason'         => $validated['reason'] ?? null,
-        ]);
-
-        return $this->sendSuccess($encashment->load(['employee', 'leaveType']), __('hrms.leave.encashment_app.submitted_successfully'), 201);
+        $result = $this->leaveEncashmentRepository->storeEncashment($validated, $request, auth()->user());
+        if (!$result['success']) return $this->sendError($result['message'], 422);
+        $encashment = $result['encashment'] ?? null;
+        return $this->sendSuccess($encashment?->load(['employee', 'leaveType']), $result['message'], 201);
     }
 
     /**
@@ -324,18 +277,14 @@ class LeaveEncashmentApiController extends Controller
             return $this->sendError('Unauthorized action. Only HR Admins can approve leave encashment.', 403);
         }
 
-        $encashment = LeaveEncashment::find($id);
+        $encashment = LeaveEncashment::where('tenant_id', auth()->user()->tenant_id)->find($id);
         if (!$encashment) {
             return $this->sendError(__('hrms.leave.encashment_app.ticket_not_found', ['id' => $id]), 404);
         }
 
-        $encashment->update([
-            'status'      => 'approved',
-            'approved_by' => auth()->id(),
-            'approved_at' => now(),
-        ]);
-
-        $this->reconcileEncashedBalance($encashment->employee_id, $encashment->leave_type_id);
+        $result = $this->leaveEncashmentRepository->approve($encashment, request(), auth()->user());
+        if (!$result['success']) return $this->sendError($result['message'], 422);
+        $encashment->refresh();
 
         return $this->sendSuccess($encashment->load(['employee', 'leaveType', 'approver']), __('hrms.leave.encashment_app.approved_successfully'));
     }
@@ -354,17 +303,15 @@ class LeaveEncashmentApiController extends Controller
             return $this->sendError('Unauthorized action. Only HR Admins can reject leave encashment.', 403);
         }
 
-        $encashment = LeaveEncashment::find($id);
+        $encashment = LeaveEncashment::where('tenant_id', auth()->user()->tenant_id)->find($id);
         if (!$encashment) {
             return $this->sendError(__('hrms.leave.encashment_app.ticket_not_found', ['id' => $id]), 404);
         }
 
-        $encashment->update([
-            'status'      => 'rejected',
-            'approved_by' => auth()->id(),
-        ]);
-
-        $this->reconcileEncashedBalance($encashment->employee_id, $encashment->leave_type_id);
+        request()->validate(['rejection_reason' => 'nullable|string|max:1000']);
+        $result = $this->leaveEncashmentRepository->reject($encashment, request('rejection_reason'), auth()->user());
+        if (!$result['success']) return $this->sendError($result['message'], 422);
+        $encashment->refresh();
 
         return $this->sendSuccess($encashment, __('hrms.leave.encashment_app.rejected_successfully'));
     }
@@ -382,7 +329,7 @@ class LeaveEncashmentApiController extends Controller
         $employee = $this->getAuthenticatedEmployee();
         $isHrAdmin = $this->isHrAdmin();
 
-        $encashment = LeaveEncashment::find($id);
+        $encashment = LeaveEncashment::where('tenant_id', auth()->user()->tenant_id)->find($id);
         if (!$encashment) {
             return $this->sendError(__('hrms.leave.encashment_app.ticket_not_found', ['id' => $id]), 404);
         }
@@ -391,12 +338,7 @@ class LeaveEncashmentApiController extends Controller
             return $this->sendError('Unauthorized action.', 403);
         }
 
-        $empId  = $encashment->employee_id;
-        $typeId = $encashment->leave_type_id;
-
-        $encashment->delete();
-
-        $this->reconcileEncashedBalance($empId, $typeId);
+        if (!$this->leaveEncashmentRepository->delete($encashment)) return $this->sendError('Unable to delete this encashment request.', 422);
 
         return $this->sendSuccess(['id' => (int)$id], __('hrms.leave.encashment_app.deleted_successfully'));
     }

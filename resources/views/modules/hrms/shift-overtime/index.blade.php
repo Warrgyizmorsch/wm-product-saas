@@ -6,39 +6,17 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <button type="button" id="btnApplyShift" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#applyShiftChangeModal" style="height: 38px;">
-            <i class="feather-plus"></i> {{ __('hrms.shift_change.apply_shift_change') }}
-        </button>
-        <button type="button" id="btnApplyOvertime" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1 d-none" data-bs-toggle="modal" data-bs-target="#applyOvertimeModal" style="height: 38px;">
-            <i class="feather-plus"></i> {{ __('hrms.overtime.apply_overtime') }}
-        </button>
+        <x-ui.button variant="primary" icon="feather-plus" id="btnApplyShift" data-bs-toggle="modal" data-bs-target="#applyShiftChangeModal">
+            {{ __('hrms.shift_change.apply_shift_change') }}
+        </x-ui.button>
+        <x-ui.button variant="primary" icon="feather-plus" id="btnApplyOvertime" class="d-none" data-bs-toggle="modal" data-bs-target="#applyOvertimeModal">
+            {{ __('hrms.overtime.apply_overtime') }}
+        </x-ui.button>
     </div>
 @endsection
 
 @push('styles')
     <style>
-        /* Underlined Horizontal Tabs (matching Leave module) */
-        #shiftOvertimeTabs .nav-link {
-            border: none !important;
-            background-color: transparent !important;
-            color: #64748b;
-            font-weight: 500;
-            padding: 12px 20px;
-            border-bottom: 2px solid transparent !important;
-            transition: all 0.2s ease-in-out;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        #shiftOvertimeTabs .nav-link:hover {
-            color: var(--bs-primary);
-        }
-        #shiftOvertimeTabs .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom: 2px solid var(--bs-primary) !important;
-            font-weight: 600;
-        }
-
         /* High-specificity overrides to force Select2 options and selection text to dark grey, not blue */
         body .select2-container--bootstrap-5 .select2-dropdown .select2-results__options .select2-results__option,
         body .select2-container--bootstrap-5 .select2-dropdown .select2-results__options .select2-results__option *,
@@ -69,10 +47,6 @@
             background-color: var(--bs-primary) !important;
         }
 
-        /* Specific label width override for Overtime Policy Configuration modal to fit text on a single line */
-        #overtimeSettingsModal .odoo-form-label {
-            width: 180px !important;
-        }
 
         /* Action Status Dropdown Styling */
         .btn-status-dropdown {
@@ -134,6 +108,18 @@
             background-color: #f1f5f9 !important;
             color: #1e293b !important;
             font-weight: 700 !important;
+        }
+
+        /* Prevent table-responsive from clipping status action dropdown menus */
+        #shift .table-responsive,
+        #overtime .table-responsive {
+            min-height: 240px;
+        }
+        @media (min-width: 992px) {
+            #shift .table-responsive,
+            #overtime .table-responsive {
+                overflow: visible !important;
+            }
         }
 
         /* ERP Pagination styles matching WFH/Leaves theme */
@@ -246,26 +232,32 @@
 
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
         <div class="row mx-0">
-            {{-- Tabs Header (matching Leave Module styling) --}}
-            <div class="col-12 px-0 mb-2">
-                <ul class="nav gap-2 border-bottom pb-2" id="shiftOvertimeTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link @if($activeTab === 'shift') active @endif" id="tab-shift" data-bs-toggle="tab" data-bs-target="#shift-pane" type="button" role="tab" aria-controls="shift-pane" aria-selected="@if($activeTab === 'shift') true @else false @endif">
-                            <i class="feather-git-pull-request me-1"></i> {{ __('hrms.shift_change.title') }}
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link @if($activeTab === 'overtime') active @endif" id="tab-overtime" data-bs-toggle="tab" data-bs-target="#overtime-pane" type="button" role="tab" aria-controls="overtime-pane" aria-selected="@if($activeTab === 'overtime') true @else false @endif">
-                            <i class="feather-clock me-1"></i> {{ __('hrms.overtime.title') }}
-                        </button>
-                    </li>
-                </ul>
+            {{-- Tabs Header with Common UI Horizontal Tabs --}}
+            <div class="col-12 px-0 mb-3">
+                @php
+                    $shiftOvertimeTabs = [
+                        [
+                            'id' => 'shift',
+                            'label' => __('hrms.shift_change.title'),
+                            'active' => ($activeTab === 'shift'),
+                            'icon' => 'feather-git-pull-request',
+                            'badge' => $shiftPendingRequests ?: null,
+                        ],
+                        [
+                            'id' => 'overtime',
+                            'label' => __('hrms.overtime.title'),
+                            'active' => ($activeTab === 'overtime'),
+                            'icon' => 'feather-clock',
+                            'badge' => $overtimePendingRequests ?: null,
+                        ],
+                    ];
+                @endphp
+                <x-ui.horizontal-tabs id="shiftOvertimeTabs" :tabs="$shiftOvertimeTabs" :syncUrl="true" syncParam="tab" />
             </div>
 
             {{-- Tab Content --}}
             <div class="col-12 px-0">
                 <div class="tab-content" id="shiftOvertimeTabContent">
-                    
                     @include('modules.hrms.shift-overtime.tabs.shift')
                     @include('modules.hrms.shift-overtime.tabs.overtime')
                 </div>
@@ -281,8 +273,9 @@
         $(document).ready(function() {
             // Append modals to body root to prevent Bootstrap z-index/backdrop issues inside tab panes
             $('#applyShiftChangeModal').appendTo('body');
+            $('#shiftCancellationModal').appendTo('body');
             $('#applyOvertimeModal').appendTo('body');
-            $('#overtimeSettingsModal').appendTo('body');
+            $('#overtimeCancellationModal').appendTo('body');
             $('#approveOvertimeTabModal').appendTo('body');
             $('#rejectOvertimeTabModal').appendTo('body');
 
@@ -423,7 +416,7 @@
                     var oldPagination = $('#shift_pagination_container');
                     var newPagination = $(doc).find('#shift_pagination_container');
                     if (oldPagination.length && newPagination.length) {
-                        oldPagination.replaceWith(newPagination);
+                        oldPagination.html(newPagination.html());
                     }
 
                     closeAllFilterDropdowns();
@@ -436,7 +429,7 @@
         $(document).on('click', '#shift_pagination_container a', function(e) {
             e.preventDefault();
             var url = $(this).attr('href');
-            if (!url) return;
+            if (!url || url.indexOf('javascript:') === 0 || url === '#') return;
             var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
             var page = urlParams.get('shift_page') || 1;
             loadShiftApplications(page);
@@ -517,7 +510,7 @@
                     var oldPagination = $('#overtime_pagination_container');
                     var newPagination = $(doc).find('#overtime_pagination_container');
                     if (oldPagination.length && newPagination.length) {
-                        oldPagination.replaceWith(newPagination);
+                        oldPagination.html(newPagination.html());
                     }
 
                     closeAllFilterDropdowns();
@@ -530,7 +523,7 @@
         $(document).on('click', '#overtime_pagination_container a', function(e) {
             e.preventDefault();
             var url = $(this).attr('href');
-            if (!url) return;
+            if (!url || url.indexOf('javascript:') === 0 || url === '#') return;
             var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
             var page = urlParams.get('overtime_page') || 1;
             loadOvertimeApplications(page);
@@ -589,7 +582,7 @@
             document.getElementById('shiftDecisionAction').value = action === 'approve' ? 'approved' : 'rejected';
 
             if (action === 'reject') {
-                const reason = prompt('Please enter a rejection reason:');
+                const reason = prompt(@json(__('hrms.shift_change.rejection_reason_prompt')));
                 if (reason === null) return;
                 document.getElementById('shiftDecisionReason').value = reason;
             } else {
@@ -626,7 +619,7 @@
         document.getElementById('confirmOvertimeTabApproveBtn').addEventListener('click', function () {
             const hoursVal = parseFloat(document.getElementById('overtimeTabApproveHoursInput').value);
             if (isNaN(hoursVal) || hoursVal <= 0) {
-                alert('Please enter a valid positive number for hours.');
+                alert(@json(__('hrms.overtime.valid_hours_alert')));
                 return;
             }
             const form = document.getElementById('overtimeDecisionForm');
@@ -681,20 +674,11 @@
             }
         };
 
-        // Maintain active tab in query parameters upon tab click and toggle button views
-        const tabElList = [].slice.call(document.querySelectorAll('#shiftOvertimeTabs button[data-bs-toggle="tab"]'));
-        tabElList.forEach(function (tabEl) {
-            tabEl.addEventListener('shown.bs.tab', function (event) {
-                const targetId = event.target.getAttribute('data-bs-target');
-                const tabName = targetId.replace('#', '').replace('-pane', '');
-                
-                const url = new URL(window.location.href);
-                url.searchParams.set('tab', tabName);
-                window.history.replaceState({}, '', url.toString());
-
-                // Sync the buttons visible in the page header
-                syncPageActionButtons(tabName);
-            });
+        // Maintain active tab and toggle header action button views
+        $(document).on('shown.bs.tab', '#shiftOvertimeTabs button[data-bs-toggle="tab"]', function (event) {
+            const targetId = $(this).attr('data-bs-target') || '';
+            const tabName = targetId.replace('#tab-', '').replace('#', '').replace('-pane', '');
+            syncPageActionButtons(tabName);
         });
     </script>
 @endpush

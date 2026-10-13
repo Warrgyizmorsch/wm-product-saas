@@ -29,14 +29,21 @@ class LeaveRequestController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        if ($request->filled('start_date') && !$request->filled('end_date')) {
+            $request->merge(['end_date' => $request->input('start_date')]);
+        }
+
         $validated = $request->validate([
             'employee_id'      => 'required|exists:employees,id',
             'leave_type_id'    => 'required|exists:leave_types,id',
             'start_date'       => 'required|date',
             'end_date'         => 'required|date|after_or_equal:start_date',
-            'start_date_type'  => 'nullable|string|in:full_day,first_half,second_half',
-            'end_date_type'    => 'nullable|string|in:full_day,first_half,second_half',
-            'session'          => 'nullable|string|in:full_day,first_half,second_half',
+            'start_date_type'  => 'nullable|string|in:full_day,first_half,second_half,hourly',
+            'end_date_type'    => 'nullable|string|in:full_day,first_half,second_half,hourly',
+            'hours'            => 'nullable|numeric|min:0.5|max:24',
+            'start_time'       => 'nullable|date_format:H:i',
+            'end_time'         => 'nullable|date_format:H:i',
+            'session'          => 'nullable|string|in:full_day,first_half,second_half,hourly',
             'reason'           => 'required|string|max:1000',
             'attachment'       => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
             'notified_contacts'   => 'nullable|array',
@@ -47,14 +54,18 @@ class LeaveRequestController extends Controller
         $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
         if (!$isHrAdmin) {
             $currentEmp = Employee::resolveForUser($user);
-            if ($currentEmp) {
-                $validated['employee_id'] = $currentEmp->id;
+            if (!$currentEmp) {
+                return redirect()->back()->withInput()->with('error', __('hrms.leave.app.emp_not_found'));
             }
+            $validated['employee_id'] = $currentEmp->id;
         }
 
         $employee = Employee::findOrFail($validated['employee_id']);
 
         $leaveType = \App\Domains\HRMS\Models\LeaveType::with('plan')->findOrFail($validated['leave_type_id']);
+        if ($leaveType->leave_plan_id && (int) $employee->leave_plan_id !== (int) $leaveType->leave_plan_id) {
+            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.invalid_leave_type_for_employee'));
+        }
         if ($leaveType->plan && !$leaveType->plan->status) {
             return redirect()->back()->withInput()->with('error', __('hrms.leave.app.plan_inactive'));
         }
@@ -63,44 +74,86 @@ class LeaveRequestController extends Controller
         $appRules     = $rules['application'] ?? [];
         $sandwichRule = !empty($appRules['sandwich_rule']);
 
-        // Calculate duration server-side from dates + session types, respecting Sandwich Rule policy
+        $isHourly = !empty($rules['accrual']['calculate_in']) && $rules['accrual']['calculate_in'] === 'hours';
+
+        // Calculate duration server-side from dates + session types/hours, respecting Sandwich Rule policy
         $startDate = Carbon::parse($validated['start_date']);
         $endDate   = Carbon::parse($validated['end_date']);
-        $startType = $validated['start_date_type'] ?? 'full_day';
-        $endType   = $validated['end_date_type']   ?? 'full_day';
+        $startType = $validated['start_date_type'] ?? ($isHourly ? 'hourly' : 'full_day');
+        $endType   = $validated['end_date_type']   ?? ($isHourly ? 'hourly' : 'full_day');
         $duration  = 0.0;
 
-        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-            $isHoliday = \App\Domains\HRMS\Models\HolidayCalendar::isHolidayForEmployee($employee, $date);
-            $isActiveWorkDay = !is_null($employee->resolveShiftForDate($date));
+        if ($isHourly) {
+            $validated['end_date'] = $validated['start_date'];
+            $endDate = $startDate->copy();
 
-            if ($sandwichRule) {
-                if ($startDate->isSameDay($endDate)) {
-                    $duration += ($startType === 'full_day') ? 1.0 : 0.5;
-                } elseif ($date->isSameDay($startDate)) {
-                    $duration += ($startType === 'full_day') ? 1.0 : 0.5;
-                } elseif ($date->isSameDay($endDate)) {
-                    $duration += ($endType === 'full_day') ? 1.0 : 0.5;
-                } else {
-                    $duration += 1.0;
+            if (!empty($validated['start_time']) && !empty($validated['end_time'])) {
+                if (Carbon::parse($validated['end_time'])->lte(Carbon::parse($validated['start_time']))) {
+                    return redirect()->back()->withInput()->with('error', __('hrms.leave.app.time_validation_error'));
                 }
-            } else {
-                if (!$isHoliday && $isActiveWorkDay) {
+            }
+
+            $duration = round(floatval($request->input('hours', 1.0)) * 2) / 2;
+            if ($duration < 0.5) {
+                return redirect()->back()->withInput()->with('error', __('hrms.leave.app.min_hourly_error'));
+            }
+            $startType = 'hourly';
+            $endType = 'hourly';
+            $validated['start_date_type'] = 'hourly';
+            $validated['end_date_type'] = 'hourly';
+            $validated['session'] = 'hourly';
+        } else {
+            // Clear hourly time fields for full-day / multi-day leaves to prevent data pollution
+            $validated['start_time'] = null;
+            $validated['end_time']   = null;
+            $validated['hours']      = null;
+            // Collect all dates in range and identify work days vs non-work days
+            $daysInRange = [];
+            $firstWorkDay = null;
+            $lastWorkDay = null;
+
+            for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+                $isHoliday = \App\Domains\HRMS\Models\HolidayCalendar::isHolidayForEmployee($employee, $date);
+                $isActiveWorkDay = !is_null($employee->resolveShiftForDate($date));
+                $isWorkDay = !$isHoliday && $isActiveWorkDay;
+
+                $daysInRange[] = [
+                    'date' => $date->copy(),
+                    'isWorkDay' => $isWorkDay,
+                ];
+
+                if ($isWorkDay) {
+                    if ($firstWorkDay === null) {
+                        $firstWorkDay = $date->copy();
+                    }
+                    $lastWorkDay = $date->copy();
+                }
+            }
+
+            foreach ($daysInRange as $d) {
+                $currDate = $d['date'];
+                if ($d['isWorkDay']) {
                     if ($startDate->isSameDay($endDate)) {
                         $duration += ($startType === 'full_day') ? 1.0 : 0.5;
-                    } elseif ($date->isSameDay($startDate)) {
+                    } elseif ($currDate->isSameDay($startDate)) {
                         $duration += ($startType === 'full_day') ? 1.0 : 0.5;
-                    } elseif ($date->isSameDay($endDate)) {
+                    } elseif ($currDate->isSameDay($endDate)) {
                         $duration += ($endType === 'full_day') ? 1.0 : 0.5;
                     } else {
                         $duration += 1.0;
                     }
+                } else {
+                    // Non-working day (Holiday or Rest Day)
+                    if ($sandwichRule && $firstWorkDay && $lastWorkDay && $currDate->gt($firstWorkDay) && $currDate->lt($lastWorkDay)) {
+                        // Sandwiched between working days
+                        $duration += 1.0;
+                    }
                 }
             }
-        }
 
-        if ($duration < 0.5) {
-            return redirect()->back()->withInput()->with('error', 'Duration cannot be less than 0.5 days. Ensure you are not applying for leave entirely on weekends or holidays.');
+            if ($duration < 0.5) {
+                return redirect()->back()->withInput()->with('error', __('hrms.leave.app.duration_zero_error'));
+            }
         }
 
         $validated['duration'] = $duration;
@@ -149,17 +202,18 @@ class LeaveRequestController extends Controller
         }
 
         // Duration Limits
-        $minDuration = floatval($appRules['min_duration'] ?? 0.5);
-        $maxDuration = floatval($appRules['max_duration'] ?? 365);
+        $minDuration = floatval($appRules['min_duration'] ?? ($isHourly ? 0.5 : 0.5));
+        $maxDuration = floatval($appRules['max_duration'] ?? ($isHourly ? 24.0 : 365.0));
+        $unitLabel = $isHourly ? __('hrms.leave.app.hours') : __('hrms.leave.days');
         if ($minDuration > 0 && $duration < $minDuration) {
-            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.min_duration_restricted', ['min' => $minDuration]));
+            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.duration_min_error', ['duration' => $duration, 'unit' => $unitLabel, 'min' => $minDuration]));
         }
         if ($maxDuration > 0 && $duration > $maxDuration) {
-            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.max_duration_restricted', ['max' => $maxDuration]));
+            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.duration_max_error', ['duration' => $duration, 'unit' => $unitLabel, 'max' => $maxDuration]));
         }
 
-        // Attachment Requirement
-        if (!empty($appRules['require_attachment'])) {
+        // Attachment Requirement (for day-based leave applications)
+        if (!$isHourly && !empty($appRules['require_attachment'])) {
             $attachmentDays = intval($appRules['attachment_days'] ?? 3);
             if ($duration >= $attachmentDays && !$request->hasFile('attachment')) {
                 return redirect()->back()->withInput()->with('error', __('hrms.leave.app.attachment_required', ['days' => $attachmentDays]));
@@ -174,6 +228,21 @@ class LeaveRequestController extends Controller
             $balance = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $employee->id)
                 ->where('leave_type_id', $leaveType->id)
                 ->first();
+
+            if (!$balance) {
+                $quota = floatval($rules['accrual']['quota_value'] ?? ($leaveType->quota ?? 0.0));
+                $balance = \App\Domains\HRMS\Models\LeaveBalance::firstOrCreate([
+                    'tenant_id'     => $employee->tenant_id,
+                    'company_id'    => $employee->company_id,
+                    'employee_id'   => $employee->id,
+                    'leave_type_id' => $leaveType->id,
+                ], [
+                    'allocated' => $quota,
+                    'used'      => 0.0,
+                    'encashed'  => 0.0,
+                ]);
+            }
+
             $remaining = $balance ? floatval($balance->remaining) : 0.0;
             $allowNegative = !empty($rules['accrual']['allow_negative']);
             $maxNegative = floatval($rules['accrual']['max_negative'] ?? 0.0);
@@ -199,31 +268,51 @@ class LeaveRequestController extends Controller
 
         $leaveRequest = $this->leaveRequestRepository->storeLeaveRequest($validated, $request);
 
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.applied', [
-            'employee_name' => $employee->full_name,
-            'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
-            'from_date'     => $startDate->format('d M Y'),
-            'to_date'       => $endDate->format('d M Y'),
-            'days'          => (string) $duration,
-        ]);
+        try {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.applied', [
+                'employee_name' => $employee->full_name,
+                'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
+                'from_date'     => $startDate->format('d M Y'),
+                'to_date'       => $endDate->format('d M Y'),
+                'days'          => (string) $duration,
+            ]);
 
-        // Send Notifications
-        \App\Services\Notification\NotificationService::sendToHrAdmins(
-            title: 'New Leave Request',
-            message: "{$employee->full_name} applied for {$duration} day(s) leave ({$startDate->format('M d')} - {$endDate->format('M d')}).",
-            actionUrl: route('hrms.leaves.index'),
-            type: 'leave_request',
-            iconClass: 'feather-calendar'
-        );
-        if ($employee->reportingManager) {
-        \App\Services\Notification\NotificationService::sendToEmployee(
-                employee: $employee->reportingManager,
-                title: 'New Leave Request Applied',
-                message: "{$employee->full_name} applied for {$duration} day(s) leave.",
+            $unitDisplay = $isHourly ? 'hour(s)' : 'day(s)';
+
+            // Send Notifications
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'New Leave Request',
+                message: "{$employee->full_name} applied for {$duration} {$unitDisplay} leave ({$startDate->format('M d')} - {$endDate->format('M d')}).",
                 actionUrl: route('hrms.leaves.index'),
                 type: 'leave_request',
                 iconClass: 'feather-calendar'
             );
+            if ($employee->reportingManager) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $employee->reportingManager,
+                    title: 'New Leave Request Applied',
+                    message: "{$employee->full_name} applied for {$duration} {$unitDisplay} leave.",
+                    actionUrl: route('hrms.leaves.index'),
+                    type: 'leave_request',
+                    iconClass: 'feather-calendar'
+                );
+            }
+
+            if (!empty($validated['notified_contacts'])) {
+                $contacts = Employee::whereIn('id', $validated['notified_contacts'])->get();
+                foreach ($contacts as $contact) {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employee: $contact,
+                        title: 'Colleague Leave Notice',
+                        message: "{$employee->full_name} will be on leave ({$startDate->format('M d')} - {$endDate->format('M d')}).",
+                        actionUrl: route('hrms.leaves.index'),
+                        type: 'leave_request',
+                        iconClass: 'feather-calendar'
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Leave applied notification dispatch failed: ' . $e->getMessage());
         }
 
         return redirect()->back()->with('success', __('hrms.leave.app.submitted_successfully'));
@@ -246,7 +335,7 @@ class LeaveRequestController extends Controller
         abort_unless($this->canApproveLeaveRequest($request->user(), $leaveRequest), 403, 'Unauthorized to process leave request at current level.');
 
         if ($leaveRequest->status === 'cancelled') {
-            return redirect()->back()->with('error', 'Cannot change the status of a cancelled leave application.');
+            return redirect()->back()->with('error', __('hrms.leave.app.status_change_cancelled_error'));
         }
 
         if (!$request->has('action') && $request->has('status')) {
@@ -258,53 +347,77 @@ class LeaveRequestController extends Controller
             'rejection_reason' => 'nullable|string|max:1000',
         ]);
 
-        $this->leaveRequestRepository->updateStatus($leaveRequest, $validated, $request);
+        try {
+            $this->leaveRequestRepository->updateStatus($leaveRequest, $validated, $request);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            return redirect()->back()->withErrors($ve->errors());
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', $e->getMessage() ?: 'An error occurred while updating application status.');
+        }
 
         $startFormatted = \Carbon\Carbon::parse($leaveRequest->start_date)->format('d M Y');
         $endFormatted = \Carbon\Carbon::parse($leaveRequest->end_date)->format('d M Y');
 
-        if ($validated['action'] === 'approved') {
-            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.approved', [
-                'employee_name' => $leaveRequest->employee?->full_name ?? 'Employee',
-                'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
-                'from_date'     => $startFormatted,
-                'to_date'       => $endFormatted,
-                'days'          => (string) ($leaveRequest->duration ?? 1),
-                'approved_by'   => auth()->user()?->name ?? 'Manager',
-            ]);
-        } elseif ($validated['action'] === 'rejected') {
-            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.rejected', [
-                'employee_name' => $leaveRequest->employee?->full_name ?? 'Employee',
-                'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
-                'from_date'     => $startFormatted,
-                'to_date'       => $endFormatted,
-                'reason'        => $validated['rejection_reason'] ?? 'Not specified',
-                'rejected_by'   => auth()->user()?->name ?? 'Manager',
-            ]);
-        }
+        try {
+            if ($validated['action'] === 'approved') {
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.approved', [
+                    'employee_name' => $leaveRequest->employee?->full_name ?? 'Employee',
+                    'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
+                    'from_date'     => $startFormatted,
+                    'to_date'       => $endFormatted,
+                    'days'          => (string) ($leaveRequest->duration ?? 1),
+                    'approved_by'   => auth()->user()?->name ?? 'Manager',
+                ]);
+            } elseif ($validated['action'] === 'rejected') {
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.rejected', [
+                    'employee_name' => $leaveRequest->employee?->full_name ?? 'Employee',
+                    'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
+                    'from_date'     => $startFormatted,
+                    'to_date'       => $endFormatted,
+                    'reason'        => $validated['rejection_reason'] ?? 'Not specified',
+                    'rejected_by'   => auth()->user()?->name ?? 'Manager',
+                ]);
+            }
 
-        // Send Status Notification to Employee
-        if ($leaveRequest->employee) {
-            $statusText = ucfirst($validated['action']);
-            $iconClass = $validated['action'] === 'approved' ? 'feather-check-circle' : 'feather-x-circle';
-        \App\Services\Notification\NotificationService::sendToEmployee(
-                employee: $leaveRequest->employee,
-                title: "Leave Request {$statusText}",
-                message: "Your leave application ({$startFormatted} to {$endFormatted}) status is now {$statusText}.",
-                actionUrl: route('hrms.leaves.index'),
-                type: 'leave_' . $validated['action'],
-                iconClass: $iconClass
-            );
+            // Send Status Notification to Employee
+            if ($leaveRequest->employee) {
+                $statusText = ucfirst($validated['action']);
+                $iconClass = $validated['action'] === 'approved' ? 'feather-check-circle' : 'feather-x-circle';
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $leaveRequest->employee,
+                    title: "Leave Request {$statusText}",
+                    message: "Your leave application ({$startFormatted} to {$endFormatted}) status is now {$statusText}.",
+                    actionUrl: route('hrms.leaves.index'),
+                    type: 'leave_' . $validated['action'],
+                    iconClass: $iconClass
+                );
+            }
+
+            if ($validated['action'] === 'approved' && !empty($leaveRequest->notified_contacts)) {
+                $contacts = Employee::whereIn('id', $leaveRequest->notified_contacts)->get();
+                foreach ($contacts as $contact) {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employee: $contact,
+                        title: 'Colleague Leave Approved',
+                        message: "{$leaveRequest->employee?->full_name}'s leave ({$startFormatted} - {$endFormatted}) has been approved.",
+                        actionUrl: route('hrms.leaves.index'),
+                        type: 'leave_approved',
+                        iconClass: 'feather-calendar'
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Leave status update notification dispatch failed: ' . $e->getMessage());
         }
 
         $statusLabels = [
-            'approved'     => __('hrms.leave.app.approved_successfully') ?? 'Leave application approved successfully.',
-            'rejected'     => __('hrms.leave.app.rejected_successfully') ?? 'Leave application rejected successfully.',
-            'pending'      => 'Leave application set to pending successfully.',
-            'unauthorized' => 'Leave application set to unauthorized successfully.',
-            'unpaid'       => 'Leave application set to unpaid successfully.',
+            'approved'     => __('hrms.leave.app.approved_successfully'),
+            'rejected'     => __('hrms.leave.app.rejected_successfully'),
+            'pending'      => __('hrms.leave.app.status_updated_successfully', ['status' => __('hrms.leave.app.status_pending')]),
+            'unauthorized' => __('hrms.leave.app.status_updated_successfully', ['status' => __('hrms.leave.app.status_unauthorized')]),
+            'unpaid'       => __('hrms.leave.app.status_updated_successfully', ['status' => __('hrms.leave.app.status_unpaid')]),
         ];
-        $msg = $statusLabels[$validated['action']] ?? 'Leave application status updated successfully.';
+        $msg = $statusLabels[$validated['action']] ?? __('hrms.leave.app.status_updated_successfully', ['status' => $validated['action']]);
 
         return redirect()->back()->with('success', $msg);
     }
@@ -335,12 +448,12 @@ class LeaveRequestController extends Controller
         }
 
         if (!$leaveRequest->canWithdraw()) {
-            return redirect()->back()->with('error', 'Only pending applications can be withdrawn.');
+            return redirect()->back()->with('error', __('hrms.leave.app.only_pending_withdrawn'));
         }
 
         $leaveRequest->delete();
 
-        return redirect()->back()->with('success', 'Leave application withdrawn successfully.');
+        return redirect()->back()->with('success', __('hrms.leave.app.withdrawn_successfully'));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -359,7 +472,7 @@ class LeaveRequestController extends Controller
         }
 
         if (!$leaveRequest->canRequestCancellation()) {
-            return redirect()->back()->with('error', 'Only approved applications can have a cancellation requested.');
+            return redirect()->back()->with('error', __('hrms.leave.app.only_approved_cancellation'));
         }
 
         $validated = $request->validate([
@@ -371,7 +484,7 @@ class LeaveRequestController extends Controller
             'cancellation_reason' => $validated['cancellation_reason'],
         ]);
 
-        return redirect()->back()->with('success', 'Cancellation request submitted. Awaiting admin approval.');
+        return redirect()->back()->with('success', __('hrms.leave.app.cancellation_submitted'));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -380,16 +493,17 @@ class LeaveRequestController extends Controller
 
     public function approveCancellation(LeaveRequest $leaveRequest): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $user = auth()->user();
+        abort_unless($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve')), 403, 'Unauthorized to approve cancellation.');
 
         if ($leaveRequest->status !== 'cancellation_requested') {
-            return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
+            return redirect()->back()->with('error', __('hrms.leave.app.no_pending_cancellation'));
         }
 
         // Cancel and restore the leave balance
         $this->leaveRequestRepository->cancelLeaveRequest($leaveRequest);
 
-        return redirect()->back()->with('success', 'Leave cancellation approved. Balance has been restored.');
+        return redirect()->back()->with('success', __('hrms.leave.app.cancellation_approved_restored'));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -398,10 +512,11 @@ class LeaveRequestController extends Controller
 
     public function denyCancellation(LeaveRequest $leaveRequest): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $user = auth()->user();
+        abort_unless($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve')), 403, 'Unauthorized to deny cancellation.');
 
         if ($leaveRequest->status !== 'cancellation_requested') {
-            return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
+            return redirect()->back()->with('error', __('hrms.leave.app.no_pending_cancellation'));
         }
 
         $leaveRequest->update([
@@ -409,7 +524,7 @@ class LeaveRequestController extends Controller
             'cancellation_reason' => null,
         ]);
 
-        return redirect()->back()->with('success', 'Cancellation request denied. Application remains approved.');
+        return redirect()->back()->with('success', __('hrms.leave.app.cancellation_denied'));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -428,65 +543,90 @@ class LeaveRequestController extends Controller
             'leave_type_id'   => 'nullable|integer',
             'start_date'      => 'required|date',
             'end_date'        => 'required|date|after_or_equal:start_date',
-            'start_date_type' => 'required|string|in:full_day,first_half,second_half',
-            'end_date_type'   => 'required|string|in:full_day,first_half,second_half',
+            'start_date_type' => 'nullable|string|in:full_day,first_half,second_half,hourly',
+            'end_date_type'   => 'nullable|string|in:full_day,first_half,second_half,hourly',
+            'hours'           => 'nullable|numeric|min:0.5|max:24',
         ]);
 
         $employee  = Employee::findOrFail($validated['employee_id']);
         $startDate = Carbon::parse($validated['start_date']);
         $endDate   = Carbon::parse($validated['end_date']);
-        $startType = $validated['start_date_type'];
-        $endType   = $validated['end_date_type'];
+        $startType = $validated['start_date_type'] ?? 'full_day';
+        $endType   = $validated['end_date_type'] ?? 'full_day';
 
         $leaveType = !empty($validated['leave_type_id']) ? \App\Domains\HRMS\Models\LeaveType::find($validated['leave_type_id']) : null;
+        $isHourly  = $leaveType && (!empty($leaveType->rules['accrual']['calculate_in']) && $leaveType->rules['accrual']['calculate_in'] === 'hours');
+
+        if ($isHourly) {
+            $hours = round(floatval($request->input('hours', 1.0)) * 2) / 2;
+            return response()->json([
+                'success'       => true,
+                'duration'      => $hours,
+                'unit'          => 'hours',
+                'holidays'      => [],
+                'rest_days'     => [],
+                'sandwich_rule' => false,
+                'sandwich_days' => [],
+            ]);
+        }
+
         $sandwichRule = $leaveType && !empty($leaveType->rules['application']['sandwich_rule']);
 
         $duration     = 0.0;
         $holidays     = [];
         $restDays     = [];
         $sandwichDays = [];
+        $daysInRange  = [];
+        $firstWorkDay = null;
+        $lastWorkDay  = null;
 
         for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
             $dateStr = $date->toDateString();
             $isHoliday = \App\Domains\HRMS\Models\HolidayCalendar::isHolidayForEmployee($employee, $date);
             $isActiveWorkDay = !is_null($employee->resolveShiftForDate($date));
-            $isNonWorkDay = $isHoliday || !$isActiveWorkDay;
+            $isWorkDay = !$isHoliday && $isActiveWorkDay;
 
-            if ($sandwichRule) {
-                if ($isHoliday) {
-                    $holidays[] = $dateStr;
-                }
-                if (!$isActiveWorkDay) {
-                    $restDays[] = $dateStr;
-                }
+            if ($isHoliday) {
+                $holidays[] = $dateStr;
+            }
+            if (!$isActiveWorkDay) {
+                $restDays[] = $dateStr;
+            }
 
+            $daysInRange[] = [
+                'date'      => $date->copy(),
+                'dateStr'   => $dateStr,
+                'isWorkDay' => $isWorkDay,
+            ];
+
+            if ($isWorkDay) {
+                if ($firstWorkDay === null) {
+                    $firstWorkDay = $date->copy();
+                }
+                $lastWorkDay = $date->copy();
+            }
+        }
+
+        foreach ($daysInRange as $d) {
+            $currDate = $d['date'];
+            $dateStr  = $d['dateStr'];
+
+            if ($d['isWorkDay']) {
                 if ($startDate->isSameDay($endDate)) {
                     $duration += ($startType === 'full_day') ? 1.0 : 0.5;
-                } elseif ($date->isSameDay($startDate)) {
+                } elseif ($currDate->isSameDay($startDate)) {
                     $duration += ($startType === 'full_day') ? 1.0 : 0.5;
-                } elseif ($date->isSameDay($endDate)) {
+                } elseif ($currDate->isSameDay($endDate)) {
                     $duration += ($endType === 'full_day') ? 1.0 : 0.5;
                 } else {
                     $duration += 1.0;
-                    if ($isNonWorkDay) {
-                        $sandwichDays[] = $dateStr;
-                    }
                 }
             } else {
-                if ($isHoliday) {
-                    $holidays[] = $dateStr;
-                } elseif (!$isActiveWorkDay) {
-                    $restDays[] = $dateStr;
-                } else {
-                    if ($startDate->isSameDay($endDate)) {
-                        $duration += ($startType === 'full_day') ? 1.0 : 0.5;
-                    } elseif ($date->isSameDay($startDate)) {
-                        $duration += ($startType === 'full_day') ? 1.0 : 0.5;
-                    } elseif ($date->isSameDay($endDate)) {
-                        $duration += ($endType === 'full_day') ? 1.0 : 0.5;
-                    } else {
-                        $duration += 1.0;
-                    }
+                // Non-working day (Holiday or Rest Day)
+                if ($sandwichRule && $firstWorkDay && $lastWorkDay && $currDate->gt($firstWorkDay) && $currDate->lt($lastWorkDay)) {
+                    // Sandwiched between working days
+                    $duration += 1.0;
+                    $sandwichDays[] = $dateStr;
                 }
             }
         }
@@ -494,6 +634,7 @@ class LeaveRequestController extends Controller
         return response()->json([
             'success'       => true,
             'duration'      => $duration,
+            'unit'          => 'days',
             'holidays'      => $holidays,
             'rest_days'     => $restDays,
             'sandwich_rule' => $sandwichRule,
@@ -521,18 +662,20 @@ class LeaveRequestController extends Controller
                 abort(403, 'Unauthorized action.');
             }
             if ($leaveRequest->status !== 'pending') {
-                return redirect()->back()->with('error', 'Only pending applications can be deleted.');
+                return redirect()->back()->with('error', __('hrms.leave.app.only_pending_deleted'));
             }
         }
 
-        // If it was approved or cancellation was requested, restore leave balance before deletion
-        if (in_array($leaveRequest->status, ['approved', 'cancellation_requested'])) {
-            $this->leaveRequestRepository->cancelLeaveRequest($leaveRequest);
-        }
+        \Illuminate\Support\Facades\DB::transaction(function () use ($leaveRequest) {
+            // If it was approved or cancellation was requested, restore leave balance before deletion
+            if (in_array($leaveRequest->status, ['approved', 'cancellation_requested'])) {
+                $this->leaveRequestRepository->cancelLeaveRequest($leaveRequest);
+            }
 
-        $leaveRequest->delete();
+            $leaveRequest->delete();
+        });
 
-        return redirect()->back()->with('success', 'Leave application deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.leave.app.deleted_successfully'));
     }
 }
 

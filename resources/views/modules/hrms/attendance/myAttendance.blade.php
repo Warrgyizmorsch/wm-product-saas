@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'My Attendance | SaaS ERP')
-@section('page-title', 'My Attendance')
-@section('breadcrumb', 'HRMS / My Attendance')
+@section('title', __('hrms.my_attendance.title') . ' | SaaS ERP')
+@section('page-title', __('hrms.my_attendance.title'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.my_attendance.title'))
 
 @section('page-actions')
-    <button type="button" onclick="openCorrectionModal()" class="btn btn-sm btn-warning text-white fw-bold text-uppercase px-3" style="height: 38px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; border-radius: 6px;">
-        <i class="feather-edit-3"></i> Request Correction
-    </button>
+    <x-ui.button type="button" data-bs-toggle="modal" data-bs-target="#requestCorrectionModal" onclick="openCorrectionModal()" variant="primary" class="text-white fw-bold text-uppercase px-3" icon="feather-edit-3" style="height: 38px; display: inline-flex; align-items: center; font-size: 11px; border-radius: 6px;">
+        {{ __('hrms.my_attendance.request_correction') }}
+    </x-ui.button>
 @endsection
 
 @push('styles')
@@ -42,11 +42,36 @@
     @endphp
 
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+        @if(session('success'))
+            <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert" style="border-radius: 8px;">
+                <i class="feather-check-circle me-2"></i>{{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert" style="border-radius: 8px;">
+                <i class="feather-alert-triangle me-2"></i>{{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if($errors->any())
+            <div class="alert alert-warning alert-dismissible fade show border-0 shadow-sm mb-4" role="alert" style="border-radius: 8px;">
+                <ul class="mb-0 ps-3 fs-12">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
         <div class="mb-4 pb-3 border-bottom">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 w-100">
                 <div>
-                    <h5 class="fw-bold text-dark mb-0 fs-16">Attendance History</h5>
-                    <p class="text-muted fs-12 mb-0">Track and review your clock-in, clock-out, breaks and status history</p>
+                    <h5 class="fw-bold text-dark mb-0 fs-16">{{ __('hrms.my_attendance.history_title') }}</h5>
+                    <p class="text-muted fs-12 mb-0">{{ __('hrms.my_attendance.history_subtitle') }}</p>
                 </div>
                 
                 <!-- Search & Filters Toolbar (Standard Theme) -->
@@ -61,46 +86,46 @@
                             name="search" 
                             id="myAttendanceSearchInput"
                             class="form-control border-0 bg-transparent p-0 fs-13" 
-                            placeholder="Search location, status..." 
+                            placeholder="{{ __('hrms.my_attendance.search_placeholder') }}" 
                             value="{{ $search ?? '' }}"
                             style="box-shadow: none; width: 180px;"
                         >
                     </div>
 
                     <!-- Sort Dropdown -->
-                    <x-ui.sort-dropdown label="Sort">
+                    <x-ui.sort-dropdown :label="__('hrms.my_attendance.sort')">
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ ($sort ?? 'date_desc') === 'date_desc' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('date_desc')">
-                            <span>Date (Newest)</span>
+                            <span>{{ __('hrms.my_attendance.sort_date_desc') }}</span>
                             @if(($sort ?? 'date_desc') === 'date_desc') <i class="feather-check ms-3 text-primary"></i> @endif
                         </a>
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ ($sort ?? 'date_desc') === 'date_asc' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('date_asc')">
-                            <span>Date (Oldest)</span>
+                            <span>{{ __('hrms.my_attendance.sort_date_asc') }}</span>
                             @if(($sort ?? 'date_desc') === 'date_asc') <i class="feather-check ms-3 text-primary"></i> @endif
                         </a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ ($sort ?? 'date_desc') === 'checkin_asc' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('checkin_asc')">
-                            <span>Check-in (Earliest)</span>
+                            <span>{{ __('hrms.my_attendance.sort_checkin_asc') }}</span>
                             @if(($sort ?? 'date_desc') === 'checkin_asc') <i class="feather-check ms-3 text-primary"></i> @endif
                         </a>
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ ($sort ?? 'date_desc') === 'checkin_desc' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('checkin_desc')">
-                            <span>Check-in (Latest)</span>
+                            <span>{{ __('hrms.my_attendance.sort_checkin_desc') }}</span>
                             @if(($sort ?? 'date_desc') === 'checkin_desc') <i class="feather-check ms-3 text-primary"></i> @endif
                         </a>
                     </x-ui.sort-dropdown>
 
                     <!-- Filter Dropdown -->
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter :label="__('hrms.my_attendance.filter')" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.my_attendance.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.my_attendance.date') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="date" value="{{ $date }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Month</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.my_attendance.month') }}</label>
                             <x-ui.odoo-form-ui type="select" name="month" select2-selector="default">
-                                <option value="">All Months</option>
+                                <option value="">{{ __('hrms.my_attendance.all_months') }}</option>
                                 @for($i = 0; $i > -12; $i--)
                                     @php
                                         $m = now()->addMonths($i);
@@ -113,23 +138,23 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.my_attendance.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status">
-                                <option value="">All Statuses</option>
-                                <option value="present" @selected($status === 'present')>Present</option>
-                                <option value="wfh" @selected($status === 'wfh')>Work From Home</option>
-                                <option value="late" @selected($status === 'late')>Late</option>
-                                <option value="half_day" @selected($status === 'half_day')>Half Day</option>
-                                <option value="absent" @selected($status === 'absent')>Absent</option>
-                                <option value="on_leave" @selected($status === 'on_leave')>Leave</option>
-                                <option value="week_off" @selected($status === 'week_off')>Week Off</option>
-                                <option value="holiday" @selected($status === 'holiday')>Holiday</option>
+                                <option value="">{{ __('hrms.my_attendance.all_statuses') }}</option>
+                                <option value="present" @selected($status === 'present')>{{ __('hrms.my_attendance.present') }}</option>
+                                <option value="wfh" @selected($status === 'wfh')>{{ __('hrms.my_attendance.wfh') }}</option>
+                                <option value="late" @selected($status === 'late')>{{ __('hrms.my_attendance.late') }}</option>
+                                <option value="half_day" @selected($status === 'half_day')>{{ __('hrms.my_attendance.half_day') }}</option>
+                                <option value="absent" @selected($status === 'absent')>{{ __('hrms.my_attendance.absent') }}</option>
+                                <option value="on_leave" @selected($status === 'on_leave')>{{ __('hrms.my_attendance.leave') }}</option>
+                                <option value="week_off" @selected($status === 'week_off')>{{ __('hrms.my_attendance.weekly_off') }}</option>
+                                <option value="holiday" @selected($status === 'holiday')>{{ __('hrms.my_attendance.holiday') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('hrms.attendance.myAttendance') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary text-white">Apply</button>
+                            <x-ui.button href="{{ route('hrms.attendance.myAttendance') }}" variant="light" size="sm" class="border">{{ __('hrms.my_attendance.reset') }}</x-ui.button>
+                            <x-ui.button type="submit" variant="primary" size="sm">{{ __('hrms.my_attendance.apply') }}</x-ui.button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -141,13 +166,13 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light text-uppercase fs-10 tracking-wider">
                         <tr>
-                            <th class="ps-4">DATE & LOCATION</th>
-                            <th>CHECK IN</th>
-                            <th>CHECK OUT</th>
-                            <th>BREAKS</th>
-                            <th>WORKING HOURS</th>
-                            <th>STATUS</th>
-                            <th class="text-end pe-4">DETAILS</th>
+                            <th class="ps-4">{{ __('hrms.my_attendance.th_date_location') }}</th>
+                            <th>{{ __('hrms.my_attendance.th_check_in') }}</th>
+                            <th>{{ __('hrms.my_attendance.th_check_out') }}</th>
+                            <th>{{ __('hrms.my_attendance.th_breaks') }}</th>
+                            <th>{{ __('hrms.my_attendance.th_working_hours') }}</th>
+                            <th>{{ __('hrms.my_attendance.th_status') }}</th>
+                            <th class="text-end pe-4">{{ __('hrms.my_attendance.th_details') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -156,22 +181,64 @@
                                 $statusVal = $attendance->status ?: 'present';
                                 $isAbsentOrLeave = in_array($statusVal, ['absent', 'on_leave']);
 
-                                // Location Badge Class
+                                // Location Badge Class & Translated Label
                                 $locLower = strtolower($attendance->location_type);
                                 $locBadgeClass = 'bg-soft-secondary text-secondary';
+                                $locText = '-';
                                 if ($locLower === 'office') {
                                     $locBadgeClass = 'bg-soft-primary text-primary';
+                                    $locText = __('hrms.my_attendance.office');
                                 } elseif ($locLower === 'wfh') {
                                     $locBadgeClass = 'bg-soft-success text-success';
+                                    $locText = __('hrms.my_attendance.wfh');
                                 } elseif ($locLower === 'onsite') {
                                     $locBadgeClass = 'bg-soft-warning text-warning';
+                                    $locText = __('hrms.my_attendance.onsite');
+                                } elseif (!empty($attendance->location_type)) {
+                                    $locText = $attendance->formatted_location_type;
+                                }
+
+                                // Status Badge & Translated Label
+                                $statusBadgeClass = 'bg-soft-secondary text-secondary';
+                                $statusText = ucfirst(str_replace('_', ' ', $statusVal));
+                                $statusStyle = '';
+                                if ($statusVal === 'present') {
+                                    $statusBadgeClass = 'bg-soft-success text-success';
+                                    $statusText = __('hrms.my_attendance.present');
+                                } elseif ($statusVal === 'wfh') {
+                                    $statusBadgeClass = 'bg-soft-info text-info';
+                                    $statusText = __('hrms.my_attendance.wfh');
+                                } elseif ($statusVal === 'late') {
+                                    $statusBadgeClass = 'bg-soft-warning text-warning';
+                                    $statusText = __('hrms.my_attendance.late');
+                                } elseif ($statusVal === 'half_day') {
+                                    $statusStyle = 'background-color: rgba(111, 66, 193, 0.1); color: #6f42c1 !important;';
+                                    $statusText = __('hrms.my_attendance.half_day');
+                                } elseif ($statusVal === 'on_leave') {
+                                    $statusBadgeClass = 'bg-soft-primary text-primary';
+                                    $statusText = __('hrms.my_attendance.on_leave');
+                                    if (!empty($attendance->leave_type_name) && strtolower(trim($attendance->leave_type_name)) !== 'leave') {
+                                        $statusText = __('hrms.my_attendance.on_leave') . ': ' . $attendance->leave_type_name;
+                                    }
+                                } elseif ($statusVal === 'absent') {
+                                    $statusBadgeClass = 'bg-soft-danger text-danger';
+                                    $statusText = __('hrms.my_attendance.absent');
+                                } elseif ($statusVal === 'week_off' || $statusVal === 'weekly_off') {
+                                    $statusBadgeClass = 'bg-soft-secondary text-secondary';
+                                    $statusText = __('hrms.my_attendance.weekly_off');
+                                } elseif ($statusVal === 'holiday') {
+                                    $statusStyle = 'background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;';
+                                    $statusText = __('hrms.my_attendance.holiday');
+                                    if (!empty($attendance->holiday_name)) {
+                                        $statusText = __('hrms.my_attendance.holiday') . ': ' . $attendance->holiday_name;
+                                    }
                                 }
                             @endphp
                             <tr>
                                 <!-- Date & Location -->
                                 <td class="ps-4">
                                     <span class="fw-bold text-dark d-block fs-13 mb-1">{{ $attendance->date->format('M d, Y') }}</span>
-                                    <span class="badge {{ $locBadgeClass }} border-0 fs-10 rounded-pill px-2 py-0.5">{{ $attendance->formatted_location_type }}</span>
+                                    <span class="badge {{ $locBadgeClass }} border-0 fs-10 rounded-pill px-2 py-0.5">{{ $locText }}</span>
                                 </td>
 
                                 <!-- Check-In -->
@@ -179,7 +246,7 @@
                                     @if ($attendance->check_in && !$isAbsentOrLeave)
                                         <span class="d-block fw-semibold text-dark fs-12">{{ $attendance->check_in->format('h:i A') }}</span>
                                         @if ($attendance->check_in_latitude)
-                                            <span class="text-muted fs-10 d-block"><i class="feather-map-pin fs-9"></i> GPS Tracked</span>
+                                            <span class="text-muted fs-10 d-block"><i class="feather-map-pin fs-9"></i> {{ __('hrms.my_attendance.gps_tracked') }}</span>
                                         @endif
                                     @else
                                         <span class="text-muted">-</span>
@@ -191,7 +258,7 @@
                                     @if ($attendance->check_out && !$isAbsentOrLeave)
                                         <span class="d-block fw-semibold text-dark fs-12">{{ $attendance->check_out->format('h:i A') }}</span>
                                         @if ($attendance->check_out_latitude)
-                                            <span class="text-muted fs-10 d-block"><i class="feather-map-pin fs-9"></i> GPS Tracked</span>
+                                            <span class="text-muted fs-10 d-block"><i class="feather-map-pin fs-9"></i> {{ __('hrms.my_attendance.gps_tracked') }}</span>
                                         @endif
                                     @else
                                         <span class="text-muted">-</span>
@@ -205,13 +272,13 @@
                                             @foreach($attendance->breaks as $brk)
                                                 @php
                                                     $brkIn = \Carbon\Carbon::parse($brk->break_in)->format('h:i A');
-                                                    $brkOut = $brk->break_out ? \Carbon\Carbon::parse($brk->break_out)->format('h:i A') : 'Active';
-                                                    $brkDur = $brk->duration_minutes !== null ? $brk->duration_minutes . 'm' : 'Active';
+                                                    $brkOut = $brk->break_out ? \Carbon\Carbon::parse($brk->break_out)->format('h:i A') : __('hrms.my_attendance.active');
+                                                    $brkDur = $brk->duration_minutes !== null ? $brk->duration_minutes . 'm' : __('hrms.my_attendance.active');
                                                 @endphp
                                                 <span class="fs-10 text-muted" style="line-height: 1.2;">{{ $brkIn }} - {{ $brkOut }} ({{ $brkDur }})</span>
                                             @endforeach
                                             @if($attendance->total_break_hours > 0)
-                                                <span class="fw-bold mt-1 text-dark" style="font-size: 10px;">Total: {{ $attendance->formatted_break_hours }}</span>
+                                                <span class="fw-bold mt-1 text-dark" style="font-size: 10px;">{{ __('hrms.my_attendance.total_break') }}: {{ $attendance->formatted_break_hours }}</span>
                                             @endif
                                         </div>
                                     @else
@@ -230,37 +297,7 @@
 
                                 <!-- Status -->
                                 <td>
-                                    @if($statusVal === 'present')
-                                        <span class="badge bg-soft-success text-success px-3 py-1.5 fs-11 rounded-pill fw-bold">Present</span>
-                                    @elseif($statusVal === 'wfh')
-                                        <span class="badge bg-soft-info text-info px-3 py-1.5 fs-11 rounded-pill fw-bold">WFH</span>
-                                    @elseif($statusVal === 'late')
-                                        <span class="badge bg-soft-warning text-warning px-3 py-1.5 fs-11 rounded-pill fw-bold">Late</span>
-                                    @elseif($statusVal === 'half_day')
-                                        <span class="badge px-3 py-1.5 fs-11 rounded-pill fw-bold" style="background-color: rgba(111, 66, 193, 0.1); color: #6f42c1 !important;">Half Day</span>
-                                    @elseif($statusVal === 'on_leave')
-                                        @php
-                                            $leaveText = 'On Leave';
-                                            if (!empty($attendance->leave_type_name) && strtolower(trim($attendance->leave_type_name)) !== 'leave') {
-                                                $leaveText = 'On Leave: ' . $attendance->leave_type_name;
-                                            }
-                                        @endphp
-                                        <span class="badge bg-soft-primary text-primary px-3 py-1.5 fs-11 rounded-pill fw-bold">{{ $leaveText }}</span>
-                                    @elseif($statusVal === 'absent')
-                                        <span class="badge bg-soft-danger text-danger px-3 py-1.5 fs-11 rounded-pill fw-bold">Absent</span>
-                                    @elseif($statusVal === 'week_off' || $statusVal === 'weekly_off')
-                                        <span class="badge bg-soft-secondary text-secondary px-3 py-1.5 fs-11 rounded-pill fw-bold">Weekly Off</span>
-                                    @elseif($statusVal === 'holiday')
-                                        @php
-                                            $holidayText = 'Holiday';
-                                            if (!empty($attendance->holiday_name)) {
-                                                $holidayText = 'Holiday: ' . $attendance->holiday_name;
-                                            }
-                                        @endphp
-                                        <span class="badge px-3 py-1.5 fs-11 rounded-pill fw-bold" style="background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;">{{ $holidayText }}</span>
-                                    @else
-                                        <span class="badge bg-soft-secondary text-secondary px-3 py-1.5 fs-11 rounded-pill fw-bold">{{ ucfirst(str_replace('_', ' ', $statusVal)) }}</span>
-                                    @endif
+                                    <span class="badge {{ $statusBadgeClass }} px-3 py-1.5 fs-11 rounded-pill fw-bold" @if($statusStyle) style="{{ $statusStyle }}" @endif>{{ $statusText }}</span>
                                 </td>
 
                                 <!-- Actions (Eye Button for Drawer Details) -->
@@ -272,9 +309,9 @@
                                     @endphp
 
                                     @if($hasPending)
-                                        <span class="badge bg-soft-warning text-warning fs-10 border-0 me-1">Correction Pending</span>
+                                        <span class="badge bg-soft-warning text-warning fs-10 border-0 me-1">{{ __('hrms.my_attendance.correction_pending') }}</span>
                                     @elseif($hasApproved)
-                                        <span class="badge bg-soft-success text-success fs-10 border-0 me-1">Regularized</span>
+                                        <span class="badge bg-soft-success text-success fs-10 border-0 me-1">{{ __('hrms.my_attendance.regularized') }}</span>
                                     @endif
 
                                     @if ($attendance->id)
@@ -282,20 +319,29 @@
                                              class="btn btn-sm btn-soft-primary rounded-circle p-0 d-inline-flex align-items-center justify-content-center" 
                                             style="width: 28px; height: 28px;" 
                                             data-date="{{ $attendance->date->format('M d, Y') }}"
-                                            data-status="{{ ucfirst($statusVal) }}"
-                                            data-location-type="{{ $attendance->location_type }}"
+                                            data-date-raw="{{ $attendance->date->format('Y-m-d') }}"
+                                            data-status="{{ $statusVal }}"
+                                            data-status-label="{{ $statusText }}"
+                                            data-location-type="{{ $attendance->location_type ?: '—' }}"
+                                            data-location-label="{{ $locText }}"
                                             data-check-in-time="{{ $attendance->check_in ? $attendance->check_in->format('h:i:s A') : '-' }}"
                                             data-check-out-time="{{ $attendance->check_out ? $attendance->check_out->format('h:i:s A') : '-' }}"
+                                            data-check-in-raw="{{ $attendance->check_in ? $attendance->check_in->format('H:i') : '' }}"
+                                            data-check-out-raw="{{ $attendance->check_out ? $attendance->check_out->format('H:i') : '' }}"
+                                            data-has-pending="{{ $hasPending ? '1' : '0' }}"
+                                            data-can-correct="{{ (!$hasPending && $attendance->date->lte(now())) ? '1' : '0' }}"
                                             data-check-in-selfie="{{ $attendance->check_in_selfie_path ? asset('storage/' . $attendance->check_in_selfie_path) : '' }}"
                                             data-check-out-selfie="{{ $attendance->check_out_selfie_path ? asset('storage/' . $attendance->check_out_selfie_path) : '' }}"
                                             data-check-in-lat="{{ $attendance->check_in_latitude }}"
                                             data-check-in-lng="{{ $attendance->check_in_longitude }}"
                                             data-check-out-lat="{{ $attendance->check_out_latitude }}"
                                             data-check-out-lng="{{ $attendance->check_out_longitude }}"
-                                            data-location-logs="{{ json_encode($attendance->locationLogs->map(fn($l) => ['lat' => (float)$l->latitude, 'lng' => (float)$l->longitude, 'time' => $l->created_at ? $l->created_at->format('h:i A') : ''])) }}"
+                                            data-location-logs="{{ json_encode(isset($attendance->locationLogs) && $attendance->locationLogs ? $attendance->locationLogs->map(fn($l) => ['lat' => (float)$l->latitude, 'lng' => (float)$l->longitude, 'time' => $l->created_at ? $l->created_at->format('h:i A') : '']) : []) }}"
                                             onclick="viewAttendanceDetailDrawer(this)">
                                         <i class="feather-eye fs-13"></i>
                                     </button>
+                                    @else
+                                        <span class="text-muted">-</span>
                                     @endif
                                 </td>
                             </tr>
@@ -304,35 +350,37 @@
                                 <td colspan="7" class="text-center text-muted py-5">
                                     <div class="d-flex flex-column align-items-center justify-content-center py-4">
                                         <i class="feather-calendar fs-36 text-muted mb-3 opacity-30"></i>
-                                        <h6 class="fw-semibold text-dark">No Attendance Logs Found</h6>
-                                        <p class="fs-12 text-muted mb-0">Try adjusting your filters or search date.</p>
+                                        <h6 class="fw-semibold text-dark">{{ __('hrms.my_attendance.empty_title') }}</h6>
+                                        <p class="fs-12 text-muted mb-0">{{ __('hrms.my_attendance.empty_desc') }}</p>
                                     </div>
                                 </td>
                             </tr>
                         @endforelse
                     </tbody>
                 </table>
+            </div>
+        </div>
     </div>
 
 <!-- Attendance Record Details Drawer -->
-<x-ui.drawer id="attendanceRecordDetailDrawer" title="Attendance Session Details" position="end" style="width: 480px; max-width: 95vw;">
+<x-ui.drawer id="attendanceRecordDetailDrawer" :title="__('hrms.my_attendance.drawer_title')" position="end" style="width: 480px; max-width: 95vw;">
     <div class="px-1">
         <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
             <div>
-                <span class="text-muted fs-11 d-block text-uppercase">Work Mode</span>
-                <span class="badge bg-soft-primary text-primary px-3 py-1 fs-11 rounded-pill fw-bold" id="detail-drawer-location">OFFICE</span>
+                <span class="text-muted fs-11 d-block text-uppercase">{{ __('hrms.my_attendance.work_mode') }}</span>
+                <span class="badge bg-soft-primary text-primary px-3 py-1 fs-11 rounded-pill fw-bold" id="detail-drawer-location">{{ __('hrms.my_attendance.office') }}</span>
             </div>
             <div class="text-end">
-                <span class="text-muted fs-11 d-block text-uppercase">Status</span>
-                <span class="badge bg-soft-success text-success px-3 py-1 fs-11 rounded-pill fw-bold" id="detail-drawer-status">Present</span>
+                <span class="text-muted fs-11 d-block text-uppercase">{{ __('hrms.my_attendance.status') }}</span>
+                <span class="badge bg-soft-success text-success px-3 py-1 fs-11 rounded-pill fw-bold" id="detail-drawer-status">{{ __('hrms.my_attendance.present') }}</span>
             </div>
         </div>
 
         <!-- Date Info Card -->
         <div class="bg-light border rounded-3 p-3 mb-4 d-flex align-items-center justify-content-between">
             <div>
-                <span class="text-muted fs-11 d-block text-uppercase">Date</span>
-                <h6 class="fw-bold text-dark mb-0 fs-13" id="detail-drawer-date">Aug 07, 2026</h6>
+                <span class="text-muted fs-11 d-block text-uppercase">{{ __('hrms.my_attendance.date') }}</span>
+                <h6 class="fw-bold text-dark mb-0 fs-13" id="detail-drawer-date">-</h6>
             </div>
             <div class="avatar-sm bg-soft-primary text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
                 <i class="feather-calendar fs-16"></i>
@@ -341,13 +389,13 @@
 
         <!-- Single Location Map -->
         <div class="mb-4">
-            <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">Session Location Map</span>
+            <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">{{ __('hrms.my_attendance.session_map') }}</span>
             <div class="position-relative w-100" id="detail-drawer-map-wrap" style="display: none;">
-                <input type="text" id="detail_drawer_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="Search address or subarea (Press Enter)...">
+                <input type="text" id="detail_drawer_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="{{ __('hrms.my_attendance.search_address_placeholder') }}">
                 <div id="detail-drawer-map" style="height: 250px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>
             </div>
             <div id="detail-drawer-map-none" class="alert alert-light border text-center fs-12 py-4 mb-0">
-                <i class="feather-map-pin text-muted fs-20 d-block mb-1"></i> No location coordinates captured for check-in or check-out.
+                <i class="feather-map-pin text-muted fs-20 d-block mb-1"></i> {{ __('hrms.my_attendance.no_coords') }}
             </div>
         </div>
 
@@ -360,17 +408,17 @@
                         <div class="avatar-sm bg-soft-success text-success rounded-circle d-flex align-items-center justify-content-center" style="width: 22px; height: 22px;">
                             <i class="feather-log-in fs-11"></i>
                         </div>
-                        <span class="fw-bold text-dark fs-12">Check In</span>
+                        <span class="fw-bold text-dark fs-12">{{ __('hrms.my_attendance.check_in') }}</span>
                     </div>
                     <div class="mb-2">
-                        <span class="text-muted fs-10 d-block">TIME</span>
+                        <span class="text-muted fs-10 d-block">{{ __('hrms.my_attendance.lbl_time') }}</span>
                         <span class="fw-bold text-dark fs-12" id="detail-drawer-checkin-time">-</span>
                     </div>
                     <div>
-                        <span class="text-muted fs-10 d-block mb-1">SELFIE</span>
+                        <span class="text-muted fs-10 d-block mb-1">{{ __('hrms.my_attendance.lbl_selfie') }}</span>
                         <div class="bg-light border border-dashed rounded p-2 d-flex align-items-center justify-content-center" style="height: 100px;">
                             <img id="detail-drawer-checkin-selfie" src="" class="rounded border shadow-sm" style="max-height: 85px; max-width: 100%; object-fit: cover; display: none; transform: scaleX(-1);">
-                            <span id="detail-drawer-checkin-selfie-none" class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> None</span>
+                            <span id="detail-drawer-checkin-selfie-none" class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> {{ __('hrms.my_attendance.none') }}</span>
                         </div>
                     </div>
                 </div>
@@ -383,22 +431,23 @@
                         <div class="avatar-sm bg-soft-danger text-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 22px; height: 22px;">
                             <i class="feather-log-out fs-11"></i>
                         </div>
-                        <span class="fw-bold text-dark fs-12">Check Out</span>
+                        <span class="fw-bold text-dark fs-12">{{ __('hrms.my_attendance.check_out') }}</span>
                     </div>
                     <div class="mb-2">
-                        <span class="text-muted fs-10 d-block">TIME</span>
+                        <span class="text-muted fs-10 d-block">{{ __('hrms.my_attendance.lbl_time') }}</span>
                         <span class="fw-bold text-dark fs-12" id="detail-drawer-checkout-time">-</span>
                     </div>
                     <div>
-                        <span class="text-muted fs-10 d-block mb-1">SELFIE</span>
+                        <span class="text-muted fs-10 d-block mb-1">{{ __('hrms.my_attendance.lbl_selfie') }}</span>
                         <div class="bg-light border border-dashed rounded p-2 d-flex align-items-center justify-content-center" style="height: 100px;">
                             <img id="detail-drawer-checkout-selfie" src="" class="rounded border shadow-sm" style="max-height: 85px; max-width: 100%; object-fit: cover; display: none; transform: scaleX(-1);">
-                            <span id="detail-drawer-checkout-selfie-none" class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> None</span>
+                            <span id="detail-drawer-checkout-selfie-none" class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> {{ __('hrms.my_attendance.none') }}</span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
     </div>
 </x-ui.drawer>
 
@@ -408,24 +457,25 @@
         <div class="modal-content text-dark">
             <form method="POST" action="{{ route('hrms.attendance.corrections.store') }}" id="correctionRequestForm">
                 @csrf
+                <input type="hidden" name="employee_id" value="{{ $employee->id }}">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="requestCorrectionModalLabel">Request Attendance Correction</h5>
+                    <h5 class="modal-title fw-bold" id="requestCorrectionModalLabel">{{ __('hrms.my_attendance.modal_title') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body d-flex flex-column gap-3">
                     <div class="alert alert-info py-2 px-3 mb-0 fs-12">
-                        <i class="feather-info me-1"></i> Submit a request to correct your clock-in, clock-out, or request regularization for an absent day.
+                        <i class="feather-info me-1"></i> {{ __('hrms.my_attendance.modal_info') }}
                     </div>
                     
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="Date of Correction" name="date" id="correction_date_val" :required="true" />
-                    <x-ui.odoo-form-ui type="input" inputType="time" label="Requested Check-In" name="requested_check_in" id="correction_check_in" :required="true" />
-                    <x-ui.odoo-form-ui type="input" inputType="time" label="Requested Check-Out" name="requested_check_out" id="correction_check_out" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.my_attendance.lbl_date_of_correction')" name="date" id="correction_date_val" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="time" :label="__('hrms.my_attendance.lbl_requested_check_in')" name="requested_check_in" id="correction_check_in" />
+                    <x-ui.odoo-form-ui type="input" inputType="time" :label="__('hrms.my_attendance.lbl_requested_check_out')" name="requested_check_out" id="correction_check_out" />
                     
-                    <x-ui.odoo-form-ui type="textarea" label="Reason for Correction" name="reason" id="correction_reason" placeholder="Explain why the check-in/out times need to be corrected..." :required="true" />
+                    <x-ui.odoo-form-ui type="textarea" :label="__('hrms.my_attendance.lbl_reason')" name="reason" id="correction_reason" :placeholder="__('hrms.my_attendance.placeholder_reason')" :required="true" />
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary text-uppercase fw-bold fs-12">Submit Request</button>
+                    <x-ui.button type="button" variant="light" class="border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">{{ __('hrms.my_attendance.cancel') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" class="text-uppercase fw-bold fs-12">{{ __('hrms.my_attendance.btn_submit_request') }}</x-ui.button>
                 </div>
             </form>
         </div>
@@ -437,6 +487,7 @@
 <script>
     let detailDrawerMapObj = null;
     let detailDrawerOverlays = [];
+
 
     function clearDetailDrawerOverlays() {
         detailDrawerOverlays.forEach(overlay => {
@@ -452,12 +503,14 @@
         if (searchInput) {
             searchInput.value = '';
             searchInput.disabled = false;
-            searchInput.placeholder = 'Search address or subarea (Press Enter)...';
+            searchInput.placeholder = {{ json_encode(__('hrms.my_attendance.search_address_placeholder')) }};
         }
 
         const date = btn.getAttribute('data-date');
         const status = btn.getAttribute('data-status');
+        const statusLabel = btn.getAttribute('data-status-label') || status;
         const locationType = btn.getAttribute('data-location-type') || 'office';
+        const locationLabel = btn.getAttribute('data-location-label') || locationType;
         
         const checkinTime = btn.getAttribute('data-check-in-time');
         const checkoutTime = btn.getAttribute('data-check-out-time');
@@ -472,8 +525,8 @@
 
         // Populate header & status details
         document.getElementById('detail-drawer-date').textContent = date;
-        document.getElementById('detail-drawer-status').textContent = status;
-        document.getElementById('detail-drawer-location').textContent = locationType.toUpperCase();
+        document.getElementById('detail-drawer-status').textContent = statusLabel;
+        document.getElementById('detail-drawer-location').textContent = locationLabel.toUpperCase();
         
         // Update badge color styles dynamically based on status
         const statusBadge = document.getElementById('detail-drawer-status');
@@ -535,9 +588,9 @@
         const hasCheckinCoords = checkinLat && checkinLng && parseFloat(checkinLat) !== 0 && parseFloat(checkinLng) !== 0;
         const hasCheckoutCoords = checkoutLat && checkoutLng && parseFloat(checkoutLat) !== 0 && parseFloat(checkoutLng) !== 0;
         const hasLocationLogs = locationLogs && locationLogs.length > 0;
-        const hasGeofenceCoords = {{ ($officeLat && $officeLng) || ($wfhLat && $wfhLng) ? 'true' : 'false' }};
+        const hasPunchCoords = hasCheckinCoords || hasCheckoutCoords || hasLocationLogs;
 
-        if (hasCheckinCoords || hasCheckoutCoords || hasLocationLogs || hasGeofenceCoords) {
+        if (hasPunchCoords) {
             mapWrap.style.display = 'block';
             mapNone.style.display = 'none';
         } else {
@@ -600,7 +653,7 @@
                     updateDropdownPosition();
 
                     if (!currentResults || currentResults.length === 0) {
-                        dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">No locations found</div>';
+                        dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">' + {{ json_encode(__('hrms.my_attendance.no_locations_found')) }} + '</div>';
                         dropdown.style.display = 'block';
                         return;
                     }
@@ -788,8 +841,8 @@
                     
                     const marker = L.marker(checkinLatLng, {
                         icon: greenIcon,
-                        title: 'Check In Point'
-                    }).addTo(detailDrawerMapObj).bindPopup(`<b>Check In Point</b><br>Time: ${checkinTime}<br>Lat: ${checkinLatVal.toFixed(6)}<br>Lng: ${checkinLngVal.toFixed(6)}`);
+                        title: {{ json_encode(__('hrms.my_attendance.check_in_point')) }}
+                    }).addTo(detailDrawerMapObj).bindPopup('<b>' + {{ json_encode(__('hrms.my_attendance.check_in_point')) }} + '</b><br>' + {{ json_encode(__('hrms.my_attendance.lbl_time') . ': ') }} + checkinTime + '<br>Lat: ' + checkinLatVal.toFixed(6) + '<br>Lng: ' + checkinLngVal.toFixed(6));
                     
                     detailDrawerOverlays.push(marker);
                 }
@@ -810,7 +863,7 @@
                                 color: '#ffffff',
                                 weight: 1.5,
                                 fillOpacity: 0.85
-                            }).addTo(detailDrawerMapObj).bindPopup(`<b>Location Log (Tracking)</b><br>Time: ${log.time || ''}<br>Lat: ${latVal.toFixed(6)}<br>Lng: ${lngVal.toFixed(6)}`);
+                            }).addTo(detailDrawerMapObj).bindPopup('<b>' + {{ json_encode(__('hrms.my_attendance.location_tracking')) }} + '</b><br>' + {{ json_encode(__('hrms.my_attendance.lbl_time') . ': ') }} + (log.time || '') + '<br>Lat: ' + latVal.toFixed(6) + '<br>Lng: ' + lngVal.toFixed(6));
                             
                             detailDrawerOverlays.push(circleMarker);
                         }
@@ -827,8 +880,8 @@
 
                     const marker = L.marker(checkoutLatLng, {
                         icon: redIcon,
-                        title: 'Check Out Point'
-                    }).addTo(detailDrawerMapObj).bindPopup(`<b>Check Out Point</b><br>Time: ${checkoutTime}<br>Lat: ${checkoutLatVal.toFixed(6)}<br>Lng: ${checkoutLngVal.toFixed(6)}`);
+                        title: {{ json_encode(__('hrms.my_attendance.check_out_point')) }}
+                    }).addTo(detailDrawerMapObj).bindPopup('<b>' + {{ json_encode(__('hrms.my_attendance.check_out_point')) }} + '</b><br>' + {{ json_encode(__('hrms.my_attendance.lbl_time') . ': ') }} + checkoutTime + '<br>Lat: ' + checkoutLatVal.toFixed(6) + '<br>Lng: ' + checkoutLngVal.toFixed(6));
                     
                     detailDrawerOverlays.push(marker);
                 }
@@ -977,7 +1030,7 @@
         }
 
         const modalEl = document.getElementById('requestCorrectionModal');
-        if (modalEl) {
+        if (modalEl && modalEl.parentElement !== document.body) {
             document.body.appendChild(modalEl);
         }
 
@@ -1016,14 +1069,27 @@
     }
 
     window.openCorrectionModal = function() {
-        document.getElementById('correction_date_val').value = '';
-        document.getElementById('correction_check_in').value = '';
-        document.getElementById('correction_check_out').value = '';
-        document.getElementById('correction_reason').value = '';
+        const dateInput = document.getElementById('correction_date_val');
+        if (dateInput) dateInput.value = '';
+        const checkinInput = document.getElementById('correction_check_in');
+        if (checkinInput) checkinInput.value = '';
+        const checkoutInput = document.getElementById('correction_check_out');
+        if (checkoutInput) checkoutInput.value = '';
+        const reasonInput = document.getElementById('correction_reason');
+        if (reasonInput) reasonInput.value = '';
 
         const modalEl = document.getElementById('requestCorrectionModal');
-        const modal = new bootstrap.Modal(modalEl);
-        modal.show();
+        if (modalEl) {
+            if (modalEl.parentElement !== document.body) {
+                document.body.appendChild(modalEl);
+            }
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            } else if (typeof $ !== 'undefined') {
+                $('#requestCorrectionModal').modal('show');
+            }
+        }
     };
 </script>
 @endpush

@@ -964,6 +964,31 @@ class HrmsDashboardController extends Controller
                 return redirect()->back()->with('error', 'You have already clocked in today at ' . Carbon::parse($attendance->check_in)->format('h:i A') . '.');
             }
 
+            $inStatus = 'present';
+            $resolvedShift = $employee->resolveShiftForDate($today);
+            if ($resolvedShift) {
+                $shiftStartStr = $resolvedShift->start_time;
+                $shiftStart = Carbon::parse($today . ' ' . $shiftStartStr);
+
+                if ($now->greaterThan($shiftStart)) {
+                    $penaltyRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
+                            $q->where('company_id', $employee->company_id)
+                              ->orWhereNull('company_id');
+                        })
+                        ->where('rule_type', 'late_arrival')
+                        ->where('status', true)
+                        ->orderByRaw('company_id IS NULL ASC')
+                        ->first();
+
+                    $graceMinutes = $penaltyRule ? (int)$penaltyRule->grace_period_minutes : 15;
+                    if ($now->diffInMinutes($shiftStart) > $graceMinutes) {
+                        $inStatus = 'late';
+                    }
+                }
+            } elseif ($now->format('H:i') > '09:45') {
+                $inStatus = 'late';
+            }
+
             if (!$attendance) {
                 $attendance = Attendance::create([
                     'tenant_id' => $tenantId,
@@ -971,13 +996,13 @@ class HrmsDashboardController extends Controller
                     'date' => $today,
                     'check_in' => $now,
                     'location_type' => $locationType,
-                    'status' => $now->format('H:i') > '09:45' ? 'late' : 'present',
+                    'status' => $inStatus,
                 ]);
             } else {
                 $attendance->update([
                     'check_in' => $now,
                     'location_type' => $locationType,
-                    'status' => $now->format('H:i') > '09:45' ? 'late' : 'present',
+                    'status' => $inStatus,
                 ]);
             }
 

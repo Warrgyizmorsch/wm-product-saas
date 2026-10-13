@@ -39,9 +39,10 @@
         'lost' => ['bg' => 'bg-soft-danger', 'text' => 'text-danger', 'dot' => 'bg-danger', 'default_label' => 'Lost'],
         'pending_capitalization' => ['bg' => 'bg-soft-warning', 'text' => 'text-warning', 'dot' => 'bg-warning', 'default_label' => 'Pending Capitalization'],
 
-        // Depreciation / disposal / write-off / revaluation workflow statuses
+        // Depreciation / disposal / write-off / revaluation / HRMS workflow statuses
         'reviewed' => ['bg' => 'bg-soft-info', 'text' => 'text-info', 'dot' => 'bg-info', 'default_label' => 'Reviewed'],
         'posted' => ['bg' => 'bg-soft-success', 'text' => 'text-success', 'dot' => 'bg-success', 'default_label' => 'Posted'],
+        'pending' => ['bg' => 'bg-soft-warning', 'text' => 'text-warning', 'dot' => 'bg-warning', 'default_label' => 'Pending'],
         'pending_approval' => ['bg' => 'bg-soft-warning', 'text' => 'text-warning', 'dot' => 'bg-warning', 'default_label' => 'Pending Approval'],
         'rejected' => ['bg' => 'bg-soft-danger', 'text' => 'text-danger', 'dot' => 'bg-danger', 'default_label' => 'Rejected'],
     ];

@@ -159,8 +159,8 @@
                                 <span><i class="feather-globe"></i>{{ __('ui.select_language') }}</span>
                                 <span class="d-flex flex-wrap justify-content-end gap-1">
                                     @foreach ($languages as $locale => $language)
-                                        <a href="{{ route('locale.switch', $locale) }}" @class(['ax-lang', 'active' => app()->getLocale() === $locale]) title="{{ $language['name'] }}">
-                                            <img src="{{ asset('assets/vendors/img/flags/1x1/'.$language['flag'].'.svg') }}" alt="{{ $language['name'] }}">
+                                        <a href="{{ route('locale.switch', $locale) }}" @class(['ax-lang', 'active' => app()->getLocale() === $locale]) title="{{ $language['native'] ?? $language['name'] }}">
+                                            <img src="{{ asset('assets/vendors/img/flags/1x1/'.$language['flag'].'.svg') }}" alt="{{ $language['native'] ?? $language['name'] }}">
                                         </a>
                                     @endforeach
                                 </span>

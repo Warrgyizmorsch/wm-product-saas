@@ -121,12 +121,13 @@ class NotificationService
         }
 
         if (!$employeeModel->user_id) {
-            $user = User::where('email', $employeeModel->office_email)
-                ->orWhere('email', $employeeModel->personal_email)
-                ->first();
-            if ($user) {
-                $employeeModel->user_id = $user->id;
-                $employeeModel->saveQuietly();
+            $emails = array_filter([$employeeModel->office_email, $employeeModel->personal_email]);
+            if (!empty($emails)) {
+                $user = User::whereIn('email', $emails)->first();
+                if ($user) {
+                    $employeeModel->user_id = $user->id;
+                    $employeeModel->saveQuietly();
+                }
             }
         }
 

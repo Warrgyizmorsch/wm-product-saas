@@ -692,7 +692,7 @@ class TravelExpenseApiController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
-            'employee_id'      => 'required|exists:employees,id',
+            'employee_id'      => 'nullable|integer|exists:employees,id',
             'purpose'          => 'required|string|max:255',
             'destination'      => 'required|string|max:255',
             'start_date'       => 'required|date',
@@ -701,6 +701,17 @@ class TravelExpenseApiController extends Controller
             'request_advance'  => 'nullable|boolean',
             'advance_amount'   => 'nullable|required_if:request_advance,1|numeric|min:1',
         ]);
+
+        [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
+        if (!$isAdmin) {
+            if (!$authEmployee) return $this->sendError('Employee profile not found for the authenticated user.', 404);
+            if (!empty($validated['employee_id']) && (int) $validated['employee_id'] !== (int) $authEmployee->id) {
+                return $this->sendError('You can only submit a travel request for your own employee profile.', 403);
+            }
+            $validated['employee_id'] = $authEmployee->id;
+        } elseif (empty($validated['employee_id'])) {
+            return $this->sendError('employee_id is required for HR administrators.', 422);
+        }
 
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
@@ -792,11 +803,22 @@ class TravelExpenseApiController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
-            'employee_id'       => 'required|exists:employees,id',
+            'employee_id'       => 'nullable|integer|exists:employees,id',
             'travel_request_id' => 'nullable|exists:travel_requests,id',
             'amount'            => 'required|numeric|min:1',
             'purpose'           => 'required|string|max:255',
         ]);
+
+        [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
+        if (!$isAdmin) {
+            if (!$authEmployee) return $this->sendError('Employee profile not found for the authenticated user.', 404);
+            if (!empty($validated['employee_id']) && (int) $validated['employee_id'] !== (int) $authEmployee->id) {
+                return $this->sendError('You can only request an advance for your own employee profile.', 403);
+            }
+            $validated['employee_id'] = $authEmployee->id;
+        } elseif (empty($validated['employee_id'])) {
+            return $this->sendError('employee_id is required for HR administrators.', 422);
+        }
 
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
@@ -887,7 +909,7 @@ class TravelExpenseApiController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
-            'employee_id'       => 'required|exists:employees,id',
+            'employee_id'       => 'nullable|integer|exists:employees,id',
             'travel_request_id' => 'nullable|exists:travel_requests,id',
             'cash_advance_id'   => 'nullable|exists:cash_advances,id',
             'title'             => 'required|string|max:255',
@@ -900,6 +922,17 @@ class TravelExpenseApiController extends Controller
             'claims.*.desc'        => 'nullable|string|max:1000',
             'claims.*.receipt'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
+
+        [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
+        if (!$isAdmin) {
+            if (!$authEmployee) return $this->sendError('Employee profile not found for the authenticated user.', 404);
+            if (!empty($validated['employee_id']) && (int) $validated['employee_id'] !== (int) $authEmployee->id) {
+                return $this->sendError('You can only submit an expense report for your own employee profile.', 403);
+            }
+            $validated['employee_id'] = $authEmployee->id;
+        } elseif (empty($validated['employee_id'])) {
+            return $this->sendError('employee_id is required for HR administrators.', 422);
+        }
 
         $employee = Employee::find($validated['employee_id']);
         if ($employee) {
@@ -1037,7 +1070,7 @@ class TravelExpenseApiController extends Controller
         }
 
         $validated = $request->validate([
-            'employee_id'       => 'required|exists:employees,id',
+            'employee_id'       => 'nullable|integer|exists:employees,id',
             'travel_request_id' => 'nullable|exists:travel_requests,id',
             'cash_advance_id'   => 'nullable|exists:cash_advances,id',
             'title'             => 'required|string|max:255',
@@ -1051,6 +1084,20 @@ class TravelExpenseApiController extends Controller
             'claims.*.receipt'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'claims.*.existing_receipt' => 'nullable|string',
         ]);
+
+        [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
+        if (!$isAdmin) {
+            if (!$authEmployee) return $this->sendError('Employee profile not found for the authenticated user.', 404);
+            if ((int) $expenseReport->employee_id !== (int) $authEmployee->id) {
+                return $this->sendError('You can only edit your own expense reports.', 403);
+            }
+            if (!empty($validated['employee_id']) && (int) $validated['employee_id'] !== (int) $authEmployee->id) {
+                return $this->sendError('You can only submit an expense report for your own employee profile.', 403);
+            }
+            $validated['employee_id'] = $authEmployee->id;
+        } elseif (empty($validated['employee_id'])) {
+            return $this->sendError('employee_id is required for HR administrators.', 422);
+        }
 
         $employee = Employee::find($validated['employee_id']);
         if ($employee) {

@@ -815,8 +815,7 @@ class PayrollRunApiController extends Controller
             return $authError;
         }
 
-        $user = auth()->user();
-        $employee = Employee::where('user_id', $user->id)->first();
+        $employee = $this->getAuthenticatedEmployee();
         if (!$employee) {
             return $this->sendError('No employee profile linked to your user account.', 404);
         }

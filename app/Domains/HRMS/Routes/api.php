@@ -131,6 +131,7 @@ Route::prefix('api/hrms/leave-structure')
 
         // Summary Dashboard API
         Route::get('/summary', [LeaveStructureApiController::class, 'summary'])->name('summary');
+        Route::get('/my', [LeaveStructureApiController::class, 'myLeaveStructure'])->name('my');
 
         // Leave Plans APIs
         Route::get('/plans', [LeaveStructureApiController::class, 'indexPlans'])->name('plans.index');
@@ -209,7 +210,7 @@ Route::prefix('api/hrms/roster')
 // 6. ASSET MANAGEMENT API ROUTES
 // ==========================================
 Route::prefix('api/hrms/assets')
-    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:100,1'])
     ->name('api.hrms.assets.')
     ->group(function () {
 
@@ -220,9 +221,6 @@ Route::prefix('api/hrms/assets')
         Route::get('/export', [AssetApiController::class, 'export'])->name('export');
         Route::post('/import', [AssetApiController::class, 'import'])->name('import');
         Route::get('/import/template', [AssetApiController::class, 'downloadTemplate'])->name('import.template');
-        Route::get('/categories/export', [AssetApiController::class, 'exportCategories'])->name('categories.export');
-        Route::post('/categories/import', [AssetApiController::class, 'importCategories'])->name('categories.import');
-        Route::get('/categories/import/template', [AssetApiController::class, 'downloadCategoriesTemplate'])->name('categories.import.template');
 
         // Asset Registry APIs
         Route::get('/registry', [AssetApiController::class, 'indexAssets'])->name('registry.index');
@@ -285,7 +283,7 @@ Route::prefix('api/hrms/employees/profile-requests')
 // 7B. EMPLOYEE DIRECTORY & PROFILE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/employees')
-    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:100,1'])
     ->name('api.hrms.employees.')
     ->group(function () {
 
@@ -295,9 +293,11 @@ Route::prefix('api/hrms/employees')
         // Import / Export APIs
         Route::get('/export', [EmployeeApiController::class, 'export'])->name('export');
         Route::post('/import', [EmployeeApiController::class, 'import'])->name('import');
+        Route::get('/import/template', [EmployeeApiController::class, 'downloadTemplate'])->name('import.template');
 
         // Employee Directory & Profile CRUD APIs
         Route::get('/', [EmployeeApiController::class, 'indexEmployees'])->name('index');
+        Route::get('/me', [EmployeeApiController::class, 'myProfile'])->name('me');
         Route::post('/', [EmployeeApiController::class, 'storeEmployee'])->name('store');
         Route::get('/{employee}', [EmployeeApiController::class, 'showEmployee'])->name('show');
         Route::put('/{employee}', [EmployeeApiController::class, 'updateEmployee'])->name('update');
@@ -400,6 +400,10 @@ Route::prefix('api/hrms/shift-change-requests')
         Route::post('/{shiftChangeRequest}/approve', [ShiftChangeRequestApiController::class, 'approveRequest'])->name('approve');
         Route::post('/{shiftChangeRequest}/reject', [ShiftChangeRequestApiController::class, 'rejectRequest'])->name('reject');
         Route::put('/{shiftChangeRequest}/status', [ShiftChangeRequestApiController::class, 'updateStatus'])->name('status.update');
+        Route::post('/{shiftChangeRequest}/withdraw', [ShiftChangeRequestApiController::class, 'withdrawRequest'])->name('withdraw');
+        Route::post('/{shiftChangeRequest}/request-cancellation', [ShiftChangeRequestApiController::class, 'requestCancellation'])->name('request-cancellation');
+        Route::post('/{shiftChangeRequest}/approve-cancellation', [ShiftChangeRequestApiController::class, 'approveCancellation'])->name('approve-cancellation');
+        Route::post('/{shiftChangeRequest}/deny-cancellation', [ShiftChangeRequestApiController::class, 'denyCancellation'])->name('deny-cancellation');
         Route::delete('/{shiftChangeRequest}', [ShiftChangeRequestApiController::class, 'destroy'])->name('destroy');
     });
 
@@ -417,6 +421,10 @@ Route::prefix('api/hrms/overtime-requests')
         Route::post('/{overtimeRequest}/approve', [OvertimeRequestApiController::class, 'approveRequest'])->name('approve');
         Route::post('/{overtimeRequest}/reject', [OvertimeRequestApiController::class, 'rejectRequest'])->name('reject');
         Route::put('/{overtimeRequest}/status', [OvertimeRequestApiController::class, 'updateStatus'])->name('status.update');
+        Route::post('/{overtimeRequest}/withdraw', [OvertimeRequestApiController::class, 'withdrawRequest'])->name('withdraw');
+        Route::post('/{overtimeRequest}/request-cancellation', [OvertimeRequestApiController::class, 'requestCancellation'])->name('request-cancellation');
+        Route::post('/{overtimeRequest}/approve-cancellation', [OvertimeRequestApiController::class, 'approveCancellation'])->name('approve-cancellation');
+        Route::post('/{overtimeRequest}/deny-cancellation', [OvertimeRequestApiController::class, 'denyCancellation'])->name('deny-cancellation');
         Route::delete('/{overtimeRequest}', [OvertimeRequestApiController::class, 'destroy'])->name('destroy');
     });
 

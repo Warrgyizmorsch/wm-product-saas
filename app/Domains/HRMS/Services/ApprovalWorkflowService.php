@@ -157,7 +157,7 @@ class ApprovalWorkflowService
             return false;
         }
 
-        if ($this->isSuperAdmin($user)) {
+        if ($this->isSuperAdmin($user) || in_array(strtolower($user->role ?? ''), ['admin', 'super_admin', 'super-admin'])) {
             return true;
         }
 
@@ -188,7 +188,7 @@ class ApprovalWorkflowService
         }
 
         if ($requestModel instanceof \App\Domains\HRMS\Models\WfhRequest) {
-            return 'hrms.leave_requests.approve';
+            return 'hrms.wfh_requests.approve';
         }
 
         if ($requestModel instanceof \App\Domains\HRMS\Models\ShiftChangeRequest) {
@@ -244,7 +244,10 @@ class ApprovalWorkflowService
             if (method_exists($actor, 'hasHrPermission') && (
                 $actor->hasHrPermission('hrms.leave_requests.approve') ||
                 $actor->hasHrPermission('hr.settings.manage') ||
-                $actor->hasHrPermission('hrms.wfh.approve')
+                $actor->hasHrPermission('hrms.wfh.approve') ||
+                $actor->hasHrPermission('hrms.wfh_requests.approve') ||
+                $actor->hasHrPermission('hrms.wfh_requests.manage') ||
+                $actor->hasHrPermission('hrms.leave_encashments.approve')
             )) {
                 return true;
             }

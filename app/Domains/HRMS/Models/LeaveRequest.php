@@ -21,6 +21,8 @@ class LeaveRequest extends BaseModel
         'duration',
         'start_date_type',
         'end_date_type',
+        'start_time',
+        'end_time',
         'notified_contacts',
         'reason',
         'status',

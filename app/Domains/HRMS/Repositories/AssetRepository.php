@@ -672,7 +672,12 @@ class AssetRepository implements AssetRepositoryInterface
             try {
                 $rows = \App\Domains\HRMS\Helpers\XlsxHelper::import($path);
             } catch (\Throwable $e) {
-                return ['success' => false, 'message' => 'Failed to parse Excel file: ' . $e->getMessage()];
+                try {
+                    $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+                    $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+                } catch (\Throwable $fallbackException) {
+                    return ['success' => false, 'message' => 'Failed to parse Excel file: ' . $fallbackException->getMessage()];
+                }
             }
         } else {
             if (($handle = fopen($path, 'r')) !== false) {
@@ -690,7 +695,7 @@ class AssetRepository implements AssetRepositoryInterface
         $header = array_shift($rows);
         $headerNormalized = array_map(function($col) {
             $clean = strtolower(trim((string)$col));
-            return str_replace(['*', '#', '_'], '', $clean);
+            return trim(str_replace(['*', '#', '_'], '', $clean));
         }, $header);
 
         $nameIdx = array_search('item name', $headerNormalized);
@@ -1062,7 +1067,7 @@ class AssetRepository implements AssetRepositoryInterface
         $header = array_shift($rows);
         $headerNormalized = array_map(function($col) {
             $clean = strtolower(trim((string)$col));
-            return str_replace(['*', '#', '_'], '', $clean);
+            return trim(str_replace(['*', '#', '_'], '', $clean));
         }, $header);
 
         $nameIdx = array_search('category name', $headerNormalized);

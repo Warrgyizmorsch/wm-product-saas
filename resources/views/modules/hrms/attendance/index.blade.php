@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Employees Attendance | SaaS ERP')
-@section('page-title', 'Employees Attendance')
-@section('breadcrumb', 'HRMS / Employees Attendance')
+@section('title', __('hrms.attendance.title') . ' | SaaS ERP')
+@section('page-title', __('hrms.attendance.title'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.attendance.title'))
 
 @section('page-actions')
     <div class="d-flex gap-2 align-items-center">
@@ -16,26 +16,26 @@
 
         @if(($view ?? 'date') === 'date')
             <x-ui.button type="button" onclick="switchView('employee')" variant="light" class="border fw-semibold text-uppercase px-3 py-2" icon="feather-users" style="height: 38px; display: inline-flex; align-items: center; font-size: 11px;">
-                Employee View
+                {{ __('hrms.attendance.employee_view') }}
             </x-ui.button>
         @else
             <x-ui.button type="button" onclick="switchView('date')" variant="light" class="border fw-semibold text-uppercase px-3 py-2" icon="feather-calendar" style="height: 38px; display: inline-flex; align-items: center; font-size: 11px;">
-                Date View
+                {{ __('hrms.attendance.date_view') }}
             </x-ui.button>
         @endif
 
         @if(($view ?? 'date') === 'corrections')
-            <x-ui.button type="button" onclick="switchView('date')" variant="warning" class="text-white fw-semibold text-uppercase px-3 py-2" icon="feather-edit-3" style="height: 38px; display: inline-flex; align-items: center; font-size: 11px;">
-                Correction Requests
+            <x-ui.button type="button" onclick="switchView('date')" variant="primary" class="text-white fw-semibold text-uppercase px-3 py-2" icon="feather-edit-3" style="height: 38px; display: inline-flex; align-items: center; font-size: 11px;">
+                {{ __('hrms.attendance.correction_requests') }}
             </x-ui.button>
         @else
             <x-ui.button type="button" onclick="switchView('corrections')" variant="light" class="border fw-semibold text-uppercase px-3 py-2" icon="feather-edit-3" style="height: 38px; display: inline-flex; align-items: center; font-size: 11px;">
-                Correction Requests
+                {{ __('hrms.attendance.correction_requests') }}
             </x-ui.button>
         @endif
 
         <x-ui.button href="{{ route('hrms.attendance.create') }}" variant="primary" icon="feather-plus" style="height: 38px; display: inline-flex; align-items: center;">
-            Add Attendance
+            {{ __('hrms.attendance.add_attendance') }}
         </x-ui.button>
     </div>
 @endsection
@@ -79,11 +79,11 @@
         <div class="mb-4 pb-3 border-bottom">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 w-100">
                 <div>
-                    <h5 class="fw-bold text-dark mb-0 fs-16">Employees Attendance Overview</h5>
+                    <h5 class="fw-bold text-dark mb-0 fs-16">{{ __('hrms.attendance.overview_title') }}</h5>
                     @if(($view ?? 'date') === 'date')
-                        <p class="text-muted fs-12 mb-0">Monitor and manage employee logs grouped by date</p>
+                        <p class="text-muted fs-12 mb-0">{{ __('hrms.attendance.overview_desc_date') }}</p>
                     @else
-                        <p class="text-muted fs-12 mb-0">Monitor and manage employee logs for the selected date: <strong>{{ \Carbon\Carbon::parse($filters['date'] ?? today()->format('Y-m-d'))->format('M d, Y') }}</strong></p>
+                        <p class="text-muted fs-12 mb-0">{{ __('hrms.attendance.overview_desc_selected', ['date' => \Carbon\Carbon::parse($filters['date'] ?? today()->format('Y-m-d'))->format('M d, Y')]) }}</p>
                     @endif
                 </div>
                 
@@ -99,46 +99,46 @@
                             type="text" 
                             name="search" 
                             class="form-control border-0 bg-transparent p-0 fs-13" 
-                            placeholder="Search employee..." 
+                            placeholder="{{ __('hrms.attendance.search_placeholder') }}" 
                             value="{{ $filters['search'] ?? '' }}"
                             style="box-shadow: none; width: 180px;"
                         >
                     </div>
 
                     <!-- Sort Dropdown -->
-                    <x-ui.sort-dropdown label="Sort">
+                    <x-ui.sort-dropdown :label="__('hrms.common.sort')">
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ ($sort ?? 'name_asc') === 'name_asc' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('name_asc')">
-                            <span>Name (A-Z)</span>
+                            <span>{{ __('hrms.common.sort_name_asc') }}</span>
                             @if(($sort ?? 'name_asc') === 'name_asc') <i class="feather-check ms-3 text-primary"></i> @endif
                         </a>
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ ($sort ?? 'name_asc') === 'name_desc' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('name_desc')">
-                            <span>Name (Z-A)</span>
+                            <span>{{ __('hrms.common.sort_name_desc') }}</span>
                             @if(($sort ?? 'name_asc') === 'name_desc') <i class="feather-check ms-3 text-primary"></i> @endif
                         </a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ ($sort ?? 'name_asc') === 'checkin_asc' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('checkin_asc')">
-                            <span>Check-in (Earliest)</span>
+                            <span>{{ __('hrms.attendance.sort_checkin_asc') }}</span>
                             @if(($sort ?? 'name_asc') === 'checkin_asc') <i class="feather-check ms-3 text-primary"></i> @endif
                         </a>
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ ($sort ?? 'name_asc') === 'checkin_desc' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('checkin_desc')">
-                            <span>Check-in (Latest)</span>
+                            <span>{{ __('hrms.attendance.sort_checkin_desc') }}</span>
                             @if(($sort ?? 'name_asc') === 'checkin_desc') <i class="feather-check ms-3 text-primary"></i> @endif
                         </a>
                     </x-ui.sort-dropdown>
 
                     <!-- Filter Dropdown -->
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.common.date') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="date" value="{{ request('date') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Month</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.common.month') }}</label>
                             <x-ui.odoo-form-ui type="select" name="month" select2-selector="default">
-                                <option value="all" @selected(($filters['month'] ?? '') === 'all')>All Months</option>
+                                <option value="all" @selected(($filters['month'] ?? '') === 'all')>{{ __('hrms.common.all_months') }}</option>
                                 @for($i = 0; $i > -12; $i--)
                                     @php
                                         $m = now()->addMonths($i);
@@ -151,9 +151,9 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Department</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.common.department') }}</label>
                             <x-ui.odoo-form-ui type="select" name="department_id" select2-selector="default">
-                                <option value="">All Departments</option>
+                                <option value="">{{ __('hrms.common.all_departments') }}</option>
                                 @foreach($departments as $dept)
                                     <option value="{{ $dept->id }}" @selected(($filters['department_id'] ?? '') == $dept->id)>{{ $dept->name }}</option>
                                 @endforeach
@@ -161,15 +161,15 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.common.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status" select2-selector="default">
-                                <option value="">All Statuses</option>
-                                <option value="present" @selected(($filters['status'] ?? '') === 'present')>Present</option>
-                                <option value="wfh" @selected(($filters['status'] ?? '') === 'wfh')>Work from Home</option>
-                                <option value="late" @selected(($filters['status'] ?? '') === 'late')>Late</option>
-                                <option value="half_day" @selected(($filters['status'] ?? '') === 'half_day')>Half Day</option>
-                                <option value="absent" @selected(($filters['status'] ?? '') === 'absent')>Absent</option>
-                                <option value="on_leave" @selected(($filters['status'] ?? '') === 'on_leave')>Leave</option>
+                                <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                <option value="present" @selected(($filters['status'] ?? '') === 'present')>{{ __('hrms.common.present') }}</option>
+                                <option value="wfh" @selected(($filters['status'] ?? '') === 'wfh')>{{ __('hrms.common.wfh') }}</option>
+                                <option value="late" @selected(($filters['status'] ?? '') === 'late')>{{ __('hrms.common.late') }}</option>
+                                <option value="half_day" @selected(($filters['status'] ?? '') === 'half_day')>{{ __('hrms.common.half_day') }}</option>
+                                <option value="absent" @selected(($filters['status'] ?? '') === 'absent')>{{ __('hrms.common.absent') }}</option>
+                                <option value="on_leave" @selected(($filters['status'] ?? '') === 'on_leave')>{{ __('hrms.common.leave') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
@@ -188,13 +188,13 @@
                     @if(($view ?? 'date') === 'corrections')
                         <thead class="bg-light text-uppercase fs-10 tracking-wider">
                             <tr>
-                                <th class="ps-4">Employee Details</th>
-                                <th>Date</th>
-                                <th>Requested Check In</th>
-                                <th>Requested Check Out</th>
-                                <th>Reason</th>
-                                <th>Status</th>
-                                <th class="pe-4 text-end">Actions</th>
+                                <th class="ps-4">{{ __('hrms.attendance.th_employee_details') }}</th>
+                                <th>{{ __('hrms.common.date') }}</th>
+                                <th>{{ __('hrms.attendance.th_requested_check_in') }}</th>
+                                <th>{{ __('hrms.attendance.th_requested_check_out') }}</th>
+                                <th>{{ __('hrms.attendance.th_reason') }}</th>
+                                <th>{{ __('hrms.common.status') }}</th>
+                                <th class="pe-4 text-end">{{ __('hrms.common.actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -204,17 +204,22 @@
                                     <td class="ps-4">
                                         <div class="d-flex align-items-center gap-2">
                                             <div class="avatar-sm rounded-circle bg-light d-flex align-items-center justify-content-center text-dark fw-bold border" style="width: 32px; height: 32px; font-size: 11px;">
-                                                @if($correction->employee->photo)
+                                                @if($correction->employee?->photo)
                                                     <img src="{{ asset('storage/' . $correction->employee->photo) }}" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
                                                 @else
-                                                    {{ strtoupper(substr($correction->employee->first_name, 0, 1) . substr($correction->employee->last_name, 0, 1)) ?: 'EM' }}
+                                                    {{ strtoupper(substr($correction->employee?->first_name ?? 'E', 0, 1) . substr($correction->employee?->last_name ?? 'M', 0, 1)) ?: 'EM' }}
                                                 @endif
                                             </div>
                                             <div>
-                                                <a href="{{ route('hrms.employees.show', $correction->employee->id) }}" class="fw-bold text-dark fs-13 d-block text-decoration-none hover-primary">
-                                                    {{ $correction->employee->display_name }}
-                                                </a>
-                                                <span class="text-muted fs-11 d-block">{{ $correction->employee->designation ? $correction->employee->designation->name : 'No Designation' }}</span>
+                                                @if($correction->employee)
+                                                    <a href="{{ route('hrms.employees.show', $correction->employee->id) }}" class="fw-bold text-dark fs-13 d-block text-decoration-none hover-primary">
+                                                        {{ $correction->employee->display_name }}
+                                                    </a>
+                                                    <span class="text-muted fs-11 d-block">{{ $correction->employee->designation ? $correction->employee->designation->name : __('hrms.attendance.no_designation') }}</span>
+                                                @else
+                                                    <span class="fw-bold text-muted fs-13 d-block">{{ __('hrms.common.employee') }} #{{ $correction->employee_id }}</span>
+                                                    <span class="text-muted fs-11 d-block">{{ __('hrms.attendance.deleted_profile') }}</span>
+                                                @endif
                                             </div>
                                         </div>
                                     </td>
@@ -237,22 +242,22 @@
                                     <!-- Status -->
                                     <td>
                                         @if($correction->status === 'pending')
-                                            <span class="badge bg-soft-warning text-warning px-3 py-1.5 fs-11 rounded-pill fw-bold">Pending</span>
+                                            <span class="badge bg-soft-warning text-warning px-3 py-1.5 fs-11 rounded-pill fw-bold">{{ __('hrms.common.pending') }}</span>
                                         @elseif($correction->status === 'approved')
-                                            <span class="badge bg-soft-success text-success px-3 py-1.5 fs-11 rounded-pill fw-bold">Approved</span>
+                                            <span class="badge bg-soft-success text-success px-3 py-1.5 fs-11 rounded-pill fw-bold">{{ __('hrms.common.approved') }}</span>
                                         @else
-                                            <span class="badge bg-soft-danger text-danger px-3 py-1.5 fs-11 rounded-pill fw-bold" title="Reason: {{ $correction->rejected_reason }}">Rejected</span>
+                                            <span class="badge bg-soft-danger text-danger px-3 py-1.5 fs-11 rounded-pill fw-bold" title="{{ __('hrms.attendance.rejection_reason') }}: {{ $correction->rejected_reason }}">{{ __('hrms.common.rejected') }}</span>
                                         @endif
                                     </td>
                                     <!-- Actions -->
                                     <td class="pe-4 text-end">
                                         @php
                                             $canApproveThisCorrection = auth()->user() && (
-                                                auth()->user()->hasHrPermission('hrms.attendance_corrections.approve') ||
-                                                auth()->user()->hasHrPermission('hrms.attendance_corrections.manage') ||
-                                                auth()->user()->hasHrPermission('hr.settings.manage') ||
-                                                auth()->user()->hasHrPermission('hrms.attendance.manage') ||
-                                                auth()->user()->hasHrPermission('hrms.attendance.approve')
+                                                 auth()->user()->hasHrPermission('hrms.attendance_corrections.approve') ||
+                                                 auth()->user()->hasHrPermission('hrms.attendance_corrections.manage') ||
+                                                 auth()->user()->hasHrPermission('hr.settings.manage') ||
+                                                 auth()->user()->hasHrPermission('hrms.attendance.manage') ||
+                                                 auth()->user()->hasHrPermission('hrms.attendance.approve')
                                             );
                                             $isSelfCorrection = auth()->user()?->employee && auth()->user()->employee->id === $correction->employee_id;
                                         @endphp
@@ -267,10 +272,10 @@
                                                         data-check-in="{{ $correction->requested_check_in ? $correction->requested_check_in->format('H:i') : '' }}"
                                                         data-check-out="{{ $correction->requested_check_out ? $correction->requested_check_out->format('H:i') : '' }}"
                                                         onclick="openApproveModal(this)">
-                                                    Approve
+                                                    {{ __('hrms.common.approve') }}
                                                 </button>
                                                 <button type="button" class="btn btn-xs btn-soft-danger text-uppercase fw-bold" style="font-size: 9px; padding: 4px 8px;" onclick="openRejectModal({{ $correction->id }})">
-                                                    Reject
+                                                    {{ __('hrms.common.reject') }}
                                                 </button>
                                             </div>
                                         @else
@@ -280,16 +285,16 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-4 text-muted fs-13">No correction requests found.</td>
+                                    <td colspan="7" class="text-center py-4 text-muted fs-13">{{ __('hrms.attendance.no_corrections_found') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
                     @elseif(($view ?? 'date') === 'date')
                         <thead class="bg-light text-uppercase fs-10 tracking-wider">
                             <tr>
-                                <th class="ps-4">Date</th>
-                                <th>Attendance Summary</th>
-                                <th class="pe-4 text-end">Actions</th>
+                                <th class="ps-4">{{ __('hrms.common.date') }}</th>
+                                <th>{{ __('hrms.attendance.th_attendance_summary') }}</th>
+                                <th class="pe-4 text-end">{{ __('hrms.common.actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -305,13 +310,7 @@
                                     $leaveCount = $dayStats['on_leave'] ?? 0;
                                     $weekOffCount = $dayStats['week_off'] ?? 0;
                                     $holidayCount = $dayStats['holiday'] ?? 0;
-                                    $overtimeCount = \App\Domains\HRMS\Models\Attendance::where('date', $dStr)
-                                        ->whereIn('employee_id', function($q) use ($dStr) {
-                                            $q->select('employee_id')
-                                              ->from('overtime_requests')
-                                              ->where('date', $dStr)
-                                              ->where('status', 'approved');
-                                        })->count();
+                                    $overtimeCount = $dayStats['overtime'] ?? 0;
                                 @endphp
                                 <tr>
                                     <td class="ps-4 fw-bold text-dark fs-13">
@@ -320,28 +319,28 @@
                                     <td>
                                         <div class="d-flex align-items-center gap-2 flex-wrap">
                                             <span class="badge bg-soft-success text-success px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'present')">
-                                                Present: {{ $presentCount }}
+                                                {{ __('hrms.common.present') }}: {{ $presentCount }}
                                             </span>
                                             <span class="badge bg-soft-warning text-warning px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'late')">
-                                                Late: {{ $lateCount }}
+                                                {{ __('hrms.common.late') }}: {{ $lateCount }}
                                             </span>
                                             <span class="badge px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer; background-color: rgba(111, 66, 193, 0.1); color: #6f42c1 !important;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'half_day')">
-                                                Half Day: {{ $halfDayCount }}
+                                                {{ __('hrms.common.half_day') }}: {{ $halfDayCount }}
                                             </span>
                                             <span class="badge bg-soft-danger text-danger px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'absent')">
-                                                Absent: {{ $absentCount }}
+                                                {{ __('hrms.common.absent') }}: {{ $absentCount }}
                                             </span>
                                             <span class="badge bg-soft-secondary text-secondary px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer; background-color: rgba(108, 117, 125, 0.1); color: #6c757d !important;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'on_leave')">
-                                                Leave: {{ $leaveCount }}
+                                                {{ __('hrms.common.leave') }}: {{ $leaveCount }}
                                             </span>
                                             <span class="badge bg-soft-secondary text-secondary px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'week_off')">
-                                                Week Off: {{ $weekOffCount }}
+                                                {{ __('hrms.common.week_off') }}: {{ $weekOffCount }}
                                             </span>
                                             <span class="badge px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer; background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'holiday')">
-                                                Holiday: {{ $holidayCount }}
+                                                {{ __('hrms.common.holiday') }}: {{ $holidayCount }}
                                             </span>
                                             <span class="badge bg-soft-primary text-primary px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'overtime')">
-                                                Overtime: {{ $overtimeCount }}
+                                                {{ __('hrms.attendance.overtime') }}: {{ $overtimeCount }}
                                             </span>
                                         </div>
                                     </td>
@@ -351,7 +350,7 @@
                                             <x-ui.icon-btn 
                                                 variant="soft-primary" 
                                                 icon="feather-eye" 
-                                                title="View Daily Attendance Logs" 
+                                                title="{{ __('hrms.attendance.view_daily_logs') }}" 
                                                 onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'all')" 
                                             />
 
@@ -359,19 +358,19 @@
                                             <x-ui.icon-btn 
                                                 variant="soft-warning" 
                                                 icon="feather-edit" 
-                                                title="Edit Attendance" 
+                                                title="{{ __('hrms.attendance.edit_attendance') }}" 
                                                 href="{{ route('hrms.attendance.create', array_merge(['date' => $dStr], request()->query())) }}" 
                                             />
 
                                             <!-- Delete All logs for the date -->
-                                            <form action="{{ route('hrms.attendance.destroy-date', $dStr) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete all attendance records for {{ $dateItem->date->format('M d, Y') }}? This action cannot be undone.');">
+                                            <form action="{{ route('hrms.attendance.destroy-date', $dStr) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ addslashes(__('hrms.attendance.confirm_delete_date', ['date' => $dateItem->date->format('M d, Y')])) }}');">
                                                 @csrf
                                                 @method('DELETE')
                                                 <x-ui.icon-btn 
                                                     type="submit" 
                                                     variant="soft-danger" 
                                                     icon="feather-trash-2" 
-                                                    title="Delete Attendance Logs" 
+                                                    title="{{ __('hrms.attendance.delete_attendance') }}" 
                                                 />
                                             </form>
                                         </div>
@@ -379,16 +378,16 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="3" class="text-center py-4 text-muted fs-13">No dates found.</td>
+                                    <td colspan="3" class="text-center py-4 text-muted fs-13">{{ __('hrms.attendance.no_dates_found') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
                     @else
                         <thead class="bg-light text-uppercase fs-10 tracking-wider">
                             <tr>
-                                <th class="ps-4">Employee Details</th>
-                                <th>Attendance Summary</th>
-                                <th class="pe-4 text-end">Actions</th>
+                                <th class="ps-4">{{ __('hrms.attendance.th_employee_details') }}</th>
+                                <th>{{ __('hrms.attendance.th_attendance_summary') }}</th>
+                                <th class="pe-4 text-end">{{ __('hrms.common.actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -404,14 +403,7 @@
                                     $halfDayCount = $employee->computed_half_day ?? 0;
                                     $absentCount = $employee->computed_absent ?? 0;
                                     $leaveCount = $employee->computed_on_leave ?? 0;
-                                    $overtimeCount = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)
-                                        ->whereBetween('date', [now()->startOfMonth()->format('Y-m-d'), now()->today()->format('Y-m-d')])
-                                        ->whereIn('date', function($q) use ($employee) {
-                                            $q->select('date')
-                                              ->from('overtime_requests')
-                                              ->where('employee_id', $employee->id)
-                                              ->where('status', 'approved');
-                                        })->count();
+                                    $overtimeCount = $employee->computed_overtime ?? 0;
                                 @endphp
                                 <tr>
                                     <!-- Employee Details -->
@@ -428,7 +420,7 @@
                                                 <a href="{{ route('hrms.employees.show', $employee->id) }}?tab=attendance" class="fw-bold text-dark fs-13 d-block text-decoration-none hover-primary">
                                                     {{ $employee->display_name }}
                                                 </a>
-                                                <span class="text-muted fs-11 d-block"><code class="fw-bold">{{ $employee->employee_id }}</code> &bull; {{ $employee->department?->name ?? 'No Department' }}</span>
+                                                <span class="text-muted fs-11 d-block"><code class="fw-bold">{{ $employee->employee_id }}</code> &bull; {{ $employee->department?->name ?? __('hrms.attendance.no_department') }}</span>
                                             </div>
                                         </div>
                                     </td>
@@ -437,22 +429,22 @@
                                     <td>
                                         <div class="d-flex align-items-center gap-2 flex-wrap">
                                             <span class="badge bg-soft-success text-success px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'present')">
-                                                Present: {{ $presentCount }}
+                                                {{ __('hrms.common.present') }}: {{ $presentCount }}
                                             </span>
                                             <span class="badge bg-soft-warning text-warning px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'late')">
-                                                Late: {{ $lateCount }}
+                                                {{ __('hrms.common.late') }}: {{ $lateCount }}
                                             </span>
                                             <span class="badge px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer; background-color: rgba(111, 66, 193, 0.1); color: #6f42c1 !important;" onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'half_day')">
-                                                Half Day: {{ $halfDayCount }}
+                                                {{ __('hrms.common.half_day') }}: {{ $halfDayCount }}
                                             </span>
                                             <span class="badge bg-soft-danger text-danger px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'absent')">
-                                                Absent: {{ $absentCount }}
+                                                {{ __('hrms.common.absent') }}: {{ $absentCount }}
                                             </span>
                                             <span class="badge bg-soft-secondary text-secondary px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer; background-color: rgba(108, 117, 125, 0.1); color: #6c757d !important;" onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'on_leave')">
-                                                Leave: {{ $leaveCount }}
+                                                {{ __('hrms.common.leave') }}: {{ $leaveCount }}
                                             </span>
                                             <span class="badge bg-soft-primary text-primary px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'overtime')">
-                                                Overtime: {{ $overtimeCount }}
+                                                {{ __('hrms.attendance.overtime') }}: {{ $overtimeCount }}
                                             </span>
                                         </div>
                                     </td>
@@ -464,14 +456,14 @@
                                             <x-ui.icon-btn 
                                                 variant="soft-primary" 
                                                 icon="feather-eye" 
-                                                title="View Attendance History" 
+                                                title="{{ __('hrms.attendance.view_history') }}" 
                                                 onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'all')" 
                                             />
                                             <!-- Edit Manual Entry -->
                                             <x-ui.icon-btn 
                                                 variant="soft-warning" 
                                                 icon="feather-edit-2" 
-                                                title="Edit Employee Attendance Logs" 
+                                                title="{{ __('hrms.attendance.edit_employee_logs') }}" 
                                                 href="{{ route('hrms.attendance.create', array_merge(['employee_id' => $employee->id], request()->query())) }}" 
                                             />
                                         </div>
@@ -479,7 +471,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="3" class="text-center py-4 text-muted fs-13">No employees found.</td>
+                                    <td colspan="3" class="text-center py-4 text-muted fs-13">{{ __('hrms.attendance.no_employees_found') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -519,30 +511,30 @@
 </div>
 
 <!-- Dynamic Detailed logs Drawer -->
-<x-ui.drawer id="attendanceDetailDrawer" title="Attendance History" position="end" style="width: 800px; max-width: 95vw;">
+<x-ui.drawer id="attendanceDetailDrawer" :title="__('hrms.attendance.drawer_title')" position="end" style="width: 800px; max-width: 95vw;">
     <!-- Loading Spinner -->
     <div id="drawerLoader" class="text-center py-5">
         <div class="spinner-border text-primary" role="status"></div>
-        <div class="text-muted mt-2 fs-12">Fetching logs...</div>
+        <div class="text-muted mt-2 fs-12">{{ __('hrms.attendance.fetching_logs') }}</div>
     </div>
 
     <!-- Drawer Content -->
     <div id="drawerContent" class="d-none">
         <div class="bg-light border rounded-3 p-3 mb-3" id="drawerEmployeeMetaCard">
             <h6 class="fw-bold mb-1 text-dark" id="drawerEmployeeName">Employee Name</h6>
-            <span class="text-muted fs-11" id="drawerEmployeeCodeContainer">Employee ID: <code class="fw-bold fs-12" id="drawerEmployeeCode">Code</code></span>
+            <span class="text-muted fs-11" id="drawerEmployeeCodeContainer">{{ __('hrms.attendance.employee_id') }}: <code class="fw-bold fs-12" id="drawerEmployeeCode">Code</code></span>
         </div>
         
         <div class="table-responsive" style="overflow-x: hidden;">
             <table class="table table-sm table-hover align-middle mb-0" style="font-size: 11px;">
                 <thead class="bg-light text-uppercase fs-9 tracking-wider">
                     <tr id="drawerTableHeaderRow">
-                        <th>Date & Location</th>
-                        <th>Check In</th>
-                        <th>Check Out</th>
-                        <th>Breaks</th>
-                        <th>Hours</th>
-                        <th>Status</th>
+                        <th>{{ __('hrms.attendance.th_date_location') }}</th>
+                        <th>{{ __('hrms.attendance.th_check_in') }}</th>
+                        <th>{{ __('hrms.attendance.th_check_out') }}</th>
+                        <th>{{ __('hrms.attendance.th_breaks') }}</th>
+                        <th>{{ __('hrms.attendance.th_hours') }}</th>
+                        <th>{{ __('hrms.common.status') }}</th>
                     </tr>
                 </thead>
                 <tbody id="drawerTableBody">
@@ -553,7 +545,7 @@
     </div>
 
     <x-slot name="footer">
-        <button type="button" class="btn btn-light border fw-semibold text-uppercase fs-11" data-bs-dismiss="offcanvas">Close Panel</button>
+        <button type="button" class="btn btn-light border fw-semibold text-uppercase fs-11" data-bs-dismiss="offcanvas">{{ __('hrms.common.close_panel') }}</button>
     </x-slot>
 </x-ui.drawer>
 
@@ -570,33 +562,35 @@
         
         // Populate header details
         let filterTitleSuffix = "";
+        const formatMap = {
+            'present': @json(__('hrms.common.present')),
+            'late': @json(__('hrms.common.late')),
+            'wfh': @json(__('hrms.common.wfh')),
+            'absent': @json(__('hrms.common.absent')),
+            'on_leave': @json(__('hrms.common.leave')),
+            'overtime': @json(__('hrms.attendance.overtime')),
+            'half_day': @json(__('hrms.common.half_day')),
+            'week_off': @json(__('hrms.common.week_off')),
+            'holiday': @json(__('hrms.common.holiday'))
+        };
         if (filterStatus !== 'all') {
-            const formatMap = {
-                'present': 'Present',
-                'late': 'Late',
-                'wfh': 'WFH',
-                'absent': 'Absent',
-                'on_leave': 'Leave',
-                'overtime': 'Overtime',
-                'half_day': 'Half Day'
-            };
             const statusLabel = formatMap[filterStatus] || filterStatus;
             filterTitleSuffix = ` (${statusLabel})`;
         }
-        document.getElementById('attendanceDetailDrawerLabel').textContent = "Employee Attendance History" + filterTitleSuffix;
+        document.getElementById('attendanceDetailDrawerLabel').textContent = @json(__('hrms.attendance.employee_history')) + filterTitleSuffix;
         document.getElementById('drawerEmployeeMetaCard').classList.remove('d-none');
         document.getElementById('drawerEmployeeName').textContent = employeeName;
         document.getElementById('drawerEmployeeCode').textContent = employeeCode;
         
         // Reset table columns for employee logs view
         document.getElementById('drawerTableHeaderRow').innerHTML = `
-            <th>Date & Location</th>
-            <th>Check In</th>
-            <th>Check Out</th>
-            <th>Breaks</th>
-            <th>Hours</th>
-            <th>Status</th>
-            <th class="text-end pe-3">Details</th>
+            <th>${@json(__('hrms.attendance.th_date_location'))}</th>
+            <th>${@json(__('hrms.attendance.th_check_in'))}</th>
+            <th>${@json(__('hrms.attendance.th_check_out'))}</th>
+            <th>${@json(__('hrms.attendance.th_breaks'))}</th>
+            <th>${@json(__('hrms.attendance.th_hours'))}</th>
+            <th>${@json(__('hrms.common.status'))}</th>
+            <th class="text-end pe-3">${@json(__('hrms.my_attendance.th_details'))}</th>
         `;
 
         // Reset loader/view
@@ -710,17 +704,17 @@
                                                         <div class="avatar-sm bg-soft-success text-success rounded-circle d-flex align-items-center justify-content-center" style="width: 22px; height: 22px;">
                                                             <i class="feather-log-in fs-11"></i>
                                                         </div>
-                                                        <span class="fw-bold text-dark fs-12">Check In Details</span>
+                                                        <span class="fw-bold text-dark fs-12">${@json(__('hrms.attendance.check_in_details'))}</span>
                                                    </div>
                                                    <div class="mb-2">
-                                                        <span class="text-muted fs-10 d-block">TIME & COORDINATES</span>
+                                                        <span class="text-muted fs-10 d-block">${@json(__('hrms.attendance.time_coordinates'))}</span>
                                                         <span class="fw-semibold text-dark fs-12">${log.check_in}</span>
-                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_in_latitude ? 'Lat: ' + parseFloat(log.check_in_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_in_longitude).toFixed(6) : 'No coordinates'}</span>
+                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_in_latitude ? 'Lat: ' + parseFloat(log.check_in_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_in_longitude).toFixed(6) : @json(__('hrms.attendance.no_coordinates'))}</span>
                                                    </div>
                                                    <div>
-                                                        <span class="text-muted fs-10 d-block mb-1">SELFIE</span>
+                                                        <span class="text-muted fs-10 d-block mb-1">${@json(__('hrms.attendance.selfie'))}</span>
                                                         <div class="bg-light border border-dashed rounded p-1.5 d-flex align-items-center justify-content-center" style="height: 80px;">
-                                                            ${log.check_in_selfie_url ? `<img src="${log.check_in_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> None</span>`}
+                                                            ${log.check_in_selfie_url ? `<img src="${log.check_in_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> -</span>`}
                                                         </div>
                                                    </div>
                                               </div>
@@ -732,17 +726,17 @@
                                                         <div class="avatar-sm bg-soft-danger text-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 22px; height: 22px;">
                                                             <i class="feather-log-out fs-11"></i>
                                                         </div>
-                                                        <span class="fw-bold text-dark fs-12">Check Out Details</span>
+                                                        <span class="fw-bold text-dark fs-12">${@json(__('hrms.attendance.check_out_details'))}</span>
                                                    </div>
                                                    <div class="mb-2">
-                                                        <span class="text-muted fs-10 d-block">TIME & COORDINATES</span>
+                                                        <span class="text-muted fs-10 d-block">${@json(__('hrms.attendance.time_coordinates'))}</span>
                                                         <span class="fw-semibold text-dark fs-12">${log.check_out}</span>
-                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_out_latitude ? 'Lat: ' + parseFloat(log.check_out_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_out_longitude).toFixed(6) : 'No coordinates'}</span>
+                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_out_latitude ? 'Lat: ' + parseFloat(log.check_out_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_out_longitude).toFixed(6) : @json(__('hrms.attendance.no_coordinates'))}</span>
                                                    </div>
                                                    <div>
-                                                        <span class="text-muted fs-10 d-block mb-1">SELFIE</span>
+                                                        <span class="text-muted fs-10 d-block mb-1">${@json(__('hrms.attendance.selfie'))}</span>
                                                         <div class="bg-light border border-dashed rounded p-1.5 d-flex align-items-center justify-content-center" style="height: 80px;">
-                                                            ${log.check_out_selfie_url ? `<img src="${log.check_out_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> None</span>`}
+                                                            ${log.check_out_selfie_url ? `<img src="${log.check_out_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> -</span>`}
                                                         </div>
                                                    </div>
                                               </div>
@@ -751,12 +745,12 @@
                                      
                                      <!-- Map -->
                                      <div class="mt-2">
-                                          <span class="text-muted fs-10 text-uppercase fw-semibold d-block mb-1">Location Map</span>
+                                          <span class="text-muted fs-10 text-uppercase fw-semibold d-block mb-1">${@json(__('hrms.attendance.location_map'))}</span>
                                           <div class="position-relative w-100" id="map-wrap-${log.id}" style="display: none; overflow: hidden; border-radius: 8px;">
                                                <div id="map-${log.id}" class="attendance-row-map" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>
                                           </div>
                                           <div id="map-none-${log.id}" class="alert alert-light border text-center fs-11 py-2.5 mb-0">
-                                               <i class="feather-map-pin text-muted fs-14 d-block mb-0.5"></i> No location coordinates captured for check-in or check-out.
+                                               <i class="feather-map-pin text-muted fs-14 d-block mb-0.5"></i> ${@json(__('hrms.attendance.no_coords_captured'))}
                                           </div>
                                      </div>
                                 </div>
@@ -767,7 +761,7 @@
                         tbody.appendChild(detailsTr);
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No attendance logs found matching this filter.</td></tr>';
+                    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">${@json(__('hrms.attendance.no_logs_matching'))}</td></tr>`;
                 }
                 
                 document.getElementById('drawerLoader').classList.add('d-none');
@@ -775,7 +769,7 @@
             })
             .catch(error => {
                 console.error('Error loading attendance logs:', error);
-                document.getElementById('drawerTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-danger">Failed to load logs. Please try again.</td></tr>';
+                document.getElementById('drawerTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">${@json(__('hrms.attendance.failed_load_logs'))}</td></tr>`;
                 document.getElementById('drawerLoader').classList.add('d-none');
                 document.getElementById('drawerContent').classList.remove('d-none');
             });
@@ -789,33 +783,33 @@
         
         // Populate header details
         let filterTitleSuffix = "";
+        const formatMap = {
+            'present': @json(__('hrms.common.present')),
+            'late': @json(__('hrms.common.late')),
+            'wfh': @json(__('hrms.common.wfh')),
+            'absent': @json(__('hrms.common.absent')),
+            'on_leave': @json(__('hrms.common.leave')),
+            'overtime': @json(__('hrms.attendance.overtime')),
+            'half_day': @json(__('hrms.common.half_day')),
+            'week_off': @json(__('hrms.common.week_off')),
+            'holiday': @json(__('hrms.common.holiday'))
+        };
         if (filterStatus !== 'all') {
-            const formatMap = {
-                'present': 'Present',
-                'late': 'Late',
-                'wfh': 'WFH',
-                'absent': 'Absent',
-                'on_leave': 'Leave',
-                'overtime': 'Overtime',
-                'half_day': 'Half Day',
-                'week_off': 'Week Off',
-                'holiday': 'Holiday'
-            };
             const statusLabel = formatMap[filterStatus] || filterStatus;
             filterTitleSuffix = ` (${statusLabel})`;
         }
-        document.getElementById('attendanceDetailDrawerLabel').textContent = "Daily Attendance Overview" + filterTitleSuffix;
+        document.getElementById('attendanceDetailDrawerLabel').textContent = @json(__('hrms.attendance.daily_overview')) + filterTitleSuffix;
         document.getElementById('drawerEmployeeMetaCard').classList.add('d-none'); // Hide employee card info since it shows date logs
 
         // Reset table columns for daily logs view
         document.getElementById('drawerTableHeaderRow').innerHTML = `
-            <th>Employee Details</th>
-            <th>Check In</th>
-            <th>Check Out</th>
-            <th>Breaks</th>
-            <th>Hours</th>
-            <th>Status</th>
-            <th class="text-end pe-3">Details</th>
+            <th>${@json(__('hrms.attendance.th_employee_details'))}</th>
+            <th>${@json(__('hrms.attendance.th_check_in'))}</th>
+            <th>${@json(__('hrms.attendance.th_check_out'))}</th>
+            <th>${@json(__('hrms.attendance.th_breaks'))}</th>
+            <th>${@json(__('hrms.attendance.th_hours'))}</th>
+            <th>${@json(__('hrms.common.status'))}</th>
+            <th class="text-end pe-3">${@json(__('hrms.my_attendance.th_details'))}</th>
         `;
 
         // Reset loader/view
@@ -934,17 +928,17 @@
                                                         <div class="avatar-sm bg-soft-success text-success rounded-circle d-flex align-items-center justify-content-center" style="width: 22px; height: 22px;">
                                                             <i class="feather-log-in fs-11"></i>
                                                         </div>
-                                                        <span class="fw-bold text-dark fs-12">Check In Details</span>
+                                                        <span class="fw-bold text-dark fs-12">${@json(__('hrms.attendance.check_in_details'))}</span>
                                                    </div>
                                                    <div class="mb-2">
-                                                        <span class="text-muted fs-10 d-block">TIME & COORDINATES</span>
+                                                        <span class="text-muted fs-10 d-block">${@json(__('hrms.attendance.time_coordinates'))}</span>
                                                         <span class="fw-semibold text-dark fs-12">${log.check_in}</span>
-                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_in_latitude ? 'Lat: ' + parseFloat(log.check_in_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_in_longitude).toFixed(6) : 'No coordinates'}</span>
+                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_in_latitude ? 'Lat: ' + parseFloat(log.check_in_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_in_longitude).toFixed(6) : @json(__('hrms.attendance.no_coordinates'))}</span>
                                                    </div>
                                                    <div>
-                                                        <span class="text-muted fs-10 d-block mb-1">SELFIE</span>
+                                                        <span class="text-muted fs-10 d-block mb-1">${@json(__('hrms.attendance.selfie'))}</span>
                                                         <div class="bg-light border border-dashed rounded p-1.5 d-flex align-items-center justify-content-center" style="height: 80px;">
-                                                            ${log.check_in_selfie_url ? `<img src="${log.check_in_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> None</span>`}
+                                                            ${log.check_in_selfie_url ? `<img src="${log.check_in_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> -</span>`}
                                                         </div>
                                                    </div>
                                               </div>
@@ -956,17 +950,17 @@
                                                         <div class="avatar-sm bg-soft-danger text-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 22px; height: 22px;">
                                                             <i class="feather-log-out fs-11"></i>
                                                         </div>
-                                                        <span class="fw-bold text-dark fs-12">Check Out Details</span>
+                                                        <span class="fw-bold text-dark fs-12">${@json(__('hrms.attendance.check_out_details'))}</span>
                                                    </div>
                                                    <div class="mb-2">
-                                                        <span class="text-muted fs-10 d-block">TIME & COORDINATES</span>
+                                                        <span class="text-muted fs-10 d-block">${@json(__('hrms.attendance.time_coordinates'))}</span>
                                                         <span class="fw-semibold text-dark fs-12">${log.check_out}</span>
-                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_out_latitude ? 'Lat: ' + parseFloat(log.check_out_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_out_longitude).toFixed(6) : 'No coordinates'}</span>
+                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_out_latitude ? 'Lat: ' + parseFloat(log.check_out_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_out_longitude).toFixed(6) : @json(__('hrms.attendance.no_coordinates'))}</span>
                                                    </div>
                                                    <div>
-                                                        <span class="text-muted fs-10 d-block mb-1">SELFIE</span>
+                                                        <span class="text-muted fs-10 d-block mb-1">${@json(__('hrms.attendance.selfie'))}</span>
                                                         <div class="bg-light border border-dashed rounded p-1.5 d-flex align-items-center justify-content-center" style="height: 80px;">
-                                                            ${log.check_out_selfie_url ? `<img src="${log.check_out_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> None</span>`}
+                                                            ${log.check_out_selfie_url ? `<img src="${log.check_out_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> -</span>`}
                                                         </div>
                                                    </div>
                                               </div>
@@ -975,12 +969,12 @@
                                      
                                      <!-- Map -->
                                      <div class="mt-2">
-                                          <span class="text-muted fs-10 text-uppercase fw-semibold d-block mb-1">Location Map</span>
+                                          <span class="text-muted fs-10 text-uppercase fw-semibold d-block mb-1">${@json(__('hrms.attendance.location_map'))}</span>
                                           <div class="position-relative w-100" id="map-wrap-${log.id}" style="display: none; overflow: hidden; border-radius: 8px;">
                                                <div id="map-${log.id}" class="attendance-row-map" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>
                                           </div>
                                           <div id="map-none-${log.id}" class="alert alert-light border text-center fs-11 py-2.5 mb-0">
-                                               <i class="feather-map-pin text-muted fs-14 d-block mb-0.5"></i> No location coordinates captured for check-in or check-out.
+                                               <i class="feather-map-pin text-muted fs-14 d-block mb-0.5"></i> ${@json(__('hrms.attendance.no_coords_captured'))}
                                           </div>
                                      </div>
                                 </div>
@@ -991,7 +985,7 @@
                         tbody.appendChild(detailsTr);
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No attendance logs found matching this filter.</td></tr>';
+                    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">${@json(__('hrms.attendance.no_logs_matching'))}</td></tr>`;
                 }
                 
                 document.getElementById('drawerLoader').classList.add('d-none');
@@ -999,7 +993,7 @@
             })
             .catch(error => {
                 console.error('Error loading attendance logs:', error);
-                document.getElementById('drawerTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-danger">Failed to load logs. Please try again.</td></tr>';
+                document.getElementById('drawerTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">${@json(__('hrms.attendance.failed_load_logs'))}</td></tr>`;
                 document.getElementById('drawerLoader').classList.add('d-none');
                 document.getElementById('drawerContent').classList.remove('d-none');
             });
@@ -1310,35 +1304,35 @@
         <div class="modal-content border-0 shadow rounded-4">
             <div class="modal-header border-0 pt-4 px-4 pb-2">
                 <h5 class="modal-title fw-bold text-dark fs-15" id="attendanceImportModalLabel">
-                    <i class="feather-upload text-primary me-2"></i>Import Attendance Logs
+                    <i class="feather-upload text-primary me-2"></i>{{ __('hrms.attendance.import_modal_title') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="{{ route('hrms.attendance.import') }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <div class="modal-body px-4 py-3">
-                    <p class="text-muted fs-12 mb-3">Upload your attendance Excel (.xlsx, .xls) or CSV file matching our standard template. All check-in/out times will be processed and statuses auto-detected if set to "auto".</p>
+                    <p class="text-muted fs-12 mb-3">{{ __('hrms.attendance.import_modal_desc') }}</p>
                     
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-11 text-uppercase mb-1">Select File (.xlsx, .xls, .csv, .txt)</label>
+                        <label class="form-label fw-bold text-dark fs-11 text-uppercase mb-1">{{ __('hrms.attendance.import_select_file') }}</label>
                         <input type="file" name="file" class="form-control fs-12" accept=".csv,.txt,.xlsx,.xls" required>
                     </div>
 
                     <div class="bg-light border rounded-3 p-3">
-                        <h6 class="fw-bold text-dark fs-12 mb-1"><i class="feather-info text-primary me-1"></i>Import Notes:</h6>
+                        <h6 class="fw-bold text-dark fs-12 mb-1"><i class="feather-info text-primary me-1"></i>{{ __('hrms.attendance.import_notes') }}</h6>
                         <ul class="text-muted fs-11 ps-3 mb-0" style="line-height: 1.5;">
-                            <li>Columns required: <code>employee_code</code>, <code>punch_datetime</code> (raw biometric combined timestamp format)</li>
-                            <li>Status, shift penalties, approved leaves, WFH logs, and total work hours are auto-calculated automatically upon import.</li>
+                            <li>{{ __('hrms.attendance.import_note_columns') }}</li>
+                            <li>{{ __('hrms.attendance.import_note_auto') }}</li>
                         </ul>
                     </div>
                 </div>
                 <div class="modal-footer border-0 pb-4 px-4 pt-2 d-flex justify-content-between">
                     <a href="{{ route('hrms.attendance.import.template') }}" class="btn btn-sm btn-link text-decoration-none fw-semibold fs-11 p-0">
-                        <i class="feather-download-cloud me-1"></i>Download Sample Template
+                        <i class="feather-download-cloud me-1"></i>{{ __('hrms.attendance.download_sample_template') }}
                     </a>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-sm btn-primary text-white px-3">Import CSV</button>
+                        <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
+                        <button type="submit" class="btn btn-sm btn-primary text-white px-3">{{ __('hrms.attendance.btn_import_csv') }}</button>
                     </div>
                 </div>
             </form>
@@ -1352,20 +1346,20 @@
         <div class="modal-content border-0 shadow rounded-4 text-dark">
             <div class="modal-header border-0 pt-4 px-4 pb-2">
                 <h5 class="modal-title fw-bold text-dark fs-15" id="rejectCorrectionModalLabel">
-                    <i class="feather-alert-triangle text-danger me-2"></i>Reject Correction Request
+                    <i class="feather-alert-triangle text-danger me-2"></i>{{ __('hrms.attendance.reject_modal_title') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="rejectCorrectionForm" method="POST" action="">
                 @csrf
                 <div class="modal-body px-4 py-3">
-                    <p class="text-muted fs-12 mb-3">Please provide a reason for rejecting this attendance correction request. This will be visible to the employee.</p>
+                    <p class="text-muted fs-12 mb-3">{{ __('hrms.attendance.reject_modal_desc') }}</p>
                     
-                    <x-ui.odoo-form-ui type="textarea" label="Rejection Reason" name="rejected_reason" id="reject_reason_input" placeholder="Type reason here..." :required="true" />
+                    <x-ui.odoo-form-ui type="textarea" :label="__('hrms.attendance.rejection_reason')" name="rejected_reason" id="reject_reason_input" :placeholder="__('hrms.attendance.placeholder_rejection_reason')" :required="true" />
                 </div>
                 <div class="modal-footer border-0 pb-4 px-4 pt-2">
-                    <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-danger text-white px-3">Reject Request</button>
+                    <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
+                    <button type="submit" class="btn btn-sm btn-danger text-white px-3">{{ __('hrms.attendance.btn_reject_request') }}</button>
                 </div>
             </form>
         </div>
@@ -1378,34 +1372,34 @@
         <div class="modal-content border-0 shadow rounded-4 text-dark">
             <div class="modal-header border-0 pt-4 px-4 pb-2">
                 <h5 class="modal-title fw-bold text-dark fs-15" id="approveCorrectionModalLabel">
-                    <i class="feather-check-circle text-success me-2"></i>Approve Correction Request
+                    <i class="feather-check-circle text-success me-2"></i>{{ __('hrms.attendance.approve_modal_title') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="approveCorrectionForm" method="POST" action="">
                 @csrf
                 <div class="modal-body px-4 py-3 d-flex flex-column gap-3">
-                    <p class="text-muted fs-12 mb-0">Review or adjust the check-in and check-out times before approving this request.</p>
+                    <p class="text-muted fs-12 mb-0">{{ __('hrms.attendance.approve_modal_desc') }}</p>
                     
                     <div class="bg-light border rounded-3 p-3 mb-1">
                         <div class="row g-2">
                             <div class="col-6">
-                                <span class="text-muted fs-10 d-block text-uppercase">Employee</span>
+                                <span class="text-muted fs-10 d-block text-uppercase">{{ __('hrms.common.employee') }}</span>
                                 <span class="fw-bold text-dark fs-12" id="approve_employee_name">-</span>
                             </div>
                             <div class="col-6">
-                                <span class="text-muted fs-10 d-block text-uppercase">Date</span>
+                                <span class="text-muted fs-10 d-block text-uppercase">{{ __('hrms.common.date') }}</span>
                                 <span class="fw-bold text-dark fs-12" id="approve_date">-</span>
                             </div>
                         </div>
                     </div>
 
-                    <x-ui.odoo-form-ui type="input" inputType="time" label="Approved Check-In Time" name="approved_check_in" id="approve_check_in_input" :required="true" />
-                    <x-ui.odoo-form-ui type="input" inputType="time" label="Approved Check-Out Time" name="approved_check_out" id="approve_check_out_input" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="time" :label="__('hrms.attendance.approved_check_in')" name="approved_check_in" id="approve_check_in_input" />
+                    <x-ui.odoo-form-ui type="input" inputType="time" :label="__('hrms.attendance.approved_check_out')" name="approved_check_out" id="approve_check_out_input" />
                 </div>
                 <div class="modal-footer border-0 pb-4 px-4 pt-2">
-                    <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-success text-white px-3">Approve & Save</button>
+                    <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
+                    <button type="submit" class="btn btn-sm btn-success text-white px-3">{{ __('hrms.attendance.btn_approve_save') }}</button>
                 </div>
             </form>
         </div>
