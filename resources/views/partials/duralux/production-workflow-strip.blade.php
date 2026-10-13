@@ -10,20 +10,20 @@
             'icon' => 'feather-cpu',
         ],
         [
-            'id' => 'routings',
-            'num' => '2',
-            'name' => __('production.step_routings'),
-            'route' => 'production.routing.index',
-            'active_routes' => ['production.routing.*'],
-            'icon' => 'feather-sliders',
-        ],
-        [
             'id' => 'boms',
             'num' => '3',
             'name' => __('production.step_boms'),
             'route' => 'production.boms.index',
             'active_routes' => ['production.boms.*'],
             'icon' => 'feather-layers',
+        ],
+        [
+            'id' => 'routings',
+            'num' => '2',
+            'name' => __('production.step_routings'),
+            'route' => 'production.routing.index',
+            'active_routes' => ['production.routing.*'],
+            'icon' => 'feather-sliders',
         ],
         [
             'id' => 'orders',

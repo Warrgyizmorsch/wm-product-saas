@@ -303,6 +303,14 @@ class NavigationMenuTest extends TestCase
         $this->assertTrue($this->find($onTrackStatus, 'Track Status')['active']);
         $this->assertFalse($this->find($onTrackStatus, 'Leads')['active']);
 
+        $onWorkCenter = $this->menu($this->owner, 'production.mes.work-centers.show');
+        $this->assertTrue($this->find($onWorkCenter, 'Work Center Board')['active']);
+        $this->assertFalse($this->find($onWorkCenter, 'Shop Floor (MES)')['active']);
+
+        $onMachine = $this->menu($this->owner, 'production.mes.machines.show');
+        $this->assertTrue($this->find($onMachine, 'Machine Board')['active']);
+        $this->assertFalse($this->find($onMachine, 'Shop Floor (MES)')['active']);
+
         $this->assertTrue($this->find($this->menu($this->owner, 'home'), 'Executive Dashboard')['active']);
     }
 

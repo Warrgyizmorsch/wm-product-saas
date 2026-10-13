@@ -366,48 +366,102 @@ class MenuBuilder
      * match), otherwise the first entry of the same resource — so
      * crm.leads.index stays highlighted on crm.leads.show.
      */
+    /**
+     * Highlights the entry for the current page: exact route names (or wildcard patterns)
+     * first, otherwise the entry whose resource prefix best (longest) matches $currentRoute.
+     * Single-screen dashboard routes (*.dashboard) are never treated as resource parents.
+     */
     private function markActive(array &$sections, ?string $currentRoute): void
     {
         if ($currentRoute === null) {
             return;
         }
 
-        $exact = fn (array $item) => $item['route'] === $currentRoute || in_array($currentRoute, $item['active_routes'], true);
-        $sameResource = fn (array $item) => $item['route'] !== null
-            && substr_count($item['route'], '.') >= 2
-            && str_starts_with($currentRoute, Str::beforeLast($item['route'], '.').'.');
+        $matchesExact = function (array $item) use ($currentRoute): bool {
+            if ($item['route'] === $currentRoute) {
+                return true;
+            }
 
-        foreach ([[$exact, false], [$sameResource, true]] as [$matches, $firstOnly]) {
-            $found = false;
+            foreach ($item['active_routes'] ?? [] as $pattern) {
+                if ($pattern === $currentRoute || Str::is($pattern, $currentRoute)) {
+                    return true;
+                }
+            }
 
-            foreach ($sections as &$section) {
-                foreach ($section['items'] as &$item) {
-                    if ($item['children'] === [] && $matches($item)) {
-                        $item['active'] = $found = true;
-                    }
+            return false;
+        };
 
-                    foreach ($item['children'] as &$child) {
-                        if ($matches($child)) {
-                            $child['active'] = $item['active'] = $found = true;
-                        }
+        // 1. Exact or pattern match
+        $foundExact = false;
+        foreach ($sections as &$section) {
+            foreach ($section['items'] as &$item) {
+                if ($item['children'] === [] && $matchesExact($item)) {
+                    $item['active'] = $foundExact = true;
+                }
 
-                        if ($found && $firstOnly) {
-                            return;
-                        }
-                    }
-                    unset($child);
-
-                    if ($found && $firstOnly) {
-                        return;
+                foreach ($item['children'] as &$child) {
+                    if ($matchesExact($child)) {
+                        $child['active'] = $item['active'] = $foundExact = true;
                     }
                 }
-                unset($item);
+                unset($child);
             }
-            unset($section);
+            unset($item);
+        }
+        unset($section);
 
-            if ($found) {
-                return;
+        if ($foundExact) {
+            return;
+        }
+
+        // 2. Resource match: find the item whose resource prefix longest matches $currentRoute.
+        // Dashboard routes (*.dashboard) are single screens, never resource parents.
+        $bestMatchItem = null;
+        $bestMatchChild = null;
+        $bestLen = 0;
+
+        foreach ($sections as &$section) {
+            foreach ($section['items'] as &$item) {
+                if ($item['children'] === []) {
+                    $len = $this->resourceMatchLength($item, $currentRoute);
+                    if ($len > $bestLen) {
+                        $bestLen = $len;
+                        $bestMatchItem = &$item;
+                        $bestMatchChild = null;
+                    }
+                }
+
+                foreach ($item['children'] as &$child) {
+                    $len = $this->resourceMatchLength($child, $currentRoute);
+                    if ($len > $bestLen) {
+                        $bestLen = $len;
+                        $bestMatchItem = &$item;
+                        $bestMatchChild = &$child;
+                    }
+                }
+                unset($child);
+            }
+            unset($item);
+        }
+        unset($section);
+
+        if ($bestMatchItem !== null) {
+            $bestMatchItem['active'] = true;
+            if ($bestMatchChild !== null) {
+                $bestMatchChild['active'] = true;
             }
         }
+    }
+
+    private function resourceMatchLength(array $item, string $currentRoute): int
+    {
+        $route = $item['route'] ?? null;
+        if ($route === null || str_ends_with($route, '.dashboard') || substr_count($route, '.') < 1) {
+            return 0;
+        }
+
+        $resourcePrefix = Str::beforeLast($route, '.').'.';
+
+        return str_starts_with($currentRoute, $resourcePrefix) ? strlen($resourcePrefix) : 0;
     }
 }
