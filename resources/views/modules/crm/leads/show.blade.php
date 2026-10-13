@@ -126,9 +126,10 @@
             border-left-color: #1e293b;
         }
     </style>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
+    <div class="d-flex align-items-center gap-2 flex-wrap lead-page-actions-wrap">
         <!-- Chevron Arrow Pipeline Statusbar -->
-        <div class="so-status-pipeline d-inline-flex align-items-center">
+        <div class="lead-pipeline-strip">
+            <div class="so-status-pipeline d-inline-flex align-items-center">
             @php
                 $coreStatuses = ['New', 'Qualified', 'Dealing', 'Won', 'Lost'];
                 $rawList = $leadStatuses ?? \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses();
@@ -165,9 +166,10 @@
                 </button>
             @endforeach
         </div>
+        </div>
 
         <!-- Pagination Arrows -->
-        <div class="d-flex align-items-center border rounded px-1 py-0.5 bg-white shadow-2xs">
+        <div class="d-flex align-items-center border rounded px-1 py-0.5 bg-white shadow-2xs ms-auto ms-sm-0">
             @if(isset($prevLead) && $prevLead)
                 <a href="{{ route('crm.leads.show', $prevLead->id) }}" class="btn btn-xs btn-link text-dark p-1 border-0 d-inline-flex align-items-center justify-content-center" title="{{ __('crm.previous_lead') }}">
                     <i class="feather-chevron-left fs-12"></i>
@@ -1868,6 +1870,208 @@
             0% { height: 6px; opacity: 0.5; }
             100% { height: 18px; opacity: 1; }
         }
+
+        /* Activity Card Highlight Pulse Effect (when redirected from calendar) */
+        @keyframes activityHighlightGlow {
+            0% { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.45); transform: scale(1.01); background-color: #eff6ff !important; }
+            50% { box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.55); transform: scale(1.01); background-color: #dbeafe !important; }
+            100% { box-shadow: none; transform: scale(1); background-color: transparent; }
+        }
+        .activity-highlight-pulse {
+            animation: activityHighlightGlow 2.5s ease-in-out;
+            border-radius: 6px;
+        }
+
+        /* ==========================================================================
+           MOBILE & TABLET RESPONSIVE SYSTEM FOR LEADS VIEW (< 992px, < 768px, < 576px)
+           ========================================================================== */
+        @media (max-width: 991.98px) {
+            /* Allow natural vertical flow on tablet and mobile instead of locking 100vh */
+            .zoho-lead-card-container {
+                height: auto !important;
+                min-height: auto !important;
+                overflow: visible !important;
+                border-radius: 0 !important;
+            }
+
+            .odoo-layout-wrapper {
+                flex-direction: column !important;
+                height: auto !important;
+                min-height: auto !important;
+                overflow: visible !important;
+            }
+
+            .odoo-sheet-col {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+                overflow-y: visible !important;
+            }
+
+            .odoo-chatter-col {
+                width: 100% !important;
+                min-width: 0 !important;
+                max-width: 100% !important;
+                height: auto !important;
+                overflow-y: visible !important;
+                border-left: none !important;
+                border-top: 2px solid #e2e8f0 !important;
+                margin-top: 8px;
+                flex-shrink: 1 !important;
+            }
+
+            /* Top header banner on tablet/mobile */
+            .zoho-header-banner {
+                padding: 12px 14px !important;
+                gap: 10px !important;
+            }
+
+            /* Status Pipeline Scrollable Ribbon */
+            .lead-pipeline-strip {
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                flex-wrap: nowrap !important;
+                padding: 4px 0 !important;
+                scrollbar-width: thin;
+                max-width: 100% !important;
+            }
+            .lead-pipeline-strip::-webkit-scrollbar {
+                height: 4px;
+            }
+            .lead-pipeline-strip::-webkit-scrollbar-thumb {
+                background-color: #cbd5e1;
+                border-radius: 4px;
+            }
+            .so-status-pipeline {
+                flex-shrink: 0 !important;
+                min-width: max-content !important;
+            }
+            .so-status-pipeline .pipeline-step {
+                padding: 5px 12px 5px 20px !important;
+                font-size: 10px !important;
+            }
+            .so-status-pipeline .pipeline-step:first-child {
+                padding-left: 12px !important;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .zoho-header-banner {
+                padding: 10px 12px !important;
+            }
+
+            .odoo-sheet-paper {
+                padding: 16px 12px !important;
+            }
+
+            /* Actions toolbar wraps nicely and touch-friendly */
+            .lead-page-actions-wrap {
+                width: 100% !important;
+                justify-content: space-between !important;
+            }
+
+            #btnToggleChatter {
+                padding: 4px 10px !important;
+                font-size: 11px !important;
+            }
+
+            /* Notebook Tabs horizontal touch scroll on mobile */
+            .odoo-notebook-tabs {
+                flex-wrap: nowrap !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                scrollbar-width: thin;
+            }
+            .odoo-notebook-tabs::-webkit-scrollbar {
+                height: 3px;
+            }
+            .odoo-notebook-tabs::-webkit-scrollbar-thumb {
+                background-color: #cbd5e1;
+                border-radius: 3px;
+            }
+            .odoo-notebook-tabs .nav-item {
+                flex-shrink: 0 !important;
+            }
+            .odoo-notebook-tabs .nav-link {
+                white-space: nowrap !important;
+                padding: 6px 12px !important;
+                font-size: 11px !important;
+            }
+
+            /* Quotation revision chips */
+            .quotation-rev-chip {
+                flex-shrink: 0 !important;
+                min-width: 150px !important;
+            }
+
+            /* Followup Offcanvas full width on mobile */
+            #leadFollowupOffcanvas {
+                width: 100% !important;
+                max-width: 100vw !important;
+            }
+
+            .border-end {
+                border-right: none !important;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            /* Field rows: Label on top, Value below */
+            .zoho-field-row {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                padding: 6px 0 !important;
+                gap: 2px !important;
+            }
+            .zoho-field-label {
+                width: 100% !important;
+                font-size: 11px !important;
+                color: #64748b !important;
+                margin-bottom: 1px !important;
+            }
+            .zoho-field-value {
+                width: 100% !important;
+                font-size: 12.5px !important;
+            }
+
+            /* Key metrics row: stack cleanly */
+            .lead-metrics-row .lead-metric-col {
+                border-right: none !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+                padding-bottom: 8px;
+            }
+            .lead-metrics-row .lead-metric-col:last-child {
+                border-bottom: none !important;
+                padding-bottom: 0;
+            }
+
+            /* Chatter tab buttons & filter on mobile */
+            .odoo-chatter-nav-pills .nav-link {
+                padding: 3px 8px !important;
+                font-size: 11px !important;
+            }
+            #activityFilterDropdownBtn {
+                padding: 3px 8px !important;
+                font-size: 11px !important;
+            }
+
+            /* Floating Softphone widget on mobile: centered bottom dock */
+            #crmFloatingSoftphoneWidget {
+                right: 12px !important;
+                bottom: 12px !important;
+                left: 12px !important;
+                width: auto !important;
+                max-width: calc(100vw - 24px) !important;
+            }
+        }
+
+        /* Dark mode overrides for mobile elements */
+        html.app-skin-dark .odoo-chatter-col {
+            border-top-color: #1e293b !important;
+        }
+        html.app-skin-dark .lead-metrics-row .lead-metric-col {
+            border-bottom-color: #1e293b !important;
+        }
     </style>
 @endpush
 
@@ -1890,27 +2094,117 @@
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script>
+        let isTogglingChatter = false;
+        window.toggleChatterBox = function() {
+            if (isTogglingChatter) return;
+            isTogglingChatter = true;
+            setTimeout(function() { isTogglingChatter = false; }, 250);
+
+            var chatter = document.getElementById('odooRightChatter');
+            var btn = document.getElementById('btnToggleChatter');
+            var text = document.getElementById('textToggleChatter');
+            if (!chatter) return;
+
+            var isHidden = chatter.classList.contains('d-none') || 
+                           chatter.style.display === 'none' || 
+                           window.getComputedStyle(chatter).display === 'none';
+
+            if (isHidden) {
+                // Show chatter
+                chatter.classList.remove('d-none');
+                chatter.style.removeProperty('display');
+                if (btn) {
+                    btn.classList.remove('btn-primary', 'text-white');
+                    btn.classList.add('btn-white', 'text-muted');
+                    btn.title = "Hide Chatter Sidebar";
+                }
+                if (text) text.innerText = 'Chatter';
+                try { localStorage.setItem('lead_chatter_hidden', '0'); } catch(e){}
+                if (window.innerWidth < 992) {
+                    setTimeout(function() {
+                        chatter.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 80);
+                }
+            } else {
+                // Hide chatter
+                chatter.classList.add('d-none');
+                chatter.style.setProperty('display', 'none', 'important');
+                if (btn) {
+                    btn.classList.remove('btn-white', 'text-muted');
+                    btn.classList.add('btn-primary', 'text-white');
+                    btn.title = "Show Chatter Sidebar";
+                }
+                if (text) text.innerText = 'Show Chatter';
+                try { localStorage.setItem('lead_chatter_hidden', '1'); } catch(e){}
+            }
+        };
+
         $(function () {
+            // Bind single click handler for Chatter toggle button
+            $(document).on('click', '#btnToggleChatter', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.toggleChatterBox();
+            });
+
+            // Restore user's previous Chatter toggle preference if saved
+            try {
+                if (localStorage.getItem('lead_chatter_hidden') === '1') {
+                    var chatter = document.getElementById('odooRightChatter');
+                    var btn = document.getElementById('btnToggleChatter');
+                    var text = document.getElementById('textToggleChatter');
+                    if (chatter) {
+                        chatter.classList.add('d-none');
+                        chatter.style.setProperty('display', 'none', 'important');
+                    }
+                    if (btn) {
+                        btn.classList.remove('btn-white', 'text-muted');
+                        btn.classList.add('btn-primary', 'text-white');
+                        btn.title = "Show Chatter Sidebar";
+                    }
+                    if (text) text.innerText = 'Show Chatter';
+                }
+            } catch(e){}
+
             // Tab state persistence logic
             var activeTabKey = 'lead_active_tab_' + {{ $lead->id }};
             var activeSubTabKey = 'lead_active_subtab_' + {{ $lead->id }};
+            var activeChatterTabKey = 'lead_active_chatter_tab_' + {{ $lead->id }};
             
             // Check URL Query Param & Hash first
             var urlParams = new URLSearchParams(window.location.search);
             var tabParam = urlParams.get('tab');
+            var activityIdParam = urlParams.get('activity_id');
             var hash = window.location.hash;
 
-            if (tabParam === 'interactions' || tabParam === 'timeline' || hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
-                localStorage.setItem(activeTabKey, 'timeline-tab');
-                if (tabParam === 'interactions' || hash === '#subtab-interactions') {
-                    localStorage.setItem(activeSubTabKey, 'subtab-interactions-tab');
-                } else if (hash === '#subtab-history') {
-                    localStorage.setItem(activeSubTabKey, 'subtab-history-tab');
-                }
+            if (tabParam === 'quotation' || hash === '#quotation' || hash === '#quotation-pane') {
+                localStorage.setItem(activeTabKey, 'quotation-tab');
             } else if (tabParam === 'overview' || hash === '#overview' || hash === '#overview-pane') {
                 localStorage.setItem(activeTabKey, 'overview-tab');
-            } else if (tabParam === 'quotation' || hash === '#quotation' || hash === '#quotation-pane') {
-                localStorage.setItem(activeTabKey, 'quotation-tab');
+            }
+
+            var isActivityIntent = (tabParam === 'interactions' || tabParam === 'activities' || tabParam === 'timeline' || activityIdParam || hash === '#chatter-activity-pane' || hash === '#subtab-interactions' || (hash && hash.indexOf('activity') > -1));
+
+            if (isActivityIntent) {
+                // Ensure Chatter box is visible
+                var chatter = document.getElementById('odooRightChatter');
+                if (chatter) {
+                    chatter.classList.remove('d-none');
+                    chatter.style.removeProperty('display');
+                }
+                var btnChatter = document.getElementById('btnToggleChatter');
+                var textChatter = document.getElementById('textToggleChatter');
+                if (btnChatter) {
+                    btnChatter.classList.remove('btn-primary', 'text-white');
+                    btnChatter.classList.add('btn-white', 'text-muted');
+                }
+                if (textChatter) textChatter.innerText = 'Chatter';
+
+                if (tabParam === 'timeline' || hash === '#chatter-history-pane' || hash === '#subtab-history') {
+                    localStorage.setItem(activeChatterTabKey, 'chatter-history-tab');
+                } else {
+                    localStorage.setItem(activeChatterTabKey, 'chatter-activity-tab');
+                }
             }
 
             // Always clean up hash or temporary query params from address bar so URL remains clean
@@ -1993,21 +2287,36 @@
                     if (mainTabEl) {
                         bootstrap.Tab.getOrCreateInstance(mainTabEl).show();
                     }
-                    
-                    // If it's timeline tab, also restore the subtab
-                    if (savedTabId === 'timeline-tab') {
-                        var savedSubTabId = localStorage.getItem(activeSubTabKey) || 'subtab-interactions-tab';
-                        var subTabEl = document.getElementById(savedSubTabId);
-                        if (subTabEl) {
-                            bootstrap.Tab.getOrCreateInstance(subTabEl).show();
-                        }
-                    }
                     syncSidebarWithCurrentTab(savedTabId);
                 }, 60);
-            } else {
-                if ($('#timeline-tab').hasClass('active')) {
-                    syncSidebarWithCurrentTab('timeline-tab');
-                }
+            }
+
+            // Restore saved chatter tab from localStorage or activity intent
+            var savedChatterTabId = localStorage.getItem(activeChatterTabKey) || (isActivityIntent ? 'chatter-activity-tab' : null);
+            if (savedChatterTabId && document.getElementById(savedChatterTabId)) {
+                setTimeout(function() {
+                    var chatterTabEl = document.getElementById(savedChatterTabId);
+                    if (chatterTabEl) {
+                        bootstrap.Tab.getOrCreateInstance(chatterTabEl).show();
+                    }
+                }, 60);
+            }
+
+            // Scroll & Highlight Target Activity if coming from Calendar
+            var targetActId = activityIdParam || (hash ? hash.replace(/^#lead-activity-|^#activity-/, '') : null);
+            if (targetActId && !isNaN(targetActId)) {
+                setTimeout(function() {
+                    var targetCard = document.getElementById('lead-activity-' + targetActId) || document.querySelector('[data-activity-id="' + targetActId + '"]');
+                    if (targetCard) {
+                        var parentCollapse = $(targetCard).closest('.collapse');
+                        if (parentCollapse.length && !parentCollapse.hasClass('show')) {
+                            parentCollapse.collapse('show');
+                        }
+                        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        $(targetCard).addClass('activity-highlight-pulse');
+                        setTimeout(function() { $(targetCard).removeClass('activity-highlight-pulse'); }, 3500);
+                    }
+                }, 300);
             }
 
             var scrollTargetOnTabShown = null;
@@ -2048,8 +2357,13 @@
                 } else if (targetId === '#sectionQuotationHistory') {
                     targetTabBtnId = 'quotation-tab';
                 } else if (targetId === '#subtab-interactions' || targetId === '#subtab-history') {
-                    targetTabBtnId = 'timeline-tab';
-                    targetSubtabBtnId = (targetId === '#subtab-interactions') ? 'subtab-interactions-tab' : 'subtab-history-tab';
+                    var chatterTabId = (targetId === '#subtab-interactions') ? 'chatter-activity-tab' : 'chatter-history-tab';
+                    var chatterTab = document.getElementById(chatterTabId);
+                    if (chatterTab) {
+                        bootstrap.Tab.getOrCreateInstance(chatterTab).show();
+                    }
+                    setTimeout(function() { isManualClick = false; }, 300);
+                    return;
                 }
 
                 // Activate subtab first if target is a subtab
@@ -2078,10 +2392,12 @@
             });
 
             // Handle scroll after tab transition finishes, and save active tab state in localStorage
-            $(document).on('shown.bs.tab', 'button[data-bs-toggle="tab"], a[data-bs-toggle="tab"]', function (e) {
+            $(document).on('shown.bs.tab', 'button[data-bs-toggle="tab"], a[data-bs-toggle="tab"], button[data-bs-toggle="pill"]', function (e) {
                 if (e.target.id) {
                     if (e.target.id === 'overview-tab' || e.target.id === 'timeline-tab' || e.target.id === 'quotation-tab') {
                         localStorage.setItem(activeTabKey, e.target.id);
+                    } else if (e.target.id === 'chatter-activity-tab' || e.target.id === 'chatter-history-tab') {
+                        localStorage.setItem(activeChatterTabKey, e.target.id);
                     } else if (e.target.id === 'subtab-history-tab' || e.target.id === 'subtab-interactions-tab') {
                         localStorage.setItem(activeSubTabKey, e.target.id);
                         localStorage.setItem(activeTabKey, 'timeline-tab');

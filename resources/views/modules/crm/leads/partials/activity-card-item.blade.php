@@ -109,7 +109,7 @@
     }
 @endphp
 
-<div class="odoo-activity-item">
+<div class="odoo-activity-item" id="lead-activity-{{ $item->id }}" data-activity-id="{{ $item->id }}">
     <div class="d-flex align-items-start gap-3">
 
         <!-- User Avatar with Green Check Badge -->
