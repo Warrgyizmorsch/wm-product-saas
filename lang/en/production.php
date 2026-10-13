@@ -2153,6 +2153,8 @@ return array (
   'fg_produced' => 'FG Produced',
   'sfg_produced' => 'SFG Output',
   'comp_output' => 'Comp. Output',
+  'view_project' => 'View Project',
+  'project_context' => 'Project Context',
 );
 
 

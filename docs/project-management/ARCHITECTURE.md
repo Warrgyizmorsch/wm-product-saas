@@ -182,9 +182,9 @@ This application operates as a single-database, multi-tenant SaaS.
 
 ---
 
-## 6. Shared ERP Infrastructure Reuse (Mandatory Rules)
+## 6. Shared ERP Infrastructure Reuse (Mandatory Rules & Phase 12 Implemented Bridges)
 
-Future coding agents must reuse established shared components rather than creating parallel infrastructure:
+All cross-module bridges (Sales Order conversion, Production Order synchronization, Purchase Requisition task linking, and Notification Event Catalog integration) implemented in Phase 12 adhere strictly to the ERP's shared infrastructure:
 
 | Capability | Reused ERP Component | Rule |
 |---|---|---|
@@ -197,6 +197,14 @@ Future coding agents must reuse established shared components rather than creati
 | **Inline Editing** | [`HandlesInlineFieldUpdates`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Support/InlineEdit/HandlesInlineFieldUpdates.php) | Use standard inline-edit schema and `x-ui.inline-edit` Blade component. |
 | **Dynamic Currency** | `format_currency()`, `active_currency_symbol()`, `window.AppCurrency` | Reuses ERP Production currency engine. Never hardcode currency codes or symbols. |
 | **Approval UX** | Production alert banners & action buttons | Reuses standard alert wrappers (`bg-soft-warning`, `bg-soft-info`) and role-based signoff CTAs. |
+| **Sales Order Conversion** | `SalesOrderProjectBridgeService` | Atomic bridge converting confirmed Sales Orders to Delivery Projects; 1 SO line to N Milestones. |
+| **Production Execution** | `ProductionOrderCompleted` / `SyncProductionTaskCompletionListener` | Event-driven status sync consuming Production yield. Never duplicate manufacturing BOM/routing/QC logic. |
+| **Production Navigation** | `show.blade.php`, `index.blade.php` | Bidirectional reverse navigation from Production Orders to Projects and Tasks. |
+| **Manufacturing Summary** | `_manufacturing-summary.blade.php` | Dynamic project-level aggregation of live orders without duplicating columns in `projects`. |
+| **Production Costing** | `ProductionCostVarianceService` & `ProductionCostAdjustmentService` | Consumes authoritative production costs dynamically in Project financial reports without duplicating costing formulas or creating `actual_production_cost` columns. |
+| **Material Procurement** | `PurchaseRequisition` (`source_type = 'project'`) | Sourcing materials via Purchase Requisitions linked to PM tasks (`project_task_id`). |
+| **Event Catalog** | `NotificationEventCatalog` | Registers all 19 PM events in the central Platform Event Catalog. |
+| **Cross-Module Authorization** | `AccessService` | Evaluates module view permissions (`production.orders.view`, `purchase.requisitions.view`) with tenant, company, and branch boundary checks. |
 
 ---
 

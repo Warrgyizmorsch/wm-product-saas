@@ -11,7 +11,7 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
 {
     public function paginateWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
     {
-        $query = ProductionOrder::with(['product', 'bom', 'routing']);
+        $query = ProductionOrder::with(['product', 'bom', 'routing', 'project', 'projectTask']);
 
         if (!empty($filters['search'])) {
             $search = '%' . $filters['search'] . '%';
@@ -138,6 +138,9 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
             'product',
             'bom',
             'routing',
+            'project',
+            'projectMilestone',
+            'projectTask',
             'creator',
             'releaser',
             'completer',

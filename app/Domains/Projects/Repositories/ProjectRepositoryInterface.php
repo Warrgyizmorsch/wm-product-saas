@@ -26,7 +26,7 @@ interface ProjectRepositoryInterface
 
     public function delete(int $id): bool;
 
-    public function latestCode(): ?string;
+    public function latestCode(?int $tenantId = null, ?int $branchId = null): ?string;
 
     public function countAll(): int;
 

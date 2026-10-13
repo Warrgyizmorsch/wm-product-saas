@@ -94,7 +94,14 @@
                     <td class="text-end text-muted">{{ format_currency($r['base_budget_amount']) }}</td>
                     <td class="text-end text-info">{{ format_currency($r['cr_budget_amount']) }}</td>
                     <td class="text-end fw-semibold text-dark">{{ format_currency($r['revised_budget_amount']) }}</td>
-                    <td class="text-end fw-bold text-dark">{{ format_currency($r['actual_cost']) }}</td>
+                    <td class="text-end fw-bold text-dark">
+                        {{ format_currency($r['actual_cost']) }}
+                        @if(($r['production_cost'] ?? 0) > 0)
+                            <div class="fs-10 text-muted fw-normal" title="Timesheet: {{ format_currency($r['timesheet_cost'] ?? 0) }} | Production: {{ format_currency($r['production_cost']) }}">
+                                <span class="badge bg-soft-info text-info p-0 px-1">Mfg: {{ format_currency($r['production_cost']) }}</span>
+                            </div>
+                        @endif
+                    </td>
                     <td class="text-end fw-bold {{ $isOverCost ? 'text-danger' : 'text-success' }}">
                         {{ format_currency($r['cost_variance']) }}
                         @if ($r['cost_burn_percent'] !== null)

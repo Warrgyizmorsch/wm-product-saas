@@ -65,6 +65,10 @@ class ProductionOrder extends BaseModel
                     $item->update(['status' => 'Ready']);
                 }
             }
+
+            if ($order->wasChanged('status') && $order->status === self::STATUS_COMPLETED) {
+                \App\Domains\Production\Events\ProductionOrderCompleted::dispatch($order);
+            }
         });
     }
 
@@ -133,6 +137,9 @@ class ProductionOrder extends BaseModel
         'qr_code',
         'sales_order_id',
         'sales_order_item_id',
+        'project_id',
+        'project_milestone_id',
+        'project_task_id',
         'parameters',
     ];
 
@@ -169,6 +176,21 @@ class ProductionOrder extends BaseModel
     public function salesOrderItem(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Sales\Models\SalesOrderItem::class, 'sales_order_item_id');
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Projects\Models\Project::class, 'project_id');
+    }
+
+    public function projectMilestone(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Projects\Models\Milestone::class, 'project_milestone_id');
+    }
+
+    public function projectTask(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Projects\Models\Task::class, 'project_task_id');
     }
 
     public function bom(): BelongsTo

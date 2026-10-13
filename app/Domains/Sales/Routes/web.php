@@ -18,6 +18,7 @@ Route::prefix('sales')
         Route::delete('orders/{order}', [SalesOrderController::class, 'destroy'])->name('orders.destroy');
         Route::post('orders/{order}/confirm', [SalesOrderController::class, 'confirm'])->name('orders.confirm');
         Route::post('orders/{order}/cancel', [SalesOrderController::class, 'cancel'])->name('orders.cancel');
+        Route::post('orders/{order}/convert-to-project', [SalesOrderController::class, 'convertToProject'])->name('orders.convert-to-project');
         Route::get('orders/{order}/download', [SalesOrderController::class, 'downloadPdf'])->name('orders.download');
 
         // Material Requirements Routes (Alias Redirects to /inventory/material-requirements)

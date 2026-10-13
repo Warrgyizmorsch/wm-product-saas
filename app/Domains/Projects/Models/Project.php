@@ -34,6 +34,15 @@ class Project extends BaseModel
             }
         }
 
+        $branchId = branch_id() ?? (request()->hasSession() ? request()->session()->get('branch_id') : null);
+
+        if ($branchId !== null && in_array($field, ['project_code', 'code'])) {
+            $branchMatch = $this->where($field, $value)->where('branch_id', $branchId)->first();
+            if ($branchMatch) {
+                return $branchMatch;
+            }
+        }
+
         return parent::resolveRouteBinding($value, $field);
     }
 
@@ -92,6 +101,10 @@ class Project extends BaseModel
         'project_code',
         'name',
         'customer_id',
+        'sales_order_id',
+        'crm_deal_id',
+        'client_contact_id',
+        'cost_center_id',
         'owner_id',
         'manager_id',
         'start_date',
@@ -151,6 +164,31 @@ class Project extends BaseModel
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function salesOrder(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Sales\Models\SalesOrder::class, 'sales_order_id');
+    }
+
+    public function crmDeal(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\CRM\Models\CrmDeal::class, 'crm_deal_id');
+    }
+
+    public function clientContact(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\CRM\Models\CrmContact::class, 'client_contact_id');
+    }
+
+    public function costCenter(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Accounting\Models\CostCenter::class, 'cost_center_id');
+    }
+
+    public function productionOrders(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Production\Models\ProductionOrder::class, 'project_id');
     }
 
     public function owner(): BelongsTo

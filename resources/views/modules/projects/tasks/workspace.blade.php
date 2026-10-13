@@ -26,6 +26,7 @@
                 @include('modules.projects.tasks.workspace._description')
                 @include('modules.projects.tasks.workspace._subtasks')
                 @include('modules.projects.tasks.workspace._dependencies')
+                @include('modules.projects.tasks.workspace._manufacturing-procurement')
                 @include('modules.projects.tasks.workspace._timelogs')
                 @include('modules.projects.tasks.workspace._attachments')
             </div>

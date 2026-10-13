@@ -364,6 +364,73 @@ class ProjectReportService
         return $this->getMilestoneVarianceQuery($filters)->paginate($perPage);
     }
 
+    /**
+     * Dynamically aggregate authoritative production actual cost for a project
+     * using Production's authoritative costing services.
+     */
+    public function getProjectProductionCost(Project $project): array
+    {
+        $orders = \App\Domains\Production\Models\ProductionOrder::query()
+            ->where('tenant_id', $project->tenant_id)
+            ->where(function ($q) use ($project) {
+                $q->where('project_id', $project->id)
+                  ->orWhereHas('projectTask', function ($tq) use ($project) {
+                      $tq->where('project_id', $project->id);
+                  });
+            })
+            ->with([
+                'reservations.product',
+                'issues.product',
+                'operations.routingOperation',
+                'operations.workCenter',
+            ])
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return [
+                'total_cost' => 0.0,
+                'material_cost' => 0.0,
+                'labor_cost' => 0.0,
+                'machine_cost' => 0.0,
+                'overhead_cost' => 0.0,
+                'other_cost' => 0.0,
+                'order_count' => 0,
+            ];
+        }
+
+        $varianceService = app(\App\Domains\Production\Services\ProductionCostVarianceService::class);
+        $adjustmentService = app(\App\Domains\Production\Services\ProductionCostAdjustmentService::class);
+
+        $totalCost = 0.0;
+        $matCost = 0.0;
+        $laborCost = 0.0;
+        $machineCost = 0.0;
+        $overheadCost = 0.0;
+        $otherCost = 0.0;
+
+        foreach ($orders as $order) {
+            $analysis = $varianceService->getCostAnalysis($order);
+            $finalSummary = $adjustmentService->getFinalCostingSummary($order, $analysis);
+
+            $totalCost += (float) ($finalSummary['totals']['final'] ?? 0.0);
+            $matCost += (float) ($finalSummary['material']['final'] ?? 0.0);
+            $laborCost += (float) ($finalSummary['labor']['final'] ?? 0.0);
+            $machineCost += (float) ($finalSummary['machine']['final'] ?? 0.0);
+            $overheadCost += (float) ($finalSummary['overhead']['final'] ?? 0.0);
+            $otherCost += (float) ($finalSummary['other']['final'] ?? 0.0);
+        }
+
+        return [
+            'total_cost' => round($totalCost, 2),
+            'material_cost' => round($matCost, 2),
+            'labor_cost' => round($laborCost, 2),
+            'machine_cost' => round($machineCost, 2),
+            'overhead_cost' => round($overheadCost, 2),
+            'other_cost' => round($otherCost, 2),
+            'order_count' => $orders->count(),
+        ];
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // 7. Budget vs. Actual Cost Report
     // ──────────────────────────────────────────────────────────────────────────
@@ -399,7 +466,12 @@ class ProjectReportService
 
             $timeLogs = $project->timeLogs;
             $actualHours = (float) $timeLogs->sum('hours');
-            $actualCost  = (float) $timeLogs->sum(fn ($tl) => (float) $tl->hours * ((float) ($tl->hourly_rate ?? 0)));
+            $timesheetCost  = (float) $timeLogs->sum(fn ($tl) => (float) $tl->hours * ((float) ($tl->hourly_rate ?? 0)));
+
+            $productionCostData = $this->getProjectProductionCost($project);
+            $productionCost = (float) $productionCostData['total_cost'];
+
+            $actualCost = $timesheetCost + $productionCost;
 
             $costVariance  = $revisedBudgetAmount - $actualCost;
             $hoursVariance = $revisedBudgetHours - $actualHours;
@@ -428,6 +500,8 @@ class ProjectReportService
                 'base_budget_amount'     => $baseBudgetAmount,
                 'cr_budget_amount'       => $crBudgetAmount,
                 'revised_budget_amount'  => $revisedBudgetAmount,
+                'timesheet_cost'         => $timesheetCost,
+                'production_cost'        => $productionCost,
                 'actual_cost'            => $actualCost,
                 'cost_variance'          => $costVariance,
                 'cost_burn_percent'      => $costBurnPercent,

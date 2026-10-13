@@ -15,6 +15,7 @@ use App\Domains\Projects\Services\TaskService;
 use App\Domains\Projects\Support\TaskDrawerPayload;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Access\AccessService;
 use App\Support\InlineEdit\HandlesInlineFieldUpdates;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -90,16 +91,76 @@ class TaskController extends Controller
 
         $task->load([
             'taskList',
-            'milestone',
+            'milestone.salesOrderItem.product',
             'assignee',
             'reviewer',
             'subTasks.assignee',
             'dependencies.dependsOn',
             'dependents.task',
             'documents.uploader',
+            'productionOrders',
+            'purchaseRequisitionItems.requisition',
+            'purchaseRequisitionItems.product',
         ]);
 
         $canManageTask = auth()->user()->can('update', $task);
+        $tenantId = require_tenant_id();
+
+        $linkedSalesOrderItem = $task->milestone?->salesOrderItem;
+        $linkedProduct = $linkedSalesOrderItem?->product;
+
+        if ($linkedSalesOrderItem && !$linkedProduct && $linkedSalesOrderItem->item_name) {
+            $linkedProduct = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)
+                ->where('name', $linkedSalesOrderItem->item_name)
+                ->first();
+        }
+
+        $isManufacturedItem = false;
+        $isTradeItem = false;
+
+        if ($linkedProduct) {
+            $supplierMethod = strtolower(trim($linkedProduct->supplier_method ?? ''));
+            if ($supplierMethod === 'manufacture') {
+                $isManufacturedItem = true;
+            } else {
+                $isTradeItem = true;
+            }
+        }
+
+        $canViewProduction = $canManageTask && $this->canViewProduction(auth()->user(), $tenantId);
+        $availableProductionOrders = collect();
+        if ($canViewProduction) {
+            $poQuery = \App\Domains\Production\Models\ProductionOrder::query()
+                ->where('tenant_id', $tenantId)
+                ->whereNull('project_task_id')
+                ->whereNotIn('status', [\App\Domains\Production\Models\ProductionOrder::STATUS_CLOSED, \App\Domains\Production\Models\ProductionOrder::STATUS_CANCELLED]);
+
+            if ($project->company_id) {
+                $poQuery->where(function ($q) use ($project) {
+                    $q->whereNull('company_id')->orWhere('company_id', $project->company_id);
+                });
+            }
+            if ($project->branch_id) {
+                $poQuery->where(function ($q) use ($project) {
+                    $q->whereNull('branch_id')->orWhere('branch_id', $project->branch_id);
+                });
+            }
+
+            $availableProductionOrders = $poQuery->latest('id')
+                ->limit(30)
+                ->get(['id', 'order_number', 'status', 'quantity_ordered', 'quantity_produced']);
+        }
+
+        $availablePrItems = collect();
+        if ($canManageTask && $this->canViewPurchase(auth()->user(), $tenantId)) {
+            $availablePrItems = \App\Domains\Purchase\Models\PurchaseRequisitionItem::query()
+                ->where('tenant_id', $tenantId)
+                ->whereNull('project_task_id')
+                ->with(['requisition', 'product'])
+                ->latest('id')
+                ->limit(30)
+                ->get();
+        }
 
         $nextAction = $this->tasks->deriveNextAction($task);
 
@@ -125,6 +186,13 @@ class TaskController extends Controller
             'otherTasks' => TaskDrawerPayload::otherTasks($task, $this->tasks->list($project)->keyBy('id')),
             'taskLists' => $canManageTask ? $this->cloneTaskListOptions($project) : collect(),
             'activeMembers' => $canManageTask ? $this->members->list($project)->where('is_active', true) : collect(),
+            'availableProductionOrders' => $availableProductionOrders,
+            'canViewProduction' => $canViewProduction,
+            'availablePrItems' => $availablePrItems,
+            'linkedSalesOrderItem' => $linkedSalesOrderItem,
+            'linkedProduct' => $linkedProduct,
+            'isManufacturedItem' => $isManufacturedItem,
+            'isTradeItem' => $isTradeItem,
             'activities' => $activities,
             'activityPage' => $activityPage,
             'activityPerPage' => $activityPerPage,
@@ -252,5 +320,202 @@ class TaskController extends Controller
         return redirect()
             ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'tasklists']))
             ->with('success', __('projects.task_assigned'));
+    }
+
+    public function linkProductionOrder(Request $request, Project $project, Task $task): RedirectResponse
+    {
+        $this->authorize('update', $task);
+
+        $tenantId = require_tenant_id();
+        $user = auth()->user();
+        if (!$this->canViewProduction($user, $tenantId)) {
+            abort(403, 'Unauthorized to link Production Orders.');
+        }
+
+        $targetCompanyId = $task->company_id ?: $project->company_id;
+        $targetBranchId = $task->branch_id ?: $project->branch_id;
+
+        $validated = $request->validate([
+            'production_order_id' => [
+                'required',
+                'integer',
+                Rule::exists('production_orders', 'id')->where(function ($query) use ($tenantId, $targetCompanyId, $targetBranchId) {
+                    $query->where('tenant_id', $tenantId);
+                    if ($targetCompanyId) {
+                        $query->where(function ($q) use ($targetCompanyId) {
+                            $q->whereNull('company_id')->orWhere('company_id', $targetCompanyId);
+                        });
+                    }
+                    if ($targetBranchId) {
+                        $query->where(function ($q) use ($targetBranchId) {
+                            $q->whereNull('branch_id')->orWhere('branch_id', $targetBranchId);
+                        });
+                    }
+                }),
+            ],
+        ]);
+
+        $productionOrder = \App\Domains\Production\Models\ProductionOrder::query()
+            ->where('tenant_id', $tenantId)
+            ->findOrFail($validated['production_order_id']);
+
+        if ($targetCompanyId && $productionOrder->company_id && (int) $targetCompanyId !== (int) $productionOrder->company_id) {
+            throw ValidationException::withMessages([
+                'production_order_id' => __('projects.company_mismatch_error') ?: 'Production order belongs to a different company.',
+            ]);
+        }
+
+        if ($targetBranchId && $productionOrder->branch_id && (int) $targetBranchId !== (int) $productionOrder->branch_id) {
+            throw ValidationException::withMessages([
+                'production_order_id' => __('projects.branch_mismatch_error') ?: 'Production order belongs to a different branch.',
+            ]);
+        }
+
+        $productionOrder->update([
+            'project_id' => $project->id,
+            'project_milestone_id' => $task->milestone_id,
+            'project_task_id' => $task->id,
+        ]);
+
+        $this->activity->record(
+            $project,
+            'production.linked',
+            "Production Order {$productionOrder->order_number} linked to task {$task->task_code}",
+            null,
+            $task,
+            ['production_order_id' => $productionOrder->id]
+        );
+
+        return redirect()
+            ->route('projects.tasks.show', [$project, $task])
+            ->with('success', __('projects.production_order_linked', ['order' => $productionOrder->order_number]) ?: "Production Order {$productionOrder->order_number} linked successfully.");
+    }
+
+    public function unlinkProductionOrder(Request $request, Project $project, Task $task, int $productionOrderId): RedirectResponse
+    {
+        $this->authorize('update', $task);
+
+        $tenantId = require_tenant_id();
+        $user = auth()->user();
+        if (!$this->canViewProduction($user, $tenantId)) {
+            abort(403, 'Unauthorized to unlink Production Orders.');
+        }
+
+        $productionOrder = \App\Domains\Production\Models\ProductionOrder::query()
+            ->where('tenant_id', $tenantId)
+            ->where('project_task_id', $task->id)
+            ->findOrFail($productionOrderId);
+
+        $productionOrder->update([
+            'project_id' => null,
+            'project_milestone_id' => null,
+            'project_task_id' => null,
+        ]);
+
+        $this->activity->record(
+            $project,
+            'production.unlinked',
+            "Production Order {$productionOrder->order_number} unlinked from task {$task->task_code}",
+            null,
+            $task,
+            ['production_order_id' => $productionOrder->id]
+        );
+
+        return redirect()
+            ->route('projects.tasks.show', [$project, $task])
+            ->with('success', __('projects.production_order_unlinked', ['order' => $productionOrder->order_number]) ?: "Production Order {$productionOrder->order_number} unlinked successfully.");
+    }
+
+    public function linkPurchaseRequisition(Request $request, Project $project, Task $task): RedirectResponse
+    {
+        $this->authorize('update', $task);
+
+        $tenantId = require_tenant_id();
+        $user = auth()->user();
+        if (!$this->canViewPurchase($user, $tenantId)) {
+            abort(403, 'Unauthorized to link Purchase Requisitions.');
+        }
+
+        $validated = $request->validate([
+            'purchase_requisition_item_id' => [
+                'required',
+                'integer',
+                Rule::exists('purchase_requisition_items', 'id')->where(function ($query) use ($tenantId) {
+                    $query->where('tenant_id', $tenantId);
+                }),
+            ],
+        ]);
+
+        $prItem = \App\Domains\Purchase\Models\PurchaseRequisitionItem::query()
+            ->where('tenant_id', $tenantId)
+            ->findOrFail($validated['purchase_requisition_item_id']);
+
+        $prItem->update([
+            'project_task_id' => $task->id,
+        ]);
+
+        $this->activity->record(
+            $project,
+            'procurement.linked',
+            "Purchase Requisition Item linked to task {$task->task_code}",
+            null,
+            $task,
+            ['purchase_requisition_item_id' => $prItem->id]
+        );
+
+        return redirect()
+            ->route('projects.tasks.show', [$project, $task])
+            ->with('success', __('projects.pr_item_linked') ?: "Purchase Requisition line linked successfully.");
+    }
+
+    public function unlinkPurchaseRequisition(Request $request, Project $project, Task $task, int $requisitionItemId): RedirectResponse
+    {
+        $this->authorize('update', $task);
+
+        $tenantId = require_tenant_id();
+        $user = auth()->user();
+        if (!$this->canViewPurchase($user, $tenantId)) {
+            abort(403, 'Unauthorized to unlink Purchase Requisitions.');
+        }
+
+        $prItem = \App\Domains\Purchase\Models\PurchaseRequisitionItem::query()
+            ->where('tenant_id', $tenantId)
+            ->where('project_task_id', $task->id)
+            ->findOrFail($requisitionItemId);
+
+        $prItem->update([
+            'project_task_id' => null,
+        ]);
+
+        $this->activity->record(
+            $project,
+            'procurement.unlinked',
+            "Purchase Requisition Item unlinked from task {$task->task_code}",
+            null,
+            $task,
+            ['purchase_requisition_item_id' => $prItem->id]
+        );
+
+        return redirect()
+            ->route('projects.tasks.show', [$project, $task])
+            ->with('success', __('projects.pr_item_unlinked') ?: "Purchase Requisition line unlinked successfully.");
+    }
+
+    private function canViewProduction(User $user, int $tenantId): bool
+    {
+        $access = app(AccessService::class);
+        return $access->allows($user, 'production.orders.view', ['tenant_id' => $tenantId])
+            || $access->allows($user, 'production.view', ['tenant_id' => $tenantId])
+            || $access->hasRole($user, 'tenant_owner', $tenantId)
+            || $access->hasRole($user, 'super_admin');
+    }
+
+    private function canViewPurchase(User $user, int $tenantId): bool
+    {
+        $access = app(AccessService::class);
+        return $access->allows($user, 'purchase.requisitions.view', ['tenant_id' => $tenantId])
+            || $access->allows($user, 'purchase.view', ['tenant_id' => $tenantId])
+            || $access->hasRole($user, 'tenant_owner', $tenantId)
+            || $access->hasRole($user, 'super_admin');
     }
 }

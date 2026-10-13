@@ -2338,4 +2338,6 @@ return [
     'fg_produced' => 'तैयार माल उत्पादित',
     'sfg_produced' => 'एसएफजी आउटपुट',
     'comp_output' => 'घटक आउटपुट',
+    'view_project' => 'परियोजना देखें',
+    'project_context' => 'परियोजना संदर्भ',
 ];

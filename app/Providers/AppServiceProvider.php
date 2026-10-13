@@ -579,6 +579,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Listeners\CreateAssetFromGrnLine::class
         );
 
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Production\Events\ProductionOrderCompleted::class,
+            \App\Domains\Projects\Listeners\SyncProductionTaskCompletionListener::class
+        );
+
         // ── Project Management Event Notifications ───────────────────────────
         foreach ([
             \App\Domains\Projects\Events\TaskAssigned::class,

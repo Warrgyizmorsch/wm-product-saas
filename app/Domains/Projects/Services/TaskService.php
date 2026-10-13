@@ -79,7 +79,9 @@ class TaskService
 
             $data['project_id'] = $project->id;
             $data['tenant_id'] = $project->tenant_id;
-            $data['milestone_id'] = $taskList->milestone_id;
+            $data['company_id'] = $data['company_id'] ?? $project->company_id;
+            $data['branch_id'] = $data['branch_id'] ?? $project->branch_id;
+            $data['milestone_id'] = $data['milestone_id'] ?? $taskList->milestone_id;
             $data['task_code'] = $this->getNextTaskCode($project);
             $data['position'] = $this->nextPosition($taskList);
             $data['status'] = $data['status'] ?? Task::STATUS_OPEN;
@@ -123,7 +125,9 @@ class TaskService
 
             if (array_key_exists('task_list_id', $data) && (int) $data['task_list_id'] !== $task->task_list_id) {
                 $taskList = TaskList::findOrFail($data['task_list_id']);
-                $data['milestone_id'] = $taskList->milestone_id;
+                if (!array_key_exists('milestone_id', $data)) {
+                    $data['milestone_id'] = $taskList->milestone_id;
+                }
                 $data['position'] = $this->nextPosition($taskList);
             }
 

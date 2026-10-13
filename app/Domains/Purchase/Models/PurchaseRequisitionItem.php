@@ -23,6 +23,7 @@ class PurchaseRequisitionItem extends Model
         'company_id',
         'branch_id',
         'sales_order_item_id',
+        'project_task_id',
         'product_id',
         'warehouse_id',
         'quantity',
@@ -32,6 +33,7 @@ class PurchaseRequisitionItem extends Model
     protected $casts = [
         'purchase_requisition_id' => 'integer',
         'sales_order_item_id' => 'integer',
+        'project_task_id' => 'integer',
         'product_id' => 'integer',
         'warehouse_id' => 'integer',
         'quantity' => 'decimal:4',
@@ -46,6 +48,11 @@ class PurchaseRequisitionItem extends Model
     public function salesOrderItem(): BelongsTo
     {
         return $this->belongsTo(SalesOrderItem::class, 'sales_order_item_id');
+    }
+
+    public function projectTask(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Projects\Models\Task::class, 'project_task_id');
     }
 
     public function product(): BelongsTo

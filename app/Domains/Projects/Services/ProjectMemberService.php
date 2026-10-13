@@ -63,6 +63,8 @@ class ProjectMemberService
         if ($existing === null) {
             $this->members->create([
                 'tenant_id' => $project->tenant_id,
+                'company_id' => $project->company_id,
+                'branch_id' => $project->branch_id,
                 'project_id' => $project->id,
                 'user_id' => $userId,
                 'is_active' => true,

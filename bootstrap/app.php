@@ -64,6 +64,16 @@ return Application::configure(basePath: dirname(__DIR__))
                 before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
                 prepend: ResolveTenant::class,
             );
+
+            // Ensure company and branch are resolved before route model binding runs
+            $middleware->prependToPriorityList(
+                before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+                prepend: ResolveBranch::class,
+            );
+            $middleware->prependToPriorityList(
+                before: ResolveBranch::class,
+                prepend: ResolveCompany::class,
+            );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

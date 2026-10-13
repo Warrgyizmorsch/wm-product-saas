@@ -65,6 +65,9 @@ class ProductionOrderService
                 'order_number' => $data['order_number'] ?? $this->numberService->generateNextNumber($tenantId, $branchId),
                 'product_id' => $productId,
                 'bom_id' => $bomId,
+                'project_id' => $data['project_id'] ?? null,
+                'project_milestone_id' => $data['project_milestone_id'] ?? null,
+                'project_task_id' => $data['project_task_id'] ?? null,
                 'quantity_ordered' => $data['quantity_ordered'] ?? 1,
                 'start_date' => $data['start_date'] ?? now()->toDateString(),
                 'end_date' => $data['end_date'] ?? now()->addDays(7)->toDateString(),
@@ -384,6 +387,18 @@ class ProductionOrderService
             $branchId = $data['branch_id'] ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
             $companyId = $data['company_id'] ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
 
+            $projectId = $data['project_id'] ?? null;
+            $projectTaskId = $data['project_task_id'] ?? null;
+            $projectMilestoneId = $data['project_milestone_id'] ?? null;
+
+            if ($projectTaskId && ! $projectId) {
+                $task = \App\Domains\Projects\Models\Task::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($projectTaskId);
+                if ($task) {
+                    $projectId = $task->project_id;
+                    $projectMilestoneId = $projectMilestoneId ?? $task->milestone_id;
+                }
+            }
+
             $order = ProductionOrder::create([
                 'tenant_id' => $tenantId,
                 'company_id' => $companyId,
@@ -395,6 +410,9 @@ class ProductionOrderService
                 'routing_id' => $routing->id,
                 'sales_order_id' => $data['sales_order_id'] ?? null,
                 'sales_order_item_id' => $data['sales_order_item_id'] ?? null,
+                'project_id' => $projectId,
+                'project_milestone_id' => $projectMilestoneId,
+                'project_task_id' => $projectTaskId,
                 'quantity_ordered' => $quantity,
                 'start_date' => $data['start_date'],
                 'end_date' => $data['end_date'],
@@ -404,6 +422,24 @@ class ProductionOrderService
                 'description' => $data['description'] ?? null,
                 'created_by' => $userId,
             ]);
+
+            if ($order->project_id) {
+                try {
+                    $proj = $order->project ?: \App\Domains\Projects\Models\Project::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($order->project_id);
+                    if ($proj) {
+                        app(\App\Domains\Projects\Services\ActivityLogService::class)->record(
+                            $proj,
+                            'production.created',
+                            "Production Order {$order->order_number} created from Project Task",
+                            null,
+                            $order->projectTask,
+                            ['production_order_id' => $order->id]
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    // Do not break order creation if activity logging fails
+                }
+            }
 
             if ($selectedRequest) {
                 $selectedRequest->update([

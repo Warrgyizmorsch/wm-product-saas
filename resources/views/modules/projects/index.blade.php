@@ -153,6 +153,49 @@
                     dropdownParent: jQuery(select).closest('.erp-filter-dropdown'),
                 });
             });
+
+            // Create Project Modal: Sales Order Selection & Auto-fill
+            const soSelect = document.getElementById('modal_sales_order_id');
+            const nameInput = document.getElementById('modal_project_name');
+
+            if (soSelect && nameInput) {
+                let isAutoFilled = !nameInput.value;
+
+                function updateProjectNameFromSO() {
+                    const selectedOption = soSelect.options[soSelect.selectedIndex];
+                    const suggestedName = selectedOption ? selectedOption.getAttribute('data-suggested-name') : '';
+
+                    if (suggestedName) {
+                        if (isAutoFilled || !nameInput.value.trim()) {
+                            nameInput.value = suggestedName;
+                            isAutoFilled = true;
+                        }
+                    } else if (isAutoFilled) {
+                        nameInput.value = '';
+                        isAutoFilled = true;
+                    }
+                }
+
+                soSelect.addEventListener('change', updateProjectNameFromSO);
+                if (window.jQuery) {
+                    jQuery(soSelect).on('change.select2 select2:select', updateProjectNameFromSO);
+                }
+
+                nameInput.addEventListener('input', function () {
+                    isAutoFilled = false;
+                });
+
+                if (soSelect.value && !nameInput.value.trim()) {
+                    updateProjectNameFromSO();
+                }
+            }
+
+            @if (request()->filled('sales_order_id') || request()->boolean('create'))
+                const createModalEl = document.getElementById('createProjectModal');
+                if (createModalEl && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(createModalEl).show();
+                }
+            @endif
         });
     </script>
 @endpush
@@ -358,7 +401,22 @@
 
                 <p class="text-muted fs-12 mb-3">{{ __('projects.code_auto_generated', ['code' => $nextCode]) }}</p>
 
+                <x-ui.odoo-form-ui type="select" label="{{ __('projects.sales_order') }}" name="sales_order_id"
+                    id="modal_sales_order_id" :searchable="true"
+                    :helperText="__('projects.sales_order_help_text')"
+                    :errorText="$isCreateReopen ? $errors->first('sales_order_id') : null">
+                    <option value="">{{ __('projects.select_sales_order_placeholder') }}</option>
+                    @foreach ($confirmedSalesOrders ?? [] as $so)
+                        <option value="{{ $so->id }}"
+                            data-suggested-name="{{ $so->customer ? $so->customer->name . ' - ' . $so->sales_order_number : 'Delivery: ' . $so->sales_order_number }}"
+                            @selected(($isCreateReopen ? old('sales_order_id') : request('sales_order_id')) == $so->id)>
+                            {{ $so->sales_order_number }}{{ $so->customer ? ' — ' . $so->customer->name : '' }} ({{ format_currency($so->total_amount) }})
+                        </option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
+
                 <x-ui.odoo-form-ui type="input" label="{{ __('projects.project_name') }}" name="name"
+                    id="modal_project_name"
                     :value="$isCreateReopen ? old('name') : null" :required="true"
                     :errorText="$isCreateReopen ? $errors->first('name') : null" />
 

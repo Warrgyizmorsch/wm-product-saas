@@ -400,3 +400,36 @@ erDiagram
   - `client_approval_ref`: string, nullable (reference to approved UAT sign-off)
   - `final_remarks`: text, nullable
 - **Status:** **COMPLETED & VERIFIED (PHASE 8)**
+
+---
+
+### 2.8 Commercial & Manufacturing Cross-Module Columns (Phase 12)
+- **Purpose:** Bridges Project Management with Sales, CRM, Finance, Production, and Procurement domains.
+- **Implemented Columns on `projects` Table:**
+  - `sales_order_id`: foreignId, nullable -> `sales_orders(id)` ON DELETE SET NULL
+  - `crm_deal_id`: foreignId, nullable -> `deals(id)` ON DELETE SET NULL
+  - `client_contact_id`: foreignId, nullable -> `contacts(id)` ON DELETE SET NULL
+  - `cost_center_id`: foreignId, nullable -> `cost_centers(id)` ON DELETE SET NULL
+- **Implemented Columns on `project_milestones` Table:**
+  - `sales_order_item_id`: foreignId, nullable -> `sales_order_items(id)` ON DELETE SET NULL
+  - Non-unique index: Allows multiple phased milestones to fulfill a single sales order line item.
+- **Implemented Columns on `production_orders` Table:**
+  - `project_id`: foreignId, nullable -> `projects(id)` ON DELETE SET NULL
+  - `project_milestone_id`: foreignId, nullable -> `project_milestones(id)` ON DELETE SET NULL
+  - `project_task_id`: foreignId, nullable -> `project_tasks(id)` ON DELETE SET NULL
+- **Implemented Columns on `purchase_requisition_items` Table:**
+  - `project_task_id`: foreignId, nullable -> `project_tasks(id)` ON DELETE SET NULL
+- **Status:** **COMPLETED & VERIFIED (PHASE 12)**
+
+---
+
+### 2.9 Manufacturing Costing & Reverse Integration Model (Phase 13)
+- **Purpose:** Authoritative manufacturing costing and bidirectional navigation between Project Management and Production without schema changes.
+- **Database Schema Migrations Required:** **NONE (0 Migrations)**.
+- **Structural Rules & Non-Negotiables:**
+  - Zero duplicate tables or duplicate cost columns: `projects.actual_production_cost` is strictly forbidden.
+  - Multi-tenant boundary enforcement: Project Tasks and Production Orders strictly enforce matching `tenant_id`, `company_id`, and `branch_id`.
+  - Dynamic Aggregation: Actual manufacturing costs are sourced live on demand through `ProductionCostVarianceService` and `ProductionCostAdjustmentService`.
+- **Status:** **COMPLETED & VERIFIED (PHASE 13)**
+
+

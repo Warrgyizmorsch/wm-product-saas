@@ -83,15 +83,51 @@ class ProductionOrderController extends Controller
             $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
         }
 
+        $quantityParam = $request->query('quantity');
+
+        $projectId = $request->query('project_id');
+        $projectTaskId = $request->query('project_task_id');
+
+        $project = null;
+        $projectTask = null;
+        $projectMilestone = null;
+
+        if ($projectTaskId) {
+            $projectTask = \App\Domains\Projects\Models\Task::where('tenant_id', $tenantId)
+                ->with(['project', 'milestone.salesOrderItem.product'])
+                ->find($projectTaskId);
+            if ($projectTask) {
+                $project = $projectTask->project;
+                $projectMilestone = $projectTask->milestone;
+                $projectId = $project?->id;
+
+                if (!$productId && $projectMilestone?->salesOrderItem) {
+                    $productId = $projectMilestone->salesOrderItem->product_id;
+                }
+                if (!$quantityParam && $projectMilestone?->salesOrderItem) {
+                    $quantityParam = $projectMilestone->salesOrderItem->quantity;
+                }
+            }
+        } elseif ($projectId) {
+            $project = \App\Domains\Projects\Models\Project::where('tenant_id', $tenantId)->find($projectId);
+        }
+
         $selectedProductId = old('product_id', $productId ?? $selectedRequest?->product_id);
-        $selectedQty = old('quantity_ordered', $selectedRequest?->quantity_requested);
-        $selectedSoItemId = old('sales_order_item_id', $selectedRequest?->materialRequirementItem?->sales_order_item_id);
+        $selectedQty = old('quantity_ordered', $quantityParam ?? $selectedRequest?->quantity_requested);
+        $selectedSoItemId = old('sales_order_item_id', $selectedRequest?->materialRequirementItem?->sales_order_item_id ?? $projectMilestone?->sales_order_item_id);
 
         if (!$selectedProductId && $salesOrderItems->isNotEmpty()) {
             $firstItem = $salesOrderItems->first();
             $selectedProductId = $firstItem->product_id;
             $selectedQty = $selectedQty ?? $firstItem->quantity;
             $selectedSoItemId = $selectedSoItemId ?? $firstItem->id;
+        }
+
+        if ($selectedProductId && !$products->contains('id', (int) $selectedProductId)) {
+            $selProd = Product::find($selectedProductId);
+            if ($selProd) {
+                $products->push($selProd);
+            }
         }
 
         return view('modules.production.orders.create', compact(
@@ -103,7 +139,10 @@ class ProductionOrderController extends Controller
             'selectedRequest',
             'selectedProductId',
             'selectedQty',
-            'selectedSoItemId'
+            'selectedSoItemId',
+            'project',
+            'projectTask',
+            'projectMilestone'
         ));
     }
 

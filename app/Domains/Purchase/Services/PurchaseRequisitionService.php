@@ -31,6 +31,8 @@ class PurchaseRequisitionService
             $sourceId = $validated['production_requisition_slip_id'] ?? null;
         } elseif ($validated['source_type'] === 'material_requirement') {
             $sourceId = $validated['material_requirement_id'] ?? null;
+        } elseif ($validated['source_type'] === 'project') {
+            $sourceId = $validated['project_id'] ?? null;
         }
 
         return DB::transaction(function () use ($validated, $sourceId, $tenantId) {
@@ -69,6 +71,8 @@ class PurchaseRequisitionService
             foreach ($validated['items'] as $item) {
                 PurchaseRequisitionItem::create([
                     'purchase_requisition_id' => $pr->id,
+                    'sales_order_item_id' => $item['sales_order_item_id'] ?? null,
+                    'project_task_id' => $item['project_task_id'] ?? null,
                     'product_id' => $item['product_id'],
                     'warehouse_id' => $item['warehouse_id'] ?? null,
                     'quantity' => $item['quantity'],
@@ -91,6 +95,8 @@ class PurchaseRequisitionService
             $sourceId = $validated['production_requisition_slip_id'] ?? null;
         } elseif ($validated['source_type'] === 'material_requirement') {
             $sourceId = $validated['material_requirement_id'] ?? null;
+        } elseif ($validated['source_type'] === 'project') {
+            $sourceId = $validated['project_id'] ?? null;
         }
 
         return DB::transaction(function () use ($validated, $sourceId, $requisition) {
@@ -108,6 +114,8 @@ class PurchaseRequisitionService
             foreach ($validated['items'] as $item) {
                 PurchaseRequisitionItem::create([
                     'purchase_requisition_id' => $requisition->id,
+                    'sales_order_item_id' => $item['sales_order_item_id'] ?? null,
+                    'project_task_id' => $item['project_task_id'] ?? null,
                     'product_id' => $item['product_id'],
                     'warehouse_id' => $item['warehouse_id'] ?? null,
                     'quantity' => $item['quantity'],

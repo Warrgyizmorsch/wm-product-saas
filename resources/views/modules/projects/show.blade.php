@@ -324,6 +324,45 @@
                 @include('modules.projects._collaborators')
             </div>
                         </div>
+                        @if ($project->sales_order_id || $project->crm_deal_id || $project->client_contact_id || $project->cost_center_id)
+                            <div class="mt-3 pt-3 border-top">
+                                <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-2">
+                                    <i class="feather-link me-1 text-primary"></i>{{ __('projects.commercial_integration') }}
+                                </span>
+                                <div class="d-flex flex-wrap gap-2 fs-13 align-items-center">
+                                    @if ($project->salesOrder)
+                                        <div class="d-inline-flex align-items-center px-2.5 py-1.5 rounded bg-light border">
+                                            <i class="feather-shopping-bag text-primary me-1.5"></i>
+                                            <span class="text-muted me-1">{{ __('projects.sales_order') }}:</span>
+                                            <a href="{{ route('sales.orders.show', $project->salesOrder->id) }}" class="fw-bold text-primary">
+                                                {{ $project->salesOrder->sales_order_number }}
+                                            </a>
+                                        </div>
+                                    @endif
+                                    @if ($project->crmDeal)
+                                        <div class="d-inline-flex align-items-center px-2.5 py-1.5 rounded bg-light border">
+                                            <i class="feather-award text-warning me-1.5"></i>
+                                            <span class="text-muted me-1">{{ __('projects.crm_deal') }}:</span>
+                                            <span class="fw-semibold text-dark">{{ $project->crmDeal->title }}</span>
+                                        </div>
+                                    @endif
+                                    @if ($project->clientContact)
+                                        <div class="d-inline-flex align-items-center px-2.5 py-1.5 rounded bg-light border">
+                                            <i class="feather-user text-info me-1.5"></i>
+                                            <span class="text-muted me-1">{{ __('projects.contact') }}:</span>
+                                            <span class="fw-semibold text-dark">{{ $project->clientContact->name }}</span>
+                                        </div>
+                                    @endif
+                                    @if ($project->costCenter)
+                                        <div class="d-inline-flex align-items-center px-2.5 py-1.5 rounded bg-light border">
+                                            <i class="feather-pie-chart text-success me-1.5"></i>
+                                            <span class="text-muted me-1">{{ __('projects.cost_center') }}:</span>
+                                            <span class="fw-semibold text-dark">{{ $project->costCenter->name }} ({{ $project->costCenter->code }})</span>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
                         <div class="mt-4 pt-3 border-top">
                             <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-2">{{ __('projects.description') }}</span>
                             @if ($canUpdateProject)
@@ -402,6 +441,7 @@
             <div class="tab-pane fade {{ $activeProjectTab === 'summary' ? 'show active' : '' }}" id="tab-summary"
                 role="tabpanel" aria-labelledby="tab-summary-tab">
                 @include('modules.projects._dashboard-stats')
+                @include('modules.projects._manufacturing-summary')
                 @include('modules.projects._project-widgets')
             </div>
             <div class="tab-pane fade {{ $activeProjectTab === 'milestones' ? 'show active' : '' }}" id="tab-milestones"
