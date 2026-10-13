@@ -258,36 +258,29 @@ class SchedulePreReleaseValidationService
         }
 
         // 4. Schedule Conflicts (Double Booking)
-        $detectedConflicts = $this->schedulingService->detectConflicts($tenantId);
-        foreach ($detectedConflicts as $conflictMsg) {
-            // Check if any operation in this schedule is involved
-            foreach ($operations as $op) {
-                if (str_contains($conflictMsg, "Schedule Op #{$op->id}")) {
-                    $errors[] = [
-                        'code'         => 'MACHINE_DOUBLE_BOOKING',
-                        'severity'     => 'error',
-                        'message'      => $conflictMsg,
-                        'operation_id' => $op->id,
-                    ];
-                }
+        $detectedConflicts = $this->schedulingService->detectConflictsDetailed($tenantId);
+        $scheduleOpIds = $operations->pluck('id')->all();
+        foreach ($detectedConflicts as $conflict) {
+            if (in_array($conflict['curr_op_id'], $scheduleOpIds, true) || in_array($conflict['next_op_id'], $scheduleOpIds, true)) {
+                $matchedOpId = in_array($conflict['curr_op_id'], $scheduleOpIds, true) ? $conflict['curr_op_id'] : $conflict['next_op_id'];
+                $errors[] = [
+                    'code'         => 'MACHINE_DOUBLE_BOOKING',
+                    'severity'     => 'error',
+                    'message'      => $conflict['message'],
+                    'operation_id' => $matchedOpId,
+                ];
             }
         }
 
         // 5. Work Center Capacity Overloads (Warning)
-        $detectedOverloads = $this->schedulingService->detectOverloads($tenantId);
-        $scheduleWcNames   = $operations->pluck('workCenter.name')->filter()->unique();
-
-        foreach ($detectedOverloads as $overloadMsg) {
-            foreach ($scheduleWcNames as $wcName) {
-                if (str_contains($overloadMsg, $wcName)) {
-                    $warnings[] = [
-                        'code'         => 'CAPACITY_OVERLOAD',
-                        'severity'     => 'warning',
-                        'message'      => $overloadMsg,
-                        'operation_id' => null,
-                    ];
-                }
-            }
+        $scheduleOverloads = $this->schedulingService->detectOverloadsForSchedule($schedule);
+        foreach ($scheduleOverloads as $overloadMsg) {
+            $warnings[] = [
+                'code'         => 'CAPACITY_OVERLOAD',
+                'severity'     => 'warning',
+                'message'      => $overloadMsg,
+                'operation_id' => null,
+            ];
         }
 
         // 6. Material Readiness Checks (Warnings for Shortages)
