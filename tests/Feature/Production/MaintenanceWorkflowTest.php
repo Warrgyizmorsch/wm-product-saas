@@ -1561,6 +1561,64 @@ class MaintenanceWorkflowTest extends TestCase
         $this->assertStringContainsString('Duplicate assignment is not allowed', $html);
         $this->assertStringContainsString('Cannot Submit', $html);
     }
+
+    /** @test */
+    public function it_properly_converts_decimal_hours_without_missing_conversions()
+    {
+        // 0.25 decimal hour is 15 minutes, NOT 25 minutes
+        $this->assertEquals('0.15 hrs', format_hours(0.25));
+        $this->assertEquals('0.15', format_hours(0.25, false));
+
+        // 0.50 decimal hour is 30 minutes
+        $this->assertEquals('0.30 hrs', format_hours(0.50));
+
+        // 0.75 decimal hour is 45 minutes
+        $this->assertEquals('0.45 hrs', format_hours(0.75));
+
+        // 1.25 decimal hour is 1 hour 15 minutes
+        $this->assertEquals('1.15 hrs', format_hours(1.25));
+
+        // 1.75 decimal hour is 1 hour 45 minutes
+        $this->assertEquals('1.45 hrs', format_hours(1.75));
+
+        // 2.50 decimal hour is 2 hours 30 minutes
+        $this->assertEquals('2.30 hrs', format_hours(2.50));
+    }
+
+    /** @test */
+    public function it_prevents_double_conversion_on_already_formatted_hours()
+    {
+        // Already formatted with suffix
+        $this->assertEquals('43.50 hrs', format_hours('43.50 hrs'));
+        $this->assertEquals('1.30 hrs', format_hours('1.30 hrs'));
+
+        // Idempotency check: calling format_hours multiple times produces identical output
+        $first = format_hours(2.50);
+        $second = format_hours($first);
+        $this->assertEquals('2.30 hrs', $second);
+    }
+
+    /** @test */
+    public function it_accurately_converts_clock_hours_to_decimal_for_costing()
+    {
+        // 1:30 clock format (1 hr 30 mins) converts to 1.50 decimal hours for costing
+        $this->assertEquals(1.50, hours_to_decimal('1:30'));
+
+        // 0.15 clock hours (15 mins) must be 0.25 decimal hours
+        $this->assertEquals(0.25, hours_to_decimal('0.15'));
+
+        // 0.09 clock hours (9 mins) must be 0.15 decimal hours
+        $this->assertEquals(0.15, hours_to_decimal('0.09'));
+
+        // 1.25 clock hours (1 hr 25 mins) converts to 1.4167 decimal hours
+        $this->assertEquals(round(1 + 25/60, 4), round(hours_to_decimal('1.25'), 4));
+
+        // 2.5 decimal hours remains 2.5
+        $this->assertEquals(2.5, hours_to_decimal(2.5));
+
+        // 1.75 decimal hours (75 >= 60) remains 1.75
+        $this->assertEquals(1.75, hours_to_decimal('1.75'));
+    }
 }
 
 

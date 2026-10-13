@@ -63,9 +63,11 @@ class ProductionMaintenanceWorkOrderAssignment extends BaseModel
                 : ($workOrder->planned_start ? \Carbon\Carbon::parse($workOrder->planned_start) : \Carbon\Carbon::parse($workOrder->created_at));
 
             $assignmentAt = $this->assigned_at ? \Carbon\Carbon::parse($this->assigned_at) : $maintStart;
-            $referenceStart = $assignmentAt->greaterThan($maintStart) ? $assignmentAt : $maintStart;
             $seconds = max(0, $referenceStart->diffInSeconds(now(), false));
-            $accumulated = round($seconds / 3600, 2);
+            $totalMinutes = (int) round($seconds / 60);
+            $h = intdiv($totalMinutes, 60);
+            $m = $totalMinutes % 60;
+            $accumulated = (float) sprintf('%d.%02d', $h, $m);
 
             return max((float) ($this->worked_hours ?: 0.0), $accumulated);
         }

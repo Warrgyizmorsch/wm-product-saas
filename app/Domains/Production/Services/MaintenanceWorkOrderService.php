@@ -391,11 +391,16 @@ class MaintenanceWorkOrderService
             if ($wo->downtime_id) {
                 $downtime = ProductionMachineDowntime::where('tenant_id', $tenantId)->find($wo->downtime_id);
                 if ($downtime) {
-                    $downtime->update([
-                        'start_time' => $start,
+                    $updateData = [
                         'end_time'   => $end,
                         'status'     => ProductionMachineDowntime::STATUS_OPEN,
-                    ]);
+                    ];
+                    // Never overwrite actual start time if downtime is an active breakdown that has already started
+                    $isBreakdown = ($wo->type === ProductionMaintenanceWorkOrder::TYPE_BREAKDOWN) || ($downtime->category === 'Breakdown');
+                    if (! $isBreakdown && (! $downtime->start_time || $downtime->start_time->isFuture())) {
+                        $updateData['start_time'] = $start;
+                    }
+                    $downtime->update($updateData);
                 }
             } else {
                 $category = ($wo->type === ProductionMaintenanceWorkOrder::TYPE_BREAKDOWN)
@@ -768,7 +773,8 @@ class MaintenanceWorkOrderService
                         $downtime->id,
                         $userId,
                         $workPerformed ?: ($scrapMachine ? 'Maintenance Completed (Machine Scrapped)' : 'Maintenance Completed'),
-                        $scrapMachine ? 'Decommissioned' : 'Idle'
+                        $scrapMachine ? 'Decommissioned' : 'Idle',
+                        $completionTime
                     );
                 }
             } else {

@@ -334,11 +334,18 @@ if (! function_exists('format_currency')) {
 
 if (! function_exists('hours_to_decimal')) {
     /**
-     * Convert H.MM format (where .MM is 00-59 minutes) into decimal hours for costing.
-     * E.g. 0.09 (9 mins) -> 0.15, 1.25 (1 hr 25 mins) -> 1.4167, 2.5 (decimal) -> 2.5
+     * Convert H.MM format (where .MM is 00-59 minutes) or H:MM into decimal hours for costing.
+     * E.g. 0.09 (9 mins) -> 0.15, 1.25 (1 hr 25 mins) -> 1.4167, 2.5 (decimal) -> 2.5, "1:30" -> 1.5
      */
     function hours_to_decimal($hmm): float
     {
+        if (is_string($hmm) && str_contains($hmm, ':')) {
+            $parts = explode(':', trim($hmm));
+            $h = (int) ($parts[0] ?? 0);
+            $m = (int) ($parts[1] ?? 0);
+            return (float) ($h + ($m / 60.0));
+        }
+
         $val = (float) ($hmm ?: 0.0);
         $str = (string) $val;
         $dotPos = strpos($str, '.');
@@ -364,31 +371,28 @@ if (! function_exists('format_hours')) {
      * Format hours such that the decimal part represents actual minutes (00-59),
      * ensuring it never exceeds .59.
      *
-     * Example: 0.09 -> "0.09 hrs" (9 minutes)
-     *          1.25 -> "1.25 hrs" (1 hour, 25 minutes)
-     *          1.37 -> "1.37 hrs" (1 hour, 37 minutes)
-     *          2.50 -> "2.30 hrs" (2 hours, 30 minutes)
+     * Example: 0.25 (decimal) -> "0.15 hrs" (15 minutes)
+     *          0.50 (decimal) -> "0.30 hrs" (30 minutes)
+     *          1.75 (decimal) -> "1.45 hrs" (1 hour, 45 minutes)
+     *          2.50 (decimal) -> "2.30 hrs" (2 hours, 30 minutes)
+     *          "43.50 hrs"    -> "43.50 hrs" (idempotent, never double-converted)
      */
     function format_hours($val, bool $includeSuffix = true): string
     {
+        if ($val === null || $val === '' || $val === false) {
+            return $includeSuffix ? '0.00 hrs' : '0.00';
+        }
+
+        // If already formatted with suffix (e.g. "43.50 hrs"), return as is (idempotent)
+        if (is_string($val) && preg_match('/hrs?$/i', trim($val))) {
+            return $includeSuffix ? trim($val) : preg_replace('/\s*hrs?$/i', '', trim($val));
+        }
+
         if (is_array($val) || $val instanceof \Traversable) {
             $totalMinutes = 0;
             foreach ($val as $item) {
                 $hVal = is_object($item) ? ($item->worked_hours ?? 0) : (is_array($item) ? ($item['worked_hours'] ?? 0) : $item);
-                $f = (float) $hVal;
-                $str = (string) $f;
-                $dotPos = strpos($str, '.');
-                if ($dotPos !== false && strlen(substr($str, $dotPos + 1)) === 1) {
-                    $totalMinutes += (int) round($f * 60);
-                } else {
-                    $h = (int) floor($f);
-                    $m = (int) round(($f - $h) * 100);
-                    if ($m >= 60) {
-                        $totalMinutes += (int) round($f * 60);
-                    } else {
-                        $totalMinutes += ($h * 60) + $m;
-                    }
-                }
+                $totalMinutes += (int) round(hours_to_decimal($hVal) * 60);
             }
             $hours = intdiv($totalMinutes, 60);
             $minutes = $totalMinutes % 60;
@@ -396,26 +400,15 @@ if (! function_exists('format_hours')) {
             return $includeSuffix ? $formatted . ' hrs' : $formatted;
         }
 
-        $f = (float) ($val ?: 0.0);
-        $str = (string) $f;
-        $dotPos = strpos($str, '.');
+        $raw = trim((string) $val);
+        $rawNum = preg_replace('/[^\d.]/', '', $raw);
+        $f = (float) ($rawNum ?: 0.0);
 
-        if ($dotPos !== false && strlen(substr($str, $dotPos + 1)) === 1) {
-            $totalMinutes = (int) round($f * 60);
-            $hours = intdiv($totalMinutes, 60);
-            $minutes = $totalMinutes % 60;
-        } else {
-            $h = (int) floor($f);
-            $m = (int) round(($f - $h) * 100);
-            if ($m >= 60) {
-                $totalMinutes = (int) round($f * 60);
-                $hours = intdiv($totalMinutes, 60);
-                $minutes = $totalMinutes % 60;
-            } else {
-                $hours = $h;
-                $minutes = $m;
-            }
-        }
+        // Standard decimal hours to clock minutes conversion:
+        // Any calculation or backend sending decimal hours (e.g. 0.25 = 15m, 0.5 = 30m, 1.75 = 1h45m, 2.5 = 2h30m)
+        $totalMinutes = (int) round($f * 60);
+        $hours = intdiv($totalMinutes, 60);
+        $minutes = $totalMinutes % 60;
 
         $formatted = sprintf('%d.%02d', $hours, $minutes);
 
