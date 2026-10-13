@@ -310,23 +310,27 @@ async function initSession(key, force = false) {
 
       if (connection === 'close') {
         const statusCode = (lastDisconnect?.error)?.output?.statusCode;
-        const isLoggedOut = statusCode === DisconnectReason.loggedOut && sessionObj.user !== null;
+        const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
         sessionObj.qr = null;
 
-        if (!isLoggedOut) {
+        if (isLoggedOut) {
+          console.log(`[Baileys ${key}] Session logged out or credentials expired (code 401). Clearing stored credentials to allow fresh QR scan.`);
+          sessionObj.status = 'disconnected';
+          sessionObj.user = null;
+          sessions.delete(key);
+          if (fs.existsSync(sessionPath)) {
+            try {
+              fs.rmSync(sessionPath, { recursive: true, force: true });
+            } catch (err) {
+              console.error(`[Baileys ${key}] Failed to clear session path:`, err);
+            }
+          }
+        } else {
           sessionObj.status = 'connecting';
           console.log(`[Baileys ${key}] Connection closed (code ${statusCode}). Re-initializing Baileys socket...`);
           setTimeout(() => {
             initSession(key, true);
           }, 3000);
-        } else {
-          sessionObj.status = 'disconnected';
-          sessionObj.user = null;
-          sessions.delete(key);
-          if (fs.existsSync(sessionPath)) {
-            fs.rmSync(sessionPath, { recursive: true, force: true });
-          }
-          console.log(`[Baileys ${key}] Session explicitly logged out by user.`);
         }
       } else if (connection === 'open') {
         sessionObj.status = 'connected';

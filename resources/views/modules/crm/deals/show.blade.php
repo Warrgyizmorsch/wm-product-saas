@@ -7,8 +7,155 @@
 @push('styles')
 <style>
     /* ==========================================================================
-       ZOHO CRM DEALS PREMIUM STYLING & DESIGN SYSTEM
+       ODOO & ZOHO CRM DEALS PREMIUM STYLING & DESIGN SYSTEM
        ========================================================================== */
+
+    /* Odoo Two-Column Workspace Layout */
+    .odoo-layout-wrapper {
+        background-color: #ffffff !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+    .odoo-sheet-col {
+        background-color: #f8fafc !important;
+        padding: 0 !important;
+        height: 100% !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+    }
+    .odoo-chatter-col {
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        background-color: #ffffff;
+    }
+    .odoo-chatter-nav-pills {
+        background-color: #f1f5f9;
+        padding: 2px !important;
+        border-radius: 6px !important;
+        display: inline-flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 2px !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+    .odoo-chatter-nav-pills .nav-link {
+        color: #64748b !important;
+        border-radius: 5px !important;
+        padding: 4px 10px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        white-space: nowrap !important;
+        border: none !important;
+        background: transparent !important;
+        transition: all 0.15s ease-in-out !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+    }
+    .odoo-chatter-nav-pills .nav-link:hover {
+        color: var(--bs-primary, #1e40af) !important;
+        background-color: rgba(30, 64, 175, 0.08) !important;
+    }
+    .odoo-chatter-nav-pills .nav-link.active {
+        background-color: var(--bs-primary, #1e40af) !important;
+        color: #ffffff !important;
+        box-shadow: 0 1px 3px rgba(30, 64, 175, 0.25) !important;
+    }
+    .odoo-chatter-nav-pills .nav-link.active .badge {
+        background-color: rgba(255, 255, 255, 0.25) !important;
+        color: #ffffff !important;
+    }
+
+    /* Odoo Chatter Activity Feed & Divider Styles (Exact match with Leads) */
+    .odoo-feed-divider {
+        display: flex;
+        align-items: center;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin: 18px 0 10px;
+        cursor: pointer;
+        user-select: none;
+        transition: opacity 0.15s ease;
+    }
+    .odoo-feed-divider:hover {
+        opacity: 0.85;
+    }
+    .odoo-feed-divider .toggle-arrow {
+        display: inline-block;
+        transition: transform 0.2s ease;
+        font-size: 11px;
+        vertical-align: middle;
+    }
+    .odoo-feed-divider.collapsed .toggle-arrow,
+    .odoo-feed-divider[aria-expanded="false"] .toggle-arrow {
+        transform: rotate(-90deg);
+    }
+    .odoo-feed-divider::before,
+    .odoo-feed-divider::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .odoo-feed-divider span {
+        padding: 0 16px;
+        color: #475569;
+        letter-spacing: 0.2px;
+    }
+    .odoo-feed-divider--planned span {
+        color: #16a34a !important;
+        font-weight: 700;
+    }
+    .odoo-feed-divider--overdue span {
+        color: #dc2626 !important;
+        font-weight: 700;
+    }
+    .odoo-feed-divider--today-done span {
+        color: #d97706 !important;
+        font-weight: 700;
+    }
+    .odoo-feed-divider--past-done span {
+        color: #64748b !important;
+        font-weight: 700;
+    }
+
+    .odoo-activity-item {
+        padding: 12px 6px;
+        border-bottom: 1px solid #f1f5f9;
+        background-color: #ffffff !important;
+        transition: background-color 0.15s ease;
+    }
+    .odoo-activity-item:last-child {
+        border-bottom: none;
+    }
+    .odoo-activity-item:hover {
+        background-color: rgba(248, 250, 252, 0.8) !important;
+        border-radius: 4px;
+    }
+
+    .activity-details-block {
+        line-height: 1.45;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+    .activity-detail-row {
+        color: #475569;
+        margin-bottom: 2px;
+        font-size: 12px;
+    }
+    .activity-detail-key {
+        font-weight: 600;
+        color: #334155;
+        margin-right: 4px;
+    }
+    .activity-detail-val {
+        color: #64748b;
+    }
+
 
     /* Related List Left Sidebar Navigation */
     .zoho-sidebar-nav .nav-link {
@@ -851,6 +998,48 @@
     @php
         $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
         $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
+
+        $allDealFollowups = $followups->reject(function($item) {
+            return $item->status === 'Rescheduled' && $item->rescheduledTo->isNotEmpty();
+        });
+
+        $now = now();
+        $todayStart = $now->copy()->startOfDay();
+        $todayEnd = $now->copy()->endOfDay();
+
+        // 1. Today's Executed Activities (Done / Logged Today)
+        $todayDoneActivities = $allDealFollowups->filter(function($i) use ($todayStart, $todayEnd) {
+            return $i->status !== 'Pending' && $i->updated_at >= $todayStart && $i->updated_at <= $todayEnd;
+        })->sortByDesc('updated_at');
+
+        // 2. Planned Activities (All pending scheduled for today or future)
+        $plannedActivities = $allDealFollowups->filter(function($i) use ($todayStart) {
+            return $i->status === 'Pending' && $i->followup_date >= $todayStart;
+        })->sortBy('followup_date');
+
+        // 3. Overdue Activities (Pending before today)
+        $overdueActivities = $allDealFollowups->filter(function($i) use ($todayStart) {
+            return $i->status === 'Pending' && $i->followup_date < $todayStart;
+        })->sortBy('followup_date');
+
+        // 4. Past Activities (Done before today)
+        $pastDoneActivities = $allDealFollowups->filter(function($i) use ($todayStart) {
+            return $i->status !== 'Pending' && $i->updated_at < $todayStart;
+        })->sortByDesc('updated_at');
+
+        $dealHistoryList = collect();
+        if ($linkedLead && $linkedLead->histories) {
+            $dealHistoryList = $dealHistoryList->concat($linkedLead->histories->map(function($h) {
+                $h->is_lead_history = true;
+                return $h;
+            }));
+        }
+        if (isset($histories) && $histories->isNotEmpty() && (!$linkedLead || $histories !== $linkedLead->histories)) {
+            $dealHistoryList = $dealHistoryList->concat($histories);
+        }
+        $groupedHistory = $dealHistoryList->sortByDesc('created_at')->groupBy(function($item) {
+            return $item->created_at ? $item->created_at->format('d/m/Y') : date('d/m/Y');
+        });
     @endphp
 
     <!-- Hidden Stage Change Form -->
@@ -1102,93 +1291,36 @@
             <x-ui.toast :auto="true" title="{{ $errors->first() }}" type="error" delay="6000" />
         @endif
 
-        <!-- ==================== TWO-COLUMN FLEX CONTENT ==================== -->
-        <div class="d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
+        <!-- ==================== ODOO TWO-COLUMN WORKSPACE (SHEET ON LEFT, CHATTER ON RIGHT) ==================== -->
+        <div class="d-flex flex-grow-1 overflow-hidden odoo-layout-wrapper" style="min-height: 0;">
             
-            <!-- Left Sidebar Menu (STICKY RELATED LIST) -->
-            <div class="zoho-sidebar-col border-end bg-white d-print-none h-100 overflow-auto" style="width: 210px; flex-shrink: 0; user-select: none;">
-                <div class="p-3">
-                    <h6 class="text-uppercase fw-bold text-muted mb-3" style="font-size: 10px; letter-spacing: 0.8px;">{{ __('crm.related_list_navigation') }}</h6>
-                    <ul class="nav flex-column zoho-sidebar-nav gap-1" id="zohoSidebarLinks">
-                        <li class="nav-item">
-                            <a href="#sectionDealInfo" class="nav-link active">
-                                <i class="feather-info fs-13 text-muted"></i> {{ __('crm.deal_information') }}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionDealProducts" class="nav-link">
-                                <i class="feather-box fs-13 text-muted"></i> {{ __('crm.product_interest') }}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionCustomerCard" class="nav-link">
-                                <i class="feather-users fs-13 text-muted"></i> {{ __('crm.customer_account_contact_info') }}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionNotes" class="nav-link">
-                                <i class="feather-grid fs-13 text-muted"></i> {{ __('crm.notes_requirement_summary') }}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionQuotations" class="nav-link">
-                                <i class="feather-file-text fs-13 text-muted"></i> {{ __('crm.quotation_proposals') }}
-                                <span class="badge bg-soft-secondary text-muted border">{{ $deal->quotations->count() }}</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionQuotationHistory" class="nav-link">
-                                <i class="feather-git-commit fs-13 text-muted"></i> {{ __('crm.quotation_revision_history') }}
-                                <span class="badge bg-soft-secondary text-muted border">{{ $deal->quotations->count() }}</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#subtab-interactions" class="nav-link">
-                                <i class="feather-calendar fs-13 text-muted"></i> {{ __('crm.activities') }}
-                                <span class="badge bg-soft-secondary text-muted border">{{ $followups->count() }}</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#subtab-history" class="nav-link">
-                                <i class="feather-clock fs-13 text-muted"></i> {{ __('crm.timeline_audit') }}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionDocuments" class="nav-link">
-                                <i class="feather-paperclip fs-13 text-muted"></i> {{ __('crm.lead_documents') }}
-                                <span class="badge bg-soft-secondary text-muted border">{{ $leadDocuments->count() }}</span>
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Right Content Scrollable Column -->
-            <div class="zoho-main-col h-100 overflow-auto flex-grow-1" style="scroll-behavior: smooth; background-color: #f8fafc;" id="zohoMainScrollable">
+            <!-- LEFT MAIN SHEET (Scrollable) -->
+            <div class="odoo-sheet-col flex-grow-1 h-100 p-0" style="scroll-behavior: smooth; background-color: #f8fafc; overflow-x: hidden !important; overflow-y: auto !important;" id="odooMainScrollable">
                 
                 <!-- Sticky Top Tab Row -->
-                <div class="d-flex align-items-center justify-content-between border-bottom px-3 py-2 flex-wrap gap-2 sticky-top" style="z-index: 90; background-color: #f8fafc;">
+                <div class="d-flex align-items-center justify-content-between border-bottom px-3 py-2 flex-wrap gap-2 sticky-top bg-white shadow-2xs" style="z-index: 90;">
                     <ul class="nav nav-pills zoho-nav-tabs" id="zohoDealTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ (!$isQuotationTabActive && request('tab') !== 'interactions' && request('tab') !== 'timeline') ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
-                                <i class="feather-grid me-1"></i>{{ __('crm.overview') }}
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ !$isQuotationTabActive ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
+                                <i class="feather-grid me-1.5"></i>{{ __('crm.overview') }}
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link px-3 py-1 fw-bold fs-12 {{ $isQuotationTabActive ? 'active' : '' }}" id="quotations-tab" data-bs-toggle="tab" data-bs-target="#quotations-pane" type="button" role="tab">
-                                <i class="feather-file-text me-1"></i>{{ __('crm.quotation_proposals') }} ({{ $deal->quotations->count() }})
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ (request('tab') === 'interactions' || request('tab') === 'timeline') ? 'active' : '' }}" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab">
-                                <i class="feather-clock me-1"></i>{{ __('crm.timeline_audit') }}
+                                <i class="feather-file-text me-1.5"></i>{{ __('crm.quotation_proposals') }} ({{ $deal->quotations->count() }})
                             </button>
                         </li>
                     </ul>
 
-                    <div class="d-flex align-items-center text-muted fs-11 fw-medium" style="font-family: 'Inter', sans-serif;">
-                        <i class="feather-clock me-1.5 text-muted fs-12"></i> 
-                        {{ __('crm.last_update') }} : {{ $deal->updated_at ? $deal->updated_at->diffForHumans() : __('crm.recently') }}
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="text-muted fs-11 fw-medium d-none d-md-flex align-items-center" style="font-family: 'Inter', sans-serif;">
+                            <i class="feather-clock me-1 text-muted fs-12"></i> 
+                            {{ __('crm.last_update') }} : {{ $deal->updated_at ? $deal->updated_at->diffForHumans() : __('crm.recently') }}
+                        </div>
+                        <button type="button" class="btn btn-xs btn-white border px-2.5 py-1 rounded-2 shadow-2xs text-muted d-inline-flex align-items-center gap-1.5 fw-semibold fs-11" id="btnToggleChatter" title="Toggle Chatter Sidebar">
+                            <i class="feather-sidebar fs-11"></i>
+                            <span id="textToggleChatter">Chatter</span>
+                        </button>
                     </div>
                 </div>
 
@@ -2330,421 +2462,24 @@
                     </div>
 
 
-                    <!-- ==================== TAB 4: TIMELINE & AUDIT LOG PANE ==================== -->
-                    <div class="tab-pane fade {{ (request('tab') === 'interactions' || request('tab') === 'timeline') ? 'show active' : '' }}" id="timeline-pane" role="tabpanel">
-                        <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
-                            <div class="card-body p-3">
-                                
-                                <!-- Subtabs Selector Row -->
-                                <div class="border-bottom pb-1 mb-3">
-                                    <ul class="nav nav-tabs border-bottom-0 zoho-timeline-subtabs" id="zohoTimelineSubTabs" role="tablist">
-                                        <li class="nav-item" role="presentation">
-                                            <button class="nav-link {{ request('tab') !== 'interactions' ? 'active' : '' }} py-2 px-3 border-0 bg-transparent" id="subtab-history-tab" data-bs-toggle="tab" data-bs-target="#subtab-history" type="button" role="tab">
-                                                {{ __('crm.history_audit_stream') }}
-                                            </button>
-                                        </li>
-                                        <li class="nav-item" role="presentation">
-                                            <button class="nav-link {{ request('tab') === 'interactions' ? 'active' : '' }} py-2 px-3 border-0 bg-transparent" id="subtab-interactions-tab" data-bs-toggle="tab" data-bs-target="#subtab-interactions" type="button" role="tab">
-                                                {{ __('crm.interactions_scheduled_calls') }}
-                                            </button>
-                                        </li>
-                                    </ul>
-                                </div>
-                                
-                                <!-- Subtabs Content -->
-                                <div class="tab-content" id="zohoTimelineSubTabsContent">
-                                    
-                                    <!-- SUBTAB 1: HISTORY TIMELINE -->
-                                    <div class="tab-pane fade {{ request('tab') !== 'interactions' ? 'show active' : '' }}" id="subtab-history" role="tabpanel">
-                                        <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
-                                            <div class="d-flex align-items-center gap-2">
-                                                <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.timeline_history_audit_stream') }}</h5>
-                                            </div>
-                                        </div>
+                </div> <!-- Closes zohoDealTabsContent -->
+            </div> <!-- Closes odoo-sheet-col -->
 
-                                        <div class="zoho-timeline-container">
-                                            @php
-                                                $groupedHistory = $histories->groupBy(function($item) {
-                                                    return $item->created_at ? $item->created_at->format('d/m/Y') : date('d/m/Y');
-                                                });
-                                            @endphp
+            <!-- RIGHT CHATTER BOX (Activity & History with Lead & Deal distinctions) -->
+            @include('modules.crm.deals.partials.deal-chatter-box', [
+                'deal' => $deal,
+                'linkedLead' => $linkedLead,
+                'users' => $users,
+                'allDealFollowups' => $allDealFollowups,
+                'plannedActivities' => $plannedActivities,
+                'overdueActivities' => $overdueActivities,
+                'todayDoneActivities' => $todayDoneActivities,
+                'pastDoneActivities' => $pastDoneActivities,
+                'groupedHistory' => $groupedHistory
+            ])
 
-                                            @if($groupedHistory->isEmpty())
-                                                <div class="text-center py-5 text-muted border border-dashed rounded bg-white fs-12">
-                                                    <i class="feather-clock fs-24 mb-1.5 d-block text-muted opacity-50"></i>
-                                                    {{ __('crm.no_history_events') }}
-                                                </div>
-                    </div>
-                                            @else
-                                                @foreach($groupedHistory as $date => $items)
-                                                    <!-- Date Header -->
-                                                    <div class="zoho-timeline-date-group">
-                                                        <div class="zoho-timeline-date-header">{{ $date }}</div>
-                                                        
-                                                        @foreach($items as $item)
-                                                            <!-- Timeline Row -->
-                                                            <div class="zoho-timeline-event d-flex align-items-start">
-                                                                <div class="zoho-timeline-line"></div>
-                                                                
-                                                                @php
-                                                                    $icon = 'feather-info';
-                                                                    if ($item->event_type === 'created') $icon = 'feather-plus';
-                                                                    elseif ($item->event_type === 'assigned') $icon = 'feather-user';
-                                                                    elseif ($item->event_type === 'status_changed' || $item->event_type === 'status_updated') $icon = 'feather-refresh-cw';
-                                                                    elseif ($item->event_type === 'quotation_created') $icon = 'feather-file-text';
-                                                                    elseif ($item->event_type === 'activity_scheduled') $icon = 'feather-calendar';
-                                                                @endphp
-                                                                <div class="zoho-timeline-icon">
-                                                                    <i class="{{ $icon }}"></i>
-                                                                </div>
-
-                                                                <div class="zoho-timeline-content d-flex align-items-center justify-content-between w-100 ms-2">
-                                                                    <div>
-                                                                        <span class="fs-13 fw-semibold text-dark">
-                                                                            {{ $item->notes ?: ucwords(str_replace('_', ' ', $item->event_type)) }}
-                                                                        </span>
-                                                                        @if($item->old_value || $item->new_value)
-                                                                            <span class="fs-11 text-muted ms-2 bg-light px-1.5 py-0.5 rounded border">
-                                                                                @if($item->old_value)
-                                                                                    <del>{{ $item->old_value }}</del> <i class="feather-arrow-right mx-0.5"></i>
-                                                                                @endif
-                                                                                <strong class="text-success">{{ $item->new_value }}</strong>
-                                                                            </span>
-                                                                        @endif
-                                                                        <div class="text-muted fs-11 mt-0.5">
-                                                                            by {{ $item->user?->name ?: 'Demo Admin' }} {{ $item->created_at ? $item->created_at->format('d/m/Y') : '' }}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="zoho-timeline-time text-muted fs-11 ms-3" style="white-space: nowrap;">
-                                                                        {{ $item->created_at ? $item->created_at->format('h:i A') : '' }}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        @endforeach
-                                                    </div>
-                                                @endforeach
-                                            @endif
-                                        </div>
-                                    </div>
-
-                                    <!-- SUBTAB 2: INTERACTIONS & ACTIVITIES -->
-                                    <div class="tab-pane fade {{ request('tab') === 'interactions' ? 'show active' : '' }}" id="subtab-interactions" role="tabpanel">
-                                        <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
-                                            <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.interactions_scheduled_activities') }}</h5>
-                                        </div>
-
-                                        @php
-                                            $groupedFollowups = $followups->reject(function($item) {
-                                                return $item->status === 'Rescheduled' && $item->rescheduledTo->isNotEmpty();
-                                            })->groupBy(function($item) {
-                                                return $item->followup_date->format('d/m/Y');
-                                            });
-                                        @endphp
-
-                                        @if($groupedFollowups->isEmpty())
-                                            <div class="text-center py-5 text-muted border border-dashed rounded-3 bg-light fs-12" style="border-color:#cbd5e1!important;">
-                                                <i class="feather-calendar fs-28 d-block mb-2 opacity-40"></i>
-                                                <span class="fw-semibold">{{ __('crm.no_activities_scheduled') }}</span><br>
-                                                <span class="fs-11">{{ __('crm.click_schedule_activity') }}</span>
-                                            </div>
-                                        @else
-                                            @foreach($groupedFollowups as $date => $items)
-                                                @php
-                                                    $hasNotConnected = $items->contains(fn($i) => $i->status === 'Not Connected');
-                                                    $hasCancelled    = $items->contains(fn($i) => $i->status === 'Cancelled');
-                                                    $hasCompleted    = $items->contains(fn($i) => $i->status === 'Completed');
-                                                    $hasRescheduled  = $items->contains(fn($i) => $i->status === 'Rescheduled');
-
-                                                    $dateBadgeBg     = '#eff6ff';
-                                                    $dateBadgeColor  = '#1d4ed8';
-                                                    $dateBadgeBorder = '#93c5fd';
-
-                                                    if ($hasNotConnected) {
-                                                        $dateBadgeBg     = '#fff7ed';
-                                                        $dateBadgeColor  = '#c2410c';
-                                                        $dateBadgeBorder = '#fdba74';
-                                                    } elseif ($hasCancelled) {
-                                                        $dateBadgeBg     = '#fef2f2';
-                                                        $dateBadgeColor  = '#b91c1c';
-                                                        $dateBadgeBorder = '#fca5a5';
-                                                    } elseif ($hasCompleted) {
-                                                        $dateBadgeBg     = '#f0fdf4';
-                                                        $dateBadgeColor  = '#15803d';
-                                                        $dateBadgeBorder = '#86efac';
-                                                    } elseif ($hasRescheduled) {
-                                                        $dateBadgeBg     = '#faf5ff';
-                                                        $dateBadgeColor  = '#6b21a8';
-                                                        $dateBadgeBorder = '#d8b4fe';
-                                                    }
-                                                @endphp
-
-                                                <!-- Date Header -->
-                                                <div class="activity-date-group mb-3">
-                                                    <div class="activity-date-badge mb-2" style="background: {{ $dateBadgeBg }}; color: {{ $dateBadgeColor }}; border: 1px solid {{ $dateBadgeBorder }}; font-weight: 700;">
-                                                        <i class="feather-calendar fs-10 me-1"></i>{{ $date }}
-                                                    </div>
-
-                                                    @foreach($items as $item)
-                                                        @php
-                                                            $actIcon = 'feather-phone-call';
-                                                            $actIconBg = 'bg-soft-primary';
-                                                            $actIconColor = 'text-primary';
-                                                            if($item->type === 'Email')   { $actIcon = 'feather-mail';    $actIconBg = 'bg-soft-warning'; $actIconColor = 'text-warning'; }
-                                                            elseif($item->type === 'Meeting') { $actIcon = 'feather-users';  $actIconBg = 'bg-soft-purple';  $actIconColor = 'text-purple'; }
-                                                            elseif($item->type === 'Demo')    { $actIcon = 'feather-monitor'; $actIconBg = 'bg-soft-danger';  $actIconColor = 'text-danger'; }
-
-                                                            $statusBadgeClass = 'bg-primary text-white';
-                                                            $statusLabel = __('crm.pending') ?? 'Pending';
-                                                            if($item->status === 'Completed') { $statusBadgeClass = 'bg-success text-white'; $statusLabel = __('crm.connected'); }
-                                                            elseif($item->status === 'Not Connected') { $statusBadgeClass = 'bg-warning text-white'; $statusLabel = __('crm.not_connected'); }
-                                                            elseif($item->status === 'Cancelled') { $statusBadgeClass = 'bg-danger text-white'; $statusLabel = __('crm.cancelled'); }
-                                                            elseif($item->status === 'Rescheduled') { $statusBadgeClass = 'bg-purple text-white'; $statusLabel = __('crm.reschedule'); }
-                                                        @endphp
-
-                                                        <div class="activity-card mb-2">
-                                                            <div class="activity-card-inner">
-
-                                                                <!-- Top row: Icon + Type + Time + Status -->
-                                                                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                                                                    <div class="activity-type-icon {{ $actIconBg }} {{ $actIconColor }} flex-shrink-0">
-                                                                        <i class="{{ $actIcon }}"></i>
-                                                                    </div>
-                                                                    <span class="fw-bold text-dark fs-13">{{ __('crm.activity_types.' . $item->type) ?? $item->type }}</span>
-                                                                    <span class="activity-time-chip"><i class="feather-clock fs-9 me-1"></i>{{ $item->followup_date->format('h:i A') }}</span>
-                                                                    <span class="badge rounded-pill {{ $statusBadgeClass }} px-2.5 py-1 fs-10 fw-semibold" @if($item->status !== 'Pending') title="Status updated on {{ $item->updated_at->format('d/m/Y h:i A') }}" @endif>{{ $statusLabel }}</span>
-
-                                                                    @php
-                                                                        $lastRescheduledDate = $item->rescheduledFrom?->followup_date;
-                                                                    @endphp
-                                                                    @if($lastRescheduledDate)
-                                                                        <span class="badge bg-soft-info text-info border border-info border-opacity-25 px-2 py-1 fs-10 fw-semibold ms-auto" title="Rescheduled from {{ $lastRescheduledDate->format('d/m/Y h:i A') }}">
-                                                                            <i class="feather-refresh-cw me-1 fs-9"></i>Rescheduled from {{ $lastRescheduledDate->format('d/m/Y h:i A') }}
-                                                                        </span>
-                                                                    @endif
-                                                                </div>
-
-                                                                <!-- Notes & Meeting / Calendar Buttons -->
-                                                                @php
-                                                                    $rawNotes = $item->notes ?? '';
-                                                                    $meetUrlFromNotes = null;
-                                                                    $cleanNotes = $rawNotes;
-                                                                    if (preg_match('/(Google Meet:\s*)(https?:\/\/\S+)/i', $rawNotes, $m)) {
-                                                                        $meetUrlFromNotes = $m[2];
-                                                                        $cleanNotes = trim(preg_replace('/\n?Google Meet:\s*https?:\/\/\S+/i', '', $rawNotes));
-                                                                    }
-                                                                    $meetLink = $item->google_meet_link ?? $meetUrlFromNotes;
-                                                                    $calEventLink = null;
-                                                                    if (!empty($item->google_event_id) && !str_starts_with($item->google_event_id, 'g_evt_')) {
-                                                                        $calEventLink = 'https://calendar.google.com/calendar/r';
-                                                                    }
-                                                                @endphp
-
-                                                                @if($cleanNotes)
-                                                                    <div class="activity-notes">
-                                                                        {{ $cleanNotes }}
-                                                                    </div>
-                                                                @endif
-
-                                                                @if(!empty($item->recording_url))
-                                                                    <div class="call-recording-player-box my-3 p-3 rounded-3 border shadow-xs" style="background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%); border-color: #bfdbfe !important;">
-                                                                        <div class="d-flex align-items-center justify-content-between mb-2.5 pb-2 border-bottom border-primary border-opacity-10 flex-wrap gap-2">
-                                                                            <div class="d-flex align-items-center gap-2">
-                                                                                <div class="avatar-text avatar-xs bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-xs" style="width: 28px; height: 28px; font-size: 11px;">
-                                                                                    <i class="feather-phone-call"></i>
-                                                                                </div>
-                                                                                <div>
-                                                                                    <div class="d-flex align-items-center gap-2">
-                                                                                        <span class="fw-bold text-dark fs-12">Call Recording Audio</span>
-                                                                                        <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 px-2 py-0.5 rounded-pill fw-semibold">
-                                                                                            <i class="feather-disc me-1 fs-9"></i>2-Way Audio
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    @if(!empty($item->audio_duration))
-                                                                                        <span class="text-muted fs-11">Duration: <strong class="text-dark">{{ gmdate("i:s", $item->audio_duration) }}</strong></span>
-                                                                                    @endif
-                                                                                </div>
-                                                                            </div>
-                                                                            <div class="d-flex align-items-center gap-1.5">
-                                                                                <a href="{{ asset($item->recording_url) }}" download="deal_call_recording_{{ $item->id }}.mp3" class="btn btn-xs btn-primary px-3 py-1 fs-11 rounded-pill d-inline-flex align-items-center gap-1 shadow-xs" title="Download Audio File">
-                                                                                    <i class="feather-download fs-10"></i> Download MP3
-                                                                                </a>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div class="px-0.5 pt-0.5">
-                                                                            <audio controls preload="metadata" class="w-100" style="height: 38px; border-radius: 25px; outline: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.04));">
-                                                                                <source src="{{ asset($item->recording_url) }}" type="audio/mpeg">
-                                                                                <source src="{{ asset($item->recording_url) }}" type="audio/mp3">
-                                                                                <source src="{{ asset($item->recording_url) }}" type="audio/webm">
-                                                                                Your browser does not support audio playback.
-                                                                            </audio>
-                                                                        </div>
-                                                                    </div>
-                                                                @endif
-
-                                                                @if($meetLink && $item->is_google_meet && $item->status === 'Pending')
-                                                                    <div class="mt-2 d-inline-block me-2">
-                                                                        <a href="{{ $meetLink }}" target="_blank"
-                                                                           class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill text-white fw-semibold fs-11 text-decoration-none"
-                                                                           style="background: linear-gradient(135deg, #1a73e8, #0d47a1); box-shadow: 0 2px 6px rgba(26,115,232,0.35);">
-                                                                            <i class="feather-video me-1"></i> {{ __('crm.join_google_meet') }}
-                                                                        </a>
-                                                                    </div>
-                                                                @endif
-
-                                                                @if($calEventLink)
-                                                                    <div class="mt-2 d-inline-block">
-                                                                        <a href="{{ $calEventLink }}" target="_blank"
-                                                                           class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill text-white fw-semibold fs-11 text-decoration-none"
-                                                                           style="background: linear-gradient(135deg, #34a853, #1e7e34); box-shadow: 0 2px 6px rgba(52,168,83,0.35);">
-                                                                            <i class="feather-calendar me-1"></i> {{ __('crm.view_in_google_calendar') }}
-                                                                        </a>
-                                                                    </div>
-                                                                @endif
-
-                                                                <!-- Attribution -->
-                                                                <div class="activity-by mt-1 d-flex align-items-center flex-wrap gap-2">
-                                                                    <span>
-                                                                        <i class="feather-user fs-9 me-1"></i>by {{ $deal->owner?->name ?: ($linkedLead?->owner?->name ?: 'System') }} &bull; Scheduled: {{ $item->followup_date->format('d M Y, h:i A') }}
-                                                                    </span>
-                                                                    @if($item->taggedUsers->isNotEmpty())
-                                                                        @foreach($item->taggedUsers as $tUser)
-                                                                            <span class="badge bg-soft-info text-info fs-10 px-2 py-1 border border-info border-opacity-25" title="Tagged User">
-                                                                                <i class="feather-at-sign me-1"></i>Tagged: <strong>{{ $tUser->name }}</strong>
-                                                                            </span>
-                                                                        @endforeach
-                                                                    @endif
-                                                                    @if($item->status !== 'Pending')
-                                                                        <span class="text-muted ms-auto fs-10">
-                                                                            <i class="feather-clock fs-9 me-1 text-primary"></i>Status Updated: <strong class="text-dark">{{ $item->updated_at->format('d M Y, h:i A') }}</strong>
-                                                                        </span>
-                                                                    @endif
-                                                                </div>
-
-                                                                <!-- Action Buttons — horizontal row at bottom, only for Pending -->
-                                                                @if($item->status === 'Pending')
-                                                                    <div class="activity-footer-actions d-flex gap-2 mt-3 d-print-none">
-                                                                        <!-- Connected -->
-                                                                        <x-ui.button type="button" variant="soft-success" size="sm" icon="feather-phone-call" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed">{{ __('crm.connected') }}</x-ui.button>
-
-                                                                        <!-- Not Connected -->
-                                                                        <x-ui.button type="button" variant="soft-warning" size="sm" icon="feather-phone-off" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected">{{ __('crm.not_connected') }}</x-ui.button>
-
-                                                                        <!-- Cancelled -->
-                                                                        <x-ui.button type="button" variant="soft-danger" size="sm" icon="feather-x-circle" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">{{ __('crm.cancelled') }}</x-ui.button>
-
-                                                                        <!-- Reschedule -->
-                                                                        <x-ui.button type="button" variant="soft-primary" size="sm" icon="feather-refresh-cw" data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">{{ __('crm.reschedule') }}</x-ui.button>
-                                                                    </div>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-
-                                                        @if($item->status === 'Pending')
-                                                            @php
-                                                                $currentTaggedIds = $item->taggedUsers->pluck('id')->toArray();
-                                                            @endphp
-
-                                                            <!-- Status Modal: Connected / Completed -->
-                                                            <x-ui.modal
-                                                                :id="'statusModal_' . $item->id . '_Completed'"
-                                                                :title="__('crm.mark_as_connected')"
-                                                                size="md"
-                                                                :centered="true"
-                                                                :formAction="route('crm.followups.update', $item->id)"
-                                                                formMethod="PUT"
-                                                                :submitText="__('crm.save_mark_connected')"
-                                                                :closeText="__('crm.cancel')"
-                                                            >
-                                                                <input type="hidden" name="status" value="Completed">
-                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
-                                                                    @foreach($users as $u)
-                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes_discussion_summary')" name="notes" rows="3" placeholder="Enter notes or discussion outcome...">{{ $item->notes }}</x-ui.odoo-form-ui>
-                                                            </x-ui.modal>
-
-                                                            <!-- Status Modal: Not Connected -->
-                                                            <x-ui.modal
-                                                                :id="'statusModal_' . $item->id . '_NotConnected'"
-                                                                :title="__('crm.mark_as_not_connected')"
-                                                                size="md"
-                                                                :centered="true"
-                                                                :formAction="route('crm.followups.update', $item->id)"
-                                                                formMethod="PUT"
-                                                                :submitText="__('crm.save_status')"
-                                                                :closeText="__('crm.cancel')"
-                                                            >
-                                                                <input type="hidden" name="status" value="Not Connected">
-                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
-                                                                    @foreach($users as $u)
-                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes_reason')" name="notes" rows="3" placeholder="Reason / notes...">{{ $item->notes }}</x-ui.odoo-form-ui>
-                                                            </x-ui.modal>
-
-                                                            <!-- Status Modal: Cancelled -->
-                                                            <x-ui.modal
-                                                                :id="'statusModal_' . $item->id . '_Cancelled'"
-                                                                :title="__('crm.cancel_activity')"
-                                                                size="md"
-                                                                :centered="true"
-                                                                :formAction="route('crm.followups.update', $item->id)"
-                                                                formMethod="PUT"
-                                                                :submitText="__('crm.confirm_cancel')"
-                                                                :closeText="__('crm.cancel')"
-                                                            >
-                                                                <input type="hidden" name="status" value="Cancelled">
-                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
-                                                                    @foreach($users as $u)
-                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.cancellation_note')" name="notes" rows="3" placeholder="Reason for cancellation...">{{ $item->notes }}</x-ui.odoo-form-ui>
-                                                            </x-ui.modal>
-
-                                                            <!-- Reschedule Modal -->
-                                                            <x-ui.modal
-                                                                :id="'rescheduleModal_' . $item->id"
-                                                                :title="__('crm.reschedule_activity')"
-                                                                size="md"
-                                                                :centered="true"
-                                                                :formAction="route('crm.followups.update', $item->id)"
-                                                                formMethod="PUT"
-                                                                :submitText="__('crm.confirm_reschedule')"
-                                                                :closeText="__('crm.cancel')"
-                                                            >
-                                                                <input type="hidden" name="is_reschedule" value="1">
-                                                                <p class="text-muted fs-11 mb-3">
-                                                                    <i class="{{ $actIcon }} me-1"></i>
-                                                                    {{ __('crm.activity_types.' . $item->type) ?? $item->type }}
-                                                                    &bull; Current: <strong>{{ $item->followup_date->format('d M Y, h:i A') }}</strong>
-                                                                </p>
-                                                                <x-ui.odoo-form-ui type="input" inputType="datetime-local" :label="__('crm.new_date_time')" name="followup_date" :required="true" />
-                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
-                                                                    @foreach($users as $u)
-                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.note_optional')" name="notes" rows="2" :placeholder="__('crm.reason_rescheduling')">{{ $item->notes }}</x-ui.odoo-form-ui>
-                                                            </x-ui.modal>
-                                                        @endif
-                                                    @endforeach
-                                                </div>
-                                            @endforeach
-                                        @endif
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-    </div>
+        </div> <!-- Closes odoo-layout-wrapper -->
+    </div> <!-- Closes zoho-lead-card-container -->
 
     <!-- Offcanvas Drawer: Deal Followup / Schedule Activity -->
     <div class="offcanvas offcanvas-end border-0 shadow-lg d-print-none" tabindex="-1" id="dealFollowupOffcanvas" aria-labelledby="dealFollowupOffcanvasLabel" style="width: 490px; max-width: 92vw;">
@@ -2979,12 +2714,78 @@
 
     @push('scripts')
     <script>
+        let isTogglingChatter = false;
+        window.toggleChatterBox = function() {
+            if (isTogglingChatter) return;
+            isTogglingChatter = true;
+            setTimeout(function() { isTogglingChatter = false; }, 250);
+
+            var chatter = document.getElementById('odooRightChatter');
+            var btn = document.getElementById('btnToggleChatter');
+            var text = document.getElementById('textToggleChatter');
+            if (!chatter) return;
+
+            var isHidden = chatter.classList.contains('d-none') || 
+                           chatter.style.display === 'none' || 
+                           window.getComputedStyle(chatter).display === 'none';
+
+            if (isHidden) {
+                // Show chatter
+                chatter.classList.remove('d-none');
+                chatter.style.removeProperty('display');
+                if (btn) {
+                    btn.classList.remove('btn-primary', 'text-white');
+                    btn.classList.add('btn-white', 'text-muted');
+                    btn.title = "Hide Chatter Sidebar";
+                }
+                if (text) text.innerText = 'Chatter';
+                try { localStorage.setItem('deal_chatter_hidden', '0'); } catch(e){}
+            } else {
+                // Hide chatter
+                chatter.classList.add('d-none');
+                chatter.style.setProperty('display', 'none', 'important');
+                if (btn) {
+                    btn.classList.remove('btn-white', 'text-muted');
+                    btn.classList.add('btn-primary', 'text-white');
+                    btn.title = "Show Chatter Sidebar";
+                }
+                if (text) text.innerText = 'Show Chatter';
+                try { localStorage.setItem('deal_chatter_hidden', '1'); } catch(e){}
+            }
+        };
+
         function submitDealStage(stageVal) {
             document.getElementById('dealStageInput').value = stageVal;
             document.getElementById('dealStageForm').submit();
         }
 
         $(document).ready(function() {
+            // Bind single click handler for Chatter toggle button
+            $(document).on('click', '#btnToggleChatter', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.toggleChatterBox();
+            });
+
+            // Restore user's previous Chatter toggle preference if saved
+            try {
+                if (localStorage.getItem('deal_chatter_hidden') === '1') {
+                    var chatter = document.getElementById('odooRightChatter');
+                    var btn = document.getElementById('btnToggleChatter');
+                    var text = document.getElementById('textToggleChatter');
+                    if (chatter) {
+                        chatter.classList.add('d-none');
+                        chatter.style.setProperty('display', 'none', 'important');
+                    }
+                    if (btn) {
+                        btn.classList.remove('btn-white', 'text-muted');
+                        btn.classList.add('btn-primary', 'text-white');
+                        btn.title = "Show Chatter Sidebar";
+                    }
+                    if (text) text.innerText = 'Show Chatter';
+                }
+            } catch(e){}
+
             const crmProductsList = @json($products ?? []);
             let rowIndex = 0;
 
@@ -3150,7 +2951,7 @@
 
             // Scroll Spy for Overview Sections
             let isManualClick = false;
-            $('#zohoMainScrollable').on('scroll', function() {
+            $('#odooMainScrollable, #zohoMainScrollable').on('scroll', function() {
                 if (isManualClick) return;
                 const scrollContainer = this;
                 const containerTop = scrollContainer.getBoundingClientRect().top;
@@ -3181,7 +2982,7 @@
             function scrollToTarget(targetHash) {
                 if (!targetHash) return;
                 const targetEl = document.querySelector(targetHash);
-                const scrollContainer = document.getElementById('zohoMainScrollable');
+                const scrollContainer = document.getElementById('odooMainScrollable') || document.getElementById('zohoMainScrollable');
                 if (targetEl && scrollContainer) {
                     const containerTop = scrollContainer.getBoundingClientRect().top;
                     const targetTop = targetEl.getBoundingClientRect().top;
@@ -3194,7 +2995,7 @@
                 }
             }
 
-            // Smooth Related List Sidebar Navigation & Tab Synchronization
+            // Smooth Related List Sidebar Navigation & Tab Synchronization (if present)
             $('#zohoSidebarLinks a').on('click', function(e) {
                 e.preventDefault();
                 const targetHash = $(this).attr('href');
@@ -3203,28 +3004,20 @@
                 $(this).addClass('active');
                 isManualClick = true;
 
-                // 1. Identify Target Main Tab and Subtab
                 let targetTabBtnId = null;
-                let targetSubtabBtnId = null;
-
                 if (['#sectionDealInfo', '#sectionCustomerCard', '#sectionNotes', '#sectionDocuments'].includes(targetHash)) {
                     targetTabBtnId = 'overview-tab';
                 } else if (targetHash === '#sectionQuotations' || targetHash === '#sectionQuotationHistory') {
                     targetTabBtnId = 'quotations-tab';
                 } else if (targetHash === '#subtab-interactions' || targetHash === '#subtab-history') {
-                    targetTabBtnId = 'timeline-tab';
-                    targetSubtabBtnId = (targetHash === '#subtab-interactions') ? 'subtab-interactions-tab' : 'subtab-history-tab';
-                }
-
-                // 2. Subtab handling if applicable
-                if (targetSubtabBtnId) {
-                    const subtabBtn = document.getElementById(targetSubtabBtnId);
-                    if (subtabBtn) {
-                        bootstrap.Tab.getOrCreateInstance(subtabBtn).show();
+                    const chatterTabId = (targetHash === '#subtab-interactions') ? 'deal-chatter-activity-tab' : 'deal-chatter-history-tab';
+                    const chatterTab = document.getElementById(chatterTabId);
+                    if (chatterTab) {
+                        bootstrap.Tab.getOrCreateInstance(chatterTab).show();
                     }
+                    return;
                 }
 
-                // 3. Main Tab activation & Scrolling
                 const tabBtn = document.getElementById(targetTabBtnId);
                 const isAlreadyActive = tabBtn && tabBtn.classList.contains('active');
 
@@ -3240,12 +3033,12 @@
             });
 
             // Tab state persistence logic
-            var activeTabKey = 'deal_active_tab_' + {{ $deal->id }};
-            var activeSubTabKey = 'deal_active_subtab_' + {{ $deal->id }};
+            var activeSheetTabKey = 'deal_active_sheet_tab_' + {{ $deal->id }};
+            var activeChatterTabKey = 'deal_active_chatter_tab_' + {{ $deal->id }};
 
             const isQTabActive = @json($isQuotationTabActive);
             if (isQTabActive) {
-                localStorage.setItem(activeTabKey, 'quotations-tab');
+                localStorage.setItem(activeSheetTabKey, 'quotations-tab');
             }
 
             // Check URL Query Param & Hash first
@@ -3253,45 +3046,46 @@
             var tabParam = urlParams.get('tab');
             var hash = window.location.hash;
 
-            if (tabParam === 'interactions' || tabParam === 'timeline' || hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
-                localStorage.setItem(activeTabKey, 'timeline-tab');
-                if (tabParam === 'interactions' || hash === '#subtab-interactions') {
-                    localStorage.setItem(activeSubTabKey, 'subtab-interactions-tab');
-                } else if (hash === '#subtab-history') {
-                    localStorage.setItem(activeSubTabKey, 'subtab-history-tab');
-                }
+            if (tabParam === 'quotations' || hash === '#quotations' || hash === '#quotations-pane') {
+                localStorage.setItem(activeSheetTabKey, 'quotations-tab');
             } else if (tabParam === 'overview' || hash === '#overview' || hash === '#overview-pane') {
-                localStorage.setItem(activeTabKey, 'overview-tab');
-            } else if (tabParam === 'quotations' || hash === '#quotations' || hash === '#quotations-pane') {
-                localStorage.setItem(activeTabKey, 'quotations-tab');
+                localStorage.setItem(activeSheetTabKey, 'overview-tab');
             }
 
-            // Restore saved tab from localStorage
-            var savedTabId = localStorage.getItem(activeTabKey);
-            if (savedTabId && $('#' + savedTabId).length) {
+            if (tabParam === 'interactions' || hash === '#deal-chatter-activity-pane' || hash === '#subtab-interactions') {
+                localStorage.setItem(activeChatterTabKey, 'deal-chatter-activity-tab');
+            } else if (tabParam === 'timeline' || hash === '#deal-chatter-history-pane' || hash === '#subtab-history' || hash === '#timeline') {
+                localStorage.setItem(activeChatterTabKey, 'deal-chatter-history-tab');
+            }
+
+            // Restore saved sheet tab from localStorage
+            var savedSheetTabId = localStorage.getItem(activeSheetTabKey) || 'overview-tab';
+            if (savedSheetTabId && $('#' + savedSheetTabId).length) {
                 setTimeout(function() {
-                    var mainTabEl = document.getElementById(savedTabId);
-                    if (mainTabEl) {
-                        bootstrap.Tab.getOrCreateInstance(mainTabEl).show();
-                    }
-                    
-                    if (savedTabId === 'timeline-tab') {
-                        var savedSubTabId = localStorage.getItem(activeSubTabKey) || 'subtab-interactions-tab';
-                        var subTabEl = document.getElementById(savedSubTabId);
-                        if (subTabEl) {
-                            bootstrap.Tab.getOrCreateInstance(subTabEl).show();
-                        }
+                    var sheetTabEl = document.getElementById(savedSheetTabId);
+                    if (sheetTabEl) {
+                        bootstrap.Tab.getOrCreateInstance(sheetTabEl).show();
                     }
                 }, 50);
             }
 
-            $(document).on('shown.bs.tab', 'button[data-bs-toggle="tab"], a[data-bs-toggle="tab"]', function (e) {
+            // Restore saved chatter tab from localStorage
+            var savedChatterTabId = localStorage.getItem(activeChatterTabKey);
+            if (savedChatterTabId && $('#' + savedChatterTabId).length) {
+                setTimeout(function() {
+                    var chatterTabEl = document.getElementById(savedChatterTabId);
+                    if (chatterTabEl) {
+                        bootstrap.Tab.getOrCreateInstance(chatterTabEl).show();
+                    }
+                }, 60);
+            }
+
+            $(document).on('shown.bs.tab', 'button[data-bs-toggle="tab"], button[data-bs-toggle="pill"]', function (e) {
                 if (e.target.id) {
-                    if (['overview-tab', 'timeline-tab', 'quotations-tab'].includes(e.target.id)) {
-                        localStorage.setItem(activeTabKey, e.target.id);
-                    } else if (['subtab-history-tab', 'subtab-interactions-tab'].includes(e.target.id)) {
-                        localStorage.setItem(activeSubTabKey, e.target.id);
-                        localStorage.setItem(activeTabKey, 'timeline-tab');
+                    if (['overview-tab', 'quotations-tab'].includes(e.target.id)) {
+                        localStorage.setItem(activeSheetTabKey, e.target.id);
+                    } else if (['deal-chatter-activity-tab', 'deal-chatter-history-tab'].includes(e.target.id)) {
+                        localStorage.setItem(activeChatterTabKey, e.target.id);
                     }
                 }
             });
@@ -3305,18 +3099,6 @@
                         scrollToTarget(targetToScroll);
                         setTimeout(function() { isManualClick = false; }, 400);
                     }, 60);
-                } else {
-                    const targetPaneId = $(e.target).attr('data-bs-target');
-                    if (targetPaneId === '#overview-pane') {
-                        $('#zohoSidebarLinks a').removeClass('active');
-                        $('#zohoSidebarLinks a[href="#sectionDealInfo"]').addClass('active');
-                    } else if (targetPaneId === '#quotations-pane') {
-                        $('#zohoSidebarLinks a').removeClass('active');
-                        $('#zohoSidebarLinks a[href="#sectionQuotations"]').addClass('active');
-                    } else if (targetPaneId === '#timeline-pane') {
-                        $('#zohoSidebarLinks a').removeClass('active');
-                        $('#zohoSidebarLinks a[href="#subtab-history"]').addClass('active');
-                    }
                 }
             });
 
