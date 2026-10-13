@@ -436,8 +436,8 @@
                                 }
 
                                 $activityUrl = $f->lead_id 
-                                    ? route('crm.leads.show', ['lead' => $f->lead_id, 'tab' => 'interactions']) . '#subtab-interactions' 
-                                    : ($f->crm_deal_id ? route('crm.deals.show', ['deal' => $f->crm_deal_id, 'tab' => 'interactions']) . '#subtab-interactions' : '#');
+                                    ? route('crm.leads.show', ['lead' => $f->lead_id, 'activity_id' => $f->id]) . '#lead-activity-' . $f->id 
+                                    : ($f->crm_deal_id ? route('crm.deals.show', ['deal' => $f->crm_deal_id, 'activity_id' => $f->id]) . '#deal-activity-' . $f->id : '#');
 
                                 $entityName = '';
                                 $entityTypeLabel = '';
@@ -462,7 +462,7 @@
                             <a href="{{ $activityUrl }}" 
                                class="activity-card-rich {{ $cardBgClass }} p-2 rounded-2 border-0 d-block text-decoration-none shadow-xs position-relative" 
                                title="{{ $f->title ?: ($f->notes ?: $f->type) }} [Status: {{ $statusText }}]" 
-                               onclick="event.stopPropagation(); if (window.localStorage && '{{ $f->lead_id }}') { localStorage.setItem('lead_active_tab_{{ $f->lead_id }}', 'timeline-tab'); localStorage.setItem('lead_active_subtab_{{ $f->lead_id }}', 'subtab-interactions-tab'); }">
+                               onclick="event.stopPropagation(); if (window.localStorage) { if ('{{ $f->lead_id }}') { localStorage.setItem('lead_active_chatter_tab_{{ $f->lead_id }}', 'chatter-activity-tab'); } else if ('{{ $f->crm_deal_id }}') { localStorage.setItem('deal_active_chatter_tab_{{ $f->crm_deal_id }}', 'deal-chatter-activity-tab'); localStorage.setItem('deal_chatter_hidden', '0'); } }">
                                 
                                 <!-- Top Row: Time + Type & Meet Indicator -->
                                 <div class="d-flex align-items-center justify-content-between gap-1 mb-1">

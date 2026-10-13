@@ -107,7 +107,7 @@
     }
 @endphp
 
-<div class="odoo-activity-item deal-chatter-item" data-origin="{{ $originType }}" data-category="{{ $category }}">
+<div class="odoo-activity-item deal-chatter-item" id="deal-activity-{{ $item->id }}" data-activity-id="{{ $item->id }}" data-origin="{{ $originType }}" data-category="{{ $category }}">
     <div class="d-flex align-items-start gap-3">
 
         <!-- User Avatar with Status Icon -->

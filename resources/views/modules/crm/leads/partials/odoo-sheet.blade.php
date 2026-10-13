@@ -351,16 +351,21 @@
                             {{ __('crm.view_account') }}
                         </x-ui.button>
                     @endif
+
+                    <button type="button" class="btn btn-xs btn-white border px-2.5 py-1 rounded-2 shadow-2xs text-muted d-inline-flex align-items-center gap-1.5 fw-semibold fs-11" id="btnToggleChatter" title="Toggle Chatter Sidebar">
+                        <i class="feather-sidebar fs-11"></i>
+                        <span id="textToggleChatter">Chatter</span>
+                    </button>
                 </div>
             </div>
 
             <!-- Key Metrics Row (Expected Revenue, Priority Stars, Expected Closing Date) -->
-            <div class="row g-3 p-3 rounded-3 mb-4 border" style="background-color: #f8fafc; border-color: #e2e8f0 !important;">
-                <div class="col-sm-4 border-end">
+            <div class="row g-3 p-3 rounded-3 mb-4 border lead-metrics-row" style="background-color: #f8fafc; border-color: #e2e8f0 !important;">
+                <div class="col-12 col-sm-4 lead-metric-col border-end">
                     <div class="text-muted fs-11 text-uppercase fw-semibold mb-1">{{ __('crm.expected_revenue_label') }}</div>
                     <div class="fs-18 fw-extrabold text-dark">{{ format_currency($lead->expected_amount ?? 0) }}</div>
                 </div>
-                <div class="col-sm-4 border-end">
+                <div class="col-12 col-sm-4 lead-metric-col border-end">
                     <div class="text-muted fs-11 text-uppercase fw-semibold mb-1">{{ __('crm.priority') }}</div>
                     <div class="d-flex align-items-center gap-1.5">
                         @php
@@ -379,7 +384,7 @@
                         @endif
                     </div>
                 </div>
-                <div class="col-sm-4">
+                <div class="col-12 col-sm-4 lead-metric-col">
                     <div class="text-muted fs-11 text-uppercase fw-semibold mb-1">{{ __('crm.expected_sale_date') }}</div>
                     <div class="fs-13 fw-bold text-dark">
                         <i class="feather-calendar me-1 text-primary fs-12"></i>
