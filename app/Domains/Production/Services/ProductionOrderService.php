@@ -100,9 +100,10 @@ class ProductionOrderService
             $productionMode = !empty($plan->production_mode)
                 ? $plan->production_mode
                 : ($product ? $product->getDefaultProductionMode() : 'standard');
-            $productionModel = !empty($plan->production_model)
+            $hasExplicitModel = !empty($plan->production_model);
+            $productionModel = $hasExplicitModel
                 ? $plan->production_model
-                : ($product->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING);
+                : ProductionOrder::MODEL_PURE_MANUFACTURING;
 
             $branchId = $plan->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
             $companyId = $plan->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
@@ -223,12 +224,12 @@ class ProductionOrderService
                     'quantity_produced' => 0.0000,
                     'quantity_rejected' => 0.0000,
                     'quantity_scrapped' => 0.0000,
-                    'is_external' => (bool) (($planOp->is_external ?? $routingOp?->is_external ?? false) || in_array($order->production_model, ['complete_subcontracting', 'subcontract_company_material'])),
+                    'is_external' => (bool) ($planOp->is_external ?? $routingOp?->is_external ?? false),
                     'vendor_id' => $planOp->vendor_id ?? $routingOp?->vendor_id,
                     'subcontract_lead_time_days' => (int) ($routingOp?->subcontract_lead_time_days ?? 0),
                     'subcontract_cost_per_unit' => (float) ($routingOp?->subcontract_cost_per_unit ?? 0.0),
                     'subcontract_service_product_id' => $routingOp?->subcontract_service_product_id,
-                    'material_supply_type' => $routingOp?->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
+                    'material_supply_type' => $routingOp?->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
                     'subcontract_input_type' => $routingOp?->subcontract_input_type ?? 'bom_raw_materials',
                     'dispatch_buffer_days' => (int) ($routingOp?->dispatch_buffer_days ?? 0),
                     'return_buffer_days' => (int) ($routingOp?->return_buffer_days ?? 0),
@@ -267,6 +268,15 @@ class ProductionOrderService
                 }
                 $currentOrderOp->save();
             }
+            }
+
+            // Derive and save production model from snapshotted operations (routing operations are authoritative unless explicitly specified by caller)
+            $currentModel = $order->production_model;
+            if (empty($currentModel) || $currentModel === ProductionOrder::MODEL_PURE_MANUFACTURING) {
+                $fallback = $product?->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING;
+                $derivedModel = ProductionOrder::determineProductionModelFromOperations($order->operations()->get(), $fallback);
+                $order->production_model = $derivedModel;
+                $order->save();
             }
 
             // Auto-orchestrate Subcontract Procurement according to tenant settings (Manual PR/PO, Auto Draft PO, Auto Approved PO)
@@ -380,9 +390,10 @@ class ProductionOrderService
             $product = Product::find($productId);
             $defaultMode = $product ? $product->getDefaultProductionMode() : 'standard';
             $productionMode = !empty($data['production_mode']) ? $data['production_mode'] : $defaultMode;
-            $productionModel = !empty($data['production_model'])
+            $hasExplicitModel = !empty($data['production_model']);
+            $productionModel = $hasExplicitModel
                 ? $data['production_model']
-                : ($product->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING);
+                : ProductionOrder::MODEL_PURE_MANUFACTURING;
 
             $branchId = $data['branch_id'] ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
             $companyId = $data['company_id'] ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
@@ -1260,6 +1271,15 @@ class ProductionOrderService
         );
 
         $this->reconcileOperationReadiness($order);
+
+        // Derive and save production model from snapshotted operations (routing operations are authoritative unless explicitly specified by caller)
+        $currentModel = $order->production_model;
+        if (empty($currentModel) || $currentModel === ProductionOrder::MODEL_PURE_MANUFACTURING) {
+            $fallback = $order->product?->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING;
+            $derivedModel = ProductionOrder::determineProductionModelFromOperations($order->operations()->get(), $fallback);
+            $order->production_model = $derivedModel;
+            $order->save();
+        }
     }
 
     protected function buildMultiLevelSnapshot(
@@ -1346,12 +1366,12 @@ class ProductionOrderService
                 'quantity_produced' => 0.0000,
                 'quantity_rejected' => 0.0000,
                 'quantity_scrapped' => 0.0000,
-                'is_external' => (bool) (($routingOp->is_external ?? false) || in_array($order->production_model, ['complete_subcontracting', 'subcontract_company_material'])),
+                'is_external' => (bool) ($routingOp->is_external ?? false),
                 'vendor_id' => $routingOp->vendor_id,
                 'subcontract_lead_time_days' => (int) ($routingOp->subcontract_lead_time_days ?? 0),
                 'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
                 'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
-                'material_supply_type' => $routingOp->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
+                'material_supply_type' => $routingOp->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
                 'subcontract_input_type' => $routingOp->subcontract_input_type ?? 'bom_raw_materials',
                 'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
                 'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
