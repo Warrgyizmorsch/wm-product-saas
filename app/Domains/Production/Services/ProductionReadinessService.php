@@ -564,24 +564,67 @@ class ProductionReadinessService
 
             $predOpFresh = ProductionOrderOperation::find($predOp->id) ?? $predOp;
             $produced = (float) $predOpFresh->quantity_produced;
+            $claimed = (float) ($predOpFresh->quantity_claimed ?? 0.0);
             $qcHold = (float) ($predOpFresh->active_qc_hold ?? 0.0);
             $rework = (float) ($predOpFresh->active_rework ?? 0.0);
             $consumed = (float) ($predOpFresh->quantity_consumed ?? 0.0);
 
+            $isQueueThreshold = (bool) (
+                $predOpFresh->queue_threshold_enabled
+                || $predOpFresh->overlap_enabled
+                || ((float) ($predOpFresh->transfer_batch_quantity ?? 0) > 0)
+                || (bool) ($predOpFresh->routingOperation?->queue_threshold_enabled ?? false)
+                || (bool) ($predOpFresh->routingOperation?->overlap_enabled ?? false)
+            );
+
+            $transferBatchQty = (float) (
+                $predOpFresh->transfer_batch_quantity > 0
+                    ? $predOpFresh->transfer_batch_quantity
+                    : ($predOpFresh->routingOperation?->transfer_batch_quantity ?? 0.0)
+            );
+
             $usableIntermediateSfg = max(0.0, $produced - ($qcHold + $rework) - $consumed);
             $totalUsableSfg = $issuedToOrder + $whStock + $usableIntermediateSfg;
+            $sfgClaimedOrProduced = max($claimed, $produced);
+            $transferredIn = (float) ($op->quantity_transferred_in ?? 0.0);
 
-            $maxExecutable = $totalUsableSfg / $bomRatio;
-            $crossReadyLimits[] = $maxExecutable;
+            if ($isQueueThreshold && $transferBatchQty > 0) {
+                // If queue threshold is enabled on SFG final op, allow parent operation to enter ready / in_progress
+                // as soon as the SFG operation claims/produces at least transfer_batch_quantity (or WIP transferred in)
+                $hasReachedThreshold = ($sfgClaimedOrProduced >= $transferBatchQty)
+                    || ($totalUsableSfg >= $transferBatchQty)
+                    || ($transferredIn > 0)
+                    || ($predOpFresh->status === ProductionOrderOperation::STATUS_COMPLETED);
 
-            if ($totalUsableSfg <= 0.0 && $predOpFresh->status !== ProductionOrderOperation::STATUS_COMPLETED) {
-                $blockers[] = [
-                    'code' => self::REASON_WIP_NOT_AVAILABLE,
-                    'dimension' => 'dependency',
-                    'message' => "Cross-assembly predecessor operation {$predOpFresh->operation_number} has insufficient usable SFG.",
-                    'severity' => 'error',
-                    'is_workflow_dependency' => true,
-                ];
+                if ($hasReachedThreshold) {
+                    $effectiveAvailable = max($totalUsableSfg, $transferredIn, $transferBatchQty);
+                    $maxExecutable = $effectiveAvailable / $bomRatio;
+                    $crossReadyLimits[] = $maxExecutable;
+                } else {
+                    $crossReadyLimits[] = 0.0;
+                    $blockers[] = [
+                        'code' => self::REASON_WIP_NOT_AVAILABLE,
+                        'dimension' => 'dependency',
+                        'message' => "Cross-assembly predecessor operation {$predOpFresh->operation_number} has not yet claimed/produced the required transfer batch threshold ({$transferBatchQty} units).",
+                        'severity' => 'error',
+                        'is_workflow_dependency' => true,
+                    ];
+                }
+            } else {
+                // Standard Finish-to-Start: requires full SFG completion or issued/warehouse stock
+                if ($totalUsableSfg <= 0.0 && $predOpFresh->status !== ProductionOrderOperation::STATUS_COMPLETED) {
+                    $crossReadyLimits[] = 0.0;
+                    $blockers[] = [
+                        'code' => self::REASON_WIP_NOT_AVAILABLE,
+                        'dimension' => 'dependency',
+                        'message' => "Cross-assembly predecessor operation {$predOpFresh->operation_number} has insufficient usable SFG.",
+                        'severity' => 'error',
+                        'is_workflow_dependency' => true,
+                    ];
+                } else {
+                    $maxExecutable = $totalUsableSfg / $bomRatio;
+                    $crossReadyLimits[] = $maxExecutable;
+                }
             }
         }
 

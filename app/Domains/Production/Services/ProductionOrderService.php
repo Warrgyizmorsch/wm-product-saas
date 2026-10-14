@@ -645,10 +645,16 @@ class ProductionOrderService
         foreach ($ops as $op) {
             $targetQty = (float) ($op->target_produced_qty ?: ($order->quantity_ordered ?: 0.0));
             $doneQty = (float) ($op->quantity_produced ?: 0.0);
-            $isOpDone = ($op->status === ProductionOrderOperation::STATUS_COMPLETED)
-                || ($op->status === ProductionOrderOperation::STATUS_SKIPPED)
+
+            // Standalone SFG / Direct Sale Guardrail:
+            // If a routing has Queue Threshold on its final operation, but the order is a standalone Finished Good
+            // (or an SFG being produced directly for sale/stock with NO parent order consuming it),
+            // the threshold is gracefully treated as a no-op for order closure. The order must NOT complete prematurely
+            // on the transfer batch; it strictly requires 100% of the target ordered quantity to be produced.
+            $isOpDone = ($op->status === ProductionOrderOperation::STATUS_SKIPPED)
                 || ($op->status === ProductionOrderOperation::STATUS_CANCELLED)
-                || ($targetQty > 0 && $doneQty >= ($targetQty - 0.0001));
+                || ($targetQty > 0 && $doneQty >= ($targetQty - 0.0001))
+                || ($op->status === ProductionOrderOperation::STATUS_COMPLETED && ($targetQty <= 0 || $doneQty >= ($targetQty - 0.0001)));
 
             if (!$isOpDone) {
                 $allDone = false;

@@ -11,6 +11,34 @@ class StoreProductionBomRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $productId = $this->input('product_id');
+        if ($productId) {
+            $product = \App\Domains\Inventory\Models\Product::find($productId);
+            if ($product && $product->uom_id) {
+                $this->merge(['base_uom_id' => $product->uom_id]);
+            }
+        }
+
+        $items = $this->input('items', []);
+        if (is_array($items)) {
+            $modified = false;
+            foreach ($items as $index => $item) {
+                if (!empty($item['material_id'])) {
+                    $material = \App\Domains\Inventory\Models\Product::find($item['material_id']);
+                    if ($material && $material->uom_id) {
+                        $items[$index]['uom_id'] = $material->uom_id;
+                        $modified = true;
+                    }
+                }
+            }
+            if ($modified) {
+                $this->merge(['items' => $items]);
+            }
+        }
+    }
+
     public function rules(): array
     {
         return [

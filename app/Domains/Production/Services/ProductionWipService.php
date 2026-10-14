@@ -710,6 +710,13 @@ class ProductionWipService
                     ->orderBy('production_order_operations.sequence', 'asc')
                     ->lockForUpdate()
                     ->first();
+
+                if (!$nextOp) {
+                    $nextOp = $sourceOp->successorDependencies()
+                        ->orderBy('production_order_operations.sequence', 'asc')
+                        ->lockForUpdate()
+                        ->first();
+                }
             }
 
             if (!$nextOp) {
@@ -964,10 +971,17 @@ class ProductionWipService
                     }
 
                     ProductionScheduleOperation::where('tenant_id', $tenantId)
-                        ->where('production_order_id', $sourceOp->production_order_id)
                         ->where('production_order_operation_id', $nextOp->id)
                         ->where('status', ProductionScheduleOperation::STATUS_WAITING)
                         ->update(['status' => ProductionScheduleOperation::STATUS_READY]);
+
+                    if ($nextOp->production_order_id) {
+                        try {
+                            app(ProductionOrderService::class)->reconcileOperationReadiness($nextOp->production_order_id);
+                        } catch (\Throwable $e) {
+                            // Non-fatal readiness reconciliation
+                        }
+                    }
 
                     if ($destWip && $destWip->id !== $sourceWip?->id) {
                         $destWip->current_routing_operation_id = $nextRoutingOpId;

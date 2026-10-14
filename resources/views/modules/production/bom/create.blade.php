@@ -42,7 +42,7 @@
                             <option value="__ADD_NEW__" class="fw-bold text-primary">{{ __('production.add_new_product') }}
                             </option>
                             @foreach ($products as $p)
-                                <option value="{{ $p->id }}" @selected(old('product_id', $selectedProductId ?? '') == $p->id)>
+                                <option value="{{ $p->id }}" data-uom-id="{{ $p->uom_id }}" @selected(old('product_id', $selectedProductId ?? '') == $p->id)>
                                     {{ $p->name }} ({{ $p->sku }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>
@@ -94,17 +94,23 @@
                             :required="true" :error-text="$errors->first('base_quantity')"
                             alpineError="errors.base_quantity" />
 
-                        <x-ui.odoo-form-ui type="select" :label="__('production.base_uom')" name="base_uom_id"
-                            :required="true" data-master="uom" :error-text="$errors->first('base_uom_id')"
-                            alpineError="errors.base_uom_id">
+                        @php
+                            $initBaseUomId = old('base_uom_id', $products->firstWhere('id', old('product_id', $selectedProductId ?? null))?->uom_id ?? '');
+                        @endphp
+                        <input type="hidden" name="base_uom_id" id="base_uom_id" value="{{ $initBaseUomId }}">
+                        <x-ui.odoo-form-ui type="select" :label="__('production.base_uom')" id="base_uom_id_display"
+                            :disabled="true" :error-text="$errors->first('base_uom_id')"
+                            alpineError="errors.base_uom_id" class="bg-light text-muted"
+                            style="pointer-events: none; cursor: not-allowed; background-color: #f8f9fa;">
                             <option value="">{{ __('production.select_uom') }}</option>
-                            <option value="__ADD_NEW__" class="fw-bold text-primary">{{ __('production.add_new_uom') }}
-                            </option>
                             @foreach ($uoms as $uom)
-                                <option value="{{ $uom->id }}" @selected(old('base_uom_id') == $uom->id)>{{ $uom->name }}
+                                <option value="{{ $uom->id }}" @selected($initBaseUomId == $uom->id)>{{ $uom->name }}
                                     ({{ $uom->code }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>
+                        <small class="form-text text-muted fs-11 mb-3 d-block">
+                            <i class="feather-lock me-1 text-secondary"></i>Auto-assigned from product master (read-only)
+                        </small>
                         <x-ui.odoo-form-ui type="textarea" :label="__('production.revision_notes')" name="notes"
                             placeholder="{{ __('production.notes_placeholder') }}" rows="3"
                             :error-text="$errors->first('notes')"
@@ -177,7 +183,10 @@
                                         <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
                                         <th style="width: 25%">{{ __('production.component_product') }}</th>
                                         <th style="width: 10%">{{ __('production.quantity') }}</th>
-                                        <th style="width: 12%">{{ __('production.uom') }}</th>
+                                        <th style="width: 12%">
+                                            {{ __('production.uom') }}
+                                            <i class="feather-lock text-muted ms-1 fs-11" title="Auto-selected from component product (read-only)"></i>
+                                        </th>
                                         <th style="width: 10%">{{ __('production.scrap_percent') }}</th>
                                         <th style="width: 8%">{{ __('production.priority') }}</th>
                                         <th style="width: 15%">{{ __('production.validity') }}</th>
@@ -203,7 +212,7 @@
                                                         {{ __('production.add_new_product') }}</option>
                                                     @foreach($materials as $material)
                                                         <option value="{{ $material->id }}" data-type="{{ $material->type }}"
-                                                            data-sku="{{ $material->sku }}">{{ $material->name }}
+                                                            data-sku="{{ $material->sku }}" data-uom-id="{{ $material->uom_id }}">{{ $material->name }}
                                                             ({{ $material->sku }})</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
@@ -323,18 +332,22 @@
 
                                             <!-- UOM -->
                                             <td class="align-middle">
-                                                <x-ui.odoo-form-ui type="select" name="items[][uom_id]"
-                                                    x-bind:name="'items['+index+'][uom_id]'" class="odoo-table-select"
-                                                    x-model="item.uom_id" required select2Selector="default"
-                                                    data-master="uom" alpineError="errors['items.' + index + '.uom_id']">
+                                                <input type="hidden" x-bind:name="'items['+index+'][uom_id]'" x-model="item.uom_id">
+                                                <select class="odoo-table-select bg-light text-muted bom-row-uom-select"
+                                                    x-model="item.uom_id"
+                                                    disabled
+                                                    tabindex="-1"
+                                                    data-select2-selector="default"
+                                                    style="pointer-events: none; cursor: not-allowed; background-color: #f8f9fa;"
+                                                    :class="errors['items.' + index + '.uom_id'] ? 'is-invalid' : ''">
                                                     <option value="">{{ __('production.select_uom') }}</option>
-                                                    <option value="__ADD_NEW__" class="fw-bold text-primary">
-                                                        {{ __('production.add_new_uom') }}</option>
                                                     @foreach($uoms as $uom)
-                                                        <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})
-                                                        </option>
+                                                        <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
                                                     @endforeach
-                                                </x-ui.odoo-form-ui>
+                                                </select>
+                                                <template x-if="errors['items.' + index + '.uom_id']">
+                                                    <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray(errors['items.' + index + '.uom_id']) ? errors['items.' + index + '.uom_id'][0] : errors['items.' + index + '.uom_id']"></div>
+                                                </template>
                                             </td>
 
                                             <!-- Material Scrap Percentage -->
@@ -521,8 +534,26 @@
             ->toArray();
     @endphp
 
+    <style>
+        .bom-row-uom-select,
+        .bom-row-uom-select + .select2-container,
+        .bom-row-uom-select + .select2-container .select2-selection {
+            pointer-events: none !important;
+            cursor: not-allowed !important;
+            background-color: #f8f9fa !important;
+        }
+        #base_uom_id_display,
+        #base_uom_id_display + .select2-container,
+        #base_uom_id_display + .select2-container .select2-selection {
+            pointer-events: none !important;
+            cursor: not-allowed !important;
+            background-color: #f8f9fa !important;
+        }
+    </style>
+
     <script>
         const activeRoutings = @json($activeRoutingsJson);
+        const productsData = @json($products);
 
         const setRoutingUi = (route) => {
             const $display = $('#routing_reference_display');
@@ -607,6 +638,13 @@
                 init() {
                     window.bomAlpineInstance = this;
                     this.items = this.items.map((item, idx) => {
+                        var initialUomId = item.uom_id || '';
+                        if (!initialUomId && item.material_id) {
+                            var foundMat = this.materials.find(m => String(m.id) === String(item.material_id));
+                            if (foundMat && foundMat.uom_id) {
+                                initialUomId = String(foundMat.uom_id);
+                            }
+                        }
                         return {
                             uid: item.uid || 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + idx,
                             material_id: item.material_id || '',
@@ -615,7 +653,7 @@
                             quantity_type: item.quantity_type || 'fixed',
                             formula: item.formula || '',
                             notes: item.notes || '',
-                            uom_id: item.uom_id || '',
+                            uom_id: initialUomId,
                             material_scrap_percentage: item.material_scrap_percentage || item.wastage_percentage || 0,
                             is_alternative: !!parseInt(item.is_alternative) || item.is_alternative === true,
                             alternative_group: item.alternative_group || '',
@@ -638,6 +676,28 @@
                             }
                         });
                     });
+
+                    const syncHeaderUom = (productId) => {
+                        var prodUomId = '';
+                        if (productId) {
+                            var selectedOption = $('#product_id').find('option[value="' + productId + '"]');
+                            prodUomId = selectedOption.attr('data-uom-id') || '';
+                            if (!prodUomId) {
+                                var foundProd = productsData.find(p => String(p.id) === String(productId));
+                                if (foundProd && foundProd.uom_id) {
+                                    prodUomId = foundProd.uom_id;
+                                }
+                            }
+                        }
+                        $('#base_uom_id').val(prodUomId);
+                        var $baseUomDisplay = $('#base_uom_id_display');
+                        $baseUomDisplay.val(prodUomId);
+                        if ($baseUomDisplay.data('select2')) {
+                            $baseUomDisplay.trigger('change.select2');
+                        } else {
+                            $baseUomDisplay.trigger('change');
+                        }
+                    };
 
                     const filterRoutings = (productId) => {
                         const currentVal = $('#routing_id').val();
@@ -665,13 +725,15 @@
                         this.loadOperations();
                     };
 
-                    // Initial filter on load
+                    // Initial filter and header UOM on load
                     const initialProductId = $('#product_id').val();
                     filterRoutings(initialProductId);
+                    syncHeaderUom(initialProductId);
 
                     $('#product_id').on('change.select2 change', (e) => {
                         var parentProductId = e.target.value;
                         filterRoutings(parentProductId);
+                        syncHeaderUom(parentProductId);
 
                         $('.odoo-table-select[name*="[material_id]"]').each(function () {
                             var $select = $(this);
@@ -868,7 +930,7 @@
                         $select.data('select2-initialized', true);
                         $select.select2(self.select2RowOptions());
 
-                        // Capture type on init
+                        // Capture type and sync UOM on init
                         var nameAttr = $select.attr('name') || '';
                         if (nameAttr.indexOf('material_id') !== -1) {
                             var val = $select.val();
@@ -876,6 +938,23 @@
                                 item.material_id = val;
                                 var selectedOption = $select.find('option[value="' + val + '"]');
                                 item.material_type = selectedOption.attr('data-type') || '';
+                                if (!item.uom_id) {
+                                    var initMatUomId = selectedOption.attr('data-uom-id');
+                                    if (!initMatUomId) {
+                                        var foundMat = self.materials.find(m => String(m.id) === String(val));
+                                        if (foundMat && foundMat.uom_id) {
+                                            initMatUomId = foundMat.uom_id;
+                                        }
+                                    }
+                                    if (initMatUomId) {
+                                        item.uom_id = String(initMatUomId);
+                                        var $uomSelect = $(rowEl).find('select.bom-row-uom-select');
+                                        $uomSelect.val(item.uom_id);
+                                        if ($uomSelect.data('select2')) {
+                                            $uomSelect.trigger('change.select2');
+                                        }
+                                    }
+                                }
                             }
                         } else if (nameAttr.indexOf('quantity_type') !== -1) {
                             var val = $select.val();
@@ -893,6 +972,24 @@
                                 item.material_id = val;
                                 var selectedOption = $select.find('option[value="' + val + '"]');
                                 item.material_type = selectedOption.attr('data-type') || '';
+                                
+                                // Auto-select component UOM based on selected material
+                                var matUomId = selectedOption.attr('data-uom-id');
+                                if (!matUomId && val) {
+                                    var foundMat = self.materials.find(m => String(m.id) === String(val));
+                                    if (foundMat && foundMat.uom_id) {
+                                        matUomId = foundMat.uom_id;
+                                    }
+                                }
+                                item.uom_id = matUomId ? String(matUomId) : '';
+                                var $uomSelect = $(rowEl).find('select.bom-row-uom-select');
+                                $uomSelect.val(item.uom_id);
+                                if ($uomSelect.data('select2')) {
+                                    $uomSelect.trigger('change.select2');
+                                } else {
+                                    $uomSelect.trigger('change');
+                                }
+
                                 self.fetchChildBomStatus(item);
                             } else if (nameAttr.indexOf('uom_id') !== -1) {
                                 item.uom_id = val;

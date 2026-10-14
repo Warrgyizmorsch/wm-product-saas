@@ -1669,7 +1669,8 @@ class SchedulingService
             return $plannedStart->copy()->addMinutes((int) ceil($durationMinutes));
         }
 
-        if (!(bool) $orderOp->overlap_enabled) {
+        $isOverlap = (bool) ($orderOp->queue_threshold_enabled ?? $orderOp->overlap_enabled ?? false);
+        if (!$isOverlap) {
             $times = $this->calculateOperationTimes($orderOp, $orderQuantity);
             return $this->addWorkingMinutes($orderOp->work_center_id, $plannedStart, $times['total_minutes']);
         }
@@ -1677,7 +1678,8 @@ class SchedulingService
         $setupMinutes = (float) ($orderOp->setup_time_planned ?? 0);
         $batchQty = (float) ($orderOp->transfer_batch_quantity ?? 0);
         $lagMinutes = (float) ($orderOp->transfer_lag_minutes ?? 0);
-        $effectiveTransferQty = min($batchQty, $orderQuantity);
+        $opTarget = (float) ($orderOp->target_produced_qty > 0 ? $orderOp->target_produced_qty : $orderQuantity);
+        $effectiveTransferQty = ($batchQty > 0) ? min($batchQty, $opTarget) : $opTarget;
 
         $firstBatchTimes = $this->calculateOperationTimes($orderOp, $effectiveTransferQty);
         $firstBatchRunDuration = (float) ($firstBatchTimes['processing_minutes'] ?? 0);
@@ -1857,12 +1859,14 @@ class SchedulingService
                 return $prev['planned_finish']->copy();
             }
 
-            // Check if overlap scheduling is enabled on the predecessor operation
-            if ($prevOrderOp && (bool) $prevOrderOp->overlap_enabled) {
+            // Check if overlap / queue threshold scheduling is enabled on the predecessor operation
+            $isOverlap = (bool) ($prevOrderOp?->queue_threshold_enabled ?? $prevOrderOp?->overlap_enabled ?? false);
+            if ($prevOrderOp && $isOverlap) {
                 $setupMinutes = (float) ($prevOrderOp->setup_time_planned ?? 0);
                 $batchQty = (float) ($prevOrderOp->transfer_batch_quantity ?? 0);
                 $lagMinutes = (float) ($prevOrderOp->transfer_lag_minutes ?? 0);
-                $effectiveTransferQty = min($batchQty, $orderQuantity);
+                $prevOpTarget = (float) ($prevOrderOp->target_produced_qty > 0 ? $prevOrderOp->target_produced_qty : $orderQuantity);
+                $effectiveTransferQty = ($batchQty > 0) ? min($batchQty, $prevOpTarget) : $prevOpTarget;
 
                 $firstBatchTimes = $this->calculateOperationTimes($prevOrderOp, $effectiveTransferQty);
                 $firstBatchRunDuration = (float) ($firstBatchTimes['processing_minutes'] ?? 0);

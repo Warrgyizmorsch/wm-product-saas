@@ -106,12 +106,6 @@ class StoreRoutingRequest extends FormRequest
                             "Transfer batch quantity must be greater than zero when Queue Threshold is enabled."
                         );
                     }
-                    if ($index === $totalOps - 1) {
-                        $validator->errors()->add(
-                            "operations.{$index}.queue_threshold_enabled",
-                            "Queue Threshold cannot be enabled on the final operation because it has no successor operation."
-                        );
-                    }
                 }
             }
 
