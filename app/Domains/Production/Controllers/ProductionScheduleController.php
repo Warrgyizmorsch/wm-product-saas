@@ -148,13 +148,14 @@ class ProductionScheduleController extends Controller
         $this->authorize('view', $schedule);
 
         $tenantId = require_tenant_id();
-        $overloads = $this->schedulingService->detectOverloads($tenantId);
-        $conflicts = $this->schedulingService->detectConflicts($tenantId);
+        $overloads = $this->schedulingService->detectOverloadsForSchedule($schedule);
+        $conflicts = $this->schedulingService->detectConflictsForSchedule($schedule);
         $warnings = array_merge($overloads, $conflicts);
+        $factoryConflicts = $this->schedulingService->detectUnrelatedConflictsForSchedule($schedule);
         $groupBy = $request->input('group_by');
         $capacityDetails = $this->schedulingService->getWorkCenterCapacityDetails($schedule, $groupBy);
 
-        return view('modules.production.schedules.show', compact('schedule', 'warnings', 'capacityDetails', 'groupBy'));
+        return view('modules.production.schedules.show', compact('schedule', 'warnings', 'factoryConflicts', 'capacityDetails', 'groupBy'));
     }
 
     public function destroy(int $id)

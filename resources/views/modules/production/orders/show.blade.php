@@ -2029,9 +2029,9 @@
                                                                         class="feather-chevron-right fs-12 accordion-rotate-icon"></i>
                                                                 </button>
                                                                 <div>
-                                                                    <div class="d-flex align-items-center gap-1.5 mb-0.5">
+                                                                    <div class="d-flex align-items-center gap-2 mb-0.5">
                                                                         <span
-                                                                            class="badge {{ $level > 1 ? 'bg-soft-purple text-purple border border-purple-subtle' : 'bg-soft-primary text-primary border' }} fs-10 py-0.5 px-1.5">
+                                                                            class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 py-0.5 px-1.5 fw-bold me-1">
                                                                             {{ $level > 1 ? 'L' . $level . ' SFG' : 'L1 FG' }}
                                                                         </span>
                                                                         <span
@@ -2059,7 +2059,7 @@
                                                             <div class="fs-10 text-muted">
                                                                 @if($isExternal)
                                                                     <span
-                                                                        class="badge bg-soft-purple text-purple border fs-10 px-1.5 py-0.5">
+                                                                        class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1.5 py-0.5">
                                                                         <i class="feather-truck me-1"></i>External Subcontract
                                                                     </span>
                                                                 @else
@@ -2075,7 +2075,7 @@
                                                         <td class="bg-white">
                                                             @if($isExternal)
                                                                 <div class="fw-semibold text-dark fs-11"><i
-                                                                        class="feather-users me-1 text-purple"></i>{{ $cOp->vendor->name ?? 'Outsourced Vendor' }}
+                                                                        class="feather-users me-1 text-primary"></i>{{ $cOp->vendor->name ?? 'Outsourced Vendor' }}
                                                                 </div>
                                                                 <div class="fs-10 text-muted">Subcontract Vendor</div>
                                                             @else
@@ -2278,7 +2278,7 @@
                                                                                 </a>
                                                                                 @if($isExternal)
                                                                                     <a href="{{ route('production.subcontract.delivery-challans.index') }}"
-                                                                                        class="btn btn-sm btn-outline-purple fs-11 py-1 px-2">
+                                                                                        class="btn btn-sm btn-outline-primary fs-11 py-1 px-2">
                                                                                         <i class="feather-file-text me-1"></i>Manage
                                                                                         Subcontract
                                                                                     </a>

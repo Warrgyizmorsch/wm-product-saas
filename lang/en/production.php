@@ -641,6 +641,8 @@ return array (
   'schedule_details' => 'Schedule Details (:number)',
   'remaining' => 'Remaining',
   'capacity_overload_warnings' => 'Capacity Overload Warnings',
+  'factory_conflicts_notice' => ':count conflict(s) detected across other factory schedules.',
+  'view_capacity_planning' => 'View Capacity Planning',
   'schedule_operations' => 'Schedule Operations',
   'capacity_analysis' => 'Capacity Analysis',
   'actual_machine' => 'Actual Machine',

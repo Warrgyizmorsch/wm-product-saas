@@ -684,6 +684,8 @@ return [
     'total_operations' => 'कुल संचालन',
     'remaining' => 'शेष',
     'capacity_overload_warnings' => 'क्षमता अधिभार चेतावनियां',
+    'factory_conflicts_notice' => 'अन्य फ़ैक्टरी अनुसूचियों में :count विरोध का पता चला।',
+    'view_capacity_planning' => 'क्षमता योजना देखें',
     'schedule_operations' => 'शेड्यूल संचालन',
     'capacity_analysis' => 'क्षमता विश्लेषण',
     'actual_machine' => 'वास्तविक मशीन',

@@ -684,6 +684,8 @@ return [
     'total_operations' => 'Общо операции',
     'remaining' => 'Оставащи',
     'capacity_overload_warnings' => 'Предупреждения за претоварване на капацитета',
+    'factory_conflicts_notice' => 'Открити са :count конфликта в други графици на фабриката.',
+    'view_capacity_planning' => 'Преглед на планирането на капацитета',
     'schedule_operations' => 'Операции по график',
     'capacity_analysis' => 'Анализ на капацитета',
     'actual_machine' => 'Действителна машина',

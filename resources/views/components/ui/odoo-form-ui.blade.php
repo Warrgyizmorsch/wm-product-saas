@@ -256,6 +256,15 @@
                 font-size: 13px;
                 transition: border-bottom-color 0.2s ease-in-out;
             }
+            .odoo-table-input[type="number"]::-webkit-outer-spin-button,
+            .odoo-table-input[type="number"]::-webkit-inner-spin-button {
+                -webkit-appearance: none !important;
+                margin: 0 !important;
+            }
+            .odoo-table-input[type="number"] {
+                -moz-appearance: textfield !important;
+                appearance: textfield !important;
+            }
             .odoo-table-input:focus {
                 border-bottom-color: var(--bs-primary) !important;
                 outline: none;
