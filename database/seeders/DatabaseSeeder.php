@@ -30,7 +30,14 @@ class DatabaseSeeder extends Seeder
                 'plan_started_at' => now(),
                 'timezone' => 'Asia/Kolkata',
                 'locale' => 'en',
-                'settings' => [],
+                'settings' => [
+                    'display_name' => 'Mossie ERP',
+                    'logo_full' => 'tenant-branding/mqZnDFzwzD4hOZ8fiBc9v12kB1jnrbaDbWIpeBhk.png',
+                    'logo_abbr' => 'tenant-branding/YxS0GHtFpJnEaNpHOCriJ5T29AKFOMRCPvsHd16v.png',
+                    'branch' => 'Main Office',
+                    'currency' => 'INR',
+                    'financial_year' => 'FY 2026',
+                ],
             ],
         );
 
