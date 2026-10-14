@@ -236,12 +236,12 @@ class LeadService
     /**
      * Update lead status and handle customer conversion logic.
      */
-    public function updateLeadStatus(Lead $lead, string $newStatus): array
+    public function updateLeadStatus(Lead $lead, string $newStatus, bool $isSystemTriggered = false): array
     {
         $oldStatus = $lead->status ?: 'New';
 
-        // Permanent Lock Check: Once a lead is Won, it can NEVER be changed to any other status
-        if (($oldStatus === 'Won' || $lead->is_customer) && $newStatus !== 'Won') {
+        // Permanent Lock Check: Once a lead is Won, it can NEVER be changed to any other status manually
+        if (($oldStatus === 'Won' || $lead->is_customer) && $newStatus !== 'Won' && !$isSystemTriggered) {
             return [
                 'success' => false,
                 'message' => 'Lead status is Won and permanently locked. Status cannot be changed.'
@@ -250,6 +250,14 @@ class LeadService
 
         if ($oldStatus === $newStatus) {
             return ['success' => true, 'message' => "Lead status is already {$newStatus}."];
+        }
+
+        // Direct Won transition guard: manual transition to Won is strictly blocked!
+        if (strcasecmp($newStatus, 'Won') === 0 && !$isSystemTriggered) {
+            return [
+                'success' => false,
+                'message' => 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.'
+            ];
         }
 
         $updateData = ['status' => $newStatus];
@@ -269,7 +277,7 @@ class LeadService
                 app(\App\Domains\CRM\Repositories\LeadRepository::class)->qualifyLead($lead);
             }
             $message = 'Lead status updated to Dealing.';
-        } elseif ($newStatus === 'Won') {
+        } elseif (strcasecmp($newStatus, 'Won') === 0) {
             if (!$lead->crm_account_id) {
                 $acc = \App\Domains\CRM\Models\CrmAccount::where('tenant_id', $lead->tenant_id ?? 1)
                     ->where(function($q) use ($lead) {
@@ -298,7 +306,12 @@ class LeadService
         }
 
         $oldStatus = $lead->status ?: 'New';
-        $lead->update($updateData);
+        Lead::$allowWonTransition = true;
+        try {
+            $lead->update($updateData);
+        } finally {
+            Lead::$allowWonTransition = false;
+        }
 
         if ($oldStatus !== $lead->status) {
             LeadHistory::logEvent(

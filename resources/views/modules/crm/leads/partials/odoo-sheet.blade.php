@@ -511,7 +511,7 @@
                     @if(!empty($allAddlContacts))
                         <div class="mt-3 p-2.5 border rounded-2 bg-light-50">
                             <span class="fs-11 fw-bold text-uppercase text-primary letter-spacing-1 d-block mb-1.5">
-                                <i class="feather-users me-1 text-primary"></i> Additional Contacts ({{ count($allAddlContacts) }})
+                                <i class="feather-users me-1 text-primary"></i> {{ __('crm.additional_contacts') }} ({{ count($allAddlContacts) }})
                             </span>
                             <div class="d-flex flex-column gap-1.5">
                                 @foreach($allAddlContacts as $ac)
@@ -570,7 +570,7 @@
                     @if(!empty($lead->utm_source) || !empty($lead->utm_medium) || !empty($lead->utm_campaign) || !empty($lead->utm_term) || !empty($lead->utm_content))
                         <li class="nav-item" role="presentation">
                             <button class="nav-link fw-bold fs-12 px-3 py-2" id="nb-utm-tab" data-bs-toggle="tab" data-bs-target="#nb-utm-pane" type="button" role="tab" aria-controls="nb-utm-pane" aria-selected="false">
-                                <i class="feather-compass me-1 text-primary"></i>UTM Parameters
+                                <i class="feather-compass me-1 text-primary"></i>{{ __('crm.utm_parameters') }}
                             </button>
                         </li>
                     @endif
@@ -791,12 +791,12 @@
                         <div class="tab-pane fade" id="nb-utm-pane" role="tabpanel" aria-labelledby="nb-utm-tab">
                             <div class="p-3 border rounded-3 bg-white" style="border-color: #e2e8f0 !important;" id="sectionUtmParams">
                                 <h6 class="fs-13 text-dark fw-bold pb-2 border-bottom mb-3">
-                                    <i class="feather-compass text-primary me-1.5"></i>UTM Parameters (Marketing Attribution)
+                                    <i class="feather-compass text-primary me-1.5"></i>{{ __('crm.utm_parameters') }}
                                 </h6>
                                 <div class="row g-2">
                                     <div class="col-md-4">
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">UTM Source</div>
+                                            <div class="zoho-field-label">{{ __('crm.utm_source') }}</div>
                                             <div class="zoho-field-value">
                                                 @if($lead->utm_source)
                                                     <span class="badge bg-soft-primary text-primary font-monospace px-2 py-1 fs-11">{{ $lead->utm_source }}</span>
@@ -808,7 +808,7 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">UTM Medium</div>
+                                            <div class="zoho-field-label">{{ __('crm.utm_medium') }}</div>
                                             <div class="zoho-field-value">
                                                 @if($lead->utm_medium)
                                                     <span class="badge bg-soft-info text-info font-monospace px-2 py-1 fs-11">{{ $lead->utm_medium }}</span>
@@ -820,7 +820,7 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">UTM Campaign</div>
+                                            <div class="zoho-field-label">{{ __('crm.utm_campaign') }}</div>
                                             <div class="zoho-field-value">
                                                 @if($lead->utm_campaign)
                                                     <span class="badge bg-soft-teal text-teal font-monospace px-2 py-1 fs-11">{{ $lead->utm_campaign }}</span>
@@ -832,13 +832,13 @@
                                     </div>
                                     <div class="col-md-6">
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">UTM Term</div>
+                                            <div class="zoho-field-label">{{ __('crm.utm_term') }}</div>
                                             <div class="zoho-field-value text-dark font-monospace fs-12">{{ $lead->utm_term ?: '—' }}</div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="zoho-field-row">
-                                            <div class="zoho-field-label">UTM Content</div>
+                                            <div class="zoho-field-label">{{ __('crm.utm_content') }}</div>
                                             <div class="zoho-field-value text-dark font-monospace fs-12">{{ $lead->utm_content ?: '—' }}</div>
                                         </div>
                                     </div>

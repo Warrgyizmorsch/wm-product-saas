@@ -367,12 +367,6 @@ class LeadController extends Controller
             ->with('success', "Lead #{$lead->id} converted to Deal{$dealMsg} successfully!");
     }
 
-    public function trackStatus()
-    {
-        $this->authorize('viewAny', Lead::class);
-        return view('modules.crm.leads.track-status');
-    }
-
     public function downloadSample()
     {
         $this->authorize('viewAny', Lead::class);
@@ -580,6 +574,16 @@ class LeadController extends Controller
     public function updateStatus(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
+
+        $targetStatus = (string) $request->input('status');
+        if (strcasecmp($targetStatus, 'Won') === 0) {
+            $msg = 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.';
+            if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->withErrors(['status' => $msg])->with('error', $msg);
+        }
+
         if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
             if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
                 return response()->json(['success' => false, 'message' => "Lead status in '{$lead->status}' stage is locked."], 422);

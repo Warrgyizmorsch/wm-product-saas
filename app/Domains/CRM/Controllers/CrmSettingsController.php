@@ -21,7 +21,6 @@ class CrmSettingsController extends Controller
         $settings = is_array($tenant?->settings) ? $tenant->settings : [];
 
         $quotationApprovalPolicy = $settings['quotation_approval_policy'] ?? 'approval_required';
-        $invoicingPolicy = $settings['invoicing_policy'] ?? 'sales_order';
         $leadAssignmentConfig = LeadAssignmentService::getConfig($tenant);
 
         $users = User::where('tenant_id', $tenantId)
@@ -32,7 +31,6 @@ class CrmSettingsController extends Controller
             'tenant' => $tenant,
             'settings' => $settings,
             'quotationApprovalPolicy' => $quotationApprovalPolicy,
-            'invoicingPolicy' => $invoicingPolicy,
             'leadAssignmentConfig' => $leadAssignmentConfig,
             'users' => $users,
         ]);
@@ -75,28 +73,6 @@ class CrmSettingsController extends Controller
 
         return redirect()->route('crm.settings.index', ['tab' => 'lead-assignment'])
             ->with('success', 'Lead Auto-Assignment & Round-Robin Distribution settings updated successfully.');
-    }
-
-    public function updateInvoicingPolicy(Request $request): RedirectResponse
-    {
-        $this->authorize('create', Lead::class);
-
-        $validated = $request->validate([
-            'invoicing_policy' => ['required', 'string', 'in:sales_order,dispatch_order,both'],
-        ]);
-
-        $tenant = tenant();
-        if (!$tenant) {
-            return redirect()->back()->with('error', 'Tenant context not found.');
-        }
-
-        $currentSettings = is_array($tenant->settings) ? $tenant->settings : [];
-        $currentSettings['invoicing_policy'] = $validated['invoicing_policy'];
-
-        $tenant->update(['settings' => $currentSettings]);
-
-        return redirect()->route('crm.settings.index', ['tab' => 'invoicing-policy'])
-            ->with('success', 'CRM & Sales Invoicing Policy settings updated successfully.');
     }
 
     public function updateQuotationApprovalPolicy(Request $request): RedirectResponse

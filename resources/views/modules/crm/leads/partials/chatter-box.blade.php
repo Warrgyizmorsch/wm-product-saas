@@ -13,14 +13,14 @@
         <div class="nav nav-pills odoo-chatter-nav-pills p-0.5 bg-light rounded-2 border d-inline-flex flex-row align-items-center flex-nowrap" id="odooChatterTabs" role="tablist">
             <button class="nav-link px-2.5 py-1 fs-12 fw-bold active d-inline-flex align-items-center gap-1.5 rounded-2 text-nowrap" id="chatter-activity-tab" data-bs-toggle="pill" data-bs-target="#chatter-activity-pane" type="button" role="tab" aria-controls="chatter-activity-pane" aria-selected="true">
                 <i class="feather-calendar fs-12"></i>
-                <span>Activities</span>
+                <span>{{ __('crm.activities') }}</span>
                 @if($activeActionableCount > 0)
                     <span class="badge bg-primary text-white rounded-pill px-1.5 py-0.2 fs-10 font-monospace">{{ $activeActionableCount }}</span>
                 @endif
             </button>
             <button class="nav-link px-2.5 py-1 fs-12 fw-bold d-inline-flex align-items-center gap-1.5 rounded-2 text-muted text-nowrap" id="chatter-history-tab" data-bs-toggle="pill" data-bs-target="#chatter-history-pane" type="button" role="tab" aria-controls="chatter-history-pane" aria-selected="false">
                 <i class="feather-clock fs-12"></i>
-                <span>History</span>
+                <span>{{ __('crm.history') }}</span>
                 <span class="badge bg-secondary-subtle text-secondary rounded-pill px-1.5 py-0.2 fs-10 font-monospace">{{ $historyCount }}</span>
             </button>
         </div>
@@ -29,51 +29,51 @@
         <div class="dropdown">
             <button class="btn btn-xs btn-white border dropdown-toggle d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-2 shadow-2xs fw-semibold fs-12 text-dark" type="button" id="activityFilterDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="feather-filter text-primary fs-12"></i>
-                <span id="activeFilterLabel">All ({{ $allActivitiesTotal }})</span>
+                <span id="activeFilterLabel">{{ __('crm.all_activities') }} ({{ $allActivitiesTotal }})</span>
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow-sm fs-12 py-1 border" aria-labelledby="activityFilterDropdownBtn" id="activityFilterMenu" style="min-width: 220px;">
                 <li>
-                    <a class="dropdown-item activity-filter-item d-flex align-items-center justify-content-between py-1.5 px-3 active" href="javascript:void(0)" data-filter="all" onclick="applyChatterActivityFilter('all', 'All', {{ $allActivitiesTotal }})">
+                    <a class="dropdown-item activity-filter-item d-flex align-items-center justify-content-between py-1.5 px-3 active" href="javascript:void(0)" data-filter="all" onclick="applyChatterActivityFilter('all', '{{ addslashes(__('crm.all_activities')) }}', {{ $allActivitiesTotal }})">
                         <span class="d-flex align-items-center gap-2">
                             <i class="feather-list text-muted fs-12"></i>
-                            <span>All Activities</span>
+                            <span>{{ __('crm.all_activities') }}</span>
                         </span>
                         <span class="badge bg-dark text-white rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $allActivitiesTotal }}</span>
                     </a>
                 </li>
                 <li><hr class="dropdown-divider my-1"></li>
                 <li>
-                    <a class="dropdown-item activity-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="planned" onclick="applyChatterActivityFilter('planned', 'Planned', {{ $plannedActivities->count() }})">
+                    <a class="dropdown-item activity-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="planned" onclick="applyChatterActivityFilter('planned', '{{ addslashes(__('crm.planned_activities')) }}', {{ $plannedActivities->count() }})">
                         <span class="d-flex align-items-center gap-2">
                             <i class="feather-calendar text-success fs-12"></i>
-                            <span>Planned Activities</span>
+                            <span>{{ __('crm.planned_activities') }}</span>
                         </span>
                         <span class="badge bg-success text-white rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $plannedActivities->count() }}</span>
                     </a>
                 </li>
                 <li>
-                    <a class="dropdown-item activity-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="overdue" onclick="applyChatterActivityFilter('overdue', 'Overdue', {{ $overdueActivities->count() }})">
+                    <a class="dropdown-item activity-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="overdue" onclick="applyChatterActivityFilter('overdue', '{{ addslashes(__('crm.overdue_activities')) }}', {{ $overdueActivities->count() }})">
                         <span class="d-flex align-items-center gap-2">
                             <i class="feather-alert-circle text-danger fs-12"></i>
-                            <span>Overdue Activities</span>
+                            <span>{{ __('crm.overdue_activities') }}</span>
                         </span>
                         <span class="badge bg-danger text-white rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $overdueActivities->count() }}</span>
                     </a>
                 </li>
                 <li>
-                    <a class="dropdown-item activity-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="today" onclick="applyChatterActivityFilter('today', 'Today', {{ $todayDoneActivities->count() }})">
+                    <a class="dropdown-item activity-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="today" onclick="applyChatterActivityFilter('today', '{{ addslashes(__('crm.today_activity')) }}', {{ $todayDoneActivities->count() }})">
                         <span class="d-flex align-items-center gap-2">
                             <i class="feather-check-circle text-warning fs-12"></i>
-                            <span>Today Activity</span>
+                            <span>{{ __('crm.today_activity') }}</span>
                         </span>
                         <span class="badge bg-warning text-dark rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $todayDoneActivities->count() }}</span>
                     </a>
                 </li>
                 <li>
-                    <a class="dropdown-item activity-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="past" onclick="applyChatterActivityFilter('past', 'Past', {{ $pastCount }})">
+                    <a class="dropdown-item activity-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="past" onclick="applyChatterActivityFilter('past', '{{ addslashes(__('crm.past_activities')) }}', {{ $pastCount }})">
                         <span class="d-flex align-items-center gap-2">
                             <i class="feather-clock text-secondary fs-12"></i>
-                            <span>Past Activities</span>
+                            <span>{{ __('crm.past_activities') }}</span>
                         </span>
                         <span class="badge bg-secondary text-white rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $pastCount }}</span>
                     </a>
@@ -102,7 +102,7 @@
                             data-next-followup="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}"
                             title="{{ __('crm.schedule_next_activity_btn') }}">
                         <i class="feather-plus fs-11 text-primary"></i>
-                        <span>Activity</span>
+                        <span>{{ __('crm.activity') }}</span>
                     </button>
 
                     <button type="button" 
@@ -111,7 +111,7 @@
                             data-bs-target="#modalLogNote" 
                             title="{{ __('crm.add_note') }}">
                         <i class="feather-edit-2 fs-10 text-muted"></i>
-                        <span>Note</span>
+                        <span>{{ __('crm.note') }}</span>
                     </button>
                 </div>
 
@@ -138,7 +138,7 @@
                                     <div class="text-center pt-2 pb-1">
                                         <button type="button" class="btn btn-xs btn-white border rounded-pill px-3 py-1.5 fs-11 text-secondary fw-semibold shadow-2xs hover-primary btn-load-more-section" data-target=".extra-overdue-items" data-count="{{ $overdueActivities->count() - 10 }}">
                                             <i class="feather-chevron-down fs-11 me-1"></i>
-                                            <span>Load More (+{{ $overdueActivities->count() - 10 }} more)</span>
+                                            <span>{{ __('crm.load_more') }} (+{{ $overdueActivities->count() - 10 }})</span>
                                         </button>
                                     </div>
                                 @endif
@@ -166,7 +166,7 @@
                                     <div class="text-center pt-2 pb-1">
                                         <button type="button" class="btn btn-xs btn-white border rounded-pill px-3 py-1.5 fs-11 text-secondary fw-semibold shadow-2xs hover-primary btn-load-more-section" data-target=".extra-planned-items" data-count="{{ $plannedActivities->count() - 10 }}">
                                             <i class="feather-chevron-down fs-11 me-1"></i>
-                                            <span>Load More (+{{ $plannedActivities->count() - 10 }} more)</span>
+                                            <span>{{ __('crm.load_more') }} (+{{ $plannedActivities->count() - 10 }})</span>
                                         </button>
                                     </div>
                                 @endif
@@ -192,7 +192,7 @@
                     @if($pastCount > 0)
                         <div class="activity-section-block" data-activity-section="past">
                             <div class="odoo-feed-divider odoo-feed-divider--past-done" data-bs-toggle="collapse" data-bs-target="#collapsePast_chatter" aria-expanded="true" aria-controls="collapsePast_chatter">
-                                <span><i class="feather-chevron-down toggle-arrow me-1"></i> Past Activities (<span id="pastActivitiesTotalBadge">{{ $pastCount }}</span>)</span>
+                                <span><i class="feather-chevron-down toggle-arrow me-1"></i> {{ __('crm.past_activities') }} (<span id="pastActivitiesTotalBadge">{{ $pastCount }}</span>)</span>
                             </div>
                             <div class="collapse show odoo-activity-list mb-3" id="collapsePast_chatter">
                                 <div id="pastActivitiesContainer">
@@ -205,11 +205,11 @@
                                     <div id="pastActivitiesInfiniteTrigger" class="text-center py-2.5 my-2" data-lead-id="{{ $lead->id }}" data-current-page="1" data-has-more="true" data-total="{{ $pastCount }}">
                                         <div class="past-activities-spinner d-none text-primary fs-11 py-1 fw-semibold">
                                             <span class="spinner-border spinner-border-sm text-primary me-1.5" style="width: 14px; height: 14px;" role="status"></span>
-                                            <span>Loading next 5 past activities...</span>
+                                            <span>{{ __('crm.loading_past_activities') }}</span>
                                         </div>
                                         <button type="button" class="btn btn-xs btn-white border rounded-pill px-3 py-1.5 fs-11 text-secondary fw-semibold shadow-2xs hover-primary btn-load-more-past-activities" onclick="loadNextPastActivities()">
                                             <i class="feather-chevron-down fs-11 me-1 text-primary"></i>
-                                            <span>Load More Activities (+{{ $pastCount - 5 }} remaining)</span>
+                                            <span>{{ __('crm.load_more_activities') }} (+{{ $pastCount - 5 }})</span>
                                         </button>
                                     </div>
                                 @endif
@@ -224,7 +224,7 @@
                                 <i class="feather-calendar fs-5"></i>
                             </div>
                             <h6 class="fw-bold text-dark fs-13 mb-1">{{ __('crm.no_pending_activities') }}</h6>
-                            <p class="text-muted fs-11 mb-3">Schedule a call, meeting, or email reminder for this lead.</p>
+                            <p class="text-muted fs-11 mb-3">{{ __('crm.schedule_call_meeting_reminder') }}</p>
                             <x-ui.button type="button" variant="primary" size="xs" icon="feather-plus" class="fw-semibold px-3 py-1.5 rounded-pill btn-open-followup-offcanvas" 
                                     data-bs-toggle="offcanvas" 
                                     data-bs-target="#leadFollowupOffcanvas" 
@@ -255,7 +255,7 @@
                 </div>
                 <div class="input-group input-group-sm" style="width: 150px;">
                     <span class="input-group-text bg-white border-end-0 py-0.5 px-2 text-muted" style="border-color: #e2e8f0;"><i class="feather-search fs-10"></i></span>
-                    <input type="search" class="form-control form-control-sm border-start-0 py-0.5 px-1 fs-11" id="historyQuickSearch" placeholder="Search history..." oninput="filterHistoryEvents(this.value)" onsearch="filterHistoryEvents(this.value)" style="border-color: #e2e8f0;">
+                    <input type="search" class="form-control form-control-sm border-start-0 py-0.5 px-1 fs-11" id="historyQuickSearch" placeholder="{{ __('crm.search_history') }}" oninput="filterHistoryEvents(this.value)" onsearch="filterHistoryEvents(this.value)" style="border-color: #e2e8f0;">
                 </div>
             </div>
 
@@ -267,7 +267,7 @@
                             <i class="feather-clock fs-20 opacity-50"></i>
                         </div>
                         <h6 class="fw-bold text-dark fs-12 mb-1">{{ __('crm.no_history_events') }}</h6>
-                        <p class="text-muted fs-11 mb-0">No past audit entries or activity records found for this lead.</p>
+                        <p class="text-muted fs-11 mb-0">{{ __('crm.no_past_audit_records') }}</p>
                     </div>
                 @else
                     <div id="historyEventsList">
@@ -276,9 +276,9 @@
                                 try {
                                     $parsedDate = \Carbon\Carbon::createFromFormat('d/m/Y', $date)->startOfDay();
                                     if ($parsedDate->isToday()) {
-                                        $displayDate = 'Today • ' . $parsedDate->format('d M Y');
+                                        $displayDate = __('crm.today') . ' • ' . $parsedDate->format('d M Y');
                                     } elseif ($parsedDate->isYesterday()) {
-                                        $displayDate = 'Yesterday • ' . $parsedDate->format('d M Y');
+                                        $displayDate = __('crm.yesterday') . ' • ' . $parsedDate->format('d M Y');
                                     } else {
                                         $displayDate = $parsedDate->format('d M Y') . ' (' . $parsedDate->format('l') . ')';
                                     }
@@ -310,7 +310,7 @@
                     <!-- No Results Search Fallback -->
                     <div id="historyEmptySearchResults" class="text-center py-4 text-muted border border-dashed rounded-3 bg-white fs-11 my-2" style="display: none;">
                         <i class="feather-search fs-18 mb-1 d-block text-muted opacity-50"></i>
-                        <span>No history events match your filter.</span>
+                        <span>{{ __('crm.no_history_match_filter') }}</span>
                     </div>
                 @endif
             </div>
@@ -391,13 +391,13 @@
         var count = btn.attr('data-count');
         if (target.hasClass('d-none')) {
             target.removeClass('d-none').hide().slideDown(200);
-            btn.find('span').text('Show Less');
+            btn.find('span').text('{{ addslashes(__('crm.show_less')) }}');
             btn.find('i').removeClass('feather-chevron-down').addClass('feather-chevron-up');
         } else {
             target.slideUp(200, function() {
                 target.addClass('d-none');
             });
-            btn.find('span').text('Load More (+' + count + ' more)');
+            btn.find('span').text('{{ addslashes(__('crm.load_more')) }} (+' + count + ')');
             btn.find('i').removeClass('feather-chevron-up').addClass('feather-chevron-down');
         }
     });
@@ -444,7 +444,7 @@
                     }
 
                     if (res.has_more && res.remaining > 0) {
-                        trigger.find('.btn-load-more-past-activities').removeClass('d-none').find('span').text('Load More Activities (+' + res.remaining + ' remaining)');
+                        trigger.find('.btn-load-more-past-activities').removeClass('d-none').find('span').text('{{ addslashes(__('crm.load_more_activities')) }} (+' + res.remaining + ')');
                     } else {
                         trigger.remove();
                     }
@@ -457,7 +457,7 @@
                 console.error('Past activities load error:', error);
                 pastActivitiesLoading = false;
                 trigger.find('.past-activities-spinner').addClass('d-none');
-                trigger.find('.btn-load-more-past-activities').removeClass('d-none').html('<i class="feather-refresh-cw me-1 text-danger"></i> Failed to load. Click to retry');
+                trigger.find('.btn-load-more-past-activities').removeClass('d-none').html('<i class="feather-refresh-cw me-1 text-danger"></i> {{ addslashes(__('crm.failed_to_load_retry')) }}');
             }
         });
     }

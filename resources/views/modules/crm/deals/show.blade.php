@@ -123,17 +123,20 @@
     }
 
     .odoo-activity-item {
-        padding: 12px 6px;
-        border-bottom: 1px solid #f1f5f9;
-        background-color: #ffffff !important;
-        transition: background-color 0.15s ease;
+        padding: 12px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        background-color: #ffffff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        transition: all 0.15s ease;
     }
     .odoo-activity-item:last-child {
-        border-bottom: none;
+        margin-bottom: 0;
     }
     .odoo-activity-item:hover {
-        background-color: rgba(248, 250, 252, 0.8) !important;
-        border-radius: 4px;
+        background-color: #f8fafc;
+        border-color: #cbd5e1;
     }
 
     .activity-details-block {
@@ -187,30 +190,50 @@
         font-size: 10px;
     }
 
-    /* Main Tab Navigation Header */
+    /* Main Tab Navigation Header - Distinct Separate Tab Cards */
     .zoho-nav-tabs {
-        gap: 6px;
+        gap: 10px !important;
+        background: transparent !important;
+        padding: 0 !important;
+        border: none !important;
+    }
+    .zoho-nav-tabs .nav-item {
+        margin: 0 !important;
     }
     .zoho-nav-tabs .nav-link {
-        border: 1px solid #cbd5e1;
-        background-color: #ffffff;
-        color: #475569;
-        padding: 6px 18px;
-        font-size: 12px;
-        font-weight: 600;
-        border-radius: 20px !important;
-        transition: all 0.2s ease;
+        border: 1px solid #e2e8f0 !important;
+        background-color: #f8fafc !important;
+        color: #475569 !important;
+        padding: 6px 16px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease !important;
+        outline: none !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
     }
     .zoho-nav-tabs .nav-link:hover {
-        background-color: #f8fafc;
-        color: #0f172a;
-        border-color: #94a3b8;
+        background-color: #ffffff !important;
+        color: var(--bs-primary, #1e40af) !important;
+        border-color: #cbd5e1 !important;
     }
     .zoho-nav-tabs .nav-link.active {
-        background-color: var(--bs-primary) !important;
+        background-color: var(--bs-primary, #1e40af) !important;
         color: #ffffff !important;
-        border-color: var(--bs-primary) !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        border-color: var(--bs-primary, #1e40af) !important;
+        box-shadow: 0 2px 6px rgba(30, 64, 175, 0.25) !important;
+    }
+    .zoho-nav-tabs .nav-link.active i {
+        color: #ffffff !important;
+    }
+    .zoho-nav-tabs .nav-link:focus,
+    .zoho-nav-tabs .nav-link:focus-visible,
+    .zoho-nav-tabs .nav-link:active {
+        outline: none !important;
+        box-shadow: none !important;
     }
 
     /* Timeline Subtabs */
@@ -739,20 +762,23 @@
         background-color: var(--bs-primary) !important;
         color: #ffffff !important;
     }
+    html.app-skin-dark .zoho-nav-tabs {
+        background: transparent !important;
+    }
     html.app-skin-dark .zoho-nav-tabs .nav-link {
+        background-color: #1e293b !important;
         border-color: #334155 !important;
-        background-color: #162038 !important;
         color: #94a3b8 !important;
     }
     html.app-skin-dark .zoho-nav-tabs .nav-link:hover {
-        background-color: #1e293b !important;
+        background-color: #334155 !important;
         color: #f8fafc !important;
         border-color: #475569 !important;
     }
     html.app-skin-dark .zoho-nav-tabs .nav-link.active {
-        background-color: var(--bs-primary) !important;
+        background-color: var(--bs-primary, #1e40af) !important;
         color: #ffffff !important;
-        border-color: var(--bs-primary) !important;
+        border-color: var(--bs-primary, #1e40af) !important;
     }
     html.app-skin-dark .zoho-timeline-subtabs .nav-link {
         color: #94a3b8 !important;
@@ -858,6 +884,124 @@
     html.app-skin-dark .alert-light {
         background-color: #162038 !important;
         border-color: #1e293b !important;
+        color: #94a3b8 !important;
+    }
+
+    /* Chatter & Activities Dark Mode Support */
+    html.app-skin-dark .odoo-chatter-col,
+    html.app-skin-dark #odooRightChatter,
+    html.app-skin-dark #dealChatterTabContent,
+    html.app-skin-dark .activity-feed-container,
+    html.app-skin-dark #odooRightChatter .bg-white,
+    html.app-skin-dark #odooRightChatter .sticky-top {
+        background-color: #0b1329 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .odoo-chatter-nav-pills {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .odoo-chatter-nav-pills .nav-link {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .odoo-chatter-nav-pills .nav-link:hover {
+        color: #60a5fa !important;
+        background-color: rgba(96, 165, 250, 0.1) !important;
+    }
+    html.app-skin-dark .odoo-chatter-nav-pills .nav-link.active {
+        background-color: var(--bs-primary, #2563eb) !important;
+        color: #ffffff !important;
+    }
+    html.app-skin-dark .odoo-feed-divider::before,
+    html.app-skin-dark .odoo-feed-divider::after {
+        border-bottom-color: #1e293b !important;
+    }
+    html.app-skin-dark .odoo-feed-divider span {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .odoo-activity-item {
+        background-color: #0f172a !important;
+        border: 1px solid #1e293b !important;
+        border-radius: 8px !important;
+        margin-bottom: 10px !important;
+        padding: 12px 14px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+    }
+    html.app-skin-dark .odoo-activity-item:hover {
+        background-color: #162038 !important;
+        border-color: #334155 !important;
+    }
+    html.app-skin-dark .odoo-activity-item .activity-title-text,
+    html.app-skin-dark .odoo-activity-item strong {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .odoo-activity-item .text-dark {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .odoo-activity-item .text-secondary {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .odoo-activity-item .text-muted {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .activity-detail-row {
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .activity-detail-key {
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .activity-detail-val {
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .odoo-avatar-badge {
+        border-color: #0f172a !important;
+    }
+    html.app-skin-dark .odoo-chatter-col .btn-white {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .odoo-chatter-col .btn-white:hover {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #ffffff !important;
+    }
+    html.app-skin-dark .deal-history-entry {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .deal-history-entry .text-dark {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .deal-history-entry .text-secondary {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .history-date-group .badge.bg-white {
+        background-color: #162038 !important;
+        border-color: #334155 !important;
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .history-date-group .border-top {
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark #dealHistoryQuickSearch {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark #dealHistoryEmptySearchResults {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .odoo-chatter-col .text-dark {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .odoo-chatter-col .text-muted {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .odoo-chatter-col .text-secondary {
         color: #94a3b8 !important;
     }
     /* Softphone Floating Widget Light & Dark Mode Styles */
@@ -1403,24 +1547,6 @@
                     $acceptedQuote = $deal->quotations->firstWhere('status', 'Accepted') ?: ($deal->quotations->firstWhere('status', 'Converted') ?: $activeQuotation);
                 @endphp
 
-                <button type="button" 
-                        class="btn btn-xs btn-success fw-bold py-1 px-2.5 rounded shadow-2xs d-inline-flex align-items-center text-white btn-crm-deal-click-to-call" 
-                        title="Start Call & Gemini AI Assistant"
-                        data-deal-id="{{ $deal->id }}"
-                        data-deal-title="{{ addslashes($deal->title) }}"
-                        data-deal-company="{{ addslashes($deal->account?->name ?: ($linkedLead?->company_name ?: '')) }}"
-                        data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
-                        data-deal-stage="{{ $deal->stage }}"
-                        data-deal-phone="{{ $primaryDealPhone }}"
-                        data-deal-numbers="{{ json_encode($dealNumbers) }}"
-                        style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
-                    <i class="feather-phone-call me-1"></i> Call Phone
-                </button>
-
-                <button type="button" class="btn btn-xs btn-primary fw-bold py-1 px-2.5 rounded shadow-2xs d-inline-flex align-items-center text-white btn-open-deal-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas">
-                    <i class="feather-calendar me-1"></i> + {{ __('crm.followup') }}
-                </button>
-
                 @if($deal->quotations->isEmpty())
                     <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
                         <i class="feather-file-plus me-1"></i> + {{ __('crm.new_quotation') }}
@@ -1517,10 +1643,6 @@
                 @endforeach
             </div>
 
-            <div class="d-none d-md-flex align-items-center gap-3 fs-11 text-muted">
-                <span><strong class="text-dark">{{ __('crm.probability') }}:</strong> <span class="text-primary fw-bold">{{ $deal->probability }}%</span></span>
-                <span><strong class="text-dark">{{ __('crm.expected_revenue') }}:</strong> <span class="text-success fw-bold">{{ format_currency($expectedRevenue) }}</span></span>
-            </div>
         </div>
 
         <!-- Flash Toast Messages -->
@@ -1543,16 +1665,17 @@
             <div class="odoo-sheet-col flex-grow-1 h-100 p-0" style="scroll-behavior: smooth; background-color: #f8fafc; overflow-x: hidden !important; overflow-y: auto !important;" id="odooMainScrollable">
                 
                 <!-- Sticky Top Tab Row -->
-                <div class="d-flex align-items-center justify-content-between border-bottom px-3 py-2 flex-wrap gap-2 sticky-top bg-white shadow-2xs" style="z-index: 90;">
+                <div class="d-flex align-items-center justify-content-between px-3 py-2 flex-wrap gap-2 sticky-top bg-white border-0 shadow-none" style="z-index: 90;">
                     <ul class="nav nav-pills zoho-nav-tabs" id="zohoDealTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ !$isQuotationTabActive ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
+                            <button class="nav-link px-3 py-1.5 fw-bold fs-12 {{ !$isQuotationTabActive ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
                                 <i class="feather-grid me-1.5"></i>{{ __('crm.overview') }}
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ $isQuotationTabActive ? 'active' : '' }}" id="quotations-tab" data-bs-toggle="tab" data-bs-target="#quotations-pane" type="button" role="tab">
-                                <i class="feather-file-text me-1.5"></i>{{ __('crm.quotation_proposals') }} ({{ $deal->quotations->count() }})
+                            <button class="nav-link px-3 py-1.5 fw-bold fs-12 {{ $isQuotationTabActive ? 'active' : '' }}" id="quotations-tab" data-bs-toggle="tab" data-bs-target="#quotations-pane" type="button" role="tab">
+                                <i class="feather-file-text me-1.5"></i>{{ __('crm.quotation_proposals') }}
+                                <span class="badge {{ $isQuotationTabActive ? 'bg-white text-primary' : 'bg-primary-subtle text-primary' }} rounded-pill px-1.5 py-0.2 fs-10 font-monospace ms-1">{{ $deal->quotations->count() }}</span>
                             </button>
                         </li>
                     </ul>
@@ -1562,9 +1685,9 @@
                             <i class="feather-clock me-1 text-muted fs-12"></i> 
                             {{ __('crm.last_update') }} : {{ $deal->updated_at ? $deal->updated_at->diffForHumans() : __('crm.recently') }}
                         </div>
-                        <button type="button" class="btn btn-xs btn-white border px-2.5 py-1 rounded-2 shadow-2xs text-muted d-inline-flex align-items-center gap-1.5 fw-semibold fs-11" id="btnToggleChatter" title="Toggle Chatter Sidebar">
+                        <button type="button" class="btn btn-xs btn-white border px-2.5 py-1 rounded-2 shadow-2xs text-muted d-inline-flex align-items-center gap-1.5 fw-semibold fs-11" id="btnToggleChatter" title="{{ __('crm.toggle_chatter') }}">
                             <i class="feather-sidebar fs-11"></i>
-                            <span id="textToggleChatter">Chatter</span>
+                            <span id="textToggleChatter">{{ __('crm.chatter') }}</span>
                         </button>
                     </div>
                 </div>
@@ -1606,7 +1729,7 @@
                                     </div>
                                     <div class="min-w-0 flex-grow-1">
                                         <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.target_closing_date') }}</span>
-                                        <span class="fs-13 fs-sm-14 fw-extrabold text-dark d-block text-truncate">{{ $deal->closing_date ? $deal->closing_date->format('d M Y') : 'Not Set' }}</span>
+                                        <span class="fs-13 fs-sm-14 fw-extrabold text-dark d-block text-truncate">{{ $deal->closing_date ? $deal->closing_date->format('d M Y') : __('crm.not_set') }}</span>
                                     </div>
                                 </div>
                             </div>

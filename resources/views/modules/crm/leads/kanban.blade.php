@@ -489,8 +489,8 @@
                     return false;
                 }
 
-                // Guard 2: Direct Won conversion blocked if Account & Deal not created yet
-                if (newStatus === 'Won' && !hasAccountDeal) {
+                // Guard 2: Direct Won conversion is strictly blocked!
+                if (newStatus === 'Won') {
                     // Revert card immediately to original column box!
                     if (originalNextSibling) {
                         originalParent.insertBefore(draggedCard, originalNextSibling);
@@ -499,13 +499,18 @@
                     }
                     recalculateTotals();
 
+                    const wonErrMsg = 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.';
+
                     // Open Warning Modal Alert
                     confirmAction({
-                        title: 'Action Blocked: Account & Deal Required',
-                        message: 'Lead "' + companyName + '" cannot be marked as Won directly because Account & Deal have not been created yet! Please click "CONVERT TO ACCOUNT & DEAL" first.',
+                        title: 'Action Blocked',
+                        message: wonErrMsg,
                         variant: 'warning',
                         confirmText: 'Got It'
                     });
+                    if (typeof showAppToast === 'function') {
+                        showAppToast('error', wonErrMsg);
+                    }
                     return false;
                 }
 
@@ -531,7 +536,7 @@
                     try {
                         data = await res.json();
                     } catch(e) {
-                        data = { success: false, message: 'Cannot mark as Won. Account & Deal conversion required first!' };
+                        data = { success: false, message: 'Unable to update lead status.' };
                     }
 
                     if (!res.ok || data.success === false) {
@@ -543,17 +548,21 @@
                         }
                         recalculateTotals();
 
-                        const errMsg = data.message || 'Cannot mark as Won. Account & Deal conversion required first!';
+                        const errMsg = data.message || 'Unable to update lead status.';
                         confirmAction({
                             title: 'Action Blocked',
                             message: errMsg,
                             variant: 'warning',
                             confirmText: 'Got It'
                         });
-                        showAppToast('error', errMsg);
+                        if (typeof showAppToast === 'function') {
+                            showAppToast('error', errMsg);
+                        }
                     } else {
                         // Display Common Component Toaster Success Message!
-                        showAppToast('success', data.message || 'Lead status updated successfully!');
+                        if (typeof showAppToast === 'function') {
+                            showAppToast('success', data.message || 'Lead status updated successfully!');
+                        }
                     }
                 })
                 .catch(err => {
@@ -567,7 +576,7 @@
 
                     confirmAction({
                         title: 'Action Blocked',
-                        message: 'Cannot mark as Won. Account & Deal conversion required first!',
+                        message: 'Unable to update lead status.',
                         variant: 'warning',
                         confirmText: 'Got It'
                     });

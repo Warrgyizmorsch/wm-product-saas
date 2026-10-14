@@ -55,11 +55,24 @@ class Lead extends Model
         });
 
         static::updating(function ($lead) {
-            if ($lead->isDirty('status') && strtolower($lead->status) === 'won' && !$lead->crm_account_id) {
-                throw new \InvalidArgumentException('Cannot mark as Won. Account & Deal conversion required first!');
+            if ($lead->isDirty('status')) {
+                $oldStatus = strtolower((string) $lead->getOriginal('status'));
+                $newStatus = strtolower((string) $lead->status);
+
+                // Permanent lock: Once Won, it cannot be changed to another status manually
+                if ($oldStatus === 'won' && $newStatus !== 'won' && !static::$allowWonTransition) {
+                    throw new \InvalidArgumentException('Lead status is Won and permanently locked. Status cannot be changed.');
+                }
+
+                // Direct Won transition guard: Cannot manually change status to Won
+                if ($newStatus === 'won' && !static::$allowWonTransition) {
+                    throw new \InvalidArgumentException('Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.');
+                }
             }
         });
     }
+
+    public static bool $allowWonTransition = false;
 
     protected $fillable = [
         'tenant_id',

@@ -205,22 +205,22 @@
                 <div class="d-flex align-items-center flex-wrap pt-1.5 fs-12" style="column-gap: 16px; row-gap: 6px;">
                     <!-- Connected -->
                     <a href="javascript:void(0)" class="text-success text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed">
-                        <i class="feather-check fs-12"></i> <span>Connected</span>
+                        <i class="feather-check fs-12"></i> <span>{{ __('crm.connected') }}</span>
                     </a>
 
                     <!-- Not Connected -->
                     <a href="javascript:void(0)" class="text-warning text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected">
-                        <i class="feather-phone-off fs-12"></i> <span>Not Connected</span>
+                        <i class="feather-phone-off fs-12"></i> <span>{{ __('crm.not_connected') }}</span>
                     </a>
 
                     <!-- Reschedule -->
                     <a href="javascript:void(0)" class="text-info text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">
-                        <i class="feather-repeat fs-12"></i> <span>Reschedule</span>
+                        <i class="feather-repeat fs-12"></i> <span>{{ __('crm.reschedule') }}</span>
                     </a>
 
                     <!-- Cancel -->
                     <a href="javascript:void(0)" class="text-danger text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">
-                        <i class="feather-x fs-12"></i> <span>Cancel</span>
+                        <i class="feather-x fs-12"></i> <span>{{ __('crm.cancel') }}</span>
                     </a>
 
                     @if($phoneToCall)
@@ -232,7 +232,7 @@
                            data-lead-company="{{ $lead->company_name }}"
                            data-lead-phone="{{ $phoneToCall }}"
                            title="{{ __('crm.click_to_call_softphone') }}">
-                            <i class="feather-phone-call fs-10"></i> <span>Call {{ $phoneToCall }}</span>
+                            <i class="feather-phone-call fs-10"></i> <span>{{ __('crm.call') }} {{ $phoneToCall }}</span>
                         </a>
                     @endif
                 </div>

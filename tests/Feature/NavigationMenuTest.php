@@ -124,7 +124,7 @@ class NavigationMenuTest extends TestCase
 
         $labels = $this->labels($this->menu($this->owner));
 
-        $this->assertContains('Track Status', $labels);
+        $this->assertContains('Leads', $labels);
         $this->assertNotContains('Chart of Accounts', $labels);
         $this->assertNotContains('Production Orders', $labels);
         // A group pinned to a module disappears whole, including its non-gated child.
@@ -297,11 +297,6 @@ class NavigationMenuTest extends TestCase
         $onLead = $this->menu($this->owner, 'crm.leads.show');
         $this->assertTrue($this->find($onLead, 'Leads')['active']);
         $this->assertTrue($this->find($onLead, 'CRM')['active']);
-        $this->assertFalse($this->find($onLead, 'Track Status')['active']);
-
-        $onTrackStatus = $this->menu($this->owner, 'crm.leads.trackStatus');
-        $this->assertTrue($this->find($onTrackStatus, 'Track Status')['active']);
-        $this->assertFalse($this->find($onTrackStatus, 'Leads')['active']);
 
         $onWorkCenter = $this->menu($this->owner, 'production.mes.work-centers.show');
         $this->assertTrue($this->find($onWorkCenter, 'Work Center Board')['active']);

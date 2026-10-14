@@ -30,7 +30,6 @@ Route::prefix('crm')
 
         // CRM Settings Routes
         Route::get('settings', [CrmSettingsController::class, 'index'])->name('settings.index');
-        Route::post('settings/invoicing-policy', [CrmSettingsController::class, 'updateInvoicingPolicy'])->name('settings.update-invoicing-policy');
         Route::post('settings/quotation-approval-policy', [CrmSettingsController::class, 'updateQuotationApprovalPolicy'])->name('settings.update-quotation-approval-policy');
         Route::post('settings/lead-assignment', [CrmSettingsController::class, 'updateLeadAssignment'])->name('settings.update-lead-assignment');
         // CRM Masters Routes
@@ -124,8 +123,6 @@ Route::prefix('crm')
             ->name('google-calendar.connect');
         Route::match(['get', 'post'], 'google-calendar/disconnect', [GoogleCalendarController::class, 'disconnectGoogleAccount'])
             ->name('google-calendar.disconnect');
-        Route::get('leads/track-status', [LeadController::class, 'trackStatus'])
-            ->name('leads.trackStatus');
         Route::get('leads/download-sample', [LeadController::class, 'downloadSample'])
             ->name('leads.downloadSample');
         Route::post('leads/import/parse', [LeadController::class, 'parseImportFile'])
