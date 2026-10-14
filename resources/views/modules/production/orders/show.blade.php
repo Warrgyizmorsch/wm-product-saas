@@ -17,7 +17,9 @@
             max-height: calc(100vh - 260px);
             min-height: 480px;
             overflow-y: auto;
-            overflow-x: auto;
+            overflow-x: hidden;
+            min-width: 0;
+            max-width: 100%;
             padding-right: 8px;
             padding-top: 10px;
             background-color: #F8FAFC;
@@ -52,8 +54,29 @@
             flex-shrink: 0;
         }
 
-        .table-responsive {
-            overflow: visible !important;
+        .production-main-content-scroll .table-responsive {
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch;
+            position: relative;
+            width: 100%;
+        }
+
+        .production-main-content-scroll .table-responsive::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .production-main-content-scroll .table-responsive::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .production-main-content-scroll .table-responsive::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(0, 0, 0, 0.35);
+        }
+
+        html.app-skin-dark .production-main-content-scroll .table-responsive::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.2);
         }
 
         @media (max-width: 767.98px) {
@@ -362,7 +385,7 @@
             <div class="d-flex align-items-center gap-2">
                 <h4 class="fw-bold text-dark mb-0">{{ __('production.production_order') }} ({{ $order->order_number }})</h4>
                 @php
-                    $model = $order->production_model ?? 'pure_manufacturing';
+                    $model = $order->effective_production_model ?? $order->production_model ?? 'pure_manufacturing';
                 @endphp
                 @if($model === 'subcontract_complete')
                     <span class="badge bg-soft-warning text-warning border border-warning-subtle ms-2"><i
@@ -539,7 +562,7 @@
             $verticalTabs[] = ['is_header' => true, 'header' => __('production.quality_and_subcontracting')];
             $verticalTabs[] = ['id' => 'vtab-scrap', 'label' => __('production.scrap_rework'), 'active' => $activeTab === 'vtab-scrap', 'icon' => 'feather-alert-triangle'];
 
-            if ($order->production_model !== 'pure_manufacturing' || $order->operations->contains('is_external', true)) {
+            if ($order->operations->contains('is_external', true)) {
                 $verticalTabs[] = ['id' => 'vtab-subcontract', 'label' => __('production.subcontracting_vendor_wip'), 'active' => $activeTab === 'vtab-subcontract', 'icon' => 'feather-truck'];
             }
 
@@ -874,7 +897,7 @@
 
 
                         {{-- Tab 2.5: Subcontracting & Vendor WIP --}}
-                        @if($order->production_model !== 'pure_manufacturing' || $order->operations->contains('is_external', true))
+                        @if($order->operations->contains('is_external', true))
                             <div class="tab-pane fade {{ $activeTab === 'vtab-subcontract' ? 'show active' : '' }}"
                                 id="vtab-subcontract" role="tabpanel" aria-labelledby="vtab-subcontract-tab">
                                 @php
@@ -916,7 +939,7 @@
 
                                 {{-- Top Summary Cards --}}
                                 <div class="row g-3 mb-4">
-                                    <div class="col-md-3">
+                                    <div class="col-12 col-sm-6 col-xl-3">
                                         <div class="card shadow-sm border p-3 bg-light h-100">
                                             <span class="fs-11 text-uppercase text-muted fw-bold">{{ __('production.subcontract_model') }}</span>
                                             <div class="fs-14 fw-bold text-dark mt-1">
@@ -926,7 +949,7 @@
                                                 class="text-muted fs-11 mt-1">{{ __('production.outsourced_steps_count', ['count' => $order->operations->where('is_external', true)->count()]) }}</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-12 col-sm-6 col-xl-3">
                                         <div class="card shadow-sm border p-3 bg-soft-primary h-100">
                                             <span class="fs-11 text-uppercase text-primary fw-bold">{{ __('production.authoritative_cost') }}</span>
                                             <div class="fs-18 fw-bold text-primary mt-1">
@@ -936,7 +959,7 @@
                                                 {{ ($subcost['actual'] ?? 0) > 0 ? __('production.actual_vendor_bill') : (($subcost['committed'] ?? 0) > 0 ? __('production.po_committed') : __('production.routing_estimate')) }}</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-12 col-sm-6 col-xl-3">
                                         <div class="card shadow-sm border p-3 bg-light h-100">
                                             <span class="fs-11 text-uppercase text-muted fw-bold">{{ __('production.cost_breakdown') }}</span>
                                             <div class="fs-12 text-dark mt-1">
@@ -947,7 +970,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-12 col-sm-6 col-xl-3">
                                         <div class="card shadow-sm border p-3 bg-soft-warning h-100">
                                             <span class="fs-11 text-uppercase text-warning fw-bold">{{ __('production.vendor_wip_status') }}</span>
                                             @php
@@ -968,8 +991,8 @@
                                             {{ __('production.operations_count_suffix') }}</span>
                                     </div>
                                     <div class="table-responsive">
-                                        <table class="table table-sm align-middle mb-0 fs-12 table-hover">
-                                            <thead class="bg-light text-uppercase fs-11 text-muted">
+                                        <x-ui.odoo-form-ui type="table" class="table table-sm align-middle mb-0 fs-12 table-hover text-nowrap" style="min-width: 1050px;">
+                                            <thead class="bg-light text-uppercase fs-11 text-muted text-nowrap">
                                                 <tr>
                                                     <th>{{ __('production.op_hash') }}</th>
                                                     <th>{{ __('production.operation') }}</th>
@@ -1145,7 +1168,7 @@
                                                     </tr>
                                                 @endforelse
                                             </tbody>
-                                        </table>
+                                        </x-ui.odoo-form-ui>
                                     </div>
                                 </div>
 
@@ -1156,14 +1179,14 @@
                                     });
                                 @endphp
 
-                                @if($hasCompanyMaterialOps || $order->production_model === 'subcontract_company_material' || $order->production_model === 'hybrid')
+                                @if($hasCompanyMaterialOps)
                                     <div class="card border shadow-sm mb-4">
                                         <div class="card-header bg-light py-2">
                                             <h6 class="fw-bold text-dark mb-0"><i class="feather-box me-1 text-warning"></i>{{ __('production.company_material_balance_subcontractor') }}</h6>
                                         </div>
                                         <div class="table-responsive">
-                                            <table class="table table-sm align-middle mb-0 fs-12">
-                                                <thead class="bg-light text-uppercase fs-11 text-muted">
+                                            <x-ui.odoo-form-ui type="table" class="table table-sm align-middle mb-0 fs-12 text-nowrap" style="min-width: 850px;">
+                                                <thead class="bg-light text-uppercase fs-11 text-muted text-nowrap">
                                                     <tr>
                                                         <th>{{ __('production.operation') }}</th>
                                                         <th>{{ __('production.material_item') }}</th>
@@ -1204,7 +1227,7 @@
                                                         </tr>
                                                     @endforelse
                                                 </tbody>
-                                            </table>
+                                            </x-ui.odoo-form-ui>
                                         </div>
                                     </div>
                                 @endif

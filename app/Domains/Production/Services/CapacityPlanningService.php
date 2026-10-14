@@ -73,7 +73,7 @@ class CapacityPlanningService
                 ->where('scenario_id', $scenarioId)
                 ->with([
                     'order.product',
-                    'orderOperation',
+                    'orderOperation.routingOperation.alternateMachines',
                     'workCenter',
                     'machine',
                 ]);
@@ -93,6 +93,14 @@ class CapacityPlanningService
 
             $operations = $opsQuery->orderBy('sequence')->get()->map(function ($op) {
                 $orderOp = $op->orderOperation;
+                $routingOp = $orderOp?->routingOperation;
+                $primaryMachineId = $orderOp?->machine_id ?: $routingOp?->machine_id;
+                $altMachineIds = $routingOp ? $routingOp->alternateMachines->pluck('machine_id')->toArray() : [];
+                $qualifiedMachineIds = array_values(array_unique(array_filter(array_merge(
+                    $primaryMachineId ? [(int) $primaryMachineId] : [],
+                    array_map('intval', $altMachineIds)
+                ))));
+
                 return [
                     'schedule_operation_id'   => $op->source_schedule_operation_id ?: $op->id,
                     'scenario_operation_id'   => $op->id,
@@ -106,6 +114,8 @@ class CapacityPlanningService
                     'sequence'                => $op->sequence,
                     'work_center_id'          => $op->work_center_id,
                     'machine_id'              => $op->machine_id,
+                    'primary_machine_id'      => $primaryMachineId ? (int) $primaryMachineId : null,
+                    'qualified_machine_ids'   => $qualifiedMachineIds,
                     'planned_start'           => $op->planned_start ? $op->planned_start->toIso8601String() : null,
                     'planned_finish'          => $op->planned_finish ? $op->planned_finish->toIso8601String() : null,
                     'baseline_start'          => $op->planned_start ? $op->planned_start->toIso8601String() : null,
@@ -129,7 +139,7 @@ class CapacityPlanningService
                 ->with([
                     'schedule',
                     'order.product',
-                    'orderOperation',
+                    'orderOperation.routingOperation.alternateMachines',
                     'workCenter',
                     'machine',
                 ])
@@ -153,6 +163,14 @@ class CapacityPlanningService
 
             $operations = $opsQuery->orderBy('sequence')->get()->map(function ($op) {
                 $orderOp = $op->orderOperation;
+                $routingOp = $orderOp?->routingOperation;
+                $primaryMachineId = $orderOp?->machine_id ?: $routingOp?->machine_id;
+                $altMachineIds = $routingOp ? $routingOp->alternateMachines->pluck('machine_id')->toArray() : [];
+                $qualifiedMachineIds = array_values(array_unique(array_filter(array_merge(
+                    $primaryMachineId ? [(int) $primaryMachineId] : [],
+                    array_map('intval', $altMachineIds)
+                ))));
+
                 return [
                     'schedule_operation_id'   => $op->id,
                     'schedule_id'             => $op->production_schedule_id,
@@ -167,6 +185,8 @@ class CapacityPlanningService
                     'sequence'                => $op->sequence,
                     'work_center_id'          => $op->work_center_id,
                     'machine_id'              => $op->machine_id,
+                    'primary_machine_id'      => $primaryMachineId ? (int) $primaryMachineId : null,
+                    'qualified_machine_ids'   => $qualifiedMachineIds,
                     'planned_start'           => $op->planned_start ? $op->planned_start->toIso8601String() : null,
                     'planned_finish'          => $op->planned_finish ? $op->planned_finish->toIso8601String() : null,
                     'baseline_start'          => $op->baseline_start ? $op->baseline_start->toIso8601String() : null,
@@ -459,8 +479,11 @@ class CapacityPlanningService
      * Validate if a machine is qualified for a schedule operation.
      * Must be active, belong to tenant & work center, and be primary or approved alternate machine.
      */
-    public function validateMachineQualification(ProductionScheduleOperation $schedOp, int $machineId, int $tenantId): Machine
-    {
+    public function validateMachineQualification(
+        ProductionScheduleOperation|\App\Domains\Production\Models\ProductionScheduleScenarioOperation $schedOp,
+        int $machineId,
+        int $tenantId
+    ): Machine {
         $machine = Machine::where('tenant_id', $tenantId)->findOrFail($machineId);
 
         if (!$machine->isActive()) {
@@ -472,21 +495,30 @@ class CapacityPlanningService
         }
 
         $orderOp = $schedOp->orderOperation;
-        if ($orderOp && $orderOp->routing_operation_id) {
+        if ($orderOp) {
             $routingOpId      = $orderOp->routing_operation_id;
-            $primaryMachineId = $orderOp->machine_id;
+            $primaryMachineId = $orderOp->machine_id ?: $orderOp->routingOperation?->machine_id;
 
-            if ($primaryMachineId && (int) $primaryMachineId === (int) $machineId) {
-                return $machine;
+            $hasAlternateMachines = false;
+            $isAlternate = false;
+
+            if ($routingOpId) {
+                $hasAlternateMachines = RoutingOperationAlternateMachine::where('tenant_id', $tenantId)
+                    ->where('routing_operation_id', $routingOpId)
+                    ->exists();
+
+                $isAlternate = RoutingOperationAlternateMachine::where('tenant_id', $tenantId)
+                    ->where('routing_operation_id', $routingOpId)
+                    ->where('machine_id', $machineId)
+                    ->exists();
             }
 
-            $isAlternate = RoutingOperationAlternateMachine::where('tenant_id', $tenantId)
-                ->where('routing_operation_id', $routingOpId)
-                ->where('machine_id', $machineId)
-                ->exists();
+            if ($primaryMachineId || $hasAlternateMachines) {
+                $isPrimary = $primaryMachineId && (int) $primaryMachineId === (int) $machineId;
 
-            if (!$isAlternate && $primaryMachineId) {
-                throw new InvalidArgumentException("Machine [{$machine->name}] is not an approved primary or alternate machine for operation [{$orderOp->name}].");
+                if (!$isPrimary && !$isAlternate) {
+                    throw new InvalidArgumentException("Machine [{$machine->name}] is not an approved primary or alternate machine for operation [{$orderOp->name}].");
+                }
             }
         }
 
@@ -951,7 +983,7 @@ class CapacityPlanningService
         return $suggestions;
     }
 
-    private function resolveCalendarForWorkCenter($wc, $tenantId)
+    public function resolveCalendarForWorkCenter($wc, $tenantId)
     {
         if ($wc->production_calendar_id) {
             $cal = ProductionCalendar::withoutGlobalScopes()->find($wc->production_calendar_id);
@@ -969,7 +1001,7 @@ class CapacityPlanningService
         ]);
     }
 
-    private function isWorkingDay($calendar, $date, $tenantId): bool
+    public function isWorkingDay($calendar, $date, $tenantId): bool
     {
         $dayOfWeek = $date->dayOfWeek;
         $workingDays = $calendar->working_days ?? [1, 2, 3, 4, 5];

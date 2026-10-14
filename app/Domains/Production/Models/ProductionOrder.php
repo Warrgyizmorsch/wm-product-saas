@@ -371,26 +371,40 @@ class ProductionOrder extends BaseModel
         return $this->effective_production_model === self::MODEL_HYBRID;
     }
 
-    public function getEffectiveProductionModelAttribute(): string
+    public static function determineProductionModelFromOperations($operations, ?string $fallback = null): string
     {
-        if ($this->production_model && $this->production_model !== self::MODEL_PURE_MANUFACTURING) {
-            return $this->production_model;
+        $collection = collect($operations);
+        if ($collection->isEmpty()) {
+            return $fallback ?? self::MODEL_PURE_MANUFACTURING;
         }
 
-        $ops = $this->relationLoaded('operations') ? $this->operations : $this->operations()->get();
-        if (!$ops || $ops->isEmpty()) {
-            return $this->production_model ?? self::MODEL_PURE_MANUFACTURING;
-        }
-
-        $hasExt = $ops->contains('is_external', true);
-        $hasInt = $ops->contains('is_external', false);
+        $hasExt = $collection->contains('is_external', true);
+        $hasInt = $collection->contains(fn($op) => !($op->is_external ?? false));
 
         if ($hasExt && $hasInt) {
             return self::MODEL_HYBRID;
-        } elseif ($hasExt && !$hasInt) {
+        }
+
+        if ($hasExt && !$hasInt) {
+            $allVendorSupplied = $collection->every(fn($op) => ($op->material_supply_type ?? null) === 'vendor_supplied');
+            if ($allVendorSupplied) {
+                return in_array($fallback, ['complete_subcontracting', self::MODEL_SUBCONTRACT_COMPLETE], true)
+                    ? $fallback
+                    : self::MODEL_SUBCONTRACT_COMPLETE;
+            }
             return self::MODEL_SUBCONTRACT_COMPANY_MATERIAL;
         }
 
         return self::MODEL_PURE_MANUFACTURING;
+    }
+
+    public function getEffectiveProductionModelAttribute(): string
+    {
+        $ops = $this->relationLoaded('operations') ? $this->operations : $this->operations()->get();
+        if ($ops && $ops->isNotEmpty()) {
+            return self::determineProductionModelFromOperations($ops);
+        }
+
+        return $this->production_model ?? self::MODEL_PURE_MANUFACTURING;
     }
 }

@@ -487,43 +487,22 @@ class ProductionScheduleController extends Controller
 
             if ($request->filled('scenario_id')) {
                 $scenarioId = (int) $request->input('scenario_id');
-                $scenOp = \App\Domains\Production\Models\ProductionScheduleScenarioOperation::withoutGlobalScopes()
-                    ->where('scenario_id', $scenarioId)
-                    ->where(function ($q) use ($operationId) {
-                        $q->where('id', $operationId)
-                            ->orWhere('source_schedule_operation_id', $operationId);
-                    })->first();
+                $result = $this->scenarioService->rescheduleScenarioOperation(
+                    require_tenant_id(),
+                    $scenarioId,
+                    $operationId,
+                    $newStart,
+                    $newMachineId,
+                    $shiftMode,
+                    $reason,
+                    auth()->id(),
+                    $expectedVersion
+                );
 
-                if ($scenOp) {
-                    $duration = (float) $scenOp->planned_duration_minutes;
-                    $newFinish = $this->schedulingService->addWorkingMinutes(
-                        $scenOp->work_center_id,
-                        $newStart,
-                        $duration
-                    );
-
-                    $scenOp->update([
-                        'planned_start' => $newStart,
-                        'planned_finish' => $newFinish,
-                        'machine_id' => $newMachineId ?? $scenOp->machine_id,
-                        'manual_override' => true,
-                    ]);
-
-                    $result = [
-                        'success' => true,
-                        'message' => "Scenario operation sequence #{$scenOp->sequence} rescheduled in What-If Sandbox mode.",
-                        'operation' => [
-                            'id' => $scenOp->source_schedule_operation_id ?: $scenOp->id,
-                            'planned_start' => $scenOp->planned_start->toIso8601String(),
-                            'planned_finish' => $scenOp->planned_finish->toIso8601String(),
-                        ]
-                    ];
-
-                    if ($request->ajax() || $request->wantsJson()) {
-                        return response()->json($result);
-                    }
-                    return redirect()->back()->with('success', $result['message']);
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json($result);
                 }
+                return redirect()->back()->with('success', $result['message']);
             }
 
             $result = $this->capacityService->rescheduleOperationWithMode(
@@ -565,14 +544,26 @@ class ProductionScheduleController extends Controller
         $this->authorize('create', ProductionSchedule::class);
 
         try {
-            $schedOp = $this->capacityService->toggleOperationLock($operationId, auth()->id());
-            $statusStr = $schedOp->locked ? 'locked' : 'unlocked';
+            if ($request->filled('scenario_id')) {
+                $schedOp = $this->scenarioService->toggleScenarioOperationLock(
+                    require_tenant_id(),
+                    (int) $request->input('scenario_id'),
+                    $operationId,
+                    auth()->id()
+                );
+                $statusStr = $schedOp->locked ? 'locked' : 'unlocked';
+                $version = $schedOp->source_version;
+            } else {
+                $schedOp = $this->capacityService->toggleOperationLock($operationId, auth()->id());
+                $statusStr = $schedOp->locked ? 'locked' : 'unlocked';
+                $version = $schedOp->version;
+            }
 
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => true,
-                    'locked' => $schedOp->locked,
-                    'version' => $schedOp->version,
+                    'locked' => (bool) $schedOp->locked,
+                    'version' => $version,
                     'message' => "Operation successfully {$statusStr}.",
                 ]);
             }
