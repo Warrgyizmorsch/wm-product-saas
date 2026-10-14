@@ -85,6 +85,11 @@ class MrpEngineService
         }
 
         foreach ($bom->items as $item) {
+            // Alternatives must not be treated as separate simultaneously required materials
+            if ($item->is_alternative) {
+                continue;
+            }
+
             // Required quantity including scrap loss
             $scrapFactor = 1.0 + ($item->material_scrap_percentage / 100);
             $requiredQty = $parentQty * $item->quantity * $scrapFactor;

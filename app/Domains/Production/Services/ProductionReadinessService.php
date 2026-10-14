@@ -300,6 +300,7 @@ class ProductionReadinessService
             $bomItems = ProductionBomItem::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('bom_id', $op->source_bom_id)
+                ->where('is_alternative', false)
                 ->get();
             $bomMaterialIds = $bomItems->pluck('material_id')->all();
             $reservations = $reservations->filter(fn($r) => in_array($r->product_id, $bomMaterialIds, true) && !in_array($r->product_id, $sfgProductIds, true));

@@ -268,6 +268,14 @@
                                                 echo '<small class="text-muted fst-italic fs-11 mt-0.5"><i class="feather-file-text me-1 text-secondary"></i>' . e($item->notes) . '</small>';
                                             }
                                             
+                                            if ($item->is_alternative) {
+                                                $parentName = $item->primaryItem?->material?->name ?? ('Primary #' . $item->replaces_item_id);
+                                                $parentSku = $item->primaryItem?->material?->sku ?? '';
+                                                echo '<span class="badge bg-soft-warning text-warning fs-10 mt-1 d-inline-block">';
+                                                echo '<i class="feather-shuffle me-1"></i>' . __('production.alternative_of') . ': ' . e($parentName) . ($parentSku ? ' (' . e($parentSku) . ')' : '') . ' • Priority ' . $item->priority;
+                                                echo '</span>';
+                                            }
+
                                             if ($item->childBom) {
                                                 echo '<small class="mt-1">';
                                                 echo '<a href="' . route('production.boms.show', $item->childBom->id) . '" class="badge bg-soft-success text-success">';
@@ -301,6 +309,9 @@
                                             echo '<td class="text-end align-middle">';
                                             echo '<span class="fw-bold text-dark d-block">' . format_currency($itemTotalCost) . '</span>';
                                             echo '<small class="text-muted font-monospace fs-10">@ ' . format_currency($unitCost) . ' / ' . e($item->uom?->code ?? $item->material?->uom?->code ?? 'PCS') . '</small>';
+                                            if ($item->is_alternative) {
+                                                echo '<span class="badge bg-soft-secondary text-muted fs-10 mt-0.5 d-inline-block">Alternative (Excluded from base cost)</span>';
+                                            }
                                             echo '</td>';
 
                                             echo '</tr>';

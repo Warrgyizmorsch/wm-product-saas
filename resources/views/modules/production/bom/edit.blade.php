@@ -193,15 +193,14 @@
                                     <tr>
                                         <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
                                         <th style="width: 25%">{{ __('production.component_product') }}</th>
-                                        <th style="width: 10%">{{ __('production.quantity') }}</th>
-                                        <th style="width: 12%">
+                                        <th style="width: 12%">{{ __('production.quantity') }}</th>
+                                        <th style="width: 10%">
                                             {{ __('production.uom') }}
                                             <i class="feather-lock text-muted ms-1 fs-11" title="Auto-selected from component product (read-only)"></i>
                                         </th>
-                                        <th style="width: 10%">{{ __('production.scrap_percent') }}</th>
+                                        <th style="width: 8%">{{ __('production.scrap_percent') }}</th>
                                         <th style="width: 8%">{{ __('production.priority') }}</th>
-                                        <th style="width: 15%">{{ __('production.validity') }}</th>
-                                        <th style="width: 12%">{{ __('production.alternative') }}</th>
+                                        <th style="width: 27%">{{ __('production.alternative') }}</th>
                                         <th style="width: 5%" class="text-center">{{ __('production.action') }}</th>
                                     </tr>
                                 </thead>
@@ -382,41 +381,40 @@
                                                     alpineError="errors['items.' + index + '.priority']" />
                                             </td>
 
-                                            <!-- Validity limits -->
-                                            <td class="align-middle">
-                                                <div class="d-flex flex-column gap-1">
-                                                    <x-ui.odoo-form-ui type="input" inputType="date"
-                                                        name="items[][effective_from]"
-                                                        x-bind:name="'items['+index+'][effective_from]'" class="fs-11"
-                                                        x-model="item.effective_from"
-                                                        alpineError="errors['items.' + index + '.effective_from']" />
-                                                    <x-ui.odoo-form-ui type="input" inputType="date"
-                                                        name="items[][effective_to]"
-                                                        x-bind:name="'items['+index+'][effective_to]'" class="fs-11"
-                                                        x-model="item.effective_to"
-                                                        alpineError="errors['items.' + index + '.effective_to']" />
-                                                </div>
-                                            </td>
-
                                             <!-- Alternative material options -->
                                             <td class="align-middle">
-                                                <div class="d-flex flex-column gap-2">
-                                                    <div>
-                                                        <input type="hidden"
-                                                            x-bind:name="'items['+index+'][is_alternative]'"
-                                                            :value="item.is_alternative ? 1 : 0">
-                                                        <x-ui.odoo-form-ui type="checkbox" name="items[][is_alternative]"
+                                                <input type="hidden" x-bind:name="'items['+index+'][row_uid]'" :value="item.uid">
+                                                <input type="hidden" x-bind:name="'items['+index+'][is_alternative]'" :value="item.is_alternative ? 1 : 0">
+                                                <input type="hidden" x-bind:name="'items['+index+'][replaces_row_uid]'" :value="item.is_alternative ? (item.replaces_row_uid || '') : ''">
+                                                <input type="hidden" x-bind:name="'items['+index+'][id]'" :value="item.id || ''">
+                                                <input type="hidden" x-bind:name="'items['+index+'][replaces_item_id]'" :value="item.is_alternative ? (item.replaces_item_id || '') : ''">
+                                                <div class="d-flex flex-column gap-1.5">
+                                                    <div class="form-check form-switch mb-0">
+                                                        <input class="form-check-input" type="checkbox"
                                                             x-model="item.is_alternative"
+                                                            @change="onAlternativeToggle(item)"
                                                             x-bind:id="'is_alternative_edit_' + index">
-                                                            {{ __('production.is_alternative') }}
-                                                        </x-ui.odoo-form-ui>
+                                                        <label class="form-check-label fs-11 fw-semibold" x-bind:for="'is_alternative_edit_' + index"
+                                                            x-text="item.is_alternative ? '{{ __('production.alternative_component') }}' : '{{ __('production.primary_component') }}'">
+                                                        </label>
                                                     </div>
-                                                    <div x-show="item.is_alternative">
-                                                        <x-ui.odoo-form-ui type="input" name="items[][alternative_group]"
-                                                            x-bind:name="'items['+index+'][alternative_group]'"
-                                                            class="fs-11" placeholder="Alt Group Code..."
-                                                            x-model="item.alternative_group"
-                                                            alpineError="errors['items.' + index + '.alternative_group']" />
+                                                    <div x-show="item.is_alternative" class="mt-1">
+                                                        <label class="fs-10 text-muted fw-bold text-uppercase d-block mb-1">
+                                                            {{ __('production.alternative_of') }} <span class="text-danger">*</span>
+                                                        </label>
+                                                        <select class="form-select form-select-sm fs-11"
+                                                            x-model="item.replaces_row_uid"
+                                                            @change="onAlternativeTargetChange(item)"
+                                                            :required="item.is_alternative"
+                                                            alpineError="errors['items.' + index + '.replaces_row_uid'] || errors['items.' + index + '.replaces_item_id']">
+                                                            <option value="">-- {{ __('production.select_primary_component') }} --</option>
+                                                            <template x-for="target in getEligiblePrimaryComponents(index)" :key="target.uid">
+                                                                <option :value="target.uid"
+                                                                    :selected="item.replaces_row_uid === target.uid"
+                                                                    x-text="'[' + (target.sku || 'No SKU') + '] ' + target.name + ' (Seq ' + target.seq + ')'">
+                                                                </option>
+                                                            </template>
+                                                        </select>
                                                     </div>
                                                 </div>
                                             </td>
@@ -653,8 +651,14 @@
                                 initialUomId = String(foundMat.uom_id);
                             }
                         }
+                        var initialUid = item.uid || item.row_uid || (item.id ? ('item_' + item.id) : ('row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + idx));
+                        var initialReplacesRowUid = item.replaces_row_uid || '';
+                        if (!initialReplacesRowUid && item.replaces_item_id) {
+                            initialReplacesRowUid = 'item_' + item.replaces_item_id;
+                        }
                         return {
-                            uid: item.uid || 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + idx,
+                            uid: initialUid,
+                            id: item.id || null,
                             material_id: item.material_id || '',
                             child_bom_id: item.child_bom_id || null,
                             quantity: item.quantity || '',
@@ -664,10 +668,9 @@
                             uom_id: initialUomId,
                             material_scrap_percentage: item.material_scrap_percentage || 0,
                             is_alternative: !!parseInt(item.is_alternative) || item.is_alternative === true,
-                            alternative_group: item.alternative_group || '',
+                            replaces_row_uid: initialReplacesRowUid,
+                            replaces_item_id: item.replaces_item_id || null,
                             priority: item.priority || 1,
-                            effective_from: item.effective_from || '',
-                            effective_to: item.effective_to || '',
                             child_bom_status: 'none',
                             child_bom_versions: [],
                             child_bom_loading: false
@@ -871,9 +874,54 @@
                     });
                 },
 
+                getEligiblePrimaryComponents(currentIndex) {
+                    const currentItem = this.items[currentIndex];
+                    if (!currentItem) return [];
+                    return this.items
+                        .map((it, idx) => {
+                            const mat = this.materials.find(m => String(m.id) === String(it.material_id));
+                            return {
+                                index: idx,
+                                uid: it.uid,
+                                id: it.id || null,
+                                seq: idx + 1,
+                                material_id: it.material_id,
+                                name: mat ? mat.name : (it.material_id ? ('Component #' + it.material_id) : ('Item #' + (idx + 1))),
+                                sku: mat ? mat.sku : '—',
+                                is_alternative: it.is_alternative,
+                            };
+                        })
+                        .filter(it => {
+                            if (it.uid === currentItem.uid) return false;
+                            if (it.is_alternative) return false;
+                            return true;
+                        });
+                },
+
+                onAlternativeToggle(item) {
+                    if (!item.is_alternative) {
+                        item.replaces_row_uid = '';
+                        item.replaces_item_id = null;
+                    } else {
+                        // Prevent this item from remaining target of another alternative
+                        this.items.forEach(other => {
+                            if (other.is_alternative && other.replaces_row_uid === item.uid) {
+                                other.replaces_row_uid = '';
+                                other.replaces_item_id = null;
+                            }
+                        });
+                    }
+                },
+
+                onAlternativeTargetChange(item) {
+                    const target = this.items.find(x => x.uid === item.replaces_row_uid);
+                    item.replaces_item_id = target && target.id ? target.id : null;
+                },
+
                 addItem() {
                     this.items.push({
                         uid: 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                        id: null,
                         material_id: '',
                         child_bom_id: null,
                         quantity: '',
@@ -883,10 +931,9 @@
                         uom_id: '',
                         material_scrap_percentage: 0,
                         is_alternative: false,
-                        alternative_group: '',
+                        replaces_row_uid: '',
+                        replaces_item_id: null,
                         priority: 1,
-                        effective_from: '',
-                        effective_to: '',
                         child_bom_status: 'none',
                         child_bom_versions: [],
                         child_bom_loading: false
@@ -896,6 +943,13 @@
 
                 removeItem(index) {
                     if (this.items.length > 1) {
+                        const removedItem = this.items[index];
+                        this.items.forEach(it => {
+                            if (it.is_alternative && it.replaces_row_uid === removedItem.uid) {
+                                it.replaces_row_uid = '';
+                                it.replaces_item_id = null;
+                            }
+                        });
                         this.items.splice(index, 1);
                     } else {
                         if (typeof confirmAction === 'function') {

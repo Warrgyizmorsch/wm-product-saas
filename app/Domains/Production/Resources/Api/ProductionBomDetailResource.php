@@ -63,6 +63,8 @@ class ProductionBomDetailResource extends JsonResource
                 'sequence'                  => (int) $item->sequence,
                 'is_critical'               => (bool) ($item->is_critical ?? false),
                 'is_alternative'            => (bool) $item->is_alternative,
+                'replaces_item_id'          => $item->replaces_item_id,
+                'priority'                  => (int) ($item->priority ?? 1),
                 'child_bom_id'              => $item->child_bom_id,
                 'notes'                     => $item->notes,
             ])),

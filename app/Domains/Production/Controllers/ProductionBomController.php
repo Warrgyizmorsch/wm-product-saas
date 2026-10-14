@@ -127,7 +127,9 @@ class ProductionBomController extends Controller
             $grossQty = $qty * (1 + ($item->material_scrap_percentage / 100));
             $unitCost = $item->material?->unit_cost ?? 0.0;
             $itemCost = $grossQty * $unitCost;
-            $totalCost += $itemCost;
+            if (!$item->is_alternative) {
+                $totalCost += $itemCost;
+            }
 
             $costDetails[] = [
                 'material_name' => $item->material?->name ?? 'Unknown Material',
@@ -138,6 +140,9 @@ class ProductionBomController extends Controller
                 'uom_code' => $item->uom?->code ?? $item->material?->uom?->code ?? 'PCS',
                 'unit_cost' => $unitCost,
                 'total_cost' => $itemCost,
+                'is_alternative' => (bool) $item->is_alternative,
+                'replaces_item_id' => $item->replaces_item_id,
+                'priority' => $item->priority,
             ];
         }
         $costPerUnit = $bom->base_quantity > 0 ? ($totalCost / $bom->base_quantity) : 0.0;

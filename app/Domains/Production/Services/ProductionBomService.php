@@ -69,23 +69,7 @@ class ProductionBomService
 
             $bom = $this->bomRepository->create($bomData);
 
-            foreach ($dto->items as $index => $itemDto) {
-                if ($itemDto->child_bom_id) {
-                    $this->validateChildBomLink(
-                        $itemDto->child_bom_id,
-                        $itemDto->material_id,
-                        $bom->id,
-                        Carbon::parse($bom->effective_date)->toDateString(),
-                        $bom->expiry_date ? Carbon::parse($bom->expiry_date)->toDateString() : null
-                    );
-                }
-
-                ProductionBomItem::create(array_merge($itemDto->toArray(), [
-                    'tenant_id' => $tenantId,
-                    'bom_id' => $bom->id,
-                    'sequence' => $itemDto->sequence ?: ($index + 1),
-                ]));
-            }
+            $this->persistBomItems($bom, $dto->items, $tenantId);
 
             // Create Approval History Log
             ProductionBomApproval::create([
@@ -139,23 +123,7 @@ class ProductionBomService
             // Recreate items to handle dynamic grids correctly
             $bom->items()->delete();
 
-            foreach ($dto->items as $index => $itemDto) {
-                if ($itemDto->child_bom_id) {
-                    $this->validateChildBomLink(
-                        $itemDto->child_bom_id,
-                        $itemDto->material_id,
-                        $bom->id,
-                        Carbon::parse($bom->effective_date)->toDateString(),
-                        $bom->expiry_date ? Carbon::parse($bom->expiry_date)->toDateString() : null
-                    );
-                }
-
-                ProductionBomItem::create(array_merge($itemDto->toArray(), [
-                    'tenant_id' => $tenantId,
-                    'bom_id' => $bom->id,
-                    'sequence' => $itemDto->sequence ?: ($index + 1),
-                ]));
-            }
+            $this->persistBomItems($bom, $dto->items, $tenantId);
 
             return $bom->load('items');
         });
@@ -341,6 +309,10 @@ class ProductionBomService
                 'created_by' => $creatorUserId,
             ]);
 
+            $oldToNewIdMap = [];
+            $createdPairs = [];
+
+            // Pass 1: Clone all component rows
             foreach ($original->items as $item) {
                 if ($item->child_bom_id) {
                     $this->validateChildBomLink(
@@ -352,22 +324,38 @@ class ProductionBomService
                     );
                 }
 
-                ProductionBomItem::create([
+                $newItem = ProductionBomItem::create([
                     'tenant_id' => $tenantId,
                     'bom_id' => $newBom->id,
                     'material_id' => $item->material_id,
                     'child_bom_id' => $item->child_bom_id,
                     'quantity' => $item->quantity,
+                    'quantity_type' => $item->quantity_type ?? 'fixed',
+                    'formula' => $item->formula,
                     'uom_id' => $item->uom_id,
                     'material_scrap_percentage' => $item->material_scrap_percentage,
-                    'is_alternative' => $item->is_alternative,
-                    'alternative_group' => $item->alternative_group,
-                    'priority' => $item->priority,
+                    'is_alternative' => (bool) $item->is_alternative,
+                    'replaces_item_id' => null, // resolved in Pass 2
+                    'priority' => $item->priority ?? 1,
                     'sequence' => $item->sequence,
-                    'effective_from' => $item->effective_from,
-                    'effective_to' => $item->effective_to,
                     'notes' => $item->notes,
                 ]);
+
+                $oldToNewIdMap[$item->id] = $newItem->id;
+                $createdPairs[] = ['old' => $item, 'new' => $newItem];
+            }
+
+            // Pass 2: Re-link alternative components to cloned primary items
+            foreach ($createdPairs as $pair) {
+                $oldItem = $pair['old'];
+                $newItem = $pair['new'];
+
+                if ($oldItem->is_alternative && $oldItem->replaces_item_id) {
+                    $targetNewId = $oldToNewIdMap[$oldItem->replaces_item_id] ?? null;
+                    if ($targetNewId) {
+                        $newItem->update(['replaces_item_id' => $targetNewId]);
+                    }
+                }
             }
 
             // Log revision creation
@@ -383,6 +371,80 @@ class ProductionBomService
 
             return $newBom;
         });
+    }
+
+    /**
+     * Persist BOM items using a two-pass algorithm to resolve primary/alternative links.
+     */
+    protected function persistBomItems(ProductionBom $bom, array $itemDtos, int $tenantId): void
+    {
+        $uidToItemMap = [];
+        $createdList = [];
+
+        // Pass 1: create all items with base attributes
+        foreach ($itemDtos as $index => $itemDto) {
+            if ($itemDto->child_bom_id) {
+                $this->validateChildBomLink(
+                    $itemDto->child_bom_id,
+                    $itemDto->material_id,
+                    $bom->id,
+                    Carbon::parse($bom->effective_date)->toDateString(),
+                    $bom->expiry_date ? Carbon::parse($bom->expiry_date)->toDateString() : null
+                );
+            }
+
+            $itemData = $itemDto->toArray();
+            unset($itemData['row_uid'], $itemData['replaces_row_uid']);
+
+            $itemData = array_merge($itemData, [
+                'tenant_id' => $tenantId,
+                'bom_id' => $bom->id,
+                'sequence' => $itemDto->sequence ?: ($index + 1),
+                'replaces_item_id' => null, // resolved in pass 2
+                'priority' => $itemDto->priority ?? 1,
+            ]);
+
+            $createdItem = ProductionBomItem::create($itemData);
+
+            if (!empty($itemDto->row_uid)) {
+                $uidToItemMap[$itemDto->row_uid] = $createdItem;
+            }
+            if (!empty($itemDto->id)) {
+                $uidToItemMap[(string) $itemDto->id] = $createdItem;
+            }
+            $uidToItemMap[(string) $createdItem->id] = $createdItem;
+
+            $createdList[] = [
+                'dto' => $itemDto,
+                'model' => $createdItem,
+            ];
+        }
+
+        // Pass 2: resolve replaces_item_id for alternative components
+        foreach ($createdList as $entry) {
+            $itemDto = $entry['dto'];
+            $model = $entry['model'];
+
+            if ($itemDto->is_alternative) {
+                $targetModel = null;
+                if (!empty($itemDto->replaces_row_uid) && isset($uidToItemMap[$itemDto->replaces_row_uid])) {
+                    $targetModel = $uidToItemMap[$itemDto->replaces_row_uid];
+                } elseif (!empty($itemDto->replaces_item_id) && isset($uidToItemMap[(string) $itemDto->replaces_item_id])) {
+                    $targetModel = $uidToItemMap[(string) $itemDto->replaces_item_id];
+                } elseif (!empty($itemDto->replaces_item_id)) {
+                    $existing = ProductionBomItem::where('bom_id', $bom->id)->find($itemDto->replaces_item_id);
+                    if ($existing && !$existing->is_alternative && $existing->id !== $model->id) {
+                        $targetModel = $existing;
+                    }
+                }
+
+                if ($targetModel && $targetModel->id !== $model->id) {
+                    if ($targetModel->bom_id === $bom->id && !$targetModel->is_alternative) {
+                        $model->update(['replaces_item_id' => $targetModel->id]);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -414,8 +476,9 @@ class ProductionBomService
                 'wastage_percentage' => $item->material_scrap_percentage, // compatibility fallback
                 'material_scrap_percentage' => $item->material_scrap_percentage,
                 'uom_code' => $item->uom?->code ?? $item->material?->uom?->code ?? 'PCS',
-                'is_alternative' => $item->is_alternative,
-                'alternative_group' => $item->alternative_group,
+                'is_alternative' => (bool) $item->is_alternative,
+                'replaces_item_id' => $item->replaces_item_id,
+                'priority' => $item->priority,
             ];
         }
 

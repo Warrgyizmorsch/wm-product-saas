@@ -468,6 +468,10 @@ class ProductionOrderService
             $itemsToResolve = [];
             $evaluator = app(BomFormulaEvaluatorService::class);
             foreach ($bom->items as $item) {
+                if ($item->is_alternative) {
+                    continue;
+                }
+
                 if ($item->isFormula()) {
                     $unitQty = $evaluator->evaluate($item->formula, $order->parameters ?? [], $order->product);
                 } else {
@@ -914,7 +918,7 @@ class ProductionOrderService
                     $multiplier = $shortageQty / $baseQty;
 
                     foreach ($subBom->items as $subItem) {
-                        if (!$subItem->material) continue;
+                        if (!$subItem->material || $subItem->is_alternative) continue;
 
                         $subPlannedQty = $subItem->quantity * $multiplier;
                         if ($subItem->material_scrap_percentage > 0) {

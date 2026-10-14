@@ -7,6 +7,7 @@ use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductionBomItem extends BaseModel
 {
@@ -19,17 +20,15 @@ class ProductionBomItem extends BaseModel
         'bom_id',
         'material_id',
         'child_bom_id',
+        'replaces_item_id',
         'quantity',
         'quantity_type', // fixed, formula
         'formula',
         'uom_id',
         'material_scrap_percentage',
         'is_alternative',
-        'alternative_group',
         'priority',
         'sequence',
-        'effective_from',
-        'effective_to',
         'notes',
     ];
 
@@ -39,9 +38,8 @@ class ProductionBomItem extends BaseModel
         'is_alternative' => 'boolean',
         'priority' => 'integer',
         'sequence' => 'integer',
-        'effective_from' => 'date',
-        'effective_to' => 'date',
         'child_bom_id' => 'integer',
+        'replaces_item_id' => 'integer',
     ];
 
     public function isFormula(): bool
@@ -54,6 +52,21 @@ class ProductionBomItem extends BaseModel
         return !$this->isFormula();
     }
 
+    public function isPrimary(): bool
+    {
+        return !$this->is_alternative;
+    }
+
+    public function isAlternative(): bool
+    {
+        return (bool) $this->is_alternative;
+    }
+
+    public function scopePrimary($query)
+    {
+        return $query->where('is_alternative', false);
+    }
+
     public function bom(): BelongsTo
     {
         return $this->belongsTo(ProductionBom::class, 'bom_id');
@@ -62,6 +75,19 @@ class ProductionBomItem extends BaseModel
     public function childBom(): BelongsTo
     {
         return $this->belongsTo(ProductionBom::class, 'child_bom_id');
+    }
+
+    public function primaryItem(): BelongsTo
+    {
+        return $this->belongsTo(ProductionBomItem::class, 'replaces_item_id');
+    }
+
+    public function alternatives(): HasMany
+    {
+        return $this->hasMany(ProductionBomItem::class, 'replaces_item_id')
+            ->orderBy('priority', 'asc')
+            ->orderBy('sequence', 'asc')
+            ->orderBy('id', 'asc');
     }
 
     public function material(): BelongsTo

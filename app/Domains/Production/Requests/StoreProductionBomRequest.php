@@ -65,11 +65,11 @@ class StoreProductionBomRequest extends FormRequest
             'items.*.uom_id' => 'required|exists:uoms,id',
             'items.*.material_scrap_percentage' => 'nullable|numeric|min:0|max:100',
             'items.*.is_alternative' => 'nullable',
-            'items.*.alternative_group' => 'nullable|string|max:255',
+            'items.*.replaces_item_id' => 'nullable|integer',
+            'items.*.replaces_row_uid' => 'nullable|string|max:100',
+            'items.*.row_uid' => 'nullable|string|max:100',
             'items.*.priority' => 'nullable|integer|min:1',
             'items.*.sequence' => 'nullable|integer|min:1',
-            'items.*.effective_from' => 'nullable|date',
-            'items.*.effective_to' => 'nullable|date|after_or_equal:items.*.effective_from',
             'items.*.notes' => 'nullable|string',
         ];
     }
@@ -80,6 +80,7 @@ class StoreProductionBomRequest extends FormRequest
             $productId = (int) $this->input('product_id');
             $items = $this->input('items', []);
             $materialIds = [];
+            $allRows = [];
 
             foreach ($items as $index => $item) {
                 $materialId = (int) ($item['material_id'] ?? 0);
@@ -97,11 +98,49 @@ class StoreProductionBomRequest extends FormRequest
                     }
                 }
 
-                // Rule 3: Alternative material group validation
+                $rowUid = !empty($item['row_uid']) ? (string) $item['row_uid'] : null;
+                $rowId = !empty($item['id']) ? (string) $item['id'] : null;
+                $key = $rowUid ?: ($rowId ?: "index_{$index}");
+
+                $allRows[$key] = [
+                    'index' => $index,
+                    'is_alternative' => !empty($item['is_alternative']),
+                    'id' => $rowId,
+                    'row_uid' => $rowUid,
+                ];
+            }
+
+            foreach ($items as $index => $item) {
                 $isAlternative = !empty($item['is_alternative']);
-                $altGroup = trim($item['alternative_group'] ?? '');
-                if ($isAlternative && empty($altGroup)) {
-                    $validator->errors()->add("items.{$index}.alternative_group", "An alternative group code is required if alternative is checked.");
+                $targetRef = $item['replaces_row_uid'] ?? ($item['replaces_item_id'] ?? null);
+
+                if ($isAlternative) {
+                    if (empty($targetRef)) {
+                        $validator->errors()->add("items.{$index}.replaces_row_uid", "An alternative component must specify the primary component it replaces.");
+                        continue;
+                    }
+
+                    $targetKey = (string) $targetRef;
+                    $targetFound = false;
+                    $targetIndex = null;
+                    $targetIsAlt = false;
+
+                    foreach ($allRows as $k => $info) {
+                        if ($k === $targetKey || (string)($info['id'] ?? '') === $targetKey || (string)($info['row_uid'] ?? '') === $targetKey) {
+                            $targetFound = true;
+                            $targetIndex = $info['index'];
+                            $targetIsAlt = $info['is_alternative'];
+                            break;
+                        }
+                    }
+
+                    if (!$targetFound) {
+                        $validator->errors()->add("items.{$index}.replaces_row_uid", "The referenced primary component was not found in this BOM.");
+                    } elseif ($targetIndex === $index) {
+                        $validator->errors()->add("items.{$index}.replaces_row_uid", "A component cannot be an alternative of itself.");
+                    } elseif ($targetIsAlt) {
+                        $validator->errors()->add("items.{$index}.replaces_row_uid", "An alternative component cannot reference another alternative component.");
+                    }
                 }
             }
         });

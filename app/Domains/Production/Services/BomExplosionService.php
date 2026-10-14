@@ -122,8 +122,8 @@ class BomExplosionService
             $childTree['net_quantity'] = $netQty;
             $childTree['gross_quantity'] = $grossQty;
             $childTree['material_scrap_percentage'] = $item->material_scrap_percentage;
-            $childTree['is_alternative'] = $item->is_alternative;
-            $childTree['alternative_group'] = $item->alternative_group;
+            $childTree['is_alternative'] = (bool) $item->is_alternative;
+            $childTree['replaces_item_id'] = $item->replaces_item_id;
             $childTree['priority'] = $item->priority;
             $childTree['uom_code'] = $item->uom?->code ?? $item->material?->uom?->code ?? 'PCS';
 
@@ -158,6 +158,10 @@ class BomExplosionService
      */
     private function consolidateRequirements(array $node, array &$flat): void
     {
+        if (!empty($node['is_alternative'])) {
+            return;
+        }
+
         $isPhantom = !empty($node['is_phantom']) && $node['level'] > 1;
 
         if (empty($node['children']) || $isPhantom) {

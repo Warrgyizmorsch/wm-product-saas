@@ -30,11 +30,11 @@ class StoreBomApiRequest extends ApiFormRequest
             'items.*.material_scrap_percentage' => 'nullable|numeric|min:0|max:100',
             'items.*.scrap_factor'              => 'nullable|numeric|min:0|max:100',
             'items.*.is_alternative'            => 'nullable|boolean',
-            'items.*.alternative_group'         => 'nullable|string|max:255',
+            'items.*.replaces_item_id'          => 'nullable|integer',
+            'items.*.replaces_row_uid'          => 'nullable|string|max:100',
+            'items.*.row_uid'                   => 'nullable|string|max:100',
             'items.*.priority'                  => 'nullable|integer|min:1',
             'items.*.sequence'                  => 'nullable|integer|min:1',
-            'items.*.effective_from'            => 'nullable|date',
-            'items.*.effective_to'              => 'nullable|date|after_or_equal:items.*.effective_from',
             'items.*.notes'                     => 'nullable|string',
         ];
     }
