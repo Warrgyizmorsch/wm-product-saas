@@ -148,7 +148,7 @@
             <div class="history-bubble mt-1.5 p-2 rounded-2 border">
                 <div class="d-flex align-items-center gap-1 text-muted fs-10 text-uppercase fw-bold mb-1">
                     <i class="feather-message-square text-teal fs-11"></i>
-                    <span>Interaction Notes</span>
+                    <span>{{ __('crm.interaction_notes') }}</span>
                 </div>
                 @if(!empty($interactionNote))
                     <div class="fs-12 text-dark text-break fw-normal lh-sm" style="white-space: pre-wrap;">{{ $interactionNote }}</div>
@@ -160,7 +160,7 @@
             <div class="d-flex align-items-center gap-2 mt-1.5 p-1.5 rounded-2 bg-soft-purple border border-purple-subtle text-purple fs-11">
                 <i class="feather-calendar fs-12 flex-shrink-0"></i>
                 <div class="text-truncate">
-                    <span class="text-muted">Target Schedule:</span>
+                    <span class="text-muted">{{ __('crm.target_schedule') }}:</span>
                     <strong class="text-purple ms-1 font-monospace">{{ $scheduledDateTime }}</strong>
                 </div>
             </div>
@@ -174,7 +174,7 @@
             </div>
         @elseif($assigneeName)
             <div class="d-flex align-items-center gap-1.5 mt-1 text-muted fs-11">
-                <span>Assigned to</span>
+                <span>{{ __('crm.assigned_to') }}</span>
                 <span class="badge bg-soft-info text-info border border-info-subtle px-2 py-0.5 rounded-pill fw-semibold">{{ $assigneeName }}</span>
             </div>
         @elseif(!empty($rawNote))
@@ -188,7 +188,7 @@
                     $avatarSrc = $user?->avatar_url ?: asset('assets/images/avatar/default.png');
                 @endphp
                 <img src="{{ $avatarSrc }}" alt="{{ $userName }}" class="rounded-circle border flex-shrink-0 shadow-2xs" style="width: 20px; height: 20px; min-width: 20px; min-height: 20px; object-fit: cover; border-color: #cbd5e1 !important;" onerror="this.onerror=null; this.src='{{ asset('assets/images/avatar/default.png') }}';">
-                <span>by <strong class="text-dark">{{ $userName }}</strong></span>
+                <span>{{ __('crm.by') }} <strong class="text-dark">{{ $userName }}</strong></span>
             </div>
             @if($item->created_at)
                 <span class="text-muted fs-10" title="{{ $item->created_at->format('d M Y, h:i A') }}">

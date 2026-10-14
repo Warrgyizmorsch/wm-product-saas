@@ -117,12 +117,12 @@
                 {{ $avatarInitial }}
             </div>
             @if(!$isPending)
-                <span class="position-absolute d-flex align-items-center justify-content-center bg-success text-white rounded-circle shadow-xs" 
+                <span class="position-absolute d-flex align-items-center justify-content-center bg-success text-white rounded-circle shadow-xs odoo-avatar-badge" 
                       style="bottom: -1px; right: -1px; width: 16px; height: 16px; border: 2px solid #ffffff; font-size: 8px;">
                     <i class="feather-check" style="stroke-width: 3.5;"></i>
                 </span>
             @else
-                <span class="position-absolute d-flex align-items-center justify-content-center bg-primary text-white rounded-circle shadow-xs" 
+                <span class="position-absolute d-flex align-items-center justify-content-center bg-primary text-white rounded-circle shadow-xs odoo-avatar-badge" 
                       style="bottom: -1px; right: -1px; width: 16px; height: 16px; border: 2px solid #ffffff; font-size: 8px;">
                     <i class="feather-clock" style="stroke-width: 3;"></i>
                 </span>
@@ -152,11 +152,11 @@
                     <!-- Origin Badge (Deal vs Lead) -->
                     @if($isDealOrigin)
                         <span class="badge bg-soft-primary text-primary border border-primary-subtle px-1.5 py-0.5 fs-10 fw-semibold rounded ms-1" title="Activity created on this Deal">
-                            <i class="feather-briefcase me-0.5"></i>Deal
+                            <i class="feather-briefcase me-0.5"></i>{{ __('crm.deal') }}
                         </span>
                     @else
                         <span class="badge bg-soft-info text-info border border-info-subtle px-1.5 py-0.5 fs-10 fw-semibold rounded ms-1" title="From Lead conversation">
-                            <i class="feather-user-check me-0.5"></i>Lead Conversation
+                            <i class="feather-user-check me-0.5"></i>{{ __('crm.lead_conversation') }}
                         </span>
                     @endif
 
@@ -175,9 +175,9 @@
                     <span class="badge rounded-pill {{ $statusBadgeClass }} px-2 py-0.5 fs-10 ms-1 fw-semibold">{{ __('crm.' . strtolower(str_replace(' ', '_', $statusLabel))) ?: $statusLabel }}</span>
                     
                     @if($isDealOrigin)
-                        <span class="badge bg-soft-primary text-primary border border-primary-subtle px-1.5 py-0.5 fs-10 fw-semibold rounded ms-1">Deal</span>
+                        <span class="badge bg-soft-primary text-primary border border-primary-subtle px-1.5 py-0.5 fs-10 fw-semibold rounded ms-1">{{ __('crm.deal') }}</span>
                     @else
-                        <span class="badge bg-soft-info text-info border border-info-subtle px-1.5 py-0.5 fs-10 fw-semibold rounded ms-1">Lead</span>
+                        <span class="badge bg-soft-info text-info border border-info-subtle px-1.5 py-0.5 fs-10 fw-semibold rounded ms-1">{{ __('crm.lead') }}</span>
                     @endif
 
                     <span class="text-secondary fs-12 ms-1">&bull; {{ __('crm.activity_types.' . $item->type) ?: $item->type }} {{ __('crm.activity_log') }}</span>
@@ -203,7 +203,7 @@
             @if($lastRescheduledDate)
                 <div class="mb-1">
                     <span class="badge bg-soft-info text-info border border-info border-opacity-25 px-1.5 py-0.5 fs-10 fw-medium d-inline-flex align-items-center gap-1">
-                        <i class="feather-refresh-cw fs-9"></i> Rescheduled from {{ $lastRescheduledDate->format('d M Y, h:i A') }}
+                        <i class="feather-refresh-cw fs-9"></i> {{ __('crm.rescheduled_from') }} {{ $lastRescheduledDate->format('d M Y, h:i A') }}
                     </span>
                 </div>
             @endif
@@ -241,22 +241,22 @@
                 <div class="d-flex align-items-center flex-wrap pt-1.5 fs-12" style="column-gap: 16px; row-gap: 6px;">
                     <!-- Connected -->
                     <a href="javascript:void(0)" class="text-success text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed">
-                        <i class="feather-check fs-12"></i> <span>Connected</span>
+                        <i class="feather-check fs-12"></i> <span>{{ __('crm.connected') }}</span>
                     </a>
 
                     <!-- Not Connected -->
                     <a href="javascript:void(0)" class="text-warning text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected">
-                        <i class="feather-phone-off fs-12"></i> <span>Not Connected</span>
+                        <i class="feather-phone-off fs-12"></i> <span>{{ __('crm.not_connected') }}</span>
                     </a>
 
                     <!-- Reschedule -->
                     <a href="javascript:void(0)" class="text-info text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">
-                        <i class="feather-repeat fs-12"></i> <span>Reschedule</span>
+                        <i class="feather-repeat fs-12"></i> <span>{{ __('crm.reschedule') }}</span>
                     </a>
 
                     <!-- Cancel -->
                     <a href="javascript:void(0)" class="text-danger text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">
-                        <i class="feather-x fs-12"></i> <span>Cancel</span>
+                        <i class="feather-x fs-12"></i> <span>{{ __('crm.cancel') }}</span>
                     </a>
 
                     @if($phoneToCall)
@@ -267,7 +267,7 @@
                            data-deal-title="{{ addslashes($deal->title) }}"
                            data-deal-phone="{{ $phoneToCall }}"
                            title="Click to call softphone">
-                            <i class="feather-phone-call fs-10"></i> <span>Call {{ $phoneToCall }}</span>
+                            <i class="feather-phone-call fs-10"></i> <span>{{ __('crm.call') }} {{ $phoneToCall }}</span>
                         </a>
                     @endif
                 </div>

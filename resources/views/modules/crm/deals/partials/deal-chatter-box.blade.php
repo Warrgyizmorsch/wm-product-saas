@@ -16,14 +16,14 @@
         <div class="nav nav-pills odoo-chatter-nav-pills p-0.5 bg-light rounded-2 border d-inline-flex flex-row align-items-center flex-nowrap" id="dealChatterTabs" role="tablist">
             <button class="nav-link px-2.5 py-1 fs-12 fw-bold active d-inline-flex align-items-center gap-1.5 rounded-2 text-nowrap" id="deal-chatter-activity-tab" data-bs-toggle="pill" data-bs-target="#deal-chatter-activity-pane" type="button" role="tab" aria-controls="deal-chatter-activity-pane" aria-selected="true">
                 <i class="feather-calendar fs-12"></i>
-                <span>Activities</span>
+                <span>{{ __('crm.activities') }}</span>
                 @if($activeActionableCount > 0)
                     <span class="badge bg-primary text-white rounded-pill px-1.5 py-0.2 fs-10 font-monospace">{{ $activeActionableCount }}</span>
                 @endif
             </button>
             <button class="nav-link px-2.5 py-1 fs-12 fw-bold d-inline-flex align-items-center gap-1.5 rounded-2 text-muted text-nowrap" id="deal-chatter-history-tab" data-bs-toggle="pill" data-bs-target="#deal-chatter-history-pane" type="button" role="tab" aria-controls="deal-chatter-history-pane" aria-selected="false">
                 <i class="feather-clock fs-12"></i>
-                <span>History</span>
+                <span>{{ __('crm.history') }}</span>
                 <span class="badge bg-secondary-subtle text-secondary rounded-pill px-1.5 py-0.2 fs-10 font-monospace">{{ $historyCount }}</span>
             </button>
         </div>
@@ -32,34 +32,34 @@
         <div class="dropdown">
             <button class="btn btn-xs btn-white border dropdown-toggle d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-2 shadow-2xs fw-semibold fs-12 text-dark" type="button" id="dealActivityFilterDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="feather-filter text-primary fs-12"></i>
-                <span id="dealActiveFilterLabel">All ({{ $allActivitiesTotal }})</span>
+                <span id="dealActiveFilterLabel">{{ __('crm.all_activities') }} ({{ $allActivitiesTotal }})</span>
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow-sm fs-12 py-1 border" aria-labelledby="dealActivityFilterDropdownBtn" id="dealActivityFilterMenu" style="min-width: 230px;">
                 <li>
-                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3 active" href="javascript:void(0)" data-filter="all" onclick="applyDealChatterActivityFilter('all', 'All', {{ $allActivitiesTotal }})">
+                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3 active" href="javascript:void(0)" data-filter="all" onclick="applyDealChatterActivityFilter('all', '{{ addslashes(__('crm.all_activities')) }}', {{ $allActivitiesTotal }})">
                         <span class="d-flex align-items-center gap-2">
                             <i class="feather-list text-muted fs-12"></i>
-                            <span>All Activities</span>
+                            <span>{{ __('crm.all_activities') }}</span>
                         </span>
                         <span class="badge bg-dark text-white rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $allActivitiesTotal }}</span>
                     </a>
                 </li>
                 <li><hr class="dropdown-divider my-1"></li>
                 <li>
-                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="deal" onclick="applyDealChatterActivityFilter('deal', 'Deal Only', {{ $dealOriginCount }})">
+                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="deal" onclick="applyDealChatterActivityFilter('deal', '{{ addslashes(__('crm.deal_activities')) }}', {{ $dealOriginCount }})">
                         <span class="d-flex align-items-center gap-2">
                             <i class="feather-briefcase text-primary fs-12"></i>
-                            <span>Deal Activities</span>
+                            <span>{{ __('crm.deal_activities') }}</span>
                         </span>
                         <span class="badge bg-primary text-white rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $dealOriginCount }}</span>
                     </a>
                 </li>
                 @if($linkedLead)
                     <li>
-                        <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="lead" onclick="applyDealChatterActivityFilter('lead', 'Lead Conversation', {{ $leadOriginCount }})">
+                        <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="lead" onclick="applyDealChatterActivityFilter('lead', '{{ addslashes(__('crm.lead_conversations')) }}', {{ $leadOriginCount }})">
                             <span class="d-flex align-items-center gap-2">
                                 <i class="feather-user-check text-info fs-12"></i>
-                                <span>Lead Conversations</span>
+                                <span>{{ __('crm.lead_conversations') }}</span>
                             </span>
                             <span class="badge bg-info text-white rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $leadOriginCount }}</span>
                         </a>
@@ -67,37 +67,37 @@
                 @endif
                 <li><hr class="dropdown-divider my-1"></li>
                 <li>
-                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="planned" onclick="applyDealChatterActivityFilter('planned', 'Planned', {{ $plannedActivities->count() }})">
+                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="planned" onclick="applyDealChatterActivityFilter('planned', '{{ addslashes(__('crm.planned_activities')) }}', {{ $plannedActivities->count() }})">
                         <span class="d-flex align-items-center gap-2">
                             <i class="feather-calendar text-success fs-12"></i>
-                            <span>Planned Activities</span>
+                            <span>{{ __('crm.planned_activities') }}</span>
                         </span>
                         <span class="badge bg-success text-white rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $plannedActivities->count() }}</span>
                     </a>
                 </li>
                 <li>
-                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="overdue" onclick="applyDealChatterActivityFilter('overdue', 'Overdue', {{ $overdueActivities->count() }})">
+                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="overdue" onclick="applyDealChatterActivityFilter('overdue', '{{ addslashes(__('crm.overdue_activities')) }}', {{ $overdueActivities->count() }})">
                         <span class="d-flex align-items-center gap-2">
                             <i class="feather-alert-circle text-danger fs-12"></i>
-                            <span>Overdue Activities</span>
+                            <span>{{ __('crm.overdue_activities') }}</span>
                         </span>
                         <span class="badge bg-danger text-white rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $overdueActivities->count() }}</span>
                     </a>
                 </li>
                 <li>
-                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="today" onclick="applyDealChatterActivityFilter('today', 'Today', {{ $todayDoneActivities->count() }})">
+                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="today" onclick="applyDealChatterActivityFilter('today', '{{ addslashes(__('crm.today_activity')) }}', {{ $todayDoneActivities->count() }})">
                         <span class="d-flex align-items-center gap-2">
                             <i class="feather-check-circle text-warning fs-12"></i>
-                            <span>Today Activity</span>
+                            <span>{{ __('crm.today_activity') }}</span>
                         </span>
                         <span class="badge bg-warning text-dark rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $todayDoneActivities->count() }}</span>
                     </a>
                 </li>
                 <li>
-                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="past" onclick="applyDealChatterActivityFilter('past', 'Past', {{ $pastCount }})">
+                    <a class="dropdown-item deal-filter-item d-flex align-items-center justify-content-between py-1.5 px-3" href="javascript:void(0)" data-filter="past" onclick="applyDealChatterActivityFilter('past', '{{ addslashes(__('crm.past_activities')) }}', {{ $pastCount }})">
                         <span class="d-flex align-items-center gap-2">
                             <i class="feather-clock text-secondary fs-12"></i>
-                            <span>Past Activities</span>
+                            <span>{{ __('crm.past_activities') }}</span>
                         </span>
                         <span class="badge bg-secondary text-white rounded-pill px-1.5 py-0.5 fs-10 font-monospace">{{ $pastCount }}</span>
                     </a>
@@ -123,7 +123,7 @@
                             data-deal-title="{{ $deal->title }}" 
                             title="{{ __('crm.schedule_next_activity_btn') }}">
                         <i class="feather-plus fs-11 text-primary"></i>
-                        <span>Activity</span>
+                        <span>{{ __('crm.activity') }}</span>
                     </button>
 
                     <button type="button" 
@@ -132,7 +132,7 @@
                             data-bs-target="#modalDealLogNote" 
                             title="{{ __('crm.add_note') }}">
                         <i class="feather-edit-2 fs-10 text-muted"></i>
-                        <span>Note</span>
+                        <span>{{ __('crm.note') }}</span>
                     </button>
 
                     @php
@@ -146,7 +146,7 @@
                                 data-deal-phone="{{ $primaryDealPhone }}"
                                 title="Call {{ $primaryDealPhone }}">
                             <i class="feather-phone-call fs-10 text-success"></i>
-                            <span>Call Phone</span>
+                            <span>{{ __('crm.call_phone') }}</span>
                         </button>
                     @endif
                 </div>
@@ -202,7 +202,7 @@
                                     <div class="text-center pt-1 pb-1">
                                         <button type="button" class="btn btn-2xs btn-white border rounded-pill px-3 py-1 fs-11 text-secondary fw-semibold shadow-2xs hover-primary" onclick="$(this).parent().prev('.extra-planned-deal-items').removeClass('d-none'); $(this).parent().remove();">
                                             <i class="feather-chevron-down fs-11 me-1"></i>
-                                            <span>Load More (+{{ $plannedActivities->count() - 10 }} more)</span>
+                                            <span>{{ __('crm.load_more') }} (+{{ $plannedActivities->count() - 10 }})</span>
                                         </button>
                                     </div>
                                 @endif
@@ -228,7 +228,7 @@
                     @if($pastCount > 0)
                         <div class="deal-activity-section-block" data-activity-section="past">
                             <div class="odoo-feed-divider odoo-feed-divider--past-done" data-bs-toggle="collapse" data-bs-target="#collapsePast_dealChatter" aria-expanded="true" aria-controls="collapsePast_dealChatter">
-                                <span><i class="feather-chevron-down toggle-arrow me-1"></i> Past Activities &amp; Conversations ({{ $pastCount }})</span>
+                                <span><i class="feather-chevron-down toggle-arrow me-1"></i> {{ __('crm.past_activities_conversations') }} ({{ $pastCount }})</span>
                             </div>
                             <div class="collapse show odoo-activity-list mb-3" id="collapsePast_dealChatter">
                                 @foreach($pastDoneActivities->take(15) as $item)
@@ -244,7 +244,7 @@
                                     <div class="text-center pt-2 pb-1">
                                         <button type="button" class="btn btn-2xs btn-white border rounded-pill px-3 py-1.5 fs-11 text-secondary fw-semibold shadow-2xs hover-primary" onclick="$(this).parent().prev('.extra-past-deal-items').removeClass('d-none'); $(this).parent().remove();">
                                             <i class="feather-chevron-down fs-11 me-1 text-primary"></i>
-                                            <span>Load More Activities (+{{ $pastCount - 15 }} remaining)</span>
+                                            <span>{{ __('crm.load_more_activities') }} (+{{ $pastCount - 15 }})</span>
                                         </button>
                                     </div>
                                 @endif
@@ -259,7 +259,7 @@
                                 <i class="feather-calendar fs-5"></i>
                             </div>
                             <h6 class="fw-bold text-dark fs-13 mb-1">{{ __('crm.no_pending_activities') }}</h6>
-                            <p class="text-muted fs-11 mb-3">Schedule a call, meeting, or reminder for this deal.</p>
+                            <p class="text-muted fs-11 mb-3">{{ __('crm.schedule_call_reminder_deal_desc') }}</p>
                             <button type="button" class="btn btn-xs btn-primary fw-semibold px-3 py-1.5 rounded-pill btn-open-deal-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas">
                                 <i class="feather-plus me-1"></i> {{ __('crm.schedule_next_activity_btn') }}
                             </button>
@@ -283,7 +283,7 @@
                 </div>
                 <div class="input-group input-group-sm" style="width: 150px;">
                     <span class="input-group-text bg-white border-end-0 py-0.5 px-2 text-muted" style="border-color: #cbd5e1;"><i class="feather-search fs-10"></i></span>
-                    <input type="search" class="form-control form-control-sm border-start-0 py-0.5 px-1 fs-11" id="dealHistoryQuickSearch" placeholder="Search history..." oninput="filterDealChatterHistory(this.value)" onsearch="filterDealChatterHistory(this.value)" style="border-color: #cbd5e1;">
+                    <input type="search" class="form-control form-control-sm border-start-0 py-0.5 px-1 fs-11" id="dealHistoryQuickSearch" placeholder="{{ __('crm.search_history') }}" oninput="filterDealChatterHistory(this.value)" onsearch="filterDealChatterHistory(this.value)" style="border-color: #cbd5e1;">
                 </div>
             </div>
 
@@ -295,7 +295,7 @@
                             <i class="feather-clock fs-20 opacity-50"></i>
                         </div>
                         <h6 class="fw-bold text-dark fs-12 mb-1">{{ __('crm.no_history_events') }}</h6>
-                        <p class="text-muted fs-11 mb-0">No past audit entries or activity records found for this deal.</p>
+                        <p class="text-muted fs-11 mb-0">{{ __('crm.no_past_history_deal_desc') }}</p>
                     </div>
                 @else
                     <div id="dealHistoryEventsList">
@@ -304,9 +304,9 @@
                                 try {
                                     $parsedDate = \Carbon\Carbon::createFromFormat('d/m/Y', $date)->startOfDay();
                                     if ($parsedDate->isToday()) {
-                                        $displayDate = 'Today • ' . $parsedDate->format('d M Y');
+                                        $displayDate = __('crm.today') . ' • ' . $parsedDate->format('d M Y');
                                     } elseif ($parsedDate->isYesterday()) {
-                                        $displayDate = 'Yesterday • ' . $parsedDate->format('d M Y');
+                                        $displayDate = __('crm.yesterday') . ' • ' . $parsedDate->format('d M Y');
                                     } else {
                                         $displayDate = $parsedDate->format('d M Y') . ' (' . $parsedDate->format('l') . ')';
                                     }
@@ -341,11 +341,11 @@
                                             <div class="d-flex align-items-center gap-1.5">
                                                 @if($isLeadHist)
                                                     <span class="badge bg-soft-info text-info border border-info-subtle px-1.5 py-0.2 fs-9 fw-bold">
-                                                        <i class="feather-user-check me-0.5"></i> Lead History
+                                                        <i class="feather-user-check me-0.5"></i> {{ __('crm.lead_history') }}
                                                     </span>
                                                 @else
                                                     <span class="badge bg-soft-primary text-primary border border-primary-subtle px-1.5 py-0.2 fs-9 fw-bold">
-                                                        <i class="feather-briefcase me-0.5"></i> Deal Audit
+                                                        <i class="feather-briefcase me-0.5"></i> {{ __('crm.deal_audit') }}
                                                     </span>
                                                 @endif
                                                 <strong class="text-dark">{{ ucwords(str_replace('_', ' ', $evType)) }}</strong>
@@ -358,7 +358,7 @@
                                             </div>
                                         @endif
                                         <div class="text-muted fs-10 mt-1">
-                                            <i class="feather-user fs-9 me-1"></i>by <strong class="text-dark">{{ $evUser }}</strong>
+                                            <i class="feather-user fs-9 me-1"></i>{{ __('crm.by') }} <strong class="text-dark">{{ $evUser }}</strong>
                                         </div>
                                     </div>
                                 @endforeach
@@ -369,7 +369,7 @@
                     <!-- No Results Search Fallback -->
                     <div id="dealHistoryEmptySearchResults" class="text-center py-4 text-muted border border-dashed rounded-3 bg-white fs-11 my-2" style="display: none;">
                         <i class="feather-search fs-18 mb-1 d-block text-muted opacity-50"></i>
-                        <span>No history events match your filter.</span>
+                        <span>{{ __('crm.no_history_match_filter') }}</span>
                     </div>
                 @endif
             </div>
@@ -385,7 +385,7 @@
             <div class="modal-header bg-light py-2.5 px-3 border-bottom">
                 <h6 class="modal-title fw-bold text-dark fs-13 d-flex align-items-center gap-1.5" id="modalDealLogNoteLabel">
                     <i class="feather-edit-2 text-primary fs-13"></i>
-                    <span>{{ __('crm.add_note') }} / Discussion Note</span>
+                    <span>{{ __('crm.add_note') }} / {{ __('crm.discussion_note') }}</span>
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -396,11 +396,11 @@
                 <input type="hidden" name="status" value="Connected">
                 <div class="modal-body p-3">
                     <div class="mb-2">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Discussion Note / Interaction Summary</label>
-                        <textarea name="notes" class="form-control form-control-sm" rows="4" placeholder="Log details of conversation or internal note..." required></textarea>
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.discussion_note_interaction_summary') }}</label>
+                        <textarea name="notes" class="form-control form-control-sm" rows="4" placeholder="{{ __('crm.log_note_placeholder') }}" required></textarea>
                     </div>
                     <div class="mb-0">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Tag Team Members</label>
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.tag_team_members') }}</label>
                         <select name="tagged_user_ids[]" class="form-select form-select-sm" multiple>
                             @foreach($users as $u)
                                 <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
@@ -410,7 +410,7 @@
                 </div>
                 <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end gap-2">
                     <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('crm.cancel') }}</button>
-                    <button type="submit" class="btn btn-sm btn-primary fw-bold">{{ __('crm.save_note') ?? 'Save Note' }}</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold">{{ __('crm.save_note') }}</button>
                 </div>
             </form>
         </div>

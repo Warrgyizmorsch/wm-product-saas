@@ -62,7 +62,7 @@ function loadLidMap(key) {
         for (const [k, v] of Object.entries(data.phoneToLid)) phoneToLidMap.set(k, v);
       }
     }
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function saveLidMap(key) {
@@ -73,7 +73,7 @@ function saveLidMap(key) {
     const lidToPhone = Object.fromEntries(lidToPhoneMap.entries());
     const phoneToLid = Object.fromEntries(phoneToLidMap.entries());
     fs.writeFileSync(filePath, JSON.stringify({ lidToPhone, phoneToLid }, null, 2));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 
@@ -158,7 +158,7 @@ async function initSession(key, force = false) {
             lidToPhoneMap.set(c.lid, phone);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     });
 
     sock.ev.on('contacts.update', (updates) => {
@@ -171,33 +171,39 @@ async function initSession(key, force = false) {
             lidToPhoneMap.set(c.lid, phone);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     });
 
     sock.ev.on('messages.upsert', async (m) => {
       try {
         if (!m.messages || !Array.isArray(m.messages)) return;
+        // Baileys sends m.type = 'notify' for real-time live incoming messages.
+        // Ignore offline history sync if type is append.
+        if (m.type && m.type !== 'notify') return;
+
         for (const msg of m.messages) {
           if (msg.key && msg.key.id) {
             messageStore.set(msg.key.id, msg);
-          }
-
-          // 1. STRICT FILTER: Ignore self messages (fromMe) - PREVENTS SELF-REPLY INFINITE LOOP!
-          if (msg.key && msg.key.fromMe) {
-            continue;
-          }
-
-          // 2. STRICT FILTER: Ignore historical messages synced on startup
-          const sessionStart = sessionObj.connectedAt || Math.floor(Date.now() / 1000);
-          const msgTimestamp = msg.messageTimestamp ? (typeof msg.messageTimestamp === 'number' ? msg.messageTimestamp : (msg.messageTimestamp.low || 0)) : 0;
-          if (msgTimestamp && msgTimestamp < (sessionStart - 5)) {
-            continue;
           }
 
           const jid = msg.key.remoteJid || '';
 
           // STRICT FILTER: Ignore Groups, Newsletters, Channels, Status Broadcasts
           if (!jid || jid === 'status@broadcast' || jid.endsWith('@g.us') || jid.endsWith('@newsletter') || jid.includes('newsletter')) {
+            continue;
+          }
+
+          // STRICT FILTER: Prevent infinite loop by dropping messages dispatched by bot API
+          if (msg.key && msg.key.id && outboundBotMessageIds.has(msg.key.id)) {
+            continue;
+          }
+
+          // FILTER: Ignore messages sent by me to OTHER contacts (e.g. agent typing in WhatsApp app)
+          // Allow self-chat (user testing by sending message to own bot number)
+          const ownJid = sessionObj.user?.id?.replace(/:.*@/, '@') || '';
+          const ownNum = ownJid ? ownJid.replace(/@.*$/, '') : '';
+          const isSelfChat = jid && (jid === sessionObj.user?.id || (ownNum && jid.includes(ownNum)));
+          if (msg.key && msg.key.fromMe && !isSelfChat) {
             continue;
           }
 
@@ -214,14 +220,14 @@ async function initSession(key, force = false) {
           if (!msgObj) continue;
 
           const bodyText = msgObj.conversation ||
-                           msgObj.extendedTextMessage?.text ||
-                           msgObj.imageMessage?.caption ||
-                           msgObj.videoMessage?.caption ||
-                           msgObj.documentMessage?.caption ||
-                           msgObj.buttonsResponseMessage?.selectedButtonId ||
-                           msgObj.listResponseMessage?.singleSelectReply?.selectedRowId ||
-                           msgObj.templateButtonReplyMessage?.selectedId ||
-                           '';
+            msgObj.extendedTextMessage?.text ||
+            msgObj.imageMessage?.caption ||
+            msgObj.videoMessage?.caption ||
+            msgObj.documentMessage?.caption ||
+            msgObj.buttonsResponseMessage?.selectedButtonId ||
+            msgObj.listResponseMessage?.singleSelectReply?.selectedRowId ||
+            msgObj.templateButtonReplyMessage?.selectedId ||
+            '';
 
           // Save LID to Phone mapping and Phone to LID mapping
           if (msg.key.remoteJid) {
@@ -462,8 +468,17 @@ app.post('/sessions/:key/send-message', async (req, res) => {
       targetJid = `${cleanNum}@s.whatsapp.net`;
     }
 
+    if (targetJid && cleanNum) {
+      const lidId = targetJid.replace(/@.*$/, '');
+      lidToPhoneMap.set(lidId, cleanNum);
+      lidToPhoneMap.set(targetJid, cleanNum);
+      phoneToLidMap.set(cleanNum, targetJid);
+      phoneToLidMap.set(cleanNum + '@s.whatsapp.net', targetJid);
+      saveLidMap(key);
+    }
+
     console.log(`[Baileys ${key}] Sending message to ${targetJid}: "${message.substring(0, 30)}..."`);
-    
+
     let sendOptions = { text: message };
     if (message_id && messageStore.has(message_id)) {
       const rawMsg = messageStore.get(message_id);
@@ -543,6 +558,15 @@ app.post('/sessions/:key/send-document', async (req, res) => {
 
     if (!targetJid) {
       targetJid = `${cleanNum}@s.whatsapp.net`;
+    }
+
+    if (targetJid && cleanNum) {
+      const lidId = targetJid.replace(/@.*$/, '');
+      lidToPhoneMap.set(lidId, cleanNum);
+      lidToPhoneMap.set(targetJid, cleanNum);
+      phoneToLidMap.set(cleanNum, targetJid);
+      phoneToLidMap.set(cleanNum + '@s.whatsapp.net', targetJid);
+      saveLidMap(key);
     }
 
     const fileBuffer = Buffer.from(document, 'base64');

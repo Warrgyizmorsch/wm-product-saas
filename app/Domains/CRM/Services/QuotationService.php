@@ -254,8 +254,7 @@ class QuotationService
             }
         }
 
-        // 2. Customer Acceptance when Quotation is Accepted
-        // Note: Customer conversion is deferred until the user explicitly clicks "Convert to Customer".
+        // 2. Automatic Won Transition when Quotation is Accepted
         if ($status === 'Accepted') {
             $deal = $quotation->crm_deal_id ? CrmDeal::find($quotation->crm_deal_id) : null;
             if (!$lead && $deal) {
@@ -266,10 +265,26 @@ class QuotationService
                     $lead = Lead::where('crm_deal_id', $deal->id)->first();
                 }
             }
+
+            // Auto-transition Deal stage to Won
+            if ($deal && !in_array($deal->stage, ['Won', 'Closed Won'])) {
+                $deal->update([
+                    'stage'        => 'Won',
+                    'probability'  => 100,
+                    'closing_date' => now(),
+                ]);
+            }
+
+            // Auto-transition Lead status to Won
+            if ($lead && strcasecmp((string)$lead->status, 'Won') !== 0) {
+                $leadService = app(\App\Domains\CRM\Services\LeadService::class);
+                $leadService->updateLeadStatus($lead, 'Won', true);
+            }
+
             if ($lead) {
                 LeadHistory::logEvent(
-                    $lead, 'quotation_accepted', $lead->status, $lead->status,
-                    "Quotation {$quotation->quotation_number} was accepted. Ready for customer conversion."
+                    $lead, 'quotation_accepted', $lead->status, 'Won',
+                    "Quotation {$quotation->quotation_number} was accepted. Lead automatically marked as Won."
                 );
             }
         }

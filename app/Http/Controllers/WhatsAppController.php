@@ -67,6 +67,21 @@ class WhatsAppController extends Controller
 
         $rawNumber = (string) ($payload['sender_number'] ?? '');
         $senderNumber = str_contains($rawNumber, '@') ? trim($rawNumber) : preg_replace('/\D/', '', $rawNumber);
+
+        // If sender number is an @lid, attempt resolution from saved lid-map.json
+        if (str_contains($senderNumber, '@lid')) {
+            $lidId = explode('@', $senderNumber)[0];
+            $lidMapFile = storage_path("app/whatsapp-sessions/{$sessionKey}/lid-map.json");
+            if (file_exists($lidMapFile)) {
+                $lidData = json_decode(file_get_contents($lidMapFile), true);
+                if (!empty($lidData['lidToPhone'][$lidId])) {
+                    $senderNumber = $lidData['lidToPhone'][$lidId];
+                } elseif (!empty($lidData['lidToPhone'][$senderNumber])) {
+                    $senderNumber = $lidData['lidToPhone'][$senderNumber];
+                }
+            }
+        }
+
         $senderName = (!empty($payload['sender_name']) && $payload['sender_name'] !== $senderNumber) ? $payload['sender_name'] : ($senderNumber ?: 'Unknown');
         $messageBody = (string) ($payload['message_body'] ?? '');
         $messageId = $payload['message_id'] ?? null;

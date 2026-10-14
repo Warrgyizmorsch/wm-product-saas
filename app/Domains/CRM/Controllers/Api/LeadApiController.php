@@ -860,6 +860,21 @@ class LeadApiController extends Controller
             }
         }
 
+        if (isset($validated['status'])) {
+            if (strcasecmp($validated['status'], 'Won') === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.',
+                ], 422);
+            }
+            if (strcasecmp($lead->status, 'Won') === 0 && strcasecmp($validated['status'], 'Won') !== 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead status is Won and permanently locked. Status cannot be changed.',
+                ], 422);
+            }
+        }
+
         $lead->update($validated);
 
         return response()->json([
@@ -907,6 +922,13 @@ class LeadApiController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Please provide status or status_id.',
+            ], 422);
+        }
+
+        if (strcasecmp($newStatus, 'Won') === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.',
             ], 422);
         }
 

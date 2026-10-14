@@ -126,16 +126,14 @@ class WhatsAppBotService
                 ->first();
         }
 
-        // Strategy B: Match active quotation by direct phone / contact phone / lead phone / account phone
+        // Strategy B: Match active quotation by contact phone / lead phone / account phone / deal lead phone
         if (!$pendingQuotation) {
             $pendingQuotation = \App\Domains\CRM\Models\Quotation::query()
                 ->where('tenant_id', $config->tenant_id)
                 ->whereIn('status', ['Quotation Sent', 'Sent', 'Approved', 'Pending Approval', 'Draft'])
-                ->where(function ($q) use ($last10, $cleanPhone, $senderNumber) {
-                    $q->where('phone', 'like', "%{$last10}%")
-                      ->orWhere('phone', $senderNumber)
-                      ->orWhere('phone', $cleanPhone)
-                      ->orWhereHas('crmDeal.contact', fn($cq) => $cq->where('phone', 'like', "%{$last10}%"))
+                ->where(function ($q) use ($last10) {
+                    $q->whereHas('crmDeal.contact', fn($cq) => $cq->where('phone', 'like', "%{$last10}%"))
+                      ->orWhereHas('crmDeal.lead', fn($lq) => $lq->where('phone', 'like', "%{$last10}%")->orWhere('company_phone', 'like', "%{$last10}%"))
                       ->orWhereHas('lead', fn($lq) => $lq->where('phone', 'like', "%{$last10}%")->orWhere('company_phone', 'like', "%{$last10}%"))
                       ->orWhereHas('crmAccount', fn($aq) => $aq->where('phone', 'like', "%{$last10}%"));
                 })
@@ -148,6 +146,7 @@ class WhatsAppBotService
             $linkedDeal = \App\Domains\CRM\Models\CrmDeal::where('tenant_id', $config->tenant_id)
                 ->where(function ($q) use ($last10) {
                     $q->whereHas('contact', fn($cq) => $cq->where('phone', 'like', "%{$last10}%"))
+                      ->orWhereHas('lead', fn($lq) => $lq->where('phone', 'like', "%{$last10}%")->orWhere('company_phone', 'like', "%{$last10}%"))
                       ->orWhereHas('account', fn($aq) => $aq->where('phone', 'like', "%{$last10}%"));
                 })
                 ->latest('id')
@@ -156,6 +155,35 @@ class WhatsAppBotService
             if ($linkedDeal && $linkedDeal->quotations->isNotEmpty()) {
                 $pendingQuotation = $linkedDeal->quotations->whereIn('status', ['Quotation Sent', 'Sent', 'Approved', 'Pending Approval', 'Draft'])->first()
                     ?: $linkedDeal->quotations->last();
+            }
+        }
+
+        // Strategy D: Reliable Fallback for Explicit Accept ("1") / Reject ("2")
+        if (!$pendingQuotation && ($isAccept || $isReject)) {
+            // First check if an outbound quotation message was recently sent
+            $recentOutbound = \App\Models\WhatsAppMessage::where('tenant_id', $config->tenant_id)
+                ->where('direction', 'outbound')
+                ->where('message_body', 'like', '%Quotation%')
+                ->latest('id')
+                ->first();
+
+            if ($recentOutbound && preg_match('/Quotation[_\s\*]+(QT-[0-9\-R]+)/i', $recentOutbound->message_body, $matches)) {
+                $extractedQuoteNum = $matches[1];
+                $rawNum = str_replace('QT-', '', $extractedQuoteNum);
+                $pendingQuotation = \App\Domains\CRM\Models\Quotation::where('tenant_id', $config->tenant_id)
+                    ->where(function($q) use ($rawNum, $extractedQuoteNum) {
+                        $q->where('quotation_number', $rawNum)
+                          ->orWhere('quotation_number', $extractedQuoteNum);
+                    })
+                    ->first();
+            }
+
+            if (!$pendingQuotation) {
+                // Fallback to the latest pending quotation in this tenant
+                $pendingQuotation = \App\Domains\CRM\Models\Quotation::where('tenant_id', $config->tenant_id)
+                    ->whereIn('status', ['Quotation Sent', 'Sent', 'Approved', 'Pending Approval', 'Draft'])
+                    ->latest('id')
+                    ->first();
             }
         }
 
@@ -169,8 +197,8 @@ class WhatsAppBotService
                     ->where('status', 'Rejected')
                     ->where('updated_at', '>=', now()->subMinutes(60))
                     ->where(function ($q) use ($last10) {
-                        $q->where('phone', 'like', "%{$last10}%")
-                          ->orWhereHas('crmDeal.contact', fn($cq) => $cq->where('phone', 'like', "%{$last10}%"))
+                        $q->whereHas('crmDeal.contact', fn($cq) => $cq->where('phone', 'like', "%{$last10}%"))
+                          ->orWhereHas('crmDeal.lead', fn($lq) => $lq->where('phone', 'like', "%{$last10}%")->orWhere('company_phone', 'like', "%{$last10}%"))
                           ->orWhereHas('lead', fn($lq) => $lq->where('phone', 'like', "%{$last10}%")->orWhere('company_phone', 'like', "%{$last10}%"))
                           ->orWhereHas('crmAccount', fn($aq) => $aq->where('phone', 'like', "%{$last10}%"));
                     })
@@ -184,12 +212,22 @@ class WhatsAppBotService
         if ($pendingQuotation && $isAccept) {
             $pendingQuotation->update([
                 'status' => 'Accepted',
-                'phone'  => $pendingQuotation->phone ?: $senderNumber,
             ]);
             try {
                 app(\App\Domains\CRM\Services\QuotationService::class)->handleQuotationStatusChange($pendingQuotation, 'Accepted');
             } catch (\Throwable $e) {
                 Log::error('Quotation status change error: ' . $e->getMessage());
+            }
+
+            $lead = $pendingQuotation->lead ?: ($pendingQuotation->crmDeal?->lead);
+            if ($lead) {
+                \App\Domains\CRM\Models\LeadHistory::logEvent(
+                    $lead,
+                    'quotation_accepted',
+                    $pendingQuotation->status,
+                    'Accepted',
+                    "Quotation {$pendingQuotation->quotation_number} was ACCEPTED via WhatsApp."
+                );
             }
 
             WhatsAppChatSession::where('phone', $senderNumber)->update(['is_completed' => true]);
@@ -213,8 +251,13 @@ class WhatsAppBotService
             $pendingQuotation->update([
                 'status'           => 'Rejected',
                 'rejection_reason' => $reason,
-                'phone'            => $pendingQuotation->phone ?: $senderNumber,
             ]);
+
+            try {
+                app(\App\Domains\CRM\Services\QuotationService::class)->handleQuotationStatusChange($pendingQuotation, 'Rejected');
+            } catch (\Throwable $e) {
+                Log::error('Quotation rejection status change error: ' . $e->getMessage());
+            }
 
             if ($pendingQuotation->crmDeal) {
                 $pendingQuotation->crmDeal->update([
@@ -222,9 +265,10 @@ class WhatsAppBotService
                 ]);
             }
 
-            if ($pendingQuotation->lead) {
+            $lead = $pendingQuotation->lead ?: ($pendingQuotation->crmDeal?->lead);
+            if ($lead) {
                 \App\Domains\CRM\Models\LeadHistory::logEvent(
-                    $pendingQuotation->lead,
+                    $lead,
                     'quotation_rejected',
                     $pendingQuotation->status,
                     'Rejected',
@@ -264,9 +308,10 @@ class WhatsAppBotService
                     ]);
                 }
 
-                if ($recentlyRejectedQuotation->lead) {
+                $lead = $recentlyRejectedQuotation->lead ?: ($recentlyRejectedQuotation->crmDeal?->lead);
+                if ($lead) {
                     \App\Domains\CRM\Models\LeadHistory::logEvent(
-                        $recentlyRejectedQuotation->lead,
+                        $lead,
                         'quotation_rejection_reason_updated',
                         null,
                         $rawMsg,

@@ -10,7 +10,7 @@
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
         <div>
             <h4 class="fw-bold mb-1"><i class="feather-settings me-2 text-primary"></i>{{ __('crm.crm_settings') }}</h4>
-            <p class="text-muted fs-12 mb-0">Configure Lead Auto-Assignment, Round-Robin Distribution, Quotation Approvals & CRM Policies.</p>
+            <p class="text-muted fs-12 mb-0">Configure Lead Auto-Assignment, Round-Robin Distribution & Quotation Approvals.</p>
         </div>
     </div>
 
@@ -45,12 +45,6 @@
                 'label' => 'Quotation Approval Policy',
                 'icon' => 'feather-check-square',
                 'active' => in_array($activeTab, ['quotation-approval', 'approvals', 'tab-quotation-approval']),
-            ],
-            [
-                'id' => 'tab-invoicing-policy',
-                'label' => 'Invoicing & Sales Policy',
-                'icon' => 'feather-file-text',
-                'active' => in_array($activeTab, ['invoicing-policy', 'general', 'tab-invoicing-policy']),
             ],
         ];
     @endphp
@@ -340,71 +334,6 @@
                                 <li class="mb-2"><strong>{{ __('crm.standard_approval_colon') }}</strong> {{ __('crm.standard_approval_summary_desc') }}</li>
                                 <li><strong>{{ __('crm.auto_approve_colon') }}</strong> {{ __('crm.auto_approve_summary_desc') }}</li>
                             </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- TAB 3: INVOICING & SALES POLICY -->
-        <!-- ========================================== -->
-        <div class="tab-pane fade @if(in_array($activeTab, ['invoicing-policy', 'general', 'tab-invoicing-policy'])) show active @endif" id="tab-invoicing-policy" role="tabpanel">
-            <div class="row g-4">
-                <div class="col-lg-8">
-                    <div class="card border-0 shadow-sm rounded-3">
-                        <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
-                            <h6 class="fw-bold mb-0 text-dark">
-                                <i class="feather-file-text me-2 text-primary"></i>Sales Invoicing Trigger Policy
-                            </h6>
-                            <span class="badge bg-soft-primary text-primary font-monospace fs-11">Billing Pipeline</span>
-                        </div>
-                        <div class="card-body p-4">
-                            <form action="{{ route('crm.settings.update-invoicing-policy') }}" method="POST">
-                                @csrf
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold text-dark fs-13">Invoice Creation Point</label>
-                                    <p class="text-muted fs-12 mb-3">Choose the ERP milestone at which sales invoices can be generated.</p>
-
-                                    <div class="row g-3">
-                                        <div class="col-md-12">
-                                            <div class="form-check custom-option-card border rounded-3 p-3 @if(($invoicingPolicy ?? 'sales_order') === 'sales_order') border-primary bg-soft-primary-light @endif">
-                                                <input class="form-check-input mt-1" type="radio" name="invoicing_policy" id="inv_policy_so" value="sales_order" @checked(($invoicingPolicy ?? 'sales_order') === 'sales_order')>
-                                                <label class="form-check-label ms-2 cursor-pointer w-100" for="inv_policy_so">
-                                                    <div class="fw-bold text-dark fs-14">From Confirmed Sales Order</div>
-                                                    <div class="text-muted fs-12 mt-1">Invoices are created directly upon confirming customer sales orders.</div>
-                                                </label>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-md-12">
-                                            <div class="form-check custom-option-card border rounded-3 p-3 @if(($invoicingPolicy ?? 'sales_order') === 'dispatch_order') border-primary bg-soft-primary-light @endif">
-                                                <input class="form-check-input mt-1" type="radio" name="invoicing_policy" id="inv_policy_dispatch" value="dispatch_order" @checked(($invoicingPolicy ?? 'sales_order') === 'dispatch_order')>
-                                                <label class="form-check-label ms-2 cursor-pointer w-100" for="inv_policy_dispatch">
-                                                    <div class="fw-bold text-dark fs-14">From Dispatch Order (Post-Fulfillment)</div>
-                                                    <div class="text-muted fs-12 mt-1">Invoices are only generated after dispatch/delivery challan is completed.</div>
-                                                </label>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-md-12">
-                                            <div class="form-check custom-option-card border rounded-3 p-3 @if(($invoicingPolicy ?? 'sales_order') === 'both') border-primary bg-soft-primary-light @endif">
-                                                <input class="form-check-input mt-1" type="radio" name="invoicing_policy" id="inv_policy_both" value="both" @checked(($invoicingPolicy ?? 'sales_order') === 'both')>
-                                                <label class="form-check-label ms-2 cursor-pointer w-100" for="inv_policy_both">
-                                                    <div class="fw-bold text-dark fs-14">Flexible (Both Modes Supported)</div>
-                                                    <div class="text-muted fs-12 mt-1">Allow generating invoice from both Sales Orders and Delivery Dispatches.</div>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="d-flex justify-content-end pt-3 border-top">
-                                    <x-ui.button type="submit" variant="primary" icon="feather-save">
-                                        Save Invoicing Policy
-                                    </x-ui.button>
-                                </div>
-                            </form>
                         </div>
                     </div>
                 </div>

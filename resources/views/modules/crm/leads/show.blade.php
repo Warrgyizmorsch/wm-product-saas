@@ -160,9 +160,9 @@
                 @endphp
                 <button type="button" 
                         class="pipeline-step {{ $stepClass }}" 
-                        onclick="document.getElementById('statusChangeInput').value='{{ $stName }}'; document.getElementById('statusChangeForm').submit();"
-                        title="{{ $stName }}">
-                    {{ $stName }}
+                        onclick="handleLeadStageChange('{{ $stName }}');"
+                        title="{{ \Illuminate\Support\Facades\Lang::has('crm.statuses.' . $stName) ? __('crm.statuses.' . $stName) : $stName }}">
+                    {{ \Illuminate\Support\Facades\Lang::has('crm.statuses.' . $stName) ? __('crm.statuses.' . $stName) : $stName }}
                 </button>
             @endforeach
         </div>
@@ -799,6 +799,73 @@
         @method('PATCH')
         <input type="hidden" name="status" id="statusChangeInput">
     </form>
+    <script>
+        window.handleLeadStageChange = function(targetStatus) {
+            const currentStatus = @json($lead->status ?: 'New');
+            const isCustomer = @json((bool)$lead->is_customer);
+
+            if (targetStatus.toLowerCase() === 'won') {
+                const msg = 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.';
+                if (typeof confirmAction === 'function') {
+                    confirmAction({
+                        title: 'Action Blocked',
+                        message: msg,
+                        variant: 'warning',
+                        confirmText: 'Got It'
+                    });
+                }
+                if (typeof showAppToast === 'function') {
+                    showAppToast('error', msg);
+                } else if (typeof confirmAction !== 'function') {
+                    alert(msg);
+                }
+                return false;
+            }
+
+            if ((currentStatus.toLowerCase() === 'won' || isCustomer) && targetStatus.toLowerCase() !== 'won') {
+                const msg = "Lead status is Won and permanently locked. Status cannot be changed.";
+                if (typeof confirmAction === 'function') {
+                    confirmAction({
+                        title: 'Action Blocked: Won Status Locked',
+                        message: msg,
+                        variant: 'warning',
+                        confirmText: 'Got It'
+                    });
+                }
+                if (typeof showAppToast === 'function') {
+                    showAppToast('error', msg);
+                } else if (typeof confirmAction !== 'function') {
+                    alert(msg);
+                }
+                return false;
+            }
+
+            if (currentStatus.toLowerCase() === 'dealing' && targetStatus.toLowerCase() !== 'dealing') {
+                const msg = "Lead status in 'Dealing' stage is locked.";
+                if (typeof confirmAction === 'function') {
+                    confirmAction({
+                        title: 'Action Blocked',
+                        message: msg,
+                        variant: 'warning',
+                        confirmText: 'Got It'
+                    });
+                }
+                if (typeof showAppToast === 'function') {
+                    showAppToast('error', msg);
+                } else if (typeof confirmAction !== 'function') {
+                    alert(msg);
+                }
+                return false;
+            }
+
+            const input = document.getElementById('statusChangeInput');
+            const form = document.getElementById('statusChangeForm');
+            if (input && form) {
+                input.value = targetStatus;
+                form.submit();
+            }
+        };
+    </script>
 
     @php
         $statusKey = $lead->status ?: 'New';
@@ -872,7 +939,7 @@
             <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
         </x-ui.odoo-form-ui>
 
-        <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+        <x-ui.odoo-form-ui type="select" :label="__('crm.tag_team_members')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
             @foreach($users as $u)
                 <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
             @endforeach
@@ -890,14 +957,14 @@
                 <div class="d-flex align-items-center justify-content-center rounded-circle" style="width: 28px; height: 28px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399;">
                     <i class="feather-phone" style="font-size: 13px;"></i>
                 </div>
-                <span class="text-white fw-bold fs-13" style="letter-spacing: 0.2px;">Phone Dialer</span>
-                <span id="softphoneStatusPill" style="display: none;">Ready</span>
+                <span class="text-white fw-bold fs-13" style="letter-spacing: 0.2px;">{{ __('crm.phone_dialer') }}</span>
+                <span id="softphoneStatusPill" style="display: none;">{{ __('crm.ready') }}</span>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <button type="button" class="btn p-0 d-flex align-items-center justify-content-center crm-header-action-btn" id="btnMinimizeSoftphone" title="Minimize / Expand" style="width: 30px; height: 30px; text-decoration: none; cursor: pointer;">
+                <button type="button" class="btn p-0 d-flex align-items-center justify-content-center crm-header-action-btn" id="btnMinimizeSoftphone" title="{{ __('crm.minimize_expand') }}" style="width: 30px; height: 30px; text-decoration: none; cursor: pointer;">
                     <i class="feather-minus" id="iconSoftphoneMinMax" style="font-size: 15px; font-weight: bold;"></i>
                 </button>
-                <button type="button" class="btn p-0 d-flex align-items-center justify-content-center crm-header-close-btn" id="btnCloseSoftphone" title="Close Dialer" style="width: 30px; height: 30px; text-decoration: none; cursor: pointer;">
+                <button type="button" class="btn p-0 d-flex align-items-center justify-content-center crm-header-close-btn" id="btnCloseSoftphone" title="{{ __('crm.close_dialer') }}" style="width: 30px; height: 30px; text-decoration: none; cursor: pointer;">
                     <i class="feather-x" style="font-size: 16px; font-weight: bold;"></i>
                 </button>
             </div>
@@ -911,13 +978,13 @@
                 <div class="avatar-text bg-primary text-white rounded-circle fw-bold mx-auto mb-1.5 shadow-sm d-flex align-items-center justify-content-center" id="dialerContactAvatar" style="width: 48px; height: 48px; font-size: 18px; letter-spacing: -0.5px;">
                     C
                 </div>
-                <div class="fw-bold text-dark fs-14 text-truncate px-2" id="dialerContactName">Customer</div>
-                <div class="text-muted fs-11 text-truncate px-2" id="dialerContactSub">Direct Call</div>
+                <div class="fw-bold text-dark fs-14 text-truncate px-2" id="dialerContactName">{{ __('crm.customer') }}</div>
+                <div class="text-muted fs-11 text-truncate px-2" id="dialerContactSub">{{ __('crm.direct_call') }}</div>
             </div>
 
             <!-- Phone Screen Number Display with Centered Clear/Backspace -->
             <div class="position-relative mb-3">
-                <input type="text" class="form-control form-control-lg text-center fw-bold fs-18 text-dark bg-white border shadow-2xs rounded-3 crm-dialer-display" id="dialerDisplayNumber" placeholder="Enter number" style="letter-spacing: 1px; font-family: monospace; height: 48px; padding-left: 48px; padding-right: 48px; line-height: 48px;">
+                <input type="text" class="form-control form-control-lg text-center fw-bold fs-18 text-dark bg-white border shadow-2xs rounded-3 crm-dialer-display" id="dialerDisplayNumber" placeholder="{{ __('crm.enter_number') }}" style="letter-spacing: 1px; font-family: monospace; height: 48px; padding-left: 48px; padding-right: 48px; line-height: 48px;">
                 <button type="button" class="btn p-0 position-absolute" id="btnDialerBackspace" title="Backspace" style="right: 8px; top: 0; bottom: 0; margin: auto 0; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; text-decoration: none; border-radius: 50%; z-index: 5; cursor: pointer;">
                     <i class="feather-delete" style="font-size: 18px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;"></i>
                 </button>
@@ -949,12 +1016,12 @@
                     <div class="d-flex align-items-center justify-content-center gap-1.5 mb-1.5">
                         <span class="spinner-grow spinner-grow-sm text-danger" style="width: 8px; height: 8px;" role="status"></span>
                         <span class="badge bg-soft-danger text-danger fs-10 fw-bold px-2 py-0.5" id="dialerLiveStatusTag">
-                            Calling...
+                            {{ __('crm.calling') }}
                         </span>
                         <span class="badge bg-soft-success text-success fs-11 fw-bold px-2 py-0.5" id="dialerLiveTimer">00:00</span>
                     </div>
                     <div class="fw-bold text-dark fs-14" id="inCallTargetDisplay">+91 0000000000</div>
-                    <span class="text-muted fs-10" id="inCallSubtext">Telephony Active</span>
+                    <span class="text-muted fs-10" id="inCallSubtext">{{ __('crm.telephony_active') }}</span>
 
                     <!-- Audio Waveform -->
                     <div class="d-flex align-items-center justify-content-center gap-1 mt-2.5" style="height: 18px;">
@@ -969,8 +1036,8 @@
                 <!-- Call Notes / Transcript Input -->
                 <div class="mb-3">
                     <div class="d-flex align-items-center justify-content-between mb-1">
-                        <span class="fw-bold fs-10 text-muted text-uppercase">Voice Notes:</span>
-                        <span class="text-muted fs-9" id="liveSpeechStatus">Listening...</span>
+                        <span class="fw-bold fs-10 text-muted text-uppercase">{{ __('crm.voice_notes') }}:</span>
+                        <span class="text-muted fs-9" id="liveSpeechStatus">{{ __('crm.listening') }}</span>
                     </div>
                     <textarea class="form-control fs-11 bg-white" id="dialerCallNotes" rows="2" placeholder="Voice transcript & notes..."></textarea>
                 </div>
@@ -982,7 +1049,7 @@
                 <div id="dialerStartAction">
                     <button type="button" class="btn btn-success w-100 py-2.5 fs-13 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm rounded-pill" id="btnStartRealCall" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
                         <i class="feather-phone-call fs-14"></i>
-                        <span>Start Call</span>
+                        <span>{{ __('crm.start_call') }}</span>
                     </button>
                 </div>
 
@@ -990,7 +1057,7 @@
                 <div id="dialerEndAction" style="display: none;">
                     <button type="button" class="btn btn-danger w-100 py-2.5 fs-13 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm rounded-pill" id="btnDisconnectAndAnalyze" style="background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);">
                         <i class="feather-phone-off fs-14"></i>
-                        <span id="btnDisconnectText">End Call & Save Summary</span>
+                        <span id="btnDisconnectText">{{ __('crm.end_call_save_summary') }}</span>
                     </button>
                 </div>
             </div>
@@ -1006,7 +1073,7 @@
                 </div>
                 <div>
                     <div class="d-flex align-items-center gap-2">
-                        <h5 class="modal-title fs-14 fw-bold mb-0 text-dark" id="geminiAiCallReviewModalLabel">Gemini AI Call Recording Analysis & Next Steps</h5>
+                        <h5 class="modal-title fs-14 fw-bold mb-0 text-dark" id="geminiAiCallReviewModalLabel">{{ __('crm.gemini_ai_call_analysis') }}</h5>
                         <span class="badge bg-soft-primary text-primary fs-10 fw-bold px-2 py-0.5 rounded-pill shadow-xs">Gemini Flash AI</span>
                     </div>
                     <span class="fs-11 text-muted">Audio transcribed & analyzed. Review before confirming activity to CRM.</span>
@@ -1060,7 +1127,7 @@
             <div class="mb-3">
                 <div class="d-flex align-items-center justify-content-between mb-1">
                     <label class="form-label fw-bold fs-12 text-dark mb-0">
-                        <i class="feather-volume-2 text-primary me-1"></i> Audio Recording Transcript (What was spoken)
+                        <i class="feather-volume-2 text-primary me-1"></i> {{ __('crm.audio_recording_transcript') }}
                     </label>
                     <span class="badge bg-soft-indigo text-indigo fs-10">Gemini Audio Speech-to-Text</span>
                 </div>
@@ -1071,7 +1138,7 @@
             <div class="mb-3">
                 <div class="d-flex align-items-center justify-content-between mb-1">
                     <label class="form-label fw-bold fs-12 text-dark mb-0">
-                        <i class="feather-file-text text-primary me-1"></i> Discussion Summary & Outcomes
+                        <i class="feather-file-text text-primary me-1"></i> {{ __('crm.discussion_summary_outcomes') }}
                     </label>
                     <span class="text-muted fs-10">Editable</span>
                 </div>
@@ -1082,12 +1149,12 @@
             <div class="p-3 bg-light rounded-3 border mb-3 shadow-xs">
                 <div class="d-flex align-items-center gap-1.5 mb-2.5 pb-2 border-bottom">
                     <i class="feather-calendar text-primary fs-13"></i>
-                    <h6 class="fs-12 fw-bold text-dark mb-0">Proposed Next Follow-up & Activity Schedule</h6>
+                    <h6 class="fs-12 fw-bold text-dark mb-0">{{ __('crm.proposed_next_followup_schedule') }}</h6>
                 </div>
 
                 <div class="row g-2 mb-2">
                     <div class="col-md-5">
-                        <label class="form-label fw-semibold fs-11 text-muted mb-1">Next Activity Type</label>
+                        <label class="form-label fw-semibold fs-11 text-muted mb-1">{{ __('crm.next_activity_type') }}</label>
                         <select class="form-select form-select-sm fs-12" id="aiModalNextActivityType">
                             <option value="Call">📞 Call Back</option>
                             <option value="Meeting">🤝 Meeting</option>
@@ -1097,13 +1164,13 @@
                         </select>
                     </div>
                     <div class="col-md-7">
-                        <label class="form-label fw-semibold fs-11 text-muted mb-1">Next Follow-up Date & Time</label>
+                        <label class="form-label fw-semibold fs-11 text-muted mb-1">{{ __('crm.next_followup_date_time') }}</label>
                         <input type="datetime-local" class="form-control form-control-sm fs-12" id="aiModalNextFollowupDate">
                     </div>
                 </div>
 
                 <div class="mb-1">
-                    <label class="form-label fw-semibold fs-11 text-muted mb-1">Next Activity Agenda / Title</label>
+                    <label class="form-label fw-semibold fs-11 text-muted mb-1">{{ __('crm.next_activity_agenda_title') }}</label>
                     <input type="text" class="form-control form-control-sm fs-12" id="aiModalNextActivityTitle" placeholder="e.g. Follow-up call for quotation and order confirmation">
                 </div>
             </div>
@@ -1112,7 +1179,7 @@
             <div class="row g-2 mb-3">
                 <div class="col-md-6">
                     <div class="p-2.5 bg-white rounded-3 border shadow-xs h-100">
-                        <label class="form-label fw-semibold fs-11 text-muted mb-1">Suggested Lead Status</label>
+                        <label class="form-label fw-semibold fs-11 text-muted mb-1">{{ __('crm.suggested_lead_status') }}</label>
                         <select class="form-select form-select-sm fs-12" id="aiModalLeadStatus">
                             @foreach($leadStatuses as $ls)
                                 <option value="{{ $ls->name }}">{{ $ls->name }}</option>
@@ -1143,11 +1210,11 @@
 
             <div class="d-flex align-items-center justify-content-between border-top pt-3 mt-3">
                 <button type="button" class="btn btn-outline-secondary fs-12 py-2 px-3 fw-semibold" data-bs-dismiss="modal">
-                    Cancel
+                    {{ __('crm.cancel') }}
                 </button>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-light border fs-12 py-2 px-3 fw-semibold text-dark" id="btnSkipAndLogOnly">
-                        <i class="feather-save me-1"></i> Save Log Only
+                        <i class="feather-save me-1"></i> {{ __('crm.save_log_only') }}
                     </button>
                     <button type="button" class="btn btn-primary fs-12 py-2 px-4 fw-bold shadow-sm" id="btnApproveAndSchedule" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
                         <i class="feather-check-circle me-1"></i> Approve & Save Call to CRM
