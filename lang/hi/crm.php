@@ -923,7 +923,7 @@ return array (
   'amount_received' => 'प्राप्त राशि',
   'sales_orders_traceability' => 'बिक्री आदेश और लिंक की गई डील',
   'create_sales_order' => 'बिक्री आदेश बनाएं',
-  'ledger_statement' => 'देय खाता ट्रांसपोर्टर खाता विवरण',
+  'ledger_statement' => 'ग्राहक लेजर',
   'print_statement' => 'स्टेटमेंट प्रिंट करें',
   'running_balance' => 'चालू शेष',
   'debit' => 'डेबिट (बिल किया गया)',

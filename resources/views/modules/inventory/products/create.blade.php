@@ -461,7 +461,7 @@
                                         <th>{{ __('inventory.warehouse_code') }}</th>
                                         <th>{{ __('inventory.warehouse_name') }}</th>
                                         <th>{{ __('inventory.quantity_on_hand') }}</th>
-                                        <th>{{ __('inventory.unit_cost') }}</th>
+                                        <th>{{ __('inventory.unit_cost') }} ({{ active_currency_symbol() }})</th>
                                     </tr>
                                 </thead>
                                 <tbody>

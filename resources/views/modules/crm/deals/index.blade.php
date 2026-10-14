@@ -1094,6 +1094,9 @@
                 @csrf
                 <input type="hidden" name="action_mode" id="dealOffcanvasActionMode" value="log_note">
 
+                {{-- Google Calendar & Meet Integration Banner --}}
+                @include('modules.crm.partials.google-calendar-banner')
+
                 <!-- 2-Mode Switcher Tabs (Exact Lead Replica) -->
                 <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
                     <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn active btn-primary text-white shadow-sm" data-mode="log_note" style="font-size: 12px; padding: 8px 6px; background-color: var(--bs-primary); border-radius: 6px; transition: all 0.2s ease;">

@@ -923,7 +923,7 @@ return array (
   'amount_received' => 'Получена сума',
   'sales_orders_traceability' => 'Поръчки за продажби и свързани сделки',
   'create_sales_order' => 'Създаване на поръчка за продажба',
-  'ledger_statement' => 'Счетоводна книга на транспортьора',
+  'ledger_statement' => 'Счетоводна книга на клиента',
   'print_statement' => 'Печат на извлечение',
   'running_balance' => 'Текущо салдо',
   'debit' => 'Дебит (Фактурирано)',

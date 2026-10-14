@@ -162,12 +162,22 @@ class GoogleCalendarController extends Controller
     }
 
     /**
-     * Redirect to Google OAuth authorization flow
+     * Redirect to Google OAuth authorization flow or handle return callback
      */
     public function connectGoogleAccount(Request $request)
     {
-        $redirectUrl = $request->input('next') ?: $request->headers->get('referer') ?: url('/crm/activities');
-        $authUrl = $this->calendarService->getAuthUrl($redirectUrl);
+        // 1. Handle return callback if auth_code/token is present
+        if ($redirect = $this->calendarService->handleAuthCallback($request, url('/crm/activities'))) {
+            return $redirect;
+        }
+
+        // 2. Initiating Google OAuth authorization
+        $returnTo = $request->input('return_to') ?: $request->input('next') ?: $request->headers->get('referer') ?: url('/crm/activities');
+        $cleanReturnTo = $this->calendarService->cleanAuthParams($returnTo);
+        session(['google_oauth_return_to' => $cleanReturnTo]);
+
+        $callbackUrl = route('crm.google-calendar.connect');
+        $authUrl = $this->calendarService->getAuthUrl($callbackUrl);
         return redirect()->away($authUrl);
     }
 

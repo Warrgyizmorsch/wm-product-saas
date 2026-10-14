@@ -66,8 +66,8 @@ class QuotationService
             $itemsData = [];
 
             foreach ($items as $item) {
-                $qty = intval($item['quantity'] ?? 0);
-                $price = floatval($item['unit_price'] ?? 0);
+                $qty = floatval($item['quantity'] ?? 0);
+                $price = convert_to_base((float) ($item['unit_price'] ?? 0));
                 $taxRate = floatval($item['tax_rate'] ?? 0);
                 $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
 
@@ -96,8 +96,8 @@ class QuotationService
                 ];
             }
 
-            $discount = floatval($data['discount'] ?? 0);
-            $totalAmount = $subtotal + $tax - $discount;
+            $discount = convert_to_base((float) ($data['discount'] ?? 0));
+            $totalAmount = max(0, $subtotal + $tax - $discount);
 
             $data['subtotal'] = $subtotal;
             $data['tax'] = $tax;
@@ -135,8 +135,8 @@ class QuotationService
             $itemsData = [];
 
             foreach ($items as $item) {
-                $qty = intval($item['quantity'] ?? 0);
-                $price = floatval($item['unit_price'] ?? 0);
+                $qty = floatval($item['quantity'] ?? 0);
+                $price = convert_to_base((float) ($item['unit_price'] ?? 0));
                 $taxRate = floatval($item['tax_rate'] ?? 0);
                 $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
 
@@ -165,8 +165,8 @@ class QuotationService
                 ];
             }
 
-            $discount = floatval($data['discount'] ?? 0);
-            $totalAmount = $subtotal + $tax - $discount;
+            $discount = convert_to_base((float) ($data['discount'] ?? 0));
+            $totalAmount = max(0, $subtotal + $tax - $discount);
 
             $revData = [
                 'tenant_id' => $quotation->tenant_id,

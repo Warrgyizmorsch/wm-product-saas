@@ -47,35 +47,8 @@ class LeadActivityController extends Controller
 
         $calService = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class);
 
-        if ($request->filled('auth_code') || $request->filled('code')) {
-            $authCode = $request->input('auth_code') ?: $request->input('code');
-            $googleUserId = $request->input('google_user_id') ?: $request->input('user_id') ?: auth()->id();
-            if ($googleUserId) {
-                session(['google_user_id' => (int)$googleUserId]);
-            }
-            $calService->exchangeAuthCode($authCode, (int)$googleUserId);
-            return redirect()->route('crm.activities.index')->with('success', 'Google Calendar connected successfully!');
-        }
-
-        if ($request->filled('token') || $request->filled('access_token')) {
-            $token = $request->input('token') ?: $request->input('access_token');
-            $googleUserId = $request->input('google_user_id') ?: $request->input('user_id') ?: auth()->id();
-            session([
-                'google_token' => $token,
-                'google_user_id' => (int)$googleUserId,
-                'google_calendar_connected' => true,
-            ]);
-
-            if (auth()->check()) {
-                $user = auth()->user();
-                $settings = is_array($user->settings) ? $user->settings : (json_decode($user->settings ?? '{}', true) ?: []);
-                $settings['google_token'] = $token;
-                $settings['google_user_id'] = (int)$googleUserId;
-                $user->settings = $settings;
-                $user->saveQuietly();
-            }
-
-            return redirect()->route('crm.activities.index')->with('success', 'Google Calendar connected successfully!');
+        if ($redirect = $calService->handleAuthCallback($request, route('crm.activities.index'))) {
+            return $redirect;
         }
 
         if ($request->filled('user_id') || $request->filled('google_user_id')) {

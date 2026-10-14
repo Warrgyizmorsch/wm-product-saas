@@ -189,7 +189,7 @@
                                                     <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][product_id]" class="product-select" required="true">
                                                         <option value="">{{ __('purchase.select_product') }}</option>
                                                         @foreach($products as $p)
-                                                            <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" @selected($p->id == $item['product_id'])>
+                                                            <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}" @selected($p->id == $item['product_id'])>
                                                                 {{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})
                                                             </option>
                                                         @endforeach
@@ -260,7 +260,7 @@
                                                     <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][product_id]" class="product-select" required="true">
                                                         <option value="">{{ __('purchase.select_product') }}</option>
                                                         @foreach($products as $p)
-                                                            <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" @selected($p->id == $item['product_id'])>
+                                                            <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}" @selected($p->id == $item['product_id'])>
                                                                 {{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})
                                                             </option>
                                                         @endforeach
@@ -331,7 +331,7 @@
                                                 <x-ui.odoo-form-ui type="select" name="items[0][product_id]" class="product-select" required="true">
                                                     <option value="">{{ __('purchase.select_product') }}</option>
                                                     @foreach($products as $p)
-                                                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
+                                                        <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
                                                 <input type="text" name="items[0][description]" class="odoo-table-input item-description-input d-none mt-1" placeholder="{{ __('purchase.describe_item_placeholder') }}">
@@ -815,7 +815,7 @@
                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select odoo-select2 product-select" required style="border-radius:0;">
                                 <option value="">{{ __('purchase.select_product') }}</option>
                                 @foreach($products as $p)
-                                    <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
+                                    <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                 @endforeach
                             </select>
                             <input type="text" name="items[${rowIdx}][description]" class="odoo-table-input item-description-input d-none mt-1" placeholder="{{ __('purchase.describe_item_placeholder') }}">
@@ -933,7 +933,7 @@
                                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select odoo-select2 product-select" required style="border-radius:0;">
                                                 <option value="">{{ __('purchase.select_product') }}</option>
                                                 @foreach($products as $p)
-                                                    <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">${item.product_name}</option>
+                                                    <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}">${item.product_name}</option>
                                                 @endforeach
                                             </select>
                                             <input type="text" name="items[${rowIdx}][description]" class="odoo-table-input item-description-input d-none mt-1" placeholder="Describe what's being purchased...">

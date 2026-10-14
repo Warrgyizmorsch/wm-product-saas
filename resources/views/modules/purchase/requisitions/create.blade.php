@@ -121,7 +121,7 @@
                                             <x-ui.odoo-form-ui type="select" name="items[0][product_id]" required="true" class="product-select select2-simple">
                                                 <option value="">{{ __('purchase.select_product') }}</option>
                                                 @foreach($products as $p)
-                                                    <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
+                                                    <option value="{{ $p->id }}" data-cost="{{ round(convert_from_base((float)($p->unit_cost ?? 0.00)), 2) }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                                 @endforeach
                                             </x-ui.odoo-form-ui>
                                         </td>
@@ -216,7 +216,7 @@
                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select product-select select2-simple" required>
                                 <option value="">{{ __('purchase.select_product') }}</option>
                                 @foreach($products as $p)
-                                    <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: 'No SKU' }})</option>
+                                    <option value="{{ $p->id }}" data-cost="{{ round(convert_from_base((float)($p->unit_cost ?? 0.00)), 2) }}">{{ $p->name }} ({{ $p->sku ?: 'No SKU' }})</option>
                                 @endforeach
                             </select>
                         </td>

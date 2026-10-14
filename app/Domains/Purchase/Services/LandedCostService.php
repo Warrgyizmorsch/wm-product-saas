@@ -77,7 +77,7 @@ class LandedCostService
             // Save Expense lines & sum total
             $totalExpenses = 0.0;
             foreach ($expensesData as $exp) {
-                $amt = (float) ($exp['amount'] ?? 0);
+                $amt = convert_to_base((float) ($exp['amount'] ?? 0));
                 if ($amt <= 0) continue;
 
                 $taxRate = (float) ($exp['tax_rate'] ?? 0);

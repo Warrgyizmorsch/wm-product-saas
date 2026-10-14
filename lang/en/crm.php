@@ -923,7 +923,7 @@ return array (
   'amount_received' => 'Amount Received',
   'sales_orders_traceability' => 'Sales Orders & Linked Deals Traceability',
   'create_sales_order' => 'Create Sales Order',
-  'ledger_statement' => 'Account Payable Transporter Ledger Statement',
+  'ledger_statement' => 'Customer Ledger',
   'print_statement' => 'Print Statement',
   'running_balance' => 'Running Balance',
   'debit' => 'Debit (Billed)',

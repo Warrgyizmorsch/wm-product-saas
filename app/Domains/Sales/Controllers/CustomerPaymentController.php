@@ -95,21 +95,23 @@ class CustomerPaymentController extends Controller
             'sales_order_id' => ['nullable', 'exists:sales_orders,id'],
         ]);
 
-        $payment = DB::transaction(function () use ($validated) {
+        $baseAmount = convert_to_base((float) $validated['amount']);
+
+        $payment = DB::transaction(function () use ($validated, $baseAmount) {
             $payment = CustomerPayment::create([
                 'tenant_id'      => tenant_id() ?? 1,
                 'customer_id'    => $validated['customer_id'],
                 'payment_number' => $validated['payment_number'],
                 'payment_date'   => $validated['payment_date'],
                 'payment_method' => $validated['payment_method'],
-                'amount'         => $validated['amount'],
+                'amount'         => $baseAmount,
                 'reference_no'   => $validated['reference_no'] ?? null,
                 'notes'          => $validated['notes'] ?? null,
                 'status'         => 'Posted',   // Direct post — Odoo/Tally style
             ]);
 
             $allocateTo    = $validated['allocate_to'] ?? 'unallocated';
-            $allocatedAmt  = (float) $validated['amount'];
+            $allocatedAmt  = $baseAmount;
 
             // ── Link to Invoice ─────────────────────────────────────────────
             if ($allocateTo === 'invoice' && !empty($validated['invoice_id'])) {
@@ -150,7 +152,7 @@ class CustomerPaymentController extends Controller
         \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.payment.received', [
             'doc_no' => $payment->payment_number,
             'customer_name' => $payment->customer?->name ?? 'Customer',
-            'amount' => number_format((float)$payment->amount, 2),
+            'amount' => format_currency((float)$payment->amount),
             'payment_method' => $payment->payment_method ?? 'Bank/Cash',
             'date' => $payment->payment_date ? (is_string($payment->payment_date) ? $payment->payment_date : $payment->payment_date->format('Y-m-d')) : now()->format('Y-m-d'),
         ], route('sales.payments.show', $payment->id), $payment);

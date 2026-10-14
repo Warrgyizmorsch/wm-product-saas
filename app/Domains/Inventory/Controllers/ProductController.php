@@ -369,14 +369,14 @@ class ProductController extends Controller
 
         $stockMap = $product->warehouseStocks->keyBy('warehouse_id')->map(fn($ws) => [
             'quantity'  => $ws->quantity,
-            'unit_cost' => $ws->unit_cost,
+            'unit_cost' => $ws->unit_cost ? round(convert_from_base((float)$ws->unit_cost), 2) : 0,
         ])->toArray();
 
         $variantStockMap = [];
         foreach ($product->variants as $variant) {
             $variantStockMap[$variant->id] = $variant->warehouseStocks->keyBy('warehouse_id')->map(fn($ws) => [
                 'quantity'  => $ws->quantity,
-                'unit_cost' => $ws->unit_cost,
+                'unit_cost' => $ws->unit_cost ? round(convert_from_base((float)$ws->unit_cost), 2) : 0,
             ])->toArray();
         }
 
@@ -588,9 +588,9 @@ class ProductController extends Controller
                 'barcode' => $product->barcode,
                 'track_serial_number' => (bool)$product->track_serial_number,
                 'track_batch' => (bool)$product->track_batch,
-                'selling_price' => (float)($product->selling_price ?: $product->unit_cost),
-                'cost_price' => (float)($product->cost_price ?: $product->unit_cost),
-                'unit_cost' => (float)$product->unit_cost,
+                'selling_price' => round(convert_from_base((float)($product->selling_price ?: $product->unit_cost)), 2),
+                'cost_price' => round(convert_from_base((float)($product->cost_price ?: $product->unit_cost)), 2),
+                'unit_cost' => round(convert_from_base((float)$product->unit_cost), 2),
                 'gst_rate' => (float)$product->gst_rate,
                 'hsn_sac' => $product->hsn_sac,
                 'uom' => $product->uom?->name ?? 'Pcs',

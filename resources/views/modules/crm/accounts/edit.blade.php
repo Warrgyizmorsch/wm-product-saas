@@ -38,7 +38,7 @@
                     <x-ui.odoo-form-ui type="input" label="Industry Type" name="industry_type" :value="old('industry_type', $account->industry_type)" />
                 </div>
                 <div class="col-md-3">
-                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.credit_limit') . ' (' . active_currency_symbol() . ')'" name="credit_limit" :value="old('credit_limit', $account->credit_limit)" step="0.01" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.credit_limit') . ' (' . active_currency_symbol() . ')'" name="credit_limit" :value="old('credit_limit', $account->credit_limit ? round(convert_from_base((float)$account->credit_limit), 2) : 0)" step="0.01" />
                 </div>
                 <div class="col-md-3">
                     <x-ui.odoo-form-ui type="select" :label="__('crm.account_manager_owner')" name="owner_id">

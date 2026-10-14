@@ -89,7 +89,7 @@ class SalesReturnController extends Controller
             'id' => $p->id,
             'name' => $p->name,
             'sku' => $p->sku ?: '',
-            'selling_price' => (float)($p->selling_price ?? 0),
+            'selling_price' => convert_from_base((float)($p->selling_price ?? 0)),
             'track_serial_number' => (bool) $p->track_serial_number,
         ])->values()->all();
 
@@ -162,8 +162,15 @@ class SalesReturnController extends Controller
 
         $returnOrder = DB::transaction(function () use ($validated) {
             $totalAmount = 0;
+            $convertedItems = [];
             foreach ($validated['items'] as $item) {
-                $totalAmount += floatval($item['quantity']) * floatval($item['unit_price']);
+                $baseUnitPrice = convert_to_base((float)$item['unit_price']);
+                $itemTotal = floatval($item['quantity']) * $baseUnitPrice;
+                $totalAmount += $itemTotal;
+                $convertedItems[] = array_merge($item, [
+                    'unit_price' => $baseUnitPrice,
+                    'total_amount' => $itemTotal,
+                ]);
             }
 
             $salesReturn = SalesReturn::create([
@@ -179,14 +186,14 @@ class SalesReturnController extends Controller
                 'total_refund_amount' => $totalAmount,
             ]);
 
-            foreach ($validated['items'] as $item) {
+            foreach ($convertedItems as $item) {
                 SalesReturnItem::create([
                     'sales_return_id' => $salesReturn->id,
                     'product_id'      => $item['product_id'],
                     'warehouse_id'    => $item['warehouse_id'],
                     'quantity'        => $item['quantity'],
                     'unit_price'      => $item['unit_price'],
-                    'total_amount'    => floatval($item['quantity']) * floatval($item['unit_price']),
+                    'total_amount'    => $item['total_amount'],
                     'serial_numbers'  => $item['serial_numbers'] ?? null,
                 ]);
             }

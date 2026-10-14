@@ -142,7 +142,7 @@
                                                 <input type="number" name="items[{{ $idx }}][quantity]" class="odoo-table-input item-qty text-end" value="{{ $item->quantity }}" min="1" required>
                                             </td>
                                             <td class="text-end">
-                                                <input type="number" name="items[{{ $idx }}][unit_price]" class="odoo-table-input item-price text-end" value="{{ $item->unit_price }}" step="0.01" min="0.01" required>
+                                                <input type="number" name="items[{{ $idx }}][unit_price]" class="odoo-table-input item-price text-end" value="{{ round(convert_from_base((float)$item->unit_price), 2) }}" step="0.01" min="0.01" required>
                                             </td>
                                             <td class="text-end">
                                                 <input type="number" name="items[{{ $idx }}][tax_rate]" class="odoo-table-input item-tax text-end" value="{{ $item->tax_rate ?: 18 }}" step="0.01" min="0">
@@ -187,7 +187,7 @@
 
                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                                     <span class="text-muted fw-semibold fs-13">{{ __('crm.discount_colon') }}</span>
-                                    <input type="number" name="discount" id="discountInput" class="odoo-table-input text-end fw-bold fs-13" style="width: 120px;" value="{{ old('discount', $quotation->discount ?: 0) }}" min="0" step="0.01">
+                                    <input type="number" name="discount" id="discountInput" class="odoo-table-input text-end fw-bold fs-13" style="width: 120px;" value="{{ old('discount', $quotation->discount ? round(convert_from_base((float)$quotation->discount), 2) : 0) }}" min="0" step="0.01">
                                 </div>
 
                                 <div class="d-flex justify-content-between align-items-center py-3 border-top border-2 mt-3" style="border-top: 2px solid var(--bs-primary) !important;">
@@ -219,7 +219,7 @@
             var productsData = {
                 @foreach ($products as $p)
                     "{{ $p->id }}": {
-                        price: {{ (float) ($p->selling_price ?: $p->unit_cost ?: 0) }},
+                        price: {{ round(convert_from_base((float) ($p->selling_price ?: $p->unit_cost ?: 0)), 2) }},
                         tax_rate: {{ (float) ($p->gst_rate ?: 18) }}
                     },
                 @endforeach

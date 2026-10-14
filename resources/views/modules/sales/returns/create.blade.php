@@ -121,7 +121,7 @@
                                     <th style="width: 40%;" class="ps-3">{{ __('crm.product_details_serials') }}</th>
                                     <th style="width: 25%;">{{ __('crm.restock_warehouse') }}</th>
                                     <th class="text-end" style="width: 13%;">{{ __('crm.return_qty') }}</th>
-                                    <th class="text-end pe-3" style="width: 17%;">{{ __('crm.refund_unit_price') }}</th>
+                                    <th class="text-end pe-3" style="width: 17%;">{{ __('crm.refund_unit_price') }} ({{ active_currency_symbol() }})</th>
                                     <th class="text-center pe-3" style="width: 5%;"></th>
                                 </tr>
                             </thead>
@@ -175,7 +175,7 @@
                     } else {
                         $totalItemDisc = (float)($item->discount ?? 0);
                     }
-                    $netPrice = ($qty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $qty, 2) : $grossPrice;
+                    $netPrice = ($qty > 0) ? round(convert_from_base(($lineGrossTotal - $totalItemDisc) / $qty), 2) : round(convert_from_base($grossPrice), 2);
                     return [
                         'product_id' => $item->product_id,
                         'item_name' => $item->item_name ?? $item->product?->name ?? 'Product Item',
@@ -198,7 +198,7 @@
                 'invoice_number' => $inv->invoice_number,
                 'sales_order_id' => $inv->sales_order_id,
                 'invoice_date' => $inv->invoice_date ? $inv->invoice_date->format('d/m/Y') : '',
-                'total_amount' => (float)$inv->total_amount,
+                'total_amount' => round(convert_from_base((float)$inv->total_amount), 2),
                 'gst_type' => $inv->gst_type ?? ((float)$inv->igst_amount > 0 ? 'IGST' : 'CGST + SGST'),
                 'items' => $inv->items->map(function($item) use ($invSubtotal, $invOrderDiscount, $invDiscountType) {
                     $qty = (float)$item->quantity;
@@ -210,7 +210,7 @@
                     } else {
                         $totalItemDisc = (float)($item->discount ?? 0);
                     }
-                    $netPrice = ($qty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $qty, 2) : $grossPrice;
+                    $netPrice = ($qty > 0) ? round(convert_from_base(($lineGrossTotal - $totalItemDisc) / $qty), 2) : round(convert_from_base($grossPrice), 2);
                     return [
                         'product_id' => $item->product_id,
                         'item_name' => $item->item_name ?? $item->product?->name ?? 'Product Item',

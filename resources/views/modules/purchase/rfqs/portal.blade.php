@@ -214,7 +214,7 @@
                                                 <td>
                                                     <div class="input-group">
                                                         <span class="input-group-text bg-light text-muted" style="font-size: 10px; padding: 2px 6px;">{{ $currency }}</span>
-                                                        <input type="number" name="rates[{{ $index }}][rate]" class="form-control text-end font-monospace" style="font-size:13px;" step="0.01" min="0" value="{{ old("rates.{$index}.rate", $quoteRate ? $quoteRate->rate : '') }}" required placeholder="0.00">
+                                                        <input type="number" name="rates[{{ $index }}][rate]" class="form-control text-end font-monospace" style="font-size:13px;" step="0.01" min="0" value="{{ old("rates.{$index}.rate", $quoteRate ? round(convert_from_base((float)$quoteRate->rate), 2) : '') }}" required placeholder="0.00">
                                                         <span class="input-group-text bg-light text-muted" style="font-size: 10px; padding: 2px 6px; min-width: 45px; justify-content: center;">/ {{ $uomName }}</span>
                                                     </div>
                                                 </td>

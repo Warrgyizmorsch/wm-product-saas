@@ -31,7 +31,7 @@
                             @endforeach
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.amount')" name="amount" id="amountInput" :value="old('amount', $prefillAmount)" :required="true" step="0.01" placeholder="0.00" style="font-weight: bold; color: #1e40af;" />
+                        <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.amount') . ' (' . active_currency_symbol() . ')'" name="amount" id="amountInput" :value="old('amount', $prefillAmount ? round(convert_from_base((float)$prefillAmount), 2) : '')" :required="true" step="0.01" placeholder="0.00" style="font-weight: bold; color: #1e40af;" />
 
                         <x-ui.odoo-form-ui type="select" :label="__('crm.payment_method')" name="payment_method" :required="true">
                             <option value="Bank Transfer" @selected(old('payment_method') == 'Bank Transfer')>{{ __('crm.method_bank_transfer') }}</option>
@@ -73,7 +73,7 @@
                             <x-ui.odoo-form-ui type="select" :label="__('crm.link_to_invoice')" name="invoice_id" id="invoiceSelect">
                                 <option value="">{{ __('crm.select_invoice') }}</option>
                                 @foreach ($invoices as $inv)
-                                    <option value="{{ $inv->id }}" data-customer="{{ $inv->customer_id ?? $inv->salesOrder?->customer_id }}" data-balance="{{ $inv->balance_due }}" @selected(old('invoice_id', $prefillInvoiceId) == $inv->id)>
+                                    <option value="{{ $inv->id }}" data-customer="{{ $inv->customer_id ?? $inv->salesOrder?->customer_id }}" data-balance="{{ round(convert_from_base((float)$inv->balance_due), 2) }}" @selected(old('invoice_id', $prefillInvoiceId) == $inv->id)>
                                         {{ $inv->invoice_number }} ({{ __('crm.balance_label') }}: {{ format_currency($inv->balance_due) }})
                                     </option>
                                 @endforeach

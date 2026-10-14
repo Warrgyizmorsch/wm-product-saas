@@ -22,9 +22,13 @@ use Illuminate\View\View;
 
 class CrmDealController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): mixed
     {
         $this->authorize('viewAny', CrmDeal::class);
+
+        if ($redirect = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class)->handleAuthCallback($request)) {
+            return $redirect;
+        }
 
         $tenantId = tenant_id() ?? 1;
         $search = $request->input('search');
@@ -240,7 +244,7 @@ class CrmDealController extends Controller
             'crm_contact_id'  => $validated['crm_contact_id'] ?? null,
             'deal_number'     => $nextNumber,
             'title'           => $validated['title'],
-            'estimated_value' => $validated['estimated_value'],
+            'estimated_value' => convert_to_base((float) $validated['estimated_value']),
             'stage'           => $stage,
             'probability'     => $prob,
             'closing_date'    => $validated['closing_date'] ?? null,
@@ -274,9 +278,13 @@ class CrmDealController extends Controller
         return redirect()->route('crm.deals.show', $deal)->with('success', 'Deal created successfully.');
     }
 
-    public function show(Request $request, CrmDeal $deal): View
+    public function show(Request $request, CrmDeal $deal): mixed
     {
         $this->authorize('view', $deal);
+
+        if ($redirect = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class)->handleAuthCallback($request)) {
+            return $redirect;
+        }
 
         if ($request->has('google_connected') || $request->has('connected')) {
             session(['google_calendar_connected' => true]);
@@ -347,7 +355,7 @@ class CrmDealController extends Controller
                 $prefilledDealItems[] = [
                     'product_id' => $productObj->id,
                     'quantity'   => floatval($it['quantity'] ?? 1),
-                    'unit_price' => floatval($productObj->selling_price ?: $productObj->unit_cost ?: 0),
+                    'unit_price' => floatval(convert_from_base($productObj->selling_price ?: $productObj->unit_cost ?: 0)),
                     'tax_rate'   => floatval($productObj->gst_rate ?: 18),
                 ];
             }
@@ -423,6 +431,7 @@ class CrmDealController extends Controller
 
         $validated['product_ids'] = $processed['product_ids'];
         $validated['product_items'] = $processed['product_items'];
+        $validated['estimated_value'] = convert_to_base((float) $validated['estimated_value']);
 
         $deal->update($validated);
 

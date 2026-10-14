@@ -2730,7 +2730,7 @@
                         'id' => $p->id,
                         'name' => $p->name,
                         'sku' => $p->sku,
-                        'selling_price' => (float) ($p->selling_price ?: ($p->parent?->selling_price ?: 0))
+                        'selling_price' => round(convert_from_base((float) ($p->selling_price ?: ($p->parent?->selling_price ?: 0))), 2)
                     ];
                 });
             @endphp
@@ -2784,10 +2784,29 @@
             // Check if activeQuotation items exist (edit state) or prefill from conversion
             const hasCreateQ = @json(request()->has('create_quotation') || old('form_type') === 'quotation_create');
             const hasEditQ = @json(request()->has('edit_quotation') || old('form_type') === 'quotation_edit');
-            const existingItems = @json(old('items') ?: (isset($activeQuotation) ? $activeQuotation->items : []));
+            @php
+                $mappedLeadQuotationItems = null;
+                if (old('items')) {
+                    $mappedLeadQuotationItems = old('items');
+                } elseif (isset($activeQuotation)) {
+                    $mappedLeadQuotationItems = $activeQuotation->items->map(function($it) {
+                        return [
+                            'id' => $it->id,
+                            'product_id' => $it->product_id,
+                            'item_name' => $it->item_name,
+                            'description' => $it->description,
+                            'quantity' => (float)$it->quantity,
+                            'unit_price' => round(convert_from_base((float)$it->unit_price), 2),
+                            'tax_rate' => (float)$it->tax_rate,
+                            'amount' => round(convert_from_base((float)$it->amount), 2),
+                        ];
+                    });
+                }
+            @endphp
+            const existingItems = @json($mappedLeadQuotationItems ?? []);
             const prefillProductItems = @json($lead->product_items ?: []);
             const prefillProductIds = @json($lead->product_ids ?: []);
-            const prefillAmount = @json($lead->expected_amount);
+            const prefillAmount = @json($lead->expected_amount ? round(convert_from_base((float)$lead->expected_amount), 2) : 0);
 
             if (hasCreateQ || hasEditQ) {
                 if (existingItems.length > 0) {
@@ -4175,6 +4194,9 @@
             <form action="{{ route('crm.leads.followups.store', $lead->id) }}" method="POST" id="leadFollowupForm" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="action_mode" id="offcanvasActionMode" value="log_note">
+
+                {{-- Google Calendar & Meet Integration Banner --}}
+                @include('modules.crm.partials.google-calendar-banner')
 
                 <!-- 2-Mode Switcher Tabs -->
                 <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">

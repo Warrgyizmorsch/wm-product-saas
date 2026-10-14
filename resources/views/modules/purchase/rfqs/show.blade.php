@@ -437,11 +437,11 @@
                                                         @php
                                                             $mappedCount++;
                                                             $quote = $rv->rates->firstWhere('product_id', $item->product_id);
-                                                            $quotedRate = $quote ? (float)$quote->rate : '';
+                                                            $quotedRate = $quote ? round(convert_from_base((float)$quote->rate), 2) : '';
                                                             $quotedQty = $quote ? (float)$quote->quantity : (float)$item->quantity;
                                                             $quotedDeliv = $quote && $quote->delivery_date ? $quote->delivery_date->format('Y-m-d') : '';
                                                             $quotedValid = $quote && $quote->validity_date ? $quote->validity_date->format('Y-m-d') : '';
-                                                            $totalCost = ((float)$quotedRate) * ((float)$quotedQty);
+                                                            $totalCost = $quote ? ((float)$quote->rate) * ((float)$quotedQty) : 0;
                                                         @endphp
                                                         <div class="p-2.5 mb-2.5 border rounded bg-white fs-12 shadow-xs">
                                                             <div class="fw-bold text-dark mb-1"><i class="feather-package text-primary me-1"></i>{{ $itemIdx + 1 }}. {{ $item->product?->name }}</div>
@@ -588,7 +588,7 @@
                                                 @php
                                                     $isMapped = $item->vendors->contains('id', $rv->vendor_id);
                                                     $quote = $rv->rates->firstWhere('product_id', $item->product_id);
-                                                    $quotedRate = $quote ? (float)$quote->rate : '';
+                                                    $quotedRate = $quote ? round(convert_from_base((float)$quote->rate), 2) : '';
                                                 @endphp
                                                 @if($isMapped)
                                                     <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
